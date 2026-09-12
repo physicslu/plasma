@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: bash scripts/render-build.sh
     startCommand: bash scripts/render-start.sh
-    healthCheckPath: /api/health/ready
+    healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.13
@@ -13,6 +13,8 @@ services:
         value: 22.22.0
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: PLASMA_RENDER_PPU_ALIAS
+        value: render-demo-ppu
       - key: PLASMA_RENDER_ENGINEERING_MOCK
         value: "1"
       - key: PLASMA_RENDER_FLASH_BYTES

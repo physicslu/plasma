@@ -2,50 +2,38 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("Render build reuses canonical React pages and resolves API requests at the browser origin", async () => {
-  const entry = await readFile(new URL("../render/main.tsx", import.meta.url), "utf8");
-  const config = await readFile(new URL("../render/vite.config.ts", import.meta.url), "utf8");
+test("Render build uses the canonical standalone Control Station runtime", async () => {
+  const build = await readFile(new URL("../../../scripts/render-build.sh", import.meta.url), "utf8");
 
-  assert.match(entry, /from "\.\.\/app\/demo\/page"/);
-  assert.match(entry, /from "\.\.\/app\/devices\/page"/);
-  assert.match(entry, /from "\.\.\/app\/documents\/page"/);
-  assert.match(entry, /from "\.\.\/app\/engineering\/page"/);
-  assert.match(entry, /from "\.\.\/app\/fleet\/page"/);
-  assert.doesNotMatch(entry, /from "\.\.\/app\/fleet\/programming\/page"/);
-  assert.doesNotMatch(entry, /from "\.\.\/app\/page"/);
-  assert.match(entry, /return <DemoLandingPage \/>/);
-  assert.match(entry, /<WorkspaceSessionProvider>/);
-  assert.match(config, /"process\.env\.NEXT_PUBLIC_PLASMA_API_URL": "window\.location\.origin"/);
-  assert.match(config, /"next\/link"/);
-  assert.match(config, /"next\/navigation"/);
-  assert.match(config, /dist-render/);
+  assert.match(build, /npm run build:product/);
+  assert.match(build, /dist\/standalone\/server\.js/);
+  assert.doesNotMatch(build, /npm run build:render/);
+  assert.doesNotMatch(build, /dist-render/);
 });
 
-test("Render client router retires legacy single-PPU routes and preserves canonical pages", async () => {
-  const entry = await readFile(new URL("../render/main.tsx", import.meta.url), "utf8");
+test("public Render demo composes Console BFF -> Manager -> loopback Mock PPU Gateway", async () => {
+  const start = await readFile(new URL("../../../scripts/render-start.sh", import.meta.url), "utf8");
 
-  assert.match(entry, /pathname === "\/devices"[\s\S]*<DevicesPage \/>/);
-  assert.match(entry, /pathname === "\/documents"[\s\S]*<DocumentsPage \/>/);
-  assert.match(entry, /pathname === "\/fleet\/programming"[\s\S]*<RetiredFleetProgrammingRoute \/>/);
-  assert.match(entry, /replaceRoute\("\/fleet"\)/);
-  assert.match(entry, /pathname === "\/ppu"[\s\S]*<RetiredPpuConsoleRoute \/>/);
-  assert.match(entry, /replaceRoute\("\/engineering"\)/);
-  assert.doesNotMatch(entry, /FleetProgrammingPage|SiteMatrixHome/);
-
-  const programmingIndex = entry.indexOf('pathname === "/fleet/programming"');
-  const fleetIndex = entry.indexOf('pathname === "/fleet" || pathname.startsWith("/fleet/")');
-  assert.ok(programmingIndex >= 0 && fleetIndex >= 0 && programmingIndex < fleetIndex,
-    "the retired exact route must be resolved before the /fleet prefix route");
+  assert.match(start, /python -m plasma_server\.server/);
+  assert.match(start, /-m plasma_web\.gateway/);
+  assert.match(start, /--host 127\.0\.0\.1/);
+  assert.match(start, /python -m plasma_manager\.server/);
+  assert.match(start, /PLASMA_CONTROL_STATION_MODE="managed"/);
+  assert.match(start, /PLASMA_MANAGER_API_URL="http:\/\/127\.0\.0\.1:/);
+  assert.match(start, /PLASMA_MANAGER_PPU_ALIAS="\$\{ppu_alias\}"/);
+  assert.match(start, /HOST="0\.0\.0\.0"/);
+  assert.match(start, /node "\$\{console_root\}\/server\.js"/);
+  assert.doesNotMatch(start, /--static-root/);
+  assert.doesNotMatch(start, /dist-render/);
 });
 
-test("Render navigation preserves a single existing workspace session between product modes", async () => {
-  const navigation = await readFile(new URL("../render/next-navigation.ts", import.meta.url), "utf8");
-  const link = await readFile(new URL("../render/next-link.tsx", import.meta.url), "utf8");
+test("deployment identity is explicit opt-in metadata on the product BFF", async () => {
+  const route = await readFile(new URL("../app/deployment.json/route.ts", import.meta.url), "utf8");
 
-  assert.match(navigation, /window\.history\.pushState/);
-  assert.match(navigation, /window\.history\.replaceState/);
-  assert.match(navigation, /useSyncExternalStore/);
-  assert.match(link, /event\.preventDefault\(\)/);
-  assert.match(link, /navigate\(/);
-  assert.doesNotMatch(link, /window\.location\.assign/);
+  assert.match(route, /PLASMA_DEPLOYMENT_IDENTITY_ENABLED/);
+  assert.match(route, /PLASMA_DEPLOYMENT_IDENTITY_SERVICE/);
+  assert.match(route, /RENDER_GIT_COMMIT/);
+  assert.match(route, /RENDER_GIT_BRANCH/);
+  assert.match(route, /Cache-Control.*no-store/s);
+  assert.match(route, /status: 404/);
 });

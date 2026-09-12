@@ -1,35 +1,32 @@
 # Render Free public Mock demo
 
-This deployment publishes the Plasma Control Station product pages, Web REST Gateway,
-Protocol v3.3 Server, and MockInterface as **one Render Free Web Service**. It
-does not introduce a second programming backend, a second Gateway, a persistent
-Node.js server, or physical hardware access.
+This deployment publishes the Plasma **Control Station product runtime** on Render Free while keeping the simulated PPU behind the same product control path used by deployed Control Stations.
+
+It is a public software demo only. It does not provide physical hardware access and does not validate Z2, FPGA I/O, OpenOCD, target voltage, or real IC programming.
 
 ## Architecture and execution boundary
 
 ```text
 Browser
   -> https://<service>.onrender.com
-  -> existing Plasma Web REST Gateway on 0.0.0.0:$PORT
-       |-> Control Station product entry / PMode / EMode static assets
-       |-> canonical Web REST v3 endpoints and REST polling
-       |-> local Plasma Server on 127.0.0.1:9900 -> 8 Mock Sites
-       `-> Engineering mock provider -> 3 Facilities / 12 PPUs / 60 Sites
+  -> Control Station Console/BFF on 0.0.0.0:$PORT
+       -> Plasma Manager on 127.0.0.1:18180
+            -> render-demo-ppu Plasma Gateway on 127.0.0.1:18080
+                 -> Plasma Protocol v3.3 Server on 127.0.0.1:9900
+                      -> 8 Mock Sites
 ```
 
-`software/web/render/` only supplies a static build entry and small navigation
-adapters. Product pages, batch execution, session state, Programming Asset
-handling, translations, themes, and API calls are imported directly from the
-existing `software/web/app/` implementation.
+The public listener is the Console/BFF only. The Manager, Plasma Gateway, and Protocol server remain loopback-only inside the Render service.
 
-The former Single PPU Programming Console is retired. Engineering single-PPU
-programming is owned by `Engineering Mode -> Programming`; the local PPU REST
-API remains available as backend/runtime capability.
+This removes the former demo-only architecture in which the browser connected directly to a public Plasma Gateway serving static assets. The demo now exercises the same managed browser route as the product:
 
-The current Plasma application uses HTTP REST polling. **It does not implement
-WebSocket.** Render supports WebSocket connections, but deploying Plasma does
-not create a nonexistent WebSocket endpoint or claim a transport the existing
-application does not provide.
+```text
+/api/manager/ppu/<PPU API path>
+```
+
+The Manager relay remains allowlisted. This convergence does **not** turn Manager into an unrestricted HTTP proxy.
+
+Engineering Mode continues to use the existing Mock provider for multi-PPU UI scenarios. The local `render-demo-ppu` remains an independent eight-Site Mock PPU used for managed PPU operations and programming acceptance.
 
 ## Create the Render Web Service
 
@@ -44,74 +41,86 @@ Connect the `physicslu/plasma` GitHub repository and choose:
 | Build Command | `bash scripts/render-build.sh` |
 | Start Command | `bash scripts/render-start.sh` |
 | Instance Type | Free |
-| Health Check Path | `/api/health/ready` |
+| Health Check Path | `/` |
 
 Set the following environment variables:
 
 | Variable | Value | Purpose |
 | --- | --- | --- |
 | `PYTHON_VERSION` | `3.12.13` | Pin the Python runtime to an allowed, tested version. |
-| `NODE_VERSION` | `22.22.0` | Pin the Node.js version used only to build React assets. |
+| `NODE_VERSION` | `22.22.0` | Build and run the standalone Console/BFF. |
 | `PYTHONUNBUFFERED` | `1` | Emit Python service logs immediately. |
-| `PLASMA_RENDER_ENGINEERING_MOCK` | `1` | Enable the existing 3-Facility, 12-PPU Engineering provider. |
-| `PLASMA_RENDER_FLASH_BYTES` | `1048576` | Allocate 1 MiB of mock Flash for each Engineering Site. |
+| `PLASMA_RENDER_PPU_ALIAS` | `render-demo-ppu` | Fixed Manager registry alias for the local Mock PPU. |
+| `PLASMA_RENDER_ENGINEERING_MOCK` | `1` | Enable the existing Engineering Mock provider. |
+| `PLASMA_RENDER_FLASH_BYTES` | `1048576` | Allocate 1 MiB of Mock Flash per Engineering Site. |
 
-Do **not** create `PORT`: Render supplies it automatically. Do not set
-`NEXT_PUBLIC_PLASMA_API_URL`: the Render browser bundle resolves the API from
-`window.location.origin`, so static HTML, REST requests, and asset downloads
-always share the visitor's origin.
+Do **not** create `PORT`: Render supplies it automatically.
 
-The repository-root `render.yaml` defines the same service and variables for a
-Render Blueprint. A manually created Web Service must still use the values
-shown above.
+The repository-root `render.yaml` defines the same service and variables for a Render Blueprint.
 
 ## Build and startup behavior
 
-`scripts/render-build.sh` installs the existing Python package, installs locked
-Web dependencies through the project's existing bounded `npm run install:ci`
-workflow, and builds `software/web/dist-render/` from the existing React page
-components.
+`scripts/render-build.sh` installs the existing Python package, installs locked Web dependencies through `npm run install:ci`, and builds only the source-tree-independent product runtime with:
 
-`scripts/render-start.sh` starts the existing Protocol v3.3 Plasma Server on
-loopback, waits until it is accepting connections, then starts the existing
-Gateway on `0.0.0.0:$PORT`. The Gateway serves the SPA shell and static assets
-from the same listener as `/api/*`. Both child processes are supervised and
-stopped together.
+```text
+npm run build:product
+software/web/dist/standalone/server.js
+```
 
-Public paths:
+The legacy `dist-render` static SPA build is no longer part of the deployed public-demo path.
 
-- `/` and `/demo`: Control Station product-mode entry.
-- `/fleet`: Production Mode with mock Facilities, PPUs, and Sites.
-- `/engineering`: Engineering Mode and canonical single-PPU Programming workspace.
-- `/ppu`: compatibility route to Engineering Mode; it no longer exposes `SITE MATRIX / PPU CONTROL`.
-- `/api/health/ready`: Server-backed readiness check.
-- `/api/status`: canonical local PPU and Site status API.
-- `/api/engineering/targets`: existing mock Facility / PPU inventory.
+`scripts/render-start.sh` performs the following sequence:
 
-After building the static assets, run the local end-to-end startup and Mock
-programming check from the repository root:
+1. validates the production Device Catalog before opening the public listener;
+2. starts the Protocol v3.3 Server on loopback;
+3. starts the Mock PPU Plasma Gateway on loopback and waits for execution readiness;
+4. generates an immutable one-PPU Manager registry for `render-demo-ppu`;
+5. starts Plasma Manager on loopback;
+6. starts the Control Station Console/BFF on Render `$PORT` with Managed Mode enabled.
+
+The Console/BFF receives:
+
+```text
+PLASMA_CONTROL_STATION_MODE=managed
+PLASMA_MANAGER_API_URL=http://127.0.0.1:18180
+PLASMA_MANAGER_PPU_ALIAS=render-demo-ppu
+```
+
+`/deployment.json` is exposed only because the Render demo explicitly enables deployment identity. It contains Render-provided non-secret Git commit/branch metadata for post-deployment acceptance. Other Control Station deployments receive HTTP 404 unless they explicitly opt in.
+
+## Validation
+
+After building the standalone product runtime, run the local end-to-end startup and managed Mock programming check from the repository root:
 
 ```bash
 software/python/.venv/bin/python scripts/tests/test-render-runtime.py
 ```
 
-## 512 MB constraints and public-demo limits
+The acceptance requires:
 
-Render Free provides 512 MB RAM. The default Engineering mock allocates
-`60 × 4 MiB = 240 MiB` before Python objects, uploads, logs, and HTTP buffers.
-This deployment sets `PLASMA_RENDER_FLASH_BYTES=1048576`, reducing its baseline
-mock memory to `60 × 1 MiB = 60 MiB`. The separate eight-Site local PPU adds
-`8 × 1 MiB = 8 MiB`. Node.js is used during the build only and does not run in
-the deployed service.
+- Console/BFF product pages are served from the public origin;
+- Manager registry contains exactly the configured demo PPU;
+- `/api/manager/ppu/api/status` reports `render-demo-ppu` with eight Sites;
+- Engineering Mock inventory remains available through the managed PPU route;
+- a SITE 1 Mock programming Job can be submitted and reaches `success` through Console/BFF -> Manager -> Gateway;
+- direct child-process RSS remains below the Render Free 512 MiB budget on Linux CI.
 
-Each demo Site therefore accepts target Images up to its 1 MiB mock Flash
-capacity. Avoid uploading real customer Programming Images, credentials, keys, or other
-confidential production data: the service is public, unauthenticated, and uses
-only simulated targets. All uploaded data, generated readback files, in-memory
-Job state, and logs are ephemeral and disappear when Render restarts,
-redeploys, or spins down the instance.
+For the deployed public service, use the cold-start-aware smoke test with the exact deployed commit:
 
-Render Free can spin down after 15 minutes without inbound traffic. The next
-visit incurs a cold start. This service is a public software demonstration; it
-does not validate a Z2, FPGA I/O, OpenOCD, target voltage, or real IC
-programming.
+```bash
+python scripts/tests/test-render-public-smoke.py \
+  --origin https://plasma-6zz7.onrender.com \
+  --expected-commit <40-character-git-sha>
+```
+
+Pinned smoke acceptance requires the managed `/api/manager/ppu/...` path and performs a Mock programming Job. An unpinned pull-request smoke only observes the currently deployed main revision and therefore remains backward-compatible until the PR itself is deployed.
+
+## 512 MiB constraints and public-demo limits
+
+Render Free provides 512 MiB RAM. `PLASMA_RENDER_FLASH_BYTES=1048576` keeps the Engineering Mock memory footprint bounded; the separate eight-Site local PPU also uses 1 MiB Mock Flash per Site.
+
+The product-path convergence adds the standalone Node Console/BFF and Manager process, so the runtime acceptance measures the direct child-process RSS of the Render supervisor. This is a deployment budget check, not a claim about production sizing.
+
+Avoid uploading real customer Programming Images, credentials, keys, or other confidential production data. The service is public, unauthenticated, and uses simulated targets. Uploaded data, readback files, in-memory Job state, and logs are ephemeral and disappear when Render restarts, redeploys, or spins down the instance.
+
+Render Free may spin down after inactivity; the next visit can incur a cold start.
