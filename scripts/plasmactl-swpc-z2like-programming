@@ -7,7 +7,6 @@ dropin_dir="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_DROPIN_DIR:-/etc/systemd/system/pla
 dropin="$dropin_dir/30-z2like-configured-mock-programming.conf"
 current_app="/opt/plasma/current/runtime/ppu/ppu.pyz"
 output_root="/var/lib/plasma/gateway-output"
-profile_path="$output_root/configured-mock-runtime.yaml"
 
 say() {
   printf '[plasmactl swpc-z2like-programming] %s\n' "$*"
@@ -89,7 +88,7 @@ render_dropin() {
 # Managed by Plasma SWPC Z2-like configured Mock Programming activation
 [Service]
 ExecStart=
-ExecStart=$plasma_python $current_app gateway --ppu-config $ppu_config --runtime-activation-socket /run/plasma-runtime-activation/helper.sock --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $output_root --engineering-configured-mock --engineering-configured-mock-profile $profile_path
+ExecStart=$plasma_python $current_app gateway --ppu-config $ppu_config --runtime-activation-socket /run/plasma-runtime-activation/helper.sock --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $output_root --engineering-configured-mock
 EOF
 }
 
@@ -127,6 +126,8 @@ if facility.get("facility_id") != expected_facility or not isinstance(ppus, list
     raise SystemExit("configured provider facility identity mismatch")
 if ppus[0].get("ppu_id") != expected_ppu:
     raise SystemExit("configured provider PPU identity mismatch")
+if ppus[0].get("provider") != "configured_mock":
+    raise SystemExit("configured PPU was incorrectly exposed as the legacy demo Mock provider")
 print(f"{expected_facility}/{expected_ppu}/{len(sites)}")
 PY
 }
