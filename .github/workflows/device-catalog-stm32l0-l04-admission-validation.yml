@@ -6,6 +6,7 @@ on:
       - "data/device-catalog/research/stm32l0_admission_policy.py"
       - "data/device-catalog/research/stm32l0_phase_l0_4_admission.py"
       - "data/device-catalog/research/test_stm32l0_phase_l0_4_admission.py"
+      - "data/device-catalog/research/validate_stm32l0_phase_l0_4_admission_plan.py"
       - "data/device-catalog/research/stm32l0-phase-l0.4-admission-plan.json"
       - "data/device-catalog/research/stm32l0-phase-l0.3-policy-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
@@ -28,6 +29,9 @@ jobs:
       - name: Run L0.4 admission tests
         working-directory: data/device-catalog/research
         run: python -m unittest -v test_stm32l0_phase_l0_4_admission.py
+      - name: Replay frozen L0.4 admission plan
+        working-directory: data/device-catalog/research
+        run: python validate_stm32l0_phase_l0_4_admission_plan.py
       - name: Build deterministic L0.4 summary
         working-directory: data/device-catalog/research
         run: |
@@ -42,8 +46,11 @@ jobs:
           assert d["phase"] == "L0.4" and d["family"] == "STM32L0"
           assert d["manufacturer_verified_identity_count"] == 360
           assert d["metadata_ready_count"] == 360
-          assert d["capability_admittable_count"] + d["capability_unresolved_count"] == 360
-          assert sum(d["current_mapping_replay"].values()) == 360
+          assert d["capability_admittable_count"] == 360
+          assert d["capability_unresolved_count"] == 0
+          assert d["capability_unresolved_exact_icpns"] == []
+          assert d["current_mapping_replay"] == {"unique": 360, "ambiguous": 0, "unmapped": 0}
+          assert d["decision_counts"] == {"admit": 360, "already_present": 0, "manual_review_required": 0, "reject": 0}
           assert d["production_snapshot"]["exact_icpn_count"] == 912
           assert d["production_snapshot"]["stm32l0_exact_icpn_count"] == 0
           assert set(d["claims"].values()) == {False}
