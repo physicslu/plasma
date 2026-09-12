@@ -1,7 +1,7 @@
 # H018 — STM32 Post-L0 Next-Family Selection
 
 **Date:** 2026-09-12
-**Status:** Gate 1 implementation complete; PR #517 Ready / mergeable; awaiting explicit Gate 2 approval
+**Status:** Gate 1 implementation complete; PR #517 Gate 2 candidate; mutable-state recheck required after handover commit
 **Primary workstream:** Device Catalog / STM32 next-family research selection
 **Repository:** `physicslu/plasma`
 **Branch:** `agent/device-catalog-post-l0-next-family-selection`
@@ -125,28 +125,28 @@ Dedicated workflow:
 
 The first dedicated run exposed one negative-control ordering issue: multiple Active candidates reached Ordering review before the explicit multiple-candidate block. The control flow was corrected so multiple Active-clean candidates fail closed before any stale comparison is reused.
 
-Final head:
+Last fully validated implementation head before the handover-only documentation update:
 
 `fd74b649c10fbbcf2dd68359f14e6537a0e363c6`
 
-Final checks:
+Checks at that head:
 
 - STM32 post-L0 next-family selection validation — SUCCESS
 - Device catalog validation — SUCCESS
 - Device catalog current validation — SUCCESS
 - Repository contracts — SUCCESS
 
-Final mutable-state check:
+Mutable state at that check:
 
 ```text
-main:          db2122c1cf57b8eff4207d94e40cd99f9fff4391
-branch:        ahead 11 / behind 0
-mergeable:     true
-reviews:       0
+main:           db2122c1cf57b8eff4207d94e40cd99f9fff4391
+branch:         ahead 11 / behind 0
+mergeable:      true
+reviews:        0
 review threads: 0
 ```
 
-PR #517 is Ready for explicit Gate 2 approval.
+The handover update itself creates a newer PR head. Therefore the values above are historical validation evidence, not permission to merge a newer head without rechecking it.
 
 ## 7. Permanent assets
 
@@ -174,8 +174,8 @@ Selection is research prioritization only; it does not establish physical progra
 
 ## 9. Next action
 
-Obtain explicit **Gate 2 merge approval for PR #517**.
+Before requesting or executing Gate 2 merge for PR #517, recheck the **current** PR head, current `main`, all applicable CI, mergeability, reviews and review threads.
 
-Before merge, recheck only mutable state that can change after this handover was written: PR head, current `main`, CI, mergeability, reviews and review threads. If any drift occurs, fail closed and revalidate before merge.
+If the current state is clean, request explicit **Gate 2 merge approval for PR #517**.
 
 After PR #517 merges, STM32L4 becomes the selected **research family only**. A future STM32L4 foundation/discovery transaction is a separate phase and requires a new Gate 1.
