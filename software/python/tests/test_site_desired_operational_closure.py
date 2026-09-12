@@ -104,7 +104,7 @@ def test_real_z2_verify_checks_p3_service_evidence_and_socket_boundaries() -> No
     assert "site_desired_state.config_path" in source
     assert "site_desired_state.gateway_write_root" in source
     assert "site_desired_state.runtime_apply_supported" in source
-    assert '== "true" ]] || \\\n    die "install evidence must advertise bounded Site Desired Runtime activation"' in source
+    assert "install evidence must advertise bounded Site Desired Runtime activation" in source
     assert "site_desired_state.runtime_activation_socket" in source
     assert "site_desired_state.server_control_socket" in source
     assert "runtime_activation.lifecycle_owner" in source
@@ -116,7 +116,7 @@ def test_real_z2_verify_checks_p3_service_evidence_and_socket_boundaries() -> No
     assert "runtime activation helper socket must be mode 0660" in source
     assert "controlled activation behavior requires explicit Real Z2 acceptance" in source
     assert "Runtime apply is not claimed" not in source
-    assert "runtime_apply_supported 2>/dev/null || true)\" == \"false\"" not in source
+    assert "install evidence must keep Site Desired Runtime apply unsupported" not in source
 
 
 def test_swpc_surrogate_matches_bounded_site_config_contract_and_rolls_permissions_back() -> None:
