@@ -42,10 +42,10 @@ validate_base() {
   [[ -f "$base_evidence" ]] || die "base SWPC Z2-like evidence is missing: $base_evidence"
   [[ -f "$ppu_config" && ! -L "$ppu_config" ]] || die "canonical PPU config is unavailable: $ppu_config"
   [[ -f "$current_app" ]] || die "current PPU runtime is unavailable: $current_app"
-  python3 - "$base_evidence" "$ppu_config" <<'PY'
+
+  python3 - "$base_evidence" <<'PY'
 import json
 import sys
-import yaml
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     evidence = json.load(handle)
@@ -62,8 +62,21 @@ for field, value in expected.items():
         raise SystemExit(f"invalid base evidence {field}: {evidence.get(field)!r}")
 if not evidence.get("plasma_python"):
     raise SystemExit("base evidence is missing plasma_python")
+PY
 
-with open(sys.argv[2], encoding="utf-8") as handle:
+  local plasma_python
+  plasma_python="$(base_field plasma_python)"
+  [[ "$plasma_python" == /opt/plasma/python/*/bin/python3 ]] || die "unexpected Plasma Python path in evidence: $plasma_python"
+  [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
+
+  # Parse the canonical YAML with the same qualified Plasma interpreter used by
+  # the deployed runtime. Do not depend on PyYAML being installed into Ubuntu's
+  # system Python.
+  "$plasma_python" - "$ppu_config" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
     config = yaml.safe_load(handle)
 if not isinstance(config, dict):
     raise SystemExit("canonical PPU config must be a mapping")
@@ -74,11 +87,6 @@ non_mock = [entry.get("id") for entry in sites if not isinstance(entry, dict) or
 if non_mock:
     raise SystemExit(f"configured mock Programming refuses non-mock Sites: {non_mock}")
 PY
-
-  local plasma_python
-  plasma_python="$(base_field plasma_python)"
-  [[ "$plasma_python" == /opt/plasma/python/*/bin/python3 ]] || die "unexpected Plasma Python path in evidence: $plasma_python"
-  [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
 
   # Fail before systemd mutation when the installed immutable PPU runtime predates
   # this capability. This makes the required order explicit: deploy the new base
@@ -112,7 +120,9 @@ EOF
 }
 
 verify_catalog() {
-  python3 - "$ppu_config" <<'PY'
+  local plasma_python
+  plasma_python="$(base_field plasma_python)"
+  "$plasma_python" - "$ppu_config" <<'PY'
 import json
 import sys
 import urllib.request
