@@ -15,7 +15,7 @@ from stm32l0_phase_l0_1_foundation import (
     validate_selection, validate_target_manifest,
 )
 
-EXPECTED_BASELINE_SHA256 = "93cdcb975854ce4bae31899a44c7167c53b5dd22c3cd75ba9fed692d45dc65db"
+EXPECTED_BASELINE_SHA256 = "958572fa69a4457966256851a39badfdc38490e0c3ce155978155baf3ca9e488"
 
 
 def main() -> int:
