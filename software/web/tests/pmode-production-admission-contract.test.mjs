@@ -4,11 +4,13 @@ import test from "node:test";
 
 const source = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 
-test("PMode requires an explicit production-admitted Target IC independent of provider kind", () => {
-  assert.match(source, /targetValid:\s*Boolean\(targetDevice\)/);
-  assert.match(source, /if \(!targetDevice\) \{[\s\S]*?setOperatorWarning\(text\.chooseTarget\)/);
-  assert.doesNotMatch(source, /targetValid:\s*syntheticMockImageAvailable\s*\|\|\s*Boolean\(targetDevice\)/);
-  assert.doesNotMatch(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
+test("PMode derives Target IC and Synthetic Image admission from shared programming capabilities", () => {
+  assert.match(source, /resolveProgrammingCapabilities\(catalog\)/);
+  assert.match(source, /targetValid:\s*!programmingCapabilities\.target_device_required \|\| Boolean\(targetDevice\)/);
+  assert.match(source, /if \(!targetDevice && programmingCapabilities\.target_device_required\)/);
+  assert.match(source, /syntheticProgrammingImageAvailable = programmingCapabilities\.synthetic_programming_image/);
+  assert.match(source, /allowSyntheticMockImage:\s*syntheticProgrammingImageAvailable/);
+  assert.doesNotMatch(source, /catalog\?\.provider === "mock"/);
 });
 
 test("PMode removes disabled Sites from the next Batch membership without changing the Production Set", () => {
