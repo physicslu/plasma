@@ -36,22 +36,32 @@ test("IC lookup remains outside the canonical Product Mode navigation", async ()
   assert.doesNotMatch(demo, /blockLockedNavigation/);
 });
 
-test("IC Selector presents admitted exact ICPN evidence without inventing physical verification", async () => {
+test("IC Selector separates hardware-test status from OpenOCD and manufacturer-part evidence", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
+  const styles = await source("../app/devices/devices.css");
   const api = await source("../app/device-catalog-api.ts");
 
   assert.match(api, /\/api\/devices\/search/);
   assert.match(api, /catalog_verification/);
+  assert.match(api, /physical_validation/);
   assert.match(api, /revision_sha256/);
   assert.match(selector, /ICPN CATALOG · PRODUCTION ADMITTED/);
   assert.match(selector, /Exact ICPN/);
-  assert.match(selector, /OCD Mapped/);
   assert.match(selector, /Catalog Revision/);
   assert.match(selector, /Authority/);
-  assert.match(selector, /PPU ·/);
-  assert.match(selector, /Socket ·/);
-  assert.match(selector, /無實體證據/);
-  assert.match(selector, /仍不等於 PPU 或 Socket 實體驗證/);
+  assert.match(selector, /icSelectorStatusStack/);
+  assert.match(selector, /icSelectorStatusPhysical[\s\S]*physicalValidationLabel\("PPU"[\s\S]*physicalValidationLabel\("Socket"/);
+  assert.match(selector, /icSelectorStatusEvidence[\s\S]*openOcdConfigLabel[\s\S]*manufacturerPartLabel/);
+  assert.match(selector, /OpenOCD 設定 · 已存在/);
+  assert.match(selector, /原廠料號 · 已確認/);
+  assert.match(selector, /未實機測試/);
+  assert.match(selector, /實機測試通過/);
+  assert.match(selector, /device\.physical_validation\.ppu_status/);
+  assert.match(selector, /device\.physical_validation\.socket_status/);
+  assert.match(selector, /原廠料號已確認且 OpenOCD 設定已存在/);
+  assert.doesNotMatch(selector, /無實體證據/);
+  assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*display:\s*grid/);
+  assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*gap:\s*5px/);
   assert.match(selector, /research candidate 不會出現在這裡/);
   assert.doesNotMatch(selector, /OCD Candidate/);
   assert.doesNotMatch(selector, /LPC845/);
