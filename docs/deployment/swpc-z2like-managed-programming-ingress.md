@@ -42,6 +42,8 @@ The design intentionally keeps three different boundaries:
 
 - health/readiness/node/status;
 - principal introspection and target discovery;
+- read-only Gateway communication-policy visibility;
+- read-only PPU network visibility;
 - Site Desired read/write and bounded Runtime Activation;
 - Mock runtime settings;
 - Engineering session and PS loopback;
@@ -49,7 +51,7 @@ The design intentionally keeps three different boundaries:
 - Job submit/cancel/readback;
 - Batch submit/status/cancel.
 
-The ingress deliberately excludes PPU network mutation, Gateway settings mutation, and arbitrary `/api/*` paths.
+The ingress deliberately excludes Gateway settings mutation, PPU network mutation/activation, and arbitrary `/api/*` paths. Read-only settings visibility is retained because the managed UI consumes those JSON surfaces for communication policy and PPU/Site presentation; removing them produces a degraded/non-JSON control-station experience without adding meaningful protection against destructive operations.
 
 Cloudflare Access is transport service identity only. Plasma Gateway remains the final application authorization, Site scope, idempotency, and execution authority. The Render Manager service token must not be stored in Manager registry state or exposed to the Browser.
 
@@ -86,8 +88,9 @@ The verifier also proves:
 
 - the listener is bound only to `127.0.0.1`;
 - `/api/settings/sites` is reachable through the managed ingress;
-- `/api/settings/ppu-network` remains blocked;
-- `/api/settings/gateway` remains blocked;
+- GET `/api/settings/gateway` and GET `/api/settings/ppu-network` remain available for managed read-only UI state;
+- POST mutation of Gateway and PPU network settings is rejected;
+- PPU network activation remains hidden;
 - unknown API paths remain blocked;
 - invalid methods such as `GET /api/jobs` are rejected.
 
@@ -143,7 +146,7 @@ This prevents the service credential from being sent to an unrelated PPU endpoin
 After SWPC, Cloudflare, and Render configuration are active:
 
 1. Render Z2Like Fleet shows `swpc-z2like-01`, Online/Healthy, 8 Sites.
-2. PPU/Site Configuration can read Site Desired state without `managed_upstream_non_json`.
+2. PPU/Site Configuration can read Site Desired and read-only network/Gateway state without `managed_upstream_non_json`.
 3. SITE1 remains enabled with `interface=mock` and the intended target.
 4. Engineering Programming can upload/check a binary Programming Asset.
 5. Submit `Erase -> Program -> Verify` to SITE1.
