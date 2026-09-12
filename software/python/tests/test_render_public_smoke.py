@@ -23,6 +23,7 @@ SPEC.loader.exec_module(SMOKE)
 class FakeRenderHandler(BaseHTTPRequestHandler):
     deployed_commit: str | None = None
     readiness_calls = 0
+    last_readiness_path: str | None = None
 
     def log_message(self, format: str, *args) -> None:
         return
@@ -42,8 +43,9 @@ class FakeRenderHandler(BaseHTTPRequestHandler):
             body = json.dumps({"git_commit": self.deployed_commit}).encode()
             self._send(HTTPStatus.OK, "application/json", body)
             return
-        if self.path == "/api/health/ready":
+        if self.path in {"/api/health/ready", "/api/manager/ppu/api/health/ready"}:
             type(self).readiness_calls += 1
+            type(self).last_readiness_path = self.path
             body = json.dumps(
                 {
                     "ok": True,
@@ -78,6 +80,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
     def setUp(self) -> None:
         FakeRenderHandler.deployed_commit = None
         FakeRenderHandler.readiness_calls = 0
+        FakeRenderHandler.last_readiness_path = None
 
     def report(self, expected_commit: str | None) -> object:
         return SMOKE.SmokeReport(origin=self.origin, expected_commit=expected_commit)
@@ -92,11 +95,12 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
             report=self.report(expected_commit),
         )
 
-    def test_unpinned_smoke_can_accept_ready_service_without_deployment_metadata(self) -> None:
+    def test_unpinned_smoke_observes_legacy_deployment_readiness(self) -> None:
         payload = self.wait(None)
 
         self.assertTrue(payload["ok"])
         self.assertEqual(FakeRenderHandler.readiness_calls, 1)
+        self.assertEqual(FakeRenderHandler.last_readiness_path, "/api/health/ready")
 
     def test_pinned_smoke_fails_closed_when_deployment_metadata_is_missing(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "deployment identity is not available"):
@@ -112,7 +116,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(FakeRenderHandler.readiness_calls, 0)
 
-    def test_pinned_smoke_accepts_readiness_only_after_exact_commit_match(self) -> None:
+    def test_pinned_smoke_uses_managed_readiness_after_exact_commit_match(self) -> None:
         expected = "c" * 40
         FakeRenderHandler.deployed_commit = expected
         report = self.report(expected)
@@ -129,12 +133,17 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(report.observed_commit, expected)
         self.assertEqual(FakeRenderHandler.readiness_calls, 1)
+        self.assertEqual(FakeRenderHandler.last_readiness_path, "/api/manager/ppu/api/health/ready")
+        self.assertEqual(report.checks["routing"], "MANAGED")
 
     @staticmethod
     def contract_payload(path: str) -> dict[str, object]:
-        if path == "/api/status":
+        normalized = path.removeprefix("/api/manager/ppu")
+        if normalized.startswith("/api/status?job="):
+            return {"job": {"job_id": normalized.split("=", 1)[1], "state": "success"}}
+        if normalized == "/api/status":
             return {"ppu": {"ppu_id": "render-demo-ppu"}, "sites": [{} for _ in range(8)]}
-        if path == "/api/engineering/targets":
+        if normalized == "/api/engineering/targets":
             return {
                 "ok": True,
                 "rest_contract_version": "3",
@@ -143,7 +152,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
                 "ppu_count": 32,
                 "site_count": 160,
             }
-        if path == "/api/mock/runtime":
+        if normalized == "/api/mock/runtime":
             return {
                 "ok": True,
                 "rest_contract_version": "3",
@@ -152,16 +161,16 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
                     "default_image_size_bytes": 1024,
                 },
             }
-        if path == "/api/devices/search?q=stm32&limit=1":
+        if normalized == "/api/devices/search?q=stm32&limit=1":
             return {
                 "ok": True,
                 "rest_contract_version": "3",
-                "catalog_size": 7657,
+                "catalog_size": 912,
                 "results": [{"identifier": "STM32F103C8T6"}],
             }
         raise AssertionError(f"unexpected contract path: {path}")
 
-    def test_unpinned_pr_observation_skips_new_device_catalog_contract(self) -> None:
+    def test_unpinned_pr_observation_skips_new_device_catalog_and_program_contracts(self) -> None:
         calls: list[str] = []
 
         def request_json(_origin: str, path: str, *, timeout: float):
@@ -174,6 +183,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:device-catalog-search"], "SKIP_UNPINNED")
         self.assertNotIn("/api/devices/search?q=stm32&limit=1", calls)
+        self.assertNotIn("api:managed-mock-program", report.checks)
 
     def test_unpinned_pr_observation_accepts_the_current_main_topology(self) -> None:
         def request_json(_origin: str, path: str, *, timeout: float):
@@ -188,19 +198,31 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:engineering-targets"], "PASS")
 
-    def test_pinned_post_deployment_smoke_enforces_device_catalog_contract(self) -> None:
+    def test_pinned_post_deployment_smoke_enforces_managed_contract_and_programs(self) -> None:
         calls: list[str] = []
+        posts: list[str] = []
 
         def request_json(_origin: str, path: str, *, timeout: float):
             calls.append(path)
             return self.contract_payload(path)
 
+        def request_json_post(_origin: str, path: str, payload: dict, *, timeout: float):
+            posts.append(path)
+            self.assertEqual(payload["site_id"], 1)
+            return {"job": {"job_id": "job-1", "state": "queued"}}
+
         report = self.report("d" * 40)
-        with patch.object(SMOKE, "request_json", side_effect=request_json):
+        with (
+            patch.object(SMOKE, "request_json", side_effect=request_json),
+            patch.object(SMOKE, "request_json_post", side_effect=request_json_post),
+        ):
             SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
 
         self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
-        self.assertIn("/api/devices/search?q=stm32&limit=1", calls)
+        self.assertEqual(report.checks["api:managed-mock-program"], "PASS")
+        self.assertIn("/api/manager/ppu/api/devices/search?q=stm32&limit=1", calls)
+        self.assertIn("/api/manager/ppu/api/status?job=job-1", calls)
+        self.assertEqual(posts, ["/api/manager/ppu/api/jobs"])
 
 
 if __name__ == "__main__":

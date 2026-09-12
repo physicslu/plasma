@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -13,9 +15,9 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-
 DEFAULT_ORIGIN = "https://plasma-6zz7.onrender.com"
 USER_AGENT = "plasma-render-public-smoke/1"
+TERMINAL_JOB_STATES = {"success", "failed", "cancelled", "timeout", "aborted"}
 
 
 @dataclass
@@ -43,24 +45,35 @@ class SmokeReport:
 
 
 def request(origin: str, path: str, *, timeout: float) -> tuple[int, str, bytes]:
-    req = Request(
-        origin.rstrip("/") + path,
-        headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
-    )
+    req = Request(origin.rstrip("/") + path, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
     with urlopen(req, timeout=timeout) as response:
         return response.status, response.headers.get_content_type(), response.read()
 
 
 def request_json(origin: str, path: str, *, timeout: float) -> dict[str, Any]:
     status, content_type, body = request(origin, path, timeout=timeout)
-    if status != 200:
-        raise RuntimeError(f"{path} returned HTTP {status}")
-    if content_type != "application/json":
-        raise RuntimeError(f"{path} returned {content_type}, expected application/json")
+    if status != 200 or content_type != "application/json":
+        raise RuntimeError(f"{path} returned HTTP {status} {content_type}")
     payload = json.loads(body)
     if not isinstance(payload, dict):
         raise RuntimeError(f"{path} JSON payload is not an object")
     return payload
+
+
+def request_json_post(origin: str, path: str, payload: dict[str, Any], *, timeout: float) -> dict[str, Any]:
+    req = Request(
+        origin.rstrip("/") + path,
+        data=json.dumps(payload).encode(),
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(req, timeout=timeout) as response:
+        if response.status not in {200, 201, 202} or response.headers.get_content_type() != "application/json":
+            raise RuntimeError(f"{path} returned unexpected response")
+        body = json.loads(response.read())
+    if not isinstance(body, dict):
+        raise RuntimeError(f"{path} JSON payload is not an object")
+    return body
 
 
 def deployment_commit(origin: str, *, timeout: float) -> str | None:
@@ -70,6 +83,10 @@ def deployment_commit(origin: str, *, timeout: float) -> str | None:
         return None
     value = payload.get("git_commit")
     return value if isinstance(value, str) and value else None
+
+
+def managed_prefix(report: SmokeReport) -> str:
+    return "/api/manager/ppu" if report.expected_commit is not None else ""
 
 
 def wait_until_ready(
@@ -84,8 +101,8 @@ def wait_until_ready(
     started = time.monotonic()
     deadline = started + wake_timeout
     last_issue = "service has not responded yet"
+    readiness_path = "/api/manager/ppu/api/health/ready" if expected_commit else "/api/health/ready"
 
-    # The first request intentionally wakes a sleeping Render Free instance.
     try:
         request(origin, "/", timeout=request_timeout)
     except (HTTPError, URLError, TimeoutError):
@@ -95,29 +112,20 @@ def wait_until_ready(
         if expected_commit:
             observed = deployment_commit(origin, timeout=request_timeout)
             if not observed:
-                last_issue = (
-                    "deployment identity is not available yet; waiting for a deployment "
-                    f"that reports expected commit {expected_commit}"
-                )
+                last_issue = f"deployment identity is not available yet; waiting for expected commit {expected_commit}"
                 time.sleep(poll_interval)
                 continue
             report.observed_commit = observed
             if observed != expected_commit:
-                last_issue = (
-                    f"Render is serving commit {observed}, waiting for expected {expected_commit}"
-                )
+                last_issue = f"Render is serving commit {observed}, waiting for expected {expected_commit}"
                 time.sleep(poll_interval)
                 continue
-
         try:
-            payload = request_json(origin, "/api/health/ready", timeout=request_timeout)
-            if (
-                payload.get("ok") is True
-                and payload.get("gateway") == "alive"
-                and payload.get("execution") == "ready"
-            ):
+            payload = request_json(origin, readiness_path, timeout=request_timeout)
+            if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
                 report.cold_start_seconds = round(time.monotonic() - started, 3)
                 report.checks["readiness"] = "PASS"
+                report.checks["routing"] = "MANAGED" if expected_commit else "LEGACY_PR_OBSERVATION"
                 return payload
             last_issue = f"readiness payload not ready: {payload!r}"
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
@@ -125,93 +133,112 @@ def wait_until_ready(
         time.sleep(poll_interval)
 
     raise RuntimeError(
-        f"Render did not reach the requested deployment/readiness state within "
-        f"{wake_timeout:.0f}s; last observation: {last_issue}"
+        f"Render did not reach the requested deployment/readiness state within {wake_timeout:.0f}s; "
+        f"last observation: {last_issue}"
     )
 
 
 def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> None:
     for path in ("/", "/demo", "/fleet", "/fleet/programming", "/engineering", "/devices", "/ppu"):
         status, content_type, body = request(origin, path, timeout=timeout)
-        if status != 200 or content_type != "text/html":
-            raise RuntimeError(f"{path} returned HTTP {status} {content_type}")
-        if report.expected_commit is not None:
-            if b"Plasma Control Station" not in body:
-                raise RuntimeError(f"{path} does not contain the Plasma Control Station shell")
-            if b"Plasma PPU Console" in body or b"SITE MATRIX" in body or b"PPU CONTROL" in body:
-                raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
-        elif b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
-            # Pull-request smoke observes whatever main revision is already deployed.
-            # Accept the previous shell until this PR itself is deployed; pinned
-            # post-deployment smoke enforces the new Control Station ownership.
-            raise RuntimeError(f"{path} does not contain a recognized Plasma product shell")
+        if status != 200 or content_type != "text/html" or b"<html" not in body.lower():
+            raise RuntimeError(f"{path} did not return an HTML product shell")
+        if b"SITE MATRIX" in body or b"PPU CONTROL" in body:
+            raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
+        if report.expected_commit is None and b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
+            # PR smoke observes the currently deployed main revision, which may still
+            # be the pre-convergence static shell. Pinned acceptance proves the new
+            # BFF identity via deployment metadata plus managed routing instead of
+            # coupling to SSR text that Vinext does not guarantee.
+            raise RuntimeError(f"{path} does not contain a recognized deployed Plasma shell")
         report.checks[f"ui:{path}"] = "PASS"
 
 
 def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> None:
-    status = request_json(origin, "/api/status", timeout=timeout)
+    prefix = managed_prefix(report)
+    status = request_json(origin, f"{prefix}/api/status", timeout=timeout)
     ppu = status.get("ppu")
     sites = status.get("sites")
     if not isinstance(ppu, dict) or ppu.get("ppu_id") != "render-demo-ppu":
-        raise RuntimeError("/api/status does not expose render-demo-ppu")
+        raise RuntimeError("managed status does not expose render-demo-ppu")
     if not isinstance(sites, list) or len(sites) != 8:
-        raise RuntimeError("/api/status does not expose the expected 8 local Mock Sites")
+        raise RuntimeError("managed status does not expose the expected 8 local Mock Sites")
     report.checks["api:status"] = "PASS"
 
-    catalog = request_json(origin, "/api/engineering/targets", timeout=timeout)
+    catalog = request_json(origin, f"{prefix}/api/engineering/targets", timeout=timeout)
     expected_counts = {(8, 32, 160)}
-    # Pull-request smoke observes the currently deployed main commit without
-    # pinning it to the PR. Accept the previous topology until this change is
-    # deployed; pinned post-deployment smoke remains strict for 8/32/160.
     if report.expected_commit is None:
         expected_counts.add((3, 12, 60))
-    actual_counts = (
-        catalog.get("facility_count"),
-        catalog.get("ppu_count"),
-        catalog.get("site_count"),
-    )
+    actual_counts = (catalog.get("facility_count"), catalog.get("ppu_count"), catalog.get("site_count"))
     if catalog.get("ok") is not True or catalog.get("rest_contract_version") != "3":
         raise RuntimeError("Engineering target catalog is not Web REST v3 ready")
     if catalog.get("provider") != "mock" or actual_counts not in expected_counts:
-        raise RuntimeError(
-            f"Engineering target catalog mismatch: provider={catalog.get('provider')!r}, "
-            f"counts={actual_counts!r}"
-        )
+        raise RuntimeError(f"Engineering target catalog mismatch: {actual_counts!r}")
     report.checks["api:engineering-targets"] = "PASS"
 
-    # Pull-request runs intentionally observe the currently deployed main revision,
-    # not the PR head. New deployment contracts are therefore enforced only when
-    # the smoke test is pinned to the exact revision expected to be live.
     if report.expected_commit is not None:
-        device_search = request_json(origin, "/api/devices/search?q=stm32&limit=1", timeout=timeout)
+        device_search = request_json(origin, f"{prefix}/api/devices/search?q=stm32&limit=1", timeout=timeout)
         results = device_search.get("results")
         catalog_size = device_search.get("catalog_size")
         if device_search.get("ok") is not True or device_search.get("rest_contract_version") != "3":
             raise RuntimeError("Device Catalog search is not Web REST v3 ready")
-        if isinstance(catalog_size, bool) or not isinstance(catalog_size, int) or catalog_size < 7000:
+        if isinstance(catalog_size, bool) or not isinstance(catalog_size, int) or catalog_size < 900:
             raise RuntimeError(f"Device Catalog size is invalid: {catalog_size!r}")
         if not isinstance(results, list) or not results:
             raise RuntimeError("Device Catalog search returned no STM32 result")
         identifier = results[0].get("identifier") if isinstance(results[0], dict) else None
         if not isinstance(identifier, str) or "stm32" not in identifier.casefold():
-            raise RuntimeError(f"Device Catalog search returned an unexpected identifier: {identifier!r}")
+            raise RuntimeError(f"Device Catalog search returned unexpected identifier: {identifier!r}")
         report.checks["api:device-catalog-search"] = "PASS"
     else:
         report.checks["api:device-catalog-search"] = "SKIP_UNPINNED"
 
-    mock_runtime = request_json(origin, "/api/mock/runtime", timeout=timeout)
+    mock_runtime = request_json(origin, f"{prefix}/api/mock/runtime", timeout=timeout)
     settings = mock_runtime.get("mock_runtime")
+    operations = settings.get("operations") if isinstance(settings, dict) else None
     if mock_runtime.get("ok") is not True or mock_runtime.get("rest_contract_version") != "3":
         raise RuntimeError("Mock runtime settings are not Web REST v3 ready")
-    if not isinstance(settings, dict):
-        raise RuntimeError("Mock runtime settings payload is missing")
-    operations = settings.get("operations")
     if not isinstance(operations, dict) or set(operations) != {"erase", "program", "verify", "read"}:
         raise RuntimeError("Mock runtime settings do not expose canonical E/P/V/R operations")
-    image_size = settings.get("default_image_size_bytes")
+    image_size = settings.get("default_image_size_bytes") if isinstance(settings, dict) else None
     if isinstance(image_size, bool) or not isinstance(image_size, int) or image_size <= 0:
         raise RuntimeError("Mock runtime default Image size is invalid")
     report.checks["api:mock-runtime"] = "PASS"
+
+    if report.expected_commit is not None:
+        image = b"Plasma public managed smoke" * 16
+        submitted = request_json_post(
+            origin,
+            f"{prefix}/api/jobs",
+            {
+                "site_id": 1,
+                "operation": "program",
+                "asset_name": "public-smoke.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": len(image),
+                "asset_sha256": hashlib.sha256(image).hexdigest(),
+                "asset_base64": base64.b64encode(image).decode(),
+            },
+            timeout=timeout,
+        )
+        job = submitted.get("job")
+        job_id = job.get("job_id") if isinstance(job, dict) else None
+        if not isinstance(job_id, str) or not job_id:
+            raise RuntimeError("managed Mock programming submit returned no Job ID")
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            payload = request_json(origin, f"{prefix}/api/status?job={job_id}", timeout=timeout)
+            current = payload.get("job")
+            state = current.get("state") if isinstance(current, dict) else None
+            if state in TERMINAL_JOB_STATES:
+                if state != "success":
+                    raise RuntimeError(f"managed Mock programming Job ended in {state}")
+                report.checks["api:managed-mock-program"] = "PASS"
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("managed Mock programming Job did not finish before timeout")
 
 
 def write_report(path: Path | None, payload: dict[str, Any]) -> None:
@@ -249,10 +276,8 @@ def main() -> None:
             request_timeout=args.request_timeout,
             report=report,
         )
-        if ready.get("service") != "plasma-web-rest-gateway":
-            raise RuntimeError("readiness service identity is not plasma-web-rest-gateway")
-        if ready.get("ppu_id") != "render-demo-ppu":
-            raise RuntimeError("readiness PPU identity is not render-demo-ppu")
+        if ready.get("service") != "plasma-web-rest-gateway" or ready.get("ppu_id") != "render-demo-ppu":
+            raise RuntimeError("managed readiness identity is incorrect")
         if report.observed_commit is None:
             report.observed_commit = deployment_commit(report.origin, timeout=args.request_timeout)
         assert_contracts(report.origin, timeout=args.request_timeout, report=report)

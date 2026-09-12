@@ -89,7 +89,7 @@ class RenderDeploymentContractTests(unittest.TestCase):
         blueprint = yaml.safe_load((REPOSITORY_ROOT / "render.yaml").read_text())
         return {service["name"]: service for service in blueprint["services"]}
 
-    def test_render_blueprint_preserves_public_demo_and_adds_control_station_lab(self) -> None:
+    def test_render_blueprint_preserves_public_demo_and_control_station_lab(self) -> None:
         services = self._services()
         self.assertEqual(set(services), {"plasma-public-demo", "plasma-control-station-lab"})
 
@@ -99,8 +99,9 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertEqual(public_demo["plan"], "free")
         self.assertEqual(public_demo["buildCommand"], "bash scripts/render-build.sh")
         self.assertEqual(public_demo["startCommand"], "bash scripts/render-start.sh")
-        self.assertEqual(public_demo["healthCheckPath"], "/api/health/ready")
+        self.assertEqual(public_demo["healthCheckPath"], "/")
         public_environment = {item["key"]: str(item["value"]) for item in public_demo["envVars"]}
+        self.assertEqual(public_environment["PLASMA_RENDER_PPU_ALIAS"], "render-demo-ppu")
         self.assertEqual(public_environment["PLASMA_RENDER_ENGINEERING_MOCK"], "1")
         self.assertEqual(public_environment["PLASMA_RENDER_FLASH_BYTES"], str(1024 * 1024))
 
@@ -116,6 +117,21 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertIs(control_environment["PLASMA_RENDER_PPU_ENDPOINT"]["sync"], False)
         self.assertNotIn("value", control_environment["PLASMA_RENDER_PPU_ENDPOINT"])
 
+    def test_public_demo_uses_product_control_station_path(self) -> None:
+        script = (REPOSITORY_ROOT / "scripts/render-start.sh").read_text(encoding="utf-8")
+        self.assertIn("python -m plasma_server.server", script)
+        self.assertIn("-m plasma_web.gateway", script)
+        self.assertIn("--host 127.0.0.1", script)
+        self.assertIn("python -m plasma_manager.server", script)
+        self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
+        self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
+        self.assertIn('PLASMA_MANAGER_PPU_ALIAS="${ppu_alias}"', script)
+        self.assertIn('HOST="0.0.0.0"', script)
+        self.assertIn('node "${console_root}/server.js"', script)
+        self.assertNotIn("--host 0.0.0.0\n  --port \"${public_port}\"", script)
+        self.assertNotIn("--static-root", script)
+        self.assertNotIn("dist-render", script)
+
     def test_control_station_lab_is_manager_only_and_requires_restricted_https_ppu_ingress(self) -> None:
         script = (REPOSITORY_ROOT / "scripts/render-control-station-start.sh").read_text(encoding="utf-8")
         self.assertIn("python -m plasma_manager.server", script)
@@ -128,9 +144,10 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertNotIn("-m plasma_web.gateway", script)
         self.assertNotIn("--engineering-mock", script)
 
-    def test_render_build_produces_public_demo_and_control_station_payloads(self) -> None:
+    def test_render_build_produces_only_product_control_station_payload(self) -> None:
         script = (REPOSITORY_ROOT / "scripts/render-build.sh").read_text(encoding="utf-8")
-        self.assertIn("npm run build:render", script)
+        self.assertNotIn("npm run build:render", script)
+        self.assertNotIn("dist-render", script)
         self.assertIn("npm run build:product", script)
         self.assertIn("dist/standalone/server.js", script)
 
