@@ -233,6 +233,10 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             "facility_count": 1,
             "ppu_count": 1,
             "site_count": len(config.sites),
+            "programming_capabilities": {
+                "synthetic_programming_image": False,
+                "target_device_required": False,
+            },
             "programming_asset_scope": "connection-session-and-ppu",
             "supported_asset_types": [item.value for item in ProgrammingAssetType],
             "supported_asset_formats": [item.value for item in ProgrammingAssetFormat],
