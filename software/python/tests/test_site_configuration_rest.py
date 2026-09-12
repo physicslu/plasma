@@ -130,6 +130,32 @@ class SiteConfigurationRestTests(unittest.TestCase):
             "disabled_runtime_binding_unobservable",
         )
 
+    def test_observed_runtime_topology_missing_desired_sites_requires_restart(self) -> None:
+        self.handler.snapshot["sites"] = []
+
+        status, payload = self.request("GET", "/api/settings/sites")
+
+        self.assertEqual(status, 200)
+        configuration = payload["site_configuration"]
+        self.assertEqual(configuration["reconciliation"], "restart_required")
+        self.assertEqual(len(configuration["sites"]), 2)
+        for site in configuration["sites"]:
+            self.assertIsNone(site["actual"])
+            self.assertEqual(site["reconciliation"], "restart_required")
+
+    def test_unobserved_runtime_topology_remains_actual_unavailable(self) -> None:
+        self.handler.snapshot.pop("sites")
+
+        status, payload = self.request("GET", "/api/settings/sites")
+
+        self.assertEqual(status, 200)
+        configuration = payload["site_configuration"]
+        self.assertEqual(configuration["reconciliation"], "actual_unavailable")
+        self.assertEqual(len(configuration["sites"]), 2)
+        for site in configuration["sites"]:
+            self.assertIsNone(site["actual"])
+            self.assertEqual(site["reconciliation"], "actual_unavailable")
+
     def test_post_requires_strong_if_match_precondition(self) -> None:
         before = self.path.read_text(encoding="utf-8")
         body = {"enabled": True, "interface": "mock", "target": "TARGET-NEW"}
