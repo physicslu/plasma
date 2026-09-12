@@ -58,6 +58,7 @@ PUBLICATION_PHASE = "C0.5"
 ADAPTER_ID = "stm32c0-c0.4-admission"
 DEFAULT_CANONICAL = HERE / "stm32c0-commercial-icpn.csv"
 DEFAULT_FROZEN_PLAN = HERE / "stm32c0-phase-c0.4-admission-plan.json"
+LIVE_PRODUCTION_MANIFEST = HERE.parent / "production/icpn-v1-manifest.json"  # compatibility/test helper; not the historical default
 
 EXPECTED_ADMITTABLE_COUNT = 209
 EXPECTED_CAPABILITY_UNRESOLVED = frozenset({
@@ -126,7 +127,7 @@ def _is_unique_mapping(mapping: dict[str, Any]) -> bool:
 
 def build_admission_plan(
     *,
-    canonical_path: Path | None = DEFAULT_CANONICAL,
+    canonical_path: Path | None = None,
     mapping_catalog_path: Path = DEFAULT_CATALOG,
     production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
 ) -> dict[str, Any]:

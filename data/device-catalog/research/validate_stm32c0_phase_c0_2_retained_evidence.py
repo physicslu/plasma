@@ -13,7 +13,7 @@ HERE = Path(__file__).resolve().parent
 BASELINE = HERE / "stm32c0-phase-c0.2-discovery-baseline.json"
 DISCOVERY = HERE / "stm32c0-phase-c0.2-discovery-manifest.json"
 C0_1 = HERE / "stm32c0-phase-c0.1-foundation-baseline.json"
-PRODUCTION = HERE.parent / "production/icpn-v1-manifest.json"
+PRODUCTION = HERE / "stm32c0-phase-c0.2-production-manifest-prestate.json"
 EVIDENCE = HERE / "evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11"
 LEAVES = EVIDENCE / "evidence"
 
