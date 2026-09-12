@@ -32,6 +32,7 @@ from stm32_cross_family_prioritization import (
 )
 
 HERE = Path(__file__).resolve().parent
+HISTORICAL_POST_U0_MANIFEST = HERE / "stm32c0-phase-c0.3-production-manifest-prestate.json"
 DEFAULT_OUTPUT = Path("/tmp/stm32-post-u0-evidence-summary.json")
 PARSER_PROFILE = "stm32_post_u0_accessibility_probe_v1"
 PROBE_ID = "stm32-post-u0-official-st-evidence-accessibility-probe-v1"
@@ -108,7 +109,7 @@ def source_url_for_base(base_device: str) -> str:
 def current_prioritization(
     *,
     catalog_path: Path = DEFAULT_CATALOG,
-    manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
+    manifest_path: Path = HISTORICAL_POST_U0_MANIFEST,
 ) -> dict[str, Any]:
     report = build_prioritization(catalog_path=catalog_path, manifest_path=manifest_path)
     if report.get("policy_id") != "stm32-cross-family-prioritization-v1":
@@ -187,7 +188,7 @@ def deterministic_targets(
     catalog_rows: list[dict[str, str]],
     *,
     catalog_path: Path = DEFAULT_CATALOG,
-    manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
+    manifest_path: Path = HISTORICAL_POST_U0_MANIFEST,
 ) -> list[ProbeTarget]:
     current_prioritization(catalog_path=catalog_path, manifest_path=manifest_path)
     targets: list[ProbeTarget] = []

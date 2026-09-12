@@ -38,6 +38,7 @@ from stm32c0_phase_c0_2_discovery import resolve_mapping
 from stm32c0_phase_c0_3_policy import (
     ADAPTER_ID as METADATA_ADAPTER_ID,
     DEFAULT_POLICY_BASELINE,
+    DEFAULT_PRODUCTION_MANIFEST,
     EXPECTED_PRODUCTION_BASE_DEVICE_COUNT,
     EXPECTED_PRODUCTION_EXACT_COUNT,
     EXPECTED_PRODUCTION_FAMILY_COUNTS,
@@ -57,7 +58,6 @@ PUBLICATION_PHASE = "C0.5"
 ADAPTER_ID = "stm32c0-c0.4-admission"
 DEFAULT_CANONICAL = HERE / "stm32c0-commercial-icpn.csv"
 DEFAULT_FROZEN_PLAN = HERE / "stm32c0-phase-c0.4-admission-plan.json"
-LIVE_PRODUCTION_MANIFEST = HERE.parent / "production/icpn-v1-manifest.json"
 
 EXPECTED_ADMITTABLE_COUNT = 209
 EXPECTED_CAPABILITY_UNRESOLVED = frozenset({
@@ -128,7 +128,7 @@ def build_admission_plan(
     *,
     canonical_path: Path | None = DEFAULT_CANONICAL,
     mapping_catalog_path: Path = DEFAULT_CATALOG,
-    production_manifest_path: Path = LIVE_PRODUCTION_MANIFEST,
+    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
 ) -> dict[str, Any]:
     metadata_plan = build_policy_plan()
     if not policy_plan_is_clean(metadata_plan):
@@ -162,9 +162,9 @@ def build_admission_plan(
         )
 
     if _git_blob_sha(production_manifest_path) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
-        raise STM32C0AdmissionError("live Production manifest blob drifted")
+        raise STM32C0AdmissionError("C0.3 Production prestate blob drifted")
     if file_sha256(production_manifest_path) != EXPECTED_PRODUCTION_MANIFEST_SHA256:
-        raise STM32C0AdmissionError("live Production manifest SHA-256 drifted")
+        raise STM32C0AdmissionError("C0.3 Production prestate SHA-256 drifted")
 
     catalog_rows = read_catalog(mapping_catalog_path)
     all_identity_candidates = build_candidate_inputs()
