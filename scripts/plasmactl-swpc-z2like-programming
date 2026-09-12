@@ -7,6 +7,7 @@ dropin_dir="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_DROPIN_DIR:-/etc/systemd/system/pla
 dropin="$dropin_dir/30-z2like-configured-mock-programming.conf"
 current_app="/opt/plasma/current/runtime/ppu/ppu.pyz"
 output_root="/var/lib/plasma/gateway-output"
+startup_ready_timeout_s="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_READY_TIMEOUT_S:-15}"
 
 say() {
   printf '[plasmactl swpc-z2like-programming] %s\n' "$*"
@@ -136,7 +137,7 @@ expected_facility = ppu.get("facility_id")
 expected_ppu = ppu.get("id")
 
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-with opener.open("http://127.0.0.1:18080/api/engineering/targets", timeout=5) as response:
+with opener.open("http://127.0.0.1:18080/api/engineering/targets", timeout=1) as response:
     payload = json.loads(response.read().decode("utf-8"))
 if response.status != 200 or payload.get("ok") is not True:
     raise SystemExit(f"Engineering catalog is unavailable: HTTP {response.status} {payload!r}")
@@ -159,6 +160,25 @@ if ppus[0].get("provider") != "configured_mock":
     raise SystemExit("configured PPU was incorrectly exposed as the legacy demo Mock provider")
 print(f"{expected_facility}/{expected_ppu}/{len(sites)}")
 PY
+}
+
+wait_for_catalog() {
+  [[ "$startup_ready_timeout_s" =~ ^[1-9][0-9]*$ ]] || \
+    die "PLASMA_SWPC_Z2LIKE_PROGRAMMING_READY_TIMEOUT_S must be a positive integer"
+
+  local deadline topology
+  deadline=$((SECONDS + startup_ready_timeout_s))
+  while (( SECONDS < deadline )); do
+    systemctl is-active --quiet plasma-web.service || return 1
+    if topology="$(verify_catalog 2>/dev/null)"; then
+      printf '%s\n' "$topology"
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  systemctl is-active --quiet plasma-web.service || return 1
+  verify_catalog
 }
 
 restore_dropin() {
@@ -203,7 +223,7 @@ install_programming() {
     restore_dropin "$backup" "$existed"
     die "plasma-web.service is not active; previous Programming activation restored"
   fi
-  if ! topology="$(verify_catalog)"; then
+  if ! topology="$(wait_for_catalog)"; then
     restore_dropin "$backup" "$existed"
     die "configured Engineering Programming verification failed; previous activation restored"
   fi
@@ -266,6 +286,7 @@ EOF
 
 require_command python3
 require_command systemctl
+require_command sleep
 
 case "${1:-}" in
   install) install_programming ;;
