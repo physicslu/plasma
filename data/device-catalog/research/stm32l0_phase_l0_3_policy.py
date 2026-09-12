@@ -118,8 +118,8 @@ def plan_is_clean(plan: dict[str,Any]) -> bool:
     dc=plan.get("decision_counts",{})
     return (
         plan.get("candidate_count")==360 and plan.get("base_device_count")==99
-        and dc.get("metadata_ready",0)+dc.get("manual_review_required",0)+dc.get("reject",0)==360
-        and dc.get("reject",0)==0
+        and dc=={"metadata_ready":360,"manual_review_required":0,"reject":0}
+        and plan.get("issues")==[] and plan.get("manual_review_base_devices")==[]
         and plan.get("production_snapshot",{}).get("exact_icpn_count")==912
         and plan.get("production_snapshot",{}).get("base_device_count")==293
         and plan.get("production_snapshot",{}).get("stm32l0_exact_icpn_count")==0
