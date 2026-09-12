@@ -6,7 +6,9 @@ on:
       - "data/device-catalog/research/stm32l0_metadata_policy.py"
       - "data/device-catalog/research/stm32l0_phase_l0_3_policy.py"
       - "data/device-catalog/research/test_stm32l0_phase_l0_3_policy.py"
+      - "data/device-catalog/research/validate_stm32l0_phase_l0_3_policy.py"
       - "data/device-catalog/research/stm32l0-phase-l0.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l0-phase-l0.3-policy-baseline.json"
       - "data/device-catalog/research/evidence/stm32l0-l0.2-official-st-discovery-live-2026-09-12/**"
       - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l0-l03-metadata-validation.yml"
@@ -27,6 +29,9 @@ jobs:
       - name: Run L0.3 policy tests
         working-directory: data/device-catalog/research
         run: python -m unittest -v test_stm32l0_phase_l0_3_policy.py
+      - name: Replay frozen L0.3 baseline
+        working-directory: data/device-catalog/research
+        run: python validate_stm32l0_phase_l0_3_policy.py
       - name: Build deterministic L0.3 summary
         working-directory: data/device-catalog/research
         run: |
@@ -41,8 +46,15 @@ jobs:
           assert d["phase"] == "L0.3" and d["family"] == "STM32L0"
           assert d["candidate_count"] == 360
           assert d["base_device_count"] == 99
-          assert sum(d["decision_counts"].values()) == 360
-          assert d["decision_counts"]["reject"] == 0
+          assert d["decision_counts"] == {
+              "metadata_ready": 360,
+              "manual_review_required": 0,
+              "reject": 0,
+          }
+          assert d["issues"] == []
+          assert d["manual_review_base_devices"] == []
+          assert d["metadata_ready_set_sha256"] == "8c7f0cc10829ff5e1ceb98cf6783247a5f685a9f1407dbd560a350348c0a521b"
+          assert d["metadata_rows_sha256"] == "6aefd256256febb6d5f48ec58e44b5fec64489593df333c68723581eb7786a95"
           assert d["production_snapshot"]["exact_icpn_count"] == 912
           assert d["production_snapshot"]["base_device_count"] == 293
           assert d["production_snapshot"]["stm32l0_exact_icpn_count"] == 0
