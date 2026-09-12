@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from plasma_client.client import PlasmaClient
 from plasma_core.assets import ProgrammingAssetFormat, ProgrammingAssetType
 from plasma_core.config import PlasmaConfig, load_config
 from plasma_core.enums import JobState, Operation
@@ -131,6 +132,10 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             ),
         )
 
+    def _client(self, facility_id: str, ppu_id: str) -> PlasmaClient:
+        key = self._key(facility_id, ppu_id)
+        return PlasmaClient(self._identity[2], self._ports[key])
+
     async def _start_servers(self) -> None:
         config = self._current_config()
         key = (config.ppu.facility_id, config.ppu.id)
@@ -205,6 +210,10 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
     def catalog(self) -> dict[str, Any]:
         config = self._current_config()
         flash_sizes = self._flash_sizes(config)
+        operation_timeout_s = max(
+            (float(site.operation_timeout_s) for site in config.sites),
+            default=30.0,
+        )
         facility = {
             "facility_id": config.ppu.facility_id,
             "display_name": config.ppu.facility_id,
@@ -237,7 +246,7 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             "timing_profile": {
                 "model": "configured-local-mock",
                 "site_flash_size_bytes": {str(site_id): size for site_id, size in flash_sizes.items()},
-                "operation_timeout_s": self.job_timeout_s(config.ppu.facility_id, config.ppu.id),
+                "operation_timeout_s": operation_timeout_s,
             },
             "facilities": [facility],
         }
