@@ -1,11 +1,11 @@
 # H016 — STM32L0 L0.4 Read-only Capability / Admission Plan
 
-**Date:** 2026-09-12  
-**Status:** Complete; PR #515 merged  
-**Primary workstream:** Device Catalog / STM32L0 admission planning  
-**Repository:** `physicslu/plasma`  
-**Branch:** `agent/device-catalog-stm32l0-phase-l04-admission-plan`  
-**PR:** #515  
+**Date:** 2026-09-12
+**Status:** Complete; PR #515 merged
+**Primary workstream:** Device Catalog / STM32L0 admission planning
+**Repository:** `physicslu/plasma`
+**Branch:** `agent/device-catalog-stm32l0-phase-l04-admission-plan`
+**PR:** #515
 **Merge commit:** `19d818037e2661aa18266c92a29a7296e98e1f00`
 
 ## 1. Starting state
