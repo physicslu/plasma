@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+base_evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
+ppu_config="${PLASMA_SWPC_Z2LIKE_CONFIG:-/etc/plasma/ppu.yaml}"
+dropin_dir="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_DROPIN_DIR:-/etc/systemd/system/plasma-web.service.d}"
+dropin="$dropin_dir/30-z2like-configured-mock-programming.conf"
+current_app="/opt/plasma/current/runtime/ppu/ppu.pyz"
+output_root="/var/lib/plasma/gateway-output"
+
+say() {
+  printf '[plasmactl swpc-z2like-programming] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl swpc-z2like-programming] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_root() {
+  (( EUID == 0 )) || die "$1 requires root; run with sudo"
+}
+
+base_field() {
+  python3 - "$base_evidence" "$1" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+value = payload.get(sys.argv[2])
+if value is None:
+    raise SystemExit(1)
+print(value)
+PY
+}
+
+validate_base() {
+  [[ -f "$base_evidence" ]] || die "base SWPC Z2-like evidence is missing: $base_evidence"
+  [[ -f "$ppu_config" && ! -L "$ppu_config" ]] || die "canonical PPU config is unavailable: $ppu_config"
+  [[ -f "$current_app" ]] || die "current PPU runtime is unavailable: $current_app"
+
+  python3 - "$base_evidence" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    evidence = json.load(handle)
+expected = {
+    "schema_version": 1,
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+    "gateway_bind": "127.0.0.1:18080",
+}
+for field, value in expected.items():
+    if evidence.get(field) != value:
+        raise SystemExit(f"invalid base evidence {field}: {evidence.get(field)!r}")
+if not evidence.get("plasma_python"):
+    raise SystemExit("base evidence is missing plasma_python")
+PY
+
+  local plasma_python
+  plasma_python="$(base_field plasma_python)"
+  [[ "$plasma_python" == /opt/plasma/python/*/bin/python3 ]] || die "unexpected Plasma Python path in evidence: $plasma_python"
+  [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
+
+  # Parse the canonical YAML with the same qualified Plasma interpreter used by
+  # the deployed runtime. Do not depend on PyYAML being installed into Ubuntu's
+  # system Python.
+  "$plasma_python" - "$ppu_config" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    config = yaml.safe_load(handle)
+if not isinstance(config, dict):
+    raise SystemExit("canonical PPU config must be a mapping")
+sites = config.get("sites")
+if not isinstance(sites, list):
+    raise SystemExit("canonical PPU config sites must be a list")
+non_mock = [entry.get("id") for entry in sites if not isinstance(entry, dict) or entry.get("interface", "mock") != "mock"]
+if non_mock:
+    raise SystemExit(f"configured mock Programming refuses non-mock Sites: {non_mock}")
+PY
+
+  # Fail before systemd mutation when the installed immutable PPU runtime predates
+  # this capability. This makes the required order explicit: deploy the new base
+  # swpc-z2like release first, then activate configured Mock Programming.
+  "$plasma_python" - "$current_app" <<'PY'
+import sys
+import zipfile
+
+path = sys.argv[1]
+with zipfile.ZipFile(path) as archive:
+    names = set(archive.namelist())
+    provider = "plasma_web/configured_mock_provider.py"
+    phase3 = "plasma_web/gateway_phase3.py"
+    if provider not in names or phase3 not in names:
+        raise SystemExit("installed PPU runtime does not contain configured Mock Programming support")
+    source = archive.read(phase3).decode("utf-8")
+    if "--engineering-configured-mock" not in source:
+        raise SystemExit("installed PPU runtime does not advertise configured Mock Programming support")
+PY
+}
+
+render_dropin() {
+  local plasma_python
+  plasma_python="$(base_field plasma_python)"
+  cat <<EOF
+# Managed by Plasma SWPC Z2-like configured Mock Programming activation
+[Service]
+ExecStart=
+ExecStart=$plasma_python $current_app gateway --ppu-config $ppu_config --runtime-activation-socket /run/plasma-runtime-activation/helper.sock --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $output_root --engineering-configured-mock
+EOF
+}
+
+verify_catalog() {
+  local plasma_python
+  plasma_python="$(base_field plasma_python)"
+  "$plasma_python" - "$ppu_config" <<'PY'
+import json
+import sys
+import urllib.request
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    config = yaml.safe_load(handle)
+ppu = config.get("ppu") or {}
+sites = config.get("sites") or []
+expected_facility = ppu.get("facility_id")
+expected_ppu = ppu.get("id")
+
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+with opener.open("http://127.0.0.1:18080/api/engineering/targets", timeout=5) as response:
+    payload = json.loads(response.read().decode("utf-8"))
+if response.status != 200 or payload.get("ok") is not True:
+    raise SystemExit(f"Engineering catalog is unavailable: HTTP {response.status} {payload!r}")
+if payload.get("provider") != "configured_mock":
+    raise SystemExit(f"unexpected Engineering provider: {payload.get('provider')!r}")
+if payload.get("facility_count") != 1 or payload.get("ppu_count") != 1:
+    raise SystemExit(f"configured provider topology is not single-PPU: {payload!r}")
+if payload.get("site_count") != len(sites):
+    raise SystemExit(f"configured provider Site count mismatch: {payload.get('site_count')!r} != {len(sites)}")
+facilities = payload.get("facilities")
+if not isinstance(facilities, list) or len(facilities) != 1:
+    raise SystemExit("configured provider facility topology is invalid")
+facility = facilities[0]
+ppus = facility.get("ppus") if isinstance(facility, dict) else None
+if facility.get("facility_id") != expected_facility or not isinstance(ppus, list) or len(ppus) != 1:
+    raise SystemExit("configured provider facility identity mismatch")
+if ppus[0].get("ppu_id") != expected_ppu:
+    raise SystemExit("configured provider PPU identity mismatch")
+if ppus[0].get("provider") != "configured_mock":
+    raise SystemExit("configured PPU was incorrectly exposed as the legacy demo Mock provider")
+print(f"{expected_facility}/{expected_ppu}/{len(sites)}")
+PY
+}
+
+restore_dropin() {
+  local backup="$1"
+  local existed="$2"
+  if (( existed )); then
+    install -m 0644 "$backup" "$dropin"
+  else
+    rm -f "$dropin"
+  fi
+  systemctl daemon-reload || true
+  systemctl restart plasma-web.service || true
+}
+
+install_programming() {
+  require_root install
+  validate_base
+  install -d -m 0755 "$dropin_dir"
+
+  local backup temporary existed=0 topology
+  backup="$(mktemp /tmp/plasma-z2like-programming-backup.XXXXXX)"
+  temporary="$(mktemp "$dropin_dir/.z2like-programming.XXXXXX")"
+  trap 'rm -f "$backup" "$temporary"' RETURN
+  if [[ -f "$dropin" ]]; then
+    cp -a "$dropin" "$backup"
+    existed=1
+  fi
+
+  render_dropin >"$temporary"
+  chmod 0644 "$temporary"
+  mv -f "$temporary" "$dropin"
+
+  if ! systemctl daemon-reload; then
+    restore_dropin "$backup" "$existed"
+    die "systemd daemon-reload failed; previous Programming activation restored"
+  fi
+  if ! systemctl restart plasma-web.service; then
+    restore_dropin "$backup" "$existed"
+    die "plasma-web.service restart failed; previous Programming activation restored"
+  fi
+  if ! systemctl is-active --quiet plasma-web.service; then
+    restore_dropin "$backup" "$existed"
+    die "plasma-web.service is not active; previous Programming activation restored"
+  fi
+  if ! topology="$(verify_catalog)"; then
+    restore_dropin "$backup" "$existed"
+    die "configured Engineering Programming verification failed; previous activation restored"
+  fi
+
+  say "PASS: configured local Mock Programming provider is active: $topology"
+  say "execution boundary: existing canonical PPU/Sites only; legacy 32-PPU demo topology is not instantiated"
+  say "qualification boundary: software/mock only; no Z2/ARMv7/PL/FPGA/Site electrical/real-IC claim"
+}
+
+verify_programming() {
+  validate_base
+  [[ -f "$dropin" ]] || die "Programming activation drop-in is missing: $dropin"
+  grep -Fq -- '--engineering-configured-mock' "$dropin" || die "Programming activation flag is missing from drop-in"
+  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
+  local topology
+  topology="$(verify_catalog)" || die "configured Engineering Programming catalog verification failed"
+  say "PASS: configured local Mock Programming provider is active: $topology"
+  say "qualification boundary: software/mock only; no Z2/ARMv7/PL/FPGA/Site electrical/real-IC claim"
+}
+
+remove_programming() {
+  require_root remove
+  [[ -f "$dropin" ]] || { say "configured local Mock Programming provider is already deactivated"; return; }
+
+  local backup
+  backup="$(mktemp /tmp/plasma-z2like-programming-remove.XXXXXX)"
+  trap 'rm -f "$backup"' RETURN
+  cp -a "$dropin" "$backup"
+  rm -f "$dropin"
+
+  if ! systemctl daemon-reload || ! systemctl restart plasma-web.service || ! systemctl is-active --quiet plasma-web.service; then
+    install -d -m 0755 "$dropin_dir"
+    install -m 0644 "$backup" "$dropin"
+    systemctl daemon-reload || true
+    systemctl restart plasma-web.service || true
+    die "Programming deactivation failed; previous activation restored"
+  fi
+  say "configured local Mock Programming provider deactivated"
+}
+
+status_programming() {
+  if [[ -f "$dropin" ]]; then
+    say "activation: installed"
+  else
+    say "activation: not installed"
+  fi
+  systemctl is-active plasma-web.service 2>/dev/null | sed 's/^/[plasmactl swpc-z2like-programming] plasma-web: /' || true
+}
+
+usage() {
+  cat <<'EOF'
+usage: bash scripts/plasmactl-swpc-z2like-programming <install|verify|status|remove>
+
+Explicitly enables the SWPC Z2-like configured local Mock Engineering provider.
+It binds Programming to the canonical /etc/plasma/ppu.yaml identity and Sites;
+it never starts the legacy 8-Facility / 32-PPU demo provider and refuses any
+configuration containing a non-mock Site interface.
+EOF
+}
+
+require_command python3
+require_command systemctl
+
+case "${1:-}" in
+  install) install_programming ;;
+  verify) verify_programming ;;
+  status) status_programming ;;
+  remove) remove_programming ;;
+  *) usage >&2; exit 64 ;;
+esac
