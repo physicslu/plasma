@@ -8,15 +8,26 @@ from plasma_interfaces.site_safety import SiteSafetyControl, SiteSafetySequencer
 
 
 class RecordingSiteSafetyControl(SiteSafetyControl):
-    def __init__(self, *, fail_power_good: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_power_good: bool = False,
+        fail_reclaim_reset: bool = False,
+    ) -> None:
         self.events: list[str] = []
         self.powered = False
         self.site_reset_asserted = False
         self.programmer_owns_reset = False
         self.fail_power_good = fail_power_good
+        self.fail_reclaim_reset = fail_reclaim_reset
 
     async def assert_reset(self) -> None:
         self.events.append("assert_reset")
+        if self.programmer_owns_reset and self.fail_reclaim_reset:
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                "injected reset-reclaim failure",
+            )
         self.site_reset_asserted = True
         self.programmer_owns_reset = False
 
@@ -46,8 +57,6 @@ class RecordingSiteSafetyControl(SiteSafetyControl):
 
     async def power_off(self) -> None:
         self.events.append("power_off")
-        if not self.site_reset_asserted:
-            raise AssertionError("Site must reclaim/assert reset before target power-off")
         self.powered = False
 
 
@@ -155,6 +164,21 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(control.powered)
         self.assertTrue(control.site_reset_asserted)
+
+    async def test_reset_reclaim_failure_still_attempts_emergency_power_off(self) -> None:
+        control = RecordingSiteSafetyControl(fail_reclaim_reset=True)
+        sequencer = SiteSafetySequencer(control)
+
+        async def operation() -> None:
+            control.events.append("operation_started")
+
+        with self.assertRaises(PlasmaError) as caught:
+            await sequencer.run(operation)
+
+        self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_FAILURE)
+        self.assertEqual(control.events[-2:], ["assert_reset", "power_off"])
+        self.assertFalse(control.powered)
+        self.assertTrue(control.programmer_owns_reset)
 
     async def test_invalid_power_good_timeout_is_rejected(self) -> None:
         control = RecordingSiteSafetyControl()
