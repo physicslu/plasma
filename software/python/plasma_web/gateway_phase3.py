@@ -183,12 +183,11 @@ def _strip_phase3_options(argv: list[str]) -> list[str]:
 
 
 def _run_configured_mock_gateway(known: argparse.Namespace) -> None:
-    """Run the normal Phase-3 Gateway against one configured local Mock PPU.
+    """Run Phase-3 REST against the one configured local Mock PPU.
 
-    This path is intentionally explicit and opt-in.  It reuses the canonical
-    Phase-3 handler and REST contract, but supplies a provider that points at the
-    already-running local Plasma Server instead of instantiating the legacy
-    8-Facility / 32-PPU demo topology.
+    This explicit opt-in path supplies a provider for the already-running local
+    Plasma Server.  It does not instantiate the legacy Engineering demo topology
+    and leaves Plasma Server lifecycle under systemd ownership.
     """
 
     handler = PlasmaWebHandler
@@ -208,13 +207,7 @@ def _run_configured_mock_gateway(known: argparse.Namespace) -> None:
     )
     handler.configure_site_configuration(known.ppu_config)
 
-    profile_path = known.engineering_configured_mock_profile or (
-        known.output_root / "configured-mock-runtime.yaml"
-    )
-    provider = ConfiguredMockEngineeringPPUProvider(
-        known.ppu_config,
-        mock_profile_path=profile_path,
-    )
+    provider = ConfiguredMockEngineeringPPUProvider(known.ppu_config)
     provider.start()
     catalog = provider.catalog()
     print(
@@ -260,11 +253,6 @@ def main() -> None:
         "--engineering-configured-mock",
         action="store_true",
         help="Expose the canonical configured local PPU as the Engineering Mock Programming provider",
-    )
-    pre.add_argument(
-        "--engineering-configured-mock-profile",
-        type=Path,
-        help="Persistent Mock runtime profile for the configured local PPU",
     )
     known, _ = pre.parse_known_args(sys.argv[1:])
 
