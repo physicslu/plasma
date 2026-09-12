@@ -7,16 +7,52 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 912
-EXPECTED_STM32C0_CATALOG_SIZE = 209
-EXPECTED_STM32F0_CATALOG_SIZE = 42
-EXPECTED_STM32F2_CATALOG_SIZE = 33
-EXPECTED_STM32F3_CATALOG_SIZE = 10
-EXPECTED_STM32F4_CATALOG_SIZE = 384
-EXPECTED_STM32F7_CATALOG_SIZE = 19
-EXPECTED_STM32G0_CATALOG_SIZE = 47
-EXPECTED_STM32G4_CATALOG_SIZE = 25
-EXPECTED_STM32U0_CATALOG_SIZE = 68
+PRODUCTION_MANIFEST_PATH = (
+    Path(__file__).resolve().parents[3] / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
+)
+
+
+def _production_manifest_expectations() -> tuple[int, int, set[str], list[dict[str, object]]]:
+    manifest = json.loads(PRODUCTION_MANIFEST_PATH.read_text(encoding="utf-8"))
+    sources = manifest["sources"]
+    assert isinstance(sources, list)
+
+    catalog_size = 0
+    families: set[str] = set()
+    vendors: dict[str, dict[str, int]] = {}
+    for source in sources:
+        assert isinstance(source, dict)
+        manufacturer = source["manufacturer"]
+        family = source["family"]
+        row_count = source["row_count"]
+        assert isinstance(manufacturer, str)
+        assert isinstance(family, str)
+        assert isinstance(row_count, int)
+        catalog_size += row_count
+        families.add(family)
+        family_counts = vendors.setdefault(manufacturer, {})
+        family_counts[family] = family_counts.get(family, 0) + row_count
+
+    taxonomy = [
+        {
+            "vendor": vendor,
+            "count": sum(family_counts.values()),
+            "families": [
+                {"family": family, "count": count}
+                for family, count in sorted(family_counts.items())
+            ],
+        }
+        for vendor, family_counts in sorted(vendors.items())
+    ]
+    return catalog_size, len(sources), families, taxonomy
+
+
+(
+    EXPECTED_PRODUCTION_CATALOG_SIZE,
+    EXPECTED_PRODUCTION_SOURCE_COUNT,
+    EXPECTED_PRODUCTION_FAMILIES,
+    EXPECTED_PRODUCTION_TAXONOMY,
+) = _production_manifest_expectations()
 
 
 LEGACY_COLUMNS = [
@@ -98,18 +134,7 @@ def test_checked_in_production_catalog_contains_only_current_admitted_exact_icpn
     assert all(record.production_admitted for record in catalog.records)
     assert all(record.identifier_kind == "manufacturer_part_number" for record in catalog.records)
     assert all(record.icpn == record.identifier for record in catalog.records)
-    assert {record.family for record in catalog.records} == {
-        "STM32C0",
-        "STM32F0",
-        "STM32F1",
-        "STM32F2",
-        "STM32F3",
-        "STM32F4",
-        "STM32F7",
-        "STM32G0",
-        "STM32G4",
-        "STM32U0",
-    }
+    assert {record.family for record in catalog.records} == EXPECTED_PRODUCTION_FAMILIES
 
 
 def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
@@ -264,22 +289,5 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
     assert metadata["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
-    assert metadata["source_count"] == 10
-    assert metadata["taxonomy"] == [
-        {
-            "vendor": "STMicroelectronics",
-            "count": EXPECTED_PRODUCTION_CATALOG_SIZE,
-            "families": [
-                {"family": "STM32C0", "count": EXPECTED_STM32C0_CATALOG_SIZE},
-                {"family": "STM32F0", "count": EXPECTED_STM32F0_CATALOG_SIZE},
-                {"family": "STM32F1", "count": 75},
-                {"family": "STM32F2", "count": EXPECTED_STM32F2_CATALOG_SIZE},
-                {"family": "STM32F3", "count": EXPECTED_STM32F3_CATALOG_SIZE},
-                {"family": "STM32F4", "count": EXPECTED_STM32F4_CATALOG_SIZE},
-                {"family": "STM32F7", "count": EXPECTED_STM32F7_CATALOG_SIZE},
-                {"family": "STM32G0", "count": EXPECTED_STM32G0_CATALOG_SIZE},
-                {"family": "STM32G4", "count": EXPECTED_STM32G4_CATALOG_SIZE},
-                {"family": "STM32U0", "count": EXPECTED_STM32U0_CATALOG_SIZE},
-            ],
-        }
-    ]
+    assert metadata["source_count"] == EXPECTED_PRODUCTION_SOURCE_COUNT
+    assert metadata["taxonomy"] == EXPECTED_PRODUCTION_TAXONOMY
