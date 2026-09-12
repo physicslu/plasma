@@ -215,7 +215,7 @@ A later separately approved hardware phase may evaluate whether this **PS/OpenOC
 - cleanup/reset behavior after success, failure, timeout and cancellation;
 - evidence retention for the physical test.
 
-No PL involvement is required for that OpenOCD hardware gate.
+No PL involvement is required for that OpenOCD hardware gate unless the selected Site power/reset or transport implementation itself uses PL resources.
 
 Until that gate passes, `hardware_runtime_ready` remains false.
 
@@ -231,3 +231,40 @@ The current software executor contract does not:
 - implement the Plasma Native PPU driver or PL programming engine;
 - create PPU or Socket validation evidence;
 - deploy or restart Plasma services.
+
+## 13. Site power/reset safety precursor
+
+Offline programming adds a safety requirement that is not present in a continuously attached debugger: a target may already contain executable code, so enabling socket power must not create an uncontrolled execution window before the execution backend acquires the target.
+
+`SiteSafetyControl` and `SiteSafetySequencer` therefore define a software-only sequencing contract:
+
+```text
+SAFE / POWER OFF
+  -> Site assert reset
+  -> Target power ON
+  -> Wait power-good
+  -> Transfer reset ownership to execution backend
+  -> Backend operation
+  -> Site reclaim/assert reset
+  -> Target power OFF
+  -> SAFE
+```
+
+Cancellation is ordered deliberately:
+
+```text
+Backend operation active
+  -> cancellation requested
+  -> Site reclaim/assert reset
+  -> cancel backend task/process
+  -> Target power OFF
+  -> SAFE
+```
+
+The backend operation is shielded from caller cancellation until Site reset has been reclaimed. If reset reclaim itself fails, Plasma still attempts emergency power-off and surfaces the safety-control failure instead of reporting a clean cancellation.
+
+The reset-transfer call is an ownership handoff, not permission for the target to run. A real OpenOCD implementation must prove connect-under-reset semantics and the electrical ownership handoff before this software contract can be wired into production execution. A one-shot subprocess alone is not proof of that handoff.
+
+This precursor intentionally does **not** enable physical target power, NRST/SRST, PL I/O, a real OpenOCD launcher, or `hardware_runtime_ready`.
+
+When real OpenOCD runtime exposure is later enabled, production configuration should keep unnecessary interactive/debug services disabled by default. GDB and Telnet are not required for normal offline programming; any automation interface must be explicitly scoped and locally restricted.
