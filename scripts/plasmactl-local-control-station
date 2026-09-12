@@ -389,6 +389,18 @@ probe_target() {
   fi
 }
 
+validate_target_control_surface() {
+  local health_url="${ppu_endpoint%/}/api/health/live"
+  local sites_url="${ppu_endpoint%/}/api/settings/sites"
+  local health_code sites_code
+  health_code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 "$health_url" 2>/dev/null || true)"
+  [[ "$health_code" == "200" ]] || return 0
+  sites_code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 -H 'Accept: application/json' "$sites_url" 2>/dev/null || true)"
+  [[ "$sites_code" == "200" ]] || \
+    die "target PPU is reachable but managed-control API is unavailable ($ppu_alias -> $ppu_endpoint, GET /api/settings/sites HTTP ${sites_code:-000}); configure the full Plasma Gateway endpoint, not a restricted diagnostics/status ingress"
+  say "target PPU managed-control probe: READY ($ppu_alias -> $ppu_endpoint)"
+}
+
 verify_profile() {
   require_linux_user_runtime
   require_command curl
@@ -405,6 +417,7 @@ verify_profile() {
   say "PASS: local Control Station Console + Manager are healthy on loopback"
   say "qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate"
   probe_target
+  validate_target_control_surface
 }
 
 status_profile() {
@@ -569,7 +582,7 @@ Options:
 
 Examples:
   plasmactl install local-control-station \
-    --ppu-alias swpc-ppu --ppu-endpoint http://127.0.0.1:18081
+    --ppu-alias swpc-ppu --ppu-endpoint http://127.0.0.1:18080
   plasmactl deploy local-control-station
   plasmactl verify local-control-station
 
