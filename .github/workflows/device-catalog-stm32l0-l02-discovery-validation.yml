@@ -1,0 +1,43 @@
+name: STM32L0 L0.2 discovery validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32l0-phase-l0.1-foundation-baseline.json"
+      - "data/device-catalog/research/stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/run_stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/test_stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l0-l02-discovery-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32l0-phase-l0.1-foundation-baseline.json"
+      - "data/device-catalog/research/stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/run_stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/test_stm32l0_phase_l0_2_discovery.py"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l0-l02-discovery-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  discovery-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run L0.2 negative controls
+        run: python data/device-catalog/research/test_stm32l0_phase_l0_2_discovery.py
+      - name: Freeze deterministic Base Device manifest in CI workspace
+        run: |
+          python data/device-catalog/research/stm32l0_phase_l0_2_discovery.py \
+            --targets-output /tmp/stm32l0-l0.2-targets.json >/tmp/stm32l0-l0.2-targets.stdout
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/stm32l0-l0.2-targets.json'))
+          print('L0.2 deterministic base_device_count=', p['base_device_count'])
+          print('L0.2 counts_by_subfamily=', json.dumps(p['base_device_counts_by_subfamily'], sort_keys=True))
+          PY
