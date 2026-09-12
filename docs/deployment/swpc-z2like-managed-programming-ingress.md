@@ -94,6 +94,14 @@ The verifier also proves:
 - unknown API paths remain blocked;
 - invalid methods such as `GET /api/jobs` are rejected.
 
+Once both configured Mock Programming and this managed ingress have been explicitly enabled, future SWPC release upgrades use only:
+
+```bash
+sudo ./scripts/plasmactl deploy swpc-z2like
+```
+
+The top-level profile orchestrator preserves the declared add-on state, regenerates the Programming activation, rewrites managed-ingress evidence against the newly deployed base release, and re-runs both verifiers. A fresh base install does not implicitly enable this ingress. An incomplete state, such as managed-ingress evidence without its Plasma-owned Nginx configuration, fails closed before base deployment begins.
+
 ## Cloudflare configuration
 
 Use a **new hostname** for managed control, for example:
