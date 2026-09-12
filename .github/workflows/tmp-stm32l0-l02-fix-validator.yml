@@ -1,0 +1,40 @@
+name: Temporary STM32L0 L0.2 validator repair
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32l0-phase-l02-discovery
+    paths:
+      - ".github/workflows/tmp-stm32l0-l02-fix-validator.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32l0-phase-l02-discovery
+          fetch-depth: 0
+      - name: Repair Production prestate shape assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path=Path('data/device-catalog/research/validate_stm32l0_phase_l0_2_retained_evidence.py')
+          text=path.read_text()
+          old='''    production = validate_production_prestate()\n    req(len(production.get("entries", [])) == 912, "immutable Production prestate count drift")\n'''
+          new='''    production = validate_production_prestate()\n    counts = {item["family"]: item["row_count"] for item in production["sources"]}\n    req(sum(counts.values()) == 912, "immutable Production prestate count drift")\n    req(counts.get("STM32L0", 0) == 0, "immutable Production prestate unexpectedly contains STM32L0")\n'''
+          if old not in text:
+              raise SystemExit('expected validator block not found')
+          path.write_text(text.replace(old,new))
+          PY
+          git diff --check
+      - name: Commit repair
+        run: |
+          git config user.name "Gordon"
+          git config user.email "physicslu@gmail.com"
+          git add data/device-catalog/research/validate_stm32l0_phase_l0_2_retained_evidence.py
+          git commit -m "STM32L0 L0.2: fix immutable prestate replay"
+          git push origin HEAD:agent/device-catalog-stm32l0-phase-l02-discovery
