@@ -156,21 +156,20 @@ It:
 - adds regression coverage for full-vs-restricted endpoint semantics;
 - documents the routing incident and corrected topology.
 
-Current PR head:
+Routing/runtime acceptance commit:
 
 ```text
 83fac67ffa9891ce4245020cbf96c4d2d1c8232c
 ```
 
-CI on the PR head is green:
+CI history:
 
-```text
-Repository contracts      PASS
-Python and PL source tests PASS
-Z2 PS release candidate   PASS
-```
+- PR #502 was fully green at the routing/runtime acceptance commit.
+- After PR #503 published STM32C0 catalog data to `main`, the PR synthetic merge exposed stale SW/PPU tests that hard-coded the older Device Catalog inventory. This was unrelated to the Local Control Station routing change.
+- PR #505 repaired that cross-domain test coupling and merged to `main` as `9197142f210c9327977284e5fc76d2b73d7d046a`.
+- This handover refresh intentionally creates a new PR #502 head so GitHub revalidates #502 against the repaired `main`. The latest GitHub checks are authoritative for Gate 2 readiness.
 
-PR #502 is still open and requires Gate 2 merge approval.
+PR #502 remains open and requires Gate 2 merge approval after the fresh checks are green.
 
 After merge:
 
