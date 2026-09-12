@@ -1,0 +1,298 @@
+{
+  "adapter_id": "stm32c0-c0.3-metadata",
+  "base_device_count": 50,
+  "base_device_set_sha256": "62b05798b95e805596692c001e417f6620ce082909444960305c02e47376eb9e",
+  "base_devices": [
+    "STM32C011F4",
+    "STM32C011F6",
+    "STM32C011J4",
+    "STM32C011J6",
+    "STM32C031C4",
+    "STM32C031C6",
+    "STM32C031F4",
+    "STM32C031F6",
+    "STM32C031G4",
+    "STM32C031G6",
+    "STM32C031K4",
+    "STM32C031K6",
+    "STM32C051C6",
+    "STM32C051C8",
+    "STM32C051F6",
+    "STM32C051F8",
+    "STM32C051G6",
+    "STM32C051G8",
+    "STM32C051K6",
+    "STM32C051K8",
+    "STM32C071C8",
+    "STM32C071CB",
+    "STM32C071F8",
+    "STM32C071FB",
+    "STM32C071G8",
+    "STM32C071GB",
+    "STM32C071K8",
+    "STM32C071KB",
+    "STM32C071R8",
+    "STM32C071RB",
+    "STM32C091CB",
+    "STM32C091CC",
+    "STM32C091FB",
+    "STM32C091FC",
+    "STM32C091GB",
+    "STM32C091GC",
+    "STM32C091KB",
+    "STM32C091KC",
+    "STM32C091RB",
+    "STM32C091RC",
+    "STM32C092CB",
+    "STM32C092CC",
+    "STM32C092FB",
+    "STM32C092FC",
+    "STM32C092GB",
+    "STM32C092GC",
+    "STM32C092KB",
+    "STM32C092KC",
+    "STM32C092RB",
+    "STM32C092RC"
+  ],
+  "candidate_count": 220,
+  "capability_mapping_deferred": true,
+  "cmsis_alias_gate_applied": false,
+  "decision_counts": {
+    "manual_review_required": 0,
+    "metadata_ready": 220,
+    "reject": 0
+  },
+  "evidence_id": "stm32c0-c0.2-official-st-commercial-discovery-v1",
+  "exact_icpn_admission_deferred": true,
+  "fail_closed": true,
+  "family": "STM32C0",
+  "flash_geometry_qualified": false,
+  "full_stm32c0_surface_covered": false,
+  "inputs": {
+    "cmsis_alias_surface_bound": false,
+    "openocd_catalog_bound": false,
+    "ordering_authority_manifest": "stm32c0-phase-c0.3-ordering-authority.json",
+    "ordering_authority_manifest_sha256": "691733479e7f89ac9f9fe1dbd7cd95a7db6be8b27e7d75a77ae38b853d3899b0",
+    "production_manifest": "stm32c0-phase-c0.3-production-manifest-prestate.json",
+    "production_manifest_git_blob_sha": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+    "retained_discovery_baseline": "stm32c0-phase-c0.2-discovery-baseline.json",
+    "retained_discovery_baseline_sha256": "c25dbd2e13d57fd0b0a7c0b8212f684487d2d22fd3178f71b32b2196d07dbc4c",
+    "retained_discovery_manifest": "stm32c0-phase-c0.2-discovery-manifest.json",
+    "retained_discovery_manifest_sha256": "5f3ff84cf21825e132d4526b262ad5a10a2e604a5d6024633ffefed94e7cef36",
+    "retained_summary": "evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11/pilot-summary.json",
+    "retained_summary_sha256": "bbbfb5ccd7695bff2933ed87d4a45985221d6e267e5a75792be4e5a81b943612"
+  },
+  "metadata_contract": {
+    "bounded_active_base_device_count": 50,
+    "bounded_active_candidate_count": 220,
+    "canonical_admission_authorized": false,
+    "capability_mapping_deferred_to": "C0.4",
+    "cmsis_alias_gates_metadata": false,
+    "flash_geometry_qualified": false,
+    "identity_lifecycle_authority": "retained C0.2 official ST Quality & Reliability exact identity + Sample & Buy Marketing Status exact-set join",
+    "metadata_authority": "official ST datasheet Ordering Information",
+    "openocd_routing_gates_metadata": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "scope_expansion_authorized": false
+  },
+  "metadata_distribution": {
+    "flash_size": {
+      "128 KiB": 55,
+      "16 KiB": 20,
+      "256 KiB": 45,
+      "32 KiB": 51,
+      "64 KiB": 49
+    },
+    "option_suffix": {
+      "": 121,
+      "N": 16,
+      "NTR": 3,
+      "TR": 80
+    },
+    "package": {
+      "LQFP": 77,
+      "SO8N": 7,
+      "TSSOP": 31,
+      "UFBGA": 7,
+      "UFQFPN": 97,
+      "WLCSP": 1
+    },
+    "pin_count": {
+      "19": 1,
+      "20": 36,
+      "28": 31,
+      "32": 63,
+      "48": 57,
+      "64": 25,
+      "8": 7
+    },
+    "temperature_grade": {
+      "-40 to 105 C": 54,
+      "-40 to 125 C": 39,
+      "-40 to 85 C": 127
+    }
+  },
+  "metadata_row_count": 220,
+  "metadata_rows_sha256": "94ebe11fda28cb6d7b68c13c7edb4bf8341887f6146d52f72461bc6ef35bee19",
+  "openocd_routing_gate_applied": false,
+  "option_security_semantics_qualified": false,
+  "phase": "C0.3",
+  "physical_hil_qualified": false,
+  "policy_evidence": {
+    "authority_version": "stm32c0-c0.3-retained220-v1",
+    "ordering_authority_manifest": "stm32c0-phase-c0.3-ordering-authority.json",
+    "ordering_authority_manifest_sha256": "691733479e7f89ac9f9fe1dbd7cd95a7db6be8b27e7d75a77ae38b853d3899b0",
+    "ordering_documents": [
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 5,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c011f4.pdf",
+        "document_id": "DS13866",
+        "ordering_section": 7,
+        "pdf_page": 93,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": false,
+          "visual_review_note": "Official ST PDF structured text verified; screenshot retrieval cache miss is a transport limitation, not an authority failure."
+        },
+        "revision": 5,
+        "series": "STM32C011"
+      },
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 4,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c031c4.pdf",
+        "document_id": "DS13867",
+        "ordering_section": 7,
+        "pdf_page": 100,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": true,
+          "visual_review_note": "Official ST Ordering Information table visually and structurally verified."
+        },
+        "revision": 4,
+        "series": "STM32C031"
+      },
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 2,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c051c6.pdf",
+        "document_id": "DS14721",
+        "ordering_section": 7,
+        "pdf_page": 107,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": true,
+          "visual_review_note": "Official ST Ordering Information table visually and structurally verified."
+        },
+        "revision": 2,
+        "series": "STM32C051"
+      },
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 2,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c071c8.pdf",
+        "document_id": "DS14693",
+        "ordering_section": 7,
+        "pdf_page": 128,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": true,
+          "visual_review_note": "Official ST Ordering Information table visually and structurally verified, including N product-version semantics."
+        },
+        "revision": 2,
+        "series": "STM32C071"
+      },
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 3,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+        "document_id": "DS14720",
+        "ordering_section": 7,
+        "pdf_page": 121,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": true,
+          "visual_review_note": "Official ST shared STM32C091/STM32C092 Ordering Information table visually and structurally verified."
+        },
+        "revision": 3,
+        "series": "STM32C091"
+      },
+      {
+        "current_revision_check": {
+          "checked_on": "2026-09-12",
+          "observed_revision": 3,
+          "revision_drift": false,
+          "source": "official_st_datasheet_surface"
+        },
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+        "document_id": "DS14720",
+        "ordering_section": 7,
+        "pdf_page": 121,
+        "review": {
+          "structured_text": true,
+          "visual_ordering_table": true,
+          "visual_review_note": "Official ST shared STM32C091/STM32C092 Ordering Information table visually and structurally verified; 09x explicitly resolves to distinct 091 and 092 series."
+        },
+        "revision": 3,
+        "series": "STM32C092"
+      }
+    ],
+    "semantic_decisions": {
+      "c071_f_p": "F/P resolves to TSSOP20",
+      "c071_f_y": "F/Y resolves to WLCSP19; pin count is package-dependent",
+      "c071_option_N": "N is an official product-version option and is preserved",
+      "c071_option_NTR": "NTR is N product version plus tape-and-reel packing",
+      "c071_option_TR": "TR is packing and is distinct from N product version",
+      "c091_c092_shared_authority": "DS14720 is shared but 091 and 092 remain distinct manufacturer series",
+      "cmsis_role": "alias/name surface only; not commercial identity or metadata authority",
+      "openocd_role": "routing observation only; not metadata authority or metadata gate"
+    }
+  },
+  "policy_ready_exact_icpn_set_sha256": "b116f624e971a3be5c947e107589bdb4d1bf5f5b0585ecae71e743cfb7a2649a",
+  "production_snapshot": {
+    "base_device_count": 243,
+    "exact_icpn_count": 703,
+    "family_exact_icpn_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47,
+      "STM32G4": 25,
+      "STM32U0": 68
+    },
+    "source_manifest_git_blob_sha": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+    "stm32c0_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "runtime_support_claimed": false,
+  "schema_version": 1
+}
