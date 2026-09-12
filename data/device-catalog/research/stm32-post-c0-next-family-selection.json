@@ -1,0 +1,90 @@
+{
+  "authority_boundaries": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "candidate_evidence": {
+    "STM32L0": {
+      "active_candidate_targets": 16,
+      "active_exact_icpns_observed": 44,
+      "commercial_identity_access_clean": true,
+      "disposition": "ordering_review_candidate",
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 16,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 16
+    },
+    "STM32L1": {
+      "active_candidate_targets": 1,
+      "active_exact_icpns_observed": 1,
+      "commercial_identity_access_clean": true,
+      "disposition": "deprioritized_for_next_family_research_due_to_lifecycle",
+      "lifecycle_excluded_targets": 3,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 4,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 4
+    },
+    "STM32L4": {
+      "active_candidate_targets": 24,
+      "active_exact_icpns_observed": 60,
+      "commercial_identity_access_clean": true,
+      "disposition": "ordering_review_candidate",
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 24,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 24
+    }
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "current_shortlist": [
+    "STM32L1",
+    "STM32L0",
+    "STM32L4"
+  ],
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "inputs": {
+    "authoritative_probe_provenance_sha256": "e55b5a94090b36aa4b30b8539cf29c3513bafb3b79d0360031a3ad413f38e34d",
+    "authoritative_probe_summary": "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/probe-summary.json",
+    "authoritative_probe_summary_sha256": "45c3020462601e6cb36e726cc1acc4203abc36a96063a5223ab5c7511bcff02c",
+    "authoritative_targets_sha256": "767ad681a7d8e839cbf68b507babb2c417905a2f40a380566e773fa987ab9434",
+    "authoritative_workflow_run_id": 34674798156,
+    "openocd_catalog_sha256_at_acquisition": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "ordering_information_review": "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json",
+    "ordering_information_review_sha256": "d16e71cb322c7da754ed12cc1bd0e984015888cbf8bdb07685e1d87966ad8612",
+    "production_manifest_prestate": "data/device-catalog/research/stm32-post-c0-production-manifest-prestate.json",
+    "production_manifest_prestate_sha256": "15f9c9a9be8640bc0664b562c667f676d0084e4c157e01f582c87a10886c5420"
+  },
+  "method_findings": {
+    "authoritative_probe": "official ST Q&R exact identity joined to Sample & Buy Marketing Status only when exact Part Number sets match",
+    "ordering_review": "STM32L0 and STM32L4 have equivalent complete required Ordering Information evidence quality from official ST datasheets",
+    "selection_is_admission": false,
+    "selection_is_programming_support": false,
+    "stm32l1_lifecycle": "three of four representative subfamilies expose only NRND exact identities and are deprioritized for this next-family transaction",
+    "stm32l4_variant_lifecycle": "all 24 representative subfamilies retain Active exact identities; three extra non-Active STM32L462 variants remain exact-variant dispositions and do not exclude STM32L4",
+    "tie_break": "current post-C0 shortlist order selects STM32L0 only after manufacturer lifecycle and Ordering Information gates are equivalent"
+  },
+  "ordering_evidence_result": "equivalent_required_ordering_evidence_quality",
+  "ordering_review_candidates": [
+    "STM32L0",
+    "STM32L4"
+  ],
+  "schema_version": 1,
+  "scope": "next_family_research_only",
+  "selected_next_research_family": "STM32L0",
+  "selection_date": "2026-09-12",
+  "selection_id": "stm32-post-c0-next-family-selection-v1",
+  "selection_status": "selected_by_current_shortlist_order_after_equivalent_evidence",
+  "tie_break_policy": "current_post_c0_cross_family_prioritization_order_after_equivalent_required_evidence"
+}

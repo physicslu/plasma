@@ -1,0 +1,50 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L443CC",
+  "evidence_section_sha256": "db8e274667d25e6a80d69033fcd44078248cf0a5157cb4eccf46e6c6dbbdc09f",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L443CCF6TR",
+    "STM32L443CCT6",
+    "STM32L443CCT6TR",
+    "STM32L443CCU6",
+    "STM32L443CCY6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L443CCF6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L443CCT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L443CCT6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L443CCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L443CCY6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "162ff4bd9e608c9fd99dea2a88f7b9a17cb3d3034390205219e627526ec09215",
+  "retrieved_at_utc": "2026-09-12T05:23:18Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443cc.html"
+}

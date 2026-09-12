@@ -1,0 +1,38 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L100C6",
+  "evidence_section_sha256": "98b46845979b8e64b280be4fcd8e288a4c0884b7a291890723b6bfa6acb53484",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32L100C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "icpn": "STM32L100C6U6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32L100C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L100C6U6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "rendered_dom_sha256": "48e9256a4a1296b07d947944cef3760ab9fe8fb0d11248bf55703b0d29b408f1",
+  "retrieved_at_utc": "2026-09-12T05:09:23Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html"
+}

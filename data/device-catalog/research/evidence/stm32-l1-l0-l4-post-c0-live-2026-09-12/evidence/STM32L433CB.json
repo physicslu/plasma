@@ -1,0 +1,44 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L433CB",
+  "evidence_section_sha256": "0ab7e1d2c736a8ffbf7288e24abe8cba4b990e3f66ee09692e6b8488d7de4481",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L433CBT6",
+    "STM32L433CBT7",
+    "STM32L433CBU6",
+    "STM32L433CBY6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433cb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L433CBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L433CBT7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L433CBU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L433CBY6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "0978a2f491585fac842f8256d9150e196977c7a56f7de461215905c7867f0ed0",
+  "retrieved_at_utc": "2026-09-12T05:20:37Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433cb.html"
+}

@@ -1,0 +1,68 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L431CB",
+  "evidence_section_sha256": "5a1d06501829501d79bb3f8a48ec88a2a33cb4596b7355a4ee3250b85184939a",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L431CBT3",
+    "STM32L431CBT3TR",
+    "STM32L431CBT6",
+    "STM32L431CBT6TR",
+    "STM32L431CBU6",
+    "STM32L431CBU6TR",
+    "STM32L431CBY6TR",
+    "STM32L431CBY7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431cb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L431CBT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBT3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBT6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBU6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBY6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L431CBY7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "106aa9d0ce93d3a2d6db8c0995fd8aa82a1fc64e87377353ac2480b6bd5b2ea2",
+  "retrieved_at_utc": "2026-09-12T05:20:19Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431cb.html"
+}

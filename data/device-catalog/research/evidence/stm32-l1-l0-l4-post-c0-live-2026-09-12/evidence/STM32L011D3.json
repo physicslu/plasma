@@ -1,0 +1,32 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L011D3",
+  "evidence_section_sha256": "f8d51b5041d075640bbf4a7a7c339f2f797108357b9964125341d0f95f5c2928",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L011D3P6",
+    "STM32L011D3P6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L011D3P6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L011D3P6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "2ba48b82501bfd5ca7f787ef5e8f37ba2e31e1a7a96a2a871836be47a48b0e85",
+  "retrieved_at_utc": "2026-09-12T05:09:50Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html"
+}

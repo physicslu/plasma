@@ -1,0 +1,32 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L063C8",
+  "evidence_section_sha256": "dfd85c2ec5675c242833eccf2bd5b01e16bf73476a8e03e3452c10a2e35bc64f",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L063C8T6",
+    "STM32L063C8U6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L063C8T6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L063C8U6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "ad8b5718bd25a8082c6279e2f0dce7abbc675d7134f31312d53fb911886bb042",
+  "retrieved_at_utc": "2026-09-12T05:15:38Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html"
+}

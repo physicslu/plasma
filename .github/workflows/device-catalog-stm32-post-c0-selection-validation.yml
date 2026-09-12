@@ -1,0 +1,56 @@
+name: STM32 post-C0 next-family selection validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/run_stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/test_stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/stm32_post_c0_selection.py"
+      - "data/device-catalog/research/test_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/freeze_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/validate_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/stm32-post-c0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-c0-production-manifest-prestate.json"
+      - "data/device-catalog/research/device-catalog-stm32-post-c0-evidence-selection.md"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - ".github/workflows/device-catalog-stm32-post-c0-selection-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/run_stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/test_stm32_post_c0_evidence_probe.py"
+      - "data/device-catalog/research/stm32_post_c0_selection.py"
+      - "data/device-catalog/research/test_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/freeze_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/validate_stm32_post_c0_selection.py"
+      - "data/device-catalog/research/stm32-post-c0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-c0-production-manifest-prestate.json"
+      - "data/device-catalog/research/device-catalog-stm32-post-c0-evidence-selection.md"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - ".github/workflows/device-catalog-stm32-post-c0-selection-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-selection:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate bounded post-C0 evidence policy
+        run: python data/device-catalog/research/test_stm32_post_c0_evidence_probe.py
+      - name: Validate selection policy negative controls
+        run: python data/device-catalog/research/test_stm32_post_c0_selection.py
+      - name: Replay frozen selection bytes
+        run: python data/device-catalog/research/freeze_stm32_post_c0_selection.py --check
+      - name: Hard-lock post-C0 selection transaction
+        run: python data/device-catalog/research/validate_stm32_post_c0_selection.py

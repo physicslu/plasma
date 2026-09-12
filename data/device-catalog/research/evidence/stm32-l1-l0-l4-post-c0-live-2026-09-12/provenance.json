@@ -1,0 +1,17 @@
+{
+  "acquire_step_outcome": "success",
+  "attempted_targets": 44,
+  "bounded_probe_complete": true,
+  "dispositioned_targets": 44,
+  "executed_git_sha": "5bf22cf7d4fceeadc478047e1ced3a60e3a9fd8d",
+  "manual_review_targets": 0,
+  "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "phase": "post-C0-selection",
+  "production_manifest_sha256": "15f9c9a9be8640bc0664b562c667f676d0084e4c157e01f582c87a10886c5420",
+  "production_write_authorized": false,
+  "schema_version": 1,
+  "selected_next_research_family": false,
+  "source_repository": "physicslu/plasma",
+  "workflow_run_attempt": 1,
+  "workflow_run_id": 34674798156
+}
