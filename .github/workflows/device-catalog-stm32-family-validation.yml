@@ -73,7 +73,9 @@ on:
       - "data/device-catalog/research/evidence/stm32c0*/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Namespace v2 preserves one active matrix per PR while escaping a stale
+  # cancelled-run lock left by the previous concurrency group.
+  group: ${{ github.workflow }}-v2-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
