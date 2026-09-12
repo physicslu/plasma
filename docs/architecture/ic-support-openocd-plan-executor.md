@@ -203,23 +203,87 @@ Native PPU runtime-ready exact ICPNs:         0
 
 The software-executor count must not be presented as physical programming support. Likewise, the 286 deterministic OpenOCD target mappings are catalog-routing evidence, not 286 executable Programming Profiles. Native PPU readiness remains a separate future PL-related metric and is not advanced by this executor.
 
-## 11. Next hardware gate
+## 11. Site power/reset safety contract
+
+Offline programming introduces a stricter safety requirement than ordinary online debug: an already-programmed target must not be allowed to execute uncontrolled application code merely because target power was enabled in the Site socket.
+
+Plasma therefore defines a Site-level power/reset sequencing contract independently from the execution backend.
+
+Safety invariants:
+
+1. Target power is OFF by default.
+2. Site reset is asserted before target power is enabled.
+3. Power-good must be established before reset ownership can be transferred to the execution backend.
+4. Reset ownership may only be transferred to a backend path that guarantees connect-under-reset semantics.
+5. On success, failure, timeout, or cancellation, the Site must reclaim/assert reset before target power is removed.
+6. On cancellation while a backend operation is active, Plasma must reclaim/assert reset before cancelling the backend task/process.
+7. No other Site is affected by this sequence.
+
+Canonical sequence:
+
+```text
+SAFE / POWER OFF
+  -> Site assert reset
+  -> Target power ON
+  -> Wait power-good
+  -> Transfer reset control to execution backend
+  -> Backend operation
+  -> Site reclaim/assert reset
+  -> Target power OFF
+  -> SAFE
+```
+
+Cancellation sequence:
+
+```text
+Backend operation active
+  -> cancellation requested
+  -> Site reclaim/assert reset
+  -> cancel backend task/process
+  -> Target power OFF
+  -> SAFE
+```
+
+`transfer_reset_control_to_backend()` is an ownership handoff, not permission to let the target execute. For a future OpenOCD runtime, the implementation must prove that the SWD/SRST path can acquire the target under reset before the Site releases its own reset hold.
+
+The software contract is represented by `SiteSafetyControl` and `SiteSafetySequencer`. CI covers success, operation failure, cancellation ordering, power-good failure, invalid timeout, and best-effort power-off when reset reclaim itself fails.
+
+This does **not** enable real DUT power, NRST/SRST, PL control signals, or physical OpenOCD execution. The production route remains:
+
+```text
+hardware_runtime_ready = false
+```
+
+A future hardware implementation is expected to provide independent per-Site equivalents of:
+
+```text
+TARGET_PWR_EN
+TARGET_RESET_N / SRST
+TARGET_PWR_GOOD
+```
+
+Target voltage sense, current sense/current limit, and controlled discharge should be treated as recommended hardware-safety additions rather than assumptions embedded in the current software contract.
+
+When real OpenOCD runtime support is later enabled, unnecessary interactive services should remain disabled by default. GDB and Telnet are not required for normal offline programming; any automation interface must be explicitly scoped and locally restricted.
+
+## 12. Next hardware gate
 
 A later separately approved hardware phase may evaluate whether this **PS/OpenOCD** executor can be promoted to real OpenOCD runtime use. That phase must independently validate at least:
 
 - installed OpenOCD version and scripts on the PS-side runtime host;
 - adapter/interface configuration;
 - target detection;
-- reset/halt behavior;
+- connect-under-reset and reset-ownership handoff behavior;
+- per-Site target power control and power-good handling;
 - erase/program/verify/read behavior on known STM32F103 hardware;
-- cleanup/reset behavior after success, failure, timeout and cancellation;
+- cleanup/reset/power behavior after success, failure, timeout and cancellation;
 - evidence retention for the physical test.
 
-No PL involvement is required for that OpenOCD hardware gate.
+No PL involvement is required for the OpenOCD process itself, but PL may be used to implement the Site-level power/reset safety controls if that is the chosen hardware architecture.
 
 Until that gate passes, `hardware_runtime_ready` remains false.
 
-## 12. Non-goals
+## 13. Non-goals
 
 The current software executor contract does not:
 
