@@ -1,0 +1,97 @@
+name: STM32L4 L4.2 live commercial discovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32l4-l42-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-discovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate deterministic L4.2 boundary
+        run: |
+          python data/device-catalog/research/test_stm32l4_phase_l4_2_discovery.py
+          python data/device-catalog/research/stm32l4_phase_l4_2_discovery.py --targets-output /tmp/l4-targets.json >/dev/null
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/l4-targets.json'))
+          assert p['phase'] == 'L4.2' and p['family'] == 'STM32L4'
+          assert 24 <= p['base_device_count'] <= 207
+          assert len(p['base_device_counts_by_subfamily']) == 24
+          assert all(v is False for v in p['claims'].values())
+          print(f"STM32L4 L4.2 deterministic boundary: PASS ({p['base_device_count']} Base Devices)")
+          PY
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Acquire deterministic STM32L4 Base Device set
+        id: acquire
+        continue-on-error: true
+        run: |
+          mkdir -p .artifacts/stm32l4-l42/evidence
+          xvfb-run -a python data/device-catalog/research/run_stm32l4_phase_l4_2_discovery.py \
+            --delay 1.0 \
+            --timeout 75 \
+            --output .artifacts/stm32l4-l42/live-summary.json \
+            --targets-output .artifacts/stm32l4-l42/targets.json \
+            --evidence-dir .artifacts/stm32l4-l42/evidence
+
+      - name: Validate bounded discovery result
+        id: validate
+        if: always() && hashFiles('.artifacts/stm32l4-l42/live-summary.json') != ''
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('.artifacts/stm32l4-l42/live-summary.json'))
+          assert p['phase'] == 'L4.2' and p['family'] == 'STM32L4'
+          assert p['attempted'] == p['base_device_count']
+          assert p['commercial_identity_verified_targets'] == p['base_device_count']
+          assert p['dispositioned_targets'] == p['base_device_count']
+          assert p['identity_manual_intervention_required'] == 0
+          assert p['acquisition_failure'] == 0
+          assert p['source_unavailable_exclusions'] == 0
+          assert p['representative_continuity_clean'] is True
+          assert p['bounded_discovery_clean'] is True
+          assert all(v is False for v in p['claims'].values())
+          print(json.dumps({k:p[k] for k in [
+              'base_device_count','active_candidate_targets','lifecycle_excluded_targets',
+              'active_exact_icpn_candidates','excluded_non_active_part_numbers',
+              'routing_followup_required','bounded_discovery_clean']}, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload immutable live acquisition candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l4-l42-live-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: error
+          path: .artifacts/stm32l4-l42/
+
+      - name: Enforce bounded discovery gate
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "STM32L4 L4.2 live acquisition requires review." >&2
+            exit 1
+          fi
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            echo "STM32L4 L4.2 live evidence failed bounded summary validation." >&2
+            exit 1
+          fi
