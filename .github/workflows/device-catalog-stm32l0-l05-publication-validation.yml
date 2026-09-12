@@ -32,7 +32,9 @@ jobs:
         run: python -m unittest -v test_stm32l0_phase_l0_5_publication.py
       - name: Verify published state
         working-directory: data/device-catalog/research
-        run: python publish_stm32l0_phase_l0_5.py --verify
+        run: |
+          python publish_stm32l0_phase_l0_5.py --verify
+          python validate_stm32l0_phase_l0_5_publication.py
       - name: Enforce Production boundary
         working-directory: data/device-catalog/research
         run: |
