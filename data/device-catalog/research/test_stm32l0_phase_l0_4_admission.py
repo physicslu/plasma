@@ -13,20 +13,24 @@ class STM32L0PhaseL04AdmissionTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.plan = build_admission_plan()
 
-    def test_all_360_metadata_ready_identities_are_capability_dispositioned(self) -> None:
+    def test_all_360_metadata_ready_identities_are_uniquely_routable(self) -> None:
         self.assertEqual(self.plan["manufacturer_verified_identity_count"], 360)
         self.assertEqual(self.plan["metadata_ready_count"], 360)
+        self.assertEqual(self.plan["capability_admittable_count"], 360)
+        self.assertEqual(self.plan["capability_unresolved_count"], 0)
+        self.assertEqual(self.plan["capability_unresolved"], [])
+        self.assertEqual(self.plan["capability_unresolved_exact_icpns"], [])
         self.assertEqual(
-            self.plan["capability_admittable_count"] + self.plan["capability_unresolved_count"],
-            360,
+            self.plan["capability_unresolved_exact_set_sha256"],
+            "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         )
-        replay = self.plan["current_mapping_replay"]
-        self.assertEqual(replay["unique"] + replay["ambiguous"] + replay["unmapped"], 360)
-        self.assertEqual(replay["unique"], self.plan["capability_admittable_count"])
-        self.assertEqual(replay["ambiguous"] + replay["unmapped"], self.plan["capability_unresolved_count"])
+        self.assertEqual(
+            self.plan["current_mapping_replay"],
+            {"unique": 360, "ambiguous": 0, "unmapped": 0},
+        )
 
     def test_admitted_candidates_have_one_l0_ordering_pattern_route(self) -> None:
-        self.assertEqual(self.plan["candidate_count"], self.plan["capability_admittable_count"])
+        self.assertEqual(self.plan["candidate_count"], 360)
         for item in self.plan["candidates"]:
             mapping = item["base_mapping"]
             self.assertEqual(mapping["status"], "unique")
@@ -40,20 +44,17 @@ class STM32L0PhaseL04AdmissionTests(unittest.TestCase):
             self.assertEqual(row["existing_identifier_kind"], "ordering_pattern")
             self.assertEqual(row["mapping_status"], "deterministic_ordering_pattern")
 
-    def test_capability_unresolved_is_not_identity_or_metadata_rejection(self) -> None:
-        for item in self.plan["capability_unresolved"]:
-            self.assertEqual(item["identity_status"], "manufacturer_verified_active")
-            self.assertEqual(item["metadata_status"], "metadata_ready")
-            self.assertEqual(item["capability_status"], "openocd_ordering_pattern_unresolved")
-            self.assertIn(item["mapping"]["status"], {"ambiguous", "unmapped"})
+    def test_capability_gate_does_not_reclassify_identity_or_metadata(self) -> None:
         self.assertFalse(self.plan["capability_unresolved_is_identity_rejection"])
+        self.assertTrue(self.plan["bounded_commercial_surface_complete"])
+        self.assertTrue(self.plan["metadata_policy_clean"])
+        self.assertTrue(self.plan["capability_mapping_gate_applied"])
 
-    def test_framework_plan_is_clean_for_capability_admittable_subset(self) -> None:
-        counts = self.plan["decision_counts"]
-        self.assertEqual(counts["admit"], self.plan["capability_admittable_count"])
-        self.assertEqual(counts["already_present"], 0)
-        self.assertEqual(counts["manual_review_required"], 0)
-        self.assertEqual(counts["reject"], 0)
+    def test_framework_plan_is_clean_for_all_360_candidates(self) -> None:
+        self.assertEqual(
+            self.plan["decision_counts"],
+            {"admit": 360, "already_present": 0, "manual_review_required": 0, "reject": 0},
+        )
         self.assertEqual(self.plan["canonical_rows_before"], 0)
         self.assertEqual(self.plan["canonical_dataset_admission"], "planned")
         self.assertTrue(admission_plan_is_clean(self.plan))
@@ -61,7 +62,7 @@ class STM32L0PhaseL04AdmissionTests(unittest.TestCase):
     def test_packing_suffix_routing_does_not_change_exact_identity(self) -> None:
         items = [item for item in self.plan["candidates"] if item["icpn"].endswith("TR")]
         self.assertTrue(items)
-        for item in items[:12]:
+        for item in items:
             self.assertEqual(item["proposed_canonical_row"]["icpn"], item["icpn"])
             self.assertNotEqual(commercial_core(item["icpn"]), item["icpn"])
 
@@ -69,6 +70,7 @@ class STM32L0PhaseL04AdmissionTests(unittest.TestCase):
         production = self.plan["production_snapshot"]
         self.assertEqual(production["exact_icpn_count"], 912)
         self.assertEqual(production["base_device_count"], 293)
+        self.assertEqual(len(production["family_exact_icpn_counts"]), 10)
         self.assertEqual(production["stm32l0_exact_icpn_count"], 0)
         self.assertFalse(self.plan["canonical_write_applied"])
         self.assertFalse(self.plan["production_write_applied"])
