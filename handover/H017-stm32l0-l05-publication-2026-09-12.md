@@ -1,10 +1,10 @@
 # H017 — STM32L0 L0.5 Controlled Publication
 
-**Date:** 2026-09-12  
-**Status:** Gate 1 implementation complete; PR #516 Gate 2 candidate after final-head recheck  
-**Primary workstream:** Device Catalog / STM32L0 controlled publication  
-**Repository:** `physicslu/plasma`  
-**Branch:** `agent/device-catalog-stm32l0-phase-l05-publication`  
+**Date:** 2026-09-12
+**Status:** Gate 1 implementation complete; PR #516 Gate 2 candidate after final-head recheck
+**Primary workstream:** Device Catalog / STM32L0 controlled publication
+**Repository:** `physicslu/plasma`
+**Branch:** `agent/device-catalog-stm32l0-phase-l05-publication`
 **PR:** #516
 
 ## 1. Starting state
