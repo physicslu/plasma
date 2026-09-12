@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "review_id": "stm32-l0-l4-post-c0-official-st-ordering-information-review-v1",
+  "review_date": "2026-09-12",
+  "scope": {
+    "families": [
+      "STM32L0",
+      "STM32L4"
+    ],
+    "purpose": "compare official ST Ordering Information evidence quality after the post-C0 commercial identity/lifecycle probe",
+    "l0_representative_target_count": 16,
+    "l4_representative_target_count": 24,
+    "l0_unique_official_datasheet_count": 16,
+    "l4_unique_official_datasheet_count": 20
+  },
+  "method": {
+    "authority": "official_st_datasheet",
+    "review_mode": "official_st_pdf_structured_text_plus_visual_cross_check_where_renderable",
+    "required_ordering_fields": [
+      "device_family",
+      "product_type",
+      "device_subfamily",
+      "pin_count",
+      "flash_memory_size",
+      "package",
+      "temperature_range",
+      "packing_or_options"
+    ],
+    "current_revision_check_date": "2026-09-12",
+    "transport_diagnostics_are_selection_evidence": false,
+    "visual_screenshot_review_is_selection_gate": false,
+    "notes": [
+      "STM32L0 reuses the immutable 2026-09-11 official-ST Ordering Information review after a current authority-surface continuity check; no blocking evidence drift was found.",
+      "STM32L4 was reviewed across all 24 deterministic representative subfamilies using 20 current official ST datasheets; the STM32L4R5/R7/R9 and STM32L4S5/S7/S9 groups share family ordering authorities.",
+      "The three non-Active STM32L462 exact variants observed by the commercial lifecycle probe are variant-level lifecycle dispositions. Active STM32L462 variants remain present, so they do not create a family-level Ordering Information block.",
+      "Ordering Information completeness is commercial metadata evidence only; it is not programming-algorithm, Flash-controller, security, HIL, electrical/socket, or runtime evidence."
+    ]
+  },
+  "by_series": {
+    "STM32L0": {
+      "representative_targets": 16,
+      "unique_official_datasheets": 16,
+      "ordering_authority_covered_targets": 16,
+      "required_schema_complete_targets": 16,
+      "blocking_evidence_issues": 0,
+      "ordering_evidence_quality": "complete",
+      "prior_review": "stm32-c0-l0-post-u0-ordering-authority-review.json",
+      "prior_review_git_blob_sha": "ecf16ec5fa414fb82f7c4e4d28b10a26edf95cd9",
+      "revision_drift": false
+    },
+    "STM32L4": {
+      "representative_targets": 24,
+      "unique_official_datasheets": 20,
+      "ordering_authority_covered_targets": 24,
+      "required_schema_complete_targets": 24,
+      "blocking_evidence_issues": 0,
+      "ordering_evidence_quality": "complete",
+      "revision_drift": false
+    }
+  },
+  "l4_authorities": [
+    {
+      "datasheet_id": "DS12469",
+      "revision": 9,
+      "ordering_pdf_page": 194,
+      "covered_targets": ["STM32L412C8"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l412c8.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS12470",
+      "revision": 6,
+      "ordering_pdf_page": 185,
+      "covered_targets": ["STM32L422CB"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l422cb.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11453",
+      "revision": 3,
+      "ordering_pdf_page": 206,
+      "covered_targets": ["STM32L431CB"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l431cb.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11451",
+      "revision": 4,
+      "ordering_pdf_page": 153,
+      "covered_targets": ["STM32L432KB"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l432kb.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11449",
+      "revision": 8,
+      "ordering_pdf_page": 220,
+      "covered_targets": ["STM32L433CB"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l433cb.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11450",
+      "revision": 4,
+      "ordering_pdf_page": 154,
+      "covered_targets": ["STM32L442KC"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l442kc.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11421",
+      "revision": 6,
+      "ordering_pdf_page": 214,
+      "covered_targets": ["STM32L443CC"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l443cc.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11910",
+      "revision": 5,
+      "ordering_pdf_page": 204,
+      "covered_targets": ["STM32L451CC"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l451cc.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11912",
+      "revision": 7,
+      "ordering_pdf_page": 218,
+      "covered_targets": ["STM32L452CC"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l452cc.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11913",
+      "revision": 5,
+      "ordering_pdf_page": 207,
+      "covered_targets": ["STM32L462CE"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l462ce.pdf",
+      "required_fields_complete": true,
+      "special_semantics": [
+        "Active and non-Active commercial variants coexist; lifecycle status remains an exact-variant property."
+      ]
+    },
+    {
+      "datasheet_id": "DS10741",
+      "revision": 3,
+      "ordering_pdf_page": 226,
+      "covered_targets": ["STM32L471QE"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l471qe.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS10969",
+      "revision": 5,
+      "ordering_pdf_page": 201,
+      "covered_targets": ["STM32L475RC"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l475rc.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS10198",
+      "revision": 11,
+      "ordering_pdf_page": 261,
+      "covered_targets": ["STM32L476JE"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l476je.pdf",
+      "required_fields_complete": true,
+      "special_semantics": [
+        "Ordering grammar includes external-SMPS option and package-specific option fields in addition to packing."
+      ]
+    },
+    {
+      "datasheet_id": "DS10199",
+      "revision": 8,
+      "ordering_pdf_page": 250,
+      "covered_targets": ["STM32L486JG"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l486jg.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS11585",
+      "revision": 20,
+      "ordering_pdf_page": 274,
+      "covered_targets": ["STM32L496AE"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l496ae.pdf",
+      "required_fields_complete": true,
+      "special_semantics": [
+        "Official options distinguish integrated-LDO, external-SMPS, sawing/PFAS and related package variants."
+      ]
+    },
+    {
+      "datasheet_id": "DS11584",
+      "revision": 14,
+      "ordering_pdf_page": 275,
+      "covered_targets": ["STM32L4A6AG"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4a6ag.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS12903",
+      "revision": 3,
+      "ordering_pdf_page": 308,
+      "covered_targets": ["STM32L4P5AE"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4p5ae.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS12902",
+      "revision": 3,
+      "ordering_pdf_page": 308,
+      "covered_targets": ["STM32L4Q5AG"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4q5ag.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS12023",
+      "revision": 5,
+      "ordering_pdf_page": 304,
+      "covered_targets": ["STM32L4R5AG", "STM32L4R7AI", "STM32L4R9AG"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4r5ag.pdf",
+      "required_fields_complete": true
+    },
+    {
+      "datasheet_id": "DS12024",
+      "revision": 4,
+      "ordering_pdf_page": 271,
+      "covered_targets": ["STM32L4S5AI", "STM32L4S7AI", "STM32L4S9AI"],
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4s5ai.pdf",
+      "required_fields_complete": true
+    }
+  ],
+  "comparison": {
+    "eligible_for_current_priority_tiebreak": [
+      "STM32L0",
+      "STM32L4"
+    ],
+    "result": "equivalent_required_ordering_evidence_quality",
+    "selected_next_research_family": null
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "selected_next_research_family": false
+  }
+}
