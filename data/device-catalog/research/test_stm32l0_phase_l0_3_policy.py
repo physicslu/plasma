@@ -4,9 +4,10 @@ from __future__ import annotations
 import copy
 import unittest
 
-from device_catalog_admission_framework import CandidateManualReview, CandidateReject
+from device_catalog_admission_framework import CandidateReject
 from stm32l0_metadata_policy import (
     EXPECTED_ACTIVE_CANDIDATE_COUNT,
+    EXPECTED_L010_BASES,
     EXPECTED_SERIES,
     EXPECTED_TARGET_COUNT,
     METADATA_FIELDS,
@@ -48,34 +49,36 @@ class STM32L0PhaseL03PolicyTests(unittest.TestCase):
             self.assertTrue(record["option_suffixes"])
             self.assertTrue(series.startswith("STM32L0"))
 
+    def test_l010_is_partitioned_across_four_official_ordering_documents(self) -> None:
+        l010 = load_ordering_authority()["STM32L010"]
+        self.assertEqual(l010["coverage"], "document_partitioned_series")
+        documents = [l010, *l010["additional_documents"]]
+        self.assertEqual({doc["document_id"] for doc in documents}, {"DS12324", "DS12323", "DS12325", "DS12319"})
+        covered = {base for doc in documents for base in doc["covered_base_devices"]}
+        self.assertEqual(covered, EXPECTED_L010_BASES)
+        for doc in documents:
+            self.assertEqual(set(doc["option_suffixes"]), {"", "TR"})
+            self.assertEqual(doc["ordering_section"], 8)
+
     def test_special_ordering_semantics_remain_fail_closed(self) -> None:
         authority = load_ordering_authority()
-        l010 = authority["STM32L010"]
-        self.assertEqual(l010["coverage"], "explicit_base_only")
-        self.assertEqual(l010["covered_base_devices"], ["STM32L010C6"])
-        self.assertNotIn("D", l010["option_suffixes"])
-        self.assertNotIn("DTR", l010["option_suffixes"])
         self.assertIn("S", authority["STM32L031"]["option_suffixes"])
         self.assertIn("S", authority["STM32L041"]["option_suffixes"])
 
-    def test_all_360_candidates_are_deterministically_dispositioned_without_rejects(self) -> None:
-        counts = self.plan["decision_counts"]
-        self.assertEqual(sum(counts.values()), 360)
-        self.assertEqual(counts["reject"], 0)
-        self.assertEqual(counts["metadata_ready"] + counts["manual_review_required"], 360)
+    def test_all_360_candidates_are_metadata_ready_without_manual_or_reject(self) -> None:
+        self.assertEqual(self.plan["decision_counts"], {
+            "metadata_ready": 360,
+            "manual_review_required": 0,
+            "reject": 0,
+        })
         self.assertEqual(self.plan["candidate_count"], 360)
         self.assertEqual(self.plan["base_device_count"], 99)
-
-    def test_manual_review_is_limited_to_uncovered_l010_base_devices(self) -> None:
-        manual_bases = set(self.plan["manual_review_base_devices"])
-        self.assertTrue(manual_bases)
-        self.assertTrue(all(base.startswith("STM32L010") for base in manual_bases))
-        self.assertNotIn("STM32L010C6", manual_bases)
-        self.assertTrue(all(base != "STM32L010C6" for base in manual_bases))
+        self.assertEqual(self.plan["manual_review_base_devices"], [])
+        self.assertEqual(self.plan["issues"], [])
 
     def test_metadata_ready_rows_use_official_st_ordering_authority_only(self) -> None:
         ready = [item["metadata"] for item in self.plan["candidates"] if item["decision"] == "metadata_ready"]
-        self.assertTrue(ready)
+        self.assertEqual(len(ready), 360)
         for row in ready:
             self.assertIsNotNone(row)
             self.assertEqual(tuple(row), METADATA_FIELDS)
@@ -87,10 +90,17 @@ class STM32L0PhaseL03PolicyTests(unittest.TestCase):
             self.assertNotIn("openocd", row["source_reference"].lower())
             self.assertNotIn("cmsis", row["source_reference"].lower())
 
-    def test_uncovered_l010_base_fails_to_manual_review_instead_of_guessing_metadata(self) -> None:
-        candidate = next(item for item in self.candidates if item["base_device"].startswith("STM32L010") and item["base_device"] != "STM32L010C6")
-        with self.assertRaises(CandidateManualReview):
-            build_metadata_row(candidate, list(METADATA_FIELDS))
+    def test_l010_rows_bind_to_the_specific_covering_datasheet(self) -> None:
+        rows = {item["icpn"]: item["metadata"] for item in self.plan["candidates"] if item["base_device"].startswith("STM32L010")}
+        by_base: dict[str, set[str]] = {}
+        for row in rows.values():
+            by_base.setdefault(row["base_device"], set()).add(row["source_reference"])
+        self.assertEqual(by_base["STM32L010C6"], {"https://www.st.com/resource/en/datasheet/stm32l010c6.pdf"})
+        self.assertEqual(by_base["STM32L010F4"], {"https://www.st.com/resource/en/datasheet/stm32l010f4.pdf"})
+        self.assertEqual(by_base["STM32L010K4"], {"https://www.st.com/resource/en/datasheet/stm32l010f4.pdf"})
+        self.assertEqual(by_base["STM32L010K8"], {"https://www.st.com/resource/en/datasheet/stm32l010k8.pdf"})
+        self.assertEqual(by_base["STM32L010R8"], {"https://www.st.com/resource/en/datasheet/stm32l010k8.pdf"})
+        self.assertEqual(by_base["STM32L010RB"], {"https://www.st.com/resource/en/datasheet/stm32l010rb.pdf"})
 
     def test_legal_looking_but_unretained_exact_identity_is_rejected(self) -> None:
         candidate = copy.deepcopy(self.candidates[0])
