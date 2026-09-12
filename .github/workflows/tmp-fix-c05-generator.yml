@@ -1,0 +1,36 @@
+name: TEMP repair STM32C0 C0.5 generator
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32c0-phase-c05-publication
+    paths:
+      - ".github/workflows/tmp-fix-c05-generator.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32c0-phase-c05-publication
+      - name: Normalize generator repository paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/tmp-stm32c0-c05-generate.yml')
+          text = p.read_text()
+          old = '          HERE = Path("data/device-catalog/research")\n'
+          new = '          HERE = Path("data/device-catalog/research").resolve()\n'
+          if old not in text:
+              raise SystemExit('expected generator path line not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
+          git config user.name "plasma-catalog-bot"
+          git config user.email "plasma-catalog-bot@users.noreply.github.com"
+          git add .github/workflows/tmp-stm32c0-c05-generate.yml
+          git commit -m "C0.5: normalize temporary generator paths"
+          git push origin HEAD:agent/device-catalog-stm32c0-phase-c05-publication
