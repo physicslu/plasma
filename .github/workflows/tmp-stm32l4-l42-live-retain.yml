@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate deterministic L4.2 target boundary
+      - name: Validate deterministic L4.2 target and bounded-browser policy
         run: |
           python data/device-catalog/research/test_stm32l4_phase_l4_2_discovery.py
           python data/device-catalog/research/stm32l4_phase_l4_2_discovery.py --targets-output /tmp/l4-targets.json >/dev/null
@@ -46,7 +46,7 @@ jobs:
           python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
           python -m playwright install --with-deps chromium
 
-      - name: Acquire complete deterministic STM32L4 Base Device set
+      - name: Acquire complete deterministic STM32L4 Base Device set with global per-device deadline
         id: acquire
         continue-on-error: true
         run: |
@@ -79,6 +79,11 @@ jobs:
           assert s['representative_continuity_clean'] is True
           assert s['bounded_discovery_clean'] is True
           assert all(v is False for v in s['claims'].values())
+          browser=s.get('browser')
+          assert isinstance(browser, dict)
+          assert browser.get('reuse_browser') is True
+          assert browser.get('per_device_global_deadline') is True
+          assert browser.get('per_device_timeout_seconds') == 75.0
 
           leaf={}
           for p in sorted((root/'evidence').glob('*.json')):
@@ -102,7 +107,7 @@ jobs:
               'workflow_run_id':int(os.environ['GITHUB_RUN_ID']),
               'workflow_run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
               'acquisition_transport':s.get('acquisition_transport'),
-              'browser':s.get('browser'),
+              'browser':browser,
               'target_count':s['base_device_count'],
               'active_candidate_targets':s['active_candidate_targets'],
               'lifecycle_excluded_targets':s['lifecycle_excluded_targets'],
