@@ -115,8 +115,10 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(sharedJob, /ICPickerField/);
   assert.match(source, /<ProgrammingJobPanel[\s\S]*mode="production"/);
   assert.match(source, /targetDevice=\{targetDevice\}/);
-  assert.match(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
-  assert.match(source, /targetDevice:\s*targetDevice \? \{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \} : null/);
+  assert.match(source, /if \(!targetDevice\) \{/);
+  assert.match(source, /targetValid:\s*Boolean\(targetDevice\)/);
+  assert.doesNotMatch(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
+  assert.match(source, /targetDevice:\s*\{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \}/);
   assert.match(source, /allowSyntheticMockImage:\s*syntheticMockImageAvailable/);
   assert.match(sharedJob, /<OperatorPanelToggle/);
   assert.match(sharedPanel, /aria-expanded=\{expanded\}/);
