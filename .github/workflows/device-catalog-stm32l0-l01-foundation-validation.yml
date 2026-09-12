@@ -1,0 +1,45 @@
+name: STM32L0 L0.1 foundation validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32l0-phase-l0.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32-post-c0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-c0-l0-post-u0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-c0-production-manifest-prestate.json"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l0-l01-foundation-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32l0-phase-l0.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32l0_phase_l0_1_foundation.py"
+      - "data/device-catalog/research/stm32-post-c0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-c0-l0-post-u0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-c0-production-manifest-prestate.json"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l0-l01-foundation-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run L0.1 negative controls
+        run: python data/device-catalog/research/test_stm32l0_phase_l0_1_foundation.py
+      - name: Replay frozen L0.1 baseline
+        run: python data/device-catalog/research/stm32l0_phase_l0_1_foundation.py --check
+      - name: Run L0.1 hard-lock validator
+        run: python data/device-catalog/research/validate_stm32l0_phase_l0_1_foundation.py

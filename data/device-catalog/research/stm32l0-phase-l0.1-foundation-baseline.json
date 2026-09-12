@@ -1,0 +1,61 @@
+{
+  "claims": {
+    "canonical_admission_authorized": false,
+    "complete_family_inventory_claimed": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "evidence_foundation": {
+    "active_exact_icpns_observed": 44,
+    "l0_ordering_authority_review_sha256": "9f4bde47508100025d3d6e92813f244431a18d95cf3fc73a45de93849dddd38d",
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "ordering_comparison_review_sha256": "d16e71cb322c7da754ed12cc1bd0e984015888cbf8bdb07685e1d87966ad8612",
+    "production_manifest_prestate_sha256": "15f9c9a9be8640bc0664b562c667f676d0084e4c157e01f582c87a10886c5420",
+    "representative_count": 16,
+    "retained_probe_summary_sha256": "45c3020462601e6cb36e726cc1acc4203abc36a96063a5223ab5c7511bcff02c",
+    "scope": "representative_evidence_only_not_complete_family_inventory",
+    "selection_sha256": "a46cef39516bf94901b979ccfc446b5720b2c6855b46ede1765232f6082df134",
+    "target_manifest_sha256": "767ad681a7d8e839cbf68b507babb2c417905a2f40a380566e773fa987ab9434",
+    "unique_official_datasheets": 16
+  },
+  "family": "STM32L0",
+  "identifier_kind_counts": {
+    "cmsis_device_name": 2,
+    "ordering_pattern": 164
+  },
+  "initial_targets": [
+    {"base_device": "STM32L010C6", "subfamily": "STM32L010"},
+    {"base_device": "STM32L011D3", "subfamily": "STM32L011"},
+    {"base_device": "STM32L021D4", "subfamily": "STM32L021"},
+    {"base_device": "STM32L031C4", "subfamily": "STM32L031"},
+    {"base_device": "STM32L041C6", "subfamily": "STM32L041"},
+    {"base_device": "STM32L051C6", "subfamily": "STM32L051"},
+    {"base_device": "STM32L052C6", "subfamily": "STM32L052"},
+    {"base_device": "STM32L053C6", "subfamily": "STM32L053"},
+    {"base_device": "STM32L062C8", "subfamily": "STM32L062"},
+    {"base_device": "STM32L063C8", "subfamily": "STM32L063"},
+    {"base_device": "STM32L071C8", "subfamily": "STM32L071"},
+    {"base_device": "STM32L072CB", "subfamily": "STM32L072"},
+    {"base_device": "STM32L073CB", "subfamily": "STM32L073"},
+    {"base_device": "STM32L081CB", "subfamily": "STM32L081"},
+    {"base_device": "STM32L082CZ", "subfamily": "STM32L082"},
+    {"base_device": "STM32L083CB", "subfamily": "STM32L083"}
+  ],
+  "phase": "L0.1",
+  "schema_version": 1,
+  "scope": "bounded_research_foundation_only",
+  "source_row_count": 166,
+  "subfamilies": [
+    "STM32L010", "STM32L011", "STM32L021", "STM32L031",
+    "STM32L041", "STM32L051", "STM32L052", "STM32L053",
+    "STM32L062", "STM32L063", "STM32L071", "STM32L072",
+    "STM32L073", "STM32L081", "STM32L082", "STM32L083"
+  ],
+  "target_config": "tcl/target/stm32l0.cfg"
+}
