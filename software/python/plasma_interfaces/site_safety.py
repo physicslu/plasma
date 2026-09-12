@@ -33,8 +33,8 @@ class SiteSafetyControl(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def transfer_reset_control_to_programmer(self) -> None:
-        """Transfer reset ownership to a programmer that guarantees connect-under-reset.
+    async def transfer_reset_control_to_execution_backend(self) -> None:
+        """Transfer reset ownership to a backend that guarantees connect-under-reset.
 
         This is an ownership handoff, not a request to let the target run.
         A real implementation must not release uncontrolled execution merely
@@ -49,11 +49,11 @@ class SiteSafetyControl(ABC):
 
 
 class SiteSafetySequencer:
-    """Guard one programmer operation with fail-safe Site power/reset ordering.
+    """Guard one execution-backend operation with fail-safe power/reset ordering.
 
-    The programmer operation is shielded from caller cancellation so the Site
-    can first reclaim/assert reset. Only after reset is asserted does this
-    sequencer cancel the programmer task. Power is then removed.
+    The backend operation is shielded from caller cancellation so the Site can
+    first reclaim/assert reset. Only after reset is asserted does this sequencer
+    cancel the backend task. Power is then removed.
 
     This class is a software contract only. It does not make the OpenOCD
     hardware runtime ready by itself.
@@ -81,17 +81,17 @@ class SiteSafetySequencer:
         if first_error is not None:
             raise first_error
 
-    async def _cancel_after_reset(self, operation_task: asyncio.Task[ResultT] | None) -> None:
+    async def _cancel_after_reset(self, backend_task: asyncio.Task[ResultT] | None) -> None:
         first_error: BaseException | None = None
         try:
             await asyncio.shield(self.control.assert_reset())
         except BaseException as exc:
             first_error = exc
 
-        if operation_task is not None and not operation_task.done():
-            operation_task.cancel()
+        if backend_task is not None and not backend_task.done():
+            backend_task.cancel()
             try:
-                await operation_task
+                await backend_task
             except asyncio.CancelledError:
                 pass
             except BaseException as exc:
@@ -108,18 +108,18 @@ class SiteSafetySequencer:
             raise first_error
 
     async def run(self, operation: Callable[[], Awaitable[ResultT]]) -> ResultT:
-        """Run one programmer operation without an uncontrolled power/reset window."""
-        operation_task: asyncio.Task[ResultT] | None = None
+        """Run one backend operation without an uncontrolled power/reset window."""
+        backend_task: asyncio.Task[ResultT] | None = None
         try:
             await self.control.assert_reset()
             await self.control.power_on()
             await self.control.wait_power_good(self.power_good_timeout_s)
-            await self.control.transfer_reset_control_to_programmer()
+            await self.control.transfer_reset_control_to_execution_backend()
 
-            operation_task = asyncio.create_task(operation(), name="plasma-site-programmer-operation")
-            result = await asyncio.shield(operation_task)
+            backend_task = asyncio.create_task(operation(), name="plasma-site-backend-operation")
+            result = await asyncio.shield(backend_task)
         except asyncio.CancelledError:
-            await self._cancel_after_reset(operation_task)
+            await self._cancel_after_reset(backend_task)
             raise
         except BaseException:
             await self._safe_off()
