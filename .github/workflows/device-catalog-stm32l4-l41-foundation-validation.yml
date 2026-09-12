@@ -1,0 +1,52 @@
+name: STM32L4 L4.1 foundation validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/stm32l4-phase-l4.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/stm32-post-l0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-l0-production-manifest-prestate.json"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l4-l41-foundation-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/stm32l4-phase-l4.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32l4_phase_l4_1_foundation.py"
+      - "data/device-catalog/research/stm32-post-l0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-post-l0-production-manifest-prestate.json"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32l4-l41-foundation-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run L4.1 negative controls
+        run: python data/device-catalog/research/test_stm32l4_phase_l4_1_foundation.py
+      - name: Replay frozen L4.1 baseline
+        run: python data/device-catalog/research/stm32l4_phase_l4_1_foundation.py --check
+      - name: Run L4.1 hard-lock validator
+        run: python data/device-catalog/research/validate_stm32l4_phase_l4_1_foundation.py
+      - name: Enforce zero Production writes in this transaction
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production
