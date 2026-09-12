@@ -1,0 +1,422 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+managed_port="${PLASMA_SWPC_Z2LIKE_MANAGED_PORT:-18082}"
+base_evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
+managed_evidence="${PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE:-/opt/plasma/install/swpc-z2like-managed-ingress.json}"
+nginx_conf="${PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf}"
+nginx_marker="# Managed by Plasma SWPC Z2-like managed programming ingress"
+gateway_root="http://127.0.0.1:18080"
+route_profile="managed-programming-v1"
+
+say() {
+  printf '[plasmactl swpc-z2like-managed] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl swpc-z2like-managed] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_root() {
+  (( EUID == 0 )) || die "$1 requires root; run with sudo"
+}
+
+base_field() {
+  python3 - "$base_evidence" "$1" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+value = payload.get(sys.argv[2])
+if value is None:
+    raise SystemExit(1)
+print(value)
+PY
+}
+
+validate_base_install() {
+  [[ -f "$base_evidence" ]] || die "base SWPC Z2-like evidence is missing: $base_evidence"
+  python3 - "$base_evidence" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+expected = {
+    "schema_version": 1,
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+    "gateway_bind": "127.0.0.1:18080",
+}
+for field, value in expected.items():
+    if payload.get(field) != value:
+        raise SystemExit(f"base evidence field {field} is invalid: {payload.get(field)!r}")
+if not payload.get("release_id") or not payload.get("git_sha"):
+    raise SystemExit("base evidence is missing release identity")
+PY
+}
+
+validate_port() {
+  [[ "$managed_port" =~ ^[0-9]+$ ]] || die "managed ingress port must be numeric: $managed_port"
+  (( managed_port >= 1 && managed_port <= 65535 )) || die "managed ingress port is out of range: $managed_port"
+  for reserved in 9900 18080 18081; do
+    (( managed_port != reserved )) || die "managed ingress port conflicts with reserved Plasma port: $managed_port"
+  done
+  if [[ -f "$base_evidence" ]]; then
+    local restricted
+    restricted="$(base_field restricted_ingress 2>/dev/null || true)"
+    [[ "$restricted" != "127.0.0.1:$managed_port" ]] || die "managed ingress must not reuse restricted diagnostics ingress: $restricted"
+  fi
+}
+
+render_nginx() {
+  cat <<EOF
+$nginx_marker
+# This listener is intentionally loopback-only. A public hostname may target it
+# only behind an authenticated Cloudflare Access service-token policy. Plasma
+# Gateway remains the final application authorization/idempotency authority.
+server {
+    listen 127.0.0.1:$managed_port;
+    server_name _;
+
+    client_max_body_size 24m;
+    proxy_http_version 1.1;
+    proxy_read_timeout 125s;
+    proxy_send_timeout 125s;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto https;
+
+    location = /api/health/live {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/health/ready {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/node {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/status {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/security/me {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/devices/search {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/engineering/targets {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    # Managed UI visibility is read-only here. Mutation of Gateway communication
+    # policy or Linux PPU networking is intentionally outside this ingress.
+    location = /api/settings/gateway {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/settings/ppu-network {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/settings/sites {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/settings/sites/activation {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/settings/sites/[1-9][0-9]*$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    location = /api/mock/runtime {
+        limit_except GET POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/engineering/diagnostics/loopback {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/engineering/session {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    location = /api/jobs {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/jobs/[^/]+/cancel$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/jobs/[^/]+/files/[^/]+$ {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    location = /api/batches {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/batches/[^/]+$ {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/batches/[^/]+/cancel$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/batches/[^/]+/targets/[^/]+/[^/]+/cancel$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/status$ {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/programming-assets/check$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/programming-assets$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs/[^/]+/cancel$ {
+        limit_except POST { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs/[^/]+/files/[^/]+$ {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+
+    # Deliberately excluded from this Programming ingress:
+    # - /api/settings/ppu-network/activation*
+    # - POST /api/settings/ppu-network
+    # - POST /api/settings/gateway
+    # - arbitrary /api/* paths
+    location / { return 404; }
+}
+EOF
+}
+
+verify_json_ready() {
+  python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+if payload.get("ok") is not True or payload.get("execution") != "ready":
+    raise SystemExit(f"unexpected readiness payload: {payload!r}")
+'
+}
+
+verify_profile() {
+  require_command curl
+  require_command nginx
+  require_command python3
+  require_command ss
+  validate_base_install
+  validate_port
+  [[ -f "$nginx_conf" ]] || die "managed Nginx ingress is missing: $nginx_conf"
+  grep -Fxq "$nginx_marker" "$nginx_conf" || die "managed Nginx ingress is not Plasma-owned"
+  nginx -t >/dev/null
+
+  local listeners ready sites_status gateway_get network_get gateway_post network_post blocked_activation blocked_unknown method_blocked
+  listeners="$(ss -H -ltn "sport = :$managed_port")"
+  [[ -n "$listeners" ]] || die "managed ingress is not listening on port $managed_port"
+  while IFS= read -r line; do
+    [[ "$line" == *"127.0.0.1:$managed_port"* ]] || die "managed ingress is not loopback-only: $line"
+  done <<<"$listeners"
+
+  ready="$(curl --noproxy '*' --fail --silent --show-error --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/health/ready")"
+  verify_json_ready <<<"$ready"
+
+  sites_status="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/sites")"
+  [[ "$sites_status" == "200" ]] || die "managed Site Desired read is unavailable: HTTP $sites_status"
+
+  gateway_get="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/gateway")"
+  [[ "$gateway_get" == "200" ]] || die "managed Gateway settings read is unavailable: HTTP $gateway_get"
+
+  network_get="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
+  [[ "$network_get" == "200" ]] || die "managed PPU network settings read is unavailable: HTTP $network_get"
+
+  gateway_post="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    -X POST -H 'Content-Type: application/json' --data '{}' \
+    "http://127.0.0.1:$managed_port/api/settings/gateway")"
+  [[ "$gateway_post" == "403" ]] || die "managed ingress unexpectedly allowed Gateway settings mutation: HTTP $gateway_post"
+
+  network_post="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    -X POST -H 'Content-Type: application/json' --data '{}' \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
+  [[ "$network_post" == "403" ]] || die "managed ingress unexpectedly allowed PPU network mutation: HTTP $network_post"
+
+  blocked_activation="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network/activation")"
+  [[ "$blocked_activation" == "404" ]] || die "managed ingress unexpectedly exposed PPU network activation: HTTP $blocked_activation"
+
+  blocked_unknown="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/not-allowlisted")"
+  [[ "$blocked_unknown" == "404" ]] || die "managed ingress unexpectedly exposed an unknown API path: HTTP $blocked_unknown"
+
+  method_blocked="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/jobs")"
+  [[ "$method_blocked" == "403" ]] || die "managed ingress did not reject GET /api/jobs: HTTP $method_blocked"
+
+  say "PASS: loopback-only managed Programming ingress is bounded and operational"
+  say "edge-auth boundary: public exposure requires Cloudflare Access service-token enforcement"
+  say "qualification boundary: mock/software path only; no Z2/ARMv7/PL/FPGA/Site/IC claim"
+}
+
+write_evidence() {
+  local release_id git_sha
+  release_id="$(base_field release_id)"
+  git_sha="$(base_field git_sha)"
+  install -d -m 0755 "$(dirname "$managed_evidence")"
+  cat >"$managed_evidence" <<EOF
+{
+  "schema_version": 1,
+  "role": "swpc-z2like-managed-programming-ingress",
+  "listen": "127.0.0.1:$managed_port",
+  "upstream_gateway": "127.0.0.1:18080",
+  "route_profile": "$route_profile",
+  "edge_auth_required": "cloudflare-access-service-token",
+  "base_release_id": "$release_id",
+  "base_git_sha": "$git_sha",
+  "hardware_boundary": "closed"
+}
+EOF
+  chmod 0644 "$managed_evidence"
+}
+
+install_profile() {
+  require_root install
+  require_command curl
+  require_command nginx
+  require_command python3
+  require_command ss
+  validate_base_install
+  validate_port
+
+  if [[ -e "$nginx_conf" ]] && ! grep -Fxq "$nginx_marker" "$nginx_conf"; then
+    die "refusing to overwrite unmanaged Nginx config: $nginx_conf"
+  fi
+
+  if [[ ! -e "$nginx_conf" ]] && ss -H -ltn "sport = :$managed_port" | grep -q .; then
+    die "managed ingress port is already in use: $managed_port"
+  fi
+
+  local snapshot="" tmp_conf
+  if [[ -f "$nginx_conf" ]]; then
+    snapshot="$(mktemp /tmp/plasma-swpc-managed-nginx.XXXXXX)"
+    cp -a "$nginx_conf" "$snapshot"
+  fi
+  tmp_conf="$(mktemp "$(dirname "$nginx_conf")/.plasma-swpc-z2like-managed.XXXXXX")"
+  render_nginx >"$tmp_conf"
+  chmod 0644 "$tmp_conf"
+  chown root:root "$tmp_conf"
+  mv -f "$tmp_conf" "$nginx_conf"
+
+  rollback() {
+    local rc=$?
+    trap - ERR
+    set +e
+    if [[ -n "$snapshot" && -f "$snapshot" ]]; then
+      cp -a "$snapshot" "$nginx_conf"
+    else
+      rm -f "$nginx_conf"
+    fi
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1
+    rm -f "$snapshot"
+    exit "$rc"
+  }
+  trap rollback ERR
+
+  nginx -t
+  systemctl reload nginx
+  verify_profile
+  write_evidence
+  trap - ERR
+  rm -f "$snapshot"
+  say "installed managed Programming ingress: 127.0.0.1:$managed_port"
+}
+
+remove_profile() {
+  require_root remove
+  require_command nginx
+  [[ -f "$nginx_conf" ]] || die "managed Nginx ingress is not installed"
+  grep -Fxq "$nginx_marker" "$nginx_conf" || die "refusing to remove unmanaged Nginx config: $nginx_conf"
+  rm -f "$nginx_conf" "$managed_evidence"
+  nginx -t
+  systemctl reload nginx
+  say "removed managed Programming ingress"
+}
+
+status_profile() {
+  validate_port
+  printf 'Profile:        swpc-z2like-managed-programming\n'
+  printf 'Listen:         127.0.0.1:%s\n' "$managed_port"
+  printf 'Upstream:       127.0.0.1:18080\n'
+  printf 'Route profile:  %s\n' "$route_profile"
+  printf 'Edge auth:      Cloudflare Access service token REQUIRED\n'
+  printf 'Hardware:       CLOSED\n'
+  if [[ -f "$managed_evidence" ]]; then
+    printf 'Evidence:       %s\n' "$managed_evidence"
+  else
+    printf 'Evidence:       not-installed\n'
+  fi
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-swpc-z2like-managed-ingress COMMAND
+
+Commands:
+  install   Install/update loopback-only managed Programming ingress (default 18082)
+  verify    Read-only validation of route/method allowlist and loopback binding
+  status    Show managed ingress contract
+  remove    Remove only the Plasma-owned managed ingress
+
+Environment:
+  PLASMA_SWPC_Z2LIKE_MANAGED_PORT  Override managed ingress port (default 18082)
+
+This command does not expose the listener publicly. A Cloudflare Tunnel hostname
+may target this listener only after a Cloudflare Access service-token policy is
+configured for the Render Manager. The existing diagnostics ingress on 18081 is
+not modified.
+EOF
+}
+
+command="${1:-help}"
+case "$command" in
+  install) install_profile ;;
+  verify) verify_profile ;;
+  status) status_profile ;;
+  remove) remove_profile ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "unknown command: $command" ;;
+esac

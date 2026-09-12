@@ -38,3 +38,7 @@ services:
         value: swpc-ppu
       - key: PLASMA_RENDER_PPU_ENDPOINT
         sync: false
+      - key: PLASMA_RENDER_PPU_ACCESS_CLIENT_ID
+        sync: false
+      - key: PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET
+        sync: false
