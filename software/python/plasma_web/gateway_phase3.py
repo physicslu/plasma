@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from . import gateway_phase2 as phase2
+from .configured_mock_provider import ConfiguredMockEngineeringPPUProvider
 from .runtime_activation import (
     RuntimeActivationError,
     RuntimeActivationHelperClient,
@@ -181,10 +182,98 @@ def _strip_phase3_options(argv: list[str]) -> list[str]:
     return stripped
 
 
+def _run_configured_mock_gateway(known: argparse.Namespace) -> None:
+    """Run the normal Phase-3 Gateway against one configured local Mock PPU.
+
+    This path is intentionally explicit and opt-in.  It reuses the canonical
+    Phase-3 handler and REST contract, but supplies a provider that points at the
+    already-running local Plasma Server instead of instantiating the legacy
+    8-Facility / 32-PPU demo topology.
+    """
+
+    handler = PlasmaWebHandler
+    if not issubclass(handler, SiteRuntimeActivationSupportMixin):
+        raise RuntimeError("configured Phase 3 Gateway handler lacks Site runtime activation support")
+    if not issubclass(handler, phase2.PPUNetworkActivationSupportMixin):
+        raise RuntimeError("configured Phase 3 Gateway handler lacks PPU network activation support")
+    if not issubclass(handler, phase2.SiteConfigurationSupportMixin):
+        raise RuntimeError("configured Phase 3 Gateway handler lacks Site configuration support")
+
+    handler.configure_runtime_activation(known.runtime_activation_socket)
+    handler.configure_network_activation(
+        socket_path=known.network_activation_socket,
+        output_root=known.output_root,
+        plasma_host=known.plasma_host,
+        plasma_port=known.plasma_port,
+    )
+    handler.configure_site_configuration(known.ppu_config)
+
+    profile_path = known.engineering_configured_mock_profile or (
+        known.output_root / "configured-mock-runtime.yaml"
+    )
+    provider = ConfiguredMockEngineeringPPUProvider(
+        known.ppu_config,
+        mock_profile_path=profile_path,
+    )
+    provider.start()
+    catalog = provider.catalog()
+    print(
+        "Configured Engineering mock PPU provider ready: "
+        f"{catalog['facility_count']} facility / {catalog['ppu_count']} PPU / "
+        f"{catalog['site_count']} Sites"
+    )
+
+    original_handler = phase2.canonical_gateway.PlasmaWebHandler
+    phase2.canonical_gateway.PlasmaWebHandler = handler
+    try:
+        phase2.canonical_gateway.serve(
+            known.host,
+            known.port,
+            known.plasma_host,
+            known.plasma_port,
+            tuple(known.cors_origins or ["*"]),
+            known.output_root,
+            provider,
+            known.static_root,
+            known.gateway_settings,
+        )
+    finally:
+        provider.close()
+        handler.close_network_activation()
+        phase2.canonical_gateway.PlasmaWebHandler = original_handler
+
+
 def main() -> None:
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--runtime-activation-socket", type=Path)
+    pre.add_argument("--network-activation-socket", type=Path)
+    pre.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
+    pre.add_argument("--output-root", type=Path, default=Path("output"))
+    pre.add_argument("--plasma-host", default="127.0.0.1")
+    pre.add_argument("--plasma-port", type=int, default=9900)
+    pre.add_argument("--host", default="127.0.0.1")
+    pre.add_argument("--port", type=int, default=8080)
+    pre.add_argument("--gateway-settings", type=Path)
+    pre.add_argument("--static-root", type=Path)
+    pre.add_argument("--cors-origin", action="append", dest="cors_origins")
+    pre.add_argument(
+        "--engineering-configured-mock",
+        action="store_true",
+        help="Expose the canonical configured local PPU as the Engineering Mock Programming provider",
+    )
+    pre.add_argument(
+        "--engineering-configured-mock-profile",
+        type=Path,
+        help="Persistent Mock runtime profile for the configured local PPU",
+    )
     known, _ = pre.parse_known_args(sys.argv[1:])
+
+    if known.engineering_configured_mock:
+        if "--engineering-mock" in sys.argv:
+            raise SystemExit("--engineering-configured-mock and --engineering-mock are mutually exclusive")
+        _run_configured_mock_gateway(known)
+        return
+
     handler = PlasmaWebHandler
     if not issubclass(handler, SiteRuntimeActivationSupportMixin):
         raise RuntimeError("configured Phase 3 Gateway handler lacks Site runtime activation support")
