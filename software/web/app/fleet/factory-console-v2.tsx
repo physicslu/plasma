@@ -665,6 +665,34 @@ export default function FactoryConsoleV2() {
   const batchRunning = serverBatchRunning || batchSubmitting || batchAborting;
 
   useEffect(() => {
+    if (batchRunning) return;
+    setBatchSelection(current => {
+      const next: SelectionMap = {};
+      for (const [facilityId, ppus] of Object.entries(current)) {
+        for (const [ppuId, siteIds] of Object.entries(ppus)) {
+          const runtime = runtimes[targetKey(facilityId, ppuId)];
+          if (!runtime || runtime.loading || runtime.error) {
+            if (siteIds.length > 0) {
+              next[facilityId] ??= {};
+              next[facilityId][ppuId] = [...siteIds];
+            }
+            continue;
+          }
+          const enabledSiteIds = new Set(runtime.sites.filter(site => site.enabled).map(site => site.id));
+          const enabledSelection = siteIds.filter(siteId => enabledSiteIds.has(siteId));
+          if (enabledSelection.length > 0) {
+            next[facilityId] ??= {};
+            next[facilityId][ppuId] = enabledSelection;
+          }
+        }
+      }
+      const normalizedCurrent = normalizeSelection(current);
+      const normalizedNext = normalizeSelection(next);
+      return JSON.stringify(normalizedCurrent) === JSON.stringify(normalizedNext) ? current : normalizedNext;
+    });
+  }, [batchRunning, batchSelection, runtimes, setBatchSelection]);
+
+  useEffect(() => {
     if (!serverBatchRunning || !batchSnapshot?.started_at) return;
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -761,7 +789,7 @@ export default function FactoryConsoleV2() {
   const syntheticMockImageAvailable = catalog?.provider === "mock";
   const batchReadiness = evaluateBatchReadiness({
     providerOnline: gatewayHealth === "online" && Boolean(catalog && !providerError),
-    targetValid: syntheticMockImageAvailable || Boolean(targetDevice),
+    targetValid: Boolean(targetDevice),
     selectedSiteCount: batchCounts.sites,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
@@ -912,7 +940,7 @@ export default function FactoryConsoleV2() {
 
   async function executeBatch() {
     if (!catalog || batchRunning) return;
-    if (!targetDevice && !syntheticMockImageAvailable) {
+    if (!targetDevice) {
       setOperatorWarning(text.chooseTarget);
       return;
     }
@@ -947,7 +975,7 @@ export default function FactoryConsoleV2() {
     setBatchObservationState("connected");
     beginActivity();
     setBatchCommandState("submitting");
-    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice ? targetDevice.icpn ?? targetDevice.identifier : "MOCK"}`);
+    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice.icpn ?? targetDevice.identifier}`);
     try {
       const batchSessionId = requiresImage && !sessionId
         ? await ensureEngineeringSession(apiBase)
@@ -957,7 +985,7 @@ export default function FactoryConsoleV2() {
         targets,
         operations,
         executionPolicy,
-        targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
+        targetDevice: { vendor: targetDevice.vendor, identifier: targetDevice.identifier },
         assetFile: imageAsset,
         allowSyntheticMockImage: syntheticMockImageAvailable,
       });
