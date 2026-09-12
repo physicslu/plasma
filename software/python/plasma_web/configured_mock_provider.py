@@ -13,36 +13,26 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 
 from .engineering_targets import MockEngineeringPPUProvider, MockPPUSpec
-from .mock_synthetic_image import synthetic_mock_asset_from_context
-from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
 DEFAULT_MOCK_FLASH_SIZE_BYTES = 256 * 1024
 
 
-class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider):
-    """Expose one configured local PPU through the Engineering Programming contract.
+class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
+    """Bind Engineering Programming to one already-running configured Mock PPU.
 
-    Unlike ``SharedImageMockEngineeringPPUProvider``, this provider does not
-    create an independent demo topology or own any ``PlasmaServer`` process.
-    It binds the Engineering Web API to the already-running local Plasma Server
-    described by the canonical PPU YAML.  The configuration is deliberately
-    accepted only when every configured Site uses the ``mock`` interface, so
-    enabling this provider can never turn a real OpenOCD/FPGA Site into an
-    implicitly remote-programmable surface.
+    This provider does not create the legacy 8-Facility / 32-PPU demo topology
+    and does not own the local ``PlasmaServer`` lifecycle.  It reads the
+    canonical PPU YAML, exposes exactly that Facility/PPU/Site identity, and
+    sends normal Plasma Protocol Jobs to the independent local Server process.
 
-    The provider reuses the existing Engineering session/asset cache and Mock
-    runtime profile contracts.  Program/Verify sends normalized Image bytes over
-    Plasma Protocol to the separate local Server process; it must not use the
-    process-local Mock blob store used by the in-process 32-PPU demo provider.
+    Activation is deliberately fail-closed: every configured Site must use the
+    ``mock`` execution interface.  A later OpenOCD/FPGA Site therefore cannot be
+    made remotely programmable merely by leaving this Z2-like mock capability
+    enabled.
     """
 
-    def __init__(
-        self,
-        config_path: str | Path,
-        *,
-        mock_profile_path: str | Path | None = None,
-    ) -> None:
+    def __init__(self, config_path: str | Path) -> None:
         self.config_path = Path(config_path).resolve()
         initial = self._load_config()
         self._identity = (
@@ -58,7 +48,6 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
         super().__init__(
             root,
             flash_size_bytes=max(flash_sizes.values(), default=DEFAULT_MOCK_FLASH_SIZE_BYTES),
-            mock_profile_path=mock_profile_path,
         )
 
     @staticmethod
@@ -78,8 +67,8 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
                 context={"server_host": config.server.host},
             )
 
-    @classmethod
-    def _require_mock_sites(cls, config: PlasmaConfig) -> None:
+    @staticmethod
+    def _require_mock_sites(config: PlasmaConfig) -> None:
         unsupported = [site.id for site in config.sites if site.interface != "mock"]
         if unsupported:
             raise PlasmaError(
@@ -191,9 +180,8 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
                         except ValueError:
                             pass
                 except PlasmaError:
-                    # Keep the PPU-wide Image lease during transient observation
-                    # loss; fail-open release here could admit a conflicting Image
-                    # while the local Server still owns the first Job.
+                    # Do not fail-open the PPU-wide Image lease while the local
+                    # Server may still own the accepted Job.
                     pass
                 await asyncio.sleep(0.05)
         finally:
@@ -226,10 +214,7 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
                     "display_name": config.ppu.display_name,
                     "model": config.ppu.model,
                     "site_count": len(config.sites),
-                    # The execution interfaces are Mock, so the existing UI may
-                    # offer its Synthetic Image convenience without inventing a
-                    # second topology.
-                    "provider": "mock",
+                    "provider": "configured_mock",
                 }
             ],
         }
@@ -256,32 +241,6 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
             },
             "facilities": [facility],
         }
-
-    def cache_asset(
-        self,
-        session_id: str,
-        facility_id: str,
-        ppu_id: str,
-        asset_name: str,
-        asset_type: str,
-        asset_format: str,
-        asset_sha256: str,
-        data: bytes,
-    ) -> dict[str, object]:
-        # Do not populate the process-local Mock blob store: the configured
-        # Plasma Server is a separate process and consumes Image bytes over the
-        # normal Plasma Protocol framing.
-        return MockEngineeringPPUProvider.cache_asset(
-            self,
-            session_id,
-            facility_id,
-            ppu_id,
-            asset_name,
-            asset_type,
-            asset_format,
-            asset_sha256,
-            data,
-        )
 
     def _resolve_main_flash_read(self, request: JobRequest) -> JobRequest:
         if request.operation is not Operation.READ:
@@ -315,38 +274,27 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
         *,
         session_id: str | None = None,
         asset_sha256: str | None = None,
-    ) -> dict[str, object]:
-        request = self._resolve_main_flash_read(
-            self._decorate_mock_request(facility_id, ppu_id, request)
-        )
+    ) -> dict[str, Any]:
+        request = self._resolve_main_flash_read(request)
         lease_key: tuple[str, str] | None = None
         if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
-            if request.image or request.image_ref is not None:
+            if request.image:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "Engineering program/verify must use a session-cached or Mock Synthetic Programming Asset",
+                    "Engineering program/verify must use a session-cached Programming Asset",
                 )
-            if not session_id:
+            if not session_id or not asset_sha256:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "Engineering program/verify requires session_id",
+                    "configured Engineering program/verify requires session_id and asset_sha256",
                 )
-            if asset_sha256:
-                asset = self._cached_asset(session_id, facility_id, ppu_id, asset_sha256)
-                asset_origin = "user"
-            else:
-                context = request.metadata.get("mock_runtime")
-                if not isinstance(context, dict):
-                    raise PlasmaError(ErrorCode.CONFIG_INVALID, "Mock execution context is unavailable")
-                asset = synthetic_mock_asset_from_context(context)
-                asset_origin = "mock_synthetic"
+            asset = self._cached_asset(session_id, facility_id, ppu_id, asset_sha256)
             image = asset.normalize_image()
             lease_key = self._key(facility_id, ppu_id)
             self._reserve_ppu_image(lease_key, image.sha256, request.job_id)
             request = replace(
                 request,
                 image=image.data,
-                image_ref=None,
                 metadata={
                     **request.metadata,
                     "image_name": image.name,
@@ -354,7 +302,7 @@ class ConfiguredMockEngineeringPPUProvider(SharedImageMockEngineeringPPUProvider
                     "source_asset_sha256": asset.sha256,
                     "source_asset_type": asset.asset_type.value,
                     "source_asset_format": asset.asset_format.value,
-                    "source_asset_origin": asset_origin,
+                    "source_asset_origin": "user",
                 },
             )
         elif session_id is not None or asset_sha256 is not None:
