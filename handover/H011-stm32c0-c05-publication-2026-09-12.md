@@ -1,9 +1,9 @@
 # H011 — STM32C0 C0.5 Controlled Publication Handover
 
-**Date:** 2026-09-12  
-**Status:** C0.5 implementation complete on feature branch; Gate 2 pending  
-**Primary workstream:** Device Catalog / STM32C0  
-**Repository:** `physicslu/plasma`  
+**Date:** 2026-09-12
+**Status:** C0.5 implementation complete on feature branch; Gate 2 pending
+**Primary workstream:** Device Catalog / STM32C0
+**Repository:** `physicslu/plasma`
 **Branch:** `agent/device-catalog-stm32c0-phase-c05-publication`
 
 ## 1. Transaction boundary
