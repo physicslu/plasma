@@ -55,6 +55,14 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
     def update_mock_runtime_settings(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self.mock_runtime.update(raw)
 
+    def catalog(self) -> dict[str, Any]:
+        catalog = super().catalog()
+        catalog["programming_capabilities"] = {
+            "synthetic_programming_image": True,
+            "target_device_required": False,
+        }
+        return catalog
+
     def freeze_batch_context(self, batch_id: str) -> dict[str, Any]:
         if not isinstance(batch_id, str) or not batch_id:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Mock Batch ID is required")
