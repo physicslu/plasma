@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -67,16 +66,46 @@ class SiteSafetySequencer:
         self.power_good_timeout_s = power_good_timeout_s
 
     async def _safe_off(self) -> None:
-        await asyncio.shield(self.control.assert_reset())
-        await asyncio.shield(self.control.power_off())
+        first_error: BaseException | None = None
+        try:
+            await asyncio.shield(self.control.assert_reset())
+        except BaseException as exc:
+            first_error = exc
+
+        try:
+            await asyncio.shield(self.control.power_off())
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
+
+        if first_error is not None:
+            raise first_error
 
     async def _cancel_after_reset(self, operation_task: asyncio.Task[ResultT] | None) -> None:
-        await asyncio.shield(self.control.assert_reset())
+        first_error: BaseException | None = None
+        try:
+            await asyncio.shield(self.control.assert_reset())
+        except BaseException as exc:
+            first_error = exc
+
         if operation_task is not None and not operation_task.done():
             operation_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            try:
                 await operation_task
-        await asyncio.shield(self.control.power_off())
+            except asyncio.CancelledError:
+                pass
+            except BaseException as exc:
+                if first_error is None:
+                    first_error = exc
+
+        try:
+            await asyncio.shield(self.control.power_off())
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
+
+        if first_error is not None:
+            raise first_error
 
     async def run(self, operation: Callable[[], Awaitable[ResultT]]) -> ResultT:
         """Run one programmer operation without an uncontrolled power/reset window."""
