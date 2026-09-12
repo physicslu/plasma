@@ -32,6 +32,14 @@ def test_activation_requires_capable_runtime_and_rolls_back_failed_mutation() ->
     assert "Programming deactivation failed; previous activation restored" in text
 
 
+def test_activation_parses_canonical_yaml_with_qualified_plasma_python() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'plasma_python="$(base_field plasma_python)"' in text
+    assert '"$plasma_python" - "$ppu_config"' in text
+    assert 'python3 - "$base_evidence" "$ppu_config"' not in text
+
+
 def test_configured_provider_refuses_hardware_interfaces_and_reuses_local_server() -> None:
     text = PROVIDER.read_text(encoding="utf-8")
 
