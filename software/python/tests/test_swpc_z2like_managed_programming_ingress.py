@@ -23,9 +23,11 @@ def test_managed_programming_ingress_is_separate_and_loopback_only() -> None:
     assert "/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf" in base
 
 
-def test_ingress_exposes_programming_and_site_runtime_routes_but_not_network_mutation() -> None:
+def test_ingress_exposes_programming_and_site_runtime_routes_with_read_only_settings_visibility() -> None:
     source = INGRESS.read_text(encoding="utf-8")
     for route in (
+        "location = /api/settings/gateway {",
+        "location = /api/settings/ppu-network {",
         "location = /api/settings/sites {",
         "location = /api/settings/sites/activation {",
         "location = /api/mock/runtime {",
@@ -40,10 +42,11 @@ def test_ingress_exposes_programming_and_site_runtime_routes_but_not_network_mut
     ):
         assert route in source
 
-    assert "location = /api/settings/ppu-network" not in source
-    assert "location = /api/settings/gateway" not in source
-    assert "managed ingress unexpectedly exposed PPU network settings" in source
-    assert "managed ingress unexpectedly exposed Gateway settings" in source
+    assert "managed Gateway settings read is unavailable" in source
+    assert "managed PPU network settings read is unavailable" in source
+    assert "managed ingress unexpectedly allowed PPU network mutation" in source
+    assert "managed ingress unexpectedly allowed Gateway settings mutation" in source
+    assert "managed ingress unexpectedly exposed PPU network activation" in source
 
 
 def test_ingress_preserves_explicit_method_boundaries() -> None:
