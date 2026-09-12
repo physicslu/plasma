@@ -8,6 +8,8 @@ public_port="${PORT:-10000}"
 manager_port="${PLASMA_RENDER_MANAGER_PORT:-18180}"
 ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-swpc-ppu}"
 ppu_endpoint="${PLASMA_RENDER_PPU_ENDPOINT:-}"
+ppu_access_client_id="${PLASMA_RENDER_PPU_ACCESS_CLIENT_ID:-}"
+ppu_access_client_secret="${PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET:-}"
 manager_pid=""
 console_pid=""
 
@@ -27,6 +29,12 @@ if [[ ! "${ppu_alias}" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
   printf '[render-control-station] PLASMA_RENDER_PPU_ALIAS is invalid\n' >&2
   exit 64
 fi
+if [[ -n "${ppu_access_client_id}" || -n "${ppu_access_client_secret}" ]]; then
+  if [[ -z "${ppu_access_client_id}" || -z "${ppu_access_client_secret}" ]]; then
+    printf '[render-control-station] Cloudflare Access service identity requires both PLASMA_RENDER_PPU_ACCESS_CLIENT_ID and PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET\n' >&2
+    exit 78
+  fi
+fi
 if [[ ! -f "${console_root}/server.js" ]]; then
   printf '[render-control-station] Missing built Control Station runtime: %s/server.js\n' "${console_root}" >&2
   exit 69
@@ -45,8 +53,19 @@ if parsed.username is not None or parsed.password is not None:
 if parsed.query or parsed.fragment:
     raise SystemExit("PLASMA_RENDER_PPU_ENDPOINT must not contain query or fragment")
 if parsed.path not in {"", "/"}:
-    raise SystemExit("PLASMA_RENDER_PPU_ENDPOINT must identify the restricted ingress root")
+    raise SystemExit("PLASMA_RENDER_PPU_ENDPOINT must identify the managed PPU ingress root")
 PY
+
+# Cloudflare Access service identity is transport state, not Manager registry
+# state. Keep the secret out of manager.yaml and scope it to this exact endpoint.
+if [[ -n "${ppu_access_client_id}" ]]; then
+  export PLASMA_MANAGER_CF_ACCESS_ORIGIN="${ppu_endpoint%/}"
+  export PLASMA_MANAGER_CF_ACCESS_CLIENT_ID="${ppu_access_client_id}"
+  export PLASMA_MANAGER_CF_ACCESS_CLIENT_SECRET="${ppu_access_client_secret}"
+  printf '[render-control-station] Cloudflare Access service identity enabled for the configured PPU origin\n'
+else
+  unset PLASMA_MANAGER_CF_ACCESS_ORIGIN PLASMA_MANAGER_CF_ACCESS_CLIENT_ID PLASMA_MANAGER_CF_ACCESS_CLIENT_SECRET || true
+fi
 
 cleanup() {
   if [[ -n "${console_pid}" ]] && kill -0 "${console_pid}" 2>/dev/null; then
