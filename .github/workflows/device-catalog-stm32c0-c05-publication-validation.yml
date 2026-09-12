@@ -1,0 +1,46 @@
+name: STM32C0 C0.5 publication validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32c0-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.5-publication-*.json"
+      - "data/device-catalog/research/publish_stm32c0_phase_c0_5.py"
+      - "data/device-catalog/research/stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"
+      - ".github/workflows/device-catalog-stm32c0-c05-publication-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32c0-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json"
+      - "data/device-catalog/research/stm32c0-phase-c0.5-publication-*.json"
+      - "data/device-catalog/research/publish_stm32c0_phase_c0_5.py"
+      - "data/device-catalog/research/stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"
+      - ".github/workflows/device-catalog-stm32c0-c05-publication-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate historical admission replay and C0.5 publication
+        run: |
+          python data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py
+          python data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py
+          python data/device-catalog/research/publish_stm32c0_phase_c0_5.py --verify
