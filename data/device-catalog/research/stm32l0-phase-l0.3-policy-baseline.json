@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "phase": "L0.3",
+  "family": "STM32L0",
+  "adapter_id": "stm32l0-l0.3-metadata",
+  "candidate_count": 360,
+  "base_device_count": 99,
+  "decision_counts": {
+    "metadata_ready": 360,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "metadata_ready_exact_icpn_set_sha256": "8c7f0cc10829ff5e1ceb98cf6783247a5f685a9f1407dbd560a350348c0a521b",
+  "manual_review_set_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+  "reject_set_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+  "metadata_row_count": 360,
+  "metadata_rows_sha256": "6aefd256256febb6d5f48ec58e44b5fec64489593df333c68723581eb7786a95",
+  "metadata_distribution": {
+    "flash_size": {
+      "8 KiB": 11,
+      "16 KiB": 44,
+      "32 KiB": 75,
+      "64 KiB": 86,
+      "128 KiB": 64,
+      "192 KiB": 80
+    },
+    "option_suffix": {
+      "": 199,
+      "D": 14,
+      "DTR": 10,
+      "S": 2,
+      "STR": 3,
+      "TR": 132
+    },
+    "package": {
+      "LQFP": 155,
+      "TFBGA": 25,
+      "TSSOP": 24,
+      "UFBGA": 14,
+      "UFQFPN": 117,
+      "WLCSP": 25
+    },
+    "pin_count": {
+      "14": 10,
+      "20": 19,
+      "25": 7,
+      "28": 23,
+      "32": 91,
+      "36": 9,
+      "48": 90,
+      "49": 9,
+      "64": 74,
+      "100": 28
+    },
+    "series": {
+      "STM32L010": 12,
+      "STM32L011": 29,
+      "STM32L021": 8,
+      "STM32L031": 47,
+      "STM32L041": 13,
+      "STM32L051": 35,
+      "STM32L052": 31,
+      "STM32L053": 22,
+      "STM32L062": 3,
+      "STM32L063": 5,
+      "STM32L071": 50,
+      "STM32L072": 44,
+      "STM32L073": 30,
+      "STM32L081": 7,
+      "STM32L082": 7,
+      "STM32L083": 17
+    },
+    "temperature_grade": {
+      "-40..85 C": 264,
+      "-40..105 C": 56,
+      "-40..125 C": 40
+    }
+  },
+  "inputs": {
+    "retained_l0_2_evidence_id": "stm32l0-l0.2-official-st-discovery-2026-09-12-retained-20260912T110725Z-996489c8",
+    "retained_l0_2_active_exact_icpn_set_sha256": "8c7f0cc10829ff5e1ceb98cf6783247a5f685a9f1407dbd560a350348c0a521b",
+    "retained_l0_2_summary_sha256": "c664e6458d00f169b2653021284acb56664b607c245e97f51bf13f4a232d51de",
+    "ordering_authority_manifest": "stm32l0-phase-l0.3-ordering-authority.json",
+    "ordering_authority_git_blob_sha": "f1ad2e10396405ed3d156597598f73075cf81b67",
+    "production_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
+    "production_manifest_git_blob_sha": "8abfcc870e51ac4232cdf8d807828cfe4ff5662d"
+  },
+  "policy_evidence": {
+    "authority_version": "stm32l0-l0.3-retained360-v1",
+    "ordering_series_count": 16,
+    "official_datasheet_binding_count": 19,
+    "ordering_documents": [
+      {"series":"STM32L010","document_id":"DS12324","revision":3,"ordering_section":8,"pdf_page":87,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l010c6.pdf","covered_base_devices":["STM32L010C6"]},
+      {"series":"STM32L010","document_id":"DS12323","revision":3,"ordering_section":8,"pdf_page":89,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l010f4.pdf","covered_base_devices":["STM32L010F4","STM32L010K4"]},
+      {"series":"STM32L010","document_id":"DS12325","revision":3,"ordering_section":8,"pdf_page":90,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l010k8.pdf","covered_base_devices":["STM32L010K8","STM32L010R8"]},
+      {"series":"STM32L010","document_id":"DS12319","revision":3,"ordering_section":8,"pdf_page":87,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l010rb.pdf","covered_base_devices":["STM32L010RB"]},
+      {"series":"STM32L011","document_id":"DocID027973","revision":5,"ordering_section":8,"pdf_page":115,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l011d3.pdf"},
+      {"series":"STM32L021","document_id":"DocID027982","revision":5,"ordering_section":8,"pdf_page":110,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l021d4.pdf"},
+      {"series":"STM32L031","document_id":"DS10668","revision":6,"ordering_section":8,"pdf_page":120,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l031f4.pdf"},
+      {"series":"STM32L041","document_id":"DS10780","revision":6,"ordering_section":8,"pdf_page":118,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l041c6.pdf"},
+      {"series":"STM32L051","document_id":"DS10184","revision":10,"ordering_section":8,"pdf_page":125,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l051c6.pdf"},
+      {"series":"STM32L052","document_id":"DS10182","revision":10,"ordering_section":8,"pdf_page":142,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l052c6.pdf"},
+      {"series":"STM32L053","document_id":"DS10152","revision":10,"ordering_section":8,"pdf_page":132,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l053c6.pdf"},
+      {"series":"STM32L062","document_id":"DS10183","revision":11,"ordering_section":8,"pdf_page":117,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l062c8.pdf"},
+      {"series":"STM32L063","document_id":"DS10090","revision":8,"ordering_section":8,"pdf_page":123,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l063c8.pdf"},
+      {"series":"STM32L071","document_id":"DS10690","revision":7,"ordering_section":8,"pdf_page":143,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l071c8.pdf"},
+      {"series":"STM32L072","document_id":"DS10689","revision":5,"ordering_section":8,"pdf_page":155,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l072cb.pdf"},
+      {"series":"STM32L073","document_id":"DS10685","revision":7,"ordering_section":8,"pdf_page":156,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l073cb.pdf"},
+      {"series":"STM32L081","document_id":"DS10888","revision":6,"ordering_section":8,"pdf_page":114,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l081cb.pdf"},
+      {"series":"STM32L082","document_id":"DS10688","revision":7,"ordering_section":8,"pdf_page":126,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l082cz.pdf"},
+      {"series":"STM32L083","document_id":"DS10671","revision":5,"ordering_section":8,"pdf_page":144,"datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l083cz.pdf"}
+    ],
+    "semantic_decisions": {
+      "stm32l010": "Four official Ordering Information documents partition the six retained L010 Base Devices; suffix grammar is blank/TR only and no general D/BOR option is inherited.",
+      "stm32l031_S": "S is preserved as the official UFQFPN28 one-power-pair option.",
+      "stm32l041_S": "S is preserved as the official UFQFPN28 one-power-pair option.",
+      "openocd_role": "Routing observation only; not metadata authority or metadata gate.",
+      "cmsis_role": "Alias/name surface only; not commercial identity or metadata authority."
+    }
+  },
+  "production_snapshot": {
+    "exact_icpn_count": 912,
+    "base_device_count": 293,
+    "stm32_family_count": 10,
+    "stm32l0_exact_icpn_count": 0,
+    "source_manifest_git_blob_sha": "8abfcc870e51ac4232cdf8d807828cfe4ff5662d"
+  },
+  "metadata_contract": {
+    "identity_lifecycle_authority": "retained L0.2 official ST dual-surface exact-set evidence",
+    "metadata_authority": "official ST datasheet Ordering Information",
+    "canonical_admission_authorized": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "runtime_programming_support_claimed": false,
+    "openocd_routing_gates_metadata": false,
+    "cmsis_alias_gates_metadata": false,
+    "scope_expansion_authorized": false,
+    "admission_deferred_to": "L0.4"
+  },
+  "canonical_dataset_admission": "deferred",
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "physical_hil_qualified": false,
+  "runtime_support_claimed": false,
+  "fail_closed": true
+}
