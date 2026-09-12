@@ -79,6 +79,25 @@ PY
   plasma_python="$(base_field plasma_python)"
   [[ "$plasma_python" == /opt/plasma/python/*/bin/python3 ]] || die "unexpected Plasma Python path in evidence: $plasma_python"
   [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
+
+  # Fail before systemd mutation when the installed immutable PPU runtime predates
+  # this capability. This makes the required order explicit: deploy the new base
+  # swpc-z2like release first, then activate configured Mock Programming.
+  "$plasma_python" - "$current_app" <<'PY'
+import sys
+import zipfile
+
+path = sys.argv[1]
+with zipfile.ZipFile(path) as archive:
+    names = set(archive.namelist())
+    provider = "plasma_web/configured_mock_provider.py"
+    phase3 = "plasma_web/gateway_phase3.py"
+    if provider not in names or phase3 not in names:
+        raise SystemExit("installed PPU runtime does not contain configured Mock Programming support")
+    source = archive.read(phase3).decode("utf-8")
+    if "--engineering-configured-mock" not in source:
+        raise SystemExit("installed PPU runtime does not advertise configured Mock Programming support")
+PY
 }
 
 render_dropin() {
@@ -132,22 +151,53 @@ print(f"{expected_facility}/{expected_ppu}/{len(sites)}")
 PY
 }
 
+restore_dropin() {
+  local backup="$1"
+  local existed="$2"
+  if (( existed )); then
+    install -m 0644 "$backup" "$dropin"
+  else
+    rm -f "$dropin"
+  fi
+  systemctl daemon-reload || true
+  systemctl restart plasma-web.service || true
+}
+
 install_programming() {
   require_root install
   validate_base
   install -d -m 0755 "$dropin_dir"
-  local temporary
+
+  local backup temporary existed=0 topology
+  backup="$(mktemp /tmp/plasma-z2like-programming-backup.XXXXXX)"
   temporary="$(mktemp "$dropin_dir/.z2like-programming.XXXXXX")"
-  trap 'rm -f "$temporary"' RETURN
+  trap 'rm -f "$backup" "$temporary"' RETURN
+  if [[ -f "$dropin" ]]; then
+    cp -a "$dropin" "$backup"
+    existed=1
+  fi
+
   render_dropin >"$temporary"
   chmod 0644 "$temporary"
   mv -f "$temporary" "$dropin"
-  trap - RETURN
-  systemctl daemon-reload
-  systemctl restart plasma-web.service
-  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active after Programming activation"
-  local topology
-  topology="$(verify_catalog)" || die "configured Engineering Programming catalog verification failed"
+
+  if ! systemctl daemon-reload; then
+    restore_dropin "$backup" "$existed"
+    die "systemd daemon-reload failed; previous Programming activation restored"
+  fi
+  if ! systemctl restart plasma-web.service; then
+    restore_dropin "$backup" "$existed"
+    die "plasma-web.service restart failed; previous Programming activation restored"
+  fi
+  if ! systemctl is-active --quiet plasma-web.service; then
+    restore_dropin "$backup" "$existed"
+    die "plasma-web.service is not active; previous Programming activation restored"
+  fi
+  if ! topology="$(verify_catalog)"; then
+    restore_dropin "$backup" "$existed"
+    die "configured Engineering Programming verification failed; previous activation restored"
+  fi
+
   say "PASS: configured local Mock Programming provider is active: $topology"
   say "execution boundary: existing canonical PPU/Sites only; legacy 32-PPU demo topology is not instantiated"
   say "qualification boundary: software/mock only; no Z2/ARMv7/PL/FPGA/Site electrical/real-IC claim"
@@ -166,10 +216,21 @@ verify_programming() {
 
 remove_programming() {
   require_root remove
+  [[ -f "$dropin" ]] || { say "configured local Mock Programming provider is already deactivated"; return; }
+
+  local backup
+  backup="$(mktemp /tmp/plasma-z2like-programming-remove.XXXXXX)"
+  trap 'rm -f "$backup"' RETURN
+  cp -a "$dropin" "$backup"
   rm -f "$dropin"
-  systemctl daemon-reload
-  systemctl restart plasma-web.service
-  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active after Programming deactivation"
+
+  if ! systemctl daemon-reload || ! systemctl restart plasma-web.service || ! systemctl is-active --quiet plasma-web.service; then
+    install -d -m 0755 "$dropin_dir"
+    install -m 0644 "$backup" "$dropin"
+    systemctl daemon-reload || true
+    systemctl restart plasma-web.service || true
+    die "Programming deactivation failed; previous activation restored"
+  fi
   say "configured local Mock Programming provider deactivated"
 }
 
