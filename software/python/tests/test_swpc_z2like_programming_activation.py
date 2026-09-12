@@ -22,6 +22,16 @@ def test_z2like_programming_activation_is_explicit_and_single_ppu() -> None:
     assert "facility_count" in text and "ppu_count" in text
 
 
+def test_activation_requires_capable_runtime_and_rolls_back_failed_mutation() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'provider = "plasma_web/configured_mock_provider.py"' in text
+    assert "installed PPU runtime does not contain configured Mock Programming support" in text
+    assert "restore_dropin" in text
+    assert "previous Programming activation restored" in text
+    assert "Programming deactivation failed; previous activation restored" in text
+
+
 def test_configured_provider_refuses_hardware_interfaces_and_reuses_local_server() -> None:
     text = PROVIDER.read_text(encoding="utf-8")
 
