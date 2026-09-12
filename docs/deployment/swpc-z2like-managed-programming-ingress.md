@@ -60,7 +60,7 @@ Cloudflare Access is transport service identity only. Plasma Gateway remains the
 Prerequisite: the normal `swpc-z2like` profile must already pass:
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"
 sudo bash scripts/plasmactl-swpc-z2like verify
 ```
 
@@ -99,7 +99,7 @@ The verifier also proves:
 Use a **new hostname** for managed control, for example:
 
 ```text
-ppu-managed-lab.open4th.com
+ppu-managed-lab.example.com
 ```
 
 Cloudflare Tunnel origin:
@@ -125,7 +125,7 @@ The Access policy is an external deployment dependency. Repository tests cannot 
 Set the Render Z2Like service environment to the managed hostname:
 
 ```text
-PLASMA_RENDER_PPU_ENDPOINT=https://ppu-managed-lab.open4th.com
+PLASMA_RENDER_PPU_ENDPOINT=https://ppu-managed-lab.example.com
 PLASMA_RENDER_PPU_ACCESS_CLIENT_ID=<Cloudflare Access service-token client ID>
 PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET=<Cloudflare Access service-token secret>
 ```
@@ -145,7 +145,7 @@ This prevents the service credential from being sent to an unrelated PPU endpoin
 
 After SWPC, Cloudflare, and Render configuration are active:
 
-1. Render Z2Like Fleet shows `swpc-z2like-01`, Online/Healthy, 8 Sites.
+1. Render Z2Like Fleet shows the configured Z2-like PPU as Online/Healthy with 8 Sites.
 2. PPU/Site Configuration can read Site Desired and read-only network/Gateway state without `managed_upstream_non_json`.
 3. SITE1 remains enabled with `interface=mock` and the intended target.
 4. Engineering Programming can upload/check a binary Programming Asset.
