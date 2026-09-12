@@ -1,11 +1,12 @@
 # H017 — STM32L0 L0.5 Controlled Publication
 
 **Date:** 2026-09-12
-**Status:** Gate 1 implementation complete; PR #516 Gate 2 candidate after final-head recheck
+**Status:** Complete; PR #516 merged
 **Primary workstream:** Device Catalog / STM32L0 controlled publication
 **Repository:** `physicslu/plasma`
 **Branch:** `agent/device-catalog-stm32l0-phase-l05-publication`
 **PR:** #516
+**Merge commit:** `db2122c1cf57b8eff4207d94e40cd99f9fff4391`
 
 ## 1. Starting state
 
@@ -156,23 +157,23 @@ After correction, L0.3, L0.4, L0.5 and cross-family validation all pass together
 
 The final L0.5 workflow is read-only. The temporary bootstrap write capability was removed after deterministic materialization.
 
-## 8. Validation state before final Gate 2 recheck
+## 8. Gate 2 completion
 
-Validated after publication and historical-contract repair:
+Final pre-merge state:
 
-- STM32L0 L0.3 metadata validation — SUCCESS
-- STM32L0 L0.4 admission validation — SUCCESS
-- STM32L0 L0.5 publication validation — SUCCESS
-- STM32 cross-family prioritization validation — SUCCESS
-- Device catalog current validation — SUCCESS
-- Device catalog validation — SUCCESS
-- C0 publication/admission regressions — SUCCESS
-- evidence-accessibility / post-U0 selection regressions — SUCCESS
+- final head: `f6e36b74597b3e173bdadba47b14166ab0d4123f`
+- `main`: `19d818037e2661aa18266c92a29a7296e98e1f00`
+- final CI: 13/13 SUCCESS
+- mergeable: true
+- reviews: 0
+- review threads: 0
 
-A final-head CI and current-main drift/review check is still required before Gate 2.
+Gate 2 was explicitly approved. PR #516 merged at:
 
-## 9. Next action
+`db2122c1cf57b8eff4207d94e40cd99f9fff4391`
 
-Recheck PR #516 final head, current `main`, all CI, compare state, reviews and review threads. If merge-ready, request explicit **Gate 2 merge approval**.
+Post-merge `main` and the Production manifest were confirmed at the expected poststate.
 
-After L0.5 merges, STM32L0 catalog publication is complete. Any physical-programming qualification or a new STM32 family transaction requires a new Gate 1.
+## 9. Continuation
+
+STM32L0 catalog publication is complete. Use **H018 — STM32 Post-L0 Next-Family Selection** for the current STM32 Device Catalog continuation.
