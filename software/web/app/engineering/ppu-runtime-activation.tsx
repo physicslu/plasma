@@ -9,10 +9,13 @@ import {
 } from "../operator-ui/operator-surface";
 import {
   activateManagerPpuSiteDesired,
-  getManagerPpuSites,
   type ManagerRegistryEntry,
   type PPUSiteConfigurationPayload,
 } from "./ppu-registry-api";
+import {
+  getRuntimeActivationCapability,
+  type RuntimeActivationCapability,
+} from "./ppu-runtime-activation-capability";
 
 type Props = {
   entry: ManagerRegistryEntry;
@@ -26,6 +29,7 @@ type P3Configuration = PPUSiteConfigurationPayload["site_configuration"] & {
 
 export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Props) {
   const alias = entry.alias;
+  const [capability, setCapability] = useState<RuntimeActivationCapability | null>(null);
   const [payload, setPayload] = useState<PPUSiteConfigurationPayload | null>(null);
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,15 +38,25 @@ export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Prop
   const refresh = useCallback(async () => {
     if (!alias) return;
     try {
-      setPayload(await getManagerPpuSites(alias));
+      const next = await getRuntimeActivationCapability(alias);
+      setCapability(next);
+      setPayload(next.payload);
       setError(null);
     } catch (requestError) {
+      setCapability(null);
+      setPayload(null);
       setError(requestError instanceof Error ? requestError.message : "Runtime activation state unavailable");
     }
   }, [alias]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => { void refresh(); }, 0);
+    const initial = window.setTimeout(() => {
+      setCapability(null);
+      setPayload(null);
+      setError(null);
+      setNotice(null);
+      void refresh();
+    }, 0);
     const timer = alias ? window.setInterval(() => { void refresh(); }, 2500) : null;
     return () => {
       window.clearTimeout(initial);
@@ -54,19 +68,22 @@ export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Prop
   const desiredRuntimeRevision = configuration?.desired_runtime_revision ?? null;
   const runtimePpuId = configuration?.runtime_ppu_id ?? null;
   const reconciliation = configuration?.reconciliation ?? "actual_unavailable";
+  const capabilityUnsupported = capability?.supported === false;
 
   const blockReason = useMemo(() => {
     if (entry.lifecycle !== "commissioned") return "Validate & Enable this PPU before runtime activation.";
+    if (capabilityUnsupported) return "Not supported by this PPU profile.";
     if (hasActiveExecution) return "Runtime activation is blocked while any Site execution is active.";
+    if (!capability) return "Runtime activation capability is being checked.";
     if (!configuration) return "Runtime activation state is unavailable.";
-    if (!configuration.runtime_apply_supported) return "This PPU deployment does not expose the bounded runtime-activation helper.";
+    if (!configuration.runtime_apply_supported) return "Not supported by this PPU profile.";
     if (!desiredRuntimeRevision || !/^sha256:[0-9a-f]{64}$/.test(desiredRuntimeRevision)) return "Desired runtime revision is unavailable.";
     if (!runtimePpuId) return "Running PPU identity is unavailable; activation cannot safely verify identity.";
     if (reconciliation === "actual_unavailable") return "Runtime state is unavailable; activation cannot safely proceed.";
     if (reconciliation === "in_sync") return "Runtime already matches saved Desired configuration.";
     if (reconciliation === "partially_observable") return "Runtime effective disabled state is known, but dormant bindings are not observable in Protocol v3.3.";
     return null;
-  }, [configuration, desiredRuntimeRevision, entry.lifecycle, hasActiveExecution, reconciliation, runtimePpuId]);
+  }, [capability, capabilityUnsupported, configuration, desiredRuntimeRevision, entry.lifecycle, hasActiveExecution, reconciliation, runtimePpuId]);
 
   async function activate() {
     if (!alias || !desiredRuntimeRevision || !runtimePpuId || blockReason || activating) return;
@@ -90,6 +107,23 @@ export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Prop
     }
   }
 
+  const badgeTone = capabilityUnsupported
+    ? "muted"
+    : reconciliation === "in_sync"
+      ? "healthy"
+      : reconciliation === "restart_required"
+        ? "warning"
+        : "muted";
+  const badgeLabel = capabilityUnsupported
+    ? "Not Supported"
+    : reconciliation === "in_sync"
+      ? "Runtime In Sync"
+      : reconciliation === "restart_required"
+        ? "Activation Required"
+        : reconciliation === "partially_observable"
+          ? "Partially Observable"
+          : "Runtime Unavailable";
+
   return (
     <OperatorCard className="ppuSiteCard" ariaLabel="Site Desired Runtime Activation">
       <header className="ppuSiteCardHeader">
@@ -99,36 +133,44 @@ export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Prop
             Activation is PPU-level. It quiesces new Job admission, restarts only the Plasma Server, reloads the canonical Site Desired configuration, then verifies the same PPU identity and Runtime reconciliation.
           </p>
         </div>
-        <span className="ppuReconciliationBadge" data-tone={reconciliation === "in_sync" ? "healthy" : reconciliation === "restart_required" ? "warning" : "muted"}>
-          {reconciliation === "in_sync" ? "Runtime In Sync" : reconciliation === "restart_required" ? "Activation Required" : reconciliation === "partially_observable" ? "Partially Observable" : "Runtime Unavailable"}
+        <span className="ppuReconciliationBadge" data-tone={badgeTone}>
+          {badgeLabel}
         </span>
       </header>
 
-      <OperatorMessage className="ppuRegistryMessage warning" tone="warning" role="status">
-        <strong>All-Site impact:</strong> activating saved Desired configuration restarts the PPU programming server. It never applies unsaved Browser Drafts, and it is rejected if execution is active or the saved Desired revision changes before activation.
-      </OperatorMessage>
+      {capabilityUnsupported ? (
+        <OperatorMessage className="ppuRegistryMessage warning" tone="warning" role="status">
+          <strong>Runtime Activation:</strong> Not supported by this PPU profile. This is a capability boundary, not a runtime fault.
+        </OperatorMessage>
+      ) : (
+        <OperatorMessage className="ppuRegistryMessage warning" tone="warning" role="status">
+          <strong>All-Site impact:</strong> activating saved Desired configuration restarts the PPU programming server. It never applies unsaved Browser Drafts, and it is rejected if execution is active or the saved Desired revision changes before activation.
+        </OperatorMessage>
+      )}
       {error && <OperatorMessage className="ppuRegistryMessage error" tone="error" role="alert">{error}</OperatorMessage>}
       {notice && <OperatorMessage className="ppuRegistryMessage success" tone="success" role="status">{notice}</OperatorMessage>}
 
-      <div className="ppuConfigurationStateFlow" aria-label="Desired runtime activation flow">
-        <article className="ppuConfigurationStateStep" data-tone="info">
-          <small>Desired Revision</small>
-          <strong>{desiredRuntimeRevision ? desiredRuntimeRevision.slice(0, 18) + "…" : "Unavailable"}</strong>
-          <span>Aggregate revision is derived from all canonical per-Site Desired revisions.</span>
-        </article>
-        <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
-        <article className="ppuConfigurationStateStep" data-tone={hasActiveExecution ? "danger" : "healthy"}>
-          <small>Execution Gate</small>
-          <strong>{hasActiveExecution ? "Busy" : "Quiesce on activation"}</strong>
-          <span>Server-authoritative admission gate closes the idle-check → restart race.</span>
-        </article>
-        <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
-        <article className="ppuConfigurationStateStep" data-tone={reconciliation === "in_sync" ? "healthy" : "warning"}>
-          <small>Runtime</small>
-          <strong>{reconciliation === "in_sync" ? "In Sync" : "Reconcile after restart"}</strong>
-          <span>Identity and Desired revision are revalidated after Plasma Server restart.</span>
-        </article>
-      </div>
+      {!capabilityUnsupported && (
+        <div className="ppuConfigurationStateFlow" aria-label="Desired runtime activation flow">
+          <article className="ppuConfigurationStateStep" data-tone="info">
+            <small>Desired Revision</small>
+            <strong>{desiredRuntimeRevision ? desiredRuntimeRevision.slice(0, 18) + "…" : "Unavailable"}</strong>
+            <span>Aggregate revision is derived from all canonical per-Site Desired revisions.</span>
+          </article>
+          <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
+          <article className="ppuConfigurationStateStep" data-tone={hasActiveExecution ? "danger" : "healthy"}>
+            <small>Execution Gate</small>
+            <strong>{hasActiveExecution ? "Busy" : "Quiesce on activation"}</strong>
+            <span>Server-authoritative admission gate closes the idle-check → restart race.</span>
+          </article>
+          <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
+          <article className="ppuConfigurationStateStep" data-tone={reconciliation === "in_sync" ? "healthy" : "warning"}>
+            <small>Runtime</small>
+            <strong>{reconciliation === "in_sync" ? "In Sync" : "Reconcile after restart"}</strong>
+            <span>Identity and Desired revision are revalidated after Plasma Server restart.</span>
+          </article>
+        </div>
+      )}
 
       <OperatorActions className="ppuSiteCardHeaderActions">
         <OperatorButton
