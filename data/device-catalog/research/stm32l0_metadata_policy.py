@@ -33,6 +33,10 @@ EXPECTED_SERIES = {
     "STM32L051", "STM32L052", "STM32L053", "STM32L062", "STM32L063",
     "STM32L071", "STM32L072", "STM32L073", "STM32L081", "STM32L082", "STM32L083",
 }
+EXPECTED_L010_BASES = {
+    "STM32L010C6", "STM32L010F4", "STM32L010K4",
+    "STM32L010K8", "STM32L010R8", "STM32L010RB",
+}
 ICPN_RE = re.compile(r"^STM32L0[0-9A-Z]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 METADATA_FIELDS = (
@@ -41,6 +45,10 @@ METADATA_FIELDS = (
     "source_type", "source_reference", "source_authority", "verification_status",
 )
 PIN_COUNT = {"D":"14", "F":"20", "E":"25", "G":"28", "K":"32", "T":"36", "C":"48", "R":"64", "V":"100"}
+GENERIC_COVERAGE = {
+    "series_x3_x4", "series_x4", "series_x4_x6", "series_x6", "series_x6_x8",
+    "series_x8", "series_x8_xB_xZ",
+}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -58,6 +66,23 @@ def _require_sha256(value: object, label: str) -> str:
     if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
         raise CandidateReject(f"candidate lacks valid {label}")
     return value
+
+
+def _validate_document(record: dict[str, Any], *, common_temp: dict[str, Any], common_pkg: dict[str, Any], label: str) -> None:
+    url = record.get("datasheet_url")
+    if not isinstance(url, str) or not url.startswith("https://www.st.com/resource/en/datasheet/") or not url.endswith(".pdf"):
+        raise AdmissionError(f"{label}: invalid ST datasheet URL")
+    if not isinstance(record.get("document_id"), str) or not record["document_id"]:
+        raise AdmissionError(f"{label}: document ID missing")
+    if not isinstance(record.get("revision"), int) or record.get("ordering_section") != 8 or not isinstance(record.get("pdf_page"), int):
+        raise AdmissionError(f"{label}: incomplete datasheet binding")
+    for key in ("pin_codes", "flash", "package_codes", "temperature_codes", "option_suffixes"):
+        if not record.get(key):
+            raise AdmissionError(f"{label}: missing {key} authority")
+    if set(record["temperature_codes"]) - set(common_temp):
+        raise AdmissionError(f"{label}: unknown temperature code")
+    if set(record["package_codes"]) - set(common_pkg):
+        raise AdmissionError(f"{label}: unknown package code")
 
 
 def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str, dict[str, Any]]:
@@ -79,7 +104,8 @@ def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str
         raise AdmissionError("STM32L0 common package authority missing")
     records = payload.get("records")
     if not isinstance(records, list) or len(records) != 16:
-        raise AdmissionError("STM32L0 ordering authority requires 16 records")
+        raise AdmissionError("STM32L0 ordering authority requires 16 series records")
+
     by_series: dict[str, dict[str, Any]] = {}
     for record in records:
         if not isinstance(record, dict):
@@ -87,39 +113,53 @@ def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str
         series = record.get("series")
         if series not in EXPECTED_SERIES or series in by_series:
             raise AdmissionError(f"invalid/duplicate ordering series {series}")
-        url = record.get("datasheet_url")
-        if not isinstance(url, str) or not url.startswith("https://www.st.com/resource/en/datasheet/") or not url.endswith(".pdf"):
-            raise AdmissionError(f"{series}: invalid ST datasheet URL")
-        if not isinstance(record.get("revision"), int) or record.get("ordering_section") != 8 or not isinstance(record.get("pdf_page"), int):
-            raise AdmissionError(f"{series}: incomplete datasheet binding")
-        for key in ("pin_codes", "flash", "package_codes", "temperature_codes", "option_suffixes"):
-            if not record.get(key):
-                raise AdmissionError(f"{series}: missing {key} authority")
-        if set(record["temperature_codes"]) - set(common_temp):
-            raise AdmissionError(f"{series}: unknown temperature code")
-        if set(record["package_codes"]) - set(common_pkg):
-            raise AdmissionError(f"{series}: unknown package code")
+        _validate_document(record, common_temp=common_temp, common_pkg=common_pkg, label=series)
         by_series[series] = record
+
     if set(by_series) != EXPECTED_SERIES:
         raise AdmissionError("STM32L0 ordering-authority series set drifted")
+
     l010 = by_series["STM32L010"]
-    if l010.get("coverage") != "explicit_base_only" or l010.get("covered_base_devices") != ["STM32L010C6"]:
-        raise AdmissionError("STM32L010 authority must remain explicit-base-only")
-    if "D" in l010["option_suffixes"] or "DTR" in l010["option_suffixes"]:
-        raise AdmissionError("STM32L010 must not inherit general D/BOR option")
+    if l010.get("coverage") != "document_partitioned_series":
+        raise AdmissionError("STM32L010 must use document-partitioned authority")
+    additional = l010.get("additional_documents")
+    if not isinstance(additional, list) or len(additional) != 3:
+        raise AdmissionError("STM32L010 requires three additional official Ordering Information documents")
+    l010_docs = [l010, *additional]
+    covered: set[str] = set()
+    for index, document in enumerate(l010_docs):
+        if not isinstance(document, dict):
+            raise AdmissionError("STM32L010 authority document must be object")
+        _validate_document(document, common_temp=common_temp, common_pkg=common_pkg, label=f"STM32L010 document {index}")
+        bases = document.get("covered_base_devices")
+        if not isinstance(bases, list) or not bases or any(not isinstance(base, str) for base in bases):
+            raise AdmissionError("STM32L010 document lacks explicit Base Device coverage")
+        overlap = covered.intersection(bases)
+        if overlap:
+            raise AdmissionError(f"STM32L010 authority coverage overlaps: {sorted(overlap)}")
+        covered.update(bases)
+        if set(document["option_suffixes"]) != {"", "TR"}:
+            raise AdmissionError("STM32L010 must retain packing-only suffix grammar")
+    if covered != EXPECTED_L010_BASES:
+        raise AdmissionError(f"STM32L010 authority Base Device coverage drifted: {sorted(covered)}")
+
     if "S" not in by_series["STM32L031"]["option_suffixes"]:
         raise AdmissionError("STM32L031 S option authority missing")
+    if "S" not in by_series["STM32L041"]["option_suffixes"]:
+        raise AdmissionError("STM32L041 S option authority missing")
     return by_series
 
 
-def _base_covered(base: str, record: dict[str, Any]) -> bool:
+def _authority_for_base(base: str, record: dict[str, Any]) -> dict[str, Any] | None:
     covered = record.get("covered_base_devices")
-    if isinstance(covered, list):
-        return base in covered
-    return record.get("coverage") in {
-        "series_x3_x4", "series_x4", "series_x4_x6", "series_x6", "series_x6_x8",
-        "series_x8", "series_x8_xB_xZ",
-    }
+    if isinstance(covered, list) and base in covered:
+        return record
+    for document in record.get("additional_documents", []):
+        if isinstance(document, dict) and base in document.get("covered_base_devices", []):
+            return document
+    if record.get("coverage") in GENERIC_COVERAGE:
+        return record
+    return None
 
 
 def build_candidate_inputs() -> list[dict[str, Any]]:
@@ -145,6 +185,7 @@ def build_candidate_inputs() -> list[dict[str, Any]]:
     results = summary.get("results")
     if not isinstance(results, list) or len(results) != EXPECTED_TARGET_COUNT:
         raise AdmissionError("L0.2 result count drifted")
+
     candidates: list[dict[str, Any]] = []
     bases: set[str] = set()
     icpns: set[str] = set()
@@ -223,10 +264,11 @@ def build_metadata_row(candidate: dict[str, Any], fields: list[str] | None = Non
 
     series = base[:9]
     authorities = load_ordering_authority(authority_path)
-    authority = authorities.get(series)
-    if authority is None:
+    series_record = authorities.get(series)
+    if series_record is None:
         raise CandidateManualReview(f"{base}: no official Ordering Information authority")
-    if not _base_covered(base, authority):
+    authority = _authority_for_base(base, series_record)
+    if authority is None:
         raise CandidateManualReview(f"{base}: retained Ordering Information authority does not explicitly cover this Base Device")
 
     pin_code, flash_code = base[-2], base[-1]
