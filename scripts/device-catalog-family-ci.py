@@ -141,6 +141,7 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/stm32c0_phase_c0_3_policy.py"),
             _py("data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py"),
             _py("data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py"),
+            _py("data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"),
         ],
     }
     try:
@@ -215,6 +216,7 @@ def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_2_discovery.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_3_policy.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_4_admission.py"]) == ["stm32c0"]
+    assert affected_families(["data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/device-catalog-phase4.5c-stm32f0-policy.md"]) == ["stm32f0"]
     assert affected_families([".github/workflows/device-catalog-stm32f2-bounded-validation.yml"]) == ["stm32f2"]
     assert affected_families(["data/device-catalog/research/openocd-parts-canonical.csv"]) == list(FAMILIES)

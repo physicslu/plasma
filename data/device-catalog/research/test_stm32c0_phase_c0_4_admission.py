@@ -128,7 +128,7 @@ class STM32C0PhaseC04AdmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             altered = Path(tempdir) / "icpn-v1-manifest.json"
             altered.write_bytes(LIVE_PRODUCTION_MANIFEST.read_bytes() + b"\n")
-            with self.assertRaisesRegex(STM32C0AdmissionError, "Production manifest blob drifted"):
+            with self.assertRaisesRegex(STM32C0AdmissionError, "C0.3 Production prestate blob drifted"):
                 build_admission_plan(production_manifest_path=altered)
 
     def test_nonempty_canonical_prestate_fails_closed(self) -> None:
