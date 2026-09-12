@@ -15,7 +15,7 @@ export type RuntimeActivationCapability =
       reason: "site-settings-route-unavailable" | "runtime-apply-disabled";
     };
 
-export function isMissingRuntimeCapabilityRoute(error: unknown): boolean {
+export function isMissingSiteSettingsCapabilityRoute(error: unknown): boolean {
   return error instanceof ManagerApiError
     && error.status === 404
     && error.code === null
@@ -34,7 +34,7 @@ export async function getRuntimeActivationCapability(alias: string): Promise<Run
     }
     return { supported: true, payload };
   } catch (error) {
-    if (isMissingRuntimeCapabilityRoute(error)) {
+    if (isMissingSiteSettingsCapabilityRoute(error)) {
       return {
         supported: false,
         payload: null,
