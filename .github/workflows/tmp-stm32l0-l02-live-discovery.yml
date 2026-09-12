@@ -1,18 +1,13 @@
 name: Temporary STM32L0 L0.2 live discovery
 
 on:
-  pull_request:
-    paths:
-      - "data/device-catalog/research/stm32l0_phase_l0_2_discovery.py"
-      - "data/device-catalog/research/run_stm32l0_phase_l0_2_discovery.py"
-      - "data/device-catalog/research/test_stm32l0_phase_l0_2_discovery.py"
-      - ".github/workflows/tmp-stm32l0-l02-live-discovery.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tmp-stm32l0-l02-live-${{ github.event.pull_request.number }}
+  group: tmp-stm32l0-l02-live-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
