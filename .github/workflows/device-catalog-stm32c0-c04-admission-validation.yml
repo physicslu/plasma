@@ -1,0 +1,54 @@
+name: STM32C0 C0.4 admission validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32c0_admission_policy.py"
+      - "data/device-catalog/research/stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py"
+      - "data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json"
+      - "data/device-catalog/research/stm32c0_phase_c0_3_policy.py"
+      - "data/device-catalog/research/stm32c0_metadata_policy.py"
+      - "data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py"
+      - "data/device-catalog/research/evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11/**"
+      - ".github/workflows/device-catalog-stm32c0-c04-admission-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32c0_admission_policy.py"
+      - "data/device-catalog/research/stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py"
+      - "data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py"
+      - "data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json"
+      - "data/device-catalog/research/stm32c0_phase_c0_3_policy.py"
+      - "data/device-catalog/research/stm32c0_metadata_policy.py"
+      - "data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py"
+      - "data/device-catalog/research/evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11/**"
+      - ".github/workflows/device-catalog-stm32c0-c04-admission-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  admission-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate retained C0.2 evidence prerequisite
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py
+      - name: Replay frozen C0.3 metadata prerequisite
+        run: python data/device-catalog/research/stm32c0_phase_c0_3_policy.py
+      - name: Run C0.4 admission negative and boundary controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py
+      - name: Replay frozen C0.4 read-only admission plan
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py
