@@ -25,6 +25,8 @@ class STDualSurfaceBrowserAcquirer:
         family_label: str,
         headless: bool = True,
         navigation_attempts: int = DEFAULT_NAVIGATION_ATTEMPTS,
+        reuse_browser: bool = False,
+        global_deadline: bool = False,
     ) -> None:
         if navigation_attempts < 1:
             raise AcquisitionError("browser navigation attempts must be at least 1")
@@ -36,6 +38,8 @@ class STDualSurfaceBrowserAcquirer:
         self.family_label = family_label.strip()
         self.headless = headless
         self.navigation_attempts = navigation_attempts
+        self.reuse_browser = reuse_browser
+        self.global_deadline = global_deadline
         self.browser_version: str | None = None
         self._playwright: Any = None
         self._browser: Any = None
@@ -52,6 +56,8 @@ class STDualSurfaceBrowserAcquirer:
         self._timeout_error = PlaywrightTimeoutError
         self._playwright_error = PlaywrightError
         self._playwright = sync_playwright().start()
+        if self.reuse_browser:
+            self._launch_browser()
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
@@ -74,6 +80,25 @@ class STDualSurfaceBrowserAcquirer:
             self._browser.close()
         self._browser = None
 
+    def _operation_timeout_ms(self, *, deadline: float | None, timeout_seconds: float) -> int:
+        if deadline is None:
+            return max(1, int(timeout_seconds * 1000))
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AcquisitionError(
+                f"{self.family_label} per-device global acquisition deadline exceeded"
+            )
+        return max(1, int(remaining * 1000))
+
+    def _safe_close(self, resource: Any) -> None:
+        if resource is None:
+            return
+        try:
+            resource.close()
+        except Exception:
+            # Cleanup must not mask the authoritative acquisition result.
+            pass
+
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
         base_device = self.base_by_url.get(source_url)
@@ -81,26 +106,38 @@ class STDualSurfaceBrowserAcquirer:
             raise AcquisitionError(f"unregistered {self.family_label} acquisition URL")
         if timeout_seconds <= 0:
             raise AcquisitionError("browser acquisition timeout must be positive")
-        timeout_ms = int(timeout_seconds * 1000)
+        deadline = time.monotonic() + timeout_seconds if self.global_deadline else None
         last_error: AcquisitionError | None = None
 
         for attempt in range(1, self.navigation_attempts + 1):
-            self._close_browser()
-            self._launch_browser()
-            context = self._browser.new_context()
-            page = context.new_page()
+            if not self.reuse_browser:
+                self._close_browser()
+            if self._browser is None:
+                self._launch_browser()
+            context = None
+            page = None
             try:
+                context = self._browser.new_context()
+                page = context.new_page()
                 response = page.goto(
                     source_url,
                     wait_until="domcontentloaded",
-                    timeout=timeout_ms,
+                    timeout=self._operation_timeout_ms(
+                        deadline=deadline,
+                        timeout_seconds=timeout_seconds,
+                    ),
                 )
                 final_url = page.url
                 validate_source_url(final_url)
                 if response is not None and response.status >= 400:
                     raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
 
-                body_text = page.locator("body").inner_text(timeout=timeout_ms)
+                body_text = page.locator("body").inner_text(
+                    timeout=self._operation_timeout_ms(
+                        deadline=deadline,
+                        timeout_seconds=timeout_seconds,
+                    )
+                )
                 folded = body_text.casefold()
                 for marker in CHALLENGE_MARKERS:
                     if marker in folded:
@@ -108,7 +145,7 @@ class STDualSurfaceBrowserAcquirer:
                             f"browser acquisition encountered challenge marker: {marker}"
                         )
 
-                deadline = time.monotonic() + timeout_seconds
+                readiness_deadline = deadline or (time.monotonic() + timeout_seconds)
                 while True:
                     html_text = page.content()
                     if dual_surface_ready(html_text, base_device):
@@ -118,28 +155,45 @@ class STDualSurfaceBrowserAcquirer:
                                 f"rendered page exceeds {MAX_RESPONSE_BYTES} bytes"
                             )
                         return body, final_url, None, None
-                    remaining = deadline - time.monotonic()
+                    remaining = readiness_deadline - time.monotonic()
                     if remaining <= 0:
+                        if self.global_deadline:
+                            raise AcquisitionError(
+                                f"{self.family_label} per-device global acquisition deadline exceeded"
+                            )
                         raise AcquisitionError(
                             f"{self.family_label} dual-surface evidence readiness timed out: "
                             "Q&R exact identity / Sample & Buy Marketing Status join incomplete"
                         )
                     time.sleep(min(EVIDENCE_READINESS_POLL_SECONDS, remaining))
             except self._timeout_error as exc:
-                last_error = AcquisitionError("browser acquisition timed out")
-                if attempt >= self.navigation_attempts:
+                if deadline is not None and time.monotonic() >= deadline:
+                    last_error = AcquisitionError(
+                        f"{self.family_label} per-device global acquisition deadline exceeded"
+                    )
+                else:
+                    last_error = AcquisitionError("browser acquisition timed out")
+                if attempt >= self.navigation_attempts or (
+                    deadline is not None and time.monotonic() >= deadline
+                ):
                     raise last_error from exc
             except self._playwright_error as exc:
                 last_error = AcquisitionError("browser acquisition failed")
+                # A Playwright transport error can mean Chromium is no longer usable.
+                self._close_browser()
                 if attempt >= self.navigation_attempts:
                     raise last_error from exc
             except AcquisitionError as exc:
                 last_error = exc
-                if attempt >= self.navigation_attempts:
+                if attempt >= self.navigation_attempts or (
+                    deadline is not None and time.monotonic() >= deadline
+                ):
                     raise
             finally:
-                page.close()
-                context.close()
+                self._safe_close(page)
+                self._safe_close(context)
+                if not self.reuse_browser:
+                    self._close_browser()
 
         assert last_error is not None
         raise last_error
