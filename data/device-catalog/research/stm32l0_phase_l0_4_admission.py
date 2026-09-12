@@ -174,7 +174,7 @@ def build_admission_plan(
             "mapping_catalog_git_blob_sha": EXPECTED_MAPPING_CATALOG_GIT_BLOB,
             "canonical_dataset": DEFAULT_CANONICAL.name,
             "canonical_dataset_absent_before_admission": absent,
-            "production_manifest": PRODUCTION.name,
+            "production_manifest": "production/icpn-v1-manifest.json",
             "production_manifest_git_blob_sha": EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB,
         },
         row_builder=build_canonical_row,
