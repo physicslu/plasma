@@ -97,16 +97,15 @@ def build_selection(
             selected = None
             status = "blocked_no_active_clean_candidate"
             ordering_result = None
+        elif len(eligible) > 1:
+            selected = None
+            status = "blocked_multiple_active_candidates_require_new_comparison"
+            ordering_result = "new_current_ordering_comparison_required"
         else:
             validate_ordering_review(ordering_review, eligible)
-            if len(eligible) == 1:
-                selected = eligible[0]
-                status = "selected_only_remaining_active_clean_candidate_after_lifecycle_and_ordering_evidence"
-                ordering_result = "complete_for_only_remaining_active_clean_candidate"
-            else:
-                selected = None
-                status = "blocked_multiple_active_candidates_require_new_comparison"
-                ordering_result = "multiple_complete_candidates_require_explicit_current_comparison"
+            selected = eligible[0]
+            status = "selected_only_remaining_active_clean_candidate_after_lifecycle_and_ordering_evidence"
+            ordering_result = "complete_for_only_remaining_active_clean_candidate"
 
     candidate_evidence: dict[str, Any] = {}
     for series in CURRENT_SHORTLIST:
