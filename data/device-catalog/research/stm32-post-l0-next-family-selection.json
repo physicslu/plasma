@@ -1,0 +1,66 @@
+{
+  "authority_boundaries": {
+    "canonical_admission_authorized": false,
+    "exact_icpn_publication_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "ppu_physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "socket_physical_validation_claimed": false
+  },
+  "candidate_evidence": {
+    "STM32L1": {
+      "active_candidate_targets": 1,
+      "active_exact_icpns_observed": 1,
+      "commercial_identity_access_clean": true,
+      "disposition": "deprioritized_for_next_family_research_due_to_lifecycle",
+      "excluded_non_active_part_numbers": 8,
+      "lifecycle_excluded_targets": 3,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 4,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 4
+    },
+    "STM32L4": {
+      "active_candidate_targets": 24,
+      "active_exact_icpns_observed": 60,
+      "commercial_identity_access_clean": true,
+      "disposition": "ordering_review_candidate",
+      "excluded_non_active_part_numbers": 3,
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 24,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 24
+    }
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "current_shortlist": [
+    "STM32L1",
+    "STM32L4"
+  ],
+  "ordering_evidence_result": "complete_for_only_remaining_active_clean_candidate",
+  "ordering_review_candidates": [
+    "STM32L4"
+  ],
+  "production_prestate": {
+    "base_devices": 392,
+    "exact_icpns": 1272,
+    "stm32_families": 11,
+    "stm32l0_exact_icpns": 360
+  },
+  "retained_evidence_origin": "stm32-post-c0-official-st-evidence-accessibility-probe-v1",
+  "schema_version": 1,
+  "scope": "next_family_research_only",
+  "selected_next_research_family": "STM32L4",
+  "selection_date": "2026-09-12",
+  "selection_id": "stm32-post-l0-next-family-selection-v1",
+  "selection_reason": "STM32L1 remains lifecycle-deprioritized by retained official-ST exact-variant evidence; STM32L4 is the only current shortlist family with all representative targets Active and complete official-ST Ordering Information evidence.",
+  "selection_status": "selected_only_remaining_active_clean_candidate_after_lifecycle_and_ordering_evidence"
+}
