@@ -60,7 +60,7 @@ def document_bindings(authorities: dict[str, dict[str, Any]]) -> list[dict[str, 
                 "pdf_page": document["pdf_page"],
                 "datasheet_url": document["datasheet_url"],
             }
-            if isinstance(document.get("covered_base_devices"), list):
+            if series == "STM32L010" and isinstance(document.get("covered_base_devices"), list):
                 item["covered_base_devices"] = document["covered_base_devices"]
             docs.append(item)
     return docs
