@@ -1,10 +1,10 @@
 # H012 — STM32 Post-C0 Next-Family Evidence Selection Handover
 
-**Date:** 2026-09-12  
-**Status:** Gate 1 implementation complete; final PR qualification pending  
-**Primary workstream:** Device Catalog / STM32 next-family research selection  
-**Repository:** `physicslu/plasma`  
-**Branch:** `agent/device-catalog-post-c0-evidence-selection`  
+**Date:** 2026-09-12
+**Status:** Gate 1 implementation complete; final PR qualification pending
+**Primary workstream:** Device Catalog / STM32 next-family research selection
+**Repository:** `physicslu/plasma`
+**Branch:** `agent/device-catalog-post-c0-evidence-selection`
 **PR:** #504
 
 ## 1. Starting state
