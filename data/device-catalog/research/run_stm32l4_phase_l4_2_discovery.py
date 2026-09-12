@@ -31,6 +31,21 @@ def _playwright_version() -> str:
         return "unknown"
 
 
+def build_browser_acquirer(
+    *,
+    base_by_url: dict[str, str],
+    headless: bool,
+) -> STDualSurfaceBrowserAcquirer:
+    """Build the L4.2 transport with bounded per-device time and browser reuse."""
+    return STDualSurfaceBrowserAcquirer(
+        base_by_url=base_by_url,
+        family_label="STM32L4 L4.2 commercial discovery",
+        headless=headless,
+        reuse_browser=True,
+        global_deadline=True,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -44,9 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     rows = read_catalog(DEFAULT_CATALOG)
     targets = deterministic_targets(rows)
     base_by_url = {target.source_url: target.base_device for target in targets}
-    with STDualSurfaceBrowserAcquirer(
+    with build_browser_acquirer(
         base_by_url=base_by_url,
-        family_label="STM32L4 L4.2 commercial discovery",
         headless=args.headless,
     ) as acquirer:
         summary = run_discovery(
@@ -61,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
             "browser_version": acquirer.browser_version,
             "playwright_version": _playwright_version(),
             "evidence_profile": PARSER_PROFILE,
+            "reuse_browser": acquirer.reuse_browser,
+            "per_device_global_deadline": acquirer.global_deadline,
+            "per_device_timeout_seconds": args.timeout,
         }
         summary["commercial_identity_authority"] = COMMERCIAL_IDENTITY_AUTHORITY
 
