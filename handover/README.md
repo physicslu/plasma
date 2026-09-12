@@ -18,14 +18,14 @@ This directory contains numbered engineering handover documents intended to let 
 | [H010](H010-stm32c0-c04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32C0 C0.4 exact-ICPN read-only capability/admission plan | Superseded by H011 | Retain as C0.4 history |
 | [H011](H011-stm32c0-c05-publication-2026-09-12.md) | 2026-09-12 | STM32C0 C0.5 controlled publication of 209 capability-admittable exact ICPNs | Superseded by H012; PR #503 merged | Retain as C0.5 publication history |
 | [H012](H012-stm32-post-c0-evidence-selection-2026-09-12.md) | 2026-09-12 | Post-C0 L1/L0/L4 official-ST evidence comparison and deterministic STM32L0 selection | Complete; PR #504 merged | Retain as next-family selection history; use H013 for current STM32 work |
-| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Current; PR #506 in qualification | Finish PR #506 final-head qualification, then obtain Gate 2 merge approval |
+| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Current; PR #506 Gate 2 candidate | Verify PR #506 final head/main/reviews, then obtain Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H013 and AGENTS.md, then continue STM32L0 L0.1.
+Read repo handover H013 and AGENTS.md, verify PR #506 final-head CI and current main drift, then continue the Gate 2 transaction.
 ```
 
 For IC Support Architecture / hardware qualification:
