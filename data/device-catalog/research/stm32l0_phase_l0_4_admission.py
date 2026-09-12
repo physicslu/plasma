@@ -32,7 +32,7 @@ METADATA_ADAPTER_ID = "stm32l0-l0.3-metadata"
 DEFAULT_CANONICAL = HERE / "stm32l0-commercial-icpn.csv"
 DEFAULT_POLICY_BASELINE = HERE / "stm32l0-phase-l0.3-policy-baseline.json"
 DEFAULT_FROZEN_PLAN = HERE / "stm32l0-phase-l0.4-admission-plan.json"
-PRODUCTION = HERE.parent / "production/icpn-v1-manifest.json"
+PRODUCTION = HERE / "stm32l0-phase-l0.4-production-manifest-prestate.json"
 
 EXPECTED_METADATA_BASELINE_GIT_BLOB = "2cd2e001bc34c1f1335ae78e352e496e59d1e698"
 EXPECTED_METADATA_ROWS_SHA256 = "6aefd256256febb6d5f48ec58e44b5fec64489593df333c68723581eb7786a95"
@@ -90,7 +90,7 @@ def _is_unique_mapping(mapping: dict[str, Any]) -> bool:
 
 def build_admission_plan(
     *,
-    canonical_path: Path | None = DEFAULT_CANONICAL,
+    canonical_path: Path | None = None,
     mapping_catalog_path: Path = DEFAULT_CATALOG,
 ) -> dict[str, Any]:
     if validate_l0_3() != 0:
@@ -111,7 +111,7 @@ def build_admission_plan(
     if _git_blob_sha(mapping_catalog_path) != EXPECTED_MAPPING_CATALOG_GIT_BLOB:
         raise STM32L0AdmissionError("OpenOCD mapping catalog bytes drifted")
     if _git_blob_sha(PRODUCTION) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
-        raise STM32L0AdmissionError("Production manifest drifted after L0.3")
+        raise STM32L0AdmissionError("L0.4 frozen Production prestate drifted")
 
     catalog_rows = read_catalog(mapping_catalog_path)
     all_candidates = build_candidate_inputs()

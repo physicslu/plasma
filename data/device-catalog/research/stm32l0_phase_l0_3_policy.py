@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 PHASE = "L0.3"
 ADMISSION_PHASE = "L0.4"
-PRODUCTION = REPO / "data/device-catalog/production/icpn-v1-manifest.json"
+PRODUCTION = HERE / "stm32l0-phase-l0.4-production-manifest-prestate.json"
 EXPECTED_PRODUCTION_BLOB = "8abfcc870e51ac4232cdf8d807828cfe4ff5662d"
 EXPECTED_PRODUCTION_COUNTS = {
     "STM32F0":42,"STM32F1":75,"STM32F2":33,"STM32F3":10,"STM32F4":384,
@@ -40,11 +40,11 @@ def _rows_sha(rows: list[dict[str,str]]) -> str:
 
 def production_snapshot() -> dict[str,Any]:
     if _git_blob(PRODUCTION) != EXPECTED_PRODUCTION_BLOB:
-        raise RuntimeError("L0.3 Production manifest byte identity drifted")
+        raise RuntimeError("L0.3 Production prestate byte identity drifted")
     payload=json.loads(PRODUCTION.read_text())
     counts={x["family"]:x["row_count"] for x in payload["sources"]}
     if counts != EXPECTED_PRODUCTION_COUNTS:
-        raise RuntimeError(f"L0.3 Production family counts drifted: {counts}")
+        raise RuntimeError(f"L0.3 Production prestate family counts drifted: {counts}")
     bases=set()
     import csv
     for src in payload["sources"]:
@@ -52,7 +52,7 @@ def production_snapshot() -> dict[str,Any]:
         with path.open(newline="",encoding="utf-8") as f:
             rows=list(csv.DictReader(f))
         if len(rows)!=src["row_count"]:
-            raise RuntimeError(f"{src['family']}: Production source count drifted")
+            raise RuntimeError(f"{src['family']}: Production prestate source count drifted")
         bases.update((src["family"],r["base_device"]) for r in rows)
     if sum(counts.values())!=912 or len(bases)!=293 or counts.get(FAMILY,0)!=0:
         raise RuntimeError("L0.3 Production aggregate prestate drifted")

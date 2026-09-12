@@ -1,0 +1,51 @@
+name: STM32L0 L0.5 publication validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l0*"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/research/device_catalog_*"
+      - "data/device-catalog/research/st_*"
+      - "data/device-catalog/research/test_st_*"
+      - "data/device-catalog/production/**"
+      - ".github/workflows/device-catalog-stm32l0-l05-publication-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run L0.5 publication tests
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32l0_phase_l0_5_publication.py
+      - name: Verify hard-locked published state
+        working-directory: data/device-catalog/research
+        run: |
+          python publish_stm32l0_phase_l0_5.py --verify
+          python validate_stm32l0_phase_l0_5_publication.py
+      - name: Enforce Production boundary
+        working-directory: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          import json
+          from publish_stm32l0_phase_l0_5 import AUDIT_PATH, BASELINE_PATH
+          audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+          baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+          assert audit["published_exact_icpn_count"] == 360
+          assert audit["published_base_device_count"] == 99
+          assert audit["production_exact_icpns_after"] == 1272
+          assert audit["production_base_devices_after"] == 392
+          assert audit["production_family_count_after"] == 11
+          assert audit["capability_unresolved_count"] == 0
+          assert set(baseline["claims"].values()) == {False}
+          print("STM32L0 L0.5 controlled-publication boundary: PASS")
+          PY
