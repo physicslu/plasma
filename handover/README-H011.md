@@ -1,1 +1,0 @@
-See `H011-local-control-station-managed-endpoint-2026-09-12.md` for the managed-endpoint wiring fix.
