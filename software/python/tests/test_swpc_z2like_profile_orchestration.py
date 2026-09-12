@@ -131,10 +131,10 @@ def test_managed_ingress_can_be_declared_without_programming(tmp_path: Path) -> 
 
     assert result.returncode == 0, result.stderr
     assert log.read_text(encoding="utf-8").splitlines() == [
-        "base deploy ",
+        "base deploy",
         "managed install",
         "managed verify",
-        "base verify ",
+        "base verify",
         "managed verify",
     ]
     assert "Programming=0 ManagedIngress=1" in result.stdout
@@ -155,10 +155,10 @@ def test_programming_can_be_declared_without_managed_ingress(tmp_path: Path) -> 
 
     assert result.returncode == 0, result.stderr
     assert log.read_text(encoding="utf-8").splitlines() == [
-        "base deploy ",
+        "base deploy",
         "programming install",
         "programming verify",
-        "base verify ",
+        "base verify",
         "programming verify",
     ]
     assert "Programming=1 ManagedIngress=0" in result.stdout
