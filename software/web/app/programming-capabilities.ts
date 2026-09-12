@@ -5,8 +5,8 @@ export type ProgrammingCapabilities = {
   target_device_required: boolean;
 };
 
-type CapabilityCatalog = EngineeringTargetCatalog & {
-  programming_capabilities?: Partial<ProgrammingCapabilities>;
+export type ProgrammingCapabilityCatalog = EngineeringTargetCatalog & {
+  programming_capabilities?: Partial<ProgrammingCapabilities> | null;
 };
 
 const FAIL_CLOSED_CAPABILITIES: ProgrammingCapabilities = {
@@ -14,24 +14,20 @@ const FAIL_CLOSED_CAPABILITIES: ProgrammingCapabilities = {
   target_device_required: true,
 };
 
-const LEGACY_SHARED_MOCK_CAPABILITIES: ProgrammingCapabilities = {
-  synthetic_programming_image: true,
-  target_device_required: false,
-};
-
 export function resolveProgrammingCapabilities(
-  catalog: EngineeringTargetCatalog | null | undefined,
+  catalog: ProgrammingCapabilityCatalog | null | undefined,
 ): ProgrammingCapabilities {
-  const advertised = (catalog as CapabilityCatalog | null | undefined)?.programming_capabilities;
-  if (advertised) {
-    return {
-      synthetic_programming_image: advertised.synthetic_programming_image === true,
-      target_device_required: advertised.target_device_required !== false,
-    };
+  const advertised = catalog?.programming_capabilities;
+  if (
+    !advertised
+    || typeof advertised.synthetic_programming_image !== "boolean"
+    || typeof advertised.target_device_required !== "boolean"
+  ) {
+    return FAIL_CLOSED_CAPABILITIES;
   }
 
-  // Compatibility only for pre-capability legacy Shared Image Mock Gateways.
-  // New PMode/EMode logic must consume capability semantics, not provider names.
-  if (catalog?.provider === "mock") return LEGACY_SHARED_MOCK_CAPABILITIES;
-  return FAIL_CLOSED_CAPABILITIES;
+  return {
+    synthetic_programming_image: advertised.synthetic_programming_image,
+    target_device_required: advertised.target_device_required,
+  };
 }
