@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_candidate_targets": 99,
+  "active_exact_icpn_candidates": 360,
+  "bounded_discovery_clean": true,
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32l0_l0_2_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "canonical_admission_authorized": false,
+  "executed_git_sha": "4423e029cea8ac541d25c87ea8612fae2a3e68ee",
+  "family": "STM32L0",
+  "lifecycle_excluded_targets": 0,
+  "live_summary_validation": "success",
+  "phase": "L0.2",
+  "production_write_authorized": false,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 99,
+  "workflow_run_attempt": 1,
+  "workflow_run_id": 34686132303
+}

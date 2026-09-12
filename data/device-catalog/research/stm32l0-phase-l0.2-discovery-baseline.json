@@ -1,0 +1,72 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "active_candidate_targets": 99,
+    "active_exact_icpn_candidates": 360,
+    "base_device_count": 99,
+    "bounded_discovery_clean": true,
+    "excluded_non_active_part_numbers": 10,
+    "identity_manual_intervention_required": 0,
+    "lifecycle_excluded_targets": 0,
+    "openocd_unique_targets": 99,
+    "representative_continuity_clean": true,
+    "routing_followup_required": 0,
+    "source_unavailable_exclusions": 0
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "evidence_id": "stm32l0-l0.2-official-st-discovery-2026-09-12-retained-20260912T110725Z-996489c8",
+  "evidence_root": "data/device-catalog/research/evidence/stm32l0-l0.2-official-st-discovery-live-2026-09-12",
+  "excluded_non_active_exact_part_numbers": [
+    "STM32L011K4T7",
+    "STM32L011K4U7",
+    "STM32L021F4U7TR",
+    "STM32L021G4U7",
+    "STM32L021K4T7",
+    "STM32L031F4P7",
+    "STM32L071RZT7",
+    "STM32L071VBT7",
+    "STM32L071VZT7",
+    "STM32L073V8T7"
+  ],
+  "family": "STM32L0",
+  "phase": "L0.2",
+  "retained_evidence": {
+    "acquisition_provenance_sha256": "2e7379f865b0f5e23101517f58d7a53ec5076820a0240369d99cb34b1f08862c",
+    "artifact_id": 10296507776,
+    "artifact_zip_sha256": "5732782fce1911debe7360c07ccbae5ba03fd86cc097a975bc271fe9c6b334bd",
+    "executed_git_sha": "4423e029cea8ac541d25c87ea8612fae2a3e68ee",
+    "leaf_digests_sha256": "79b562f6eb87081544cd409c399d68f3afa06f644501a243d272be37004c4502",
+    "live_summary_sha256": "c664e6458d00f169b2653021284acb56664b607c245e97f51bf13f4a232d51de",
+    "manifest_sha256": "66e4c248398e8986878538c3dde7cc3811df0f3f1a0fbbbd2b1f46c77a20e97a",
+    "pr_head_sha": "996489c8fe5e871310dd42c0d06c7b0302ca0750",
+    "retention_provenance_sha256": "23bd258b75f687b01e43beb249f759b4d71a704ba56480ce170c054017cb635f",
+    "targets_sha256": "72350a146038c09b43516715f52cddf06ee5d05f1a4ab737a994744d43e166ed",
+    "workflow_run_attempt": 1,
+    "workflow_run_id": 34686132303
+  },
+  "schema_version": 1,
+  "scope": "retained official-ST complete commercial identity/lifecycle discovery; no Production write",
+  "set_digests": {
+    "active_exact_icpn_set_sha256": "8c7f0cc10829ff5e1ceb98cf6783247a5f685a9f1407dbd560a350348c0a521b",
+    "base_device_set_sha256": "1c9dc41c8f8dc44a132e8303e0c88b2168dc3bbf745a6250aa7f382e57d5f8af",
+    "excluded_non_active_set_sha256": "86be718862ed2641a3e857d0d7016aca459852d7dc3f210123893b28f66a6960"
+  },
+  "source_bindings": {
+    "l0_1_foundation_sha256": "958572fa69a4457966256851a39badfdc38490e0c3ce155978155baf3ca9e488",
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "production_prestate_exact_icpn_count": 912,
+    "production_prestate_sha256": "15f9c9a9be8640bc0664b562c667f676d0084e4c157e01f582c87a10886c5420",
+    "stm32l0_production_prestate_exact_icpn_count": 0
+  }
+}
