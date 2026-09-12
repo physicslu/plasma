@@ -348,9 +348,16 @@ class SiteConfigurationSupportMixin:
         cls,
         desired: dict[str, Any],
         actual: dict[str, Any] | None,
+        *,
+        runtime_topology_observed: bool,
     ) -> str:
         if actual is None:
-            return "actual_unavailable"
+            # A successfully observed runtime Site list that does not contain a
+            # Desired Site is a known topology mismatch. Restarting is exactly
+            # the bounded operation required to load the new canonical topology.
+            # Reserve actual_unavailable for snapshots where Site topology itself
+            # could not be observed, so the activation safety gate remains fail-closed.
+            return "restart_required" if runtime_topology_observed else "actual_unavailable"
         if desired["enabled"] != actual["enabled"]:
             return "restart_required"
         if actual["enabled"]:
@@ -369,7 +376,8 @@ class SiteConfigurationSupportMixin:
         desired = self._site_configuration_controller().current()
         snapshot = actual_snapshot if actual_snapshot is not None else self._local_snapshot()
         raw_actual_sites = snapshot.get("sites")
-        actual_sites = raw_actual_sites if isinstance(raw_actual_sites, list) else []
+        runtime_topology_observed = isinstance(raw_actual_sites, list)
+        actual_sites = raw_actual_sites if runtime_topology_observed else []
         actual_by_id = {
             site.get("site_id"): site
             for site in actual_sites
@@ -382,7 +390,11 @@ class SiteConfigurationSupportMixin:
             site_id = desired_site["site_id"]
             raw_actual = actual_by_id.get(site_id)
             actual = self._site_actual_view(raw_actual) if isinstance(raw_actual, dict) else None
-            state = self._site_reconciliation_state(desired_site, actual)
+            state = self._site_reconciliation_state(
+                desired_site,
+                actual,
+                runtime_topology_observed=runtime_topology_observed,
+            )
             states.append(state)
             sites.append(
                 {
