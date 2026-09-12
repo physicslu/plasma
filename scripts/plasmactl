@@ -5,7 +5,7 @@ wrapper_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
 integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
 local_control_station_backend="${PLASMA_LOCAL_CONTROL_STATION_BACKEND:-$repo_root/scripts/plasmactl-local-control-station}"
-swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
+swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-orchestrator}"
 swpc_z2like_bootstrap_backend="${PLASMA_SWPC_Z2LIKE_BOOTSTRAP_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-bootstrap-sites}"
 z2_ps_backend="${PLASMA_Z2_PS_BACKEND:-$repo_root/scripts/plasmactl-z2-ps}"
 # Compatibility marker for repository documentation/contracts. The integration
