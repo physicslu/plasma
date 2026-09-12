@@ -239,7 +239,7 @@ bash scripts/plasmactl verify z2-ps
 bash scripts/plasmactl status z2-ps
 ```
 
-The historical PS-only verification proves a real ARMv7 host, active Server/Gateway, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. P3 adds helper/service/configuration contracts in source and packaging, but **that does not automatically qualify controlled activation on a physical Z2**.
+The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. It does **not** issue the controlled restart transaction merely to make verification pass.
 
 A real P3 activation acceptance should additionally prove on the exact deployed identity:
 
@@ -255,7 +255,7 @@ Runtime reconciliation reaches the expected state
 PYNQ System Python/PYNQ ownership unchanged
 ```
 
-Until this is actually exercised on physical hardware, report it as software/release implementation rather than Real Z2 P3 PASS.
+Until the controlled activation sequence is actually exercised on physical hardware, report the verifier PASS as **Real Z2 PS runtime/wiring evidence**, not as a complete Real Z2 P3 controlled-activation PASS.
 
 ## Managed Control Station path
 

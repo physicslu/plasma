@@ -13,6 +13,9 @@ config_root="/etc/plasma"
 ppu_config="$config_root/ppu.yaml"
 server_unit="/etc/systemd/system/plasma-server.service"
 gateway_unit="/etc/systemd/system/plasma-web.service"
+runtime_activation_unit="/etc/systemd/system/plasma-runtime-activation.service"
+server_control_socket="/run/plasma-server/control.sock"
+runtime_activation_socket="/run/plasma-runtime-activation/helper.sock"
 
 say() {
   printf '[plasmactl z2-ps] %s\n' "$*"
@@ -197,8 +200,63 @@ verify_site_desired_operational_contract() {
     die "install evidence does not identify the canonical Site Desired config"
   [[ "$(json_field "$install_evidence" site_desired_state.gateway_write_root 2>/dev/null || true)" == "$config_root" ]] || \
     die "install evidence does not identify the bounded Gateway write root"
-  [[ "$(json_field "$install_evidence" site_desired_state.runtime_apply_supported 2>/dev/null || true)" == "false" ]] || \
-    die "install evidence must keep Site Desired Runtime apply unsupported"
+}
+
+verify_p3_runtime_activation_contract() {
+  require_command stat
+  require_file "$runtime_activation_unit" "Plasma runtime activation helper unit"
+
+  [[ "$(json_field "$install_evidence" site_desired_state.runtime_apply_supported 2>/dev/null || true)" == "true" ]] || \
+    die "install evidence must advertise bounded Site Desired Runtime activation"
+  [[ "$(json_field "$install_evidence" site_desired_state.runtime_activation_socket 2>/dev/null || true)" == "$runtime_activation_socket" ]] || \
+    die "install evidence does not identify the runtime activation helper socket"
+  [[ "$(json_field "$install_evidence" site_desired_state.server_control_socket 2>/dev/null || true)" == "$server_control_socket" ]] || \
+    die "install evidence does not identify the Server control socket"
+  [[ "$(json_field "$install_evidence" site_desired_state.upgrade_preserves_existing_config 2>/dev/null || true)" == "true" ]] || \
+    die "install evidence does not prove canonical Desired preservation on upgrade"
+  [[ "$(json_field "$install_evidence" runtime_activation.service 2>/dev/null || true)" == "plasma-runtime-activation.service" ]] || \
+    die "install evidence does not identify the bounded runtime activation service"
+  [[ "$(json_field "$install_evidence" runtime_activation.lifecycle_owner 2>/dev/null || true)" == "plasma-web.service" ]] || \
+    die "runtime activation helper lifecycle owner is not plasma-web.service"
+  [[ "$(json_field "$install_evidence" runtime_activation.scope 2>/dev/null || true)" == "restart-plasma-server-only" ]] || \
+    die "runtime activation helper scope is wider than restart-plasma-server-only"
+  [[ "$(json_field "$install_evidence" runtime_activation.server_authoritative_quiesce 2>/dev/null || true)" == "true" ]] || \
+    die "install evidence does not require Server-authoritative quiesce"
+  [[ "$(json_field "$install_evidence" runtime_activation.quiesce_ttl_bounded 2>/dev/null || true)" == "true" ]] || \
+    die "install evidence does not require bounded quiesce TTL"
+
+  grep -Fq "RuntimeDirectory=plasma-server" "$server_unit" || die "Plasma Server runtime directory is not declared"
+  grep -Fq "RuntimeDirectoryMode=0700" "$server_unit" || die "Plasma Server runtime directory mode is not 0700"
+  grep -Fq -- "--runtime-control-socket $server_control_socket" "$server_unit" || \
+    die "Plasma Server is not bound to the canonical control socket"
+
+  grep -Fq "Requires=plasma-server.service plasma-runtime-activation.service" "$gateway_unit" || \
+    die "Plasma Gateway does not require the bounded runtime activation helper"
+  grep -Fq -- "--runtime-activation-socket $runtime_activation_socket" "$gateway_unit" || \
+    die "Plasma Gateway is not bound to the canonical runtime activation helper socket"
+
+  grep -Fq "User=root" "$runtime_activation_unit" || die "runtime activation helper must run as root"
+  grep -Fq "Group=plasma" "$runtime_activation_unit" || die "runtime activation helper group must be plasma"
+  grep -Fq "RuntimeDirectory=plasma-runtime-activation" "$runtime_activation_unit" || \
+    die "runtime activation helper runtime directory is not declared"
+  grep -Fq "RuntimeDirectoryMode=0750" "$runtime_activation_unit" || \
+    die "runtime activation helper runtime directory mode is not 0750"
+  grep -Fq "RestrictAddressFamilies=AF_UNIX" "$runtime_activation_unit" || \
+    die "runtime activation helper is not restricted to AF_UNIX"
+  grep -Fq "PartOf=plasma-web.service" "$runtime_activation_unit" || \
+    die "runtime activation helper lifecycle is not owned by plasma-web.service"
+  grep -Fq "runtime-activation-helper --socket $runtime_activation_socket --server-control-socket $server_control_socket" "$runtime_activation_unit" || \
+    die "runtime activation helper ExecStart exceeds or misses the bounded socket contract"
+
+  systemctl is-active --quiet plasma-runtime-activation.service || die "plasma-runtime-activation.service is not active"
+  [[ -S "$server_control_socket" ]] || die "Plasma Server control socket is not active: $server_control_socket"
+  [[ "$(stat -c '%a' "$server_control_socket")" == "600" ]] || die "Plasma Server control socket must be mode 0600"
+  [[ "$(stat -c '%U:%G' "$server_control_socket")" == "plasma:plasma" ]] || \
+    die "Plasma Server control socket must be owned plasma:plasma"
+  [[ -S "$runtime_activation_socket" ]] || die "runtime activation helper socket is not active: $runtime_activation_socket"
+  [[ "$(stat -c '%a' "$runtime_activation_socket")" == "660" ]] || die "runtime activation helper socket must be mode 0660"
+  [[ "$(stat -c '%U:%G' "$runtime_activation_socket")" == "root:plasma" ]] || \
+    die "runtime activation helper socket must be owned root:plasma"
 }
 
 verify_runtime() {
@@ -234,6 +292,7 @@ PY
   verify_site_desired_operational_contract
   systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
   systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
+  verify_p3_runtime_activation_contract
 
   local base readiness loopback test_id loopback_request
   base="$(local_health_url)" || die "install evidence is missing gateway_host"
@@ -269,20 +328,21 @@ if response.get("payload_base64") != "AA==":
     raise SystemExit(f"loopback payload echo is invalid: {response!r}")
 PY
 
-  say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback + Site Desired service wiring"
-  say "qualification boundary: persistence wiring only; Runtime apply is not claimed"
+  say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback + P3 runtime-activation wiring"
+  say "qualification boundary: bounded helper/socket wiring is proven; controlled activation behavior requires explicit Real Z2 acceptance"
   say "PL/FPGA/Site/power/real-IC readiness is separate"
 }
 
 show_status() {
   require_file "$install_evidence" "Z2 PS install evidence"
-  local release_id git_sha gateway_host python_path server_state web_state
+  local release_id git_sha gateway_host python_path server_state web_state activation_state
   release_id="$(json_field "$install_evidence" release_id)"
   git_sha="$(json_field "$install_evidence" git_sha)"
   gateway_host="$(json_field "$install_evidence" gateway_host)"
   python_path="$(json_field "$install_evidence" plasma_python.path)"
   server_state="$(systemctl is-active plasma-server.service 2>/dev/null || true)"
   web_state="$(systemctl is-active plasma-web.service 2>/dev/null || true)"
+  activation_state="$(systemctl is-active plasma-runtime-activation.service 2>/dev/null || true)"
   printf 'Profile:       z2-ps\n'
   printf 'Release:       %s\n' "$release_id"
   printf 'Git SHA:       %s\n' "$git_sha"
@@ -290,7 +350,8 @@ show_status() {
   printf 'Gateway:       http://%s:18080\n' "$gateway_host"
   printf 'Server svc:    %s\n' "${server_state:-unknown}"
   printf 'Gateway svc:   %s\n' "${web_state:-unknown}"
-  printf 'Site desired:  %s (persistent only; no Runtime apply)\n' "$ppu_config"
+  printf 'Activation:    %s (bounded restart-plasma-server-only helper)\n' "${activation_state:-unknown}"
+  printf 'Site desired:  %s (persistent + controlled Runtime activation wiring)\n' "$ppu_config"
   printf 'Hardware:      PS-only; PL/Site/real-IC not qualified by this profile\n'
 }
 
