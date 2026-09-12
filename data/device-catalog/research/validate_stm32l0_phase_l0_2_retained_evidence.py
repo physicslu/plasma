@@ -95,7 +95,9 @@ def main() -> int:
 
     validate_l0_1_boundary()
     production = validate_production_prestate()
-    req(len(production.get("entries", [])) == 912, "immutable Production prestate count drift")
+    counts = {item["family"]: item["row_count"] for item in production["sources"]}
+    req(sum(counts.values()) == 912, "immutable Production prestate count drift")
+    req(counts.get("STM32L0", 0) == 0, "immutable Production prestate unexpectedly contains STM32L0")
 
     manifest = validate_manifest(EVIDENCE, expected_files=EXPECTED_FILES)
     req(manifest.get("evidence_id") == EXPECTED_EVIDENCE_ID, "manifest evidence ID drift")
