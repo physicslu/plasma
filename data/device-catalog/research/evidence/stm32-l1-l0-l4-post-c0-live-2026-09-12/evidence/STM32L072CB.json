@@ -1,0 +1,44 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L072CB",
+  "evidence_section_sha256": "948efca249ccbdb491393bd009f8dc3100ad33a2e9228e93689c25e1de6293bc",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L072CBT6",
+    "STM32L072CBT6TR",
+    "STM32L072CBU6",
+    "STM32L072CBY6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L072CBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L072CBT6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L072CBU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L072CBY6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "36606951e0eacd39b37e8dbfeae7709806e7cf89910b3782d499a7e9c4965a84",
+  "retrieved_at_utc": "2026-09-12T05:15:52Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html"
+}

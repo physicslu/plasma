@@ -1,0 +1,26 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L4S9AI",
+  "evidence_section_sha256": "ed1af4e333c38200a31500c2091cf484e36372bfb244b397b7e8f3da1d1c1d8e",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L4S9AII6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9ai.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L4S9AII6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "dae4e580e40a143904052968da385d7133aab41596c9b7035963f165d63f8f41",
+  "retrieved_at_utc": "2026-09-12T05:50:42Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9ai.html"
+}

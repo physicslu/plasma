@@ -1,0 +1,38 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L041C6",
+  "evidence_section_sha256": "8a90e5dfd5069f8b77f3acc7489ab12ae50289e12ef89b969834517cc0facf3a",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L041C6T6TR",
+    "STM32L041C6T7",
+    "STM32L041C6U6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L041C6T6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L041C6T7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L041C6U6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "fcfa32348f14f8a6a5ee0bf5d17854920bf4a83a073a4e1480a625bd2c45f4ac",
+  "retrieved_at_utc": "2026-09-12T05:11:24Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html"
+}

@@ -1,0 +1,32 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L081CB",
+  "evidence_section_sha256": "b6276cf4792b0d0a0699747c8474ed407344cd82b7b2c4c209f310e3d1c08361",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L081CBT6",
+    "STM32L081CBT6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L081CBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L081CBT6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "76b097b0ea6344c0868404e2e498a11de65f6da3a0cbc30103950964357afb79",
+  "retrieved_at_utc": "2026-09-12T05:16:03Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html"
+}

@@ -1,0 +1,26 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L4R7AI",
+  "evidence_section_sha256": "9f0ed18099519cdbcef74580e6cf12c0aedc55e23ef1322126231a676a1c007b",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L4R7AII6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7ai.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L4R7AII6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "ace4131bf74e964428855846fe29a103ecf48a6ec2cd79def55ceeec12afae6c",
+  "retrieved_at_utc": "2026-09-12T05:49:06Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7ai.html"
+}

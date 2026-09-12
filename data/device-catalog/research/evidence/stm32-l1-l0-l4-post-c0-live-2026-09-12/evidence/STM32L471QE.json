@@ -1,0 +1,50 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L471QE",
+  "evidence_section_sha256": "a5d87edadb836a153cf7fec82b777168514735bdf0215ec840074244e8d605b1",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L471QEI3TR",
+    "STM32L471QEI6",
+    "STM32L471QEI6TR",
+    "STM32L471QEI7",
+    "STM32L471QEI7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471qe.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L471QEI3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L471QEI6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L471QEI6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L471QEI7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L471QEI7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "6db82ad1939937278429ba82fceec3f07b055fa8b704a1d927c88cfa0664b1dc",
+  "retrieved_at_utc": "2026-09-12T05:24:59Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471qe.html"
+}

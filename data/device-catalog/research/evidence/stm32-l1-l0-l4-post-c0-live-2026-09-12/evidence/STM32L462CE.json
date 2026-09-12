@@ -1,0 +1,66 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L462CE",
+  "evidence_section_sha256": "5c689cd0c07dbddb6222b4b0f4d47250fdf274d3bff70e9a76473855b84ae8c1",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32L462CET6",
+    "STM32L462CEU6",
+    "STM32L462CEU6TR"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32L462CET6P",
+      "marketing_status": "Preview Product is in design stage. EN"
+    },
+    {
+      "icpn": "STM32L462CEU3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "icpn": "STM32L462CEU6F",
+      "marketing_status": "Evaluation Product is under characterization. Limited Engineering samples available. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462ce.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_accessibility_probe_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L462CET6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32L462CET6P",
+      "marketing_status": "Preview Product is in design stage. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L462CEU3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32L462CEU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32L462CEU6F",
+      "marketing_status": "Evaluation Product is under characterization. Limited Engineering samples available. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32L462CEU6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "6eb5733c8d21f6cd19c7320358f5a0665bbba140aba53fe65a60784ab4cc5ec3",
+  "retrieved_at_utc": "2026-09-12T05:24:54Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462ce.html"
+}

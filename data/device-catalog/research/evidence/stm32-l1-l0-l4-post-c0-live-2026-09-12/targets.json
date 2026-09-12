@@ -1,0 +1,322 @@
+{
+  "claims": {
+    "commercial_identity_claimed_from_openocd": false,
+    "production_write_authorized": false,
+    "selected_next_research_family": false
+  },
+  "phase": "post-C0-selection",
+  "probe_id": "stm32-post-c0-official-st-evidence-accessibility-probe-v1",
+  "schema_version": 1,
+  "selection_rule": "one lexical-min Base Device per guarded ordering-pattern subfamily",
+  "target_count": 44,
+  "targets": [
+    {
+      "base_device": "STM32L100C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html",
+      "subfamily": "STM32L100"
+    },
+    {
+      "base_device": "STM32L151C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html",
+      "subfamily": "STM32L151"
+    },
+    {
+      "base_device": "STM32L152C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html",
+      "subfamily": "STM32L152"
+    },
+    {
+      "base_device": "STM32L162QC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html",
+      "subfamily": "STM32L162"
+    },
+    {
+      "base_device": "STM32L010C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010c6.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L011D3",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L021D4",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "base_device": "STM32L031C4",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L041C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L051C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L052C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L053C6",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c6.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "base_device": "STM32L062C8",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062c8.html",
+      "subfamily": "STM32L062"
+    },
+    {
+      "base_device": "STM32L063C8",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html",
+      "subfamily": "STM32L063"
+    },
+    {
+      "base_device": "STM32L071C8",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071c8.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L072CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L073CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cb.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L081CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html",
+      "subfamily": "STM32L081"
+    },
+    {
+      "base_device": "STM32L082CZ",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082cz.html",
+      "subfamily": "STM32L082"
+    },
+    {
+      "base_device": "STM32L083CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cb.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L412C8",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412c8.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L422CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l422cb.html",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L431CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431cb.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L432KB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l432kb.html",
+      "subfamily": "STM32L432"
+    },
+    {
+      "base_device": "STM32L433CB",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433cb.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L442KC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l442kc.html",
+      "subfamily": "STM32L442"
+    },
+    {
+      "base_device": "STM32L443CC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443cc.html",
+      "subfamily": "STM32L443"
+    },
+    {
+      "base_device": "STM32L451CC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451cc.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L452CC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452cc.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L462CE",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462ce.html",
+      "subfamily": "STM32L462"
+    },
+    {
+      "base_device": "STM32L471QE",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471qe.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L475RC",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475rc.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L476JE",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476je.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L486JG",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486jg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L496AE",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496ae.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L4A6AG",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6ag.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4P5AE",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ae.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4Q5AG",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5ag.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4R5AG",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5ag.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R7AI",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7ai.html",
+      "subfamily": "STM32L4R7"
+    },
+    {
+      "base_device": "STM32L4R9AG",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9ag.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4S5AI",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5ai.html",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S7AI",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s7ai.html",
+      "subfamily": "STM32L4S7"
+    },
+    {
+      "base_device": "STM32L4S9AI",
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9ai.html",
+      "subfamily": "STM32L4S9"
+    }
+  ]
+}
