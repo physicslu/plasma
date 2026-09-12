@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 
@@ -22,11 +23,58 @@ class PPUTransportError(PPUHTTPError):
 # the Plasma deployment contract.
 _DIRECT_HTTP = build_opener(ProxyHandler({}))
 
+_CF_ACCESS_ORIGIN_ENV = "PLASMA_MANAGER_CF_ACCESS_ORIGIN"
+_CF_ACCESS_CLIENT_ID_ENV = "PLASMA_MANAGER_CF_ACCESS_CLIENT_ID"
+_CF_ACCESS_CLIENT_SECRET_ENV = "PLASMA_MANAGER_CF_ACCESS_CLIENT_SECRET"
+
+
+def _normalize_origin(value: str) -> str | None:
+    parsed = urlsplit(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.hostname is None:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    if parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+        return None
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+
+
+def _cloudflare_access_headers(endpoint: str) -> dict[str, str]:
+    """Return deployment-scoped Cloudflare Access service-token headers.
+
+    Service identity is transport/deployment state, not PPU registry state. The
+    credentials therefore live only in the Manager process environment and are
+    emitted only when the configured protected origin exactly matches this PPU
+    endpoint. They are never serialized into registry snapshots or forwarded from
+    Browser-controlled request headers.
+    """
+
+    origin = os.environ.get(_CF_ACCESS_ORIGIN_ENV)
+    client_id = os.environ.get(_CF_ACCESS_CLIENT_ID_ENV)
+    client_secret = os.environ.get(_CF_ACCESS_CLIENT_SECRET_ENV)
+    configured = (origin, client_id, client_secret)
+    if not any(value is not None for value in configured):
+        return {}
+    if not all(isinstance(value, str) and value.strip() for value in configured):
+        raise PPUTransportError("Manager Cloudflare Access service identity is incomplete")
+
+    normalized_origin = _normalize_origin(origin or "")
+    normalized_endpoint = _normalize_origin(endpoint)
+    if normalized_origin is None:
+        raise PPUTransportError("Manager Cloudflare Access origin is invalid")
+    if normalized_endpoint != normalized_origin:
+        return {}
+    return {
+        "CF-Access-Client-Id": (client_id or "").strip(),
+        "CF-Access-Client-Secret": (client_secret or "").strip(),
+    }
+
 
 class PPUHttpClient:
     def __init__(self, endpoint: str, timeout_s: float) -> None:
         self.endpoint = endpoint.rstrip("/")
         self.timeout_s = timeout_s
+        self._service_headers = _cloudflare_access_headers(self.endpoint)
 
     def _request_json(
         self,
@@ -43,6 +91,7 @@ class PPUHttpClient:
             "Accept": "application/json",
             "User-Agent": "plasma-manager/1",
             **(headers or {}),
+            **self._service_headers,
         }
         if data is not None and "Content-Type" not in request_headers:
             request_headers["Content-Type"] = "application/json"
@@ -97,6 +146,7 @@ class PPUHttpClient:
         request_headers = {
             "User-Agent": "plasma-manager/1",
             **headers,
+            **self._service_headers,
         }
         request = Request(
             f"{self.endpoint}{path_and_query}",
