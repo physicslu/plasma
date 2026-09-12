@@ -1,0 +1,81 @@
+{
+  "adapter_id": "stm32c0-c0.4-admission",
+  "canonical_dataset_absent_before_admission": true,
+  "canonical_dataset_admission": "planned",
+  "canonical_input_sha256": "a57ec095b1af22963ef5415d7f3cbc1cd4a920dc6e06a9817dca4d029b714971",
+  "canonical_rows_before": 0,
+  "capability_admittable_count": 209,
+  "capability_unresolved_count": 11,
+  "capability_unresolved_exact_icpns": [
+    "STM32C051K8U3",
+    "STM32C051K8U3TR",
+    "STM32C051K8U6",
+    "STM32C051K8U6TR",
+    "STM32C051K8U7",
+    "STM32C051K8U7TR",
+    "STM32C071FBY6TR",
+    "STM32C071R8I6N",
+    "STM32C071RBI6N",
+    "STM32C091RBI6",
+    "STM32C092RBI6"
+  ],
+  "capability_unresolved_exact_set_sha256": "32698be0aee4f95360a1b27ddfecd1034d7627e0b223dd8873153b5d96ec5601",
+  "capability_unresolved_is_identity_rejection": false,
+  "claims": {
+    "canonical_write_applied": false,
+    "flash_geometry_equivalence_claimed": false,
+    "full_stm32c0_surface_covered": false,
+    "hil_qualification_claimed": false,
+    "option_security_semantics_claimed": false,
+    "physical_target_qualification_claimed": false,
+    "production_write_applied": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false
+  },
+  "current_mapping_replay": {
+    "ambiguous": 0,
+    "unique": 209,
+    "unmapped": 11
+  },
+  "decision_counts": {
+    "admit": 209,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32c0-c0.2-official-st-commercial-discovery-v1",
+  "fail_closed": true,
+  "family": "STM32C0",
+  "inputs": {
+    "historical_c0_2_mapping_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "mapping_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "metadata_rows_sha256": "94ebe11fda28cb6d7b68c13c7edb4bf8341887f6146d52f72461bc6ef35bee19",
+    "policy_baseline_git_blob_sha": "4272a441f072433b0dfe726f1d97459bbad957f3",
+    "policy_ready_exact_icpn_set_sha256": "b116f624e971a3be5c947e107589bdb4d1bf5f5b0585ecae71e743cfb7a2649a",
+    "production_manifest_git_blob_sha": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+    "production_manifest_sha256": "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0"
+  },
+  "manufacturer_verified_identity_count": 220,
+  "metadata_adapter_id": "stm32c0-c0.3-metadata",
+  "metadata_ready_count": 220,
+  "phase": "C0.4",
+  "production_snapshot": {
+    "base_device_count": 243,
+    "exact_icpn_count": 703,
+    "family_exact_icpn_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47,
+      "STM32G4": 25,
+      "STM32U0": 68
+    },
+    "source_manifest_git_blob_sha": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+    "stm32c0_exact_icpn_count": 0
+  },
+  "required_target_config": "tcl/target/stm32c0x.cfg",
+  "schema_version": 1
+}
