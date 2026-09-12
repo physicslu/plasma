@@ -24,14 +24,14 @@ This directory contains numbered engineering handover documents intended to let 
 | [H016](H016-stm32l0-l04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32L0 L0.4 read-only capability/admission plan | Complete; PR #515 merged | Retain as L0.4 admission history; use H017/H018/H019 |
 | [H017](H017-stm32l0-l05-publication-2026-09-12.md) | 2026-09-12 | STM32L0 L0.5 controlled publication of 360 capability-admittable exact ICPNs | Complete; PR #516 merged | Retain as L0.5 publication history; use H018/H019 |
 | [H018](H018-stm32-post-l0-next-family-selection-2026-09-12.md) | 2026-09-12 | Post-L0 L1/L4 retained official-ST evidence replay and deterministic STM32L4 selection | Complete; PR #517 merged | Retain as STM32L4 selection history; use H019 |
-| [H019](H019-stm32l4-l41-foundation-2026-09-13.md) | 2026-09-13 | STM32L4 L4.1 bounded research foundation | Current; Gate 1 implementation in progress | Open/validate L4.1 PR, then obtain Gate 2 merge approval |
+| [H019](H019-stm32l4-l41-foundation-2026-09-13.md) | 2026-09-13 | STM32L4 L4.1 bounded research foundation | Current; PR #520 Gate 2 candidate | Recheck current head/main/applicable CI/reviews, then obtain Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H019 and AGENTS.md, verify the STM32L4 L4.1 PR current head/main/CI/reviews, then continue the gated transaction.
+Read repo handover H019 and AGENTS.md, verify PR #520 current head/main/applicable CI/mergeability/reviews, then continue the Gate 2 transaction.
 ```
 
 For IC Support Architecture / hardware qualification:
