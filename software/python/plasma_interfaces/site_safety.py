@@ -44,7 +44,7 @@ class SiteSafetyControl(ABC):
 
     @abstractmethod
     async def power_off(self) -> None:
-        """Disable target power. Reset must already be asserted by the Site."""
+        """Disable target power, including as an emergency fallback if reset fails."""
         raise NotImplementedError
 
 
