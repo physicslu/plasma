@@ -22,7 +22,7 @@ SELECTION = HERE / "stm32-post-u0-next-family-selection.json"
 AUTHORITATIVE_PROVENANCE = DEFAULT_EVIDENCE.parent / "provenance.json"
 AUTHORITATIVE_TARGETS = DEFAULT_EVIDENCE.parent / "targets.json"
 QR_PROVENANCE = DEFAULT_QR_DIAGNOSTIC.parent / "provenance.json"
-PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
+PRODUCTION_MANIFEST = HERE / "stm32c0-phase-c0.3-production-manifest-prestate.json"
 OPENOCD_CATALOG = HERE / "openocd-parts-canonical.csv"
 
 EXPECTED = {
