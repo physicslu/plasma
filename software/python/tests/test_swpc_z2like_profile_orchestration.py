@@ -115,7 +115,7 @@ def test_deploy_reconciles_previously_enabled_programming_and_managed_ingress(tm
     assert "previously enabled add-ons were reconciled in one operation" in result.stdout
 
 
-def test_managed_ingress_without_programming_fails_before_base_mutation(tmp_path: Path) -> None:
+def test_managed_ingress_can_be_declared_without_programming(tmp_path: Path) -> None:
     env, log, _, managed_conf, managed_evidence = _environment(tmp_path)
     managed_conf.write_text(MANAGED_MARKER + "\n", encoding="utf-8")
     managed_evidence.write_text("{}\n", encoding="utf-8")
@@ -129,9 +129,39 @@ def test_managed_ingress_without_programming_fails_before_base_mutation(tmp_path
         check=False,
     )
 
-    assert result.returncode != 0
-    assert "managed Programming ingress is enabled while configured Mock Programming is disabled" in result.stderr
-    assert not log.exists()
+    assert result.returncode == 0, result.stderr
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "base deploy ",
+        "managed install",
+        "managed verify",
+        "base verify ",
+        "managed verify",
+    ]
+    assert "Programming=0 ManagedIngress=1" in result.stdout
+
+
+def test_programming_can_be_declared_without_managed_ingress(tmp_path: Path) -> None:
+    env, log, dropin, _, _ = _environment(tmp_path)
+    dropin.write_text(PROGRAMMING_MARKER + "\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["bash", str(ORCHESTRATOR), "deploy"],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "base deploy ",
+        "programming install",
+        "programming verify",
+        "base verify ",
+        "programming verify",
+    ]
+    assert "Programming=1 ManagedIngress=0" in result.stdout
 
 
 def test_incomplete_managed_state_fails_closed(tmp_path: Path) -> None:
