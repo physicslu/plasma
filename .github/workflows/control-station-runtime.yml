@@ -10,7 +10,9 @@ on:
       - "scripts/control-station-runtime-acceptance.py"
       - "scripts/product-release.py"
       - "scripts/render-build.sh"
+      - "scripts/render-start.sh"
       - "scripts/render-control-station-start.sh"
+      - "scripts/tests/test-render-runtime.py"
       - "render.yaml"
       - "software/web/**"
       - "!software/web/e2e/**"
@@ -19,6 +21,7 @@ on:
       - "software/python/pyproject.toml"
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
+      - "software/python/tests/test_render_deployment.py"
       - "release/**"
       - ".github/workflows/control-station-runtime.yml"
   pull_request:
@@ -29,7 +32,9 @@ on:
       - "scripts/control-station-runtime-acceptance.py"
       - "scripts/product-release.py"
       - "scripts/render-build.sh"
+      - "scripts/render-start.sh"
       - "scripts/render-control-station-start.sh"
+      - "scripts/tests/test-render-runtime.py"
       - "render.yaml"
       - "software/web/**"
       - "!software/web/e2e/**"
@@ -38,6 +43,7 @@ on:
       - "software/python/pyproject.toml"
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
+      - "software/python/tests/test_render_deployment.py"
       - "release/**"
       - ".github/workflows/control-station-runtime.yml"
 
@@ -79,12 +85,16 @@ jobs:
       - name: Build standalone Control Station Console
         working-directory: software/web
         run: npm run build:product
+      - name: Run Render managed-demo runtime acceptance
+        if: runner.os == 'Linux'
+        run: python scripts/tests/test-render-runtime.py
       - name: Run runtime packaging regression tests
         run: >-
           python -m pytest -q
           software/python/tests/test_control_station_runtime.py
           software/python/tests/test_control_station_release.py
           software/python/tests/test_product_release.py
+          software/python/tests/test_render_deployment.py
       - name: Build release, clean-extract, and run Console/BFF + Manager smoke
         run: >-
           python scripts/control-station-runtime-acceptance.py
