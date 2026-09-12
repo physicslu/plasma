@@ -1,11 +1,12 @@
 # H012 — STM32 Post-C0 Next-Family Evidence Selection Handover
 
 **Date:** 2026-09-12
-**Status:** Gate 1 implementation and final PR qualification complete; Gate 2 pending
+**Status:** Complete; PR #504 merged
 **Primary workstream:** Device Catalog / STM32 next-family research selection
 **Repository:** `physicslu/plasma`
 **Branch:** `agent/device-catalog-post-c0-evidence-selection`
 **PR:** #504
+**Merge commit:** `7e2c23bbd6f5ce5f8e9633a0e7178e006767c9c3`
 
 ## 1. Starting state
 
@@ -164,8 +165,12 @@ Permanent workflow:
 
 Temporary live/generator/retention workflows were removed from the final intended diff.
 
-## 9. Next gate
+## 9. Completion and continuation
 
-Final-head qualification is complete. Before merge, verify `main` has not drifted from `878e0b7b874c5aa45b55ee619e5d30531d2dd037`, confirm no unresolved review threads, then obtain explicit **Gate 2 merge approval** on PR #504.
+PR #504 was synchronized to the then-current `main`, all applicable final-head and post-merge CI passed, and it merged at:
 
-After merge, Production remains **912 exact ICPNs (delta 0)**. The next possible transaction would be an STM32L0 bounded research/discovery phase, which requires a new Gate 1.
+`7e2c23bbd6f5ce5f8e9633a0e7178e006767c9c3`
+
+Production remained **912 exact ICPNs (delta 0)**.
+
+Current STM32 Device Catalog continuation moved to **H013 — STM32L0 L0.1 Foundation**.
