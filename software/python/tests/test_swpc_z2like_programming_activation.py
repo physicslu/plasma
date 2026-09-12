@@ -32,6 +32,17 @@ def test_activation_requires_capable_runtime_and_rolls_back_failed_mutation() ->
     assert "Programming deactivation failed; previous activation restored" in text
 
 
+def test_activation_waits_for_gateway_readiness_before_rollback() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert "wait_for_catalog()" in text
+    assert "PLASMA_SWPC_Z2LIKE_PROGRAMMING_READY_TIMEOUT_S" in text
+    assert 'topology="$(wait_for_catalog)"' in text
+    assert "systemctl is-active --quiet plasma-web.service || return 1" in text
+    assert "sleep 0.2" in text
+    assert "timeout=1" in text
+
+
 def test_activation_parses_canonical_yaml_with_qualified_plasma_python() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
 
