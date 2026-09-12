@@ -4,6 +4,8 @@ from __future__ import annotations
 import copy
 import unittest
 
+from run_stm32l4_phase_l4_2_discovery import build_browser_acquirer
+from st_dual_surface_browser_acquisition import STDualSurfaceBrowserAcquirer
 from st_product_page_acquisition import AcquisitionError
 from stm32l4_phase_l4_2_discovery import (
     AUTHORITY_SURFACE,
@@ -47,6 +49,20 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
         with self.assertRaises(AcquisitionError):
             RateLimitedFetcher(delay_seconds=0.99, fetcher=lambda _url, _timeout: (b"", "", None, None))
 
+    def test_l4_browser_policy_uses_one_global_device_deadline_and_reuses_browser(self) -> None:
+        base_by_url = {self.targets[0].source_url: self.targets[0].base_device}
+        acquirer = build_browser_acquirer(base_by_url=base_by_url, headless=True)
+        self.assertTrue(acquirer.reuse_browser)
+        self.assertTrue(acquirer.global_deadline)
+        self.assertEqual(acquirer.navigation_attempts, 2)
+
+        legacy_default = STDualSurfaceBrowserAcquirer(
+            base_by_url=base_by_url,
+            family_label="regression control",
+        )
+        self.assertFalse(legacy_default.reuse_browser)
+        self.assertFalse(legacy_default.global_deadline)
+
     @staticmethod
     def _fetch(url: str, _timeout: float) -> tuple[bytes, str, None, None]:
         return b"synthetic", url, None, None
@@ -78,10 +94,12 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
 
     def test_manual_review_blocks_discovery(self) -> None:
         bad_base = self.targets[-1].base_device
+
         def builder(*, base_device: str, **kwargs: object) -> dict[str, object]:
             if base_device == bad_base:
                 raise AcquisitionError("synthetic schema mismatch")
             return self._active_evidence(base_device=base_device, **kwargs)
+
         summary = run_discovery(targets=self.targets, catalog_rows=self.rows, fetcher=self._fetch, evidence_builder=builder)
         self.assertFalse(discovery_is_clean(summary))
         self.assertEqual(summary["identity_manual_intervention_required"], 1)
@@ -89,10 +107,12 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
 
     def test_source_unavailable_is_dispositioned_but_not_clean(self) -> None:
         bad_base = self.targets[-1].base_device
+
         def fetch(url: str, timeout: float) -> tuple[bytes, str, None, None]:
             if bad_base.lower() in url:
                 raise AcquisitionError("browser navigation returned HTTP 404")
             return self._fetch(url, timeout)
+
         summary = run_discovery(targets=self.targets, catalog_rows=self.rows, fetcher=fetch, evidence_builder=self._active_evidence)
         self.assertFalse(discovery_is_clean(summary))
         self.assertEqual(summary["source_unavailable_exclusions"], 1)
@@ -100,6 +120,7 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
 
     def test_lifecycle_only_nonrepresentative_target_can_be_cleanly_dispositioned(self) -> None:
         lifecycle_base = next(target.base_device for target in reversed(self.targets) if target.base_device not in EXPECTED_L4_1_REPRESENTATIVES)
+
         def builder(*, base_device: str, **kwargs: object) -> dict[str, object]:
             if base_device == lifecycle_base:
                 return {
@@ -110,6 +131,7 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
                     "excluded_non_active_part_numbers": [{"icpn": base_device + "T6", "marketing_status": "Obsolete Product"}],
                 }
             return self._active_evidence(base_device=base_device, **kwargs)
+
         summary = run_discovery(targets=self.targets, catalog_rows=self.rows, fetcher=self._fetch, evidence_builder=builder)
         self.assertTrue(discovery_is_clean(summary))
         self.assertEqual(summary["lifecycle_excluded_targets"], 1)
@@ -117,6 +139,7 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
 
     def test_representative_lifecycle_regression_blocks_continuity(self) -> None:
         lifecycle_base = sorted(EXPECTED_L4_1_REPRESENTATIVES)[0]
+
         def builder(*, base_device: str, **kwargs: object) -> dict[str, object]:
             if base_device == lifecycle_base:
                 return {
@@ -127,6 +150,7 @@ class STM32L4L42DiscoveryTests(unittest.TestCase):
                     "excluded_non_active_part_numbers": [{"icpn": base_device + "T6", "marketing_status": "Obsolete Product"}],
                 }
             return self._active_evidence(base_device=base_device, **kwargs)
+
         summary = run_discovery(targets=self.targets, catalog_rows=self.rows, fetcher=self._fetch, evidence_builder=builder)
         self.assertFalse(discovery_is_clean(summary))
         self.assertFalse(summary["representative_continuity_clean"])
