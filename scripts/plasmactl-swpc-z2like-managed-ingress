@@ -121,6 +121,16 @@ server {
         proxy_pass $gateway_root;
     }
 
+    # Managed UI visibility is read-only here. Mutation of Gateway communication
+    # policy or Linux PPU networking is intentionally outside this ingress.
+    location = /api/settings/gateway {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
+    location = /api/settings/ppu-network {
+        limit_except GET { deny all; }
+        proxy_pass $gateway_root;
+    }
     location = /api/settings/sites {
         limit_except GET { deny all; }
         proxy_pass $gateway_root;
@@ -203,8 +213,9 @@ server {
     }
 
     # Deliberately excluded from this Programming ingress:
-    # - /api/settings/ppu-network*
-    # - /api/settings/gateway
+    # - /api/settings/ppu-network/activation*
+    # - POST /api/settings/ppu-network
+    # - POST /api/settings/gateway
     # - arbitrary /api/* paths
     location / { return 404; }
 }
@@ -231,7 +242,7 @@ verify_profile() {
   grep -Fxq "$nginx_marker" "$nginx_conf" || die "managed Nginx ingress is not Plasma-owned"
   nginx -t >/dev/null
 
-  local listeners ready sites_status blocked_network blocked_gateway blocked_unknown method_blocked
+  local listeners ready sites_status gateway_get network_get gateway_post network_post blocked_activation blocked_unknown method_blocked
   listeners="$(ss -H -ltn "sport = :$managed_port")"
   [[ -n "$listeners" ]] || die "managed ingress is not listening on port $managed_port"
   while IFS= read -r line; do
@@ -246,13 +257,27 @@ verify_profile() {
     "http://127.0.0.1:$managed_port/api/settings/sites")"
   [[ "$sites_status" == "200" ]] || die "managed Site Desired read is unavailable: HTTP $sites_status"
 
-  blocked_network="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
-    "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
-  [[ "$blocked_network" == "404" ]] || die "managed ingress unexpectedly exposed PPU network settings: HTTP $blocked_network"
-
-  blocked_gateway="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+  gateway_get="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
     "http://127.0.0.1:$managed_port/api/settings/gateway")"
-  [[ "$blocked_gateway" == "404" ]] || die "managed ingress unexpectedly exposed Gateway settings: HTTP $blocked_gateway"
+  [[ "$gateway_get" == "200" ]] || die "managed Gateway settings read is unavailable: HTTP $gateway_get"
+
+  network_get="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
+  [[ "$network_get" == "200" ]] || die "managed PPU network settings read is unavailable: HTTP $network_get"
+
+  gateway_post="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    -X POST -H 'Content-Type: application/json' --data '{}' \
+    "http://127.0.0.1:$managed_port/api/settings/gateway")"
+  [[ "$gateway_post" == "403" ]] || die "managed ingress unexpectedly allowed Gateway settings mutation: HTTP $gateway_post"
+
+  network_post="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    -X POST -H 'Content-Type: application/json' --data '{}' \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
+  [[ "$network_post" == "403" ]] || die "managed ingress unexpectedly allowed PPU network mutation: HTTP $network_post"
+
+  blocked_activation="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/ppu-network/activation")"
+  [[ "$blocked_activation" == "404" ]] || die "managed ingress unexpectedly exposed PPU network activation: HTTP $blocked_activation"
 
   blocked_unknown="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
     "http://127.0.0.1:$managed_port/api/not-allowlisted")"
