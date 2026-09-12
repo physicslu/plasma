@@ -1,0 +1,162 @@
+{
+  "claims": {
+    "canonical_admission_authorized": false,
+    "complete_family_inventory_claimed": false,
+    "exact_icpn_publication_authorized": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "evidence_foundation": {
+    "active_exact_icpns_observed": 60,
+    "excluded_non_active_part_numbers_observed": 3,
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "ordering_review_sha256": "d16e71cb322c7da754ed12cc1bd0e984015888cbf8bdb07685e1d87966ad8612",
+    "production_manifest_prestate_sha256": "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec",
+    "representative_count": 24,
+    "retained_probe_summary_sha256": "45c3020462601e6cb36e726cc1acc4203abc36a96063a5223ab5c7511bcff02c",
+    "scope": "representative_evidence_only_not_complete_family_inventory",
+    "selection_sha256": "70dd86816606e94380fe6a0b0474a88771542607fc7db2aaa3a8be65e1e2e7b8",
+    "target_manifest_sha256": "767ad681a7d8e839cbf68b507babb2c417905a2f40a380566e773fa987ab9434",
+    "unique_official_datasheets": 20
+  },
+  "family": "STM32L4",
+  "identifier_kind_counts": {
+    "cmsis_device_name": 48,
+    "ordering_pattern": 207
+  },
+  "initial_targets": [
+    {
+      "base_device": "STM32L412C8",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L422CB",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L431CB",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L432KB",
+      "subfamily": "STM32L432"
+    },
+    {
+      "base_device": "STM32L433CB",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L442KC",
+      "subfamily": "STM32L442"
+    },
+    {
+      "base_device": "STM32L443CC",
+      "subfamily": "STM32L443"
+    },
+    {
+      "base_device": "STM32L451CC",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L452CC",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L462CE",
+      "subfamily": "STM32L462"
+    },
+    {
+      "base_device": "STM32L471QE",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L475RC",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L476JE",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L486JG",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L496AE",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L4A6AG",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4P5AE",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4Q5AG",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4R5AG",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R7AI",
+      "subfamily": "STM32L4R7"
+    },
+    {
+      "base_device": "STM32L4R9AG",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4S5AI",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S7AI",
+      "subfamily": "STM32L4S7"
+    },
+    {
+      "base_device": "STM32L4S9AI",
+      "subfamily": "STM32L4S9"
+    }
+  ],
+  "phase": "L4.1",
+  "schema_version": 1,
+  "scope": "bounded_research_foundation_only",
+  "source_row_count": 255,
+  "subfamilies": [
+    "STM32L412",
+    "STM32L422",
+    "STM32L431",
+    "STM32L432",
+    "STM32L433",
+    "STM32L442",
+    "STM32L443",
+    "STM32L451",
+    "STM32L452",
+    "STM32L462",
+    "STM32L471",
+    "STM32L475",
+    "STM32L476",
+    "STM32L486",
+    "STM32L496",
+    "STM32L4A6",
+    "STM32L4P5",
+    "STM32L4Q5",
+    "STM32L4R5",
+    "STM32L4R7",
+    "STM32L4R9",
+    "STM32L4S5",
+    "STM32L4S7",
+    "STM32L4S9"
+  ],
+  "target_config": "tcl/target/stm32l4x.cfg"
+}
