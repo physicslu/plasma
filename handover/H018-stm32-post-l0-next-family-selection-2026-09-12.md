@@ -1,7 +1,7 @@
 # H018 — STM32 Post-L0 Next-Family Selection
 
 **Date:** 2026-09-12
-**Status:** Gate 1 implementation complete; PR #517 Gate 2 candidate after final-head recheck
+**Status:** Gate 1 implementation complete; PR #517 Ready / mergeable; awaiting explicit Gate 2 approval
 **Primary workstream:** Device Catalog / STM32 next-family research selection
 **Repository:** `physicslu/plasma`
 **Branch:** `agent/device-catalog-post-l0-next-family-selection`
@@ -117,23 +117,49 @@ Selection status:
 
 This selection does **not** reuse the old post-C0 tie-break. A negative control makes both L1 and L4 Active-clean and requires the transaction to block for a new comparison rather than silently select by stale order.
 
-## 6. Validation
+## 6. Validation history
 
 Dedicated workflow:
 
 `.github/workflows/device-catalog-stm32-post-l0-selection-validation.yml`
 
-The first run exposed one negative-control ordering issue: multiple Active candidates reached Ordering review before the explicit multiple-candidate block. The control flow was corrected so multiple Active-clean candidates fail closed before any stale comparison is reused.
+The first dedicated run exposed one negative-control ordering issue: multiple Active candidates reached Ordering review before the explicit multiple-candidate block. The control flow was corrected so multiple Active-clean candidates fail closed before any stale comparison is reused.
 
-After correction:
+Final head:
 
-- post-L0 next-family selection validation — SUCCESS
-- deterministic selection — STM32L4
-- Production writes — 0
+`fd74b649c10fbbcf2dd68359f14e6537a0e363c6`
 
-Final repository-wide CI still requires recheck after documentation/handover commits.
+Final checks:
 
-## 7. Production boundary
+- STM32 post-L0 next-family selection validation — SUCCESS
+- Device catalog validation — SUCCESS
+- Device catalog current validation — SUCCESS
+- Repository contracts — SUCCESS
+
+Final mutable-state check:
+
+```text
+main:          db2122c1cf57b8eff4207d94e40cd99f9fff4391
+branch:        ahead 11 / behind 0
+mergeable:     true
+reviews:       0
+review threads: 0
+```
+
+PR #517 is Ready for explicit Gate 2 approval.
+
+## 7. Permanent assets
+
+- `.github/workflows/device-catalog-stm32-post-l0-selection-validation.yml`
+- `data/device-catalog/research/device-catalog-stm32-post-l0-next-family-selection.md`
+- `data/device-catalog/research/stm32-post-l0-next-family-selection.json`
+- `data/device-catalog/research/stm32-post-l0-production-manifest-prestate.json`
+- `data/device-catalog/research/stm32_post_l0_selection.py`
+- `data/device-catalog/research/test_stm32_post_l0_selection.py`
+- `data/device-catalog/research/validate_stm32_post_l0_selection.py`
+- `handover/H018-stm32-post-l0-next-family-selection-2026-09-12.md`
+
+## 8. Production boundary
 
 This phase performs zero Production writes:
 
@@ -146,8 +172,10 @@ STM32L0 Production: 360
 
 Selection is research prioritization only; it does not establish physical programming support.
 
-## 8. Next action
+## 9. Next action
 
-Recheck PR #517 final head, current `main`, all applicable CI, compare state, reviews and review threads. If merge-ready, request explicit **Gate 2 merge approval**.
+Obtain explicit **Gate 2 merge approval for PR #517**.
 
-After this selection merges, a future STM32L4 foundation/discovery transaction requires a new Gate 1.
+Before merge, recheck only mutable state that can change after this handover was written: PR head, current `main`, CI, mergeability, reviews and review threads. If any drift occurs, fail closed and revalidate before merge.
+
+After PR #517 merges, STM32L4 becomes the selected **research family only**. A future STM32L4 foundation/discovery transaction is a separate phase and requires a new Gate 1.
