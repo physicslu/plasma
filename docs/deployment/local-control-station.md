@@ -86,17 +86,19 @@ http://HOST[:PORT]
 https://HOST[:PORT]
 ```
 
-The value must identify the Plasma Gateway root. Embedded credentials, query strings, fragments, and nested paths are rejected.
+The value must identify the **full Plasma Gateway root used for managed control**, not a narrower diagnostics/status proxy. Embedded credentials, query strings, fragments, and nested paths are rejected.
 
 Examples:
 
 ```text
-SWPC co-resident Z2-like restricted ingress
-http://127.0.0.1:18081
+SWPC co-resident Z2-like full local Gateway
+http://127.0.0.1:18080
 
 Future real Z2 on a trusted local network
 http://192.168.10.21:18080
 ```
+
+The SWPC Z2-like `127.0.0.1:18081` listener is intentionally a restricted diagnostics/status ingress. It does not expose Site Desired writes or runtime activation and **must not** be configured as the local Control Station PPU endpoint.
 
 The Manager/BFF target alias is fixed by deployment configuration. Browser selection does not rewrite the backend target.
 
@@ -107,7 +109,7 @@ First install requires an explicit PPU endpoint:
 ```bash
 ./scripts/plasmactl install local-control-station \
   --ppu-alias swpc-ppu \
-  --ppu-endpoint http://127.0.0.1:18081
+  --ppu-endpoint http://127.0.0.1:18080
 ```
 
 Optional overrides:
@@ -171,6 +173,8 @@ An unreachable PPU does **not** invalidate the Control Station deployment itself
 Control Station readiness != PPU readiness != Programming readiness
 ```
 
+However, if the configured PPU is reachable and `/api/health/live` succeeds while `/api/settings/sites` is unavailable, verification fails closed. That condition proves the configured endpoint is not the managed-control Gateway surface, which is a deployment configuration error rather than temporary PPU unavailability.
+
 ## Verification
 
 ```bash
@@ -185,9 +189,10 @@ This verifies:
 - Console BFF points to the local Manager;
 - fixed PPU alias is injected into the BFF;
 - Manager liveness passes on loopback;
-- Console root responds on loopback.
+- Console root responds on loopback;
+- a reachable configured PPU exposes the managed Site configuration surface rather than only a restricted diagnostics/status surface.
 
-The configured PPU `/api/health/live` is probed as additional evidence, but an unavailable target is non-fatal for **Control Station deployment qualification**.
+The configured PPU `/api/health/live` is probed as additional evidence. An unreachable target remains non-fatal for **Control Station deployment qualification**, but a reachable target with an incompatible managed-control surface fails configuration verification.
 
 It does not prove:
 

@@ -93,10 +93,10 @@ The Linux reference profile is documented in detail at `docs/deployment/local-co
 ```bash
 ./scripts/plasmactl install local-control-station \
   --ppu-alias swpc-ppu \
-  --ppu-endpoint http://127.0.0.1:18081
+  --ppu-endpoint http://127.0.0.1:18080
 ```
 
-The PPU endpoint is mandatory on first install and is deployment configuration, not Browser-owned state. HTTP and HTTPS Gateway roots are accepted; credentials, query strings, fragments and nested paths are rejected.
+The PPU endpoint is mandatory on first install and is deployment configuration, not Browser-owned state. HTTP and HTTPS **full Plasma Gateway roots** are accepted; credentials, query strings, fragments and nested paths are rejected. For the co-resident SWPC Z2-like surrogate, `127.0.0.1:18080` is the managed-control Gateway. The `127.0.0.1:18081` listener is intentionally restricted to diagnostics/status and is not a valid Control Station endpoint for Site Desired writes or runtime activation.
 
 Default local bindings:
 
@@ -144,13 +144,15 @@ Target PPU availability is probed but is deliberately not part of Control Statio
 Control Station readiness != PPU readiness != Programming readiness
 ```
 
+A temporarily unreachable PPU remains non-fatal. If the configured PPU is reachable but `/api/settings/sites` is unavailable, verification fails closed because that proves the endpoint is not the managed-control Gateway surface.
+
 ### Verification
 
 ```bash
 ./scripts/plasmactl verify local-control-station
 ```
 
-This verifies the local runtime/evidence contract, managed-mode BFF wiring, local Manager liveness and local Console health. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
+This verifies the local runtime/evidence contract, managed-mode BFF wiring, local Manager liveness and local Console health. For a reachable PPU, it also verifies that the configured endpoint exposes the managed Site settings surface instead of only a restricted diagnostics/status surface. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
 
 ### Cross-platform boundary
 
@@ -250,7 +252,7 @@ The backend never implicitly stops integration-host **user** systemd services. P
 ### Verification
 
 ```bash
-./scripts/plasmactl verify swpc-z2like
+sudo ./scripts/plasmactl verify swpc-z2like
 ```
 
 This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned canonical config, Server/Gateway/runtime-activation system units, active services, direct local Site Desired API, local/restricted health, negative-route isolation, and PS diagnostic loopback. Dynamic canonical Site configuration is accepted within the one-based `id` and `max_supported_sites <= 8` contract.
