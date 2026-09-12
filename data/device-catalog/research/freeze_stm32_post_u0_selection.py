@@ -24,7 +24,7 @@ AUTHORITATIVE_PROVENANCE = AUTHORITATIVE_DIR / "provenance.json"
 AUTHORITATIVE_TARGETS = AUTHORITATIVE_DIR / "targets.json"
 QR_DIAGNOSTIC_DIR = DEFAULT_QR_DIAGNOSTIC.parent
 QR_DIAGNOSTIC_PROVENANCE = QR_DIAGNOSTIC_DIR / "provenance.json"
-PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
+PRODUCTION_MANIFEST = HERE / "stm32c0-phase-c0.3-production-manifest-prestate.json"
 OPENOCD_CATALOG = HERE / "openocd-parts-canonical.csv"
 DEFAULT_OUTPUT = HERE / "stm32-post-u0-next-family-selection.json"
 
