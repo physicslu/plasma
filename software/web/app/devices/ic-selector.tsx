@@ -28,10 +28,53 @@ function backendLabel(status: string): string {
   return humanizeStatus(status);
 }
 
-function statusClass(value: string): string {
-  if (value === "mapped" || value === "engineering_verified" || value === "verified") return "verified";
+function statusClass(value: string | null): string {
+  if (
+    value === "mapped"
+    || value === "engineering_verified"
+    || value === "verified"
+    || value === "passed"
+    || value?.startsWith("verified_")
+  ) return "verified";
   if (value === "rejected" || value === "failed" || value === "blocked") return "failed";
   return "pending";
+}
+
+function openOcdConfigLabel(status: string, zh: boolean): string {
+  if (status === "mapped") return zh ? "OpenOCD 設定 · 已存在" : "OpenOCD config · Present";
+  if (status === "no_mapping") return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
+  if (status === "rejected") return zh ? "OpenOCD 設定 · 已拒絕" : "OpenOCD config · Rejected";
+  return zh ? `OpenOCD 設定 · ${humanizeStatus(status)}` : `OpenOCD config · ${humanizeStatus(status)}`;
+}
+
+function manufacturerPartLabel(status: string | null, zh: boolean): string {
+  if (status === "verified" || status === "engineering_verified" || status?.startsWith("verified_")) {
+    return zh ? "原廠料號 · 已確認" : "Manufacturer part · Confirmed";
+  }
+  if (status === "rejected" || status === "failed" || status === "blocked") {
+    return zh ? "原廠料號 · 未確認" : "Manufacturer part · Not confirmed";
+  }
+  return zh ? "原廠料號 · 待確認" : "Manufacturer part · Pending";
+}
+
+function physicalValidationLabel(kind: "PPU" | "Socket", status: string, zh: boolean): string {
+  if (status === "no_evidence" || status === "not_verified") {
+    return `${kind} · ${zh ? "未實機測試" : "Not hardware-tested"}`;
+  }
+  if (status === "engineering_verified" || status === "verified" || status === "passed") {
+    return `${kind} · ${zh ? "實機測試通過" : "Hardware test passed"}`;
+  }
+  if (status === "rejected" || status === "failed" || status === "blocked") {
+    return `${kind} · ${zh ? "實機測試未通過" : "Hardware test failed"}`;
+  }
+  return `${kind} · ${humanizeStatus(status)}`;
+}
+
+function physicalValidationDetail(status: string, zh: boolean): string {
+  if (status === "no_evidence" || status === "not_verified") return zh ? "未實機測試" : "Not hardware-tested";
+  if (status === "engineering_verified" || status === "verified" || status === "passed") return zh ? "實機測試通過" : "Hardware test passed";
+  if (status === "rejected" || status === "failed" || status === "blocked") return zh ? "實機測試未通過" : "Hardware test failed";
+  return humanizeStatus(status);
 }
 
 function shortRevision(value: string | null): string {
@@ -169,11 +212,23 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <span>{device.family}</span>
                   {device.subfamily && <span>{device.subfamily}</span>}
                 </div>
-                <div className="icSelectorStatusRow">
-                  <span className={statusClass(device.backend.mapping_status)}>{backendLabel(device.backend.mapping_status)}</span>
-                  <span className="verified">ICPN · {zh ? "官方證據" : "Verified evidence"}</span>
-                  <span className="pending">PPU · {zh ? "無實體證據" : "No evidence"}</span>
-                  <span className="pending">Socket · {zh ? "無實體證據" : "No evidence"}</span>
+                <div className="icSelectorStatusStack">
+                  <div className="icSelectorStatusRow icSelectorStatusPhysical">
+                    <span className={statusClass(device.physical_validation.ppu_status)}>
+                      {physicalValidationLabel("PPU", device.physical_validation.ppu_status, zh)}
+                    </span>
+                    <span className={statusClass(device.physical_validation.socket_status)}>
+                      {physicalValidationLabel("Socket", device.physical_validation.socket_status, zh)}
+                    </span>
+                  </div>
+                  <div className="icSelectorStatusRow icSelectorStatusEvidence">
+                    <span className={statusClass(device.backend.mapping_status)}>
+                      {openOcdConfigLabel(device.backend.mapping_status, zh)}
+                    </span>
+                    <span className={statusClass(device.catalog_verification.status)}>
+                      {manufacturerPartLabel(device.catalog_verification.status, zh)}
+                    </span>
+                  </div>
                 </div>
               </button>
             );
@@ -203,14 +258,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>Catalog Revision</dt><dd><code>{shortRevision(selected.catalog.revision_sha256)}</code></dd></div>
               <div><dt>Authority</dt><dd>{selected.catalog_verification.source_authority ?? "—"}</dd></div>
               <div><dt>ICPN Evidence</dt><dd>{humanizeStatus(selected.catalog_verification.status)}</dd></div>
-              <div><dt>PPU</dt><dd>{zh ? "尚無實體驗證證據" : "No physical validation evidence"}</dd></div>
-              <div><dt>Socket</dt><dd>{zh ? "尚無實體驗證證據" : "No physical validation evidence"}</dd></div>
+              <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
+              <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
             </dl>
 
             <div className="icSelectorBoundary">
               {zh
-                ? "Exact ICPN 與 OpenOCD mapping 已通過 catalog admission，但仍不等於 PPU 或 Socket 實體驗證。Programming Configuration 必須另外建立驗證證據。"
-                : "Exact ICPN identity and OpenOCD mapping are catalog-admitted, but this is still not PPU or Socket physical validation. Programming Configuration evidence remains separate."}
+                ? "原廠料號已確認且 OpenOCD 設定已存在，但這兩項都不代表 PPU 或 Socket 已完成實機測試。實機驗證必須另外建立對應的 PPU / Socket 測試證據。"
+                : "The manufacturer part is confirmed and an OpenOCD configuration exists, but neither proves PPU or Socket hardware validation. PPU/Socket test evidence remains separate."}
             </div>
           </>
         ) : (

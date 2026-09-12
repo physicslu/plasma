@@ -108,6 +108,7 @@
 .icSelectorTaxonomy b { display: block; font-size: 11px; }
 .icSelectorTaxonomy span + span::before { content: " · "; color: var(--line-strong); }
 
+.icSelectorStatusStack { display: grid; gap: 5px; justify-items: end; }
 .icSelectorStatusRow { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
 .icSelectorStatusRow span {
   border: 1px solid var(--line);
@@ -144,7 +145,8 @@
   .icSelector { grid-template-columns: 1fr; }
   .icSelectorDetail { position: static; }
   .icSelectorResult { grid-template-columns: minmax(180px, .8fr) minmax(180px, 1fr); }
-  .icSelectorStatusRow { grid-column: 1 / -1; justify-content: flex-start; }
+  .icSelectorStatusStack { grid-column: 1 / -1; justify-items: start; }
+  .icSelectorStatusRow { justify-content: flex-start; }
 }
 
 @media (max-width: 650px) {
@@ -155,5 +157,6 @@
   .icSelectorSearchBox { grid-template-columns: 1fr; gap: 2px; }
   .icSelectorSearchBox em { justify-self: start; }
   .icSelectorResult { grid-template-columns: 1fr; }
-  .icSelectorStatusRow { grid-column: auto; justify-content: flex-start; }
+  .icSelectorStatusStack { grid-column: auto; justify-items: start; }
+  .icSelectorStatusRow { justify-content: flex-start; }
 }
