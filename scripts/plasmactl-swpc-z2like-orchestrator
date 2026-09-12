@@ -54,9 +54,6 @@ capture_desired_state() {
   managed_was_enabled=0
   if programming_desired; then programming_was_enabled=1; fi
   if managed_desired; then managed_was_enabled=1; fi
-  if (( managed_was_enabled && ! programming_was_enabled )); then
-    die "managed Programming ingress is enabled while configured Mock Programming is disabled"
-  fi
 }
 
 reconcile_addons() {
@@ -112,8 +109,9 @@ Commands:
   verify    Verify base runtime plus every currently declared add-on
   status    Show base status and declared add-on state
 
-The orchestrator preserves declared state. It never enables configured Mock
-Programming or managed ingress merely because a fresh base profile was installed.
+The orchestrator preserves each declared add-on independently. It never enables
+configured Mock Programming or managed ingress merely because a fresh base
+profile was installed.
 EOF
 }
 
