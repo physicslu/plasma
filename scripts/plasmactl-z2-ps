@@ -227,12 +227,12 @@ verify_p3_runtime_activation_contract() {
 
   grep -Fq "RuntimeDirectory=plasma-server" "$server_unit" || die "Plasma Server runtime directory is not declared"
   grep -Fq "RuntimeDirectoryMode=0700" "$server_unit" || die "Plasma Server runtime directory mode is not 0700"
-  grep -Fq "--runtime-control-socket $server_control_socket" "$server_unit" || \
+  grep -Fq -- "--runtime-control-socket $server_control_socket" "$server_unit" || \
     die "Plasma Server is not bound to the canonical control socket"
 
   grep -Fq "Requires=plasma-server.service plasma-runtime-activation.service" "$gateway_unit" || \
     die "Plasma Gateway does not require the bounded runtime activation helper"
-  grep -Fq "--runtime-activation-socket $runtime_activation_socket" "$gateway_unit" || \
+  grep -Fq -- "--runtime-activation-socket $runtime_activation_socket" "$gateway_unit" || \
     die "Plasma Gateway is not bound to the canonical runtime activation helper socket"
 
   grep -Fq "User=root" "$runtime_activation_unit" || die "runtime activation helper must run as root"
