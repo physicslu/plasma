@@ -1,0 +1,64 @@
+name: STM32L0 L0.4 admission validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l0_admission_policy.py"
+      - "data/device-catalog/research/stm32l0_phase_l0_4_admission.py"
+      - "data/device-catalog/research/test_stm32l0_phase_l0_4_admission.py"
+      - "data/device-catalog/research/validate_stm32l0_phase_l0_4_admission_plan.py"
+      - "data/device-catalog/research/stm32l0-phase-l0.4-admission-plan.json"
+      - "data/device-catalog/research/stm32l0-phase-l0.3-policy-baseline.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/**"
+      - ".github/workflows/device-catalog-stm32l0-l04-admission-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run L0.4 admission tests
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32l0_phase_l0_4_admission.py
+      - name: Replay frozen L0.4 admission plan
+        working-directory: data/device-catalog/research
+        run: python validate_stm32l0_phase_l0_4_admission_plan.py
+      - name: Build deterministic L0.4 summary
+        working-directory: data/device-catalog/research
+        run: |
+          python stm32l0_phase_l0_4_admission.py --summary-only --output "$RUNNER_TEMP/stm32l0-l04-summary.json"
+          cat "$RUNNER_TEMP/stm32l0-l04-summary.json"
+      - name: Enforce read-only boundary
+        run: |
+          python - <<'PY'
+          import json, os
+          p = os.path.join(os.environ["RUNNER_TEMP"], "stm32l0-l04-summary.json")
+          d = json.load(open(p, encoding="utf-8"))
+          assert d["phase"] == "L0.4" and d["family"] == "STM32L0"
+          assert d["manufacturer_verified_identity_count"] == 360
+          assert d["metadata_ready_count"] == 360
+          assert d["capability_admittable_count"] == 360
+          assert d["capability_unresolved_count"] == 0
+          assert d["capability_unresolved_exact_icpns"] == []
+          assert d["current_mapping_replay"] == {"unique": 360, "ambiguous": 0, "unmapped": 0}
+          assert d["decision_counts"] == {"admit": 360, "already_present": 0, "manual_review_required": 0, "reject": 0}
+          assert d["production_snapshot"]["exact_icpn_count"] == 912
+          assert d["production_snapshot"]["stm32l0_exact_icpn_count"] == 0
+          assert set(d["claims"].values()) == {False}
+          print("STM32L0 L0.4 read-only boundary: PASS")
+          PY
+      - name: Upload deterministic summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l0-l04-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stm32l0-l04-summary.json
+          retention-days: 30
