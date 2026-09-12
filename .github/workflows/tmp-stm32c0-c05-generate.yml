@@ -1,0 +1,252 @@
+name: TEMP STM32C0 C0.5 publication generator
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32c0-phase-c05-publication
+    paths:
+      - ".github/workflows/tmp-stm32c0-c05-generate.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32c0-phase-c05-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate deterministic C0.5 publication bytes
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import tempfile
+          from pathlib import Path
+
+          from device_catalog_admission_framework import file_sha256, write_canonical_dataset
+          from stm32c0_admission_policy import CANONICAL_FIELDS
+          from stm32c0_phase_c0_4_admission import (
+              admission_plan_is_clean,
+              admission_summary,
+              build_admission_plan,
+          )
+
+          HERE = Path("data/device-catalog/research")
+          PRESTATE = HERE / "stm32c0-phase-c0.3-production-manifest-prestate.json"
+          PLAN_PATH = HERE / "stm32c0-phase-c0.4-admission-plan.json"
+          CANONICAL = HERE / "stm32c0-commercial-icpn.csv"
+          PROPOSAL = HERE / "stm32c0-phase-c0.5-publication-proposal.json"
+          AUDIT = HERE / "stm32c0-phase-c0.5-publication-audit.json"
+          PRODUCTION = Path("data/device-catalog/production/icpn-v1-manifest.json")
+
+          EXPECTED_PRESTATE_SHA256 = "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0"
+          EXPECTED_PRESTATE_BLOB = "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc"
+          EXPECTED_PUBLISHED = 209
+          EXPECTED_UNRESOLVED = 11
+          EXPECTED_PRESTATE = (703, 243, 9)
+
+          def git_blob(data: bytes) -> str:
+              return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+
+          def json_bytes(value, *, sort_keys: bool) -> bytes:
+              return (json.dumps(value, indent=2, sort_keys=sort_keys) + "\n").encode()
+
+          def snapshot(manifest_path: Path):
+              manifest = json.loads(manifest_path.read_text())
+              counts = {}
+              bases = set()
+              for source in manifest["sources"]:
+                  family = source["family"]
+                  path = (manifest_path.parent / source["path"]).resolve()
+                  data = path.read_bytes()
+                  with path.open(newline="", encoding="utf-8") as handle:
+                      rows = list(csv.DictReader(handle))
+                  assert len(rows) == source["row_count"], (family, "row_count")
+                  assert hashlib.sha256(data).hexdigest() == source["sha256"], (family, "sha256")
+                  assert git_blob(data) == source["git_blob_sha"], (family, "blob")
+                  assert all(row["family"] == family for row in rows), family
+                  counts[family] = len(rows)
+                  bases.update((family, row["base_device"]) for row in rows)
+              return sum(counts.values()), bases, counts
+
+          assert file_sha256(PRESTATE) == EXPECTED_PRESTATE_SHA256
+          assert git_blob(PRESTATE.read_bytes()) == EXPECTED_PRESTATE_BLOB
+          assert file_sha256(PRODUCTION) == EXPECTED_PRESTATE_SHA256
+          assert git_blob(PRODUCTION.read_bytes()) == EXPECTED_PRESTATE_BLOB
+
+          frozen = json.loads(PLAN_PATH.read_text())
+          unresolved = list(frozen["capability_unresolved_exact_icpns"])
+          assert frozen["capability_admittable_count"] == EXPECTED_PUBLISHED
+          assert frozen["capability_unresolved_count"] == EXPECTED_UNRESOLVED
+          assert len(unresolved) == EXPECTED_UNRESOLVED
+
+          with tempfile.TemporaryDirectory() as td:
+              absent = Path(td) / "stm32c0-commercial-icpn.csv"
+              plan = build_admission_plan(canonical_path=absent, production_manifest_path=PRESTATE)
+          assert admission_plan_is_clean(plan)
+          assert admission_summary(plan) == frozen
+
+          with CANONICAL.open("w", newline="", encoding="utf-8") as handle:
+              csv.DictWriter(handle, fieldnames=list(CANONICAL_FIELDS), lineterminator="\n").writeheader()
+          result = write_canonical_dataset(plan=plan, canonical_path=CANONICAL)
+          assert result["status"] == "written"
+          assert result["rows_after"] == EXPECTED_PUBLISHED
+          canonical_bytes = CANONICAL.read_bytes()
+          with CANONICAL.open(newline="", encoding="utf-8") as handle:
+              rows = list(csv.DictReader(handle))
+          assert len(rows) == EXPECTED_PUBLISHED
+          assert len({row["icpn"] for row in rows}) == EXPECTED_PUBLISHED
+          assert not (set(row["icpn"] for row in rows) & set(unresolved))
+          base_count = len({row["base_device"] for row in rows})
+
+          before_exact, before_bases, before_families = snapshot(PRESTATE)
+          assert (before_exact, len(before_bases), len(before_families)) == EXPECTED_PRESTATE
+          assert "STM32C0" not in before_families
+
+          canonical_sha = hashlib.sha256(canonical_bytes).hexdigest()
+          canonical_blob = git_blob(canonical_bytes)
+          manifest = json.loads(PRESTATE.read_text())
+          manifest["sources"].append({
+              "manufacturer": "STMicroelectronics",
+              "family": "STM32C0",
+              "path": "../research/stm32c0-commercial-icpn.csv",
+              "row_count": EXPECTED_PUBLISHED,
+              "git_blob_sha": canonical_blob,
+              "sha256": canonical_sha,
+          })
+          manifest_bytes = json_bytes(manifest, sort_keys=False)
+          PRODUCTION.write_bytes(manifest_bytes)
+
+          post_exact = before_exact + EXPECTED_PUBLISHED
+          post_bases = len(before_bases) + base_count
+          post_families = len(before_families) + 1
+          assert post_exact == 912
+
+          plan_sha = file_sha256(PLAN_PATH)
+          manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+          manifest_blob = git_blob(manifest_bytes)
+          unresolved_sha = frozen["capability_unresolved_exact_set_sha256"]
+
+          proposal = {
+              "schema_version": 1,
+              "phase": "C0.5",
+              "family": "STM32C0",
+              "status": "publication_proposal_clean",
+              "admission_plan_sha256": plan_sha,
+              "production_manifest_sha256_before": EXPECTED_PRESTATE_SHA256,
+              "production_manifest_git_blob_sha_before": EXPECTED_PRESTATE_BLOB,
+              "canonical_csv_file_sha256_proposed": canonical_sha,
+              "canonical_csv_git_blob_sha_proposed": canonical_blob,
+              "production_manifest_sha256_proposed": manifest_sha,
+              "production_manifest_git_blob_sha_proposed": manifest_blob,
+              "manufacturer_verified_identity_count": 220,
+              "metadata_ready_identity_count": 220,
+              "capability_admittable_count": EXPECTED_PUBLISHED,
+              "published_exact_icpn_count_proposed": EXPECTED_PUBLISHED,
+              "published_base_device_count_proposed": base_count,
+              "added_exact_icpns": sorted(row["icpn"] for row in rows),
+              "bounded_commercial_surface_complete": True,
+              "published_surface_partial_due_to_capability": True,
+              "capability_unresolved_count": EXPECTED_UNRESOLVED,
+              "capability_unresolved_exact_icpns": sorted(unresolved),
+              "capability_unresolved_exact_set_sha256": unresolved_sha,
+              "capability_unresolved_is_identity_rejection": False,
+              "production_exact_icpns_before": before_exact,
+              "production_exact_icpns_after_proposed": post_exact,
+              "production_base_devices_before": len(before_bases),
+              "production_base_devices_after_proposed": post_bases,
+              "production_family_count_before": len(before_families),
+              "production_family_count_after_proposed": post_families,
+              "canonical_write_applied": False,
+              "production_write_applied": False,
+              "programming_algorithm_equivalence_claimed": False,
+              "flash_geometry_equivalence_claimed": False,
+              "option_security_semantics_claimed": False,
+              "physical_target_qualification_claimed": False,
+              "hil_qualification_claimed": False,
+              "runtime_programming_support_claimed": False,
+              "full_stm32c0_surface_covered": False,
+          }
+          proposal_bytes = json_bytes(proposal, sort_keys=True)
+          PROPOSAL.write_bytes(proposal_bytes)
+          proposal_sha = hashlib.sha256(proposal_bytes).hexdigest()
+
+          audit = {
+              "schema_version": 1,
+              "phase": "C0.5",
+              "family": "STM32C0",
+              "status": "published",
+              "admission_plan_sha256": plan_sha,
+              "publication_proposal_sha256": proposal_sha,
+              "canonical_csv_file_sha256": canonical_sha,
+              "canonical_csv_git_blob_sha": canonical_blob,
+              "production_manifest_sha256_before": EXPECTED_PRESTATE_SHA256,
+              "production_manifest_git_blob_sha_before": EXPECTED_PRESTATE_BLOB,
+              "production_manifest_sha256_after": manifest_sha,
+              "production_manifest_git_blob_sha_after": manifest_blob,
+              "manufacturer_verified_identity_count": 220,
+              "metadata_ready_identity_count": 220,
+              "capability_admittable_count": EXPECTED_PUBLISHED,
+              "published_exact_icpn_count": EXPECTED_PUBLISHED,
+              "published_base_device_count": base_count,
+              "added_exact_icpns": proposal["added_exact_icpns"],
+              "stm32c0_rows_before": 0,
+              "stm32c0_rows_after": EXPECTED_PUBLISHED,
+              "stm32c0_base_devices_after": base_count,
+              "production_exact_icpns_before": before_exact,
+              "production_exact_icpns_after": post_exact,
+              "production_base_devices_before": len(before_bases),
+              "production_base_devices_after": post_bases,
+              "production_family_count_before": len(before_families),
+              "production_family_count_after": post_families,
+              "bounded_commercial_surface_complete": True,
+              "published_surface_partial_due_to_capability": True,
+              "capability_unresolved_count": EXPECTED_UNRESOLVED,
+              "capability_unresolved_exact_icpns": sorted(unresolved),
+              "capability_unresolved_exact_set_sha256": unresolved_sha,
+              "capability_unresolved_is_identity_rejection": False,
+              "canonical_write_applied": True,
+              "production_write_applied": True,
+              "programming_algorithm_equivalence_claimed": False,
+              "flash_geometry_equivalence_claimed": False,
+              "option_security_semantics_claimed": False,
+              "physical_target_qualification_claimed": False,
+              "hil_qualification_claimed": False,
+              "runtime_programming_support_claimed": False,
+              "full_stm32c0_surface_covered": False,
+          }
+          audit_bytes = json_bytes(audit, sort_keys=True)
+          AUDIT.write_bytes(audit_bytes)
+
+          print("C0.4 plan SHA256", plan_sha)
+          print("published rows", EXPECTED_PUBLISHED)
+          print("published bases", base_count)
+          print("unresolved rows", EXPECTED_UNRESOLVED)
+          print("canonical SHA256", canonical_sha)
+          print("canonical blob", canonical_blob)
+          print("proposal SHA256", proposal_sha)
+          print("audit SHA256", hashlib.sha256(audit_bytes).hexdigest())
+          print("post manifest SHA256", manifest_sha)
+          print("post manifest blob", manifest_blob)
+          print("poststate", post_exact, post_bases, post_families)
+          PY
+      - name: Commit generated publication bytes
+        run: |
+          git config user.name "plasma-catalog-bot"
+          git config user.email "plasma-catalog-bot@users.noreply.github.com"
+          git add \
+            data/device-catalog/production/icpn-v1-manifest.json \
+            data/device-catalog/research/stm32c0-commercial-icpn.csv \
+            data/device-catalog/research/stm32c0-phase-c0.5-publication-proposal.json \
+            data/device-catalog/research/stm32c0-phase-c0.5-publication-audit.json
+          git commit -m "C0.5: generate deterministic STM32C0 publication bytes"
+          git push origin HEAD:agent/device-catalog-stm32c0-phase-c05-publication
