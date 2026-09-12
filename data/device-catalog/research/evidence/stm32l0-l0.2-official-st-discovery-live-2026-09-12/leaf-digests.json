@@ -1,0 +1,505 @@
+{
+  "artifact_id": 10296507776,
+  "artifact_zip_sha256": "5732782fce1911debe7360c07ccbae5ba03fd86cc097a975bc271fe9c6b334bd",
+  "family": "STM32L0",
+  "leaf_count": 99,
+  "leaves": [
+    {
+      "base_device": "STM32L010C6",
+      "path": "evidence/STM32L010C6.json",
+      "sha256": "96d577b35b1c8534b7b293c889e70a994b17cfe0a1fed8ed9bbf87f198f73352"
+    },
+    {
+      "base_device": "STM32L010F4",
+      "path": "evidence/STM32L010F4.json",
+      "sha256": "ef9a2ef4d8bfcad8b57aad306b1a86dc7a5f0455257fcb66cb8e316ded30dd35"
+    },
+    {
+      "base_device": "STM32L010K4",
+      "path": "evidence/STM32L010K4.json",
+      "sha256": "d55503ccae02a1a3d92efe30f7cbc5a26cd3cd519d03eebd4cc052d89dd344dd"
+    },
+    {
+      "base_device": "STM32L010K8",
+      "path": "evidence/STM32L010K8.json",
+      "sha256": "3d5814c74c0316622e6facc0b3873212c05ee15f601ef002ece240e04b1208f4"
+    },
+    {
+      "base_device": "STM32L010R8",
+      "path": "evidence/STM32L010R8.json",
+      "sha256": "7359a36ef09347005f7d96d2abe4d8b9c7851d9afb476ea2d715b16e170a94ea"
+    },
+    {
+      "base_device": "STM32L010RB",
+      "path": "evidence/STM32L010RB.json",
+      "sha256": "e40143a1a59c9ea7c293990e77444558afa88b1189fea177b40fcf727f6d6dbd"
+    },
+    {
+      "base_device": "STM32L011D3",
+      "path": "evidence/STM32L011D3.json",
+      "sha256": "72aecda5545389c74e73c1977950578ca065701d145bc7218bfc03052a5f1c0d"
+    },
+    {
+      "base_device": "STM32L011D4",
+      "path": "evidence/STM32L011D4.json",
+      "sha256": "1f738406a56cf95d838089744489c94396e43e670126140c715bb4af8cc3c81c"
+    },
+    {
+      "base_device": "STM32L011E3",
+      "path": "evidence/STM32L011E3.json",
+      "sha256": "98eced58db463d53760ecfc6f7671a869359b3715217148de5ab8d682f15467b"
+    },
+    {
+      "base_device": "STM32L011E4",
+      "path": "evidence/STM32L011E4.json",
+      "sha256": "9ee37a5cd41eb2ff91e8d060b519c62e23dd59dfd2bafe7b89e9729a9e83d9e1"
+    },
+    {
+      "base_device": "STM32L011F3",
+      "path": "evidence/STM32L011F3.json",
+      "sha256": "0524b33c9d2010f3d586d29eac67c1968eb7839e8c3dc0f0ce8e167b83b9e676"
+    },
+    {
+      "base_device": "STM32L011F4",
+      "path": "evidence/STM32L011F4.json",
+      "sha256": "e692b420f795c674b26e6fa04a997982bc99a603da3f1c41e64ff90cf316d0a2"
+    },
+    {
+      "base_device": "STM32L011G3",
+      "path": "evidence/STM32L011G3.json",
+      "sha256": "39bfcbbe06d72a85cbb3d421962f2f5c24f4f83f0abd9d8aa6c205ec10d532a0"
+    },
+    {
+      "base_device": "STM32L011G4",
+      "path": "evidence/STM32L011G4.json",
+      "sha256": "872c5e3a32696c24d5c5ba1669d143112300d4ca907c5c5f7e009501b16a0096"
+    },
+    {
+      "base_device": "STM32L011K3",
+      "path": "evidence/STM32L011K3.json",
+      "sha256": "8905e50c30d9bdb5751e1e302106a92d8892fef1cff79cbbea39591669863c7f"
+    },
+    {
+      "base_device": "STM32L011K4",
+      "path": "evidence/STM32L011K4.json",
+      "sha256": "5d3e346a74cc50716d903fdba7734c81a825b9afe0d20a90e83d81b8b0c4f388"
+    },
+    {
+      "base_device": "STM32L021D4",
+      "path": "evidence/STM32L021D4.json",
+      "sha256": "1b6df581c96008bf3b49735dc9de0076a7def0ce6725bd435081928eab49600a"
+    },
+    {
+      "base_device": "STM32L021F4",
+      "path": "evidence/STM32L021F4.json",
+      "sha256": "2199df70022118f0bca3966530e60ce84a36558c404638b376684f2f10807f8e"
+    },
+    {
+      "base_device": "STM32L021G4",
+      "path": "evidence/STM32L021G4.json",
+      "sha256": "3553989270b3eb7afed3eb5bd069ff7a6fea4986772c03c6e9e1eea95ec4e80e"
+    },
+    {
+      "base_device": "STM32L021K4",
+      "path": "evidence/STM32L021K4.json",
+      "sha256": "d84e125f69e4083484cb0a940e87d5fb5de41a452e2522fbdb001ef28497d165"
+    },
+    {
+      "base_device": "STM32L031C4",
+      "path": "evidence/STM32L031C4.json",
+      "sha256": "dae15edbf722b8c83435265966223b5ed633f5200f416270437085f008c2a0d0"
+    },
+    {
+      "base_device": "STM32L031C6",
+      "path": "evidence/STM32L031C6.json",
+      "sha256": "05bbe30e95f394ec9d31d3921fb27dcfc1b7aba4a155ac4e5d7a8afb0bfeb7ef"
+    },
+    {
+      "base_device": "STM32L031E4",
+      "path": "evidence/STM32L031E4.json",
+      "sha256": "d747632a36c95088364a4ecea8356a1a9f0461f5e0abd3f6734c650d17f5b977"
+    },
+    {
+      "base_device": "STM32L031E6",
+      "path": "evidence/STM32L031E6.json",
+      "sha256": "bd74ca093c7dc702dc784e3810e42534d49ce14cb2e4b918848a6236111dce07"
+    },
+    {
+      "base_device": "STM32L031F4",
+      "path": "evidence/STM32L031F4.json",
+      "sha256": "fa1d1ca625ded04a0a7b31b3570dfea21264085e606beda23f79022b32af14ed"
+    },
+    {
+      "base_device": "STM32L031F6",
+      "path": "evidence/STM32L031F6.json",
+      "sha256": "98b330d8a71495326de52efe1592ea7969d57f832b29e1b322893ddc61a57c71"
+    },
+    {
+      "base_device": "STM32L031G4",
+      "path": "evidence/STM32L031G4.json",
+      "sha256": "471d5449b2fbc53654b77466db9e4d0fe4e81ff388bf93921e5d03e58d463574"
+    },
+    {
+      "base_device": "STM32L031G6",
+      "path": "evidence/STM32L031G6.json",
+      "sha256": "28d34095f8cb35088d39bd38a940f9214f2185b30db22ece30bf6b16a5f035f2"
+    },
+    {
+      "base_device": "STM32L031K4",
+      "path": "evidence/STM32L031K4.json",
+      "sha256": "ed7c2ce422e379975c6bdd1cfc45d737e1b857bec283b3e2f224316129c7558e"
+    },
+    {
+      "base_device": "STM32L031K6",
+      "path": "evidence/STM32L031K6.json",
+      "sha256": "e4af51e7416b2fe6119ff4f449aae5066a3884a46ed19e828397fff66ecf2f1b"
+    },
+    {
+      "base_device": "STM32L041C6",
+      "path": "evidence/STM32L041C6.json",
+      "sha256": "f6e0f22aa54993f027c7364041b7f6be242dcfa3f9d75e2fa7c24a0c634fe47c"
+    },
+    {
+      "base_device": "STM32L041E6",
+      "path": "evidence/STM32L041E6.json",
+      "sha256": "d12f457ee5cd48f6a3ff59fbc71eb3a34b66e9f7147b51ae537f531880cc5513"
+    },
+    {
+      "base_device": "STM32L041F6",
+      "path": "evidence/STM32L041F6.json",
+      "sha256": "e806564747e4657cef41d50b79f5c60c67bc37c1c77a8a111f3417fbcaaf7ce6"
+    },
+    {
+      "base_device": "STM32L041G6",
+      "path": "evidence/STM32L041G6.json",
+      "sha256": "fa04c438c74e0d01c2bfc4907b04c6a2a026bc0083066fcd10fe7e9f7bc3581f"
+    },
+    {
+      "base_device": "STM32L041K6",
+      "path": "evidence/STM32L041K6.json",
+      "sha256": "2be39fd1228393ce05e8278a0d4298047e4cbca9ec76d4cc1e77f3cb41ee04bc"
+    },
+    {
+      "base_device": "STM32L051C6",
+      "path": "evidence/STM32L051C6.json",
+      "sha256": "230b0bc1e3a052408234c31f910207bbacc50a58a71ae2ae610c0e523f3cff6d"
+    },
+    {
+      "base_device": "STM32L051C8",
+      "path": "evidence/STM32L051C8.json",
+      "sha256": "f4e534917a9e946c1bdc9311f6c17053b79f995a9cbdf4fd2bcf0982c534ac02"
+    },
+    {
+      "base_device": "STM32L051K6",
+      "path": "evidence/STM32L051K6.json",
+      "sha256": "c01f79b60e04b880c9898398e712b031f2cdfce6c80995c6c18ed2ac3fc3fa7a"
+    },
+    {
+      "base_device": "STM32L051K8",
+      "path": "evidence/STM32L051K8.json",
+      "sha256": "24486ae05bb0eef38d42596b70a4b407269fba34dc8426e35f200d8e9b3e3e02"
+    },
+    {
+      "base_device": "STM32L051R6",
+      "path": "evidence/STM32L051R6.json",
+      "sha256": "fb60b78ac4a7b99854c6bda78686644c44ce2b7e1f8b2003808c80f0b2f8a1ca"
+    },
+    {
+      "base_device": "STM32L051R8",
+      "path": "evidence/STM32L051R8.json",
+      "sha256": "9d0698d9dc7d12ae651615a4b3f636b50ccb2eb5366aa1af2c7239d69e754e70"
+    },
+    {
+      "base_device": "STM32L051T6",
+      "path": "evidence/STM32L051T6.json",
+      "sha256": "12136874d5b7fe0268521b88036b07064446fc20ad195320debb991b5e91be59"
+    },
+    {
+      "base_device": "STM32L051T8",
+      "path": "evidence/STM32L051T8.json",
+      "sha256": "444e0c93d999b3a1a7dbedd0d79cb52b04da1aab1dfe82673aa17a5b440d78b3"
+    },
+    {
+      "base_device": "STM32L052C6",
+      "path": "evidence/STM32L052C6.json",
+      "sha256": "758fe502dca44155f1d0e8c9b6428b46487ad3c5b09cdd2fa1095e7240262bfa"
+    },
+    {
+      "base_device": "STM32L052C8",
+      "path": "evidence/STM32L052C8.json",
+      "sha256": "52c3d8424c7f96c85b9a4e78ac9dbf4475ad048d1e9a52d978e0f390fb802c16"
+    },
+    {
+      "base_device": "STM32L052K6",
+      "path": "evidence/STM32L052K6.json",
+      "sha256": "b7611b0ce7d99db36c5f9670d859ba6ee2ec5e733454da355082813e17a56b14"
+    },
+    {
+      "base_device": "STM32L052K8",
+      "path": "evidence/STM32L052K8.json",
+      "sha256": "03e969eb6ee679ad9c035ee92a5cfd3b19bd16403ac511f3c4732c033fc871eb"
+    },
+    {
+      "base_device": "STM32L052R6",
+      "path": "evidence/STM32L052R6.json",
+      "sha256": "95cf0f6c97e89f55871a73aad344641bbffb9fe30f3f739857c910fa70183dcc"
+    },
+    {
+      "base_device": "STM32L052R8",
+      "path": "evidence/STM32L052R8.json",
+      "sha256": "6304cca258263fc9161c126443188eee8c9031860e2108a997d25108c8ac5f0d"
+    },
+    {
+      "base_device": "STM32L052T6",
+      "path": "evidence/STM32L052T6.json",
+      "sha256": "e6b8a34c3665f5c9f821c52274ef3c9ddc9a2c0f3e9d20c740191ea4e94dfaf6"
+    },
+    {
+      "base_device": "STM32L052T8",
+      "path": "evidence/STM32L052T8.json",
+      "sha256": "92417e27cea1901911b6da4183e43d0ca6d08e71b39e93c7faf42eaedf0409d2"
+    },
+    {
+      "base_device": "STM32L053C6",
+      "path": "evidence/STM32L053C6.json",
+      "sha256": "d50b38de15557d94111d02256226011cf71515d4ec8fa3fb58026ffe5e40ca68"
+    },
+    {
+      "base_device": "STM32L053C8",
+      "path": "evidence/STM32L053C8.json",
+      "sha256": "9c7bba19041315985a64cc61d631469272c3a12fb2f82649a5bb6fb327736eaf"
+    },
+    {
+      "base_device": "STM32L053R6",
+      "path": "evidence/STM32L053R6.json",
+      "sha256": "8b63445cad705e7d980915df69c256ebac57bc3f3b24391205de0569fc8a4884"
+    },
+    {
+      "base_device": "STM32L053R8",
+      "path": "evidence/STM32L053R8.json",
+      "sha256": "7dc663e83ded7b1dd9c4248e0f3379b3ba3cb66c1ccd93f6893a1609a5a8628e"
+    },
+    {
+      "base_device": "STM32L062C8",
+      "path": "evidence/STM32L062C8.json",
+      "sha256": "13a920c9cc54bece43c678e9da64db99d5114da1390360b0fdee69ac67518bf3"
+    },
+    {
+      "base_device": "STM32L062K8",
+      "path": "evidence/STM32L062K8.json",
+      "sha256": "03deeae4c79e0c77b3536721ddece56f95ae4faf1b3b386d87ca4f75b02bb677"
+    },
+    {
+      "base_device": "STM32L063C8",
+      "path": "evidence/STM32L063C8.json",
+      "sha256": "4a0094bcc798ba2d070d44e04eea7bf39ccd90c058502a0718c43286900d7999"
+    },
+    {
+      "base_device": "STM32L063R8",
+      "path": "evidence/STM32L063R8.json",
+      "sha256": "2086a574834ca92583632df80408aa1642226c0d4e6e7c8c6111690e8d983ae4"
+    },
+    {
+      "base_device": "STM32L071C8",
+      "path": "evidence/STM32L071C8.json",
+      "sha256": "470d55e11169bbc8f29d9f2b5937b6d93d094775dbf6ded35fdd97a80fafffe4"
+    },
+    {
+      "base_device": "STM32L071CB",
+      "path": "evidence/STM32L071CB.json",
+      "sha256": "e77f7ce5dbbd89438d9b2e57c1f440835697e1447ddd69f31761b04391ae4155"
+    },
+    {
+      "base_device": "STM32L071CZ",
+      "path": "evidence/STM32L071CZ.json",
+      "sha256": "c3221c32d7c973b5337206dc2fcbd48716f70b399ee3ac442e0948873cccbb18"
+    },
+    {
+      "base_device": "STM32L071K8",
+      "path": "evidence/STM32L071K8.json",
+      "sha256": "94ce5025649229c5934c91111f2d563999f929d6a0fedb16bcb91a3332399a7f"
+    },
+    {
+      "base_device": "STM32L071KB",
+      "path": "evidence/STM32L071KB.json",
+      "sha256": "f89a0387ed2964a07993fcf5e9704e1a1d23bef3379741abe2983a16c8e07b44"
+    },
+    {
+      "base_device": "STM32L071KZ",
+      "path": "evidence/STM32L071KZ.json",
+      "sha256": "828ed6b5d94b13d89d3fded4489a5a9eeb80995b7261f47164cedf8ebfa15488"
+    },
+    {
+      "base_device": "STM32L071RB",
+      "path": "evidence/STM32L071RB.json",
+      "sha256": "96f80a527258485c40de3363f4fa1cf80b96c99d4763bff8644dabe611e59fbe"
+    },
+    {
+      "base_device": "STM32L071RZ",
+      "path": "evidence/STM32L071RZ.json",
+      "sha256": "4fdb5026a438c85b6af8d497ad13683bd1923964aabda526b7f06b9bb75c40a3"
+    },
+    {
+      "base_device": "STM32L071V8",
+      "path": "evidence/STM32L071V8.json",
+      "sha256": "1b4a5c3e1f8654b9756fb03825954111db3e130540a2974bbe949fe03110e3a8"
+    },
+    {
+      "base_device": "STM32L071VB",
+      "path": "evidence/STM32L071VB.json",
+      "sha256": "b85763c6cff3a1df4432792d000f56c07f244f2541bbb0edc146d6059e1bcd0b"
+    },
+    {
+      "base_device": "STM32L071VZ",
+      "path": "evidence/STM32L071VZ.json",
+      "sha256": "d32ceea3a627cbf625df5be30990e2db98e2fc089bf08f99b8c1ab63f849c7ba"
+    },
+    {
+      "base_device": "STM32L072CB",
+      "path": "evidence/STM32L072CB.json",
+      "sha256": "8cd10ee75a16d3b59efa72b64cbbf40eb054e56ecad69c47c087f231bbb7ad04"
+    },
+    {
+      "base_device": "STM32L072CZ",
+      "path": "evidence/STM32L072CZ.json",
+      "sha256": "d735bc9574205748f259bd6061dd1ee90b7267067d1bb47f99a8d23657a83f8d"
+    },
+    {
+      "base_device": "STM32L072KB",
+      "path": "evidence/STM32L072KB.json",
+      "sha256": "dd152b5bef53defbe9c85b8ebfc5dd94c1a79d37f28e67a8e0fba43179a8d121"
+    },
+    {
+      "base_device": "STM32L072KZ",
+      "path": "evidence/STM32L072KZ.json",
+      "sha256": "a4365f3fa5b83b1863e5e558d1860fd4958f178c480ff0d7347d53d61dc3a0de"
+    },
+    {
+      "base_device": "STM32L072RB",
+      "path": "evidence/STM32L072RB.json",
+      "sha256": "7b4ab5c14e3fdd3a1b241fcd40971199bda9b819c18a7a7f06b3cbe1d79a9520"
+    },
+    {
+      "base_device": "STM32L072RZ",
+      "path": "evidence/STM32L072RZ.json",
+      "sha256": "b1b796f339942988285cd2d49eeeabc4e90ed9875aa3e337ea455e42e0c64340"
+    },
+    {
+      "base_device": "STM32L072V8",
+      "path": "evidence/STM32L072V8.json",
+      "sha256": "3301713843aeb2ebbac53a168ffe6c5f22688901d627e1d119fd26148dfcbb53"
+    },
+    {
+      "base_device": "STM32L072VB",
+      "path": "evidence/STM32L072VB.json",
+      "sha256": "f412d7e54681053f5ee210df827f8ea1dceb8fcd15d422d14e6e13705ccaf344"
+    },
+    {
+      "base_device": "STM32L072VZ",
+      "path": "evidence/STM32L072VZ.json",
+      "sha256": "0b53fbab92c06211048ecb11b409bc11a1e429992fec5324afbab9980a12b59e"
+    },
+    {
+      "base_device": "STM32L073CB",
+      "path": "evidence/STM32L073CB.json",
+      "sha256": "b12a5653a725f797f38af00a5ba1a8c1c1f3f5e60a06fc2309d85ddbaa1ffcde"
+    },
+    {
+      "base_device": "STM32L073CZ",
+      "path": "evidence/STM32L073CZ.json",
+      "sha256": "b3a854d32ba26fc39beca5a82807c657c616b8626be44aad1aec9a9d6d3fd2a1"
+    },
+    {
+      "base_device": "STM32L073RB",
+      "path": "evidence/STM32L073RB.json",
+      "sha256": "8f5dc76ec846758dbc3a4d67eac75e4ebe0cedc2c585f7f3cb870e40952507e3"
+    },
+    {
+      "base_device": "STM32L073RZ",
+      "path": "evidence/STM32L073RZ.json",
+      "sha256": "7623037bd71616d010404fa62ba316223f66a4b999c2d1d06d23fe7603c11982"
+    },
+    {
+      "base_device": "STM32L073V8",
+      "path": "evidence/STM32L073V8.json",
+      "sha256": "8f98afd9ebbd6cb443f164a0657f3cd635c4d517c8726e9461bf8fa0f635b97a"
+    },
+    {
+      "base_device": "STM32L073VB",
+      "path": "evidence/STM32L073VB.json",
+      "sha256": "98273655c1256e2b6ac1f85b2fac22b6debde21d2fa3b8bc7fbd2897f6cc96fb"
+    },
+    {
+      "base_device": "STM32L073VZ",
+      "path": "evidence/STM32L073VZ.json",
+      "sha256": "2265be0d428966fd0464f0d51d161b165eb57152bde5267cc76df464bc2345c2"
+    },
+    {
+      "base_device": "STM32L081CB",
+      "path": "evidence/STM32L081CB.json",
+      "sha256": "f37af5abf26d07f614328794f086d84b4054ef3db4cf738a3d0cc88bf33cf7a8"
+    },
+    {
+      "base_device": "STM32L081CZ",
+      "path": "evidence/STM32L081CZ.json",
+      "sha256": "d26e2b336afd3bf4ddcc682a9cb016d938b4e54f4557a55a8d82e2fe31e2c9d4"
+    },
+    {
+      "base_device": "STM32L081KZ",
+      "path": "evidence/STM32L081KZ.json",
+      "sha256": "8dbc5f509e8cbd9e9838190146e70d9c1730a13d63df53fe1bc1cbc543220b92"
+    },
+    {
+      "base_device": "STM32L082CZ",
+      "path": "evidence/STM32L082CZ.json",
+      "sha256": "ac7e96e3edc9b223c4ccacd5d246fb837753edb0a4fa75be5425daaa0336d97c"
+    },
+    {
+      "base_device": "STM32L082KB",
+      "path": "evidence/STM32L082KB.json",
+      "sha256": "ca58036c92754b7af919b194dced946e064192fc8b8656d03eda7f004d7300b7"
+    },
+    {
+      "base_device": "STM32L082KZ",
+      "path": "evidence/STM32L082KZ.json",
+      "sha256": "6980c4fa91b92c9e73b6fb7d0e8539cbad907fde020063a7cf0482e8d809aac3"
+    },
+    {
+      "base_device": "STM32L083CB",
+      "path": "evidence/STM32L083CB.json",
+      "sha256": "e1a5d40b4fe916c3b696f0e17073a45b5b6c0f2f66fbee390628e9be1f804e65"
+    },
+    {
+      "base_device": "STM32L083CZ",
+      "path": "evidence/STM32L083CZ.json",
+      "sha256": "fb12d39aeea96faaa74c01e1731497b6347a20160d5f43bf1f2ec608dff17a73"
+    },
+    {
+      "base_device": "STM32L083RB",
+      "path": "evidence/STM32L083RB.json",
+      "sha256": "71e17e62db612cfd71608b803a09b4e9b4d4a9178beba167430224667f701e87"
+    },
+    {
+      "base_device": "STM32L083RZ",
+      "path": "evidence/STM32L083RZ.json",
+      "sha256": "43035ee5fb45da90ac6edb7c093cf9071456de0b3fd95353818f07ba272b6600"
+    },
+    {
+      "base_device": "STM32L083V8",
+      "path": "evidence/STM32L083V8.json",
+      "sha256": "8aa5eef665eda4188da0e6b347ec2b3cc3084f40488f82bc6d2df3e5f7d4bca0"
+    },
+    {
+      "base_device": "STM32L083VB",
+      "path": "evidence/STM32L083VB.json",
+      "sha256": "82d18a326ffd64bc3b423fb0d1836a6b7d2ab7c903088a5ba7a7fe0c26cce77e"
+    },
+    {
+      "base_device": "STM32L083VZ",
+      "path": "evidence/STM32L083VZ.json",
+      "sha256": "9a07debd21c86d00257d60c0c65cb2f6504d0a2474e759023d537ed2b87c8da9"
+    }
+  ],
+  "phase": "L0.2",
+  "schema_version": 1
+}

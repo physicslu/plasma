@@ -1,0 +1,635 @@
+{
+  "base_device_count": 99,
+  "base_device_counts_by_subfamily": {
+    "STM32L010": 6,
+    "STM32L011": 10,
+    "STM32L021": 4,
+    "STM32L031": 10,
+    "STM32L041": 5,
+    "STM32L051": 8,
+    "STM32L052": 8,
+    "STM32L053": 4,
+    "STM32L062": 2,
+    "STM32L063": 2,
+    "STM32L071": 11,
+    "STM32L072": 9,
+    "STM32L073": 7,
+    "STM32L081": 3,
+    "STM32L082": 3,
+    "STM32L083": 7
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "complete_family_inventory_claimed_before_live_evidence": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "discovery_id": "stm32l0-l0.2-official-st-commercial-discovery-v1",
+  "family": "STM32L0",
+  "l0_1_foundation_sha256": "958572fa69a4457966256851a39badfdc38490e0c3ce155978155baf3ca9e488",
+  "phase": "L0.2",
+  "schema_version": 1,
+  "scope": "bounded read-only official-ST STM32L0 complete commercial discovery",
+  "targets": [
+    {
+      "base_device": "STM32L010C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010c6.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L010F4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010f4.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L010K4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010k4.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L010K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010k8.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L010R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010r8.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L010RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010rb.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "base_device": "STM32L011D3",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011D4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d4.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011E3",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011e3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011E4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011e4.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011F3",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011f3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011F4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011f4.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011G3",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011g3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011G4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011g4.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011K3",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011k3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L011K4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011k4.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "base_device": "STM32L021D4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "base_device": "STM32L021F4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021f4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "base_device": "STM32L021G4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021g4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "base_device": "STM32L021K4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021k4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "base_device": "STM32L031C4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c6.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031E4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031e4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031E6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031e6.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031F4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031f4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031F6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031f6.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031G4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031g4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031G6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031g6.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031K4",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031k4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L031K6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031k6.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "base_device": "STM32L041C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L041E6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041e6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L041F6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041f6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L041G6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041g6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L041K6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041k6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "base_device": "STM32L051C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c8.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051K6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051k6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051k8.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051R6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051r6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051r8.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051T6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051t6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L051T8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051t8.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "base_device": "STM32L052C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c8.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052K6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052k6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052k8.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052R6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052r6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052r8.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052T6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052t6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L052T8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052t8.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "base_device": "STM32L053C6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c6.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "base_device": "STM32L053C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c8.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "base_device": "STM32L053R6",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053r6.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "base_device": "STM32L053R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053r8.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "base_device": "STM32L062C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062c8.html",
+      "subfamily": "STM32L062"
+    },
+    {
+      "base_device": "STM32L062K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062k8.html",
+      "subfamily": "STM32L062"
+    },
+    {
+      "base_device": "STM32L063C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html",
+      "subfamily": "STM32L063"
+    },
+    {
+      "base_device": "STM32L063R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063r8.html",
+      "subfamily": "STM32L063"
+    },
+    {
+      "base_device": "STM32L071C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071c8.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071cb.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071cz.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071k8.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071kb.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071KZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071kz.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071rb.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071RZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071rz.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071V8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071v8.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071VB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071vb.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L071VZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071vz.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "base_device": "STM32L072CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cz.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072kb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072KZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072kz.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072rb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072RZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072rz.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072V8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072v8.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072VB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072vb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L072VZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072vz.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "base_device": "STM32L073CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cb.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cz.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073rb.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073RZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073rz.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073V8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073v8.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073VB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073vb.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L073VZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073vz.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "base_device": "STM32L081CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html",
+      "subfamily": "STM32L081"
+    },
+    {
+      "base_device": "STM32L081CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cz.html",
+      "subfamily": "STM32L081"
+    },
+    {
+      "base_device": "STM32L081KZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081kz.html",
+      "subfamily": "STM32L081"
+    },
+    {
+      "base_device": "STM32L082CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082cz.html",
+      "subfamily": "STM32L082"
+    },
+    {
+      "base_device": "STM32L082KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082kb.html",
+      "subfamily": "STM32L082"
+    },
+    {
+      "base_device": "STM32L082KZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082kz.html",
+      "subfamily": "STM32L082"
+    },
+    {
+      "base_device": "STM32L083CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cb.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083CZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cz.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083rb.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083RZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083rz.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083V8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083v8.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083VB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083vb.html",
+      "subfamily": "STM32L083"
+    },
+    {
+      "base_device": "STM32L083VZ",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083vz.html",
+      "subfamily": "STM32L083"
+    }
+  ]
+}
