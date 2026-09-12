@@ -17,19 +17,19 @@ class RecordingSiteSafetyControl(SiteSafetyControl):
         self.events: list[str] = []
         self.powered = False
         self.site_reset_asserted = False
-        self.programmer_owns_reset = False
+        self.backend_owns_reset = False
         self.fail_power_good = fail_power_good
         self.fail_reclaim_reset = fail_reclaim_reset
 
     async def assert_reset(self) -> None:
         self.events.append("assert_reset")
-        if self.programmer_owns_reset and self.fail_reclaim_reset:
+        if self.backend_owns_reset and self.fail_reclaim_reset:
             raise PlasmaError(
                 ErrorCode.INTERFACE_FAILURE,
                 "injected reset-reclaim failure",
             )
         self.site_reset_asserted = True
-        self.programmer_owns_reset = False
+        self.backend_owns_reset = False
 
     async def power_on(self) -> None:
         self.events.append("power_on")
@@ -48,12 +48,12 @@ class RecordingSiteSafetyControl(SiteSafetyControl):
                 recoverable=True,
             )
 
-    async def transfer_reset_control_to_programmer(self) -> None:
-        self.events.append("transfer_reset_to_programmer")
+    async def transfer_reset_control_to_execution_backend(self) -> None:
+        self.events.append("transfer_reset_to_backend")
         if not self.powered or not self.site_reset_asserted:
             raise AssertionError("reset ownership handoff requires powered target held in reset")
         self.site_reset_asserted = False
-        self.programmer_owns_reset = True
+        self.backend_owns_reset = True
 
     async def power_off(self) -> None:
         self.events.append("power_off")
@@ -68,7 +68,7 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
         async def operation() -> str:
             control.events.append("operation_started")
             self.assertTrue(control.powered)
-            self.assertTrue(control.programmer_owns_reset)
+            self.assertTrue(control.backend_owns_reset)
             control.events.append("operation_completed")
             return "ok"
 
@@ -81,7 +81,7 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
                 "assert_reset",
                 "power_on",
                 "wait_power_good:0.25",
-                "transfer_reset_to_programmer",
+                "transfer_reset_to_backend",
                 "operation_started",
                 "operation_completed",
                 "assert_reset",
@@ -90,7 +90,7 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(control.powered)
         self.assertTrue(control.site_reset_asserted)
-        self.assertFalse(control.programmer_owns_reset)
+        self.assertFalse(control.backend_owns_reset)
 
     async def test_operation_failure_reclaims_reset_then_powers_off(self) -> None:
         control = RecordingSiteSafetyControl()
@@ -98,16 +98,16 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
 
         async def operation() -> None:
             control.events.append("operation_started")
-            raise RuntimeError("injected programmer failure")
+            raise RuntimeError("injected backend failure")
 
-        with self.assertRaisesRegex(RuntimeError, "injected programmer failure"):
+        with self.assertRaisesRegex(RuntimeError, "injected backend failure"):
             await sequencer.run(operation)
 
         self.assertEqual(control.events[-2:], ["assert_reset", "power_off"])
         self.assertFalse(control.powered)
         self.assertTrue(control.site_reset_asserted)
 
-    async def test_cancel_asserts_reset_before_programmer_task_is_cancelled(self) -> None:
+    async def test_cancel_asserts_reset_before_backend_task_is_cancelled(self) -> None:
         control = RecordingSiteSafetyControl()
         sequencer = SiteSafetySequencer(control)
         operation_started = asyncio.Event()
@@ -178,7 +178,7 @@ class SiteSafetySequencerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_FAILURE)
         self.assertEqual(control.events[-2:], ["assert_reset", "power_off"])
         self.assertFalse(control.powered)
-        self.assertTrue(control.programmer_owns_reset)
+        self.assertTrue(control.backend_owns_reset)
 
     async def test_invalid_power_good_timeout_is_rejected(self) -> None:
         control = RecordingSiteSafetyControl()
