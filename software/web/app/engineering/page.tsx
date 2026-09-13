@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { Fragment, useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
 import GatewaySettingsPanel from "./gateway-settings";
@@ -13,6 +13,7 @@ import "./engineering-density.css";
 import "./engineering-workspace-refresh.css";
 import "./engineering-readability.css";
 import "./engineering-alignment.css";
+import "./engineering-nav-groups.css";
 import "./ppu-site-registry-live.css";
 
 const sections = [
@@ -24,6 +25,12 @@ const sections = [
   ["tools", "engineering.tools", "⌘"],
   ["settings", "engineering.settings", "⚙"],
 ] as const;
+
+const navGroupLabels = {
+  overview: { "zh-TW": "主要工作", "en-US": "WORKFLOW" },
+  diagnostics: { "zh-TW": "疑難排解", "en-US": "TROUBLESHOOTING" },
+  tools: { "zh-TW": "進階設定", "en-US": "ADVANCED" },
+} as const;
 
 type DiagnosticsSection = "loopback";
 type SettingsSection = "gateway" | "mock";
@@ -89,90 +96,99 @@ export default function EngineeringPage() {
             </header>
 
             <nav aria-label={t("engineering.title")} aria-busy={!hydrated}>
-              {sections.map(([id, key, icon]) => id === "diagnostics" ? (
-                <div className="engineeringNavTreeGroup" key={id}>
-                  <button
-                    type="button"
-                    disabled={!hydrated}
-                    className={active === id ? "active" : ""}
-                    aria-pressed={active === id}
-                    aria-expanded={diagnosticsExpanded}
-                    title={t(key)}
-                    onClick={() => selectSection(id)}
-                  >
-                    <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
-                    <span className="engineeringNavLabel">{t(key)}</span>
-                    <span className="engineeringNavDisclosure" aria-hidden="true">{diagnosticsExpanded ? "⌄" : "›"}</span>
-                  </button>
-                  {diagnosticsExpanded && (
-                    <div className="engineeringNavChildren" role="group" aria-label="Diagnostics">
+              {sections.map(([id, key, icon]) => {
+                const groupLabel = id === "overview" || id === "diagnostics" || id === "tools"
+                  ? navGroupLabels[id][locale]
+                  : null;
+                return (
+                  <Fragment key={id}>
+                    {groupLabel && <div className="engineeringNavGroupLabel" aria-hidden="true">{groupLabel}</div>}
+                    {id === "diagnostics" ? (
+                      <div className="engineeringNavTreeGroup">
+                        <button
+                          type="button"
+                          disabled={!hydrated}
+                          className={active === id ? "active" : ""}
+                          aria-pressed={active === id}
+                          aria-expanded={diagnosticsExpanded}
+                          title={t(key)}
+                          onClick={() => selectSection(id)}
+                        >
+                          <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                          <span className="engineeringNavLabel">{t(key)}</span>
+                          <span className="engineeringNavDisclosure" aria-hidden="true">{diagnosticsExpanded ? "⌄" : "›"}</span>
+                        </button>
+                        {diagnosticsExpanded && (
+                          <div className="engineeringNavChildren" role="group" aria-label="Diagnostics">
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={diagnosticsSurfaceActive && diagnosticsSection === "loopback" ? "active" : ""}
+                              aria-pressed={diagnosticsSurfaceActive && diagnosticsSection === "loopback"}
+                              onClick={() => selectDiagnosticsSection("loopback")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                              <span className="engineeringNavLabel">{locale === "zh-TW" ? "Loopback 測試" : "Loopback Test"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : id === "settings" ? (
+                      <div className="engineeringNavTreeGroup">
+                        <button
+                          type="button"
+                          disabled={!hydrated}
+                          className={active === id ? "active" : ""}
+                          aria-pressed={active === id}
+                          aria-expanded={settingsExpanded}
+                          title={settingsLabel}
+                          onClick={() => selectSection(id)}
+                        >
+                          <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                          <span className="engineeringNavLabel">{settingsLabel}</span>
+                          <span className="engineeringNavDisclosure" aria-hidden="true">{settingsExpanded ? "⌄" : "›"}</span>
+                        </button>
+                        {settingsExpanded && (
+                          <div className="engineeringNavChildren" role="group" aria-label={settingsLabel}>
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={settingsSurfaceActive && settingsSection === "gateway" ? "active" : ""}
+                              aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
+                              onClick={() => selectSettingsSection("gateway")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
+                              <span className="engineeringNavLabel">Plasma Gateway</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={settingsSurfaceActive && settingsSection === "mock" ? "active" : ""}
+                              aria-pressed={settingsSurfaceActive && settingsSection === "mock"}
+                              onClick={() => selectSettingsSection("mock")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                              <span className="engineeringNavLabel">{mockLabel}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                       <button
                         type="button"
                         disabled={!hydrated}
-                        className={diagnosticsSurfaceActive && diagnosticsSection === "loopback" ? "active" : ""}
-                        aria-pressed={diagnosticsSurfaceActive && diagnosticsSection === "loopback"}
-                        onClick={() => selectDiagnosticsSection("loopback")}
+                        className={active === id ? "active" : ""}
+                        aria-pressed={active === id}
+                        title={t(key)}
+                        onClick={() => selectSection(id)}
                       >
-                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
-                        <span className="engineeringNavLabel">{locale === "zh-TW" ? "Loopback 測試" : "Loopback Test"}</span>
+                        <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                        <span className="engineeringNavLabel">{t(key)}</span>
                       </button>
-                    </div>
-                  )}
-                </div>
-              ) : id === "settings" ? (
-                <div className="engineeringNavTreeGroup" key={id}>
-                  <button
-                    type="button"
-                    disabled={!hydrated}
-                    className={active === id ? "active" : ""}
-                    aria-pressed={active === id}
-                    aria-expanded={settingsExpanded}
-                    title={settingsLabel}
-                    onClick={() => selectSection(id)}
-                  >
-                    <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
-                    <span className="engineeringNavLabel">{settingsLabel}</span>
-                    <span className="engineeringNavDisclosure" aria-hidden="true">{settingsExpanded ? "⌄" : "›"}</span>
-                  </button>
-                  {settingsExpanded && (
-                    <div className="engineeringNavChildren" role="group" aria-label={settingsLabel}>
-                      <button
-                        type="button"
-                        disabled={!hydrated}
-                        className={settingsSurfaceActive && settingsSection === "gateway" ? "active" : ""}
-                        aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
-                        onClick={() => selectSettingsSection("gateway")}
-                      >
-                        <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
-                        <span className="engineeringNavLabel">Plasma Gateway</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!hydrated}
-                        className={settingsSurfaceActive && settingsSection === "mock" ? "active" : ""}
-                        aria-pressed={settingsSurfaceActive && settingsSection === "mock"}
-                        onClick={() => selectSettingsSection("mock")}
-                      >
-                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
-                        <span className="engineeringNavLabel">{mockLabel}</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={!hydrated}
-                  className={active === id ? "active" : ""}
-                  aria-pressed={active === id}
-                  title={t(key)}
-                  onClick={() => selectSection(id)}
-                >
-                  <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
-                  <span className="engineeringNavLabel">{t(key)}</span>
-                </button>
-              ))}
+                    )}
+                  </Fragment>
+                );
+              })}
             </nav>
 
             <button
