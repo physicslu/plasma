@@ -14,7 +14,7 @@ const initialSettings = {
   },
 };
 
-test("Engineering Mock settings apply per-mille error, timing, seed and show server-applied summary", async ({ page }) => {
+test("Engineering Mock Runtime settings apply per-mille error, timing, seed and show server-applied summary", async ({ page }) => {
   let posted: Record<string, unknown> | null = null;
   await page.route("**/api/mock/runtime", async route => {
     const request = route.request();
@@ -47,8 +47,8 @@ test("Engineering Mock settings apply per-mille error, timing, seed and show ser
   });
 
   await page.goto("/engineering");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Mock", exact: true }).click();
+  await page.getByRole("button", { name: /^(System Configuration|系統設定)$/ }).click();
+  await page.getByRole("button", { name: /^Mock Runtime · (Simulation only|僅模擬)$/ }).click();
 
   await expect(page.getByRole("heading", { name: /^Mock (設定|Settings)$/ })).toBeVisible();
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
