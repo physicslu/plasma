@@ -16,6 +16,7 @@ DEFAULT_SUMMARY = EVIDENCE_ROOT / "probe-summary.json"
 DEFAULT_TARGETS = EVIDENCE_ROOT / "targets.json"
 DEFAULT_PROVENANCE = EVIDENCE_ROOT / "provenance.json"
 DEFAULT_ORDERING = HERE / "stm32l1-requalification-ordering-authority.json"
+FROZEN_PRODUCTION_PRESTATE = HERE / "stm32l1-requalification-production-prestate.json"
 DEFAULT_OUTPUT = HERE / "stm32l1-requalification-result.json"
 
 EXPECTED_SUBFAMILIES = ["STM32L100", "STM32L151", "STM32L152", "STM32L162"]
@@ -51,8 +52,11 @@ def build_requalification_result(
     targets_path: Path = DEFAULT_TARGETS,
     provenance_path: Path = DEFAULT_PROVENANCE,
     ordering_path: Path = DEFAULT_ORDERING,
+    production_prestate_path: Path = FROZEN_PRODUCTION_PRESTATE,
 ) -> dict[str, object]:
-    current = validate_current_boundary()
+    # Historical validation is intentionally bound to the transaction's frozen
+    # post-L4 Production prestate, not to mutable future Production.
+    current = validate_current_boundary(manifest_path=production_prestate_path)
     summary = _load(summary_path)
     targets = _load(targets_path)
     provenance = _load(provenance_path)
