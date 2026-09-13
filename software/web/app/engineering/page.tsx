@@ -32,6 +32,11 @@ const navGroupLabels = {
   tools: { "zh-TW": "進階設定", "en-US": "ADVANCED" },
 } as const;
 
+const settingsSubgroupLabels = {
+  communication: { "zh-TW": "通訊政策", "en-US": "COMMUNICATION POLICY" },
+  simulation: { "zh-TW": "僅模擬", "en-US": "SIMULATION ONLY" },
+} as const;
+
 type DiagnosticsSection = "loopback";
 type SettingsSection = "gateway" | "mock";
 
@@ -150,6 +155,9 @@ export default function EngineeringPage() {
                         </button>
                         {settingsExpanded && (
                           <div className="engineeringNavChildren" role="group" aria-label={settingsLabel}>
+                            <div className="engineeringNavSubgroupLabel" data-settings-group="communication" aria-hidden="true">
+                              {settingsSubgroupLabels.communication[locale]}
+                            </div>
                             <button
                               type="button"
                               disabled={!hydrated}
@@ -157,9 +165,12 @@ export default function EngineeringPage() {
                               aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
                               onClick={() => selectSettingsSection("gateway")}
                             >
-                              <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
                               <span className="engineeringNavLabel">Plasma Gateway</span>
                             </button>
+                            <div className="engineeringNavSubgroupLabel" data-settings-group="simulation" aria-hidden="true">
+                              {settingsSubgroupLabels.simulation[locale]}
+                            </div>
                             <button
                               type="button"
                               disabled={!hydrated}
