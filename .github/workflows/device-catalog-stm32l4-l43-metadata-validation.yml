@@ -1,0 +1,60 @@
+name: STM32L4 L4.3 metadata validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l4_metadata_policy.py"
+      - "data/device-catalog/research/stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/test_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/build_stm32l4_phase_l4_3_baseline.py"
+      - "data/device-catalog/research/validate_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
+      - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
+      - "data/device-catalog/production/**"
+      - ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32l4_metadata_policy.py"
+      - "data/device-catalog/research/stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/test_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/build_stm32l4_phase_l4_3_baseline.py"
+      - "data/device-catalog/research/validate_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
+      - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
+      - "data/device-catalog/production/**"
+      - ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run L4.3 policy tests
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32l4_phase_l4_3_policy.py
+      - name: Replay frozen L4.3 baseline byte-for-byte
+        working-directory: data/device-catalog/research
+        run: |
+          python build_stm32l4_phase_l4_3_baseline.py --output "$RUNNER_TEMP/stm32l4-l43-baseline.json"
+          cmp "$RUNNER_TEMP/stm32l4-l43-baseline.json" stm32l4-phase-l4.3-policy-baseline.json
+      - name: Permanent L4.3 metadata hard-lock
+        working-directory: data/device-catalog/research
+        run: python validate_stm32l4_phase_l4_3_policy.py
+      - name: Enforce zero Production writes in this transaction
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production

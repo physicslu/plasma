@@ -1,0 +1,164 @@
+{
+  "authority": {
+    "exact_variant_exception_count": 3,
+    "exact_variant_exception_icpns": [
+      "STM32L4A6RGT7",
+      "STM32L4A6RGT7TR",
+      "STM32L4S5QII3P"
+    ],
+    "exact_variant_exception_policy": "three retained Active exact ICPNs only; current official ST exact-part surface overrides only the omitted/conflicting field",
+    "primary": "official ST datasheet Ordering Information",
+    "series_count": 24,
+    "unique_datasheet_count": 20
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "scope_expansion_authorized": false
+  },
+  "family": "STM32L4",
+  "phase": "L4.3",
+  "result": {
+    "base_device_count": 138,
+    "candidate_count": 446,
+    "decision_counts": {
+      "manual_review_required": 0,
+      "metadata_ready": 446,
+      "reject": 0
+    },
+    "exact_variant_exception_icpns": [
+      "STM32L4A6RGT7",
+      "STM32L4A6RGT7TR",
+      "STM32L4S5QII3P"
+    ],
+    "family": "STM32L4",
+    "issues": [],
+    "manual_review_base_devices": [],
+    "manual_review_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "metadata_contract": {
+      "admission_deferred_to": "L4.4",
+      "canonical_admission_authorized": false,
+      "cmsis_alias_gates_metadata": false,
+      "exact_variant_exception_count": 3,
+      "exact_variant_exceptions_expand_identity_scope": false,
+      "flash_geometry_qualified": false,
+      "identity_lifecycle_authority": "retained L4.2 official ST dual-surface exact-set evidence",
+      "metadata_authority": "official ST datasheet Ordering Information plus exact-part manufacturer exceptions for three retained Active variants",
+      "openocd_routing_gates_metadata": false,
+      "option_security_semantics_qualified": false,
+      "physical_hil_qualified": false,
+      "production_write_authorized": false,
+      "programming_policy_defined": false,
+      "runtime_programming_support_claimed": false,
+      "scope_expansion_authorized": false
+    },
+    "metadata_distribution": {
+      "flash_size": {
+        "1 MiB": 145,
+        "128 KiB": 58,
+        "2 MiB": 38,
+        "256 KiB": 99,
+        "512 KiB": 94,
+        "64 KiB": 12
+      },
+      "option_suffix": {
+        "": 228,
+        "MTR": 1,
+        "P": 35,
+        "PTR": 9,
+        "S": 3,
+        "STR": 5,
+        "TR": 165
+      },
+      "package": {
+        "LQFP": 216,
+        "Thin WLCSP": 1,
+        "UFBGA": 77,
+        "UFBGA 10x10": 10,
+        "UFBGA 7x7": 34,
+        "UFQFPN": 56,
+        "WLCSP": 52
+      },
+      "pin_count": {
+        "100": 98,
+        "132": 42,
+        "144": 51,
+        "169": 22,
+        "32": 27,
+        "36": 5,
+        "48": 75,
+        "64": 115,
+        "72": 7,
+        "81": 4
+      },
+      "series": {
+        "STM32L412": 35,
+        "STM32L422": 7,
+        "STM32L431": 42,
+        "STM32L432": 6,
+        "STM32L433": 34,
+        "STM32L442": 2,
+        "STM32L443": 17,
+        "STM32L451": 25,
+        "STM32L452": 25,
+        "STM32L462": 11,
+        "STM32L471": 26,
+        "STM32L475": 14,
+        "STM32L476": 39,
+        "STM32L486": 15,
+        "STM32L496": 33,
+        "STM32L4A6": 17,
+        "STM32L4P5": 29,
+        "STM32L4Q5": 17,
+        "STM32L4R5": 19,
+        "STM32L4R7": 3,
+        "STM32L4R9": 11,
+        "STM32L4S5": 10,
+        "STM32L4S7": 3,
+        "STM32L4S9": 6
+      },
+      "temperature_grade": {
+        "-40..105 C": 23,
+        "-40..125 C": 73,
+        "-40..85 C": 350
+      }
+    },
+    "metadata_ready_set_sha256": "cdb350bdf1513f51430808b98677948569740d230c45bd735f439142ab03eb45",
+    "metadata_rows_sha256": "d67e27b641b295df697b804741b7be1abbb2ee26dd7a24e11482640306bef500",
+    "phase": "L4.3",
+    "production_snapshot": {
+      "base_device_count": 392,
+      "exact_icpn_count": 1272,
+      "family_count": 11,
+      "family_exact_icpn_counts": {
+        "STM32C0": 209,
+        "STM32F0": 42,
+        "STM32F1": 75,
+        "STM32F2": 33,
+        "STM32F3": 10,
+        "STM32F4": 384,
+        "STM32F7": 19,
+        "STM32G0": 47,
+        "STM32G4": 25,
+        "STM32L0": 360,
+        "STM32U0": 68
+      },
+      "manifest_sha256": "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec",
+      "stm32l4_exact_icpn_count": 0
+    },
+    "reject_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "schema_version": 1,
+  "source_bindings": {
+    "exact_variant_exceptions_sha256": "d7514a5db450d36b6acbbfd8e6650074134f3637c2012047a549557149d6bc31",
+    "l4_2_active_exact_set_sha256": "cdb350bdf1513f51430808b98677948569740d230c45bd735f439142ab03eb45",
+    "l4_2_baseline_sha256": "eeb538cfac4ace738878ca5b60adad2ef122a46881565d3917d77078af8fe804",
+    "ordering_authority_sha256": "da0dd36a6f9a7d9ac75b5910d45bfb477c664c94c1bedc9d482292cd7bb479ec",
+    "production_prestate_sha256": "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec"
+  }
+}

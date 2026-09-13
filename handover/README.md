@@ -18,21 +18,22 @@ This directory contains numbered engineering handover documents intended to let 
 | [H010](H010-stm32c0-c04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32C0 C0.4 exact-ICPN read-only capability/admission plan | Superseded by H011 | Retain as C0.4 history |
 | [H011](H011-stm32c0-c05-publication-2026-09-12.md) | 2026-09-12 | STM32C0 C0.5 controlled publication of 209 capability-admittable exact ICPNs | Superseded by H012; PR #503 merged | Retain as C0.5 publication history |
 | [H012](H012-stm32-post-c0-evidence-selection-2026-09-12.md) | 2026-09-12 | Post-C0 L1/L0/L4 official-ST evidence comparison and deterministic STM32L0 selection | Complete; PR #504 merged | Retain as next-family selection history |
-| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Complete; PR #506 merged | Retain as L0.1 foundation history; use H014/H015/H016/H017/H018/H019/H020 |
-| [H014](H014-stm32l0-l02-commercial-discovery-2026-09-12.md) | 2026-09-12 | STM32L0 L0.2 manufacturer-authoritative commercial discovery | Complete; PR #509 merged | Retain as L0.2 discovery history; use H015/H016/H017/H018/H019/H020 |
-| [H015](H015-stm32l0-l03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32L0 L0.3 manufacturer-authoritative metadata policy | Complete; PR #513 merged | Retain as L0.3 metadata history; use H016/H017/H018/H019/H020 |
-| [H016](H016-stm32l0-l04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32L0 L0.4 read-only capability/admission plan | Complete; PR #515 merged | Retain as L0.4 admission history; use H017/H018/H019/H020 |
-| [H017](H017-stm32l0-l05-publication-2026-09-12.md) | 2026-09-12 | STM32L0 L0.5 controlled publication of 360 capability-admittable exact ICPNs | Complete; PR #516 merged | Retain as L0.5 publication history; use H018/H019/H020 |
-| [H018](H018-stm32-post-l0-next-family-selection-2026-09-12.md) | 2026-09-12 | Post-L0 L1/L4 retained official-ST evidence replay and deterministic STM32L4 selection | Complete; PR #517 merged | Retain as STM32L4 selection history; use H019/H020 |
-| [H019](H019-stm32l4-l41-foundation-2026-09-13.md) | 2026-09-13 | STM32L4 L4.1 bounded research foundation | Complete; PR #520 merged | Retain as L4.1 foundation history; use H020 |
-| [H020](H020-stm32l4-l42-commercial-discovery-2026-09-13.md) | 2026-09-13 | STM32L4 L4.2 manufacturer-authoritative commercial discovery with targeted timeout recovery | Current; PR #521 Gate 2 candidate | Recheck final head/current main/applicable CI/mergeability/reviews, then obtain explicit Gate 2 merge approval |
+| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Complete; PR #506 merged | Retain as L0.1 foundation history; use H014/H015/H016/H017/H018/H019/H020/H021 |
+| [H014](H014-stm32l0-l02-commercial-discovery-2026-09-12.md) | 2026-09-12 | STM32L0 L0.2 manufacturer-authoritative commercial discovery | Complete; PR #509 merged | Retain as L0.2 discovery history; use H015/H016/H017/H018/H019/H020/H021 |
+| [H015](H015-stm32l0-l03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32L0 L0.3 manufacturer-authoritative metadata policy | Complete; PR #513 merged | Retain as L0.3 metadata history; use H016/H017/H018/H019/H020/H021 |
+| [H016](H016-stm32l0-l04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32L0 L0.4 read-only capability/admission plan | Complete; PR #515 merged | Retain as L0.4 admission history; use H017/H018/H019/H020/H021 |
+| [H017](H017-stm32l0-l05-publication-2026-09-12.md) | 2026-09-12 | STM32L0 L0.5 controlled publication of 360 capability-admittable exact ICPNs | Complete; PR #516 merged | Retain as L0.5 publication history; use H018/H019/H020/H021 |
+| [H018](H018-stm32-post-l0-next-family-selection-2026-09-12.md) | 2026-09-12 | Post-L0 L1/L4 retained official-ST evidence replay and deterministic STM32L4 selection | Complete; PR #517 merged | Retain as STM32L4 selection history; use H019/H020/H021 |
+| [H019](H019-stm32l4-l41-foundation-2026-09-13.md) | 2026-09-13 | STM32L4 L4.1 bounded research foundation | Complete; PR #520 merged | Retain as L4.1 foundation history; use H020/H021 |
+| [H020](H020-stm32l4-l42-commercial-discovery-2026-09-13.md) | 2026-09-13 | STM32L4 L4.2 manufacturer-authoritative commercial discovery with targeted timeout recovery | Complete; PR #521 merged | Retain as L4.2 discovery history; use H021 |
+| [H021](H021-stm32l4-l43-metadata-policy-2026-09-13.md) | 2026-09-13 | STM32L4 L4.3 manufacturer-authoritative metadata policy with three exact-part manufacturer exceptions | Current; PR #530 Gate 2 candidate | Recheck final head/current main/applicable CI/mergeability/reviews, then obtain explicit Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H020 and AGENTS.md, verify PR #521 final head/current main/applicable CI/mergeability/reviews, then continue the Gate 2 transaction. Do not merge or start L4.3 without explicit approval.
+Read repo handover H021 and AGENTS.md, verify PR #530 final head/current main/applicable CI/mergeability/reviews and zero Production diff, then continue the Gate 2 transaction. Do not merge or start L4.4 without explicit approval.
 ```
 
 For IC Support Architecture / hardware qualification:
