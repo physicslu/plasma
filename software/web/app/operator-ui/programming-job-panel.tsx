@@ -151,7 +151,13 @@ export function ProgrammingJobPanel({
       )}
     >
       {executionActive && (
-        <div className="programmingJobExecutionBar" role="status" aria-live="polite">
+        <div
+          className="programmingJobExecutionBar"
+          data-programming-job-action="status"
+          role="status"
+          aria-label={statusLabel}
+          aria-live="polite"
+        >
           <div>
             <small>{statusLabel}</small>
             <b>{statusValue}</b>
@@ -160,6 +166,7 @@ export function ProgrammingJobPanel({
           <button
             type="button"
             className="programmingJobExecutionAbort"
+            data-programming-job-action="abort"
             disabled={abortDisabled}
             onClick={() => void onAbort()}
           >
@@ -234,24 +241,26 @@ export function ProgrammingJobPanel({
         </div>
       )}
 
-      <div className="programmingJobActionBar" data-programming-job-actions={mode}>
-        <button
-          type="button"
-          className="programmingJobStart"
-          data-programming-job-action="start"
-          disabled={startDisabled}
-          title={disabledStartTitle}
-          onClick={() => void onStart()}
-        >
-          ▶ {startLabel}
-        </button>
-        <div className={`programmingJobStatus ${statusClassName}`.trim()} data-programming-job-action="status" role="status" aria-label={statusLabel}>
-          <small>{statusLabel}</small>
-          <b>{statusValue}</b>
-          {readinessGuidance && <span className="programmingJobStatusHint">{readinessGuidance}</span>}
+      {!executionActive && (
+        <div className="programmingJobActionBar" data-programming-job-actions={mode}>
+          <button
+            type="button"
+            className="programmingJobStart"
+            data-programming-job-action="start"
+            disabled={startDisabled}
+            title={disabledStartTitle}
+            onClick={() => void onStart()}
+          >
+            ▶ {startLabel}
+          </button>
+          <div className={`programmingJobStatus ${statusClassName}`.trim()} data-programming-job-action="status" role="status" aria-label={statusLabel}>
+            <small>{statusLabel}</small>
+            <b>{statusValue}</b>
+            {readinessGuidance && <span className="programmingJobStatusHint">{readinessGuidance}</span>}
+          </div>
+          <button type="button" className="programmingJobAbort" data-programming-job-action="abort" disabled={abortDisabled} onClick={() => void onAbort()}>■ {abortLabel}</button>
         </div>
-        <button type="button" className="programmingJobAbort" data-programming-job-action="abort" disabled={abortDisabled} onClick={() => void onAbort()}>■ {abortLabel}</button>
-      </div>
+      )}
     </OperatorPanel>
   );
 }
