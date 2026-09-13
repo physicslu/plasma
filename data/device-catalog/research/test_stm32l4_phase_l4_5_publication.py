@@ -10,7 +10,9 @@ import unittest
 from publish_stm32l4_phase_l4_5 import (
     AUDIT_PATH,
     BASELINE_PATH,
+    CANONICAL_EXCEPTION_VERIFICATION_STATUS,
     CANONICAL_PATH,
+    CANONICAL_VERIFICATION_STATUS,
     EXPECTED_EXACT_SET_SHA256,
     EXPECTED_PLAN_GIT_BLOB,
     EXPECTED_POSTSTATE,
@@ -66,12 +68,13 @@ class STM32L4PhaseL45PublicationTests(unittest.TestCase):
         self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32l4x.cfg" for row in self.rows))
         statuses = {row["verification_status"] for row in self.rows}
         self.assertEqual(statuses, {
-            "manufacturer_ordering_information_verified",
-            "manufacturer_authority_exact_variant_exception_verified",
+            CANONICAL_VERIFICATION_STATUS,
+            CANONICAL_EXCEPTION_VERIFICATION_STATUS,
         })
+        self.assertTrue(all(status.startswith("verified_") for status in statuses))
         exception_rows = {
             row["icpn"] for row in self.rows
-            if row["verification_status"] == "manufacturer_authority_exact_variant_exception_verified"
+            if row["verification_status"] == CANONICAL_EXCEPTION_VERIFICATION_STATUS
         }
         self.assertEqual(exception_rows, {"STM32L4A6RGT7", "STM32L4A6RGT7TR", "STM32L4S5QII3P"})
 
