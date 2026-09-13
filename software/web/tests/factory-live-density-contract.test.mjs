@@ -17,6 +17,7 @@ test("PMode Live Site density keeps actual Sites visible and removes only second
     source(guidancePath),
   ]);
 
+  assert.match(consoleSource, /Array\.from\(\{ length: ppu\.site_count \}/);
   assert.match(consoleSource, /if \(siteCount <= 8\) return "spacious"/);
   assert.match(consoleSource, /if \(siteCount <= 20\) return "comfortable"/);
   assert.match(consoleSource, /if \(siteCount <= 40\) return "compact"/);
