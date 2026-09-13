@@ -1,0 +1,33 @@
+.engineeringNavGroupLabel {
+  margin: 12px 14px 5px;
+  color: var(--text-soft, #64748b);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.engineeringSidebar nav > .engineeringNavGroupLabel:first-child {
+  margin-top: 7px;
+}
+
+.engineeringNavGroupLabel + button,
+.engineeringNavGroupLabel + .engineeringNavTreeGroup {
+  margin-top: 0;
+}
+
+[data-theme="dark"] .engineeringNavGroupLabel {
+  color: var(--text-soft);
+}
+
+.engineeringPage.sidebarCollapsed .engineeringNavGroupLabel {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .engineeringNavGroupLabel {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+}
