@@ -3,7 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from typing import Any
 
 from plasma_client.client import PlasmaClient
 from plasma_core.errors import ErrorCode, PlasmaError
@@ -28,6 +28,11 @@ class EmergencyRuntimeShutdownFailureMock(MockInterface):
         raise RuntimeError("injected raw emergency safe-shutdown failure")
 
 
+class StateWriteFailureOutput(OutputManager):
+    def write_state(self, job_id: str, data: dict[str, Any]) -> Path:
+        raise OSError("injected output persistence failure")
+
+
 class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -42,21 +47,14 @@ class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
     async def start_server(self, interface_factory) -> PlasmaClient:
         config = make_config(self.root, enabled_sites=1)
         manager = SiteManager(config, interface_factory=interface_factory)
+        manager.workers[1].output = StateWriteFailureOutput(config.server.output_root)
         self.server = PlasmaServer(config, manager)
         await self.server.start()
         return PlasmaClient(*self.server.address, response_timeout_s=3.0)
 
-    async def run_with_output_failure(self, client: PlasmaClient) -> dict:
-        with patch.object(
-            OutputManager,
-            "write_state",
-            side_effect=OSError("injected output persistence failure"),
-        ):
-            return (await client.erase(1))["result"]
-
     async def test_emergency_safe_shutdown_failure_is_authoritative_job_error(self) -> None:
         client = await self.start_server(lambda _site: EmergencyShutdownFailureMock())
-        result = await self.run_with_output_failure(client)
+        result = (await client.erase(1))["result"]
 
         self.assertEqual(result["state"], "error")
         self.assertEqual(result["error"]["error_code"], ErrorCode.INTERFACE_FAILURE.value)
@@ -73,7 +71,7 @@ class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_raw_emergency_safe_shutdown_failure_is_normalized(self) -> None:
         client = await self.start_server(lambda _site: EmergencyRuntimeShutdownFailureMock())
-        result = await self.run_with_output_failure(client)
+        result = (await client.erase(1))["result"]
 
         self.assertEqual(result["state"], "error")
         self.assertEqual(result["error"]["error_code"], ErrorCode.INTERFACE_FAILURE.value)
