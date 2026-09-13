@@ -6,6 +6,10 @@ on:
       - "data/device-catalog/research/stm32l1_phase_l1_2_discovery.py"
       - "data/device-catalog/research/run_stm32l1_phase_l1_2_discovery.py"
       - "data/device-catalog/research/test_stm32l1_phase_l1_2_discovery.py"
+      - "data/device-catalog/research/stm32l1_phase_l1_2_sharded.py"
+      - "data/device-catalog/research/run_stm32l1_phase_l1_2_shard.py"
+      - "data/device-catalog/research/aggregate_stm32l1_phase_l1_2_shards.py"
+      - "data/device-catalog/research/test_stm32l1_phase_l1_2_sharded.py"
       - "data/device-catalog/research/stm32l1_phase_l1_1_foundation.py"
       - "data/device-catalog/research/stm32l1-phase-l1.1-foundation-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
@@ -17,11 +21,11 @@ permissions:
 
 env:
   PYTHONUNBUFFERED: "1"
+  SHARD_COUNT: "4"
 
 jobs:
-  live-discovery:
+  validate-boundary:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,20 +34,86 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate deterministic L1.2 boundary and negative controls
-        run: python data/device-catalog/research/test_stm32l1_phase_l1_2_discovery.py
+        run: |
+          python data/device-catalog/research/test_stm32l1_phase_l1_2_discovery.py
+          python data/device-catalog/research/test_stm32l1_phase_l1_2_sharded.py
+
+  live-shard:
+    needs: validate-boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Install research-only browser acquisition dependency
         run: |
           python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
           python -m playwright install --with-deps chromium
-      - name: Run bounded official-ST L1.2 live discovery
+      - name: Run bounded official-ST L1.2 shard ${{ matrix.shard }}
         id: discovery
         shell: bash
         run: |
           set +e
-          python data/device-catalog/research/run_stm32l1_phase_l1_2_discovery.py \
+          mkdir -p /tmp/stm32l1-l1.2-shard
+          python data/device-catalog/research/run_stm32l1_phase_l1_2_shard.py \
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count "$SHARD_COUNT" \
             --headless \
             --timeout 90 \
             --delay 1 \
+            --output /tmp/stm32l1-l1.2-shard/summary.json \
+            --evidence-dir /tmp/stm32l1-l1.2-shard/evidence
+          rc=$?
+          echo "$rc" > /tmp/stm32l1-l1.2-shard/exit-code.txt
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload immutable shard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l1-l12-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+          if-no-files-found: error
+          retention-days: 90
+          path: /tmp/stm32l1-l1.2-shard/
+      - name: Enforce shard disposition
+        if: always()
+        shell: bash
+        run: |
+          test -f /tmp/stm32l1-l1.2-shard/exit-code.txt
+          test "$(cat /tmp/stm32l1-l1.2-shard/exit-code.txt)" = "0"
+
+  aggregate:
+    needs: live-shard
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: stm32l1-l12-shard-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: /tmp/stm32l1-l1.2-shards
+      - name: Aggregate full bounded discovery
+        id: aggregate
+        shell: bash
+        run: |
+          set +e
+          python data/device-catalog/research/aggregate_stm32l1_phase_l1_2_shards.py \
+            --input-root /tmp/stm32l1-l1.2-shards \
             --output /tmp/stm32l1-l1.2-live-summary.json \
             --targets-output /tmp/stm32l1-l1.2-targets.json \
             --evidence-dir /tmp/stm32l1-l1.2-evidence
@@ -51,19 +121,19 @@ jobs:
           echo "$rc" > /tmp/stm32l1-l1.2-exit-code.txt
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Upload immutable live discovery artifact
+      - name: Upload immutable full live discovery artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stm32l1-l12-live-${{ github.run_id }}-${{ github.run_attempt }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
           path: |
             /tmp/stm32l1-l1.2-live-summary.json
             /tmp/stm32l1-l1.2-targets.json
             /tmp/stm32l1-l1.2-exit-code.txt
             /tmp/stm32l1-l1.2-evidence/
-      - name: Enforce live discovery disposition
+      - name: Enforce full live discovery disposition
         if: always()
         shell: bash
         run: |
