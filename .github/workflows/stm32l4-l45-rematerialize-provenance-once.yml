@@ -1,0 +1,55 @@
+name: STM32L4 L4.5 rematerialize provenance once
+
+on:
+  push:
+    branches:
+      - "agent/device-catalog-stm32l4-phase-l45-publication"
+    paths:
+      - ".github/workflows/stm32l4-l45-rematerialize-provenance-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32l4-phase-l45-publication
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Rematerialize deterministic publication bytes
+        working-directory: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          from publish_stm32l4_phase_l4_5 import (
+              AUDIT_PATH, BASELINE_PATH, CANONICAL_PATH, PRODUCTION_MANIFEST,
+              PROPOSAL_PATH, _expected_publication_bytes, verify_current_publication,
+          )
+          canonical, proposal, audit, baseline, manifest = _expected_publication_bytes()
+          CANONICAL_PATH.write_bytes(canonical)
+          PROPOSAL_PATH.write_bytes(proposal)
+          AUDIT_PATH.write_bytes(audit)
+          BASELINE_PATH.write_bytes(baseline)
+          PRODUCTION_MANIFEST.write_bytes(manifest)
+          print(verify_current_publication())
+          PY
+      - name: Commit deterministic artifacts and remove bootstrap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/device-catalog/research/stm32l4-commercial-icpn.csv \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-proposal.json \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-audit.json \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-baseline.json \
+            data/device-catalog/production/icpn-v1-manifest.json
+          git rm .github/workflows/stm32l4-l45-rematerialize-provenance-once.yml
+          git diff --cached --check
+          git commit -m "Normalize STM32L4 L4.5 runtime provenance"
+          git push origin HEAD:agent/device-catalog-stm32l4-phase-l45-publication
