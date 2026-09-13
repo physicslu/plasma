@@ -175,11 +175,12 @@ export default function EngineeringPage() {
                               type="button"
                               disabled={!hydrated}
                               className={settingsSurfaceActive && settingsSection === "mock" ? "active" : ""}
+                              aria-label={mockLabel}
                               aria-pressed={settingsSurfaceActive && settingsSection === "mock"}
                               onClick={() => selectSettingsSection("mock")}
                             >
                               <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
-                              <span className="engineeringNavLabel">{mockLabel}</span>
+                              <span className="engineeringNavLabel">Mock Runtime</span>
                             </button>
                           </div>
                         )}
