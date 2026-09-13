@@ -1,0 +1,124 @@
+name: TEMP STM32L4 L4.2 targeted timeout recovery
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32l4-phase-l42-discovery
+    paths:
+      - ".github/workflows/tmp-stm32l4-l42-timeout-recovery.yml"
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: stm32l4-l42-targeted-timeout-recovery
+  cancel-in-progress: true
+
+jobs:
+  recover-retain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate frozen L4.2 boundary and recovery utility
+        run: |
+          python data/device-catalog/research/test_stm32l4_phase_l4_2_discovery.py
+          python -m py_compile data/device-catalog/research/tmp_recover_stm32l4_phase_l4_2_timeouts.py
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Download and hard-lock initial partial acquisition artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/10304163363/zip" \
+            -o /tmp/l42-initial.zip
+          echo "e04253546cfba83209bf0b55f8fe46de4b5e14110bbc1bb5b95aefcb46d984a4  /tmp/l42-initial.zip" | sha256sum -c -
+          rm -rf /tmp/l42-initial
+          mkdir -p /tmp/l42-initial
+          unzip -q /tmp/l42-initial.zip -d /tmp/l42-initial
+          test -f /tmp/l42-initial/live-summary.json
+          test -f /tmp/l42-initial/targets.json
+          test "$(find /tmp/l42-initial/evidence -maxdepth 1 -name '*.json' | wc -l)" -eq 123
+
+      - name: Re-acquire only the fixed 15-device timeout set and merge evidence
+        id: recover
+        continue-on-error: true
+        run: |
+          ROOT=data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13
+          rm -rf "$ROOT"
+          xvfb-run -a python data/device-catalog/research/tmp_recover_stm32l4_phase_l4_2_timeouts.py \
+            --source-root /tmp/l42-initial \
+            --output-root "$ROOT" \
+            --delay 1.0 \
+            --timeout 180
+
+      - name: Validate clean 138-device merged retention contract
+        id: validate
+        if: steps.recover.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13')
+          s=json.loads((root/'live-summary.json').read_text())
+          p=json.loads((root/'provenance.json').read_text())
+          l=json.loads((root/'leaf-digests.json').read_text())
+          m=json.loads((root/'retained-manifest.json').read_text())
+          assert s['attempted'] == s['base_device_count'] == s['commercial_identity_verified_targets'] == s['dispositioned_targets'] == 138
+          assert s['identity_manual_intervention_required'] == s['acquisition_failure'] == s['source_unavailable_exclusions'] == 0
+          assert s['representative_continuity_clean'] is s['commercial_identity_clean'] is s['bounded_discovery_clean'] is True
+          assert all(v is False for v in s['claims'].values())
+          assert l['leaf_count'] == len(l['sha256_by_file']) == 138
+          assert p['schema_version'] == 2 and p['workflow_role'] == 'targeted_timeout_recovery_and_retention'
+          assert len(p['acquisition_runs']) == 2
+          initial,recovery=p['acquisition_runs']
+          assert initial['workflow_run_id'] == 34713341677 and initial['artifact_id'] == 10304163363
+          assert initial['successful_target_count'] == 123 and initial['timeout_target_count'] == 15
+          assert recovery['workflow_run_id'] == int(__import__('os').environ['GITHUB_RUN_ID'])
+          assert recovery['successful_target_count'] == recovery['contributed_base_device_count'] == 15
+          assert recovery['per_device_timeout_seconds'] == 180.0
+          assert m['schema_version'] == 2 and m['base_device_count'] == 138 and m['acquisition_run_count'] == 2
+          print('STM32L4 L4.2 targeted recovery retention: PASS')
+          PY
+
+      - name: Upload immutable merged recovery artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l4-l42-timeout-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: error
+          path: data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/
+
+      - name: Commit retained research evidence to transaction branch
+        if: steps.recover.outcome == 'success' && steps.validate.outcome == 'success'
+        run: |
+          ROOT=data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13
+          rm -rf "$ROOT/evidence" "$ROOT/recovery-summary.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$ROOT/live-summary.json" "$ROOT/targets.json" "$ROOT/provenance.json" "$ROOT/leaf-digests.json" "$ROOT/retained-manifest.json"
+          git commit -m "Retain STM32L4 L4.2 targeted timeout recovery evidence"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin HEAD:${{ github.ref_name }}
+
+      - name: Enforce targeted recovery gate
+        if: always()
+        run: |
+          test "${{ steps.recover.outcome }}" = "success" || { echo "15-device targeted recovery failed" >&2; exit 1; }
+          test "${{ steps.validate.outcome }}" = "success" || { echo "merged 138-device retention validation failed" >&2; exit 1; }
