@@ -1,9 +1,10 @@
 /*
  * PMode Live Site Status density policy.
  *
- * Keep one PPU / 8 Sites fully readable. As the Production Set grows, reduce
- * chrome first, then remove secondary per-Site text instead of shrinking it
- * below a readable size. This file is presentation-only.
+ * Render every actual Site reported by the PPU. Production Sets with <= 8
+ * total Sites use the spacious layout; as the Production Set grows, reduce
+ * chrome first, then remove secondary per-Site text instead of hiding Site
+ * cards or shrinking text below a readable size. This file is presentation-only.
  */
 
 .factoryConsoleV2 .factoryLiveStatus.density-spacious {
