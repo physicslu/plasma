@@ -1,10 +1,10 @@
 # H024 — STM32L1 Lifecycle Requalification Handover
 
-**Date:** 2026-09-13  
-**Status:** Gate 1 implementation complete; PR #538 Gate 2 candidate  
-**Primary workstream:** Device Catalog / STM32L1 lifecycle evidence requalification  
-**Repository:** `physicslu/plasma`  
-**Branch:** `agent/device-catalog-stm32l1-requalification`  
+**Date:** 2026-09-13
+**Status:** Gate 1 implementation complete; PR #538 Gate 2 candidate
+**Primary workstream:** Device Catalog / STM32L1 lifecycle evidence requalification
+**Repository:** `physicslu/plasma`
+**Branch:** `agent/device-catalog-stm32l1-requalification`
 **PR:** #538
 
 ## 1. Starting state
