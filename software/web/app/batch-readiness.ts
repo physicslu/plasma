@@ -32,6 +32,8 @@ export type BatchReadiness = {
   ready: boolean;
 };
 
+export type BatchReadinessLocale = "zh-TW" | "en-US";
+
 const LABELS: Record<BatchReadinessCode, string> = {
   "batch-ready": "BATCH READY",
   "no-target": "NO TARGET",
@@ -46,8 +48,64 @@ const LABELS: Record<BatchReadinessCode, string> = {
   cancelling: "CANCELLING",
 };
 
+const GUIDANCE: Record<BatchReadinessCode, Record<BatchReadinessLocale, string>> = {
+  "batch-ready": {
+    "zh-TW": "可以開始燒錄。",
+    "en-US": "Ready to start programming.",
+  },
+  "no-target": {
+    "zh-TW": "請先選擇目標 IC。",
+    "en-US": "Select a target IC first.",
+  },
+  "no-site": {
+    "zh-TW": "請至少勾選一個 Site。",
+    "en-US": "Select at least one Site.",
+  },
+  "no-op": {
+    "zh-TW": "請選擇 Erase / Program / Verify / Read。",
+    "en-US": "Select Erase / Program / Verify / Read.",
+  },
+  "image-required": {
+    "zh-TW": "Program／Verify 需要 Programming Image。",
+    "en-US": "Program / Verify requires a Programming Image.",
+  },
+  "image-invalid": {
+    "zh-TW": "Programming Image 無效，請重新選擇或上傳。",
+    "en-US": "The Programming Image is invalid. Select or upload it again.",
+  },
+  "invalid-read": {
+    "zh-TW": "Read 參數不完整。",
+    "en-US": "Complete the Read parameters.",
+  },
+  "programming-unavailable": {
+    "zh-TW": "燒錄功能目前不可用；請檢查 Programming Provider。",
+    "en-US": "Programming is unavailable. Check the Programming Provider.",
+  },
+  "site-busy": {
+    "zh-TW": "有 Site 忙碌中；請等待完成或取消目前 Batch。",
+    "en-US": "One or more Sites are busy. Wait for completion or cancel the active Batch.",
+  },
+  running: {
+    "zh-TW": "Batch 執行中；Site membership 已鎖定。",
+    "en-US": "Batch execution is in progress; Site membership is locked.",
+  },
+  cancelling: {
+    "zh-TW": "Batch 取消中；請等待 Server 回報終止狀態。",
+    "en-US": "Batch cancellation is in progress. Wait for the Server terminal state.",
+  },
+};
+
 function result(code: BatchReadinessCode): BatchReadiness {
   return { code, label: LABELS[code], ready: code === "batch-ready" };
+}
+
+export function batchReadinessGuidance(code: BatchReadinessCode, locale: BatchReadinessLocale): string {
+  return GUIDANCE[code][locale];
+}
+
+export function batchReadinessGuidanceFromLabel(label: string, locale: BatchReadinessLocale): string | null {
+  const entry = (Object.entries(LABELS) as Array<[BatchReadinessCode, string]>).find(([, value]) => value === label);
+  return entry ? batchReadinessGuidance(entry[0], locale) : null;
 }
 
 /**
