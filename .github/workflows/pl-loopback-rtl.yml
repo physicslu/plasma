@@ -1,0 +1,38 @@
+name: PL loopback RTL regression
+
+on:
+  push:
+    paths:
+      - "pl/rtl/bus/plasma_pl_loopback_*.sv"
+      - "pl/verification/cocotb/pl_loopback/**"
+      - "pl/tests/test_pl_loopback_rtl.py"
+      - ".github/workflows/pl-loopback-rtl.yml"
+  pull_request:
+    paths:
+      - "pl/rtl/bus/plasma_pl_loopback_*.sv"
+      - "pl/verification/cocotb/pl_loopback/**"
+      - "pl/tests/test_pl_loopback_rtl.py"
+      - ".github/workflows/pl-loopback-rtl.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cocotb-icarus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Icarus and cocotb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends iverilog make
+          python -m pip install "pytest>=8,<10" "cocotb==1.9.2"
+      - name: Run PL Loopback AXI4-Lite functional regression
+        run: python -m pytest -q pl/tests/test_pl_loopback_rtl.py

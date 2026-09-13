@@ -20,10 +20,13 @@ plasma = "plasma_client.cli:main"
 plasma-server = "plasma_server.server:main"
 plasma-web = "plasma_web.gateway_phase2:main"
 plasma-manager = "plasma_manager.server:main"
+plasma-server-pl-qualification = "plasma_server.pl_qualification:main"
+plasma-web-pl-qualification = "plasma_web.gateway_pl_qualification:main"
 
 [tool.setuptools]
 packages = [
   "plasma_core",
+  "plasma_hw",
   "plasma_interfaces",
   "plasma_handlers",
   "plasma_server",
