@@ -202,13 +202,16 @@ Interface / Handler
 MockInterface today; Z2/FPGA/real-target validation is separate
 ```
 
-Optional fleet path:
+Managed Control Station path:
 
 ```text
-Fleet client
+Browser
     |
     v
-Plasma Manager (read-only registry / aggregation + narrow PS Loopback and Site Desired relays)
+Control Station Console/BFF
+    |
+    v
+Plasma Manager (registry / fleet observation / bounded managed PPU relay)
     |
     +--> PPU A Plasma Gateway -> local execution
     +--> PPU B Plasma Gateway -> local execution
@@ -222,10 +225,12 @@ Implementation facts:
 - It does **not use WebSocket**.
 - Web Console uses REST polling.
 - `plasma_manager` is optional and not required for local PPU execution.
-- Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default).
-- Manager fleet observation remains read-only. Current write-like exceptions are narrow and explicit: fixed PS Loopback pass-through at `POST /api/ppus/{ppu_alias}/diagnostics/loopback` with `endpoint=ps`, plus alias-scoped Site Desired configuration pass-through at `POST /api/ppus/{ppu_alias}/gateway/api/settings/sites/{site_id}`. Neither is a generic proxy or a general command-routing contract.
-- Site Desired reads/writes remain PPU-owned. Manager only relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
-- Current Manager does not provide Job/Batch command routing, central scheduling, discovery, auth policy, Programming Asset rollout, or general Fleet write orchestration.
+- Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default for the integration profile).
+- Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus the current Job, Batch, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes required by the Control Station product.
+- Managed routing is **not** a generic reverse proxy. Exact methods and paths are allowlisted in `software/python/plasma_manager/server.py`; Browser traffic reaches those routes through the same-origin BFF.
+- Job/Batch execution remains PPU/Gateway-owned. Manager relays commands and observations to the selected PPU; it is not a central Job scheduler and does not replace the PPU execution engine.
+- Site Desired reads/writes remain PPU-owned. Manager relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
+- Manager still does not provide automatic PPU discovery, a general Fleet write API, or an independent central authentication/scheduling policy layer.
 - Mock programming success does not prove hardware programming.
 
 Do not introduce FastAPI/WebSocket merely because they were discussed as future options.
@@ -296,16 +301,18 @@ Do not assume production Z2 needs Node.js, npm, or the development server merely
 
 ## 8. Runtime services and ports
 
-Service management is defined by `scripts/plasmactl`.
+Service management is defined by `scripts/plasmactl`. Port numbers are profile-specific defaults; use `docs/deployment/port-profile-matrix.md` as the canonical cross-profile map rather than assuming one Manager port applies to every deployment.
 
 | systemd service | Default port | Canonical role |
 |---|---:|---|
 | `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
-| `plasma-web.service` | 18080 | Plasma Gateway |
+| `plasma-web.service` | 18080 | Full Plasma Gateway |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
-| `plasma-manager.service` | 18180 | Optional Plasma Manager fleet control plane; read-only observation plus narrow PS Loopback and Site Desired relays |
+| `plasma-manager.service` | 18180 | Generic/integration/package Manager default; registry, fleet observation, and bounded managed PPU relay |
 
-Packaged PPU deployments must bind `plasma-server.service` and `plasma-web.service` to the same explicit canonical PPU configuration path. Site Desired persistence requires directory-level create/rename permission for atomic replacement; grant that write boundary only to the Plasma Gateway service and only for the managed Plasma configuration root. `plasma-server.service` remains read-only for canonical configuration. A successful Save Desired changes persistent desired state only; it does not imply runtime apply or service restart.
+The Linux `local-control-station` profile intentionally uses Console/BFF `127.0.0.1:18190` and Manager `127.0.0.1:18280`. The SWPC Z2-like profile intentionally separates full local Gateway `18080`, restricted diagnostics/status ingress `18081`, and Cloudflare-Access-protected managed Programming ingress `18082`. These are profile contracts, not accidental drift.
+
+Packaged PPU deployments must bind `plasma-server.service` and `plasma-web.service` to the same explicit canonical PPU configuration path. Site Desired persistence requires directory-level create/rename permission for atomic replacement; grant that write boundary only to the Plasma Gateway service and only for the managed Plasma configuration root. `plasma-server.service` remains read-only for canonical configuration. A successful Save Desired changes persistent desired state only; runtime activation is a separate explicit operation.
 
 Useful commands:
 
@@ -611,9 +618,9 @@ Agents must not silently turn these facts into wrong assumptions:
 5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
 7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
-8. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in deployment and two narrow relays: Phase-0 PS Loopback and alias-scoped Site Desired configuration. General command routing, Job/Batch scheduling, discovery, authentication policy, Programming Asset rollout, and general Fleet write orchestration remain future work.
+8. Plasma Manager currently implements explicit registry/fleet aggregation plus bounded managed PPU command routing for the current Control Station contract, including allowlisted Job/Batch/Programming Asset and Site/network operations. It is not a generic proxy or central scheduler; automatic discovery, general Fleet write orchestration, and an independent central auth/scheduling policy remain outside the current contract.
 9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
-10. Site Desired persistence and Runtime activation are separate contracts. Current Site settings save persistent Desired state; hot apply/restart from the settings request remains unsupported.
+10. Site Desired persistence and Runtime activation are separate contracts. Current P3-capable deployments support explicit bounded runtime activation through the activation helper/server-control sockets; saving Desired state alone never implies that runtime activation occurred.
 
 ## 19. Communication and completion report
 

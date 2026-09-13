@@ -38,15 +38,15 @@ Plasma needs one Control Station codebase that can be exercised in several envir
 Render demo                    -> same product code + Mock lane
 Render z2like demo             -> same product code + Manager -> SWPC PPU
 Linux local-control-station    -> same product code + local Manager -> configured PPU
-future macOS package           -> same product/runtime contract
-future Windows package         -> same product/runtime contract
+macOS package pilot            -> same product/runtime contract
+Windows package pilot          -> same product/runtime contract
 ```
 
 These are deployment/package variants, not duplicated feature implementations.
 
 ## Linux reference ownership
 
-The first implementation is intentionally Linux-only and uses **user systemd**. This is the SWPC reference deployment for future platform packages.
+The Linux reference implementation uses **user systemd**. Platform packages use their native service managers while preserving the same product contract.
 
 Runtime state is separated from the Git worktree:
 
@@ -94,7 +94,7 @@ Examples:
 SWPC co-resident Z2-like full local Gateway
 http://127.0.0.1:18080
 
-Future real Z2 on a trusted local network
+Real Z2 on a trusted local network
 http://192.168.10.21:18080
 ```
 
@@ -128,6 +128,8 @@ Default local ports:
 Console/BFF  127.0.0.1:18190
 Manager      127.0.0.1:18280
 ```
+
+These are intentional `local-control-station` profile defaults, not replacements for the generic/package Manager default `18180`. See `docs/deployment/port-profile-matrix.md` for the canonical cross-profile map.
 
 `install` builds an immutable release, writes profile configuration and user-systemd units, and enables the units. It does not start them.
 
@@ -210,7 +212,7 @@ Those are separate target/hardware acceptance layers.
 
 ## `plasma.open4th.com` role
 
-After the SWPC local-control-station runtime is accepted, the intended role is:
+When the SWPC local-control-station runtime is intentionally exposed through the existing tunnel, the routing role is:
 
 ```text
 plasma.open4th.com
@@ -225,7 +227,7 @@ The tunnel should point at the loopback Console. The profile itself must not bin
 
 `plasmactl local-control-station` is **not** the macOS or Windows installer.
 
-Future platform packages must preserve the same logical runtime contract:
+The existing macOS/Windows package pilots preserve the same logical runtime contract:
 
 ```text
 Control Station Console/BFF
@@ -239,14 +241,14 @@ PPU API
 
 Only packaging/service integration changes by OS. Product features, Programming workflows, Manager contract, and PPU API remain shared.
 
-## Future real Z2 profiles
+## Real Z2 qualification profiles
 
-Real hardware remains a separate deployment family:
+Real hardware is a separate deployment family:
 
 ```text
-z2-ps      future Real Z2 PS-only qualification
+z2-ps      implemented Real Z2 PS-only deployment/qualification profile
 z2-full    future PS + PL + Site/Programming qualification
 z2         intentionally unavailable until z2-full is qualified
 ```
 
-`swpc-z2like` must never be silently aliased to any of these profiles.
+`z2-ps` being implemented does not mean the current revision is qualified on a real board; real-board install/readiness/PS-loopback evidence remains a separate acceptance step. `swpc-z2like` must never be silently aliased to any Real Z2 profile.

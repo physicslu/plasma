@@ -1,4 +1,5 @@
 import { sanitizeManagerFleet } from "../../fleet/fleet-contract";
+import { requireManagerContractVersion } from "../../manager-contract";
 
 const FLEET_UI_ENABLED = process.env.PLASMA_FLEET_UI_ENABLED === "1";
 const DEFAULT_MANAGER_API_URL = "http://127.0.0.1:18180";
@@ -63,6 +64,17 @@ export async function GET(): Promise<Response> {
       });
     }
     const payload: unknown = await response.json();
+    try {
+      requireManagerContractVersion(payload);
+    } catch {
+      return json(502, {
+        ok: false,
+        error: {
+          code: "manager_contract_mismatch",
+          message: "Manager contract version is unsupported by this Control Station",
+        },
+      });
+    }
     return json(200, sanitizeManagerFleet(payload));
   } catch {
     return json(503, {
