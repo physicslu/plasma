@@ -6,6 +6,7 @@ on:
       - agent/device-catalog-stm32l4-phase-l42-discovery
     paths:
       - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/retained-manifest.json"
+      - ".github/workflows/tmp-stm32l4-l42-postprocess.yml"
 
 permissions:
   contents: write
