@@ -64,7 +64,17 @@ export async function GET(): Promise<Response> {
       });
     }
     const payload: unknown = await response.json();
-    requireManagerContractVersion(payload);
+    try {
+      requireManagerContractVersion(payload);
+    } catch {
+      return json(502, {
+        ok: false,
+        error: {
+          code: "manager_contract_mismatch",
+          message: "Manager contract version is unsupported by this Control Station",
+        },
+      });
+    }
     return json(200, sanitizeManagerFleet(payload));
   } catch {
     return json(503, {
