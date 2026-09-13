@@ -3,6 +3,7 @@
 ## Transaction
 
 - Phase: STM32L4 L4.5
+- PR: #535
 - Branch: `agent/device-catalog-stm32l4-phase-l45-publication`
 - Gate 1: explicitly approved
 - Gate 2: not yet approved
@@ -121,10 +122,9 @@ The temporary materialization workflow removed itself after deterministic genera
 
 Before Gate 2:
 
-1. open/update the L4.5 PR;
-2. ensure all applicable final CI is green on the final head;
-3. confirm current `main`, PR mergeability, and review/comment blockers;
-4. confirm Production delta is exactly +446 STM32L4 rows and no unrelated Production change exists;
-5. obtain explicit Gate 2 merge approval.
+1. ensure PR #535 final-head applicable CI is green;
+2. confirm current `main`, PR mergeability, and review/comment blockers;
+3. confirm Production delta is exactly +446 STM32L4 rows and no unrelated Production change exists;
+4. obtain explicit Gate 2 merge approval.
 
 After merge, do not automatically infer physical programmer support from catalog publication. Any next STM32 family selection or hardware/runtime qualification requires its own Gate 1 scope.
