@@ -10,7 +10,7 @@
 
 .programmingJobPanel {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   border-radius: var(--operator-panel-radius);
   background: var(--panel, #fff);
 }
@@ -18,6 +18,69 @@
 .programmingJobPanel > .operatorPanelBody {
   min-width: 0;
   padding: 0;
+}
+
+.programmingJobExecutionBar {
+  position: sticky;
+  top: 8px;
+  z-index: 30;
+  margin: 8px 10px 0;
+  padding: 9px 10px;
+  border: 1px solid #e4a52f;
+  border-radius: 6px;
+  background: color-mix(in srgb, #fff3cd 88%, var(--panel, #fff));
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .12);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.programmingJobExecutionBar > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 7px;
+}
+
+.programmingJobExecutionBar small {
+  color: var(--text-soft, #51606f);
+  font-size: var(--operator-status-label-font-size);
+  font-weight: 800;
+}
+
+.programmingJobExecutionBar b {
+  color: var(--text, #172033);
+  font-size: var(--operator-status-value-font-size);
+  font-weight: 900;
+}
+
+.programmingJobExecutionBar span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft, #51606f);
+  font-size: var(--operator-helper-font-size);
+  font-weight: 650;
+}
+
+.programmingJobExecutionAbort {
+  min-height: var(--operator-action-min-height);
+  padding: 0 18px;
+  border: 1px solid #b52323;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #cf3838, #ba2929);
+  color: #fff;
+  font-size: var(--operator-action-font-size);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.programmingJobExecutionAbort:disabled {
+  opacity: .42;
+  cursor: not-allowed;
 }
 
 .programmingJobGrid {
@@ -243,6 +306,14 @@
   line-height: 1.05;
 }
 
+.programmingJobStatusHint {
+  max-width: 100%;
+  color: var(--text-soft, #51606f);
+  font-size: var(--operator-helper-font-size);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .programmingJobStatus.state-running,
 .programmingJobStatus.state-queued,
 .programmingJobStatus.state-stopping,
@@ -274,6 +345,11 @@
   background: var(--panel);
 }
 
+[data-theme="dark"] .programmingJobExecutionBar {
+  border-color: #9d751f;
+  background: color-mix(in srgb, #8a641a 18%, var(--panel));
+}
+
 [data-theme="dark"] .programmingJobField {
   border-color: var(--line);
 }
@@ -292,7 +368,11 @@
 [data-theme="dark"] .programmingJobOperationChecks label,
 [data-theme="dark"] .programmingJobPolicyControls label,
 [data-theme="dark"] .programmingJobStatus b,
-[data-theme="dark"] .programmingJobStatus small {
+[data-theme="dark"] .programmingJobStatus small,
+[data-theme="dark"] .programmingJobStatusHint,
+[data-theme="dark"] .programmingJobExecutionBar small,
+[data-theme="dark"] .programmingJobExecutionBar b,
+[data-theme="dark"] .programmingJobExecutionBar span {
   color: var(--text);
 }
 
@@ -303,6 +383,25 @@
 }
 
 @media (max-width: 760px) {
+  .programmingJobExecutionBar {
+    top: 4px;
+    margin: 6px 8px 0;
+    grid-template-columns: 1fr;
+  }
+
+  .programmingJobExecutionBar > div {
+    grid-template-columns: auto auto;
+  }
+
+  .programmingJobExecutionBar span {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .programmingJobExecutionAbort {
+    width: 100%;
+  }
+
   .programmingJobField {
     padding: 8px;
     grid-template-columns: 1fr;
