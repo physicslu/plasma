@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "phase": "post-L4-STM32L1-requalification",
+  "family": "STM32L1",
+  "authority": "official_st_datasheet_ordering_information",
+  "review_date": "2026-09-13",
+  "purpose": "Confirm that current Active STM32L1 generation surfaces remain decodable by official ST ordering-information schemes before any future exact-ICPN discovery phase.",
+  "migration_authority": {
+    "document": "TN1176",
+    "title": "Migrating from STM32L15xx6/8/B to STM32L15xx6/8/B-A and from STM32L100x6/8/B to STM32L100x6/8/B-A",
+    "source_url": "https://www.st.com/resource/en/technical_note/tn1176-migrating-from-stm32l15xx68b-to-stm32l15xx68ba-and-from-stm32l100x68b-to-stm32l100x68ba-stmicroelectronics.pdf",
+    "role": "official evidence that non-A and generation-A product designations are distinct manufacturer-defined product surfaces"
+  },
+  "ordering_sources": [
+    {
+      "subfamilies": ["STM32L100"],
+      "device_scope": "STM32L100x6/8/B-A",
+      "document": "DocID025966 Rev 6",
+      "source_url": "https://www.st.com/content/ccc/resource/technical/document/datasheet/group3/12/cc/d2/27/5e/21/4b/97/DM00108661/files/DM00108661.pdf/jcr%3Acontent/translations/en.DM00108661.pdf",
+      "ordering_information_present": true,
+      "generation_a_semantics_present": true
+    },
+    {
+      "subfamilies": ["STM32L151", "STM32L152"],
+      "device_scope": "STM32L151x6/8/B-A STM32L152x6/8/B-A",
+      "document": "DocID024330 Rev 5",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32l151c8-a.pdf",
+      "ordering_information_present": true,
+      "generation_a_semantics_present": true
+    },
+    {
+      "subfamilies": ["STM32L162"],
+      "device_scope": "STM32L162xC/C-A",
+      "document": "DS10287 Rev 6",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32l162qc.pdf",
+      "ordering_information_present": true,
+      "generation_a_semantics_present": true
+    }
+  ],
+  "coverage": {
+    "required_subfamilies": ["STM32L100", "STM32L151", "STM32L152", "STM32L162"],
+    "covered_subfamilies": ["STM32L100", "STM32L151", "STM32L152", "STM32L162"],
+    "coverage_complete": true
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "canonical_admission_authorized": false,
+    "exact_icpn_publication_authorized": false,
+    "programming_policy_defined": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "flash_geometry_qualified": false,
+    "option_security_qualified": false,
+    "hil_qualified": false,
+    "runtime_programming_support_claimed": false
+  }
+}
