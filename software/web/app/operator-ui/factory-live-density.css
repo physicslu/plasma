@@ -1,0 +1,110 @@
+/*
+ * PMode Live Site Status density policy.
+ *
+ * Render every actual Site reported by the PPU. Production Sets with <= 8
+ * total Sites use the spacious layout; as the Production Set grows, reduce
+ * chrome first, then remove secondary per-Site text instead of hiding Site
+ * cards or shrinking text below a readable size. This file is presentation-only.
+ */
+
+.factoryConsoleV2 .factoryLiveStatus.density-spacious {
+  --site-card-w: 92px;
+  --site-card-h: 66px;
+  --site-led: 20px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-spacious .factorySiteLedCardTop b {
+  font-size: 9px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-spacious .factorySiteLedCard > small {
+  font-size: 8px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-comfortable {
+  --site-card-w: 80px;
+  --site-card-h: 58px;
+  --site-led: 17px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-comfortable .factorySiteLedCardTop b,
+.factoryConsoleV2 .factoryLiveStatus.density-comfortable .factorySiteLedCard > small {
+  font-size: 8px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact {
+  --site-card-w: 70px;
+  --site-card-h: 48px;
+  --site-led: 15px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factoryPpuRows,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRows {
+  padding: 5px;
+  gap: 5px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factoryPpuRow,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRow {
+  padding: 5px;
+  gap: 4px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factorySiteLedGrid,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factorySiteLedGrid {
+  gap: 4px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factorySiteLedCard,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factorySiteLedCard {
+  grid-template-rows: auto 1fr;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factorySiteLedCardTop b {
+  font-size: 8px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-compact .factorySiteLedCard > small,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factorySiteLedCard > small {
+  display: none;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense {
+  --site-card-w: 60px;
+  --site-card-h: 42px;
+  --site-led: 13px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryFacilityStack {
+  gap: 4px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryFacilityGroup > header {
+  min-height: 24px;
+  padding: 3px 6px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRowHeader {
+  grid-template-columns: 15px minmax(0, 1fr);
+  gap: 4px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRowHeader input {
+  width: 13px;
+  height: 13px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRowHeader b,
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factorySiteLedCardTop b {
+  font-size: 8px;
+}
+
+.factoryConsoleV2 .factoryLiveStatus.density-dense .factoryPpuRowHeader small {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .factoryConsoleV2 .factoryLiveStatus.density-spacious {
+    --site-card-w: 84px;
+  }
+}
