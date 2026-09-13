@@ -45,6 +45,8 @@ export default function EngineeringPage() {
   const diagnosticsSurfaceActive = active === "diagnostics";
   const settingsSurfaceActive = active === "settings";
   const ppuSiteSurfaceActive = active === "ppu-sites";
+  const settingsLabel = locale === "zh-TW" ? "系統設定" : "System Configuration";
+  const mockLabel = locale === "zh-TW" ? "Mock Runtime · 僅模擬" : "Mock Runtime · Simulation only";
 
   function selectSection(id: (typeof sections)[number][0]) {
     if (id === "diagnostics") {
@@ -125,15 +127,15 @@ export default function EngineeringPage() {
                     className={active === id ? "active" : ""}
                     aria-pressed={active === id}
                     aria-expanded={settingsExpanded}
-                    title={t(key)}
+                    title={settingsLabel}
                     onClick={() => selectSection(id)}
                   >
                     <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
-                    <span className="engineeringNavLabel">{t(key)}</span>
+                    <span className="engineeringNavLabel">{settingsLabel}</span>
                     <span className="engineeringNavDisclosure" aria-hidden="true">{settingsExpanded ? "⌄" : "›"}</span>
                   </button>
                   {settingsExpanded && (
-                    <div className="engineeringNavChildren" role="group" aria-label="Settings">
+                    <div className="engineeringNavChildren" role="group" aria-label={settingsLabel}>
                       <button
                         type="button"
                         disabled={!hydrated}
@@ -152,7 +154,7 @@ export default function EngineeringPage() {
                         onClick={() => selectSettingsSection("mock")}
                       >
                         <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
-                        <span className="engineeringNavLabel">Mock</span>
+                        <span className="engineeringNavLabel">{mockLabel}</span>
                       </button>
                     </div>
                   )}
@@ -199,7 +201,7 @@ export default function EngineeringPage() {
             ) : (
               <div className="engineeringPlaceholder">
                 <small>EXTENSION SLOT</small>
-                <h2>{t(sections.find(([id]) => id === active)?.[1] ?? "engineering.overview")}</h2>
+                <h2>{id === "settings" ? settingsLabel : t(sections.find(([sectionId]) => sectionId === active)?.[1] ?? "engineering.overview")}</h2>
                 <p>{t("engineering.placeholder")}</p>
                 <div className="engineeringSlotGrid" aria-hidden="true">
                   <span />
