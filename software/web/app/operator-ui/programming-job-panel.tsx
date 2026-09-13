@@ -4,6 +4,7 @@ import { batchReadinessGuidanceFromLabel } from "../batch-readiness";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
+import { useBatchSummaryLiveMetrics } from "./batch-summary-live";
 import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
 import "./programming-job-controls.css";
 import "./production-workflow-guidance.css";
@@ -127,6 +128,10 @@ export function ProgrammingJobPanel({
   const statusText = typeof statusValue === "string" ? statusValue : null;
   const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
   const executionActive = statusText ? activeExecutionStates.has(statusText) : false;
+  const liveMetrics = useBatchSummaryLiveMetrics(mode);
+  const executionGuidance = liveMetrics
+    ? `SITES ${liveMetrics.sites} · PROCESSED ${liveMetrics.processedIc}/${liveMetrics.totalIc}${readinessGuidance ? ` · ${readinessGuidance}` : ""}`
+    : readinessGuidance;
   const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
 
   return (
@@ -150,7 +155,7 @@ export function ProgrammingJobPanel({
           <div>
             <small>{statusLabel}</small>
             <b>{statusValue}</b>
-            {readinessGuidance && <span>{readinessGuidance}</span>}
+            {executionGuidance && <span>{executionGuidance}</span>}
           </div>
           <button
             type="button"
