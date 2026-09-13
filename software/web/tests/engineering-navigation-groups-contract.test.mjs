@@ -19,8 +19,9 @@ test("Engineering navigation groups workflow, troubleshooting, advanced, and Sys
   assert.match(page, /simulation: \{ "zh-TW": "僅模擬", "en-US": "SIMULATION ONLY" \}/);
   assert.match(page, /\["overview", "engineering\.overview", "⌂"\][\s\S]*\["ppu-sites", "engineering\.ppuSites", "▤"\][\s\S]*\["programming", "engineering\.programming", "▶"\][\s\S]*\["diagnostics", "engineering\.diagnostics", "∿"\][\s\S]*\["logs", "engineering\.logs", "▧"\][\s\S]*\["tools", "engineering\.tools", "⌘"\][\s\S]*\["settings", "engineering\.settings", "⚙"\]/);
   assert.match(page, /type SettingsSection = "gateway" \| "mock"/);
-  assert.match(page, /data-settings-group="communication"[\s\S]*Plasma Gateway/);
-  assert.match(page, /data-settings-group="simulation"[\s\S]*Mock Runtime · Simulation only/);
+  assert.match(page, /data-settings-group="communication"[\s\S]*settingsSection === "gateway"[\s\S]*Plasma Gateway/);
+  assert.match(page, /data-settings-group="simulation"[\s\S]*settingsSection === "mock"[\s\S]*\{mockLabel\}/);
+  assert.match(page, /const mockLabel = locale === "zh-TW" \? "Mock Runtime · 僅模擬" : "Mock Runtime · Simulation only"/);
   assert.match(page, /System Configuration/);
   assert.match(page, /className="engineeringNavGroupLabel"/);
   assert.match(page, /className="engineeringNavSubgroupLabel"/);
