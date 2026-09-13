@@ -236,14 +236,11 @@ class DeployedSecurePlasmaWebHandler(
 
 def main() -> None:
     controller = load_security_controller_from_env()
-    original_handler = gateway.PlasmaWebHandler
     previous_umask = os.umask(0o077)
     DeployedSecurePlasmaWebHandler.security_controller = controller
-    gateway.PlasmaWebHandler = DeployedSecurePlasmaWebHandler
     try:
-        gateway.main()
+        gateway.main(handler_class=DeployedSecurePlasmaWebHandler)
     finally:
-        gateway.PlasmaWebHandler = original_handler
         DeployedSecurePlasmaWebHandler.security_controller = None
         os.umask(previous_umask)
         controller.close()
