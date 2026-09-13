@@ -31,7 +31,7 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
   });
 }
 
-test("EMode Settings > Plasma Gateway edits shared server-owned timeout and retry settings", async ({ page }) => {
+test("EMode System Configuration > Plasma Gateway edits shared server-owned timeout and retry settings", async ({ page }) => {
   let settings = { revision: 1, ppu_request_timeout_ms: 10_000, ppu_retry_count: 3 };
   let submitted: Record<string, number> | null = null;
 
@@ -48,7 +48,7 @@ test("EMode Settings > Plasma Gateway edits shared server-owned timeout and retr
   });
 
   await page.goto("/engineering");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^(System Configuration|系統設定)$/ }).click();
   await expect(page.getByRole("heading", { name: "Plasma Gateway 設定", exact: true })).toBeVisible();
   await expect(page.getByText("PLASMA GATEWAY COMMUNICATION CONFIGURATION", { exact: true })).toBeVisible();
   await expect(page.getByLabel("PPU Request Timeout seconds")).toHaveValue("10");
@@ -76,7 +76,7 @@ test("EMode Settings > Plasma Gateway edits shared server-owned timeout and retr
   await expect(page.getByRole("status")).toContainText("Plasma Gateway 設定已儲存");
 });
 
-test("Plasma Gateway and Mock share the same Settings visual contract", async ({ page }) => {
+test("Plasma Gateway and Mock Runtime share the same System Configuration visual contract", async ({ page }) => {
   const gatewaySettings = { revision: 2, ppu_request_timeout_ms: 10_000, ppu_retry_count: 3 };
   const mockSettings = {
     profile_id: "default",
@@ -104,13 +104,13 @@ test("Plasma Gateway and Mock share the same Settings visual contract", async ({
   }));
 
   await page.goto("/engineering");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^(System Configuration|系統設定)$/ }).click();
   await expect(page.getByRole("region", { name: "Plasma Gateway Settings Guide" })).toBeVisible();
   const gatewayVisual = await settingsVisualContract(page);
   const gatewayCanvas = await page.locator(".engineeringCanvas.settingsActive").boundingBox();
   const gatewayPage = await page.locator(".settingsPage").boundingBox();
 
-  await page.getByRole("button", { name: "Mock", exact: true }).click();
+  await page.getByRole("button", { name: /^Mock Runtime · (Simulation only|僅模擬)$/ }).click();
   await expect(page.getByRole("region", { name: "Mock Settings Guide" })).toBeVisible();
   const mockVisual = await settingsVisualContract(page);
   const mockCanvas = await page.locator(".engineeringCanvas.settingsActive").boundingBox();
