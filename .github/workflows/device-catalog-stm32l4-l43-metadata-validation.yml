@@ -1,0 +1,68 @@
+name: STM32L4 L4.3 metadata validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32l4_metadata_policy.py"
+      - "data/device-catalog/research/stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/test_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/validate_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
+      - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
+      - "data/device-catalog/production/**"
+      - ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run L4.3 policy tests
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32l4_phase_l4_3_policy.py
+      - name: Build deterministic L4.3 summary
+        working-directory: data/device-catalog/research
+        run: |
+          set +e
+          python stm32l4_phase_l4_3_policy.py --summary-only --output "$RUNNER_TEMP/stm32l4-l43-summary.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/stm32l4-l43-summary.json"
+          echo "planner_status=$status" >> "$GITHUB_OUTPUT"
+        id: planner
+      - name: Upload deterministic summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l4-l43-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stm32l4-l43-summary.json
+          retention-days: 30
+      - name: Enforce L4.3 fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json, os
+          p = os.path.join(os.environ["RUNNER_TEMP"], "stm32l4-l43-summary.json")
+          d = json.load(open(p, encoding="utf-8"))
+          assert d["phase"] == "L4.3" and d["family"] == "STM32L4"
+          assert d["candidate_count"] == 446
+          assert d["base_device_count"] == 138
+          assert d["decision_counts"] == {"metadata_ready":446,"manual_review_required":0,"reject":0}, d["decision_counts"]
+          assert d["issues"] == [], d["issues"]
+          assert d["manual_review_base_devices"] == [], d["manual_review_base_devices"]
+          assert d["production_snapshot"]["exact_icpn_count"] == 1272
+          assert d["production_snapshot"]["base_device_count"] == 392
+          assert d["production_snapshot"]["family_count"] == 11
+          assert d["production_snapshot"]["stm32l4_exact_icpn_count"] == 0
+          for key in ("canonical_admission_authorized","production_write_authorized","programming_policy_defined","flash_geometry_qualified","option_security_semantics_qualified","physical_hil_qualified","runtime_programming_support_claimed","scope_expansion_authorized"):
+              assert d["metadata_contract"][key] is False, (key, d["metadata_contract"][key])
+          print("STM32L4 L4.3 fail-closed boundary: PASS")
+          PY
