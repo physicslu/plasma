@@ -74,7 +74,6 @@ reconcile_addons() {
 }
 
 verify_profile() {
-  require_root_verify
   capture_desired_state
   bash "$base_backend" verify "$@"
   if (( programming_was_enabled )); then
@@ -134,7 +133,7 @@ shift || true
 case "$command" in
   install) bash "$base_backend" install "$@" ;;
   deploy) deploy_profile "$@" ;;
-  verify) verify_profile "$@" ;;
+  verify) require_root_verify; verify_profile "$@" ;;
   status) status_profile "$@" ;;
   help|-h|--help) usage ;;
   *) usage >&2; die "unknown command: $command" ;;
