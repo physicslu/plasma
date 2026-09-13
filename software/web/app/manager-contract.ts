@@ -15,3 +15,9 @@ export function requireManagerContractVersion(value: unknown): void {
     throw new Error(`Unsupported Plasma Manager contract version: ${typeof version === "string" ? version : "missing"}`);
   }
 }
+
+export function requireManagerRegistryContractVersion(value: unknown): void {
+  const payload = object(value);
+  const registry = object(payload?.registry);
+  requireManagerContractVersion(registry ?? payload);
+}
