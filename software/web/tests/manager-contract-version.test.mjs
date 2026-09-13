@@ -14,6 +14,7 @@ test("Control Station rejects missing or incompatible Manager contract versions"
   assert.match(contract, /requireManagerRegistryContractVersion/);
 
   assert.match(fleetRoute, /requireManagerContractVersion\(payload\)/);
+  assert.match(fleetRoute, /manager_contract_mismatch/);
   assert.ok(
     fleetRoute.indexOf("requireManagerContractVersion(payload)") < fleetRoute.indexOf("sanitizeManagerFleet(payload)"),
     "Manager version must be validated before fleet payload sanitization",
