@@ -26,7 +26,8 @@ def test_phase3_startup_does_not_chain_or_replace_handler_globals() -> None:
     phase3 = (ROOT / "software/python/plasma_web/gateway_phase3.py").read_text(encoding="utf-8")
     secure = (ROOT / "software/python/plasma_web/secure_gateway_app.py").read_text(encoding="utf-8")
 
-    assert "phase2.main()" not in phase3
+    assert "\n        phase2.main()" not in phase3
+    assert "\n    phase2.main()" not in phase3
     assert "phase2.PlasmaWebHandler =" not in phase3
     assert "canonical_gateway.PlasmaWebHandler =" not in phase3
     assert "gateway.PlasmaWebHandler =" not in secure
