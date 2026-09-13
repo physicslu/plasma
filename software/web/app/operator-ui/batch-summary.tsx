@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "../i18n";
 import {
-  batchSummaryChannelFromAriaLabel,
+  batchSummaryScopeFromAriaLabel,
   clearBatchSummaryLiveMetrics,
   publishBatchSummaryLiveMetrics,
 } from "./batch-summary-live";
@@ -36,27 +36,27 @@ export function BatchSummary({
 }: BatchSummaryProps) {
   const { locale } = useI18n();
   const hasManufacturingYield = items.some(item => item.key === "yield");
-  const liveChannel = batchSummaryChannelFromAriaLabel(ariaLabel);
+  const liveScope = batchSummaryScopeFromAriaLabel(ariaLabel);
   const liveSites = numericKpi(items, ["sites", "production-sites"]);
   const liveProcessedIc = numericKpi(items, ["processed-ic"]);
   const liveTotalIc = numericKpi(items, ["total-ic"]);
 
   useEffect(() => {
-    if (!liveChannel) return;
+    if (!liveScope) return;
     if (liveSites === null || liveProcessedIc === null || liveTotalIc === null) {
-      clearBatchSummaryLiveMetrics(liveChannel);
+      clearBatchSummaryLiveMetrics(liveScope);
       return;
     }
-    publishBatchSummaryLiveMetrics(liveChannel, {
+    publishBatchSummaryLiveMetrics(liveScope, {
       sites: liveSites,
       processedIc: liveProcessedIc,
       totalIc: liveTotalIc,
     });
-  }, [liveChannel, liveProcessedIc, liveSites, liveTotalIc]);
+  }, [liveProcessedIc, liveScope, liveSites, liveTotalIc]);
 
   useEffect(() => () => {
-    if (liveChannel) clearBatchSummaryLiveMetrics(liveChannel);
-  }, [liveChannel]);
+    if (liveScope) clearBatchSummaryLiveMetrics(liveScope);
+  }, [liveScope]);
 
   return (
     <section className={`batchSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
