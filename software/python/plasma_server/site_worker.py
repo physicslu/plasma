@@ -172,8 +172,22 @@ class SiteWorker:
                 "site worker failed outside the handler boundary",
                 original_exception=failure,
             )
-        with contextlib.suppress(Exception):
+        try:
             await self.handler.interface.safe_shutdown()
+        except Exception as exc:
+            shutdown_error = (
+                exc
+                if isinstance(exc, PlasmaError)
+                else PlasmaError(
+                    ErrorCode.INTERFACE_FAILURE,
+                    "interface safe shutdown failed during emergency recovery",
+                    original_exception=exc,
+                )
+            )
+            shutdown_error.context.setdefault("phase", "emergency_safe_shutdown")
+            shutdown_error.context.setdefault("prior_error_code", error.code.value)
+            shutdown_error.context.setdefault("prior_error_message", error.message)
+            error = shutdown_error
         detail = ErrorDetail.from_exception(
             error,
             site_id=request.site_id,
