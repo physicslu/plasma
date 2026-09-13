@@ -318,7 +318,7 @@ def _parser() -> argparse.ArgumentParser:
 
     deploy = sub.add_parser("deploy", help="verify, stage, activate and health-check one PPU release")
     deploy.add_argument("--release-artifact", type=Path, required=True)
-    deploy.add_argument("--sidecar", type=Path, required=True)
+    deploy.add_argument("--sidecar", type=Path)
     deploy.add_argument("--plasma-python", type=Path, required=True)
     deploy.add_argument("--gateway-host", required=True)
     deploy.add_argument("--ppu-id", required=True)
@@ -338,9 +338,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         systemd_root=args.systemd_root,
     )
     installer = _load_installer(args.installer)
+    release_artifact = args.release_artifact.resolve()
+    sidecar = (args.sidecar or Path(str(release_artifact) + ".sha256")).resolve()
     request = DeploymentRequest(
-        release_artifact=args.release_artifact.resolve(),
-        sidecar=args.sidecar.resolve(),
+        release_artifact=release_artifact,
+        sidecar=sidecar,
         plasma_python=args.plasma_python.resolve(),
         gateway_host=args.gateway_host,
         ppu_id=args.ppu_id,
