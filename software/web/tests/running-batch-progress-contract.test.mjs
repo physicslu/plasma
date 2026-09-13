@@ -17,7 +17,7 @@ test("persistent execution bar mirrors shared Batch Summary progress without own
     source(jobPath),
   ]);
 
-  assert.match(summary, /batchSummaryChannelFromAriaLabel\(ariaLabel\)/);
+  assert.match(summary, /batchSummaryScopeFromAriaLabel\(ariaLabel\)/);
   assert.match(summary, /\["sites", "production-sites"\]/);
   assert.match(summary, /\["processed-ic"\]/);
   assert.match(summary, /\["total-ic"\]/);
