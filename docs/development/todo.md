@@ -45,6 +45,32 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ## Deferred architecture evolution
 
+### Mock Runtime Core Convergence
+
+**Status:** TODO / medium-term architecture cleanup; no immediate runtime merge required
+
+**Layer:** Mock Runtime / deployment profiles / test infrastructure
+
+**Reason:** Plasma currently has two useful Mock deployment shapes with different verification purposes: the Render `render-demo-ppu` fixture models one managed PPU with eight Sites for `Console/BFF -> Manager -> Gateway -> Protocol Server` acceptance, while PMode and EMode use the Python-owned Engineering Mock topology with eight Facilities, 32 PPUs and 160 Sites for multi-PPU workflow and Batch simulation. Keeping both deployment profiles is intentional. The debt is not that two profiles exist; the risk is allowing their E/P/V/R execution semantics, Mock Flash behavior, timing/error injection, Job/Site state transitions, retry or cancellation rules to evolve independently and drift.
+
+Required work:
+
+- preserve a single-PPU managed-path deployment profile for Render/public-demo smoke and programming acceptance;
+- preserve the factory-scale Engineering Mock topology profile for PMode/EMode multi-PPU and Batch scenarios;
+- inventory duplicated or divergent Mock execution behavior across both profiles, including E/P/V/R, timing, error injection, Mock Flash, Job/Site state, retry, cancellation and readback semantics;
+- converge duplicated behavior onto one shared Mock Execution Core where practical instead of forcing both deployment profiles into one runtime shape;
+- keep topology construction and deployment adapters separate so single-PPU acceptance does not become coupled to the 32-PPU/160-Site factory topology;
+- keep Manager as routing/management infrastructure rather than making it the Mock execution owner;
+- add parity tests that prove equivalent operation/state/retry/cancellation semantics for both deployment profiles where they intentionally overlap;
+- document any intentionally different behavior explicitly instead of relying on fixture-specific implementation accidents;
+- consider renaming `render-demo-ppu` to a clearer managed-smoke/deployment-fixture identity only if that can be done without creating unnecessary deployment churn.
+
+Architectural invariant:
+
+> Plasma may have multiple Mock deployment profiles, but equivalent Mock execution semantics should have one implementation owner. Deployment shape is configuration; E/P/V/R behavior must not fork silently.
+
+Closure evidence must show that the single-PPU managed acceptance profile and the factory-scale 32-PPU/160-Site profile still serve their separate purposes while shared execution semantics are implemented once or guarded by deterministic parity tests.
+
 ### Plasma Hardware API / OpenOCD Adapter Productization
 
 **Status:** TODO / post-PoC architecture evolution
