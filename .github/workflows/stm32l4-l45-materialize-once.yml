@@ -1,0 +1,45 @@
+name: STM32L4 L4.5 materialize once
+
+on:
+  push:
+    branches:
+      - "agent/device-catalog-stm32l4-phase-l45-publication"
+    paths:
+      - "data/device-catalog/research/publish_stm32l4_phase_l4_5.py"
+      - ".github/workflows/stm32l4-l45-materialize-once.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32l4-phase-l45-publication
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Materialize controlled publication
+        working-directory: data/device-catalog/research
+        run: |
+          python publish_stm32l4_phase_l4_5.py --publish
+          python publish_stm32l4_phase_l4_5.py --verify
+      - name: Commit deterministic artifacts and remove bootstrap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/device-catalog/research/stm32l4-commercial-icpn.csv \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-proposal.json \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-audit.json \
+            data/device-catalog/research/stm32l4-phase-l4.5-publication-baseline.json \
+            data/device-catalog/production/icpn-v1-manifest.json
+          git rm .github/workflows/stm32l4-l45-materialize-once.yml
+          git diff --cached --check
+          git commit -m "Publish STM32L4 L4.5 catalog entries"
+          git push origin HEAD:agent/device-catalog-stm32l4-phase-l45-publication
