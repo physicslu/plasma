@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from device_catalog_admission_framework import CandidateManualReview, CandidateReject
-from stm32l4_metadata_policy import FAMILY, METADATA_FIELDS, build_candidate_inputs, build_metadata_row, load_ordering_authority
+from stm32l4_metadata_policy import FAMILY, METADATA_FIELDS, build_candidate_inputs, build_metadata_row, load_exact_variant_exceptions, load_ordering_authority
 from stm32l4_phase_l4_1_foundation import validate_production_prestate
 from validate_stm32l4_phase_l4_2_retained_evidence import main as validate_retained
 
@@ -64,7 +64,9 @@ def production_snapshot() -> dict[str, Any]:
 def contract() -> dict[str, Any]:
     return {
         "identity_lifecycle_authority": "retained L4.2 official ST dual-surface exact-set evidence",
-        "metadata_authority": "official ST datasheet Ordering Information",
+        "metadata_authority": "official ST datasheet Ordering Information plus exact-part manufacturer exceptions for three retained Active variants",
+        "exact_variant_exception_count": 3,
+        "exact_variant_exceptions_expand_identity_scope": False,
         "canonical_admission_authorized": False,
         "production_write_authorized": False,
         "programming_policy_defined": False,
@@ -83,6 +85,7 @@ def build_plan() -> dict[str, Any]:
     if validate_retained() != 0:
         raise RuntimeError("L4.2 retained evidence validation failed")
     load_ordering_authority()
+    load_exact_variant_exceptions()
     items: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
     rows: list[dict[str, str]] = []
@@ -108,6 +111,7 @@ def build_plan() -> dict[str, Any]:
     ready = [x["icpn"] for x in items if x["decision"] == "metadata_ready"]
     manual = [x["icpn"] for x in items if x["decision"] == "manual_review_required"]
     rejected = [x["icpn"] for x in items if x["decision"] == "reject"]
+    exception_rows = [row for row in rows if row["verification_status"] == "manufacturer_authority_exact_variant_exception_verified"]
     return {
         "schema_version": 1,
         "phase": PHASE,
@@ -120,6 +124,7 @@ def build_plan() -> dict[str, Any]:
         "reject_set_sha256": _set_sha(rejected),
         "metadata_rows_sha256": _rows_sha(rows),
         "metadata_distribution": dist,
+        "exact_variant_exception_icpns": sorted(row["icpn"] for row in exception_rows),
         "issues": sorted({issue for item in items for issue in item["issues"]}),
         "manual_review_base_devices": sorted({x["base_device"] for x in items if x["decision"] == "manual_review_required"}),
         "production_snapshot": production_snapshot(),
@@ -139,6 +144,7 @@ def plan_is_clean(plan: dict[str, Any]) -> bool:
         plan.get("candidate_count") == 446
         and plan.get("base_device_count") == 138
         and dc == {"metadata_ready": 446, "manual_review_required": 0, "reject": 0}
+        and plan.get("exact_variant_exception_icpns") == ["STM32L4A6RGT7", "STM32L4A6RGT7TR", "STM32L4S5QII3P"]
         and plan.get("issues") == []
         and plan.get("manual_review_base_devices") == []
         and plan.get("production_snapshot", {}).get("exact_icpn_count") == 1272
@@ -146,6 +152,8 @@ def plan_is_clean(plan: dict[str, Any]) -> bool:
         and plan.get("production_snapshot", {}).get("stm32l4_exact_icpn_count") == 0
         and plan.get("canonical_dataset_admission") == "deferred"
         and plan.get("production_write_applied") is False
+        and plan.get("metadata_contract", {}).get("exact_variant_exception_count") == 3
+        and plan.get("metadata_contract", {}).get("exact_variant_exceptions_expand_identity_scope") is False
         and set(plan.get("metadata_contract", {}).get(key) for key in (
             "canonical_admission_authorized", "production_write_authorized", "programming_policy_defined",
             "flash_geometry_qualified", "option_security_semantics_qualified", "physical_hil_qualified",
@@ -158,7 +166,7 @@ def summary(plan: dict[str, Any]) -> dict[str, Any]:
     return {key: plan[key] for key in (
         "phase", "family", "candidate_count", "base_device_count", "decision_counts",
         "metadata_ready_set_sha256", "manual_review_set_sha256", "reject_set_sha256",
-        "metadata_rows_sha256", "metadata_distribution", "issues", "manual_review_base_devices",
+        "metadata_rows_sha256", "metadata_distribution", "exact_variant_exception_icpns", "issues", "manual_review_base_devices",
         "production_snapshot", "metadata_contract",
     )}
 
