@@ -30,14 +30,14 @@ This directory contains numbered engineering handover documents intended to let 
 | [H022](H022-stm32l4-l44-admission-plan-2026-09-13.md) | 2026-09-13 | STM32L4 L4.4 exact-ICPN read-only capability/admission plan | Complete; PR #534 merged | Retain as L4.4 admission history; use H023 |
 | [H023](H023-stm32l4-l45-publication-2026-09-13.md) | 2026-09-13 | STM32L4 L4.5 controlled publication of 446 capability-admittable exact ICPNs | Complete; PR #535 merged | Retain as L4.5 publication history; use H024 |
 | [H024](H024-stm32l1-requalification-2026-09-13.md) | 2026-09-13 | STM32L1 official-ST lifecycle requalification and generation-aware evidence correction | Complete; PR #538 merged | Retain as STM32L1 requalification history; use H025 |
-| [H025](H025-stm32l1-l11-foundation-2026-09-13.md) | 2026-09-13 | STM32L1 L1.1 bounded research foundation | Current; PR #540 Gate 1 implementation | Complete final-head CI and Gate 2 merge transaction; do not start L1.2 without a new Gate 1 |
+| [H025](H025-stm32l1-l11-foundation-2026-09-13.md) | 2026-09-13 | STM32L1 L1.1 bounded research foundation | Current; PR #540 Gate 2 candidate | Recheck final head/current main/applicable CI/mergeability/reviews and zero Production delta, then obtain explicit Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H025 and AGENTS.md. Verify PR #540 final head/current main/applicable CI/mergeability/reviews and zero Production delta, then continue the L1.1 Gate 2 transaction when merge-ready. Do not merge without explicit Gate 2 approval and do not start STM32L1 L1.2 without a new Gate 1.
+Read repo handover H025 and AGENTS.md. Verify PR #540 final head/current main/applicable CI/mergeability/reviews and zero Production delta, then continue the L1.1 Gate 2 transaction. Do not merge without explicit Gate 2 approval and do not start STM32L1 L1.2 without a new Gate 1.
 ```
 
 For IC Support Architecture / hardware qualification:
