@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import threading
 from http import HTTPStatus
 from pathlib import Path
@@ -12,11 +11,13 @@ from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway as canonical_gateway
 from . import gateway_base as base
+from .gateway_runner import serve_handler
 from .ppu_network_activation import (
     PPUNetworkActivationController,
     PPUNetworkActivationError,
     PPUNetworkActivationHelperClient,
 )
+from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 from .site_configuration import (
     DESIRED_REVISION_PREFIX,
     SiteConfigurationConflictError,
@@ -524,58 +525,127 @@ class Phase2PlasmaWebHandler(
         super().do_POST()
 
 
-# Secure deployment swaps this module variable before calling main().
+# Compatibility alias for callers that imported the Phase-2 handler by the
+# historical generic name. Startup never mutates this alias or the canonical
+# Gateway handler global.
 PlasmaWebHandler = Phase2PlasmaWebHandler
 
 
-def _strip_phase2_options(argv: list[str]) -> list[str]:
-    stripped: list[str] = []
-    index = 0
-    while index < len(argv):
-        value = argv[index]
-        if value in {"--network-activation-socket", "--ppu-config"}:
-            index += 2
-            continue
-        if value.startswith("--network-activation-socket=") or value.startswith("--ppu-config="):
-            index += 1
-            continue
-        stripped.append(value)
-        index += 1
-    return stripped
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Plasma browser REST gateway")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--plasma-host", default="127.0.0.1")
+    parser.add_argument("--plasma-port", type=int, default=9900)
+    parser.add_argument("--output-root", type=Path, default=Path("output"))
+    parser.add_argument(
+        "--gateway-settings",
+        type=Path,
+        help="Persistent Gateway communication settings YAML (default: <output-root>/gateway-settings.yaml)",
+    )
+    parser.add_argument(
+        "--static-root",
+        type=Path,
+        help="Serve a built Plasma Web Console and SPA routes from the Gateway origin",
+    )
+    parser.add_argument(
+        "--cors-origin",
+        action="append",
+        dest="cors_origins",
+        help="Allowed Web origin; repeat for multiple origins (prototype default: *)",
+    )
+    parser.add_argument("--network-activation-socket", type=Path)
+    parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
+    parser.add_argument(
+        "--engineering-mock",
+        action="store_true",
+        help="Enable the server-side Engineering mock Facility/PPU provider",
+    )
+    parser.add_argument(
+        "--engineering-mock-root",
+        type=Path,
+        default=Path("engineering-mock"),
+        help="Output/log root for Engineering mock PPU runtimes",
+    )
+    parser.add_argument(
+        "--engineering-mock-flash-size",
+        type=int,
+        default=4 * 1024 * 1024,
+        help="Mock Flash bytes per Engineering Site (default: 4 MiB)",
+    )
+    parser.add_argument(
+        "--engineering-mock-profile",
+        type=Path,
+        help="Persistent Mock runtime profile YAML (default: <engineering-mock-root>/mock-runtime.yaml)",
+    )
+    return parser
 
 
-def main() -> None:
-    pre = argparse.ArgumentParser(add_help=False)
-    pre.add_argument("--network-activation-socket", type=Path)
-    pre.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
-    pre.add_argument("--output-root", type=Path, default=Path("output"))
-    pre.add_argument("--plasma-host", default="127.0.0.1")
-    pre.add_argument("--plasma-port", type=int, default=9900)
-    known, _ = pre.parse_known_args(sys.argv[1:])
-
-    handler = PlasmaWebHandler
+def _configure_handler(handler: type[Phase2PlasmaWebHandler], args: argparse.Namespace) -> None:
     if not issubclass(handler, PPUNetworkActivationSupportMixin):
         raise RuntimeError("configured Phase 2 Gateway handler lacks PPU network activation support")
     if not issubclass(handler, SiteConfigurationSupportMixin):
         raise RuntimeError("configured Phase 2 Gateway handler lacks Site configuration support")
     handler.configure_network_activation(
-        socket_path=known.network_activation_socket,
-        output_root=known.output_root,
-        plasma_host=known.plasma_host,
-        plasma_port=known.plasma_port,
+        socket_path=args.network_activation_socket,
+        output_root=args.output_root,
+        plasma_host=args.plasma_host,
+        plasma_port=args.plasma_port,
     )
-    handler.configure_site_configuration(known.ppu_config)
+    handler.configure_site_configuration(args.ppu_config)
 
-    original_handler = canonical_gateway.PlasmaWebHandler
-    original_argv = list(sys.argv)
-    canonical_gateway.PlasmaWebHandler = handler
-    sys.argv[:] = _strip_phase2_options(sys.argv)
+
+def _build_provider(args: argparse.Namespace) -> SharedImageMockEngineeringPPUProvider | None:
+    if not args.engineering_mock:
+        return None
+    profile_path = args.engineering_mock_profile or (args.engineering_mock_root / "mock-runtime.yaml")
+    provider = SharedImageMockEngineeringPPUProvider(
+        args.engineering_mock_root,
+        flash_size_bytes=args.engineering_mock_flash_size,
+        mock_profile_path=profile_path,
+    )
+    provider.start()
+    catalog = provider.catalog()
+    print(
+        "Engineering mock PPU provider ready: "
+        f"{catalog['facility_count']} facilities / {catalog['ppu_count']} PPUs / "
+        f"{catalog['site_count']} Sites"
+    )
+    return provider
+
+
+def main(
+    *,
+    handler_class: type[Phase2PlasmaWebHandler] = Phase2PlasmaWebHandler,
+    argv: list[str] | None = None,
+) -> None:
+    """Run the legacy Phase-2 entrypoint through explicit handler composition."""
+
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.static_root is not None and not (args.static_root / "index.html").is_file():
+        parser.error(f"static root must contain index.html: {args.static_root}")
+
+    _configure_handler(handler_class, args)
+    provider: SharedImageMockEngineeringPPUProvider | None = None
     try:
-        canonical_gateway.main()
+        provider = _build_provider(args)
+        serve_handler(
+            handler_class,
+            host=args.host,
+            port=args.port,
+            plasma_host=args.plasma_host,
+            plasma_port=args.plasma_port,
+            cors_origins=tuple(args.cors_origins or ["*"]),
+            output_root=args.output_root,
+            engineering_provider=provider,
+            static_root=args.static_root,
+            gateway_settings_path=args.gateway_settings,
+        )
     finally:
-        handler.close_network_activation()
-        canonical_gateway.PlasmaWebHandler = original_handler
-        sys.argv[:] = original_argv
+        if provider is not None:
+            provider.close()
+        handler_class.close_network_activation()
 
 
 if __name__ == "__main__":
