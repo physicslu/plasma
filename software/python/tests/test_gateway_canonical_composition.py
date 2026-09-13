@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from plasma_web import gateway_phase3
+from plasma_web import gateway_phase2, gateway_phase3
 from plasma_web.gateway_phase2 import PPUNetworkActivationSupportMixin, SiteConfigurationSupportMixin
 from plasma_web.gateway_phase3 import Phase3PlasmaWebHandler, SiteRuntimeActivationSupportMixin
 from plasma_web.secure_gateway_app import DeployedSecurePlasmaWebHandler
@@ -22,6 +22,15 @@ def test_phase3_handler_has_explicit_feature_composition() -> None:
     assert issubclass(DeployedSecurePlasmaWebHandler, PPUNetworkActivationSupportMixin)
 
 
+def test_phase2_startup_uses_explicit_runner_without_handler_global_replacement() -> None:
+    phase2 = (ROOT / "software/python/plasma_web/gateway_phase2.py").read_text(encoding="utf-8")
+
+    assert "serve_handler(" in phase2
+    assert "canonical_gateway.PlasmaWebHandler =" not in phase2
+    assert "canonical_gateway.main()" not in phase2
+    assert "_strip_phase2_options" not in phase2
+
+
 def test_phase3_startup_does_not_chain_or_replace_handler_globals() -> None:
     phase3 = (ROOT / "software/python/plasma_web/gateway_phase3.py").read_text(encoding="utf-8")
     secure = (ROOT / "software/python/plasma_web/secure_gateway_app.py").read_text(encoding="utf-8")
@@ -32,6 +41,29 @@ def test_phase3_startup_does_not_chain_or_replace_handler_globals() -> None:
     assert "canonical_gateway.PlasmaWebHandler =" not in phase3
     assert "gateway.PlasmaWebHandler =" not in secure
     assert "gateway.main(handler_class=DeployedSecurePlasmaWebHandler)" in secure
+
+
+def test_phase2_parser_retains_canonical_runtime_options() -> None:
+    args = gateway_phase2._parser().parse_args(
+        [
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "18080",
+            "--plasma-host",
+            "127.0.0.1",
+            "--plasma-port",
+            "9900",
+            "--network-activation-socket",
+            "/tmp/plasma-network.sock",
+            "--ppu-config",
+            "/tmp/ppu.yaml",
+            "--engineering-mock",
+        ]
+    )
+    assert args.port == 18080
+    assert args.plasma_port == 9900
+    assert args.engineering_mock is True
 
 
 def test_phase3_provider_modes_are_parser_mutually_exclusive() -> None:
