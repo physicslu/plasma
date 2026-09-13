@@ -9,6 +9,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/ppu-runtime.py"
@@ -29,6 +30,7 @@ on:
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
@@ -37,6 +39,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/ppu-runtime.py"
@@ -57,6 +60,7 @@ on:
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
@@ -88,13 +92,16 @@ jobs:
         run: |
           python -m py_compile scripts/z2-python-runtime.py
           python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
+          python -m py_compile scripts/ppu-bootstrap-deployment.py
           bash -n scripts/build-z2-python-runtime.sh
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
+          python scripts/ppu-bootstrap-deployment.py --help
           python -m pip install pytest
           python -m pytest -q \
             software/python/tests/test_z2_python_runtime_artifact.py \
-            software/python/tests/test_z2_ps_release_cache_contract.py
+            software/python/tests/test_z2_ps_release_cache_contract.py \
+            software/python/tests/test_z2_bootstrap_deployment_call_graph.py
 
       - name: Restore verified ARMv7 Python build cache
         id: z2-python-cache
@@ -194,6 +201,7 @@ jobs:
           software/python/tests/test_ppu_runtime.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
+          software/python/tests/test_z2_bootstrap_deployment_call_graph.py
           software/python/tests/test_z2_python_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py
           software/python/tests/test_plasmactl_deployment_profiles.py
@@ -241,6 +249,7 @@ jobs:
           mkdir -p "$root/scripts" "$root/artifacts" "$root/docs"
           cp scripts/plasmactl "$root/scripts/plasmactl"
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
+          cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
@@ -248,7 +257,8 @@ jobs:
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
-            "$root/scripts/ppu-z2-installer.py" "$root/scripts/z2-python-runtime.py"
+            "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
+            "$root/scripts/z2-python-runtime.py"
           test -f "$root/scripts/ppu-z2-installer-core.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
