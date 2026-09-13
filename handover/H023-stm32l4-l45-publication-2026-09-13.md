@@ -46,24 +46,26 @@ exact ICPNs: 446
 Base Devices: 138
 ```
 
+L4.5 translates the frozen L4.3 research verification labels into the established Production runtime `verified_*` provenance vocabulary. This normalization changes no identity, metadata, manufacturer authority, or L4.4 capability decision.
+
 Canonical hashes:
 
-- Git blob: `5548df18cd8a8797ad8d2c3d3160af1c4c85cfad`
-- SHA-256: `75062ea1ac51cfa66f0fd76025f74504aad92ea8f982f9b7b2c743ab541fe93e`
+- Git blob: `6cbb7ee5f5189c7d510623940a8945a2bde38399`
+- SHA-256: `f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c`
 
 Publication proposal:
 
-- Git blob: `0d849436a304e2363d30915cfdef54c1d6d6e3f7`
-- SHA-256: `2347bf8158e3ca6441ad8a6484130f3dfed98c3592a2ac9f4539a4768a97b16e`
+- Git blob: `24a3166fe302e60a184f8623a164e2a2df3b7afd`
+- SHA-256: `b390447109da6f836e06722a050cdec7c883f695d7f1df7c8be64eab356790d7`
 
 Publication audit:
 
-- Git blob: `8914420c67266234e5ef671ebff1e6156f856500`
-- SHA-256: `295d174fae4a02bd03c2ca3872b47e3dbc378afe3ebfc0aee07fd943fc81c7c4`
+- Git blob: `9bd87bffea6880bfa2e2d373f5ac0c33e02625da`
+- SHA-256: `0c6a0d9ebdc5d97a7238333592f298d786000df1b466e698996695192fe12053`
 
 Publication baseline Git blob:
 
-`dd031a661cf0c3734eb0dd3f6bd7d274de708c8f`
+`d43143e3f48a75c886810be1fc7b70061cc3966c`
 
 ## Production transition
 
@@ -87,8 +89,17 @@ STM32L4 Production: 446
 
 Post-publication manifest:
 
-- Git blob: `ee77f620ba77015382239c15bd6459aad60f19b0`
-- SHA-256: `bea4ef5bda39e26bf0a8aef9c2bee33c5b1233452f1f4b83c944495bc9a3f2e4`
+- Git blob: `1aa2311a25a69742c428147a402816ed5071e04e`
+- SHA-256: `b88adcb38f0833a25da1671592ea98496d61166b9d0e51877ffb92ad2820b9fe`
+
+## Integration repairs discovered by publication
+
+L4.5 exposed three stale/current-state boundaries and one real runtime-integration contract:
+
+1. cross-family prioritization now excludes STM32L4 from the future-family shortlist and leaves STM32L1 as the remaining standard shortlist family;
+2. historical L0.5 validation now permits later Production growth while preserving its frozen bytes and original poststate hard locks;
+3. historical L4.3 CI validates its frozen pre-publication manifest instead of incorrectly requiring all later transactions to have zero Production diff;
+4. STM32L4 publication provenance is normalized to the canonical runtime `verified_*` contract rather than weakening the runtime loader.
 
 ## Boundary
 
@@ -116,7 +127,7 @@ Publication means catalog identity availability only. L4.5 does **not** claim:
 - `.github/workflows/device-catalog-stm32l4-l45-publication-validation.yml`
 - `data/device-catalog/production/icpn-v1-manifest.json`
 
-The temporary materialization workflow removed itself after deterministic generation; permanent CI is read-only.
+Temporary materialization workflows removed themselves after deterministic generation; permanent CI is read-only.
 
 ## Continuation
 
