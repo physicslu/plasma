@@ -68,6 +68,7 @@ def test_phase3_configured_provider_is_opt_in_and_excludes_legacy_mock() -> None
 
     assert '"--engineering-configured-mock"' in text
     assert "ConfiguredMockEngineeringPPUProvider" in text
-    assert 'if "--engineering-mock" in sys.argv' in text
-    assert "mutually exclusive" in text
-    assert "canonical_gateway.serve(" in text
+    assert "add_mutually_exclusive_group" in text
+    assert '"--engineering-mock"' in text
+    assert "serve_handler(" in text
+    assert "phase2.main()" not in text.replace("gateway_phase2.main()", "")
