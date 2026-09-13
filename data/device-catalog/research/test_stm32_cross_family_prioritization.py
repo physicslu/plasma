@@ -13,32 +13,33 @@ from stm32_cross_family_prioritization import (
     build_prioritization,
 )
 
-CURRENT_SHORTLIST = ["STM32L1", "STM32L4"]
+CURRENT_SHORTLIST = ["STM32L1"]
 
 
 class STM32CrossFamilyPrioritizationTests(unittest.TestCase):
     def _current(self):
         return build_prioritization(catalog_path=DEFAULT_CATALOG, manifest_path=DEFAULT_MANIFEST)
 
-    def test_current_post_l0_inventory_and_shortlist_are_deterministic(self) -> None:
+    def test_current_post_l4_inventory_and_shortlist_are_deterministic(self) -> None:
         report = self._current()
         self.assertEqual(report["policy_id"], "stm32-cross-family-prioritization-v1")
-        self.assertEqual(report["production_invariants"]["exact_icpn_count"], 1272)
-        self.assertEqual(report["production_invariants"]["base_device_count"], 392)
+        self.assertEqual(report["production_invariants"]["exact_icpn_count"], 1718)
+        self.assertEqual(report["production_invariants"]["base_device_count"], 530)
         self.assertEqual(report["production_invariants"]["production_series"], [
             "STM32C0", "STM32F0", "STM32F1", "STM32F2", "STM32F3",
-            "STM32F4", "STM32F7", "STM32G0", "STM32G4", "STM32L0", "STM32U0",
+            "STM32F4", "STM32F7", "STM32G0", "STM32G4", "STM32L0", "STM32L4", "STM32U0",
         ])
         self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32U0"], 68)
         self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32C0"], 209)
         self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L0"], 360)
-        self.assertEqual(report["inventory"]["candidate_series_count"], 12)
-        self.assertEqual(report["inventory"]["candidate_source_row_count"], 1060)
-        self.assertEqual(report["inventory"]["candidate_ordering_pattern_rows"], 691)
-        self.assertEqual(report["inventory"]["shortlist_eligible_series_count"], 2)
+        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L4"], 446)
+        self.assertEqual(report["inventory"]["candidate_series_count"], 11)
+        self.assertEqual(report["inventory"]["candidate_source_row_count"], 805)
+        self.assertEqual(report["inventory"]["candidate_ordering_pattern_rows"], 484)
+        self.assertEqual(report["inventory"]["shortlist_eligible_series_count"], 1)
         self.assertEqual(report["inventory"]["cohort_counts"], {
             "high_complexity_requires_partitioned_scope": 1,
-            "standard_nonwireless_research": 2,
+            "standard_nonwireless_research": 1,
             "trustzone_requires_security_scope": 3,
             "wireless_requires_dedicated_scope": 6,
         })
@@ -50,6 +51,7 @@ class STM32CrossFamilyPrioritizationTests(unittest.TestCase):
         self.assertNotIn("STM32U0", candidates)
         self.assertNotIn("STM32C0", candidates)
         self.assertNotIn("STM32L0", candidates)
+        self.assertNotIn("STM32L4", candidates)
         self.assertIsNone(report["selected_next_research_family"])
         self.assertTrue(all(value is False for value in report["claims"].values()))
 
@@ -109,7 +111,7 @@ class STM32CrossFamilyPrioritizationTests(unittest.TestCase):
 
     def test_shortlist_never_becomes_selection_or_programming_claim(self) -> None:
         report = self._current()
-        self.assertEqual(len(report["research_shortlist"]), 2)
+        self.assertEqual(len(report["research_shortlist"]), 1)
         self.assertEqual(
             [item["plasma_series"] for item in report["research_shortlist"]],
             CURRENT_SHORTLIST,

@@ -12,7 +12,7 @@ This directory contains numbered engineering handover documents intended to let 
 | [H004](H004-real-z2-managed-ps-control-station-2026-09-10.md) | 2026-09-10 | Real PYNQ-Z2 PS qualification, macOS Control Station Managed routing, PR #450, and CI cache follow-up | Current | Continue PR #451 or formal Plasma PS<->PL loopback qualification |
 | [H005](H005-nxp-kl25-live-semantic-qualification-2026-09-10.md) | 2026-09-10 | NXP KL25 live bounded semantic qualification through Gate 5.7A | Current | Continue Gate 5.8 manufacturer-evidence semantic/citation review |
 | [H006](H006-stm32-next-family-evidence-selection-2026-09-10.md) | 2026-09-10 | STM32 cross-family evidence accessibility, U0/C0 Ordering Information review, and historical next-family research selection | Superseded by H012/H013 | Retain as historical U0/C0 selection evidence |
-| [H007](H007-vendor-neutral-ic-admission-handover-2026-09-10.md) | 2026-09-10 | Vendor-neutral admission architecture and NXP KL25 compatibility plan before PR-B/PR-C/PR-D closure | Superseded by H008 | Use H008 for current continuation state; retain H007 as history |
+| [H007](H007-vendor-neutral-ic-admission-handover-2026-09-10.md) | 2026-09-10 | Vendor-neutral admission architecture and NXP KL25 compatibility plan before PR-A/PR-B/PR-C/PR-D closure | Superseded by H008 | Use H008 for current continuation state; retain H007 as history |
 | [H008](H008-ic-support-architecture-freeze-v1-2026-09-11.md) | 2026-09-11 | Vendor-neutral IC Support Architecture Freeze v1 after PR-A/PR-B/PR-C/PR-D | Current | Define a bounded first real-hardware qualification Gate 1 for one exact target and narrow operation set |
 | [H009](H009-stm32c0-c03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32C0 C0.3 manufacturer-authoritative metadata policy over the retained C0.2 commercial set | Superseded by H010 | Retain as C0.3 history |
 | [H010](H010-stm32c0-c04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32C0 C0.4 exact-ICPN read-only capability/admission plan | Superseded by H011 | Retain as C0.4 history |
@@ -26,15 +26,16 @@ This directory contains numbered engineering handover documents intended to let 
 | [H018](H018-stm32-post-l0-next-family-selection-2026-09-12.md) | 2026-09-12 | Post-L0 L1/L4 retained official-ST evidence replay and deterministic STM32L4 selection | Complete; PR #517 merged | Retain as STM32L4 selection history |
 | [H019](H019-stm32l4-l41-foundation-2026-09-13.md) | 2026-09-13 | STM32L4 L4.1 bounded research foundation | Complete; PR #520 merged | Retain as L4.1 foundation history |
 | [H020](H020-stm32l4-l42-commercial-discovery-2026-09-13.md) | 2026-09-13 | STM32L4 L4.2 manufacturer-authoritative commercial discovery with targeted timeout recovery | Complete; PR #521 merged | Retain as L4.2 discovery history |
-| [H021](H021-stm32l4-l43-metadata-policy-2026-09-13.md) | 2026-09-13 | STM32L4 L4.3 manufacturer-authoritative metadata policy with three exact-part manufacturer exceptions | Complete; PR #530 merged | Retain as L4.3 metadata history; use H022 |
-| [H022](H022-stm32l4-l44-admission-plan-2026-09-13.md) | 2026-09-13 | STM32L4 L4.4 exact-ICPN read-only capability/admission plan | Current; PR #534 Gate 2 candidate | Recheck final head/current main/applicable CI/mergeability/reviews and zero Production diff, then obtain explicit Gate 2 merge approval |
+| [H021](H021-stm32l4-l43-metadata-policy-2026-09-13.md) | 2026-09-13 | STM32L4 L4.3 manufacturer-authoritative metadata policy with three exact-part manufacturer exceptions | Complete; PR #530 merged | Retain as L4.3 metadata history |
+| [H022](H022-stm32l4-l44-admission-plan-2026-09-13.md) | 2026-09-13 | STM32L4 L4.4 exact-ICPN read-only capability/admission plan | Complete; PR #534 merged | Retain as L4.4 admission history; use H023 |
+| [H023](H023-stm32l4-l45-publication-2026-09-13.md) | 2026-09-13 | STM32L4 L4.5 controlled publication of 446 capability-admittable exact ICPNs | Current; PR #535 Gate 2 candidate | Recheck final head/current main/applicable CI/mergeability/reviews and exact +446 Production delta, then obtain explicit Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H022 and AGENTS.md, verify PR #534 final head/current main/applicable CI/mergeability/reviews and zero Production diff, then continue the Gate 2 transaction. Do not merge or start L4.5 without explicit approval.
+Read repo handover H023 and AGENTS.md, verify PR #535 final head/current main/applicable CI/mergeability/reviews and exact +446 STM32L4 Production delta, then continue the Gate 2 transaction. Do not merge or start a new STM32 selection/hardware qualification transaction without explicit approval.
 ```
 
 For IC Support Architecture / hardware qualification:

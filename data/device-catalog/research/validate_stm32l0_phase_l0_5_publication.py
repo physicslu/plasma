@@ -83,25 +83,30 @@ def main() -> int:
         raise RuntimeError("L0.5 publication audit bytes drifted")
 
     summary = verify_current_publication()
-    if summary != {
+    historical = {
         "status": "valid",
         "phase": "L0.5",
-        "published_exact_icpns": 360,
-        "published_base_devices": 99,
-        "production_exact_icpns": 1272,
-        "production_base_devices": 392,
-        "production_family_count": 11,
-        "stm32l0_production": 360,
-    }:
-        raise RuntimeError(f"L0.5 current publication summary drifted: {summary}")
+        "published_exact_icpns": EXPECTED_PUBLISHED_ROWS,
+        "published_base_devices": EXPECTED_PUBLISHED_BASES,
+        "stm32l0_production": EXPECTED_PUBLISHED_ROWS,
+    }
+    for key, value in historical.items():
+        if summary.get(key) != value:
+            raise RuntimeError(f"L0.5 current publication {key} drifted: {summary}")
+    if summary.get("production_exact_icpns", -1) < EXPECTED_POSTSTATE[0]:
+        raise RuntimeError(f"L0.5 current Production exact count regressed: {summary}")
+    if summary.get("production_base_devices", -1) < EXPECTED_POSTSTATE[1]:
+        raise RuntimeError(f"L0.5 current Production Base Device count regressed: {summary}")
+    if summary.get("production_family_count", -1) < EXPECTED_POSTSTATE[2]:
+        raise RuntimeError(f"L0.5 current Production family count regressed: {summary}")
 
     print("STM32L0 L0.5 publication: VALID")
-    print("Published exact ICPNs: 360")
-    print("Published Base Devices: 99")
-    print("Production exact ICPNs: 1272")
-    print("Production Base Devices: 392")
-    print("STM32 families: 11")
-    print("STM32L0 Production: 360")
+    print(f"Published exact ICPNs: {EXPECTED_PUBLISHED_ROWS}")
+    print(f"Published Base Devices: {EXPECTED_PUBLISHED_BASES}")
+    print(f"Current Production exact ICPNs: {summary['production_exact_icpns']}")
+    print(f"Current Production Base Devices: {summary['production_base_devices']}")
+    print(f"Current STM32 families: {summary['production_family_count']}")
+    print(f"STM32L0 Production: {summary['stm32l0_production']}")
     print("PPU/Socket/HIL/runtime support claimed: false")
     return 0
 
