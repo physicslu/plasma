@@ -25,6 +25,10 @@ function catalog(provider = "mock") {
     facility_count: 1,
     ppu_count: 1,
     site_count: 2,
+    programming_capabilities: provider === "mock" ? {
+      synthetic_programming_image: true,
+      target_device_required: false,
+    } : undefined,
     programming_asset_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,

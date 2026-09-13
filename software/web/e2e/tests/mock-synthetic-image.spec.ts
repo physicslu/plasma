@@ -24,6 +24,10 @@ function catalog() {
     facility_count: 1,
     ppu_count: 1,
     site_count: 2,
+    programming_capabilities: {
+      synthetic_programming_image: true,
+      target_device_required: false,
+    },
     programming_asset_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,

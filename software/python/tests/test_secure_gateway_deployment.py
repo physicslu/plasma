@@ -131,8 +131,9 @@ def test_secure_launcher_keeps_gateway_created_material_owner_only(
     monkeypatch.setenv("PLASMA_SECURITY_STATE", str(state_path))
     original_handler = secure_gateway_app.gateway.PlasmaWebHandler
 
-    def fake_gateway_main() -> None:
-        assert secure_gateway_app.gateway.PlasmaWebHandler is DeployedSecurePlasmaWebHandler
+    def fake_gateway_main(*, handler_class) -> None:
+        assert handler_class is DeployedSecurePlasmaWebHandler
+        assert secure_gateway_app.gateway.PlasmaWebHandler is original_handler
         output_path.write_bytes(b"target-readback")
 
     monkeypatch.setattr(secure_gateway_app.gateway, "main", fake_gateway_main)

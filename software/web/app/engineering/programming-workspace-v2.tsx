@@ -34,6 +34,7 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
+import { resolveProgrammingCapabilities } from "../programming-capabilities";
 import type { BatchSiteSnapshot } from "../server-batch-api";
 import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
 import {
@@ -287,7 +288,8 @@ export default function ProgrammingWorkspaceV2() {
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
-  const syntheticMockImageAvailable = selectedPPU?.provider === "mock";
+  const programmingCapabilities = resolveProgrammingCapabilities(catalog);
+  const syntheticProgrammingImageAvailable = programmingCapabilities.synthetic_programming_image;
   const targetSelectionKey = selection.facilityId && selection.ppuId
     ? `${selection.facilityId}/${selection.ppuId}`
     : null;
@@ -312,7 +314,7 @@ export default function ProgrammingWorkspaceV2() {
     selectedSiteCount: selectedSiteIds.length,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
-    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable || Boolean(batchSnapshot?.asset),
+    imagePresent: Boolean(imageAsset) || syntheticProgrammingImageAvailable || Boolean(batchSnapshot?.asset),
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
     readSelected: selectedOperations.includes("read"),
     readParamsValid: true,
@@ -765,7 +767,7 @@ export default function ProgrammingWorkspaceV2() {
     if (!targetApiBase || connection !== "online" || !site.enabled || isRunning(site)) return true;
     if (batchRunning) return true;
     if (submittingSiteIds.includes(site.id)) return true;
-    if ((operation === "program" || operation === "verify") && !imageAsset && !syntheticMockImageAvailable) return true;
+    if ((operation === "program" || operation === "verify") && !imageAsset && !syntheticProgrammingImageAvailable) return true;
     if ((operation === "program" || operation === "verify") && Boolean(imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES)) return true;
     return false;
   }
@@ -779,7 +781,7 @@ export default function ProgrammingWorkspaceV2() {
     try {
       const usesSyntheticImage = (operation === "program" || operation === "verify")
         && !imageAsset
-        && syntheticMockImageAvailable;
+        && syntheticProgrammingImageAvailable;
       if (usesSyntheticImage) {
         appendLog(`[IMG] SYNTHETIC · ${siteLabel(siteId)} · ${operation.toUpperCase()} · Mock Settings Default Image Size`);
       }
@@ -921,7 +923,7 @@ export default function ProgrammingWorkspaceV2() {
         },
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
-        allowSyntheticMockImage: syntheticMockImageAvailable,
+        allowSyntheticMockImage: syntheticProgrammingImageAvailable,
       });
       const mockRevision = accepted.mock_runtime?.profile_revision;
       appendLog(
@@ -958,7 +960,7 @@ export default function ProgrammingWorkspaceV2() {
 
   const displayedImageName = imageAsset?.name
     ?? batchSnapshot?.asset?.name
-    ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "Select programming image (.bin)...");
+    ?? (requiresImage && syntheticProgrammingImageAvailable ? syntheticImageLabel : "Select programming image (.bin)...");
 
   return (
     <section className="engineeringProgramming engineeringProgrammingV2">
@@ -1044,8 +1046,8 @@ export default function ProgrammingWorkspaceV2() {
               image={{
                 name: displayedImageName,
                 title: displayedImageName,
-                source: imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
-                hint: syntheticMockImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin).",
+                source: imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticProgrammingImageAvailable ? "mock_synthetic" : "none",
+                hint: syntheticProgrammingImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin).",
                 browseLabel: "Browse...",
                 browseDisabled: targetLocked,
                 inputDisabled: targetLocked,

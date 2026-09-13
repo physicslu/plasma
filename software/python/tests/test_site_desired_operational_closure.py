@@ -92,9 +92,10 @@ def test_ppu_runtime_manifest_requires_gateway_and_server_config_identity() -> N
     assert gateway_args[index + 1] == "<ppu-config>"
 
 
-def test_real_z2_verify_checks_p2_service_and_evidence_boundaries() -> None:
+def test_real_z2_verify_checks_p3_service_evidence_and_socket_boundaries() -> None:
     source = Z2_CONTROL.read_text(encoding="utf-8")
     assert "verify_site_desired_operational_contract" in source
+    assert "verify_p3_runtime_activation_contract" in source
     assert "gateway --ppu-config $ppu_config" in source
     assert "server --config $ppu_config" in source
     assert "PPU config root must be mode 0770" in source
@@ -103,7 +104,19 @@ def test_real_z2_verify_checks_p2_service_and_evidence_boundaries() -> None:
     assert "site_desired_state.config_path" in source
     assert "site_desired_state.gateway_write_root" in source
     assert "site_desired_state.runtime_apply_supported" in source
-    assert "Runtime apply" in source
+    assert "install evidence must advertise bounded Site Desired Runtime activation" in source
+    assert "site_desired_state.runtime_activation_socket" in source
+    assert "site_desired_state.server_control_socket" in source
+    assert "runtime_activation.lifecycle_owner" in source
+    assert "runtime_activation.scope" in source
+    assert "runtime_activation.server_authoritative_quiesce" in source
+    assert "runtime_activation.quiesce_ttl_bounded" in source
+    assert "plasma-runtime-activation.service is not active" in source
+    assert "Plasma Server control socket must be mode 0600" in source
+    assert "runtime activation helper socket must be mode 0660" in source
+    assert "controlled activation behavior requires explicit Real Z2 acceptance" in source
+    assert "Runtime apply is not claimed" not in source
+    assert "install evidence must keep Site Desired Runtime apply unsupported" not in source
 
 
 def test_swpc_surrogate_matches_bounded_site_config_contract_and_rolls_permissions_back() -> None:

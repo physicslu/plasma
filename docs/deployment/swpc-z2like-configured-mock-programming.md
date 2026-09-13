@@ -110,7 +110,13 @@ The activation is implemented as an explicit systemd drop-in for `plasma-web.ser
 sudo bash scripts/plasmactl-swpc-z2like-programming remove
 ```
 
-A later `swpc-z2like` release deployment may change the isolated Plasma Python path or Gateway command. Re-run the Programming `install` command after a base profile upgrade so the drop-in is regenerated from current installation evidence.
+Once Programming has been explicitly enabled, normal release upgrades are one operation:
+
+```bash
+sudo ./scripts/plasmactl deploy swpc-z2like
+```
+
+The top-level SWPC profile orchestrator reads the declared add-on state before deployment, upgrades the immutable base runtime, then regenerates and verifies the configured Mock Programming activation against the new base evidence. Operators do **not** need to manually repeat `plasmactl-swpc-z2like-programming install` after every base upgrade. Fresh installs remain fail-closed: the orchestrator preserves previously enabled capabilities but never enables Programming merely because the base profile exists.
 
 ## Render acceptance
 

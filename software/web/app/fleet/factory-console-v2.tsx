@@ -20,6 +20,7 @@ import type {
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
+import { resolveProgrammingCapabilities } from "../programming-capabilities";
 import {
   cancelServerBatch,
   createServerBatch,
@@ -665,6 +666,34 @@ export default function FactoryConsoleV2() {
   const batchRunning = serverBatchRunning || batchSubmitting || batchAborting;
 
   useEffect(() => {
+    if (batchRunning) return;
+    setBatchSelection(current => {
+      const next: SelectionMap = {};
+      for (const [facilityId, ppus] of Object.entries(current)) {
+        for (const [ppuId, siteIds] of Object.entries(ppus)) {
+          const runtime = runtimes[targetKey(facilityId, ppuId)];
+          if (!runtime || runtime.loading || runtime.error) {
+            if (siteIds.length > 0) {
+              next[facilityId] ??= {};
+              next[facilityId][ppuId] = [...siteIds];
+            }
+            continue;
+          }
+          const enabledSiteIds = new Set(runtime.sites.filter(site => site.enabled).map(site => site.id));
+          const enabledSelection = siteIds.filter(siteId => enabledSiteIds.has(siteId));
+          if (enabledSelection.length > 0) {
+            next[facilityId] ??= {};
+            next[facilityId][ppuId] = enabledSelection;
+          }
+        }
+      }
+      const normalizedCurrent = normalizeSelection(current);
+      const normalizedNext = normalizeSelection(next);
+      return JSON.stringify(normalizedCurrent) === JSON.stringify(normalizedNext) ? current : normalizedNext;
+    });
+  }, [batchRunning, batchSelection, runtimes, setBatchSelection]);
+
+  useEffect(() => {
     if (!serverBatchRunning || !batchSnapshot?.started_at) return;
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -758,14 +787,15 @@ export default function FactoryConsoleV2() {
     });
   });
   const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
-  const syntheticMockImageAvailable = catalog?.provider === "mock";
+  const programmingCapabilities = resolveProgrammingCapabilities(catalog);
+  const syntheticProgrammingImageAvailable = programmingCapabilities.synthetic_programming_image;
   const batchReadiness = evaluateBatchReadiness({
     providerOnline: gatewayHealth === "online" && Boolean(catalog && !providerError),
-    targetValid: syntheticMockImageAvailable || Boolean(targetDevice),
+    targetValid: !programmingCapabilities.target_device_required || Boolean(targetDevice),
     selectedSiteCount: batchCounts.sites,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
-    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable,
+    imagePresent: Boolean(imageAsset) || syntheticProgrammingImageAvailable,
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_BYTES,
     readSelected: selectedOperations.includes("read"),
     readParamsValid: true,
@@ -912,7 +942,7 @@ export default function FactoryConsoleV2() {
 
   async function executeBatch() {
     if (!catalog || batchRunning) return;
-    if (!targetDevice && !syntheticMockImageAvailable) {
+    if (!targetDevice && programmingCapabilities.target_device_required) {
       setOperatorWarning(text.chooseTarget);
       return;
     }
@@ -947,7 +977,7 @@ export default function FactoryConsoleV2() {
     setBatchObservationState("connected");
     beginActivity();
     setBatchCommandState("submitting");
-    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice ? targetDevice.icpn ?? targetDevice.identifier : "MOCK"}`);
+    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice?.icpn ?? targetDevice?.identifier ?? "provider default"}`);
     try {
       const batchSessionId = requiresImage && !sessionId
         ? await ensureEngineeringSession(apiBase)
@@ -959,7 +989,7 @@ export default function FactoryConsoleV2() {
         executionPolicy,
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
-        allowSyntheticMockImage: syntheticMockImageAvailable,
+        allowSyntheticMockImage: syntheticProgrammingImageAvailable,
       });
       setGatewayHealth("online");
       applyBatchSnapshot(accepted, catalog);
@@ -1138,9 +1168,9 @@ export default function FactoryConsoleV2() {
               targetLabel={text.targetIc}
               imageLabel={text.image}
               image={{
-                name: imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
+                name: imageAsset?.name ?? (requiresImage && syntheticProgrammingImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
                 title: imageAsset?.name,
-                source: imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
+                source: imageAsset ? "user" : requiresImage && syntheticProgrammingImageAvailable ? "mock_synthetic" : "none",
                 hint: text.imageHint,
                 browseLabel: text.browse,
                 browseDisabled: batchRunning,

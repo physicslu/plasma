@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+base_backend="${PLASMA_SWPC_Z2LIKE_BASE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
+programming_backend="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-programming}"
+managed_backend="${PLASMA_SWPC_Z2LIKE_MANAGED_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-managed-ingress}"
+programming_dropin="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_DROPIN:-/etc/systemd/system/plasma-web.service.d/30-z2like-configured-mock-programming.conf}"
+programming_marker="# Managed by Plasma SWPC Z2-like configured Mock Programming activation"
+managed_nginx_conf="${PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf}"
+managed_evidence="${PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE:-/opt/plasma/install/swpc-z2like-managed-ingress.json}"
+managed_marker="# Managed by Plasma SWPC Z2-like managed programming ingress"
+
+say() {
+  printf '[plasmactl swpc-z2like-profile] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl swpc-z2like-profile] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_backend() {
+  local path="$1" label="$2"
+  [[ -f "$path" ]] || die "$label backend is missing: $path"
+}
+
+programming_desired() {
+  [[ -e "$programming_dropin" ]] || return 1
+  [[ -f "$programming_dropin" ]] || die "Programming activation path is not a regular file: $programming_dropin"
+  grep -Fxq "$programming_marker" "$programming_dropin" || \
+    die "Programming activation exists but is not Plasma-owned: $programming_dropin"
+  return 0
+}
+
+managed_desired() {
+  local conf=0 evidence=0
+  [[ -e "$managed_nginx_conf" ]] && conf=1
+  [[ -e "$managed_evidence" ]] && evidence=1
+  if (( conf != evidence )); then
+    die "managed Programming ingress state is incomplete; config/evidence must exist together"
+  fi
+  (( conf )) || return 1
+  [[ -f "$managed_nginx_conf" ]] || die "managed ingress path is not a regular file: $managed_nginx_conf"
+  [[ -f "$managed_evidence" ]] || die "managed ingress evidence is not a regular file: $managed_evidence"
+  grep -Fxq "$managed_marker" "$managed_nginx_conf" || \
+    die "managed Programming ingress exists but is not Plasma-owned: $managed_nginx_conf"
+  return 0
+}
+
+capture_desired_state() {
+  programming_was_enabled=0
+  managed_was_enabled=0
+  if programming_desired; then programming_was_enabled=1; fi
+  if managed_desired; then managed_was_enabled=1; fi
+}
+
+reconcile_addons() {
+  if (( programming_was_enabled )); then
+    say "reconciling configured Mock Programming against the deployed base release"
+    bash "$programming_backend" install
+    bash "$programming_backend" verify
+  fi
+  if (( managed_was_enabled )); then
+    say "reconciling managed Programming ingress against the deployed base release"
+    bash "$managed_backend" install
+    bash "$managed_backend" verify
+  fi
+}
+
+verify_profile() {
+  capture_desired_state
+  bash "$base_backend" verify "$@"
+  if (( programming_was_enabled )); then
+    bash "$programming_backend" verify
+  fi
+  if (( managed_was_enabled )); then
+    bash "$managed_backend" verify
+  fi
+  say "PASS: declared SWPC Z2-like profile state is coherent"
+}
+
+deploy_profile() {
+  capture_desired_state
+  say "declared add-ons before deploy: Programming=$programming_was_enabled ManagedIngress=$managed_was_enabled"
+  bash "$base_backend" deploy "$@"
+  reconcile_addons
+  verify_profile "$@"
+  say "deployment complete; base runtime and previously enabled add-ons were reconciled in one operation"
+}
+
+status_profile() {
+  capture_desired_state
+  bash "$base_backend" status "$@"
+  printf '[plasmactl swpc-z2like-profile] Programming desired: %s\n' "$programming_was_enabled"
+  printf '[plasmactl swpc-z2like-profile] Managed ingress desired: %s\n' "$managed_was_enabled"
+  if (( programming_was_enabled )); then bash "$programming_backend" status; fi
+  if (( managed_was_enabled )); then bash "$managed_backend" status; fi
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-swpc-z2like-orchestrator COMMAND [base-profile options]
+
+Commands:
+  install   First provision of the base SWPC Z2-like profile; add-ons remain opt-in
+  deploy    Deploy base runtime, then reconcile and verify all previously enabled add-ons
+  verify    Verify base runtime plus every currently declared add-on
+  status    Show base status and declared add-on state
+
+The orchestrator preserves each declared add-on independently. It never enables
+configured Mock Programming or managed ingress merely because a fresh base
+profile was installed.
+EOF
+}
+
+require_backend "$base_backend" "base SWPC Z2-like"
+require_backend "$programming_backend" "configured Mock Programming"
+require_backend "$managed_backend" "managed Programming ingress"
+programming_was_enabled=0
+managed_was_enabled=0
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  install) bash "$base_backend" install "$@" ;;
+  deploy) deploy_profile "$@" ;;
+  verify) verify_profile "$@" ;;
+  status) status_profile "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "unknown command: $command" ;;
+esac

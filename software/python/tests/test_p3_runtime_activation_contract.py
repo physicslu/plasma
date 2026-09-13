@@ -67,6 +67,31 @@ def test_z2_installer_preserves_existing_desired_state_and_bounds_privilege() ->
     assert 'systemctl("enable", "--now", RUNTIME_ACTIVATION_SERVICE)' not in source
 
 
+def test_z2_verifier_accepts_p3_installer_evidence_and_checks_runtime_wiring() -> None:
+    installer = (ROOT / "scripts/ppu-z2-installer.py").read_text(encoding="utf-8")
+    control = (ROOT / "scripts/plasmactl-z2-ps").read_text(encoding="utf-8")
+
+    assert 'site_state["runtime_apply_supported"] = True' in installer
+    assert 'site_state["runtime_activation_socket"] = str(RUNTIME_ACTIVATION_SOCKET)' in installer
+    assert 'site_state["server_control_socket"] = str(SERVER_CONTROL_SOCKET)' in installer
+    assert '"lifecycle_owner": "plasma-web.service"' in installer
+    assert '"scope": "restart-plasma-server-only"' in installer
+    assert '"server_authoritative_quiesce": True' in installer
+    assert '"quiesce_ttl_bounded": True' in installer
+
+    assert "verify_p3_runtime_activation_contract" in control
+    assert "install evidence must advertise bounded Site Desired Runtime activation" in control
+    assert "site_desired_state.runtime_activation_socket" in control
+    assert "site_desired_state.server_control_socket" in control
+    assert "runtime_activation.lifecycle_owner" in control
+    assert "runtime_activation.scope" in control
+    assert "runtime_activation.server_authoritative_quiesce" in control
+    assert "runtime_activation.quiesce_ttl_bounded" in control
+    assert "plasma-runtime-activation.service is not active" in control
+    assert "runtime activation helper socket must be mode 0660" in control
+    assert "Runtime apply is not claimed" not in control
+
+
 def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state() -> None:
     installer = (ROOT / "scripts/swpc-z2like-ppu-install.sh").read_text(encoding="utf-8")
     control = (ROOT / "scripts/plasmactl-swpc-z2like").read_text(encoding="utf-8")
