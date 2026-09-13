@@ -85,9 +85,35 @@
   font-weight: 900;
 }
 
+.batchSummaryYieldNote {
+  margin: 0;
+  padding: 0 10px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--text-soft, #425466);
+  font-size: var(--operator-helper-font-size);
+  line-height: 1.35;
+}
+
+.batchSummaryYieldNote b {
+  flex: 0 0 auto;
+  color: var(--text, #172033);
+  font-weight: 850;
+}
+
+.batchSummaryYieldNote span {
+  min-width: 0;
+}
+
 [data-theme="dark"] .batchSummary.has-title {
   border-color: var(--line);
   background: var(--panel);
+}
+
+[data-theme="dark"] .batchSummaryYieldNote,
+[data-theme="dark"] .batchSummaryYieldNote b {
+  color: var(--text);
 }
 
 @container (max-width: 1050px) {
@@ -99,5 +125,10 @@
 @container (max-width: 700px) {
   .batchSummaryGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batchSummaryYieldNote {
+    display: grid;
+    gap: 2px;
   }
 }

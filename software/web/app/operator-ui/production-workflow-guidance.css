@@ -1,0 +1,122 @@
+/*
+ * PMode-only operation guidance layered on the existing Factory Console DOM.
+ *
+ * This file is presentation-only. It must not redefine Batch readiness,
+ * Production Set membership, dispatch, cancellation, or Yield calculations.
+ */
+
+.factoryConsoleV2 .productionSiteSelection::before {
+  content: "1 SELECT SITES  →  2 SET PRODUCTION SITES  →  3 CONFIGURE IC / IMAGE / OPS  →  4 START PROGRAMMING";
+  display: block;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line, #d4dee8);
+  background: linear-gradient(90deg, #eff6ff, #f8fafc);
+  color: #24415d;
+  font-family: var(--font-sans), Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.3;
+  letter-spacing: .025em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[lang="zh-TW"] .factoryConsoleV2 .productionSiteSelection::before {
+  content: "1 選設備 / Site  →  2 SET 生產範圍  →  3 選 IC / Image / 操作  →  4 開始燒錄";
+}
+
+.factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small {
+  max-width: min(48vw, 560px);
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid #9fc3ea;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4f91;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+}
+
+.factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small::before {
+  content: "SCOPE · ";
+  flex: 0 0 auto;
+  margin-right: 3px;
+  color: #1d4ed8;
+  font-weight: 900;
+}
+
+html[lang="zh-TW"] .factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small::before {
+  content: "範圍 · ";
+}
+
+.factoryConsoleV2 .productionTreeToolbar .commitProductionSet:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .12), 0 2px 6px rgba(37, 99, 235, .16);
+}
+
+.factoryConsoleV2 .factoryLiveStatus .factoryLegend::after {
+  content: "FAIL = DUT / Site programming failure · ERROR = equipment / communication failure · ERROR is excluded from DUT FAIL and Yield.";
+  flex: 1 0 100%;
+  margin-top: 1px;
+  color: #59697a;
+  font-size: 8px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: right;
+}
+
+html[lang="zh-TW"] .factoryConsoleV2 .factoryLiveStatus .factoryLegend::after {
+  content: "FAIL = 晶片 / Site 燒錄失敗 · ERROR = 設備 / 通訊異常 · ERROR 不計入 DUT FAIL 與 Yield。";
+}
+
+/* Keep manufacturing failure red; distinguish infrastructure/communication ERROR in orange. */
+.factoryConsoleV2 .factoryLiveStatus .factoryLegend i[data-state="error"],
+.factoryConsoleV2 .factoryLiveStatus .factorySiteLed[data-state="error"] i {
+  background: #f97316;
+  box-shadow: 0 0 7px rgba(249, 115, 22, .5);
+}
+
+.factoryConsoleV2 .factoryLiveStatus .factorySiteLedCard.state-error {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+[data-theme="dark"] .factoryConsoleV2 .productionSiteSelection::before {
+  border-color: var(--line);
+  background: linear-gradient(90deg, rgba(37, 99, 235, .16), var(--panel-2));
+  color: var(--text);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small {
+  border-color: #355e8e;
+  background: rgba(37, 99, 235, .12);
+  color: var(--text);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small::before {
+  color: #79aef3;
+}
+
+[data-theme="dark"] .factoryConsoleV2 .factoryLiveStatus .factoryLegend::after {
+  color: var(--text-soft);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .factoryLiveStatus .factorySiteLedCard.state-error {
+  border-color: #9a5d2b;
+  background: color-mix(in srgb, #f97316 9%, var(--panel));
+}
+
+@media (max-width: 760px) {
+  .factoryConsoleV2 .productionSiteSelection::before {
+    white-space: normal;
+  }
+
+  .factoryConsoleV2 .productionSiteSelection .operatorPanelTitle > small {
+    max-width: 100%;
+  }
+
+  .factoryConsoleV2 .factoryLiveStatus .factoryLegend::after {
+    text-align: left;
+  }
+}
