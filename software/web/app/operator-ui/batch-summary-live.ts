@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type BatchSummaryLiveChannel = "production" | "engineering";
+export type BatchSummaryLiveScope = "production" | "engineering";
 
 export type BatchSummaryLiveMetrics = {
   sites: number;
@@ -8,12 +8,12 @@ export type BatchSummaryLiveMetrics = {
   totalIc: number;
 };
 
-const snapshots: Record<BatchSummaryLiveChannel, BatchSummaryLiveMetrics | null> = {
+const snapshots: Record<BatchSummaryLiveScope, BatchSummaryLiveMetrics | null> = {
   production: null,
   engineering: null,
 };
 
-const listeners: Record<BatchSummaryLiveChannel, Set<() => void>> = {
+const listeners: Record<BatchSummaryLiveScope, Set<() => void>> = {
   production: new Set(),
   engineering: new Set(),
 };
@@ -26,36 +26,36 @@ function equalMetrics(left: BatchSummaryLiveMetrics | null, right: BatchSummaryL
     && left.totalIc === right.totalIc;
 }
 
-export function batchSummaryChannelFromAriaLabel(ariaLabel: string): BatchSummaryLiveChannel | null {
+export function batchSummaryScopeFromAriaLabel(ariaLabel: string): BatchSummaryLiveScope | null {
   if (ariaLabel === "Production Batch Summary") return "production";
   if (ariaLabel === "Engineering Batch Summary") return "engineering";
   return null;
 }
 
 export function publishBatchSummaryLiveMetrics(
-  channel: BatchSummaryLiveChannel,
+  scope: BatchSummaryLiveScope,
   metrics: BatchSummaryLiveMetrics,
 ): void {
-  if (equalMetrics(snapshots[channel], metrics)) return;
-  snapshots[channel] = metrics;
-  listeners[channel].forEach(listener => listener());
+  if (equalMetrics(snapshots[scope], metrics)) return;
+  snapshots[scope] = metrics;
+  listeners[scope].forEach(listener => listener());
 }
 
-export function clearBatchSummaryLiveMetrics(channel: BatchSummaryLiveChannel): void {
-  if (snapshots[channel] === null) return;
-  snapshots[channel] = null;
-  listeners[channel].forEach(listener => listener());
+export function clearBatchSummaryLiveMetrics(scope: BatchSummaryLiveScope): void {
+  if (snapshots[scope] === null) return;
+  snapshots[scope] = null;
+  listeners[scope].forEach(listener => listener());
 }
 
 export function useBatchSummaryLiveMetrics(
-  channel: BatchSummaryLiveChannel,
+  scope: BatchSummaryLiveScope,
 ): BatchSummaryLiveMetrics | null {
   return useSyncExternalStore(
     listener => {
-      listeners[channel].add(listener);
-      return () => listeners[channel].delete(listener);
+      listeners[scope].add(listener);
+      return () => listeners[scope].delete(listener);
     },
-    () => snapshots[channel],
+    () => snapshots[scope],
     () => null,
   );
 }
