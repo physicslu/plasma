@@ -1,8 +1,8 @@
 {
   "admission_plan_git_blob_sha": "ec660436dd6866abca28a63d6bac774f9ab50e49",
   "admission_plan_sha256": "a67e771631e1db58a30210866070916e671369693ce8eb90bcd4196b16892f58",
-  "canonical_csv_git_blob_sha": "5548df18cd8a8797ad8d2c3d3160af1c4c85cfad",
-  "canonical_csv_sha256": "75062ea1ac51cfa66f0fd76025f74504aad92ea8f982f9b7b2c743ab541fe93e",
+  "canonical_csv_git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
+  "canonical_csv_sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c",
   "claims": {
     "flash_geometry_equivalence_claimed": false,
     "hil_qualification_claimed": false,
@@ -18,8 +18,8 @@
   "phase": "L4.5",
   "prestate_manifest_git_blob_sha": "4e6a53695e86729063acd8ae102f66cc7eeb06c8",
   "prestate_manifest_sha256": "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec",
-  "production_manifest_git_blob_sha_after": "ee77f620ba77015382239c15bd6459aad60f19b0",
-  "production_manifest_sha256_after": "bea4ef5bda39e26bf0a8aef9c2bee33c5b1233452f1f4b83c944495bc9a3f2e4",
+  "production_manifest_git_blob_sha_after": "1aa2311a25a69742c428147a402816ed5071e04e",
+  "production_manifest_sha256_after": "b88adcb38f0833a25da1671592ea98496d61166b9d0e51877ffb92ad2820b9fe",
   "production_poststate": {
     "base_devices": 530,
     "exact_icpns": 1718,
@@ -32,10 +32,10 @@
     "families": 11,
     "stm32l4": 0
   },
-  "publication_audit_git_blob_sha": "8914420c67266234e5ef671ebff1e6156f856500",
-  "publication_audit_sha256": "295d174fae4a02bd03c2ca3872b47e3dbc378afe3ebfc0aee07fd943fc81c7c4",
-  "publication_proposal_git_blob_sha": "0d849436a304e2363d30915cfdef54c1d6d6e3f7",
-  "publication_proposal_sha256": "2347bf8158e3ca6441ad8a6484130f3dfed98c3592a2ac9f4539a4768a97b16e",
+  "publication_audit_git_blob_sha": "9bd87bffea6880bfa2e2d373f5ac0c33e02625da",
+  "publication_audit_sha256": "0c6a0d9ebdc5d97a7238333592f298d786000df1b466e698996695192fe12053",
+  "publication_proposal_git_blob_sha": "24a3166fe302e60a184f8623a164e2a2df3b7afd",
+  "publication_proposal_sha256": "b390447109da6f836e06722a050cdec7c883f695d7f1df7c8be64eab356790d7",
   "published_base_device_count": 138,
   "published_exact_icpn_count": 446,
   "published_exact_icpn_set_sha256": "cdb350bdf1513f51430808b98677948569740d230c45bd735f439142ab03eb45",

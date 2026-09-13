@@ -98,8 +98,8 @@
       "family": "STM32L4",
       "path": "../research/stm32l4-commercial-icpn.csv",
       "row_count": 446,
-      "git_blob_sha": "5548df18cd8a8797ad8d2c3d3160af1c4c85cfad",
-      "sha256": "75062ea1ac51cfa66f0fd76025f74504aad92ea8f982f9b7b2c743ab541fe93e"
+      "git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
+      "sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c"
     }
   ]
 }
