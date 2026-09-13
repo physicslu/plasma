@@ -10,7 +10,7 @@ async function source(url) {
   return readFile(url, "utf8");
 }
 
-test("PMode Live Site density keeps one eight-Site PPU readable and removes secondary detail only at higher density", async () => {
+test("PMode Live Site density keeps actual Sites visible and removes only secondary detail at higher density", async () => {
   const [consoleSource, density, guidance] = await Promise.all([
     source(consolePath),
     source(densityPath),
@@ -22,10 +22,12 @@ test("PMode Live Site density keeps one eight-Site PPU readable and removes seco
   assert.match(consoleSource, /if \(siteCount <= 40\) return "compact"/);
   assert.match(guidance, /@import "\.\/factory-live-density\.css"/);
 
+  assert.match(density, /Render every actual Site reported by the PPU/);
   assert.match(density, /density-spacious[\s\S]*--site-card-w:\s*92px/);
   assert.match(density, /density-spacious[\s\S]*factorySiteLedCard > small[\s\S]*font-size:\s*8px/);
   assert.match(density, /density-compact[\s\S]*factorySiteLedCard > small,[\s\S]*density-dense[\s\S]*factorySiteLedCard > small[\s\S]*display:\s*none/);
   assert.match(density, /density-dense[\s\S]*--site-card-w:\s*60px/);
+  assert.doesNotMatch(density, /factorySiteLedCard\s*\{[^}]*display:\s*none/);
 
   for (const forbidden of [
     "createServerBatch",
