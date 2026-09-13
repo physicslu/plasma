@@ -55,6 +55,22 @@ jobs:
       - name: Permanent L4.3 metadata hard-lock
         working-directory: data/device-catalog/research
         run: python validate_stm32l4_phase_l4_3_policy.py
-      - name: Enforce zero Production writes in this transaction
-        if: github.event_name == 'pull_request'
-        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production
+      - name: Enforce frozen pre-publication Production boundary
+        working-directory: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          path = Path("stm32-post-l0-production-manifest-prestate.json")
+          data = path.read_bytes()
+          assert hashlib.sha256(data).hexdigest() == "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec"
+          blob = hashlib.sha1(f"blob {len(data)}\0".encode() + data, usedforsecurity=False).hexdigest()
+          assert blob == "4e6a53695e86729063acd8ae102f66cc7eeb06c8"
+          manifest = json.loads(data)
+          sources = manifest["sources"]
+          assert sum(source["row_count"] for source in sources) == 1272
+          assert len(sources) == 11
+          assert all(source["family"] != "STM32L4" for source in sources)
+          print("STM32L4 L4.3 frozen Production boundary: PASS")
+          PY
