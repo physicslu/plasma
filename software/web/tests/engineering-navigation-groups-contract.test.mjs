@@ -4,13 +4,14 @@ import test from "node:test";
 
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 const stylePath = new URL("../app/engineering/engineering-nav-groups.css", import.meta.url);
+const mockStylePath = new URL("../app/engineering/mock-runtime-settings.css", import.meta.url);
 
 async function source(url) {
   return readFile(url, "utf8");
 }
 
 test("Engineering navigation groups workflow, troubleshooting, advanced, and System Configuration responsibilities without changing section identity", async () => {
-  const [page, css] = await Promise.all([source(pagePath), source(stylePath)]);
+  const [page, css, mockCss] = await Promise.all([source(pagePath), source(stylePath), source(mockStylePath)]);
 
   assert.match(page, /overview: \{ "zh-TW": "主要工作", "en-US": "WORKFLOW" \}/);
   assert.match(page, /diagnostics: \{ "zh-TW": "疑難排解", "en-US": "TROUBLESHOOTING" \}/);
@@ -27,6 +28,7 @@ test("Engineering navigation groups workflow, troubleshooting, advanced, and Sys
   assert.match(page, /className="engineeringNavSubgroupLabel"/);
   assert.match(css, /\.engineeringPage\.sidebarCollapsed \.engineeringNavGroupLabel,[\s\S]*\.engineeringPage\.sidebarCollapsed \.engineeringNavSubgroupLabel[\s\S]*display:\s*none/);
   assert.match(css, /data-settings-group="simulation"[\s\S]*color:/);
+  assert.match(mockCss, /\.mockOperationTable tbody th,[\s\S]*\.mockAppliedTable tbody th[\s\S]*font-size:\s*16px/);
 
   for (const forbidden of [
     "createServerBatch",
