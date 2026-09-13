@@ -55,8 +55,8 @@ test("real Gateway persists Mock settings and Engineering UI shows the applied r
     expect(applied.seed).toEqual({ mode: "fixed", fixed_seed: 4242 });
 
     await page.goto("/engineering");
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await page.getByRole("button", { name: "Mock", exact: true }).click();
+    await page.getByRole("button", { name: /^(System Configuration|系統設定)$/ }).click();
+    await page.getByRole("button", { name: /^Mock Runtime · (Simulation only|僅模擬)$/ }).click();
     await expect(page.getByText(`REV ${applied.revision}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Applied Configuration" })).toContainText("fixed · 4242");
     await expect(page.getByRole("region", { name: "Applied Configuration" })).toContainText("4096 KiB");
