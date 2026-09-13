@@ -1,9 +1,10 @@
 """Fail-closed STM32L4 Phase L4.3 manufacturer-authoritative metadata policy.
 
-Commercial identity/lifecycle authority remains the immutable L4.2 official-ST
-exact-set evidence. Metadata authority is official ST datasheet Ordering
-Information. The policy decodes only the 446 retained Active exact ICPNs and
-never expands identity scope.
+Commercial identity/lifecycle authority remains immutable L4.2 official-ST exact-set
+evidence. Metadata authority is official ST datasheet Ordering Information, with only
+three exact-part manufacturer-surface exceptions where current ST commercial data
+and the current datasheet ordering table disagree/omit an Active retained variant.
+No exception may expand the retained 446-ICPN identity scope.
 """
 from __future__ import annotations
 
@@ -18,8 +19,8 @@ from validate_stm32l4_phase_l4_2_retained_evidence import EVIDENCE as L4_2_EVIDE
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_ORDERING_AUTHORITY = HERE / "stm32l4-phase-l4.3-ordering-authority.json"
+DEFAULT_EXCEPTIONS = HERE / "stm32l4-phase-l4.3-exact-variant-exceptions.json"
 L4_2_SUMMARY = L4_2_EVIDENCE / "live-summary.json"
-
 MANUFACTURER = "STMicroelectronics"
 FAMILY = "STM32L4"
 PHASE = "L4.3"
@@ -27,6 +28,7 @@ EXPECTED_ACTIVE_CANDIDATE_COUNT = 446
 EXPECTED_BASE_DEVICE_COUNT = 138
 EXPECTED_EXCLUDED_COUNT = 5
 EXPECTED_UNIQUE_DATASHEETS = 20
+EXPECTED_EXCEPTION_ICPNS = {"STM32L4A6RGT7", "STM32L4A6RGT7TR", "STM32L4S5QII3P"}
 EXPECTED_SERIES = {
     "STM32L412", "STM32L422", "STM32L431", "STM32L432", "STM32L433", "STM32L442",
     "STM32L443", "STM32L451", "STM32L452", "STM32L462", "STM32L471", "STM32L475",
@@ -50,10 +52,8 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str, dict[str, Any]]:
     payload = _read_json(path)
-    if payload.get("schema_version") != 1 or payload.get("phase") != PHASE:
-        raise AdmissionError("unsupported STM32L4 L4.3 ordering-authority schema/phase")
-    if payload.get("family") != FAMILY or payload.get("manufacturer") != MANUFACTURER:
-        raise AdmissionError("STM32L4 ordering-authority identity drifted")
+    if payload.get("schema_version") != 1 or payload.get("phase") != PHASE or payload.get("family") != FAMILY or payload.get("manufacturer") != MANUFACTURER:
+        raise AdmissionError("STM32L4 ordering-authority identity/schema drifted")
     if payload.get("authority_version") != "stm32l4-l4.3-retained446-v1":
         raise AdmissionError("STM32L4 ordering-authority version drifted")
     governance = payload.get("governance")
@@ -63,9 +63,7 @@ def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str
     if not isinstance(grammars, dict) or not grammars:
         raise AdmissionError("STM32L4 suffix grammar authority missing")
     for grammar_id, grammar in grammars.items():
-        if not isinstance(grammar, dict):
-            raise AdmissionError(f"{grammar_id}: malformed suffix grammar")
-        tails = grammar.get("allowed_tails")
+        tails = grammar.get("allowed_tails") if isinstance(grammar, dict) else None
         if not isinstance(tails, list) or not tails or len(tails) != len(set(tails)) or any(not isinstance(x, str) for x in tails):
             raise AdmissionError(f"{grammar_id}: invalid allowed suffix tails")
     records = payload.get("records")
@@ -89,13 +87,32 @@ def load_ordering_authority(path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str
             value = record.get(field)
             if not isinstance(value, dict) or not value or any(not isinstance(k, str) or not isinstance(v, str) for k, v in value.items()):
                 raise AdmissionError(f"{series}: missing {field} authority")
-        grammar_id = record.get("suffix_grammar")
-        if grammar_id not in grammars:
-            raise AdmissionError(f"{series}: unknown suffix grammar {grammar_id}")
+        if record.get("suffix_grammar") not in grammars:
+            raise AdmissionError(f"{series}: unknown suffix grammar")
         by_series[series] = record
     if set(by_series) != EXPECTED_SERIES or len(docs) != EXPECTED_UNIQUE_DATASHEETS:
         raise AdmissionError("STM32L4 Ordering Information coverage drifted")
     return by_series
+
+
+def load_exact_variant_exceptions(path: Path = DEFAULT_EXCEPTIONS) -> dict[str, dict[str, Any]]:
+    payload = _read_json(path)
+    if payload.get("schema_version") != 1 or payload.get("phase") != PHASE or payload.get("family") != FAMILY:
+        raise AdmissionError("STM32L4 exact-variant exception identity/schema drifted")
+    if payload.get("scope_expansion_authorized") is not False:
+        raise AdmissionError("exact-variant exception file authorized scope expansion")
+    exceptions = payload.get("exceptions")
+    if not isinstance(exceptions, dict) or set(exceptions) != EXPECTED_EXCEPTION_ICPNS:
+        raise AdmissionError("STM32L4 exact-variant exception set drifted")
+    for icpn, item in exceptions.items():
+        if not isinstance(item, dict) or item.get("field") not in {"temperature_grade", "option_suffix"}:
+            raise AdmissionError(f"{icpn}: malformed exception")
+        if not isinstance(item.get("code"), str) or not isinstance(item.get("value"), str) or not isinstance(item.get("reason"), str):
+            raise AdmissionError(f"{icpn}: incomplete exception evidence")
+        urls = item.get("authority_urls")
+        if not isinstance(urls, list) or not urls or any(not isinstance(url, str) or not (url.startswith("https://www.st.com/") or url.startswith("https://estore.st.com/")) for url in urls):
+            raise AdmissionError(f"{icpn}: exception lacks official ST authority URL")
+    return exceptions
 
 
 def _retained_summary() -> dict[str, Any]:
@@ -124,29 +141,21 @@ def build_candidate_inputs() -> list[dict[str, Any]]:
     if not isinstance(results, list) or len(results) != EXPECTED_BASE_DEVICE_COUNT:
         raise AdmissionError("L4.2 retained result count drifted")
     candidates: list[dict[str, Any]] = []
-    bases: set[str] = set()
-    icpns: set[str] = set()
-    excluded: set[str] = set()
+    bases: set[str] = set(); icpns: set[str] = set(); excluded: set[str] = set()
     for result in results:
         if not isinstance(result, dict):
             raise AdmissionError("malformed L4.2 result")
-        base = result.get("base_device")
-        series = result.get("subfamily")
-        evidence = result.get("evidence")
-        source_url = result.get("source_url")
+        base, series, evidence, source_url = result.get("base_device"), result.get("subfamily"), result.get("evidence"), result.get("source_url")
         if not isinstance(base, str) or base in bases or not isinstance(series, str) or series not in EXPECTED_SERIES:
             raise AdmissionError(f"invalid/duplicate L4.2 Base Device {base}")
         bases.add(base)
-        if not base.startswith(series) or result.get("disposition") != "active_candidates" or result.get("commercial_identity_status") != "verified_active":
+        if not base.startswith(series) or result.get("disposition") != "active_candidates" or result.get("commercial_identity_status") != "verified_active" or result.get("manual_intervention_required") is not False:
             raise AdmissionError(f"{base}: L4.3 accepts only retained Active identity state")
-        if result.get("manual_intervention_required") is not False:
-            raise AdmissionError(f"{base}: retained manual state drifted")
         if not isinstance(source_url, str) or not source_url.startswith("https://www.st.com/en/microcontrollers-microprocessors/"):
             raise AdmissionError(f"{base}: official ST product URL missing")
         if not isinstance(evidence, dict) or evidence.get("parser_profile") != "stm32l4_l4_2_dual_surface_v1" or evidence.get("parser_version") != 2:
             raise AdmissionError(f"{base}: retained evidence profile drifted")
-        exact = evidence.get("exact_icpns")
-        non_active = evidence.get("excluded_non_active_part_numbers")
+        exact, non_active = evidence.get("exact_icpns"), evidence.get("excluded_non_active_part_numbers")
         if not isinstance(exact, list) or not exact or not isinstance(non_active, list):
             raise AdmissionError(f"{base}: exact lifecycle disposition missing")
         for item in non_active:
@@ -158,10 +167,10 @@ def build_candidate_inputs() -> list[dict[str, Any]]:
                 raise AdmissionError(f"{base}: invalid/duplicate exact ICPN {icpn}")
             icpns.add(icpn)
             candidates.append({"manufacturer": MANUFACTURER, "series": series, "base_device": base, "icpn": icpn, "identity_source": source_url})
-    if len(bases) != EXPECTED_BASE_DEVICE_COUNT or len(icpns) != EXPECTED_ACTIVE_CANDIDATE_COUNT or len(excluded) != EXPECTED_EXCLUDED_COUNT:
-        raise AdmissionError("L4.2 retained identity cardinality drifted")
-    if icpns & excluded:
-        raise AdmissionError("Active and excluded exact sets collide")
+    if len(bases) != EXPECTED_BASE_DEVICE_COUNT or len(icpns) != EXPECTED_ACTIVE_CANDIDATE_COUNT or len(excluded) != EXPECTED_EXCLUDED_COUNT or icpns & excluded:
+        raise AdmissionError("L4.2 retained identity boundary/cardinality drifted")
+    if not EXPECTED_EXCEPTION_ICPNS.issubset(icpns):
+        raise AdmissionError("exact-variant exceptions escaped retained Active scope")
     return candidates
 
 
@@ -176,20 +185,19 @@ def _resolve_pin_count(series: str, pin_value: str, package_code: str) -> str:
     return pin_value
 
 
-def build_metadata_row(candidate: dict[str, Any], fields: list[str] | None = None, *, authority_path: Path = DEFAULT_ORDERING_AUTHORITY) -> dict[str, str]:
-    icpn = candidate.get("icpn")
-    base = candidate.get("base_device")
-    series = candidate.get("series")
+def build_metadata_row(candidate: dict[str, Any], fields: list[str] | None = None, *, authority_path: Path = DEFAULT_ORDERING_AUTHORITY, exceptions_path: Path = DEFAULT_EXCEPTIONS) -> dict[str, str]:
+    icpn, base, series = candidate.get("icpn"), candidate.get("base_device"), candidate.get("series")
     if not isinstance(icpn, str) or not isinstance(base, str) or not isinstance(series, str):
         raise CandidateReject("candidate identity is incomplete")
     if icpn not in retained_exact_icpns():
         raise CandidateReject("identity is outside retained L4.2 Active scope")
     if not icpn.startswith(base) or base[:9] != series or len(base) < 11:
         raise CandidateReject(f"invalid exact STM32L4 identity: {icpn}")
-    authorities = load_ordering_authority(authority_path)
-    authority = authorities.get(series)
+    authority = load_ordering_authority(authority_path).get(series)
     if authority is None:
         raise CandidateManualReview(f"{series}: no official Ordering Information authority")
+    exceptions = load_exact_variant_exceptions(exceptions_path)
+    exception = exceptions.get(icpn)
     pin_code, flash_code = base[-2], base[-1]
     suffix = icpn[len(base):]
     if len(suffix) < 2:
@@ -205,27 +213,33 @@ def build_metadata_row(candidate: dict[str, Any], fields: list[str] | None = Non
         raise CandidateManualReview(f"{base}: Flash code {flash_code} outside official authority")
     if package is None:
         raise CandidateManualReview(f"{icpn}: package code {package_code} outside official authority")
+    exception_used = False
     if temperature is None:
-        raise CandidateManualReview(f"{icpn}: temperature code {temperature_code} outside official authority")
+        if exception and exception["field"] == "temperature_grade" and exception["code"] == temperature_code:
+            temperature = exception["value"]; exception_used = True
+        else:
+            raise CandidateManualReview(f"{icpn}: temperature code {temperature_code} outside official authority")
     payload = _read_json(authority_path)
     grammar = payload["grammars"][authority["suffix_grammar"]]
     if option_suffix not in grammar["allowed_tails"]:
-        raise CandidateManualReview(f"{icpn}: suffix tail {option_suffix!r} outside official {authority['suffix_grammar']} grammar")
+        if exception and exception["field"] == "option_suffix" and exception["code"] == option_suffix and exception["value"] == option_suffix:
+            exception_used = True
+        else:
+            raise CandidateManualReview(f"{icpn}: suffix tail {option_suffix!r} outside official {authority['suffix_grammar']} grammar")
+    source_authority = authority["datasheet_url"]
+    source_reference = f"{authority['document_id']} Rev {authority['revision']} p{authority['ordering_pdf_page']}"
+    source_type = "official_st_datasheet_ordering_information"
+    verification_status = "manufacturer_ordering_information_verified"
+    if exception_used:
+        source_authority += " | " + " | ".join(exception["authority_urls"])
+        source_reference += " + exact Active variant manufacturer-surface exception"
+        source_type = "official_st_datasheet_plus_exact_variant_manufacturer_exception"
+        verification_status = "manufacturer_authority_exact_variant_exception_verified"
     row = {
-        "manufacturer": MANUFACTURER,
-        "icpn": icpn,
-        "family": FAMILY,
-        "series": series,
-        "base_device": base,
-        "package": package,
-        "pin_count": _resolve_pin_count(series, pin_value, package_code),
-        "flash_size": flash_size,
-        "temperature_grade": temperature,
-        "option_suffix": option_suffix,
-        "source_type": "official_st_datasheet_ordering_information",
-        "source_reference": f"{authority['document_id']} Rev {authority['revision']} p{authority['ordering_pdf_page']}",
-        "source_authority": authority["datasheet_url"],
-        "verification_status": "manufacturer_ordering_information_verified",
+        "manufacturer": MANUFACTURER, "icpn": icpn, "family": FAMILY, "series": series, "base_device": base,
+        "package": package, "pin_count": _resolve_pin_count(series, pin_value, package_code), "flash_size": flash_size,
+        "temperature_grade": temperature, "option_suffix": option_suffix, "source_type": source_type,
+        "source_reference": source_reference, "source_authority": source_authority, "verification_status": verification_status,
     }
     selected = list(METADATA_FIELDS) if fields is None else fields
     if any(field not in METADATA_FIELDS for field in selected):
