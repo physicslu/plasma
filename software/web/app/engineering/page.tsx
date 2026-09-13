@@ -201,7 +201,7 @@ export default function EngineeringPage() {
             ) : (
               <div className="engineeringPlaceholder">
                 <small>EXTENSION SLOT</small>
-                <h2>{id === "settings" ? settingsLabel : t(sections.find(([sectionId]) => sectionId === active)?.[1] ?? "engineering.overview")}</h2>
+                <h2>{active === "settings" ? settingsLabel : t(sections.find(([sectionId]) => sectionId === active)?.[1] ?? "engineering.overview")}</h2>
                 <p>{t("engineering.placeholder")}</p>
                 <div className="engineeringSlotGrid" aria-hidden="true">
                   <span />
