@@ -6,6 +6,7 @@ import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
 import "./programming-job-controls.css";
+import "./production-workflow-guidance.css";
 
 export type ProgrammingJobOperation = {
   key: string;
