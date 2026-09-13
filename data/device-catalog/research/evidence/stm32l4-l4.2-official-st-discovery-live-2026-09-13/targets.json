@@ -1,0 +1,877 @@
+{
+  "base_device_count": 138,
+  "base_device_counts_by_subfamily": {
+    "STM32L412": 8,
+    "STM32L422": 4,
+    "STM32L431": 7,
+    "STM32L432": 2,
+    "STM32L433": 5,
+    "STM32L442": 1,
+    "STM32L443": 3,
+    "STM32L451": 6,
+    "STM32L452": 6,
+    "STM32L462": 3,
+    "STM32L471": 8,
+    "STM32L475": 6,
+    "STM32L476": 14,
+    "STM32L486": 5,
+    "STM32L496": 10,
+    "STM32L4A6": 5,
+    "STM32L4P5": 12,
+    "STM32L4Q5": 6,
+    "STM32L4R5": 8,
+    "STM32L4R7": 3,
+    "STM32L4R9": 6,
+    "STM32L4S5": 4,
+    "STM32L4S7": 3,
+    "STM32L4S9": 3
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "complete_family_inventory_claimed_before_live_evidence": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "discovery_id": "stm32l4-l4.2-official-st-commercial-discovery-v1",
+  "family": "STM32L4",
+  "l4_1_foundation_sha256": "3f85587e74f9af1ee93f59d53a05ea1d47201e6b8564b8e8a91cb91f378bd40f",
+  "phase": "L4.2",
+  "schema_version": 1,
+  "scope": "bounded read-only official-ST STM32L4 complete commercial discovery",
+  "targets": [
+    {
+      "base_device": "STM32L412C8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412c8.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412cb.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412K8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412k8.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412kb.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412R8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412r8.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412rb.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412T8",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412t8.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L412TB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l412tb.html",
+      "subfamily": "STM32L412"
+    },
+    {
+      "base_device": "STM32L422CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l422cb.html",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L422KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l422kb.html",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L422RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l422rb.html",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L422TB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l422tb.html",
+      "subfamily": "STM32L422"
+    },
+    {
+      "base_device": "STM32L431CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431cb.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431CC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431cc.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431kb.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431KC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431kc.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431rb.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431rc.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L431VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l431vc.html",
+      "subfamily": "STM32L431"
+    },
+    {
+      "base_device": "STM32L432KB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l432kb.html",
+      "subfamily": "STM32L432"
+    },
+    {
+      "base_device": "STM32L432KC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l432kc.html",
+      "subfamily": "STM32L432"
+    },
+    {
+      "base_device": "STM32L433CB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433cb.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L433CC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433cc.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L433RB",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433rb.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L433RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433rc.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L433VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l433vc.html",
+      "subfamily": "STM32L433"
+    },
+    {
+      "base_device": "STM32L442KC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l442kc.html",
+      "subfamily": "STM32L442"
+    },
+    {
+      "base_device": "STM32L443CC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443cc.html",
+      "subfamily": "STM32L443"
+    },
+    {
+      "base_device": "STM32L443RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443rc.html",
+      "subfamily": "STM32L443"
+    },
+    {
+      "base_device": "STM32L443VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l443vc.html",
+      "subfamily": "STM32L443"
+    },
+    {
+      "base_device": "STM32L451CC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451cc.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L451CE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451ce.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L451RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451rc.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L451RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451re.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L451VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451vc.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L451VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l451ve.html",
+      "subfamily": "STM32L451"
+    },
+    {
+      "base_device": "STM32L452CC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452cc.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L452CE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452ce.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L452RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452rc.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L452RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452re.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L452VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452vc.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L452VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l452ve.html",
+      "subfamily": "STM32L452"
+    },
+    {
+      "base_device": "STM32L462CE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462ce.html",
+      "subfamily": "STM32L462"
+    },
+    {
+      "base_device": "STM32L462RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462re.html",
+      "subfamily": "STM32L462"
+    },
+    {
+      "base_device": "STM32L462VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l462ve.html",
+      "subfamily": "STM32L462"
+    },
+    {
+      "base_device": "STM32L471QE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471qe.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471qg.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471re.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471rg.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471ve.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471vg.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471ZE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471ze.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L471ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l471zg.html",
+      "subfamily": "STM32L471"
+    },
+    {
+      "base_device": "STM32L475RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475rc.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L475RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475re.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L475RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475rg.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L475VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475vc.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L475VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475ve.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L475VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l475vg.html",
+      "subfamily": "STM32L475"
+    },
+    {
+      "base_device": "STM32L476JE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476je.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476JG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476jg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476ME",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476me.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476MG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476mg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476QE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476qe.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476qg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476RC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476rc.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476re.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476rg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476VC",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476vc.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476ve.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476vg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476ZE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476ze.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L476ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l476zg.html",
+      "subfamily": "STM32L476"
+    },
+    {
+      "base_device": "STM32L486JG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486jg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L486QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486qg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L486RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486rg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L486VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486vg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L486ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l486zg.html",
+      "subfamily": "STM32L486"
+    },
+    {
+      "base_device": "STM32L496AE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496ae.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496ag.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496QE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496qe.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496qg.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496re.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496rg.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496ve.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496vg.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496ZE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496ze.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L496ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l496zg.html",
+      "subfamily": "STM32L496"
+    },
+    {
+      "base_device": "STM32L4A6AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6ag.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4A6QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6qg.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4A6RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6rg.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4A6VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6vg.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4A6ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6zg.html",
+      "subfamily": "STM32L4A6"
+    },
+    {
+      "base_device": "STM32L4P5AE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ae.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ag.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5CE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ce.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5CG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5cg.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5QE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5qe.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5qg.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5RE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5re.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5rg.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5VE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ve.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5vg.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5ZE",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5ze.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4P5ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4p5zg.html",
+      "subfamily": "STM32L4P5"
+    },
+    {
+      "base_device": "STM32L4Q5AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5ag.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4Q5CG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5cg.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4Q5QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5qg.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4Q5RG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5rg.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4Q5VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5vg.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4Q5ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4q5zg.html",
+      "subfamily": "STM32L4Q5"
+    },
+    {
+      "base_device": "STM32L4R5AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5ag.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5ai.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5QG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5qg.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5QI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5qi.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5vg.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5vi.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5zg.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R5ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r5zi.html",
+      "subfamily": "STM32L4R5"
+    },
+    {
+      "base_device": "STM32L4R7AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7ai.html",
+      "subfamily": "STM32L4R7"
+    },
+    {
+      "base_device": "STM32L4R7VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7vi.html",
+      "subfamily": "STM32L4R7"
+    },
+    {
+      "base_device": "STM32L4R7ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r7zi.html",
+      "subfamily": "STM32L4R7"
+    },
+    {
+      "base_device": "STM32L4R9AG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9ag.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4R9AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9ai.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4R9VG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9vg.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4R9VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9vi.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4R9ZG",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9zg.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4R9ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4r9zi.html",
+      "subfamily": "STM32L4R9"
+    },
+    {
+      "base_device": "STM32L4S5AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5ai.html",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S5QI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5qi.html",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S5VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5vi.html",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S5ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5zi.html",
+      "subfamily": "STM32L4S5"
+    },
+    {
+      "base_device": "STM32L4S7AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s7ai.html",
+      "subfamily": "STM32L4S7"
+    },
+    {
+      "base_device": "STM32L4S7VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s7vi.html",
+      "subfamily": "STM32L4S7"
+    },
+    {
+      "base_device": "STM32L4S7ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s7zi.html",
+      "subfamily": "STM32L4S7"
+    },
+    {
+      "base_device": "STM32L4S9AI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9ai.html",
+      "subfamily": "STM32L4S9"
+    },
+    {
+      "base_device": "STM32L4S9VI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9vi.html",
+      "subfamily": "STM32L4S9"
+    },
+    {
+      "base_device": "STM32L4S9ZI",
+      "selection_reason": "deterministic unique Base Device collapsed from frozen L4.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s9zi.html",
+      "subfamily": "STM32L4S9"
+    }
+  ]
+}

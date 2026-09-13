@@ -1,0 +1,19 @@
+{
+  "acquisition_run_count": 2,
+  "active_exact_icpn_candidates": 446,
+  "base_device_count": 138,
+  "claims": {
+    "canonical_admission_authorized": false,
+    "production_write_authorized": false,
+    "runtime_programming_support_claimed": false
+  },
+  "excluded_non_active_part_numbers": 5,
+  "family": "STM32L4",
+  "leaf_digests_sha256": "4231e22e22b646dc8aa2c859740ea778e84aca8f6b516fc3b5e93ac7dec7b47d",
+  "live_summary_sha256": "0c9279000bf69384ed167049c711bfe7b6fe4e1274288cc1bbd6b21e6bafc784",
+  "phase": "L4.2",
+  "provenance_sha256": "774f7391a45d4106d0fcbb019d4aa7ac31a3c72691586c55b489f3d63f234587",
+  "schema_version": 2,
+  "scope": "retained manufacturer-authoritative commercial discovery evidence with bounded targeted timeout recovery",
+  "targets_sha256": "568726e2b285831b1d17d49bf1da78ae7fde12ff720d24190c5fb5dcd2cd44d9"
+}
