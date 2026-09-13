@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build deterministic retained STM32L4 L4.2 baseline from clean live evidence."""
+"""Build deterministic retained STM32L4 L4.2 baseline from clean retained evidence."""
 from __future__ import annotations
 
 import argparse
@@ -18,6 +18,9 @@ DEFAULT_BASELINE = HERE / "stm32l4-phase-l4.2-discovery-baseline.json"
 DEFAULT_MANIFEST = HERE / "stm32l4-phase-l4.2-discovery-manifest.json"
 EXPECTED_OPENOCD_CATALOG_SHA256 = "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3"
 EXPECTED_PRODUCTION_PRESTATE_SHA256 = "c435551f65cede76356ba45fa8523259d6201c2cc673c05ccf214a888beeefec"
+EXPECTED_RETENTION_RUN_ID = 34741498287
+EXPECTED_RETENTION_EXEC_SHA = "5a066ac1d9d2c92961bf2c09553b3658b89e8e6f"
+EXPECTED_ACQUISITION_RUN_COUNT = 2
 
 
 def read_json(path: Path) -> dict:
@@ -59,6 +62,20 @@ def main() -> int:
     if any(v is not False for v in summary.get("claims", {}).values()):
         raise RuntimeError("summary authority boundary escaped fail-closed state")
 
+    if provenance.get("schema_version") != 2:
+        raise RuntimeError("recovery provenance schema drifted")
+    if provenance.get("workflow_run_id") != EXPECTED_RETENTION_RUN_ID:
+        raise RuntimeError("recovery retention workflow run drifted")
+    if provenance.get("workflow_run_attempt") != 1:
+        raise RuntimeError("recovery retention workflow attempt drifted")
+    if provenance.get("executed_git_sha") != EXPECTED_RETENTION_EXEC_SHA:
+        raise RuntimeError("recovery retention execution SHA drifted")
+    acquisition_runs = provenance.get("acquisition_runs")
+    if not isinstance(acquisition_runs, list) or len(acquisition_runs) != EXPECTED_ACQUISITION_RUN_COUNT:
+        raise RuntimeError("two-run acquisition provenance missing")
+    if retained.get("schema_version") != 2 or retained.get("acquisition_run_count") != EXPECTED_ACQUISITION_RUN_COUNT:
+        raise RuntimeError("retained recovery manifest schema drifted")
+
     target_rows = targets.get("targets")
     result_rows = summary.get("results")
     if not isinstance(target_rows, list) or len(target_rows) != 138:
@@ -96,12 +113,14 @@ def main() -> int:
         raise RuntimeError("excluded non-Active count drifted")
     if len(set(active)) != len(active) or len(set(excluded)) != len(excluded):
         raise RuntimeError("duplicate exact Part Number in retained evidence")
+    if set(active) & set(excluded):
+        raise RuntimeError("exact Part Number appears in both Active and excluded sets")
 
     baseline = {
-        "schema_version": 1,
+        "schema_version": 2,
         "phase": "L4.2",
         "family": "STM32L4",
-        "scope": "retained official-ST complete commercial identity/lifecycle discovery; no Production write",
+        "scope": "retained official-ST complete commercial identity/lifecycle discovery with bounded targeted timeout recovery; no Production write",
         "commercial_identity_authority": COMMERCIAL_IDENTITY_AUTHORITY,
         "evidence_root": "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13",
         "aggregate": {
@@ -123,6 +142,7 @@ def main() -> int:
             "workflow_run_id": provenance.get("workflow_run_id"),
             "workflow_run_attempt": provenance.get("workflow_run_attempt"),
             "executed_git_sha": provenance.get("executed_git_sha"),
+            "acquisition_run_count": len(acquisition_runs),
             "live_summary_sha256": sha256(EVIDENCE / "live-summary.json"),
             "targets_sha256": sha256(EVIDENCE / "targets.json"),
             "provenance_sha256": sha256(EVIDENCE / "provenance.json"),
