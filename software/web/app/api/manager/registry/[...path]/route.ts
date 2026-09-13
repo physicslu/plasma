@@ -1,3 +1,4 @@
+import { requireManagerRegistryContractVersion } from "../../../../manager-contract";
 import {
   relayManagerNetworkCommissioningRequest,
   relayManagerPpuAliasRequest,
@@ -39,6 +40,19 @@ function registryPath(request: Request): RegistryBrowserPath | null {
   return null;
 }
 
+function managerContractMismatch(): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        code: "manager_contract_mismatch",
+        message: "Manager contract version is unsupported by this Control Station",
+      },
+    },
+    { status: 502, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+  );
+}
+
 async function relayEntry(request: Request): Promise<Response> {
   const parsed = registryPath(request);
   if (!parsed || parsed.resource !== "entry") {
@@ -47,7 +61,18 @@ async function relayEntry(request: Request): Promise<Response> {
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
-  return await relayManagerRegistryRequest(request, parsed.alias);
+  const response = await relayManagerRegistryRequest(request, parsed.alias);
+  if (!response.ok) return response;
+  const payload: unknown = await response.json().catch(() => null);
+  try {
+    requireManagerRegistryContractVersion(payload);
+  } catch {
+    return managerContractMismatch();
+  }
+  return Response.json(payload, {
+    status: response.status,
+    headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+  });
 }
 
 async function relayResource(request: Request): Promise<Response> {
