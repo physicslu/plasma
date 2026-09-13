@@ -6,6 +6,7 @@ on:
       - "data/device-catalog/research/stm32l4_metadata_policy.py"
       - "data/device-catalog/research/stm32l4_phase_l4_3_policy.py"
       - "data/device-catalog/research/test_stm32l4_phase_l4_3_policy.py"
+      - "data/device-catalog/research/build_stm32l4_phase_l4_3_baseline.py"
       - "data/device-catalog/research/validate_stm32l4_phase_l4_3_policy.py"
       - "data/device-catalog/research/stm32l4-phase-l4.3-ordering-authority.json"
       - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
@@ -40,12 +41,19 @@ jobs:
           cat "$RUNNER_TEMP/stm32l4-l43-summary.json"
           echo "planner_status=$status" >> "$GITHUB_OUTPUT"
         id: planner
-      - name: Upload deterministic summary
+      - name: Build candidate frozen baseline
+        working-directory: data/device-catalog/research
+        run: |
+          python build_stm32l4_phase_l4_3_baseline.py --output "$RUNNER_TEMP/stm32l4-l43-baseline.json"
+          cat "$RUNNER_TEMP/stm32l4-l43-baseline.json"
+      - name: Upload deterministic outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stm32l4-l43-summary-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/stm32l4-l43-summary.json
+          name: stm32l4-l43-deterministic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/stm32l4-l43-summary.json
+            ${{ runner.temp }}/stm32l4-l43-baseline.json
           retention-days: 30
       - name: Enforce L4.3 fail-closed boundary
         run: |
