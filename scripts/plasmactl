@@ -94,7 +94,7 @@ Profile-aware commands:
   sudo plasmactl deploy swpc-z2like  [same options]
   sudo plasmactl bootstrap-sites swpc-z2like
                                        One-time sites: [] -> disabled mock SITE1..SITE8; no runtime activation
-  plasmactl verify swpc-z2like       Read-only local surrogate readiness/restricted-ingress/PS-loopback checks
+  sudo plasmactl verify swpc-z2like  Root-read-only surrogate readiness/restricted-ingress/PS-loopback checks
   plasmactl status swpc-z2like       Installed release identity and system-service state
 
   sudo plasmactl install z2-ps --release-artifact PATH --gateway-host IPv4 \
