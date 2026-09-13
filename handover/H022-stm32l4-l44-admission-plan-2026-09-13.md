@@ -3,6 +3,7 @@
 ## Transaction
 
 - Phase: STM32L4 L4.4
+- PR: #534
 - Branch: `agent/device-catalog-stm32l4-phase-l44-admission-plan`
 - Gate 1: explicitly approved
 - Gate 2: not yet approved
@@ -86,10 +87,9 @@ L4.4 performs no canonical or Production write.
 
 Before Gate 2:
 
-1. create/update the L4.4 PR;
-2. ensure all applicable final CI is green on the final head;
-3. confirm PR mergeability and no review/comment blockers;
-4. confirm zero `data/device-catalog/production` diff and no canonical STM32L4 CSV write;
-5. obtain explicit Gate 2 merge approval.
+1. ensure PR #534 final-head applicable CI is green;
+2. confirm PR mergeability and no review/comment blockers;
+3. confirm zero `data/device-catalog/production` diff and no canonical STM32L4 CSV write;
+4. obtain explicit Gate 2 merge approval.
 
 After merge, do **not** start L4.5 without a separate Gate 1 approval.
