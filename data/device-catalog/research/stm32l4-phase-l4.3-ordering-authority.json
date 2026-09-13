@@ -1,1 +1,80 @@
-PLACEHOLDER
+{
+  "authority_basis": "official ST datasheet Ordering Information; L4.1 retained 20-datasheet review extended deterministically over the frozen L4.2 138-Base-Device / 446-Active-exact-ICPN set",
+  "authority_version": "stm32l4-l4.3-retained446-v1",
+  "family": "STM32L4",
+  "governance": {
+    "canonical_admission_authorized": false,
+    "cmsis_alias_is_metadata_authority": false,
+    "flash_geometry_qualified": false,
+    "openocd_is_metadata_authority": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "scope_expansion_authorized": false
+  },
+  "grammars": {
+    "l496": {
+      "allowed_tails": ["", "P", "S", "TR", "PTR", "STR", "PST", "SCT"],
+      "semantics": {"P": "external SMPS", "PS": "external SMPS + PFAS-free", "S": "new sawing", "SC": "integrated LDO + new sawing + copper wiring", "T": "special packing code for PS/SC option rows", "TR": "tape-and-reel"}
+    },
+    "power_pkg_i": {
+      "allowed_tails": ["", "P", "I", "PI", "TR", "PTR", "ITR", "PITR"],
+      "semantics": {"I": "specific package/material option", "P": "external SMPS", "TR": "tape-and-reel"}
+    },
+    "power_pkg_ms": {
+      "allowed_tails": ["", "P", "M", "S", "PM", "PS", "TR", "PTR", "MTR", "STR", "PMTR", "PSTR"],
+      "semantics": {"M": "specific supply-chain/package option", "P": "external SMPS", "S": "PFAS-free/package-specific option", "TR": "tape-and-reel"}
+    },
+    "power_pkg_s": {
+      "allowed_tails": ["", "P", "S", "PS", "TR", "PTR", "STR", "PSTR"],
+      "semantics": {"P": "external SMPS", "S": "PFAS-free/package-specific option; combinations preserve field order", "TR": "tape-and-reel"}
+    },
+    "power_sawing": {
+      "allowed_tails": ["", "P", "S", "PS", "TR", "PTR", "STR", "PSTR"],
+      "semantics": {"P": "external SMPS", "S": "new sawing", "TR": "tape-and-reel"}
+    },
+    "power_smps": {
+      "allowed_tails": ["", "P", "TR", "PTR"],
+      "semantics": {"": "integrated LDO / standard packing", "P": "external SMPS", "PTR": "external SMPS + tape-and-reel", "TR": "integrated LDO + tape-and-reel"}
+    },
+    "sawing": {
+      "allowed_tails": ["", "S", "TR", "STR"],
+      "semantics": {"S": "new sawing", "TR": "tape-and-reel"}
+    },
+    "simple": {
+      "allowed_tails": ["", "TR"],
+      "semantics": {"": "standard", "TR": "tape-and-reel"}
+    }
+  },
+  "manufacturer": "STMicroelectronics",
+  "phase": "L4.3",
+  "records": [
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l412c8.pdf","document_id":"DS12469","flash":{"8":"64 KiB","B":"128 KiB"},"ordering_pdf_page":194,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","K":"32","R":"64","T":"36"},"revision":9,"series":"STM32L412","suffix_grammar":"power_smps","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l422cb.pdf","document_id":"DS12470","flash":{"8":"64 KiB","B":"128 KiB"},"ordering_pdf_page":185,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","K":"32","R":"64","T":"36"},"revision":6,"series":"STM32L422","special_semantics":["Current retained Active exact set is decoded fail-closed; no P option is admitted by this authority record."],"suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l431cb.pdf","document_id":"DS11453","flash":{"B":"128 KiB","C":"256 KiB"},"ordering_pdf_page":206,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","K":"32","R":"64","V":"100"},"revision":3,"series":"STM32L431","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l432kb.pdf","document_id":"DS11451","flash":{"B":"128 KiB","C":"256 KiB"},"ordering_pdf_page":153,"package_codes":{"U":"UFQFPN"},"pin_codes":{"K":"32"},"revision":4,"series":"STM32L432","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l433cb.pdf","document_id":"DS11449","flash":{"B":"128 KiB","C":"256 KiB"},"ordering_pdf_page":220,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","R":"64","V":"100"},"revision":8,"series":"STM32L433","suffix_grammar":"power_pkg_s","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l442kc.pdf","document_id":"DS11450","flash":{"C":"256 KiB"},"ordering_pdf_page":154,"package_codes":{"U":"UFQFPN"},"pin_codes":{"K":"32"},"revision":4,"series":"STM32L442","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l443cc.pdf","document_id":"DS11421","flash":{"C":"256 KiB"},"ordering_pdf_page":214,"package_codes":{"F":"Thin WLCSP","I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","R":"64","V":"100"},"revision":6,"series":"STM32L443","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l451cc.pdf","document_id":"DS11910","flash":{"C":"256 KiB","E":"512 KiB"},"ordering_pdf_page":204,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","R":"64","V":"100"},"revision":5,"series":"STM32L451","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l452cc.pdf","document_id":"DS11912","flash":{"C":"256 KiB","E":"512 KiB"},"ordering_pdf_page":218,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","R":"64","V":"100"},"revision":7,"series":"STM32L452","suffix_grammar":"power_smps","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l462ce.pdf","document_id":"DS11913","flash":{"E":"512 KiB"},"ordering_pdf_page":207,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"C":"48","R":"64","V":"100"},"revision":5,"series":"STM32L462","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l471qe.pdf","document_id":"DS10741","flash":{"E":"512 KiB","G":"1 MiB"},"ordering_pdf_page":226,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP"},"pin_codes":{"Q":"132","R":"64","V":"100","Z":"144"},"revision":3,"series":"STM32L471","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l475rc.pdf","document_id":"DS10969","flash":{"C":"256 KiB","E":"512 KiB","G":"1 MiB"},"ordering_pdf_page":201,"package_codes":{"T":"LQFP"},"pin_codes":{"R":"64","V":"100"},"revision":5,"series":"STM32L475","suffix_grammar":"simple","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l476je.pdf","document_id":"DS10198","flash":{"C":"256 KiB","E":"512 KiB","G":"1 MiB"},"ordering_pdf_page":261,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"J":"72","M":"81","Q":"132","R":"64","V":"100/99","Z":"144"},"revision":11,"series":"STM32L476","special_semantics":["V pin-count code is package-dependent (100/99); raw value is retained rather than guessed.","M/S are package-specific option fields; do not normalize away."],"suffix_grammar":"power_pkg_ms","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l486jg.pdf","document_id":"DS10199","flash":{"G":"1 MiB"},"ordering_pdf_page":250,"package_codes":{"I":"UFBGA","T":"LQFP","Y":"WLCSP"},"pin_codes":{"J":"72","Q":"132","R":"64","V":"100","Z":"144"},"revision":8,"series":"STM32L486","special_semantics":["I is a package/material option and must not be normalized away."],"suffix_grammar":"power_pkg_i","temperature_codes":{"3":"-40..125 C","6":"-40..85 C","7":"-40..105 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l496ae.pdf","document_id":"DS11585","flash":{"E":"512 KiB","G":"1 MiB"},"ordering_pdf_page":274,"package_codes":{"I":"UFBGA","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","R":"64","V":"100","W":"115","Z":"144"},"revision":20,"series":"STM32L496","special_semantics":["PS/SC option rows use special T packing; ordinary blank/P/S rows use optional TR."],"suffix_grammar":"l496","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4a6ag.pdf","document_id":"DS11584","flash":{"G":"1 MiB"},"ordering_pdf_page":275,"package_codes":{"I":"UFBGA","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","R":"64","V":"100","Z":"144"},"revision":14,"series":"STM32L4A6","suffix_grammar":"power_smps","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4p5ae.pdf","document_id":"DS12903","flash":{"E":"512 KiB","G":"1 MiB"},"ordering_pdf_page":308,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"A":"169","C":"48","Q":"132","R":"64","V":"100","Z":"144"},"revision":3,"series":"STM32L4P5","suffix_grammar":"power_sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4q5ag.pdf","document_id":"DS12902","flash":{"G":"1 MiB"},"ordering_pdf_page":308,"package_codes":{"I":"UFBGA","T":"LQFP","U":"UFQFPN","Y":"WLCSP"},"pin_codes":{"A":"169","C":"48","Q":"132","R":"64","V":"100","Z":"144"},"revision":3,"series":"STM32L4Q5","suffix_grammar":"power_smps","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4r5ag.pdf","document_id":"DS12023","flash":{"G":"1 MiB","I":"2 MiB"},"ordering_pdf_page":304,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":5,"series":"STM32L4R5","suffix_grammar":"power_sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4r5ag.pdf","document_id":"DS12023","flash":{"G":"1 MiB","I":"2 MiB"},"ordering_pdf_page":304,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":5,"series":"STM32L4R7","suffix_grammar":"power_sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4r5ag.pdf","document_id":"DS12023","flash":{"G":"1 MiB","I":"2 MiB"},"ordering_pdf_page":304,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":5,"series":"STM32L4R9","suffix_grammar":"power_sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4s5ai.pdf","document_id":"DS12024","flash":{"I":"2 MiB"},"ordering_pdf_page":272,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":4,"series":"STM32L4S5","special_semantics":["Standard blank option remains valid for retained Active exact identities; S is optional new-sawing variant."],"suffix_grammar":"sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4s5ai.pdf","document_id":"DS12024","flash":{"I":"2 MiB"},"ordering_pdf_page":272,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":4,"series":"STM32L4S7","special_semantics":["Standard blank option remains valid for retained Active exact identities; S is optional new-sawing variant."],"suffix_grammar":"sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}},
+    {"coverage":"series_code_grammar","datasheet_url":"https://www.st.com/resource/en/datasheet/stm32l4s5ai.pdf","document_id":"DS12024","flash":{"I":"2 MiB"},"ordering_pdf_page":272,"package_codes":{"I":"UFBGA 7x7","J":"UFBGA 10x10","T":"LQFP","Y":"WLCSP"},"pin_codes":{"A":"169","Q":"132","V":"100","Z":"144"},"revision":4,"series":"STM32L4S9","special_semantics":["Standard blank option remains valid for retained Active exact identities; S is optional new-sawing variant."],"suffix_grammar":"sawing","temperature_codes":{"3":"-40..125 C","6":"-40..85 C"}}
+  ],
+  "schema_version": 1
+}
