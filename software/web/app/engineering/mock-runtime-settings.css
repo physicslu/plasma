@@ -35,7 +35,9 @@
 .mockOperationTable tbody th,
 .mockAppliedTable tbody th {
   color: var(--text);
+  font-size: 16px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .mockOperationTable input {
