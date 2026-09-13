@@ -44,29 +44,31 @@ exact ICPNs: 446
 Base Devices: 138
 ```
 
+L4.5 normalizes the frozen L4.3 research verification labels into the established Production runtime `verified_*` provenance vocabulary. This is a publication-schema translation only; it does not change manufacturer evidence, identity scope, metadata values, or L4.4 routing decisions.
+
 Canonical hard lock:
 
-- Git blob: `5548df18cd8a8797ad8d2c3d3160af1c4c85cfad`
-- SHA-256: `75062ea1ac51cfa66f0fd76025f74504aad92ea8f982f9b7b2c743ab541fe93e`
+- Git blob: `6cbb7ee5f5189c7d510623940a8945a2bde38399`
+- SHA-256: `f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c`
 
 Publication proposal:
 
-- Git blob: `0d849436a304e2363d30915cfdef54c1d6d6e3f7`
-- SHA-256: `2347bf8158e3ca6441ad8a6484130f3dfed98c3592a2ac9f4539a4768a97b16e`
+- Git blob: `24a3166fe302e60a184f8623a164e2a2df3b7afd`
+- SHA-256: `b390447109da6f836e06722a050cdec7c883f695d7f1df7c8be64eab356790d7`
 
 Publication audit:
 
-- Git blob: `8914420c67266234e5ef671ebff1e6156f856500`
-- SHA-256: `295d174fae4a02bd03c2ca3872b47e3dbc378afe3ebfc0aee07fd943fc81c7c4`
+- Git blob: `9bd87bffea6880bfa2e2d373f5ac0c33e02625da`
+- SHA-256: `0c6a0d9ebdc5d97a7238333592f298d786000df1b466e698996695192fe12053`
 
 Publication baseline Git blob:
 
-`dd031a661cf0c3734eb0dd3f6bd7d274de708c8f`
+`d43143e3f48a75c886810be1fc7b70061cc3966c`
 
 Post-publication Production manifest:
 
-- Git blob: `ee77f620ba77015382239c15bd6459aad60f19b0`
-- SHA-256: `bea4ef5bda39e26bf0a8aef9c2bee33c5b1233452f1f4b83c944495bc9a3f2e4`
+- Git blob: `1aa2311a25a69742c428147a402816ed5071e04e`
+- SHA-256: `b88adcb38f0833a25da1671592ea98496d61166b9d0e51877ffb92ad2820b9fe`
 
 ## Production poststate
 
@@ -81,7 +83,7 @@ The 446 published rows are catalog identities. They are not 446 physically quali
 
 ## Manufacturer exception continuity
 
-The three exact L4.3 manufacturer-authority exceptions remain explicit in canonical metadata and do not expand identity scope:
+The three exact L4.3 manufacturer-authority exceptions remain explicit in canonical provenance and do not expand identity scope:
 
 - `STM32L4A6RGT7`
 - `STM32L4A6RGT7TR`
@@ -103,8 +105,8 @@ L4.5 does not qualify:
 ## Permanent validation
 
 - `publish_stm32l4_phase_l4_5.py` deterministically reconstructs the publication from frozen inputs and is idempotent after publication.
-- `test_stm32l4_phase_l4_5_publication.py` verifies identity set, canonical semantics, manufacturer-exception continuity, Production binding, and non-claim boundaries.
+- `test_stm32l4_phase_l4_5_publication.py` verifies identity set, canonical semantics, runtime-compatible provenance, manufacturer-exception continuity, Production binding, and non-claim boundaries.
 - `validate_stm32l4_phase_l4_5_publication.py` hard-locks all materialized publication bytes.
 - `.github/workflows/device-catalog-stm32l4-l45-publication-validation.yml` provides permanent read-only CI.
 
-The temporary write-capable materialization workflow removed itself after committing deterministic outputs.
+Temporary write-capable materialization workflows removed themselves after committing deterministic outputs.
