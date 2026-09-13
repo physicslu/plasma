@@ -42,6 +42,8 @@ EXPECTED_PUBLISHED_ROWS = 446
 EXPECTED_PUBLISHED_BASES = 138
 EXPECTED_PRESTATE = (1272, 392, 11)
 EXPECTED_POSTSTATE = (1718, 530, 12)
+CANONICAL_VERIFICATION_STATUS = "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+CANONICAL_EXCEPTION_VERIFICATION_STATUS = "verified_st_datasheet_ordering_information_plus_exact_variant_manufacturer_exception_plus_retained_exact_identity"
 
 
 def _git_blob_sha(data: bytes) -> str:
@@ -129,6 +131,20 @@ def _validate_frozen_inputs() -> dict[str, Any]:
     return frozen
 
 
+def _normalize_publication_provenance(row: dict[str, str]) -> dict[str, str]:
+    """Translate frozen L4.3 research status into the canonical runtime provenance vocabulary."""
+    status = row.get("verification_status")
+    if status == "manufacturer_ordering_information_verified":
+        row["verification_status"] = CANONICAL_VERIFICATION_STATUS
+    elif status == "manufacturer_authority_exact_variant_exception_verified":
+        row["verification_status"] = CANONICAL_EXCEPTION_VERIFICATION_STATUS
+    else:
+        raise RuntimeError(f"{row.get('icpn')}: unsupported L4.3 verification status for publication: {status}")
+    if not row["verification_status"].startswith("verified_"):
+        raise RuntimeError(f"{row.get('icpn')}: canonical runtime provenance normalization failed")
+    return row
+
+
 def _historical_canonical_rows() -> list[dict[str, str]]:
     _validate_frozen_inputs()
     catalog_rows = read_catalog(DEFAULT_CATALOG)
@@ -144,7 +160,7 @@ def _historical_canonical_rows() -> list[dict[str, str]]:
         if mapping.get("status") != "unique" or mapping.get("target_config") != TARGET_CONFIG:
             raise RuntimeError(f"{icpn}: L4.4 positive OpenOCD route no longer replays")
         candidate["base_mapping"] = mapping
-        row = build_canonical_row(candidate, list(CANONICAL_FIELDS))
+        row = _normalize_publication_provenance(build_canonical_row(candidate, list(CANONICAL_FIELDS)))
         if row.get("icpn") != icpn:
             raise RuntimeError(f"{icpn}: canonical identity changed during rendering")
         rows.append(row)
