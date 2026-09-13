@@ -8,6 +8,7 @@ on:
       - "data/device-catalog/research/test_stm32l4_phase_l4_3_policy.py"
       - "data/device-catalog/research/validate_stm32l4_phase_l4_3_policy.py"
       - "data/device-catalog/research/stm32l4-phase-l4.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
       - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
       - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
       - "data/device-catalog/production/**"
@@ -56,12 +57,15 @@ jobs:
           assert d["candidate_count"] == 446
           assert d["base_device_count"] == 138
           assert d["decision_counts"] == {"metadata_ready":446,"manual_review_required":0,"reject":0}, d["decision_counts"]
+          assert d["exact_variant_exception_icpns"] == ["STM32L4A6RGT7","STM32L4A6RGT7TR","STM32L4S5QII3P"]
           assert d["issues"] == [], d["issues"]
           assert d["manual_review_base_devices"] == [], d["manual_review_base_devices"]
           assert d["production_snapshot"]["exact_icpn_count"] == 1272
           assert d["production_snapshot"]["base_device_count"] == 392
           assert d["production_snapshot"]["family_count"] == 11
           assert d["production_snapshot"]["stm32l4_exact_icpn_count"] == 0
+          assert d["metadata_contract"]["exact_variant_exception_count"] == 3
+          assert d["metadata_contract"]["exact_variant_exceptions_expand_identity_scope"] is False
           for key in ("canonical_admission_authorized","production_write_authorized","programming_policy_defined","flash_geometry_qualified","option_security_semantics_qualified","physical_hil_qualified","runtime_programming_support_claimed","scope_expansion_authorized"):
               assert d["metadata_contract"][key] is False, (key, d["metadata_contract"][key])
           print("STM32L4 L4.3 fail-closed boundary: PASS")
