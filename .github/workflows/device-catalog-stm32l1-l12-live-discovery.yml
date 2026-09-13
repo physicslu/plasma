@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 50
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 2
       matrix:
         shard: [0, 1, 2, 3]
     steps:
@@ -64,10 +64,9 @@ jobs:
         run: |
           set +e
           mkdir -p /tmp/stm32l1-l1.2-shard
-          python data/device-catalog/research/run_stm32l1_phase_l1_2_shard.py \
+          xvfb-run -a python data/device-catalog/research/run_stm32l1_phase_l1_2_shard.py \
             --shard-index "${{ matrix.shard }}" \
             --shard-count "$SHARD_COUNT" \
-            --headless \
             --timeout 90 \
             --delay 1 \
             --output /tmp/stm32l1-l1.2-shard/summary.json \
