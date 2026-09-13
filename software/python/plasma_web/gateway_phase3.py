@@ -175,7 +175,7 @@ PlasmaWebHandler = Phase3PlasmaWebHandler
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Plasma Phase-3 browser REST gateway")
+    parser = argparse.ArgumentParser(description="Plasma browser REST gateway")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--plasma-host", default="127.0.0.1")
