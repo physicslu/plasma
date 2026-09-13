@@ -8,17 +8,18 @@ async function source(url) {
   return readFile(url, "utf8");
 }
 
-test("active Programming Job exposes one execution status and one ABORT without the idle action row", async () => {
+test("Programming Job keeps the canonical START / Batch Status / ABORT row during execution", async () => {
   const panel = await source(panelPath);
 
-  assert.match(panel, /const executionActive = statusText \? activeExecutionStates\.has\(statusText\) : false/);
-  assert.match(panel, /\{executionActive && \([\s\S]*className="programmingJobExecutionBar"[\s\S]*data-programming-job-action="status"/);
-  assert.match(panel, /className="programmingJobExecutionAbort"[\s\S]*data-programming-job-action="abort"/);
-  assert.match(panel, /\{!executionActive && \([\s\S]*className="programmingJobActionBar"/);
+  assert.match(panel, /className="programmingJobActionBar"[\s\S]*data-programming-job-actions=\{mode\}/);
+  assert.match(panel, /data-programming-job-action="start"/);
+  assert.match(panel, /data-programming-job-action="status"/);
+  assert.match(panel, /data-programming-job-action="abort"/);
 
-  for (const state of ["SUBMITTING", "QUEUED", "RUNNING", "RECONNECTING", "STOPPING", "ABORTING", "CANCELLING"]) {
-    assert.match(panel, new RegExp(`"${state}"`));
-  }
+  assert.doesNotMatch(panel, /programmingJobExecutionBar/);
+  assert.doesNotMatch(panel, /programmingJobExecutionAbort/);
+  assert.doesNotMatch(panel, /activeExecutionStates/);
+  assert.doesNotMatch(panel, /useBatchSummaryLiveMetrics/);
 
   for (const forbidden of [
     "createServerBatch",
