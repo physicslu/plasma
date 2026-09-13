@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from plasma_client.client import PlasmaClient
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.job_logging import OutputManager
 from plasma_interfaces.mock import MockInterface
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
@@ -42,16 +44,19 @@ class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
         manager = SiteManager(config, interface_factory=interface_factory)
         self.server = PlasmaServer(config, manager)
         await self.server.start()
-
-        def fail_state_write(*_args, **_kwargs) -> None:
-            raise OSError("injected output persistence failure")
-
-        manager.output.write_state = fail_state_write  # type: ignore[method-assign]
         return PlasmaClient(*self.server.address, response_timeout_s=3.0)
+
+    async def run_with_output_failure(self, client: PlasmaClient) -> dict:
+        with patch.object(
+            OutputManager,
+            "write_state",
+            side_effect=OSError("injected output persistence failure"),
+        ):
+            return (await client.erase(1))["result"]
 
     async def test_emergency_safe_shutdown_failure_is_authoritative_job_error(self) -> None:
         client = await self.start_server(lambda _site: EmergencyShutdownFailureMock())
-        result = (await client.erase(1))["result"]
+        result = await self.run_with_output_failure(client)
 
         self.assertEqual(result["state"], "error")
         self.assertEqual(result["error"]["error_code"], ErrorCode.INTERFACE_FAILURE.value)
@@ -68,7 +73,7 @@ class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_raw_emergency_safe_shutdown_failure_is_normalized(self) -> None:
         client = await self.start_server(lambda _site: EmergencyRuntimeShutdownFailureMock())
-        result = (await client.erase(1))["result"]
+        result = await self.run_with_output_failure(client)
 
         self.assertEqual(result["state"], "error")
         self.assertEqual(result["error"]["error_code"], ErrorCode.INTERFACE_FAILURE.value)
