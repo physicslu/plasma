@@ -82,6 +82,8 @@ type DeploymentPayload = {
   deployment: BootstrapDeploymentRecord;
 };
 
+type BinaryData = ArrayBuffer | Uint8Array;
+
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     cache: "no-store",
@@ -160,13 +162,17 @@ export function startManagerPpuBootstrapDeployment(
   });
 }
 
-export async function sha256Hex(data: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", data);
+function binaryBytes(data: BinaryData): Uint8Array {
+  return data instanceof Uint8Array ? data : new Uint8Array(data);
+}
+
+export async function sha256Hex(data: BinaryData): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", binaryBytes(data));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function bytesToBase64(data: ArrayBuffer): string {
-  const bytes = new Uint8Array(data);
+export function bytesToBase64(data: BinaryData): string {
+  const bytes = binaryBytes(data);
   let binary = "";
   const stride = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += stride) {
@@ -177,10 +183,10 @@ export function bytesToBase64(data: ArrayBuffer): string {
 
 export function parseSha256Sidecar(text: string, expectedFileName: string): string {
   const fields = text.trim().split(/\s+/);
-  if (fields.length !== 2) throw new Error("Release SHA-256 sidecar must contain one digest and file name");
+  if (fields.length !== 2) throw new Error("Z2 PS Kit SHA-256 sidecar must contain one digest and file name");
   const digest = fields[0]?.toLowerCase() ?? "";
   const fileName = (fields[1] ?? "").replace(/^\*/, "");
-  if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error("Release SHA-256 sidecar digest is invalid");
-  if (fileName !== expectedFileName) throw new Error("Release SHA-256 sidecar does not identify the selected kit");
+  if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error("Z2 PS Kit SHA-256 sidecar digest is invalid");
+  if (fileName !== expectedFileName) throw new Error("Z2 PS Kit SHA-256 sidecar does not identify the selected kit");
   return digest;
 }
