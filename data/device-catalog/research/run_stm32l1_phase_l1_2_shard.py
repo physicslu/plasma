@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         headless=args.headless,
         reuse_browser=True,
-        global_deadline=True,
+        global_deadline=False,
     ) as acquirer:
         summary = run_discovery_slice(
             full_targets=full_targets,
