@@ -1,7 +1,9 @@
 import { useRef } from "react";
 import type { ChangeEvent, ReactNode } from "react";
+import { batchReadinessGuidanceFromLabel } from "../batch-readiness";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
+import { useI18n } from "../i18n";
 import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
 import "./programming-job-controls.css";
 
@@ -50,6 +52,16 @@ export type ProgrammingJobImage = {
   inputAriaLabel: string;
   onFileChange: (file: File | null, event: ChangeEvent<HTMLInputElement>) => void;
 };
+
+const activeExecutionStates = new Set([
+  "SUBMITTING",
+  "QUEUED",
+  "RUNNING",
+  "RECONNECTING",
+  "STOPPING",
+  "ABORTING",
+  "CANCELLING",
+]);
 
 export function ProgrammingJobPanel({
   mode,
@@ -108,8 +120,13 @@ export function ProgrammingJobPanel({
   abortDisabled: boolean;
   onAbort: () => void | Promise<void>;
 }) {
+  const { locale } = useI18n();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modeLabel = mode === "production" ? "Production" : "Engineering";
+  const statusText = typeof statusValue === "string" ? statusValue : null;
+  const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
+  const executionActive = statusText ? activeExecutionStates.has(statusText) : false;
+  const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
 
   return (
     <OperatorPanel
@@ -127,6 +144,24 @@ export function ProgrammingJobPanel({
         />
       )}
     >
+      {executionActive && (
+        <div className="programmingJobExecutionBar" role="status" aria-live="polite">
+          <div>
+            <small>{statusLabel}</small>
+            <b>{statusValue}</b>
+            {readinessGuidance && <span>{readinessGuidance}</span>}
+          </div>
+          <button
+            type="button"
+            className="programmingJobExecutionAbort"
+            disabled={abortDisabled}
+            onClick={() => void onAbort()}
+          >
+            ■ {abortLabel}
+          </button>
+        </div>
+      )}
+
       {!collapsed && (
         <div className="programmingJobGrid" data-programming-job-fields={mode}>
           <div className="programmingJobField" data-programming-job-field="target">
@@ -194,10 +229,20 @@ export function ProgrammingJobPanel({
       )}
 
       <div className="programmingJobActionBar" data-programming-job-actions={mode}>
-        <button type="button" className="programmingJobStart" data-programming-job-action="start" disabled={startDisabled} onClick={() => void onStart()}>▶ {startLabel}</button>
+        <button
+          type="button"
+          className="programmingJobStart"
+          data-programming-job-action="start"
+          disabled={startDisabled}
+          title={disabledStartTitle}
+          onClick={() => void onStart()}
+        >
+          ▶ {startLabel}
+        </button>
         <div className={`programmingJobStatus ${statusClassName}`.trim()} data-programming-job-action="status" role="status" aria-label={statusLabel}>
           <small>{statusLabel}</small>
           <b>{statusValue}</b>
+          {readinessGuidance && <span className="programmingJobStatusHint">{readinessGuidance}</span>}
         </div>
         <button type="button" className="programmingJobAbort" data-programming-job-action="abort" disabled={abortDisabled} onClick={() => void onAbort()}>■ {abortLabel}</button>
       </div>
