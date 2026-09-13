@@ -26,6 +26,10 @@ require_backend() {
   [[ -f "$path" ]] || die "$label backend is missing: $path"
 }
 
+require_root_verify() {
+  (( EUID == 0 )) || die "verify requires root because appliance configuration and managed ingress metadata are intentionally restricted; run: sudo bash scripts/plasmactl verify swpc-z2like"
+}
+
 programming_desired() {
   [[ -e "$programming_dropin" ]] || return 1
   [[ -f "$programming_dropin" ]] || die "Programming activation path is not a regular file: $programming_dropin"
@@ -70,6 +74,7 @@ reconcile_addons() {
 }
 
 verify_profile() {
+  require_root_verify
   capture_desired_state
   bash "$base_backend" verify "$@"
   if (( programming_was_enabled )); then
@@ -106,8 +111,11 @@ Usage: plasmactl-swpc-z2like-orchestrator COMMAND [base-profile options]
 Commands:
   install   First provision of the base SWPC Z2-like profile; add-ons remain opt-in
   deploy    Deploy base runtime, then reconcile and verify all previously enabled add-ons
-  verify    Verify base runtime plus every currently declared add-on
+  verify    Root-read-only verification of base runtime plus every currently declared add-on
   status    Show base status and declared add-on state
+
+`verify` requires root because canonical appliance configuration and managed
+Nginx ingress metadata are intentionally inaccessible to an unprivileged user.
 
 The orchestrator preserves each declared add-on independently. It never enables
 configured Mock Programming or managed ingress merely because a fresh base
