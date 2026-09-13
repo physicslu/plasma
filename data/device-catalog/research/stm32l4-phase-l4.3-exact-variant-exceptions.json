@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "phase": "L4.3",
+  "family": "STM32L4",
+  "policy": "exact_part_manufacturer_surface_exception_only_when_current_datasheet_ordering_table_omits_a_retained_active_variant",
+  "scope_expansion_authorized": false,
+  "exceptions": {
+    "STM32L4A6RGT7": {
+      "field": "temperature_grade",
+      "code": "7",
+      "value": "-40..105 C",
+      "reason": "DS11584 Rev 14 Table 133 omits suffix 7, while current official ST exact-part surfaces retain STM32L4A6RGT7 as Active and ST eStore specifies -40..105 C.",
+      "authority_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6rg.html",
+        "https://estore.st.com/en/stm32l4a6rgt7-cpn.html"
+      ]
+    },
+    "STM32L4A6RGT7TR": {
+      "field": "temperature_grade",
+      "code": "7",
+      "value": "-40..105 C",
+      "reason": "DS11584 Rev 14 Table 133 omits suffix 7, while current official ST exact-part surfaces retain STM32L4A6RGT7TR as Active and ST eStore specifies -40..105 C with tape-and-reel packing.",
+      "authority_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l4a6rg.html",
+        "https://estore.st.com/en/stm32l4a6rgt7tr-cpn.html"
+      ]
+    },
+    "STM32L4S5QII3P": {
+      "field": "option_suffix",
+      "code": "P",
+      "value": "P",
+      "reason": "DS12024 Rev 4 Table 128 lists S but omits P; current official ST STM32L4S5QI exact-part surface retains STM32L4S5QII3P as Active and reports SMPS=External.",
+      "authority_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l4s5qi.html",
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l4plus-series/stm32l4r5-s5/stm32l4s5qi.html"
+      ]
+    }
+  }
+}
