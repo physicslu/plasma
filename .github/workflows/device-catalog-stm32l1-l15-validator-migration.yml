@@ -1,0 +1,176 @@
+name: STM32L1 L1.5 historical validator migration
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32l1-l15-publication
+    paths:
+      - ".github/workflows/device-catalog-stm32l1-l15-validator-migration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply fail-closed historical/current validator separation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one replacement target, got {count}")
+              p.write_text(text.replace(old, new), encoding="utf-8")
+
+          # L1.2 is historical discovery. Its Gate-1 Production boundary must replay
+          # the frozen post-L4 prestate, not mutable current Production.
+          p = "data/device-catalog/research/stm32l1_phase_l1_2_discovery.py"
+          replace_once(
+              p,
+              'DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"',
+              'DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"\n'
+              'FROZEN_GATE1_PRODUCTION_MANIFEST = HERE / "stm32l1-requalification-production-prestate.json"',
+          )
+          replace_once(
+              p,
+              'def validate_gate1_production_boundary(path: Path = DEFAULT_PRODUCTION_MANIFEST) -> dict[str, Any]:',
+              'def validate_gate1_production_boundary(path: Path = FROZEN_GATE1_PRODUCTION_MANIFEST) -> dict[str, Any]:',
+          )
+
+          # L1.3 metadata planning is an immutable historical transaction.
+          p = "data/device-catalog/research/stm32l1_phase_l1_3_policy.py"
+          replace_once(
+              p,
+              'PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"',
+              'PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"\n'
+              'FROZEN_PRODUCTION_PRESTATE = HERE / "stm32l1-requalification-production-prestate.json"',
+          )
+          replace_once(p, '_git_blob_sha(PRODUCTION)', '_git_blob_sha(FROZEN_PRODUCTION_PRESTATE)')
+          replace_once(p, 'json.loads(PRODUCTION.read_text(encoding="utf-8"))', 'json.loads(FROZEN_PRODUCTION_PRESTATE.read_text(encoding="utf-8"))')
+          replace_once(p, '(PRODUCTION.parent / source["path"]).resolve()', '(FROZEN_PRODUCTION_PRESTATE.parent / source["path"]).resolve()')
+
+          # L1.4 must replay the same frozen Production prestate while retaining
+          # the original manifest filename in its frozen plan/provenance.
+          p = "data/device-catalog/research/stm32l1_phase_l1_4_admission.py"
+          replace_once(
+              p,
+              'PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"',
+              'PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"\n'
+              'FROZEN_PRODUCTION_PRESTATE = HERE / "stm32l1-requalification-production-prestate.json"',
+          )
+          replace_once(p, '_git_blob_sha(PRODUCTION)', '_git_blob_sha(FROZEN_PRODUCTION_PRESTATE)')
+          replace_once(p, '_sha256(PRODUCTION)', '_sha256(FROZEN_PRODUCTION_PRESTATE)')
+
+          # The L1.4 frozen plan already hard-locks canonical_rows_before == 0.
+          # Do not require the current filesystem to remain permanently pre-L1.5.
+          p = "data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py"
+          replace_once(p, '    DEFAULT_CANONICAL,\n', '')
+          replace_once(p, '    req(not DEFAULT_CANONICAL.exists(), "L1.4 requires absent STM32L1 canonical prestate")\n', '')
+
+          # L4.5 remains hard-locked on its own 446-row family publication, but
+          # later family publications may legitimately grow global Production.
+          p = "data/device-catalog/research/validate_stm32l4_phase_l4_5_publication.py"
+          old = '''    summary = verify_current_publication()\n    if summary != {\n        "status": "valid",\n        "phase": "L4.5",\n        "published_exact_icpns": 446,\n        "published_base_devices": 138,\n        "production_exact_icpns": 1718,\n        "production_base_devices": 530,\n        "production_family_count": 12,\n        "stm32l4_production": 446,\n    }:\n        raise RuntimeError(f"L4.5 current publication summary drifted: {summary}")\n\n    print("STM32L4 L4.5 publication: VALID")\n    print("Published exact ICPNs: 446")\n    print("Published Base Devices: 138")\n    print("Production exact ICPNs: 1718")\n    print("Production Base Devices: 530")\n    print("STM32 families: 12")\n    print("STM32L4 Production: 446")\n'''
+          new = '''    summary = verify_current_publication()\n    expected_family = {\n        "status": "valid",\n        "phase": "L4.5",\n        "published_exact_icpns": 446,\n        "published_base_devices": 138,\n        "stm32l4_production": 446,\n    }\n    for key, value in expected_family.items():\n        if summary.get(key) != value:\n            raise RuntimeError(f"L4.5 family publication summary drifted: {key}={summary.get(key)!r}")\n    for key, minimum in (\n        ("production_exact_icpns", EXPECTED_POSTSTATE[0]),\n        ("production_base_devices", EXPECTED_POSTSTATE[1]),\n        ("production_family_count", EXPECTED_POSTSTATE[2]),\n    ):\n        observed = summary.get(key)\n        if not isinstance(observed, int) or observed < minimum:\n            raise RuntimeError(f"L4.5 global Production regressed: {key}={observed!r}, minimum={minimum}")\n\n    print("STM32L4 L4.5 publication: VALID")\n    print("Published exact ICPNs: 446")\n    print("Published Base Devices: 138")\n    print(f"Production exact ICPNs: {summary['production_exact_icpns']}")\n    print(f"Production Base Devices: {summary['production_base_devices']}")\n    print(f"STM32 families: {summary['production_family_count']}")\n    print("STM32L4 Production: 446")\n'''
+          replace_once(p, old, new)
+
+          # Cross-family prioritization is intentionally current-state policy.
+          # After L1.5, STM32L1 is Production and therefore leaves the shortlist.
+          p = "data/device-catalog/research/test_stm32_cross_family_prioritization.py"
+          replace_once(
+              p,
+              'CURRENT_SHORTLIST = ["STM32L1"]',
+              'HERE = Path(__file__).resolve().parent\nCURRENT_SHORTLIST: list[str] = []\nPRE_L1_SHORTLIST = ["STM32L1"]\nPRE_L1_MANIFEST = HERE / "stm32l1-requalification-production-prestate.json"',
+          )
+          replace_once(
+              p,
+              '    def _current(self):\n        return build_prioritization(catalog_path=DEFAULT_CATALOG, manifest_path=DEFAULT_MANIFEST)\n',
+              '    def _current(self):\n        return build_prioritization(catalog_path=DEFAULT_CATALOG, manifest_path=DEFAULT_MANIFEST)\n\n'
+              '    def _pre_l1(self):\n        return build_prioritization(catalog_path=DEFAULT_CATALOG, manifest_path=PRE_L1_MANIFEST)\n',
+          )
+          replace_once(p, '    def test_current_post_l4_inventory_and_shortlist_are_deterministic(self) -> None:', '    def test_current_post_l1_inventory_and_shortlist_are_deterministic(self) -> None:')
+          replace_once(p, 'self.assertEqual(report["production_invariants"]["exact_icpn_count"], 1718)', 'self.assertEqual(report["production_invariants"]["exact_icpn_count"], 1862)')
+          replace_once(p, 'self.assertEqual(report["production_invariants"]["base_device_count"], 530)', 'self.assertEqual(report["production_invariants"]["base_device_count"], 589)')
+          replace_once(
+              p,
+              '            "STM32F4", "STM32F7", "STM32G0", "STM32G4", "STM32L0", "STM32L4", "STM32U0",',
+              '            "STM32F4", "STM32F7", "STM32G0", "STM32G4", "STM32L0", "STM32L1", "STM32L4", "STM32U0",',
+          )
+          replace_once(
+              p,
+              '        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L0"], 360)\n        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L4"], 446)',
+              '        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L0"], 360)\n        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L1"], 144)\n        self.assertEqual(report["production_invariants"]["family_exact_icpn_counts"]["STM32L4"], 446)',
+          )
+          replace_once(p, 'self.assertEqual(report["inventory"]["candidate_series_count"], 11)', 'self.assertEqual(report["inventory"]["candidate_series_count"], 10)')
+          replace_once(p, 'self.assertEqual(report["inventory"]["candidate_source_row_count"], 805)', 'self.assertEqual(report["inventory"]["candidate_source_row_count"], 673)')
+          replace_once(p, 'self.assertEqual(report["inventory"]["candidate_ordering_pattern_rows"], 484)', 'self.assertEqual(report["inventory"]["candidate_ordering_pattern_rows"], 397)')
+          replace_once(p, 'self.assertEqual(report["inventory"]["shortlist_eligible_series_count"], 1)', 'self.assertEqual(report["inventory"]["shortlist_eligible_series_count"], 0)')
+          replace_once(
+              p,
+              '            "high_complexity_requires_partitioned_scope": 1,\n            "standard_nonwireless_research": 1,\n            "trustzone_requires_security_scope": 3,',
+              '            "high_complexity_requires_partitioned_scope": 1,\n            "trustzone_requires_security_scope": 3,',
+          )
+          replace_once(
+              p,
+              '        self.assertNotIn("STM32L4", candidates)\n        self.assertIsNone(report["selected_next_research_family"])',
+              '        self.assertNotIn("STM32L4", candidates)\n        self.assertNotIn("STM32L1", candidates)\n        self.assertIsNone(report["selected_next_research_family"])',
+          )
+          replace_once(
+              p,
+              '    def test_mixed_identifier_kinds_are_not_automatically_rejected(self) -> None:\n        report = self._current()',
+              '    def test_mixed_identifier_kinds_are_not_automatically_rejected(self) -> None:\n        report = self._pre_l1()',
+          )
+          replace_once(p, '        for series in CURRENT_SHORTLIST:\n            self.assertGreater(candidates[series]["ordering_pattern_rows"], 0)', '        for series in PRE_L1_SHORTLIST:\n            self.assertGreater(candidates[series]["ordering_pattern_rows"], 0)')
+          replace_once(p, 'report = build_prioritization(catalog_path=path, manifest_path=DEFAULT_MANIFEST)', 'report = build_prioritization(catalog_path=path, manifest_path=PRE_L1_MANIFEST)')
+          replace_once(p, '        self.assertEqual(len(report["research_shortlist"]), 1)', '        self.assertEqual(len(report["research_shortlist"]), 0)')
+          PY
+
+      - name: Run targeted historical/current validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/test_stm32l1_phase_l1_2_discovery.py
+          python data/device-catalog/research/validate_stm32l1_phase_l1_2_retained_evidence.py
+          python data/device-catalog/research/test_stm32l1_phase_l1_3_policy.py
+          python data/device-catalog/research/validate_stm32l1_phase_l1_3_policy.py
+          python data/device-catalog/research/test_stm32l1_phase_l1_4_admission.py
+          python data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py
+          (
+            cd data/device-catalog/research
+            python -m unittest -v test_stm32l4_phase_l4_5_publication.py
+            python validate_stm32l4_phase_l4_5_publication.py
+          )
+          python data/device-catalog/research/test_stm32_cross_family_prioritization.py
+          python data/device-catalog/research/test_stm32_cross_family_prioritization_replay.py
+          python data/device-catalog/research/validate_stm32l1_phase_l1_5_publication.py
+
+      - name: Commit validated migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/device-catalog/research/stm32l1_phase_l1_2_discovery.py \
+            data/device-catalog/research/stm32l1_phase_l1_3_policy.py \
+            data/device-catalog/research/stm32l1_phase_l1_4_admission.py \
+            data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py \
+            data/device-catalog/research/validate_stm32l4_phase_l4_5_publication.py \
+            data/device-catalog/research/test_stm32_cross_family_prioritization.py
+          git diff --cached --check
+          git commit -m "Decouple historical validators from current Production growth"
+          git push origin HEAD:agent/device-catalog-stm32l1-l15-publication
