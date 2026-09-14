@@ -11,7 +11,7 @@ on:
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
-      - "scripts/tests/test-device-catalog-ci-trigger-governance.py"
+      - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -31,7 +31,7 @@ on:
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
-      - "scripts/tests/test-device-catalog-ci-trigger-governance.py"
+      - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -117,7 +117,7 @@ jobs:
               ".github/ci-workstreams.json",
               ".github/device-catalog-ci-trigger-debt.json",
               "scripts/tests/test-ci-domain-boundaries.py",
-              "scripts/tests/test-device-catalog-ci-trigger-governance.py",
+              "scripts/ci/device-catalog-trigger-governance.py",
               ".github/workflows/python-tests.yml",
               ".github/workflows/ic-support-validation.yml",
               ".github/workflows/ppu-release.yml",
@@ -204,4 +204,4 @@ jobs:
       - name: Enforce Device Catalog CI trigger governance
         env:
           PLASMA_CI_GOVERNANCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: python scripts/tests/test-device-catalog-ci-trigger-governance.py
+        run: python scripts/ci/device-catalog-trigger-governance.py
