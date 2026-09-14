@@ -1,0 +1,40 @@
+name: STM32L1 L1.5 migration path fix
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32l1-l15-publication
+    paths:
+      - ".github/workflows/device-catalog-stm32l1-l15-validator-migration-path-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Point migration at byte-identical neutral prestate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/device-catalog-stm32l1-l15-validator-migration.yml')
+          text = p.read_text(encoding='utf-8')
+          old = 'stm32l1-requalification-production-prestate.json'
+          new = 'stm32l1-post-l4-production-manifest-prestate.json'
+          if text.count(old) != 4:
+              raise SystemExit(f'expected 4 historical-prestate references, got {text.count(old)}')
+          p.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/device-catalog-stm32l1-l15-validator-migration.yml
+          git rm .github/workflows/device-catalog-stm32l1-l15-validator-migration-path-fix.yml
+          git diff --cached --check
+          git commit -m "Point L1.5 validator migration at neutral prestate"
+          git push origin HEAD:agent/device-catalog-stm32l1-l15-publication
