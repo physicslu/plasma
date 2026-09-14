@@ -29,7 +29,9 @@ TARGET_MARKER = "PLASMA_Z2LIKE_DEMO_QEMU_TARGET"
 CORE_OVERRIDE = "PLASMA_Z2LIKE_DEMO_INSTALLER_CORE"
 EVIDENCE_LEVEL = "swpc-qemu-armv7-z2like-demo"
 ACTIVATION_MARKER = "z2like-demo-activation.json"
+SITE_COUNT_MARKER = "z2like-demo-site-count"
 DEFAULT_SIMULATION_SITE_COUNT = 8
+MAX_SIMULATION_SITE_COUNT = 8
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -136,15 +138,27 @@ def _atomic_symlink(link: Path, target: Path) -> None:
     os.replace(temporary, link)
 
 
-def _simulation_site_count() -> int:
-    raw = os.environ.get("PLASMA_Z2LIKE_DEMO_SITE_COUNT", str(DEFAULT_SIMULATION_SITE_COUNT)).strip()
+def _validated_site_count(raw: str) -> int:
     try:
-        site_count = int(raw)
+        site_count = int(raw.strip())
     except ValueError as exc:
-        raise Z2InstallerError("PLASMA_Z2LIKE_DEMO_SITE_COUNT must be an integer") from exc
-    if not 1 <= site_count <= 8:
-        raise Z2InstallerError("PLASMA_Z2LIKE_DEMO_SITE_COUNT must be between 1 and 8")
+        raise Z2InstallerError("z2like-demo Site count must be an integer") from exc
+    if not 1 <= site_count <= MAX_SIMULATION_SITE_COUNT:
+        raise Z2InstallerError(
+            f"z2like-demo Site count must be between 1 and {MAX_SIMULATION_SITE_COUNT}"
+        )
     return site_count
+
+
+def _simulation_site_count(state_root: Path) -> int:
+    marker = state_root / SITE_COUNT_MARKER
+    if marker.is_file():
+        try:
+            return _validated_site_count(marker.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise Z2InstallerError(f"cannot read z2like-demo Site-count marker: {marker}") from exc
+    raw = os.environ.get("PLASMA_Z2LIKE_DEMO_SITE_COUNT", str(DEFAULT_SIMULATION_SITE_COUNT))
+    return _validated_site_count(raw)
 
 
 def _config_lines(
@@ -168,7 +182,7 @@ def _config_lines(
         "server:",
         "  host: 127.0.0.1",
         "  port: 9900",
-        "  max_supported_sites: 8",
+        f"  max_supported_sites: {MAX_SIMULATION_SITE_COUNT}",
         f"  max_concurrent_jobs: {max_concurrent_jobs}",
         "  max_queue_depth_per_site: 16",
         f"  output_root: {state_root / 'output'}",
@@ -197,6 +211,28 @@ def _config_lines(
     return lines
 
 
+def _simulation_config_for_count(
+    *,
+    ppu_id: str,
+    facility_id: str,
+    display_name: str,
+    state_root: Path,
+    log_root: Path,
+    site_count: int,
+) -> str:
+    return "\n".join(
+        _config_lines(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=state_root,
+            log_root=log_root,
+            site_count=site_count,
+            legacy_empty_sites=False,
+        )
+    )
+
+
 def _simulation_config(
     *,
     ppu_id: str,
@@ -208,16 +244,13 @@ def _simulation_config(
     for label, value in (("ppu-id", ppu_id), ("facility-id", facility_id), ("display-name", display_name)):
         if not value or "\n" in value or "\r" in value:
             raise Z2InstallerError(f"{label} must be a non-empty single-line value")
-    return "\n".join(
-        _config_lines(
-            ppu_id=ppu_id,
-            facility_id=facility_id,
-            display_name=display_name,
-            state_root=state_root,
-            log_root=log_root,
-            site_count=_simulation_site_count(),
-            legacy_empty_sites=False,
-        )
+    return _simulation_config_for_count(
+        ppu_id=ppu_id,
+        facility_id=facility_id,
+        display_name=display_name,
+        state_root=state_root,
+        log_root=log_root,
+        site_count=_simulation_site_count(state_root),
     )
 
 
@@ -240,6 +273,37 @@ def _legacy_empty_simulation_config(
             legacy_empty_sites=True,
         )
     )
+
+
+def _managed_simulation_configs(
+    *,
+    ppu_id: str,
+    facility_id: str,
+    display_name: str,
+    state_root: Path,
+    log_root: Path,
+) -> set[bytes]:
+    configs = {
+        _legacy_empty_simulation_config(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=state_root,
+            log_root=log_root,
+        ).encode("utf-8")
+    }
+    for site_count in range(1, MAX_SIMULATION_SITE_COUNT + 1):
+        configs.add(
+            _simulation_config_for_count(
+                ppu_id=ppu_id,
+                facility_id=facility_id,
+                display_name=display_name,
+                state_root=state_root,
+                log_root=log_root,
+                site_count=site_count,
+            ).encode("utf-8")
+        )
+    return configs
 
 
 def _health_ready(gateway_host: str, *, deadline_s: float = 40.0) -> Mapping[str, object]:
@@ -295,15 +359,14 @@ def install_release(
     )
     if previous_config is None:
         _atomic_text(config_path, desired_config, 0o640)
-    else:
-        legacy_empty = _legacy_empty_simulation_config(
-            ppu_id=ppu_id,
-            facility_id=facility_id,
-            display_name=display_name,
-            state_root=paths.state_root,
-            log_root=paths.log_root,
-        ).encode("utf-8")
-        if previous_config == legacy_empty:
+    elif previous_config in _managed_simulation_configs(
+        ppu_id=ppu_id,
+        facility_id=facility_id,
+        display_name=display_name,
+        state_root=paths.state_root,
+        log_root=paths.log_root,
+    ):
+        if previous_config != desired_config.encode("utf-8"):
             _atomic_text(config_path, desired_config, 0o640)
 
     _atomic_symlink(paths.current, release_target)
@@ -366,8 +429,9 @@ def install_release(
         },
         "site_desired_state": {
             "config_path": str(config_path),
-            "upgrade_preserves_existing_config": True,
-            "legacy_empty_topology_migration": True,
+            "configured_site_count": _simulation_site_count(paths.state_root),
+            "managed_topology_reconciliation": True,
+            "upgrade_preserves_nonmanaged_config": True,
             "runtime_apply_supported": False,
         },
         "activation": {
