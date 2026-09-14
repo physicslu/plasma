@@ -166,6 +166,8 @@ def deploy(
             raise QEMUSimulationKitError("deployment coordinator returned invalid JSON") from exc
         if not isinstance(payload, dict) or payload.get("result") != "PASS":
             raise QEMUSimulationKitError("deployment coordinator did not return PASS evidence")
+        if payload.get("release_id") != verified.release_id:
+            raise QEMUSimulationKitError("deployed release identity does not match verified kit identity")
         return {
             "schema_version": 1,
             "result": "PASS",
