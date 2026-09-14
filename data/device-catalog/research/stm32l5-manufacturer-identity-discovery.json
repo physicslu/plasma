@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32l5-manufacturer-identity-discovery",
+  "authority": "research_only",
+  "parent_security_scope": "stm32l5-security-scope-foundation.json",
+  "series": "STM32L5",
+  "subfamily": "STM32L5x2",
+  "observed_at": "2026-09-14",
+  "manufacturer": "STMicroelectronics",
+  "identity_authority": "ST Quality & Reliability exact Part Number rows",
+  "family_product_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l5x2/products.html",
+  "base_device_count": 17,
+  "exact_icpn_count": 49,
+  "base_device_set_sha256": "a49212731437f33674abc0c5c6a90697bbc3e377f997c618a66fb96b51632435",
+  "exact_icpn_set_sha256": "f9a74a7badfb39f8fc52753fc3904cd63a8b3e0a2e4dcc37dee759809aaa68b1",
+  "base_devices": [
+    "STM32L552CC",
+    "STM32L552CE",
+    "STM32L552ME",
+    "STM32L552QC",
+    "STM32L552QE",
+    "STM32L552RC",
+    "STM32L552RE",
+    "STM32L552VC",
+    "STM32L552VE",
+    "STM32L552ZC",
+    "STM32L552ZE",
+    "STM32L562CE",
+    "STM32L562ME",
+    "STM32L562QE",
+    "STM32L562RE",
+    "STM32L562VE",
+    "STM32L562ZE"
+  ],
+  "result": {
+    "commercial_identity_clean": true,
+    "bounded_discovery_clean": true,
+    "all_observed_marketing_status_active": true,
+    "manual_intervention": 0,
+    "source_unavailable_exclusions": 0
+  },
+  "claims": {
+    "production_admission_authorized": false,
+    "lifecycle_permanent": false,
+    "security_semantics_supported": false,
+    "option_byte_semantics_supported": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "hil_validated": false
+  },
+  "next_research_gate": "stm32l5-metadata-policy"
+}
