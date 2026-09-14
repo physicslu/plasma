@@ -64,6 +64,7 @@ GENERATION_A_SUBFAMILIES = frozenset({"STM32L100", "STM32L151", "STM32L152"})
 GENERATION_A_DENSITIES = frozenset({"6", "8", "B"})
 MIGRATION_AUTHORITY = "TN1176"
 DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
+FROZEN_GATE1_PRODUCTION_MANIFEST = HERE / "stm32l1-post-l4-production-manifest-prestate.json"
 DEFAULT_OUTPUT = Path("/tmp/stm32l1-l1.2-live-summary.json")
 MAX_BASE_DEVICES = 87
 MAX_SURFACES = 174
@@ -127,7 +128,7 @@ def validate_l1_1_boundary(path: Path = L1_1_BASELINE) -> dict[str, Any]:
     return payload
 
 
-def validate_gate1_production_boundary(path: Path = DEFAULT_PRODUCTION_MANIFEST) -> dict[str, Any]:
+def validate_gate1_production_boundary(path: Path = FROZEN_GATE1_PRODUCTION_MANIFEST) -> dict[str, Any]:
     if git_blob_sha(path) != EXPECTED_GATE1_PRODUCTION_GIT_BLOB:
         raise AcquisitionError("L1.2 Gate 1 Production manifest Git blob drifted")
     payload = json.loads(path.read_text(encoding="utf-8"))

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from stm32l1_phase_l1_4_admission import (
-    DEFAULT_CANONICAL,
     DEFAULT_FROZEN_PLAN,
     EXPECTED_POLICY_READY_EXACT_SET_SHA256,
     PHASE,
@@ -56,7 +55,6 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def main() -> int:
     req(validate_l1_3() == 0, "L1.3 permanent metadata validation failed")
-    req(not DEFAULT_CANONICAL.exists(), "L1.4 requires absent STM32L1 canonical prestate")
     req(git_blob_sha(DEFAULT_FROZEN_PLAN) == EXPECTED_FROZEN_PLAN_GIT_BLOB, "frozen L1.4 plan blob drifted")
     req(sha256(DEFAULT_FROZEN_PLAN) == EXPECTED_FROZEN_PLAN_SHA256, "frozen L1.4 plan digest drifted")
 

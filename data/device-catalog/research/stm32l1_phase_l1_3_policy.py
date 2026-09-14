@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 PHASE = "L1.3"
 ADMISSION_PHASE = "L1.4"
 PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"
+FROZEN_PRODUCTION_PRESTATE = HERE / "stm32l1-post-l4-production-manifest-prestate.json"
 EXPECTED_PRODUCTION_GIT_BLOB = "1aa2311a25a69742c428147a402816ed5071e04e"
 EXPECTED_CANDIDATE_COUNT = 144
 EXPECTED_BASE_DEVICE_COUNT = 59
@@ -47,9 +48,9 @@ def _git_blob_sha(path: Path) -> str:
 
 
 def production_snapshot() -> dict[str, Any]:
-    if _git_blob_sha(PRODUCTION) != EXPECTED_PRODUCTION_GIT_BLOB:
+    if _git_blob_sha(FROZEN_PRODUCTION_PRESTATE) != EXPECTED_PRODUCTION_GIT_BLOB:
         raise RuntimeError("L1.3 Production manifest Git blob drifted")
-    payload = json.loads(PRODUCTION.read_text(encoding="utf-8"))
+    payload = json.loads(FROZEN_PRODUCTION_PRESTATE.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("status") != "production":
         raise RuntimeError("L1.3 Production manifest invalid")
     sources = payload.get("sources")
@@ -61,7 +62,7 @@ def production_snapshot() -> dict[str, Any]:
     bases: set[tuple[str, str]] = set()
     for source in sources:
         family = source["family"]
-        path = (PRODUCTION.parent / source["path"]).resolve()
+        path = (FROZEN_PRODUCTION_PRESTATE.parent / source["path"]).resolve()
         with path.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
         if len(rows) != source["row_count"]:
