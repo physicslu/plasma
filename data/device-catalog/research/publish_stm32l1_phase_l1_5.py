@@ -65,6 +65,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def _all_false(value: object) -> bool:
+    return isinstance(value, dict) and bool(value) and set(value.values()) == {False}
+
+
 def _production_snapshot(manifest_path: Path) -> tuple[int, set[tuple[str, str]], dict[str, int]]:
     manifest = _read_json(manifest_path)
     family_counts: dict[str, int] = {}
@@ -353,16 +357,86 @@ def _expected_publication_bytes() -> tuple[bytes, bytes, bytes, bytes, bytes]:
 
 
 def verify_current_publication() -> dict[str, Any]:
-    canonical_bytes, proposal_bytes, audit_bytes, baseline_bytes, historical_manifest_bytes = _expected_publication_bytes()
-    expected_files = {
-        CANONICAL_PATH: canonical_bytes,
-        PROPOSAL_PATH: proposal_bytes,
-        AUDIT_PATH: audit_bytes,
-        BASELINE_PATH: baseline_bytes,
-    }
-    for path, expected in expected_files.items():
-        if not path.exists() or path.read_bytes() != expected:
-            raise RuntimeError(f"{path.name}: published bytes drifted")
+    for path in (CANONICAL_PATH, PROPOSAL_PATH, AUDIT_PATH, BASELINE_PATH, PRODUCTION_MANIFEST):
+        if not path.exists():
+            raise RuntimeError(f"{path.name}: published artifact missing")
+
+    canonical_bytes = CANONICAL_PATH.read_bytes()
+    proposal_bytes = PROPOSAL_PATH.read_bytes()
+    audit_bytes = AUDIT_PATH.read_bytes()
+    baseline_bytes = BASELINE_PATH.read_bytes()
+    proposal = _read_json(PROPOSAL_PATH)
+    audit = _read_json(AUDIT_PATH)
+    baseline = _read_json(BASELINE_PATH)
+
+    if proposal.get("phase") != PHASE or proposal.get("family") != FAMILY or proposal.get("status") != "publication_proposal_clean":
+        raise RuntimeError("L1.5 publication proposal identity/status drifted")
+    if audit.get("phase") != PHASE or audit.get("family") != FAMILY or audit.get("status") != "published":
+        raise RuntimeError("L1.5 publication audit identity/status drifted")
+    if baseline.get("phase") != PHASE or baseline.get("family") != FAMILY or baseline.get("status") != "publication_hard_lock":
+        raise RuntimeError("L1.5 publication baseline identity/status drifted")
+
+    if baseline.get("admission_plan_git_blob_sha") != EXPECTED_PLAN_GIT_BLOB or baseline.get("admission_plan_sha256") != EXPECTED_PLAN_SHA256:
+        raise RuntimeError("L1.5 admission-plan binding drifted")
+    if baseline.get("prestate_manifest_git_blob_sha") != EXPECTED_PRESTATE_MANIFEST_BLOB or baseline.get("prestate_manifest_sha256") != EXPECTED_PRESTATE_MANIFEST_SHA256:
+        raise RuntimeError("L1.5 prestate binding drifted")
+    if baseline.get("mapping_catalog_git_blob_sha") != EXPECTED_MAPPING_CATALOG_GIT_BLOB:
+        raise RuntimeError("L1.5 OpenOCD binding drifted")
+    if baseline.get("published_exact_icpn_set_sha256") != EXPECTED_EXACT_SET_SHA256:
+        raise RuntimeError("L1.5 published exact-set binding drifted")
+    if baseline.get("published_exact_icpn_count") != EXPECTED_PUBLISHED_ROWS or baseline.get("published_base_device_count") != EXPECTED_PUBLISHED_BASES:
+        raise RuntimeError("L1.5 published cardinality drifted")
+    if baseline.get("production_prestate") != {"exact_icpns": 1718, "base_devices": 530, "families": 12, "stm32l1": 0}:
+        raise RuntimeError("L1.5 Production prestate semantic binding drifted")
+    if baseline.get("production_poststate") != {"exact_icpns": 1862, "base_devices": 589, "families": 13, "stm32l1": 144}:
+        raise RuntimeError("L1.5 Production poststate semantic binding drifted")
+    if not _all_false(baseline.get("claims")):
+        raise RuntimeError("L1.5 baseline overclaim escaped")
+
+    if baseline.get("canonical_csv_sha256") != hashlib.sha256(canonical_bytes).hexdigest() or baseline.get("canonical_csv_git_blob_sha") != _git_blob_sha(canonical_bytes):
+        raise RuntimeError("L1.5 canonical artifact digest drifted")
+    if baseline.get("publication_proposal_sha256") != hashlib.sha256(proposal_bytes).hexdigest() or baseline.get("publication_proposal_git_blob_sha") != _git_blob_sha(proposal_bytes):
+        raise RuntimeError("L1.5 proposal artifact digest drifted")
+    if baseline.get("publication_audit_sha256") != hashlib.sha256(audit_bytes).hexdigest() or baseline.get("publication_audit_git_blob_sha") != _git_blob_sha(audit_bytes):
+        raise RuntimeError("L1.5 audit artifact digest drifted")
+
+    with CANONICAL_PATH.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    identities = {row.get("icpn", "") for row in rows}
+    if len(rows) != EXPECTED_PUBLISHED_ROWS or len(identities) != EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError("L1.5 canonical row cardinality drifted")
+    if len({row.get("base_device", "") for row in rows}) != EXPECTED_PUBLISHED_BASES:
+        raise RuntimeError("L1.5 canonical Base Device cardinality drifted")
+    if _set_sha(identities) != EXPECTED_EXACT_SET_SHA256:
+        raise RuntimeError("L1.5 canonical exact set drifted")
+    if any(
+        row.get("family") != FAMILY
+        or row.get("existing_identifier_kind") != "ordering_pattern"
+        or row.get("mapping_status") != "deterministic_ordering_pattern"
+        or row.get("openocd_target_config") != TARGET_CONFIG
+        or row.get("verification_status") != CANONICAL_VERIFICATION_STATUS
+        for row in rows
+    ):
+        raise RuntimeError("L1.5 canonical semantics drifted")
+
+    if set(proposal.get("added_exact_icpns", [])) != identities or proposal.get("added_exact_icpn_set_sha256") != EXPECTED_EXACT_SET_SHA256:
+        raise RuntimeError("L1.5 proposal exact-set drifted")
+    if set(audit.get("added_exact_icpns", [])) != identities or audit.get("added_exact_icpn_set_sha256") != EXPECTED_EXACT_SET_SHA256:
+        raise RuntimeError("L1.5 audit exact-set drifted")
+    if audit.get("canonical_write_applied") is not True or audit.get("production_write_applied") is not True:
+        raise RuntimeError("L1.5 publication audit write-state drifted")
+    for flag in (
+        "programming_algorithm_equivalence_claimed",
+        "flash_geometry_equivalence_claimed",
+        "option_security_semantics_claimed",
+        "physical_target_qualification_claimed",
+        "ppu_physical_validation_claimed",
+        "socket_physical_validation_claimed",
+        "hil_qualification_claimed",
+        "runtime_programming_support_claimed",
+    ):
+        if audit.get(flag) is not False:
+            raise RuntimeError(f"L1.5 audit overclaim escaped: {flag}")
 
     current = _read_json(PRODUCTION_MANIFEST)
     sources = current.get("sources")
@@ -387,8 +461,13 @@ def verify_current_publication() -> dict[str, Any]:
         raise RuntimeError("current Production state regressed below L1.5 poststate")
     if families.get(FAMILY) != EXPECTED_PUBLISHED_ROWS:
         raise RuntimeError("published STM32L1 Production row count drifted")
-    if (exact, len(bases), len(families)) == EXPECTED_POSTSTATE and PRODUCTION_MANIFEST.read_bytes() != historical_manifest_bytes:
-        raise RuntimeError("L1.5 exact poststate manifest bytes drifted")
+    if (exact, len(bases), len(families)) == EXPECTED_POSTSTATE:
+        current_manifest = PRODUCTION_MANIFEST.read_bytes()
+        if baseline.get("production_manifest_sha256_after") != hashlib.sha256(current_manifest).hexdigest():
+            raise RuntimeError("L1.5 exact poststate manifest SHA-256 drifted")
+        if baseline.get("production_manifest_git_blob_sha_after") != _git_blob_sha(current_manifest):
+            raise RuntimeError("L1.5 exact poststate manifest Git blob drifted")
+
     return {
         "status": "valid",
         "phase": PHASE,
