@@ -1,0 +1,55 @@
+name: STM32L5 canonical admission plan validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32l5-admission-route-evidence.csv'
+      - 'data/device-catalog/research/stm32l5_admission_policy.py'
+      - 'data/device-catalog/research/stm32l5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/validate_stm32l5_canonical_admission_plan.py'
+      - 'data/device-catalog/research/device-catalog-stm32l5-canonical-admission-plan.md'
+      - 'data/device-catalog/research/stm32l5-metadata-policy-baseline.json'
+      - 'data/device-catalog/research/stm32l5_metadata_policy.py'
+      - 'data/device-catalog/research/stm32l5-security-scope-foundation.json'
+      - '.github/workflows/device-catalog-stm32l5-canonical-admission-plan-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32l5-admission-route-evidence.csv'
+      - 'data/device-catalog/research/stm32l5_admission_policy.py'
+      - 'data/device-catalog/research/stm32l5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/validate_stm32l5_canonical_admission_plan.py'
+      - 'data/device-catalog/research/device-catalog-stm32l5-canonical-admission-plan.md'
+      - 'data/device-catalog/research/stm32l5-metadata-policy-baseline.json'
+      - 'data/device-catalog/research/stm32l5_metadata_policy.py'
+      - 'data/device-catalog/research/stm32l5-security-scope-foundation.json'
+      - '.github/workflows/device-catalog-stm32l5-canonical-admission-plan-validation.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate canonical admission plan
+        run: python data/device-catalog/research/validate_stm32l5_canonical_admission_plan.py
+      - name: Enforce zero Production writes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- data/device-catalog/production/)"
+          test -z "$changed" || { echo "Production writes are forbidden in STM32L5 canonical admission planning:"; echo "$changed"; exit 1; }
