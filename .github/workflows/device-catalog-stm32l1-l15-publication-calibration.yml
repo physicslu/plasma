@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only)"
+          changed="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
           echo "$changed"
           expected=$(cat <<'EOF'
           data/device-catalog/production/icpn-v1-manifest.json
@@ -46,7 +46,7 @@ jobs:
           data/device-catalog/research/stm32l1-phase-l1.5-publication-proposal.json
           EOF
           )
-          test "$(printf '%s\n' "$changed" | sort)" = "$(printf '%s\n' "$expected" | sort)"
+          test "$changed" = "$(printf '%s\n' "$expected" | sort -u)"
       - name: Stage deterministic publication artifact
         shell: bash
         run: |
