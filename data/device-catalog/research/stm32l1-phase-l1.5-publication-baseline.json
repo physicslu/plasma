@@ -1,0 +1,44 @@
+{
+  "admission_plan_git_blob_sha": "6b75db8c09809534eba530e07ff11cf91085677f",
+  "admission_plan_sha256": "ea413a7c1761eded8875737c9e8fde3ff359a4bf52dfde1f52a795179d2457e4",
+  "canonical_csv_git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
+  "canonical_csv_sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec",
+  "claims": {
+    "flash_geometry_equivalence_claimed": false,
+    "hil_qualification_claimed": false,
+    "option_security_semantics_claimed": false,
+    "physical_target_qualification_claimed": false,
+    "ppu_physical_validation_claimed": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "socket_physical_validation_claimed": false
+  },
+  "family": "STM32L1",
+  "mapping_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+  "phase": "L1.5",
+  "prestate_manifest_git_blob_sha": "1aa2311a25a69742c428147a402816ed5071e04e",
+  "prestate_manifest_sha256": "b88adcb38f0833a25da1671592ea98496d61166b9d0e51877ffb92ad2820b9fe",
+  "production_manifest_git_blob_sha_after": "9c1f1a2c7c1ff3bea7892c5decf408ece676d7a3",
+  "production_manifest_sha256_after": "64074683cb01d3584da314f15e499f3db2c4b586d96def3ab8371dd2b50d93f5",
+  "production_poststate": {
+    "base_devices": 589,
+    "exact_icpns": 1862,
+    "families": 13,
+    "stm32l1": 144
+  },
+  "production_prestate": {
+    "base_devices": 530,
+    "exact_icpns": 1718,
+    "families": 12,
+    "stm32l1": 0
+  },
+  "publication_audit_git_blob_sha": "0cb14c4889e61a6b1ae70b2210f45a891176179a",
+  "publication_audit_sha256": "62b5102282b7fa08c4536896a77e5e7286df3791b1660e9f9aa13ffb95365558",
+  "publication_proposal_git_blob_sha": "fcb388739f5796859d715b512b89ac8c0d379075",
+  "publication_proposal_sha256": "c6569d29dbaaa45fa79c3c9a019bb993128d91f45feb79a717fd86afacc5f371",
+  "published_base_device_count": 59,
+  "published_exact_icpn_count": 144,
+  "published_exact_icpn_set_sha256": "0fcc20ca062da9c7e564b141b38c529c2c3a27a6ca781a2473f9f617e2886a12",
+  "schema_version": 1,
+  "status": "publication_hard_lock"
+}
