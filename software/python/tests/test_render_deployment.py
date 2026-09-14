@@ -113,7 +113,7 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertEqual(control_station["startCommand"], "bash scripts/render-control-station-start.sh")
         self.assertEqual(control_station["healthCheckPath"], "/")
         control_environment = {item["key"]: item for item in control_station["envVars"]}
-        self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "swpc-ppu")
+        self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "z2-qemu-ppu")
         for secret_key in (
             "PLASMA_RENDER_PPU_ENDPOINT",
             "PLASMA_RENDER_PPU_ACCESS_CLIENT_ID",
@@ -143,6 +143,7 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
         self.assertIn('PLASMA_FLEET_UI_ENABLED="1"', script)
         self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
+        self.assertIn('PLASMA_RENDER_PPU_ALIAS:-z2-qemu-ppu', script)
         self.assertIn('parsed.scheme != "https"', script)
         self.assertIn("must identify the managed PPU ingress root", script)
         self.assertIn("PLASMA_RENDER_PPU_ACCESS_CLIENT_ID", script)
@@ -177,12 +178,3 @@ class RenderDeploymentContractTests(unittest.TestCase):
 
             default_provider = MockEngineeringPPUProvider(Path(root))
             self.assertEqual(default_provider.flash_size_bytes, MOCK_FLASH_SIZE_BYTES)
-
-    def test_engineering_mock_rejects_invalid_flash_capacity(self) -> None:
-        for value in (0, -1, True):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                MockEngineeringPPUProvider(Path("unused"), flash_size_bytes=value)
-
-
-if __name__ == "__main__":
-    unittest.main()

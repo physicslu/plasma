@@ -17,8 +17,11 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
+      - "scripts/z2like-qemu-sim.py"
+      - "scripts/z2like-qemu-bootstrap-smoke.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
+      - "docs/deployment/z2like-demo-qemu-armv7.md"
       - "release/**"
       - "software/python/pyproject.toml"
       - "software/python/plasma_core/**"
@@ -34,6 +37,7 @@ on:
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
+      - "software/python/tests/test_z2like_qemu_sim_contract.py"
   pull_request:
     paths:
       - ".github/workflows/z2-ps-release.yml"
@@ -47,8 +51,11 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
+      - "scripts/z2like-qemu-sim.py"
+      - "scripts/z2like-qemu-bootstrap-smoke.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
+      - "docs/deployment/z2like-demo-qemu-armv7.md"
       - "release/**"
       - "software/python/pyproject.toml"
       - "software/python/plasma_core/**"
@@ -64,6 +71,7 @@ on:
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
+      - "software/python/tests/test_z2like_qemu_sim_contract.py"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -93,6 +101,7 @@ jobs:
           python -m py_compile scripts/z2-python-runtime.py
           python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
           python -m py_compile scripts/ppu-bootstrap-deployment.py
+          python -m py_compile scripts/z2like-qemu-sim.py scripts/z2like-qemu-bootstrap-smoke.py
           bash -n scripts/build-z2-python-runtime.sh
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
@@ -101,7 +110,8 @@ jobs:
           python -m pytest -q \
             software/python/tests/test_z2_python_runtime_artifact.py \
             software/python/tests/test_z2_ps_release_cache_contract.py \
-            software/python/tests/test_z2_bootstrap_deployment_call_graph.py
+            software/python/tests/test_z2_bootstrap_deployment_call_graph.py \
+            software/python/tests/test_z2like_qemu_sim_contract.py
 
       - name: Restore verified ARMv7 Python build cache
         id: z2-python-cache
@@ -205,6 +215,7 @@ jobs:
           software/python/tests/test_z2_python_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py
           software/python/tests/test_plasmactl_deployment_profiles.py
+          software/python/tests/test_z2like_qemu_sim_contract.py
 
       - name: Download qualified Plasma Python runtime candidate
         uses: actions/download-artifact@v4
@@ -278,6 +289,27 @@ jobs:
             sha256sum "$(basename "$kit")" > "$(basename "$kit").sha256"
           )
           echo "kit=$kit" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU for persistent ARMv7 simulated Z2
+        uses: docker/setup-qemu-action@v4
+        with:
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm
+
+      - name: Deploy canonical Z2 PS kit through private Bootstrap into QEMU ARMv7
+        shell: bash
+        env:
+          Z2_KIT: ${{ steps.kit.outputs.kit }}
+        run: |
+          set -euo pipefail
+          python scripts/z2like-qemu-sim.py up
+          python scripts/z2like-qemu-bootstrap-smoke.py "$Z2_KIT" --sidecar "$Z2_KIT.sha256"
+          python scripts/z2like-qemu-sim.py status --write-evidence
+
+      - name: Stop QEMU simulated Z2 container
+        if: always()
+        shell: bash
+        run: python scripts/z2like-qemu-sim.py down || true
 
       - name: Upload complete Z2 PS release candidate kit
         uses: actions/upload-artifact@v4

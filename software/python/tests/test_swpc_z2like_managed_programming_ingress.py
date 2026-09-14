@@ -13,7 +13,9 @@ def test_managed_programming_ingress_is_separate_and_loopback_only() -> None:
     source = INGRESS.read_text(encoding="utf-8")
     assert 'PLASMA_SWPC_Z2LIKE_MANAGED_PORT:-18082' in source
     assert 'listen 127.0.0.1:$managed_port;' in source
-    assert 'gateway_root="http://127.0.0.1:18080"' in source
+    assert 'PLASMA_SWPC_Z2LIKE_MANAGED_GATEWAY_ROOT:-http://127.0.0.1:18080' in source
+    assert 'PLASMA_SWPC_Z2LIKE_MANAGED_BASE_KIND:-swpc-z2like' in source
+    assert "managed upstream must remain loopback/private" in source
     assert "Cloudflare Access service-token" in source
     assert 'location / { return 404; }' in source
     assert "/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf" in source
@@ -49,12 +51,15 @@ def test_ingress_exposes_programming_and_site_runtime_routes_with_read_only_sett
     assert "managed ingress unexpectedly exposed PPU network activation" in source
 
 
-def test_ingress_preserves_explicit_method_boundaries() -> None:
+def test_ingress_preserves_explicit_method_and_runtime_activation_boundaries() -> None:
     source = INGRESS.read_text(encoding="utf-8")
     assert "limit_except GET { deny all; }" in source
     assert "limit_except POST { deny all; }" in source
     assert "limit_except GET POST { deny all; }" in source
     assert "managed ingress did not reject GET /api/jobs" in source
+    assert 'PLASMA_SWPC_Z2LIKE_MANAGED_ALLOW_RUNTIME_ACTIVATION:-1' in source
+    assert 'location = /api/settings/sites/activation { return 404; }' in source
+    assert "simulation ingress unexpectedly exposed Site runtime activation" in source
 
 
 def test_render_service_identity_is_optional_but_pairwise_fail_closed_and_not_serialized() -> None:

@@ -5,16 +5,21 @@ managed_port="${PLASMA_SWPC_Z2LIKE_MANAGED_PORT:-18082}"
 base_evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
 managed_evidence="${PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE:-/opt/plasma/install/swpc-z2like-managed-ingress.json}"
 nginx_conf="${PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf}"
-nginx_marker="# Managed by Plasma SWPC Z2-like managed programming ingress"
-gateway_root="http://127.0.0.1:18080"
-route_profile="managed-programming-v1"
+nginx_marker="${PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_MARKER:-# Managed by Plasma SWPC Z2-like managed programming ingress}"
+gateway_root="${PLASMA_SWPC_Z2LIKE_MANAGED_GATEWAY_ROOT:-http://127.0.0.1:18080}"
+base_kind="${PLASMA_SWPC_Z2LIKE_MANAGED_BASE_KIND:-swpc-z2like}"
+profile_name="${PLASMA_SWPC_Z2LIKE_MANAGED_PROFILE_NAME:-swpc-z2like-managed-programming}"
+evidence_role="${PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE_ROLE:-swpc-z2like-managed-programming-ingress}"
+route_profile="${PLASMA_SWPC_Z2LIKE_MANAGED_ROUTE_PROFILE:-managed-programming-v1}"
+allow_runtime_activation="${PLASMA_SWPC_Z2LIKE_MANAGED_ALLOW_RUNTIME_ACTIVATION:-1}"
+qualification_boundary="${PLASMA_SWPC_Z2LIKE_MANAGED_QUALIFICATION_BOUNDARY:-mock/software path only; no Z2/ARMv7/PL/FPGA/Site/IC claim}"
 
 say() {
-  printf '[plasmactl swpc-z2like-managed] %s\n' "$*"
+  printf '[plasmactl managed-ingress] %s\n' "$*"
 }
 
 die() {
-  printf '[plasmactl swpc-z2like-managed] ERROR: %s\n' "$*" >&2
+  printf '[plasmactl managed-ingress] ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -39,26 +44,77 @@ print(value)
 PY
 }
 
+validate_gateway_root() {
+  python3 - "$gateway_root" <<'PY'
+import ipaddress
+import sys
+from urllib.parse import urlsplit
+
+value = sys.argv[1].strip()
+parsed = urlsplit(value)
+if parsed.scheme != "http" or not parsed.netloc or parsed.hostname is None:
+    raise SystemExit("managed upstream must be an absolute private HTTP root")
+if parsed.username is not None or parsed.password is not None:
+    raise SystemExit("managed upstream must not embed credentials")
+if parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+    raise SystemExit("managed upstream must be an origin root without path/query/fragment")
+try:
+    address = ipaddress.ip_address(parsed.hostname)
+except ValueError as exc:
+    raise SystemExit("managed upstream host must be an explicit IP address") from exc
+if address.version != 4 or address.is_unspecified or address.is_multicast:
+    raise SystemExit("managed upstream must be a usable IPv4 address")
+if not (address.is_loopback or address.is_private):
+    raise SystemExit("managed upstream must remain loopback/private")
+if parsed.port is None:
+    raise SystemExit("managed upstream must use an explicit port")
+PY
+}
+
 validate_base_install() {
-  [[ -f "$base_evidence" ]] || die "base SWPC Z2-like evidence is missing: $base_evidence"
-  python3 - "$base_evidence" <<'PY'
+  [[ -f "$base_evidence" ]] || die "base evidence is missing: $base_evidence"
+  python3 - "$base_evidence" "$base_kind" "$gateway_root" <<'PY'
 import json
 import sys
-with open(sys.argv[1], encoding="utf-8") as handle:
+from urllib.parse import urlsplit
+
+path, kind, gateway_root = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
     payload = json.load(handle)
-expected = {
-    "schema_version": 1,
-    "role": "ppu-surrogate",
-    "platform": "linux",
-    "z2_equivalent": False,
-    "hardware_boundary": "closed",
-    "gateway_bind": "127.0.0.1:18080",
-}
-for field, value in expected.items():
-    if payload.get(field) != value:
-        raise SystemExit(f"base evidence field {field} is invalid: {payload.get(field)!r}")
-if not payload.get("release_id") or not payload.get("git_sha"):
-    raise SystemExit("base evidence is missing release identity")
+if kind == "swpc-z2like":
+    expected = {
+        "schema_version": 1,
+        "role": "ppu-surrogate",
+        "platform": "linux",
+        "z2_equivalent": False,
+        "hardware_boundary": "closed",
+        "gateway_bind": "127.0.0.1:18080",
+    }
+    for field, value in expected.items():
+        if payload.get(field) != value:
+            raise SystemExit(f"base evidence field {field} is invalid: {payload.get(field)!r}")
+    if not payload.get("release_id") or not payload.get("git_sha"):
+        raise SystemExit("base evidence is missing release identity")
+elif kind == "qemu-armv7":
+    parsed = urlsplit(gateway_root)
+    expected = {
+        "schema_version": 1,
+        "role": "ppu-simulation",
+        "simulation_environment": "SWPC",
+        "backend": "qemu-armv7",
+        "platform": "linux-armv7l",
+        "z2_equivalent": False,
+        "hardware_boundary": "closed",
+        "gateway_bind": f"{parsed.hostname}:{parsed.port}",
+        "runtime_state": "runtime_active",
+    }
+    for field, value in expected.items():
+        if payload.get(field) != value:
+            raise SystemExit(f"QEMU base evidence field {field} is invalid: {payload.get(field)!r}")
+    if not payload.get("release_id") or not payload.get("git_sha") or not payload.get("device_id"):
+        raise SystemExit("QEMU base evidence is missing release/device identity")
+else:
+    raise SystemExit(f"unsupported managed ingress base kind: {kind!r}")
 PY
 }
 
@@ -68,7 +124,10 @@ validate_port() {
   for reserved in 9900 18080 18081; do
     (( managed_port != reserved )) || die "managed ingress port conflicts with reserved Plasma port: $managed_port"
   done
-  if [[ -f "$base_evidence" ]]; then
+  [[ "$allow_runtime_activation" == "0" || "$allow_runtime_activation" == "1" ]] || \
+    die "runtime activation policy must be 0 or 1"
+  validate_gateway_root
+  if [[ "$base_kind" == "swpc-z2like" && -f "$base_evidence" ]]; then
     local restricted
     restricted="$(base_field restricted_ingress 2>/dev/null || true)"
     [[ "$restricted" != "127.0.0.1:$managed_port" ]] || die "managed ingress must not reuse restricted diagnostics ingress: $restricted"
@@ -135,10 +194,23 @@ server {
         limit_except GET { deny all; }
         proxy_pass $gateway_root;
     }
+EOF
+  if [[ "$allow_runtime_activation" == "1" ]]; then
+    cat <<EOF
     location = /api/settings/sites/activation {
         limit_except POST { deny all; }
         proxy_pass $gateway_root;
     }
+EOF
+  else
+    cat <<'EOF'
+    # The QEMU simulation does not emulate the privileged systemd activation
+    # helper. Keep this side-effecting route closed rather than pretending the
+    # appliance has real Z2 service-manager semantics.
+    location = /api/settings/sites/activation { return 404; }
+EOF
+  fi
+  cat <<EOF
     location ~ ^/api/settings/sites/[1-9][0-9]*$ {
         limit_except POST { deny all; }
         proxy_pass $gateway_root;
@@ -242,7 +314,7 @@ verify_profile() {
   grep -Fxq "$nginx_marker" "$nginx_conf" || die "managed Nginx ingress is not Plasma-owned"
   nginx -t >/dev/null
 
-  local listeners ready sites_status gateway_get network_get gateway_post network_post blocked_activation blocked_unknown method_blocked
+  local listeners ready sites_status gateway_get network_get gateway_post network_post site_activation_get blocked_activation blocked_unknown method_blocked
   listeners="$(ss -H -ltn "sport = :$managed_port")"
   [[ -n "$listeners" ]] || die "managed ingress is not listening on port $managed_port"
   while IFS= read -r line; do
@@ -275,6 +347,14 @@ verify_profile() {
     "http://127.0.0.1:$managed_port/api/settings/ppu-network")"
   [[ "$network_post" == "403" ]] || die "managed ingress unexpectedly allowed PPU network mutation: HTTP $network_post"
 
+  site_activation_get="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$managed_port/api/settings/sites/activation")"
+  if [[ "$allow_runtime_activation" == "1" ]]; then
+    [[ "$site_activation_get" == "403" ]] || die "managed Site activation route contract is unavailable: HTTP $site_activation_get"
+  else
+    [[ "$site_activation_get" == "404" ]] || die "simulation ingress unexpectedly exposed Site runtime activation: HTTP $site_activation_get"
+  fi
+
   blocked_activation="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
     "http://127.0.0.1:$managed_port/api/settings/ppu-network/activation")"
   [[ "$blocked_activation" == "404" ]] || die "managed ingress unexpectedly exposed PPU network activation: HTTP $blocked_activation"
@@ -289,22 +369,25 @@ verify_profile() {
 
   say "PASS: loopback-only managed Programming ingress is bounded and operational"
   say "edge-auth boundary: public exposure requires Cloudflare Access service-token enforcement"
-  say "qualification boundary: mock/software path only; no Z2/ARMv7/PL/FPGA/Site/IC claim"
+  say "qualification boundary: $qualification_boundary"
 }
 
 write_evidence() {
-  local release_id git_sha
+  local release_id git_sha upstream
   release_id="$(base_field release_id)"
   git_sha="$(base_field git_sha)"
+  upstream="${gateway_root#http://}"
   install -d -m 0755 "$(dirname "$managed_evidence")"
   cat >"$managed_evidence" <<EOF
 {
   "schema_version": 1,
-  "role": "swpc-z2like-managed-programming-ingress",
+  "role": "$evidence_role",
   "listen": "127.0.0.1:$managed_port",
-  "upstream_gateway": "127.0.0.1:18080",
+  "upstream_gateway": "$upstream",
   "route_profile": "$route_profile",
+  "runtime_activation_exposed": $([[ "$allow_runtime_activation" == "1" ]] && printf true || printf false),
   "edge_auth_required": "cloudflare-access-service-token",
+  "base_kind": "$base_kind",
   "base_release_id": "$release_id",
   "base_git_sha": "$git_sha",
   "hardware_boundary": "closed"
@@ -332,10 +415,10 @@ install_profile() {
 
   local snapshot="" tmp_conf
   if [[ -f "$nginx_conf" ]]; then
-    snapshot="$(mktemp /tmp/plasma-swpc-managed-nginx.XXXXXX)"
+    snapshot="$(mktemp /tmp/plasma-managed-nginx.XXXXXX)"
     cp -a "$nginx_conf" "$snapshot"
   fi
-  tmp_conf="$(mktemp "$(dirname "$nginx_conf")/.plasma-swpc-z2like-managed.XXXXXX")"
+  tmp_conf="$(mktemp "$(dirname "$nginx_conf")/.plasma-managed-ingress.XXXXXX")"
   render_nginx >"$tmp_conf"
   chmod 0644 "$tmp_conf"
   chown root:root "$tmp_conf"
@@ -362,7 +445,7 @@ install_profile() {
   write_evidence
   trap - ERR
   rm -f "$snapshot"
-  say "installed managed Programming ingress: 127.0.0.1:$managed_port"
+  say "installed managed Programming ingress: 127.0.0.1:$managed_port -> $gateway_root"
 }
 
 remove_profile() {
@@ -378,10 +461,12 @@ remove_profile() {
 
 status_profile() {
   validate_port
-  printf 'Profile:        swpc-z2like-managed-programming\n'
+  printf 'Profile:        %s\n' "$profile_name"
+  printf 'Base kind:      %s\n' "$base_kind"
   printf 'Listen:         127.0.0.1:%s\n' "$managed_port"
-  printf 'Upstream:       127.0.0.1:18080\n'
+  printf 'Upstream:       %s\n' "$gateway_root"
   printf 'Route profile:  %s\n' "$route_profile"
+  printf 'Runtime act.:   %s\n' "$([[ "$allow_runtime_activation" == "1" ]] && printf ALLOWED || printf BLOCKED)"
   printf 'Edge auth:      Cloudflare Access service token REQUIRED\n'
   printf 'Hardware:       CLOSED\n'
   if [[ -f "$managed_evidence" ]]; then
@@ -396,18 +481,21 @@ usage() {
 Usage: plasmactl-swpc-z2like-managed-ingress COMMAND
 
 Commands:
-  install   Install/update loopback-only managed Programming ingress (default 18082)
+  install   Install/update loopback-only managed Programming ingress
   verify    Read-only validation of route/method allowlist and loopback binding
   status    Show managed ingress contract
   remove    Remove only the Plasma-owned managed ingress
 
-Environment:
-  PLASMA_SWPC_Z2LIKE_MANAGED_PORT  Override managed ingress port (default 18082)
+Default SWPC Z2-like environment:
+  PLASMA_SWPC_Z2LIKE_MANAGED_PORT=18082
+  PLASMA_SWPC_Z2LIKE_MANAGED_GATEWAY_ROOT=http://127.0.0.1:18080
+  PLASMA_SWPC_Z2LIKE_MANAGED_BASE_KIND=swpc-z2like
 
-This command does not expose the listener publicly. A Cloudflare Tunnel hostname
-may target this listener only after a Cloudflare Access service-token policy is
-configured for the Render Manager. The existing diagnostics ingress on 18081 is
-not modified.
+The QEMU ARMv7 wrapper overrides these variables for its separate 18083 ingress.
+This command never publishes a listener itself. A Cloudflare Tunnel hostname may
+target the loopback listener only after a Cloudflare Access service-token policy
+is configured for the Render Manager. The existing diagnostics ingress on 18081
+is not modified.
 EOF
 }
 

@@ -6,7 +6,7 @@ console_root="${repo_root}/software/web/dist/standalone"
 state_root="/tmp/plasma-render-control-station"
 public_port="${PORT:-10000}"
 manager_port="${PLASMA_RENDER_MANAGER_PORT:-18180}"
-ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-swpc-ppu}"
+ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-z2-qemu-ppu}"
 ppu_endpoint="${PLASMA_RENDER_PPU_ENDPOINT:-}"
 ppu_access_client_id="${PLASMA_RENDER_PPU_ACCESS_CLIENT_ID:-}"
 ppu_access_client_secret="${PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET:-}"
@@ -86,7 +86,7 @@ observation_db="${state_root}/manager-observations.sqlite3"
 # The public lab registry is deliberately immutable. Omitting
 # manager.registry_state_path keeps add/remove/lifecycle mutation disabled and
 # prevents an unauthenticated public Console/BFF caller from turning the fixed
-# SWPC lab target into an arbitrary Manager-side HTTP(S) request target.
+# simulation target into an arbitrary Manager-side HTTP(S) request target.
 python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${ppu_endpoint}" <<'PY'
 import sys
 from pathlib import Path
