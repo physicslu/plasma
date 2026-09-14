@@ -94,7 +94,20 @@ Run 3 proved the corrected transaction and artifact packaging. Run 4 repeated th
 
 No identity set, metadata grammar, route, lifecycle disposition or publication count was relaxed as part of these corrections.
 
-## 7. Permanent validation
+## 7. Historical validator compatibility closure
+
+L1.5 exposed a repository-level coupling defect: several older permanent validators treated mutable current Production as if it were their immutable historical prestate.
+
+The fix preserves the original hard-lock rather than weakening it:
+- added `stm32l1-post-l4-production-manifest-prestate.json`, byte-identical to the original post-L4 Production manifest; Git blob remains `1aa2311a25a69742c428147a402816ed5071e04e`;
+- L1.2/L1.3/L1.4 historical replay now reads that immutable snapshot;
+- their one-time PR zero-Production transaction guards were removed from permanent historical CI because the frozen baseline/plan already records the zero-write fact and downstream publications must be allowed;
+- L4.5 still hard-locks its own 446-row STM32L4 publication while allowing later monotonic global Production growth;
+- cross-family prioritization now treats STM32L1 as current Production after L1.5, while its L1-specific negative controls replay against the pre-L1 snapshot.
+
+Targeted replay after this migration passed L1.2, L1.3, L1.4, L4.5, cross-family prioritization and L1.5 validation without modifying any of the five frozen L1.5 publication outputs.
+
+## 8. Permanent validation
 
 Permanent validator:
 `data/device-catalog/research/validate_stm32l1_phase_l1_5_publication.py`
@@ -104,7 +117,7 @@ Permanent CI:
 
 The permanent contract hard-locks family publication artifacts and provenance while allowing later unrelated Production growth. STM32L1 remains exactly 144 published rows unless a new governed transaction changes that family.
 
-## 8. Governance disposition
+## 9. Governance disposition
 
 L1.5 publishes commercial catalog identities only. It does not claim that Plasma can physically program these devices.
 
