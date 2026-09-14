@@ -6,6 +6,7 @@ import { useWorkspaceSession } from "../workspace-session";
 import GatewaySettingsPanel from "./gateway-settings";
 import LoopbackTest from "./loopback-test";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
+import PpuRuntimeDeploymentPage from "./ppu-runtime-deployment-page";
 import PpuSiteConfiguration from "./ppu-site-configuration";
 import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
@@ -32,6 +33,12 @@ const navGroupLabels = {
   tools: { "zh-TW": "進階設定", "en-US": "ADVANCED" },
 } as const;
 
+const settingsSubgroupLabels = {
+  communication: { "zh-TW": "通訊政策", "en-US": "COMMUNICATION POLICY" },
+  simulation: { "zh-TW": "僅模擬", "en-US": "SIMULATION ONLY" },
+} as const;
+
+type PpuSiteSection = "configuration" | "runtime";
 type DiagnosticsSection = "loopback";
 type SettingsSection = "gateway" | "mock";
 
@@ -42,6 +49,8 @@ function subscribeHydration(): () => void {
 export default function EngineeringPage() {
   const { locale, t } = useI18n();
   const { emodeSection, setEmodeSection } = useWorkspaceSession();
+  const [ppuSiteSection, setPpuSiteSection] = useState<PpuSiteSection>("configuration");
+  const [ppuSiteExpanded, setPpuSiteExpanded] = useState(false);
   const [diagnosticsSection, setDiagnosticsSection] = useState<DiagnosticsSection>("loopback");
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("gateway");
@@ -56,6 +65,11 @@ export default function EngineeringPage() {
   const mockLabel = locale === "zh-TW" ? "Mock Runtime · 僅模擬" : "Mock Runtime · Simulation only";
 
   function selectSection(id: (typeof sections)[number][0]) {
+    if (id === "ppu-sites") {
+      setEmodeSection("ppu-sites");
+      setPpuSiteExpanded(value => active === "ppu-sites" ? !value : true);
+      return;
+    }
     if (id === "diagnostics") {
       setEmodeSection("diagnostics");
       setDiagnosticsExpanded(value => active === "diagnostics" ? !value : true);
@@ -67,6 +81,12 @@ export default function EngineeringPage() {
       return;
     }
     setEmodeSection(id);
+  }
+
+  function selectPpuSiteSection(id: PpuSiteSection) {
+    setPpuSiteSection(id);
+    setPpuSiteExpanded(true);
+    setEmodeSection("ppu-sites");
   }
 
   function selectDiagnosticsSection(id: DiagnosticsSection) {
@@ -103,7 +123,47 @@ export default function EngineeringPage() {
                 return (
                   <Fragment key={id}>
                     {groupLabel && <div className="engineeringNavGroupLabel" aria-hidden="true">{groupLabel}</div>}
-                    {id === "diagnostics" ? (
+                    {id === "ppu-sites" ? (
+                      <div className="engineeringNavTreeGroup">
+                        <button
+                          type="button"
+                          disabled={!hydrated}
+                          className={active === id ? "active" : ""}
+                          aria-pressed={active === id}
+                          aria-expanded={ppuSiteExpanded}
+                          title={t(key)}
+                          onClick={() => selectSection(id)}
+                        >
+                          <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                          <span className="engineeringNavLabel">{t(key)}</span>
+                          <span className="engineeringNavDisclosure" aria-hidden="true">{ppuSiteExpanded ? "⌄" : "›"}</span>
+                        </button>
+                        {ppuSiteExpanded && (
+                          <div className="engineeringNavChildren" role="group" aria-label="PPU and Site Management">
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={ppuSiteSurfaceActive && ppuSiteSection === "configuration" ? "active" : ""}
+                              aria-pressed={ppuSiteSurfaceActive && ppuSiteSection === "configuration"}
+                              onClick={() => selectPpuSiteSection("configuration")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
+                              <span className="engineeringNavLabel">{locale === "zh-TW" ? "PPU / Site 設定" : "PPU / Site Configuration"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={ppuSiteSurfaceActive && ppuSiteSection === "runtime" ? "active" : ""}
+                              aria-pressed={ppuSiteSurfaceActive && ppuSiteSection === "runtime"}
+                              onClick={() => selectPpuSiteSection("runtime")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                              <span className="engineeringNavLabel">{locale === "zh-TW" ? "Runtime 部署" : "Runtime Deployment"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : id === "diagnostics" ? (
                       <div className="engineeringNavTreeGroup">
                         <button
                           type="button"
@@ -150,6 +210,9 @@ export default function EngineeringPage() {
                         </button>
                         {settingsExpanded && (
                           <div className="engineeringNavChildren" role="group" aria-label={settingsLabel}>
+                            <div className="engineeringNavSubgroupLabel" data-settings-group="communication" aria-hidden="true">
+                              {settingsSubgroupLabels.communication[locale]}
+                            </div>
                             <button
                               type="button"
                               disabled={!hydrated}
@@ -157,18 +220,22 @@ export default function EngineeringPage() {
                               aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
                               onClick={() => selectSettingsSection("gateway")}
                             >
-                              <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
                               <span className="engineeringNavLabel">Plasma Gateway</span>
                             </button>
+                            <div className="engineeringNavSubgroupLabel" data-settings-group="simulation" aria-hidden="true">
+                              {settingsSubgroupLabels.simulation[locale]}
+                            </div>
                             <button
                               type="button"
                               disabled={!hydrated}
                               className={settingsSurfaceActive && settingsSection === "mock" ? "active" : ""}
+                              aria-label={mockLabel}
                               aria-pressed={settingsSurfaceActive && settingsSection === "mock"}
                               onClick={() => selectSettingsSection("mock")}
                             >
                               <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
-                              <span className="engineeringNavLabel">{mockLabel}</span>
+                              <span className="engineeringNavLabel">Mock Runtime</span>
                             </button>
                           </div>
                         )}
@@ -206,6 +273,8 @@ export default function EngineeringPage() {
           <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : diagnosticsSurfaceActive ? "diagnosticsActive" : settingsSurfaceActive ? "settingsActive" : ppuSiteSurfaceActive ? "ppuSitesActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
+            ) : active === "ppu-sites" && ppuSiteSection === "runtime" ? (
+              <PpuRuntimeDeploymentPage />
             ) : active === "ppu-sites" ? (
               <PpuSiteConfiguration />
             ) : active === "diagnostics" && diagnosticsSection === "loopback" ? (
