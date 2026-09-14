@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "temporary-ratchet",
+  "policy": {
+    "phase_non_publication_production_triggers_forbidden": true,
+    "publication_only_exact_manifest_trigger_allowed": true,
+    "family_dispatcher_production_triggers_forbidden": true,
+    "debt_may_only_shrink": true
+  },
+  "violations": {
+    ".github/workflows/device-catalog-stm32-family-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32c0-c04-admission-validation.yml": [
+      "data/device-catalog/production/icpn-v1-manifest.json"
+    ],
+    ".github/workflows/device-catalog-stm32l0-l03-metadata-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32l0-l04-admission-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32l0-l05-publication-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32l4-l44-admission-validation.yml": [
+      "data/device-catalog/production/**"
+    ],
+    ".github/workflows/device-catalog-stm32l4-l45-publication-validation.yml": [
+      "data/device-catalog/production/**"
+    ]
+  }
+}
