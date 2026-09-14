@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+
+# z2like-demo canonical backend: one ARMv7 simulated Z2 running on SWPC.
+# Keep its public managed-control ingress separate from:
+#   18081 = SWPC x86 surrogate restricted diagnostics
+#   18082 = SWPC x86 surrogate managed Programming
+# Bootstrap remains private on the Docker bridge at 172.29.33.21:18081.
+export PLASMA_SWPC_Z2LIKE_MANAGED_PORT="${PLASMA_Z2LIKE_QEMU_MANAGED_PORT:-18083}"
+export PLASMA_SWPC_Z2LIKE_EVIDENCE="${PLASMA_Z2LIKE_QEMU_EVIDENCE:-$repo_root/.work/z2like-qemu-sim/install.json}"
+export PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE="${PLASMA_Z2LIKE_QEMU_MANAGED_EVIDENCE:-/var/lib/plasma-z2like-qemu/managed-ingress.json}"
+export PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_CONF="${PLASMA_Z2LIKE_QEMU_MANAGED_NGINX_CONF:-/etc/nginx/conf.d/plasma-z2like-qemu-managed.conf}"
+export PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_MARKER="# Managed by Plasma z2like-demo QEMU ARMv7 managed programming ingress"
+export PLASMA_SWPC_Z2LIKE_MANAGED_GATEWAY_ROOT="http://172.29.33.21:18080"
+export PLASMA_SWPC_Z2LIKE_MANAGED_BASE_KIND="qemu-armv7"
+export PLASMA_SWPC_Z2LIKE_MANAGED_PROFILE_NAME="z2like-demo-qemu-armv7-managed-programming"
+export PLASMA_SWPC_Z2LIKE_MANAGED_EVIDENCE_ROLE="z2like-demo-qemu-managed-programming-ingress"
+export PLASMA_SWPC_Z2LIKE_MANAGED_ROUTE_PROFILE="z2like-qemu-managed-programming-v1"
+export PLASMA_SWPC_Z2LIKE_MANAGED_ALLOW_RUNTIME_ACTIVATION="0"
+export PLASMA_SWPC_Z2LIKE_MANAGED_QUALIFICATION_BOUNDARY="SWPC/QEMU ARMv7 simulation only; no systemd/reboot/PYNQ/PL/Site electrical/real-IC claim"
+
+exec "$repo_root/scripts/plasmactl-swpc-z2like-managed-ingress" "$@"
