@@ -73,6 +73,24 @@ def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core()
     assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
 
 
+def test_simulation_validates_release_identity_from_coordinator_evidence():
+    kit = _load(KIT, "plasma_z2like_demo_kit_contract_test")
+    payload = {
+        "result": "PASS",
+        "transaction": {"release_id": "0.1.1-deadbeefcafe"},
+        "installer_evidence": {"release_id": "0.1.1-deadbeefcafe"},
+    }
+    assert kit._validated_deployment_release_id(payload) == "0.1.1-deadbeefcafe"
+    with pytest.raises(kit.QEMUSimulationKitError):
+        kit._validated_deployment_release_id(
+            {
+                "result": "PASS",
+                "transaction": {"release_id": "0.1.1-deadbeefcafe"},
+                "installer_evidence": {"release_id": "0.1.1-cafebabefeed"},
+            }
+        )
+
+
 def test_simulation_installer_requires_explicit_armv7_marker_and_core_binding(monkeypatch: pytest.MonkeyPatch):
     source = INSTALLER.read_text(encoding="utf-8")
     assert "PLASMA_Z2LIKE_DEMO_QEMU_TARGET" in source
