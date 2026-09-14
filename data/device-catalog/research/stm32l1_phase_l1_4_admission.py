@@ -38,6 +38,7 @@ DEFAULT_CANONICAL = HERE / "stm32l1-commercial-icpn.csv"
 DEFAULT_POLICY_BASELINE = HERE / "stm32l1-phase-l1.3-policy-baseline.json"
 DEFAULT_FROZEN_PLAN = HERE / "stm32l1-phase-l1.4-admission-plan.json"
 PRODUCTION = HERE.parent / "production" / "icpn-v1-manifest.json"
+FROZEN_PRODUCTION_PRESTATE = HERE / "stm32l1-post-l4-production-manifest-prestate.json"
 
 EXPECTED_METADATA_BASELINE_GIT_BLOB = "55a0c05d9fdbc527b7e2bfb2fb4ac5d99b000c58"
 EXPECTED_METADATA_BASELINE_SHA256 = "6da49ceda71a3611244e1961e6aca3809d5809f8f7106834123c6ae48e726e62"
@@ -130,9 +131,9 @@ def build_admission_plan(
         raise STM32L1AdmissionError("OpenOCD mapping catalog bytes drifted")
     if _sha256(mapping_catalog_path) != EXPECTED_OPENOCD_SHA256:
         raise STM32L1AdmissionError("OpenOCD mapping catalog digest drifted")
-    if _git_blob_sha(PRODUCTION) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
+    if _git_blob_sha(FROZEN_PRODUCTION_PRESTATE) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
         raise STM32L1AdmissionError("L1.4 Production prestate bytes drifted")
-    if _sha256(PRODUCTION) != EXPECTED_PRODUCTION_MANIFEST_SHA256:
+    if _sha256(FROZEN_PRODUCTION_PRESTATE) != EXPECTED_PRODUCTION_MANIFEST_SHA256:
         raise STM32L1AdmissionError("L1.4 Production prestate digest drifted")
 
     catalog_rows = read_catalog(mapping_catalog_path)

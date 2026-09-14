@@ -13,6 +13,7 @@ on:
       - "data/device-catalog/research/stm32l1-phase-l1.3-exact-variant-exceptions.json"
       - "data/device-catalog/research/stm32l1-phase-l1.3-policy-baseline.json"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
       - ".github/workflows/device-catalog-stm32l1-l13-metadata-policy-validation.yml"
   push:
@@ -28,6 +29,7 @@ on:
       - "data/device-catalog/research/stm32l1-phase-l1.3-exact-variant-exceptions.json"
       - "data/device-catalog/research/stm32l1-phase-l1.3-policy-baseline.json"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
       - ".github/workflows/device-catalog-stm32l1-l13-metadata-policy-validation.yml"
 
@@ -54,11 +56,3 @@ jobs:
       - name: Validate frozen L1.3 metadata policy
         run: |
           python data/device-catalog/research/validate_stm32l1_phase_l1_3_policy.py
-
-      - name: Enforce zero Production writes in this transaction
-        if: github.event_name == 'pull_request'
-        run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- data/device-catalog/production/ | grep -q .; then
-            echo "L1.3 must not modify Production"
-            exit 1
-          fi

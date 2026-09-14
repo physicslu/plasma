@@ -14,6 +14,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_2_sharded.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_2_retained_evidence.py"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32l1-l12-retained-validation.yml"
@@ -31,6 +32,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_2_sharded.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_2_retained_evidence.py"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32l1-l12-retained-validation.yml"
@@ -55,6 +57,3 @@ jobs:
           python data/device-catalog/research/test_stm32l1_phase_l1_2_sharded.py
       - name: Replay deterministic target boundary and hard-lock retained evidence
         run: python data/device-catalog/research/validate_stm32l1_phase_l1_2_retained_evidence.py
-      - name: Enforce zero Production writes in this transaction
-        if: github.event_name == 'pull_request'
-        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production

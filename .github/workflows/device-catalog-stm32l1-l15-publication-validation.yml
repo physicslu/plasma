@@ -1,0 +1,57 @@
+name: STM32L1 L1.5 publication validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32l1-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32l1-l1.5-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-proposal.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-audit.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-baseline.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-provenance.json"
+      - "data/device-catalog/research/publish_stm32l1_phase_l1_5.py"
+      - "data/device-catalog/research/test_stm32l1_phase_l1_5_publication.py"
+      - "data/device-catalog/research/validate_stm32l1_phase_l1_5_publication.py"
+      - ".github/workflows/device-catalog-stm32l1-l15-publication-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32l1-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-proposal.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-audit.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-baseline.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.5-publication-provenance.json"
+      - "data/device-catalog/research/publish_stm32l1_phase_l1_5.py"
+      - "data/device-catalog/research/test_stm32l1_phase_l1_5_publication.py"
+      - "data/device-catalog/research/validate_stm32l1_phase_l1_5_publication.py"
+      - ".github/workflows/device-catalog-stm32l1-l15-publication-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run post-publication negative controls
+        run: python data/device-catalog/research/test_stm32l1_phase_l1_5_publication.py
+      - name: Validate permanent L1.5 publication hard-lock
+        run: python data/device-catalog/research/validate_stm32l1_phase_l1_5_publication.py
+      - name: Enforce bounded Production delta for L1.5 PR
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- data/device-catalog/production/ | sort -u)"
+          echo "$changed"
+          test "$changed" = "data/device-catalog/production/icpn-v1-manifest.json"

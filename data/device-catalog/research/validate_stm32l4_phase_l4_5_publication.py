@@ -83,24 +83,31 @@ def main() -> int:
         raise RuntimeError("L4.5 publication audit bytes drifted")
 
     summary = verify_current_publication()
-    if summary != {
+    expected_family = {
         "status": "valid",
         "phase": "L4.5",
         "published_exact_icpns": 446,
         "published_base_devices": 138,
-        "production_exact_icpns": 1718,
-        "production_base_devices": 530,
-        "production_family_count": 12,
         "stm32l4_production": 446,
-    }:
-        raise RuntimeError(f"L4.5 current publication summary drifted: {summary}")
+    }
+    for key, value in expected_family.items():
+        if summary.get(key) != value:
+            raise RuntimeError(f"L4.5 family publication summary drifted: {key}={summary.get(key)!r}")
+    for key, minimum in (
+        ("production_exact_icpns", EXPECTED_POSTSTATE[0]),
+        ("production_base_devices", EXPECTED_POSTSTATE[1]),
+        ("production_family_count", EXPECTED_POSTSTATE[2]),
+    ):
+        observed = summary.get(key)
+        if not isinstance(observed, int) or observed < minimum:
+            raise RuntimeError(f"L4.5 global Production regressed: {key}={observed!r}, minimum={minimum}")
 
     print("STM32L4 L4.5 publication: VALID")
     print("Published exact ICPNs: 446")
     print("Published Base Devices: 138")
-    print("Production exact ICPNs: 1718")
-    print("Production Base Devices: 530")
-    print("STM32 families: 12")
+    print(f"Production exact ICPNs: {summary['production_exact_icpns']}")
+    print(f"Production Base Devices: {summary['production_base_devices']}")
+    print(f"STM32 families: {summary['production_family_count']}")
     print("STM32L4 Production: 446")
     print("PPU/Socket/HIL/runtime support claimed: false")
     return 0

@@ -100,14 +100,6 @@
       "row_count": 446,
       "git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
       "sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c"
-    },
-    {
-      "manufacturer": "STMicroelectronics",
-      "family": "STM32L1",
-      "path": "../research/stm32l1-commercial-icpn.csv",
-      "row_count": 144,
-      "git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
-      "sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec"
     }
   ]
 }
