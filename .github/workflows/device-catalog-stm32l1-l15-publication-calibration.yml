@@ -1,0 +1,65 @@
+name: STM32L1 L1.5 publication calibration
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32l1-l15-publication
+    paths:
+      - "data/device-catalog/research/publish_stm32l1_phase_l1_5.py"
+      - "data/device-catalog/research/test_stm32l1_phase_l1_5_publication.py"
+      - "data/device-catalog/research/stm32l1-l1.5-production-manifest-prestate.json"
+      - ".github/workflows/device-catalog-stm32l1-l15-publication-calibration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build publication proposal
+        run: python data/device-catalog/research/publish_stm32l1_phase_l1_5.py
+      - name: Apply publication in calibration worktree
+        run: python data/device-catalog/research/publish_stm32l1_phase_l1_5.py --publish
+      - name: Run post-publication tests
+        run: python data/device-catalog/research/test_stm32l1_phase_l1_5_publication.py
+      - name: Verify deterministic publication
+        run: python data/device-catalog/research/publish_stm32l1_phase_l1_5.py --verify
+      - name: Assert bounded Production delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          echo "$changed"
+          expected=$(cat <<'EOF'
+          data/device-catalog/production/icpn-v1-manifest.json
+          data/device-catalog/research/stm32l1-commercial-icpn.csv
+          data/device-catalog/research/stm32l1-phase-l1.5-publication-audit.json
+          data/device-catalog/research/stm32l1-phase-l1.5-publication-baseline.json
+          data/device-catalog/research/stm32l1-phase-l1.5-publication-proposal.json
+          EOF
+          )
+          test "$(printf '%s\n' "$changed" | sort)" = "$(printf '%s\n' "$expected" | sort)"
+      - name: Stage deterministic publication artifact
+        shell: bash
+        run: |
+          mkdir -p /tmp/stm32l1-l15-publication/data/device-catalog/research
+          mkdir -p /tmp/stm32l1-l15-publication/data/device-catalog/production
+          cp data/device-catalog/research/stm32l1-commercial-icpn.csv /tmp/stm32l1-l15-publication/data/device-catalog/research/
+          cp data/device-catalog/research/stm32l1-phase-l1.5-publication-proposal.json /tmp/stm32l1-l15-publication/data/device-catalog/research/
+          cp data/device-catalog/research/stm32l1-phase-l1.5-publication-audit.json /tmp/stm32l1-l15-publication/data/device-catalog/research/
+          cp data/device-catalog/research/stm32l1-phase-l1.5-publication-baseline.json /tmp/stm32l1-l15-publication/data/device-catalog/research/
+          cp data/device-catalog/production/icpn-v1-manifest.json /tmp/stm32l1-l15-publication/data/device-catalog/production/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32l1-l15-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/stm32l1-l15-publication
+          if-no-files-found: error
+          retention-days: 90
