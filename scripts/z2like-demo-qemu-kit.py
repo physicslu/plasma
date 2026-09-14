@@ -78,6 +78,22 @@ def _require_simulation_target() -> None:
         )
 
 
+def _validated_deployment_release_id(payload: object) -> str:
+    if not isinstance(payload, dict) or payload.get("result") != "PASS":
+        raise QEMUSimulationKitError("deployment coordinator did not return PASS evidence")
+    transaction = payload.get("transaction")
+    installer_evidence = payload.get("installer_evidence")
+    if not isinstance(transaction, dict) or not isinstance(installer_evidence, dict):
+        raise QEMUSimulationKitError("deployment coordinator evidence shape is invalid")
+    transaction_release = transaction.get("release_id")
+    installer_release = installer_evidence.get("release_id")
+    if not isinstance(transaction_release, str) or not transaction_release:
+        raise QEMUSimulationKitError("deployment transaction release identity is missing")
+    if installer_release != transaction_release:
+        raise QEMUSimulationKitError("installer and deployment transaction release identities disagree")
+    return transaction_release
+
+
 def deploy(
     kit_artifact: Path,
     *,
@@ -164,9 +180,8 @@ def deploy(
             payload = json.loads(completed.stdout)
         except json.JSONDecodeError as exc:
             raise QEMUSimulationKitError("deployment coordinator returned invalid JSON") from exc
-        if not isinstance(payload, dict) or payload.get("result") != "PASS":
-            raise QEMUSimulationKitError("deployment coordinator did not return PASS evidence")
-        if payload.get("release_id") != verified.release_id:
+        deployed_release_id = _validated_deployment_release_id(payload)
+        if deployed_release_id != verified.release_id:
             raise QEMUSimulationKitError("deployed release identity does not match verified kit identity")
         return {
             "schema_version": 1,
