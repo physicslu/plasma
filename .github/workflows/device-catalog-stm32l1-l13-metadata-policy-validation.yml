@@ -14,7 +14,6 @@ on:
       - "data/device-catalog/research/stm32l1-phase-l1.3-policy-baseline.json"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l1-l13-metadata-policy-validation.yml"
   push:
     branches:
@@ -30,7 +29,6 @@ on:
       - "data/device-catalog/research/stm32l1-phase-l1.3-policy-baseline.json"
       - "data/device-catalog/research/stm32l1-phase-l1.2-discovery-baseline.json"
       - "data/device-catalog/research/evidence/stm32l1-l1.2-official-st-discovery-live-2026-09-13/**"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l1-l13-metadata-policy-validation.yml"
 
 permissions:
