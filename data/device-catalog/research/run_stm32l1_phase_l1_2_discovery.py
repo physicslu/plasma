@@ -37,7 +37,7 @@ def build_browser_acquirer(*, base_by_url: dict[str, str], headless: bool) -> ST
         family_label="STM32L1 L1.2 generation-aware commercial discovery",
         headless=headless,
         reuse_browser=True,
-        global_deadline=True,
+        global_deadline=False,
     )
 
 
