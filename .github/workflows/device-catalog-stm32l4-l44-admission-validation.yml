@@ -11,7 +11,6 @@ on:
       - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/research/stm32-post-l0-production-manifest-prestate.json"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l4-l44-admission-validation.yml"
   workflow_dispatch:
 
