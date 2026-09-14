@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
-import re
 import subprocess
 from pathlib import Path
 
@@ -14,10 +14,23 @@ DEBT_PATH = ROOT / ".github" / "device-catalog-ci-trigger-debt.json"
 DEBT_REPO_PATH = ".github/device-catalog-ci-trigger-debt.json"
 
 PRODUCTION_PREFIX = "data/device-catalog/production/"
-PRODUCTION_MANIFEST = "data/device-catalog/production/icpn-v1-manifest.json"
-FAMILY_DISPATCHER = ".github/workflows/device-catalog-stm32-family-validation.yml"
-PHASE_ROLE_RE = re.compile(
-    r"^device-catalog-stm32[a-z0-9]+-.*(?:foundation|discovery|metadata|admission|publication).*\.yml$"
+PRODUCTION_PROBES = (
+    "data/device-catalog/production/icpn-v1-manifest.json",
+    "data/device-catalog/production/__ci_governance_probe__.json",
+    "data/device-catalog/production/nested/__ci_governance_probe__.json",
+)
+
+# Only current-state/global validators may be triggered by canonical Production
+# paths.  Family/phase/research workflows are default-denied regardless of
+# filename vocabulary.  This prevents new roles such as qualification,
+# security-scope, TrustZone, wireless, or H7 partitioning from escaping the
+# boundary merely because their names do not match an older regex.
+GLOBAL_PRODUCTION_TRIGGER_OWNERS = frozenset(
+    {
+        ".github/workflows/device-catalog-validation.yml",
+        ".github/workflows/device-catalog-current-validation.yml",
+        ".github/workflows/device-catalog-production-doc-contract.yml",
+    }
 )
 
 
@@ -25,10 +38,10 @@ def fail(message: str) -> None:
     raise SystemExit(message)
 
 
-def trigger_paths(text: str) -> set[str]:
+def trigger_paths(text: str) -> list[str]:
     lines = text.splitlines()
     in_on = False
-    result: set[str] = set()
+    result: list[str] = []
 
     for line in lines:
         if not in_on:
@@ -45,33 +58,63 @@ def trigger_paths(text: str) -> set[str]:
         value = stripped[2:].strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
-        result.add(value)
+        result.append(value)
 
     return result
 
 
+def _matches(path: str, pattern: str) -> bool:
+    # The repository uses simple GitHub path globs.  fnmatch is deliberately
+    # conservative here: '*' also matching '/' can only widen detection, which
+    # is appropriate for a fail-closed governance check.
+    return fnmatch.fnmatchcase(path, pattern)
+
+
+def production_trigger_patterns(patterns: list[str]) -> set[str]:
+    """Return positive trigger patterns that leave any Production probe enabled.
+
+    Ordered !negation is respected so an explicit exclusion can narrow a broad
+    positive pattern without being reported as debt.
+    """
+    offenders: set[str] = set()
+    for probe in PRODUCTION_PROBES:
+        enabled = False
+        enabling_pattern: str | None = None
+        for raw in patterns:
+            negative = raw.startswith("!")
+            pattern = raw[1:] if negative else raw
+            if not pattern or not _matches(probe, pattern):
+                continue
+            enabled = not negative
+            enabling_pattern = None if negative else raw
+        if enabled and enabling_pattern is not None:
+            offenders.add(enabling_pattern)
+
+    # Exact/prefix Production paths that may not coincide with a probe are also
+    # forbidden.  This catches future named files without needing to enumerate
+    # them in PRODUCTION_PROBES.
+    for raw in patterns:
+        if raw.startswith("!"):
+            continue
+        if raw.startswith(PRODUCTION_PREFIX):
+            offenders.add(raw)
+    return offenders
+
+
 def governed_violations() -> set[tuple[str, str]]:
     violations: set[tuple[str, str]] = set()
+    workflows = sorted(WORKFLOWS.glob("device-catalog-*.yml")) + sorted(
+        WORKFLOWS.glob("device-catalog-*.yaml")
+    )
 
-    for workflow in sorted(WORKFLOWS.glob("device-catalog-*.yml")):
+    for workflow in workflows:
         relative = workflow.relative_to(ROOT).as_posix()
-        paths = trigger_paths(workflow.read_text(encoding="utf-8"))
-        production_paths = {path for path in paths if path.startswith(PRODUCTION_PREFIX)}
-
-        if relative == FAMILY_DISPATCHER:
-            for path in production_paths:
-                violations.add((relative, path))
+        production_patterns = production_trigger_patterns(
+            trigger_paths(workflow.read_text(encoding="utf-8"))
+        )
+        if relative in GLOBAL_PRODUCTION_TRIGGER_OWNERS:
             continue
-
-        if not PHASE_ROLE_RE.match(workflow.name):
-            continue
-
-        if "publication" in workflow.name:
-            forbidden = production_paths - {PRODUCTION_MANIFEST}
-        else:
-            forbidden = production_paths
-
-        for path in forbidden:
+        for path in production_patterns:
             violations.add((relative, path))
 
     return violations
@@ -101,8 +144,8 @@ def load_debt_bytes(data: bytes, *, source: str) -> set[tuple[str, str]]:
         if paths != sorted(set(paths)):
             fail(f"{source}: debt paths for {workflow} must be unique and sorted")
         for path in paths:
-            if not isinstance(path, str) or not path.startswith(PRODUCTION_PREFIX):
-                fail(f"{source}: invalid production trigger path for {workflow}: {path!r}")
+            if not isinstance(path, str):
+                fail(f"{source}: invalid trigger debt for {workflow}: {path!r}")
             flattened.add((workflow, path))
 
     return flattened
@@ -132,7 +175,26 @@ def fmt(entries: set[tuple[str, str]]) -> str:
     return "\n".join(f"  - {workflow}: {path}" for workflow, path in sorted(entries)) or "  (none)"
 
 
+def self_test() -> None:
+    assert production_trigger_patterns(["data/device-catalog/production/icpn-v1-manifest.json"])
+    assert production_trigger_patterns(["data/device-catalog/production/**"])
+    assert production_trigger_patterns(["data/device-catalog/**"])
+    assert not production_trigger_patterns(["data/device-catalog/research/**"])
+    assert not production_trigger_patterns(
+        ["data/device-catalog/**", "!data/device-catalog/production/**"]
+    )
+    assert production_trigger_patterns(
+        [
+            "data/device-catalog/**",
+            "!data/device-catalog/production/**",
+            "data/device-catalog/production/icpn-v1-manifest.json",
+        ]
+    )
+    print("Device Catalog CI trigger governance self-test: PASS")
+
+
 def main() -> int:
+    self_test()
     actual = governed_violations()
     debt = load_current_debt()
 
@@ -156,7 +218,10 @@ def main() -> int:
                 "new debt entries are forbidden:\n" + fmt(additions)
             )
 
-    print(f"Device Catalog CI trigger governance PASS; retained_debt={len(debt)}")
+    print(
+        "Device Catalog CI trigger governance PASS; "
+        f"retained_debt={len(debt)} global_production_owners={len(GLOBAL_PRODUCTION_TRIGGER_OWNERS)}"
+    )
     return 0
 
 
