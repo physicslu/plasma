@@ -221,6 +221,7 @@ def _start_runtime(
             str(SERVER_PORT),
             "--output-root",
             str(state_root / "gateway-output"),
+            "--engineering-configured-mock",
         ],
         cwd=state_root,
         env=env,

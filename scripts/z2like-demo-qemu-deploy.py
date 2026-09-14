@@ -13,6 +13,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 CHUNK_BYTES = 1024 * 1024
+MAX_SIMULATION_SITE_COUNT = 8
+SITE_COUNT_MARKER = "/var/lib/plasma/z2like-demo-site-count"
 
 
 class DeployError(RuntimeError):
@@ -103,6 +106,40 @@ def _read_pairing_token(container: str) -> str:
     return token
 
 
+def _prepare_target_scenario(container: str, site_count: int) -> None:
+    if not 1 <= site_count <= MAX_SIMULATION_SITE_COUNT:
+        raise DeployError(
+            f"z2like-demo Site count must be between 1 and {MAX_SIMULATION_SITE_COUNT}"
+        )
+    writer = (
+        "from pathlib import Path; import sys; "
+        f"p=Path({SITE_COUNT_MARKER!r}); "
+        "p.parent.mkdir(parents=True, exist_ok=True); "
+        "p.write_text(sys.argv[1]+'\\n', encoding='utf-8'); "
+        "p.chmod(0o600)"
+    )
+    written = subprocess.run(
+        ["docker", "exec", container, "python3", "-c", writer, str(site_count)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=15,
+    )
+    if written.returncode != 0:
+        raise DeployError(f"cannot persist QEMU Site-count marker: {written.stderr.strip()}")
+    restarted = subprocess.run(
+        ["docker", "restart", container],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=45,
+    )
+    if restarted.returncode != 0:
+        raise DeployError(f"cannot reload QEMU target harness: {restarted.stderr.strip()}")
+
+
 def _registry_entry(manager: str, alias: str, endpoint: str) -> dict[str, Any]:
     status, payload = _json_request(f"{manager}/api/registry")
     _expect(status, 200, payload, "registry read")
@@ -146,11 +183,30 @@ def _set_lifecycle(manager: str, alias: str, lifecycle: str, *, retry_s: float =
         time.sleep(1.0)
 
 
+def _verify_programming_catalog(payload: Mapping[str, Any], *, site_count: int, ppu_id: str) -> None:
+    if payload.get("ok") is not True or payload.get("provider") != "configured_mock":
+        raise DeployError(f"QEMU configured Mock Programming provider is unavailable: {payload!r}")
+    if payload.get("ppu_count") != 1 or payload.get("site_count") != site_count:
+        raise DeployError(
+            f"QEMU Programming catalog topology mismatch: expected one PPU/{site_count} Sites, got {payload!r}"
+        )
+    facilities = payload.get("facilities")
+    if not isinstance(facilities, list) or len(facilities) != 1:
+        raise DeployError(f"QEMU Programming catalog facility topology is invalid: {payload!r}")
+    ppus = facilities[0].get("ppus") if isinstance(facilities[0], dict) else None
+    if not isinstance(ppus, list) or len(ppus) != 1 or ppus[0].get("ppu_id") != ppu_id:
+        raise DeployError(f"QEMU Programming catalog PPU identity mismatch: {payload!r}")
+
+
 def deploy(args: argparse.Namespace) -> dict[str, Any]:
     kit = args.kit.expanduser().resolve()
     sidecar = args.sidecar.expanduser().resolve()
     if not kit.is_file() or not sidecar.is_file():
         raise DeployError("kit artifact and sidecar are required")
+    if not 1 <= args.site_count <= MAX_SIMULATION_SITE_COUNT:
+        raise DeployError(
+            f"site-count must be between 1 and {MAX_SIMULATION_SITE_COUNT}"
+        )
     fields = sidecar.read_text(encoding="utf-8").strip().split()
     kit_sha = _sha256(kit)
     if len(fields) != 2 or fields[1].lstrip("*") != kit.name or fields[0].lower() != kit_sha:
@@ -166,9 +222,17 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     elif lifecycle_before not in {"pending", "disabled"}:
         raise DeployError(f"unsupported Manager lifecycle before maintenance: {lifecycle_before!r}")
 
+    # The target remains non-operationally admitted while its simulation profile
+    # is updated and the container is restarted. Restarting here also reloads the
+    # current bind-mounted target harness after a git update.
+    _prepare_target_scenario(args.container, args.site_count)
+
     bootstrap_url = f"{manager}/api/registry/{args.alias}/bootstrap"
-    status, before = _json_request(bootstrap_url)
-    _expect(status, 200, before, "Bootstrap status")
+    before = _wait_json(
+        bootstrap_url,
+        lambda payload: isinstance(payload.get("bootstrap"), dict),
+        timeout_s=60.0,
+    )
     bootstrap = before.get("bootstrap")
     if not isinstance(bootstrap, dict):
         raise DeployError("Manager Bootstrap status omitted target document")
@@ -267,7 +331,12 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     if not (ready.get("ok") is True and ready.get("gateway") == "alive" and ready.get("execution") == "ready"):
         raise DeployError(f"QEMU Gateway readiness contract failed: {ready!r}")
 
-    # Re-enable only after the Manager itself has a current trusted observation.
+    targets_status, targets = _json_request(f"http://{args.ppu_ip}:18080/api/engineering/targets")
+    _expect(targets_status, 200, targets, "QEMU Programming catalog")
+    _verify_programming_catalog(targets, site_count=args.site_count, ppu_id=args.ppu_id)
+
+    # Re-enable only after Runtime, topology and the configured Programming
+    # provider are all coherent and the Manager has a current trusted observation.
     commissioned = _set_lifecycle(manager, args.alias, "commissioned", retry_s=45.0)
 
     return {
@@ -283,6 +352,8 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
         "runtime_state_after": "runtime_active",
         "deployment_state": "succeeded",
         "gateway_readiness": "PASS",
+        "programming_provider": "configured_mock",
+        "configured_site_count": args.site_count,
         "kit_sha256": kit_sha,
         "not_claimed": [
             "Render deployment state",
@@ -290,6 +361,7 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
             "PYNQ-Z2 hardware",
             "PL/FPGA",
             "real IC programming",
+            "physical multi-Site concurrency",
         ],
     }
 
@@ -305,6 +377,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--facility-id", default="swpc-simulation")
     parser.add_argument("--display-name", default="SWPC QEMU ARMv7 Z2 Simulation")
     parser.add_argument("--container", default="plasma-z2like-demo-qemu")
+    parser.add_argument(
+        "--site-count",
+        type=int,
+        default=os.environ.get("PLASMA_Z2LIKE_DEMO_SITE_COUNT", "8"),
+        help="number of enabled Mock Sites to provision (1..8; default 8)",
+    )
     return parser
 
 
