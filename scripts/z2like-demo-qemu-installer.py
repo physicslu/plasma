@@ -3,7 +3,7 @@
 
 This module intentionally implements the installer surface consumed by
 ``ppu-bootstrap-deployment.py`` while reusing the production Z2 release verifier
-and immutable release copier.  It replaces only the physical-Z2/systemd
+and immutable release copier. It replaces only the physical-Z2/systemd
 activation layer with a userspace activation handshake owned by
 ``z2like-demo-qemu-target.py``.
 
@@ -26,6 +26,7 @@ from typing import Mapping
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TARGET_MARKER = "PLASMA_Z2LIKE_DEMO_QEMU_TARGET"
+CORE_OVERRIDE = "PLASMA_Z2LIKE_DEMO_INSTALLER_CORE"
 EVIDENCE_LEVEL = "swpc-qemu-armv7-z2like-demo"
 ACTIVATION_MARKER = "z2like-demo-activation.json"
 
@@ -40,7 +41,8 @@ def _load(path: Path, name: str) -> ModuleType:
     return module
 
 
-_core = _load(SCRIPT_DIR / "ppu-z2-installer-core.py", "plasma_z2like_demo_installer_core")
+core_path = Path(os.environ.get(CORE_OVERRIDE, str(SCRIPT_DIR / "ppu-z2-installer-core.py"))).resolve()
+_core = _load(core_path, "plasma_z2like_demo_installer_core")
 
 Z2InstallerError = _core.Z2InstallerError
 InstallPaths = _core.InstallPaths
@@ -64,17 +66,11 @@ def _require_target_baseline() -> None:
 
 
 def validate_plasma_python(path: Path, *, product_root: Path = Path("/opt/plasma")) -> PythonRuntime:
-    """Validate the QEMU container interpreter without claiming product Python install.
-
-    Real ``z2-ps`` requires a Plasma-owned interpreter below ``/opt/plasma/python``.
-    The QEMU userspace simulation intentionally uses the container interpreter so
-    it can exercise the ARMv7 runtime/control path without pretending to validate
-    the physical-Z2 Python installation contract.
-    """
+    """Validate the QEMU container interpreter without claiming product Python install."""
 
     del product_root
     resolved = path.resolve()
-    if not resolved.is_absolute() or not resolved.is_file() or not os.access(resolved, os.X_OK):
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
         raise Z2InstallerError(f"QEMU simulation Python is not executable: {resolved}")
     code = (
         "import json,platform,sys;"
@@ -302,6 +298,7 @@ def install_release(
         },
         "previous_release": str(previous) if previous is not None else None,
         "hardware_boundary": dict(_core.EXPECTED_HARDWARE_BOUNDARY),
+        "installer_core": str(core_path),
         "not_claimed": [
             "PYNQ-Z2 hardware",
             "Plasma-owned Python installation",
