@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Persistent ARMv7 userspace target for the SWPC ``z2like-demo`` scenario.
 
-The process runs inside a Docker/QEMU ``linux/arm/v7`` container.  It owns the
+The process runs inside a Docker/QEMU ``linux/arm/v7`` container. It owns the
 simulation-only process lifecycle for:
 
 * independent authenticated PPU Bootstrap on :18081;
@@ -9,7 +9,7 @@ simulation-only process lifecycle for:
 * the currently activated packaged Plasma Gateway on :18080.
 
 It deliberately does not emulate systemd, PYNQ, PL, electrical Site I/O, target
-power or a real IC.  SWPC is the simulation environment; this ARMv7 process is
+power or a real IC. SWPC is the simulation environment; this ARMv7 process is
 the single canonical ``z2like-demo`` PPU backend.
 """
 
@@ -307,6 +307,7 @@ def _run(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGINT, request_stop)
 
     active_release: str | None = None
+    failed_release: str | None = None
     server: subprocess.Popen[Any] | None = None
     gateway: subprocess.Popen[Any] | None = None
     try:
@@ -314,25 +315,42 @@ def _run(args: argparse.Namespace) -> int:
             if bootstrap.poll() is not None:
                 raise TargetError(f"Bootstrap exited unexpectedly: rc={bootstrap.returncode}")
             desired_release = _release_identity(product_root / "current")
+            if desired_release != failed_release:
+                failed_release = None
             runtime_dead = (
                 (server is not None and server.poll() is not None)
                 or (gateway is not None and gateway.poll() is not None)
             )
-            if desired_release != active_release or runtime_dead:
+            needs_transition = desired_release != active_release or runtime_dead
+            if needs_transition:
                 _terminate(gateway)
                 _terminate(server)
                 server = gateway = None
                 active_release = None
-                if desired_release is not None:
-                    release_id, server, gateway = _start_runtime(
-                        product_root=product_root,
-                        config_root=config_root,
-                        state_root=runtime_state,
-                        log_root=log_root,
-                        gateway_host=args.bind_host,
-                    )
-                    active_release = release_id
-                    print(f"z2like-demo-qemu-target: Runtime active {release_id}", flush=True)
+                if desired_release is not None and desired_release != failed_release:
+                    try:
+                        release_id, server, gateway = _start_runtime(
+                            product_root=product_root,
+                            config_root=config_root,
+                            state_root=runtime_state,
+                            log_root=log_root,
+                            gateway_host=args.bind_host,
+                        )
+                    except TargetError as exc:
+                        # Activation failure must not kill Bootstrap. The deployment
+                        # coordinator needs Bootstrap to remain reachable while its
+                        # health deadline expires and the installer restores the
+                        # previous release. Do not retry the same failed symlink;
+                        # wait for the rollback/current-link transition.
+                        failed_release = desired_release
+                        print(
+                            f"z2like-demo-qemu-target: Runtime activation failed for {desired_release}: {exc}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                    else:
+                        active_release = release_id
+                        print(f"z2like-demo-qemu-target: Runtime active {release_id}", flush=True)
             time.sleep(0.1)
     finally:
         _terminate(gateway)
