@@ -1,0 +1,43 @@
+name: STM32 TrustZone cohort Gate 1 validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32_trustzone_cohort_qualification.py"
+      - "data/device-catalog/research/test_stm32_trustzone_cohort_qualification.py"
+      - "data/device-catalog/research/stm32-trustzone-cohort-gate1-qualification.json"
+      - "data/device-catalog/research/device-catalog-stm32-trustzone-cohort-gate1.md"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
+      - ".github/workflows/device-catalog-stm32-trustzone-cohort-gate1-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/stm32_trustzone_cohort_qualification.py"
+      - "data/device-catalog/research/test_stm32_trustzone_cohort_qualification.py"
+      - "data/device-catalog/research/stm32-trustzone-cohort-gate1-qualification.json"
+      - "data/device-catalog/research/device-catalog-stm32-trustzone-cohort-gate1.md"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
+      - ".github/workflows/device-catalog-stm32-trustzone-cohort-gate1-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate deterministic TrustZone cohort qualification
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32_trustzone_cohort_qualification.py
+      - name: Render qualification
+        run: python data/device-catalog/research/stm32_trustzone_cohort_qualification.py
+      - name: Enforce zero Production writes
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production
