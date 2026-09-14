@@ -1,0 +1,56 @@
+name: STM32L1 L1.3 metadata baseline calibration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/device-catalog-stm32l1-l13-metadata-policy
+    paths:
+      - "data/device-catalog/research/stm32l1_metadata_policy.py"
+      - "data/device-catalog/research/stm32l1_phase_l1_3_policy.py"
+      - "data/device-catalog/research/build_stm32l1_phase_l1_3_baseline.py"
+      - "data/device-catalog/research/test_stm32l1_phase_l1_3_policy.py"
+      - "data/device-catalog/research/stm32l1-phase-l1.3-ordering-authority.json"
+      - "data/device-catalog/research/stm32l1-phase-l1.3-exact-variant-exceptions.json"
+      - ".github/workflows/device-catalog-stm32l1-l13-baseline-calibration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run L1.3 metadata negative controls
+        run: |
+          python -m unittest \
+            data/device-catalog/research/test_stm32l1_phase_l1_3_policy.py
+
+      - name: Replay full metadata plan
+        run: |
+          python data/device-catalog/research/stm32l1_phase_l1_3_policy.py \
+            --summary-only \
+            --output /tmp/stm32l1-l1.3-summary.json
+          cat /tmp/stm32l1-l1.3-summary.json
+
+      - name: Build candidate frozen baseline
+        run: |
+          python data/device-catalog/research/build_stm32l1_phase_l1_3_baseline.py \
+            --output /tmp/stm32l1-l1.3-baseline.json
+          cat /tmp/stm32l1-l1.3-baseline.json
+
+      - name: Enforce zero Production writes
+        run: |
+          if git diff --name-only origin/main...HEAD -- data/device-catalog/production/ | grep -q .; then
+            echo "L1.3 must not modify Production"
+            exit 1
+          fi
