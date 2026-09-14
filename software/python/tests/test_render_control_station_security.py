@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPOSITORY_ROOT / "scripts" / "render-control-station-start.sh"
+BLUEPRINT = REPOSITORY_ROOT / "render.yaml"
 COLLECTION_ROUTE = REPOSITORY_ROOT / "software" / "web" / "app" / "api" / "manager" / "registry" / "route.ts"
 ENTRY_ROUTE = REPOSITORY_ROOT / "software" / "web" / "app" / "api" / "manager" / "registry" / "[...path]" / "route.ts"
+CAPABILITY = REPOSITORY_ROOT / "software" / "web" / "app" / "api" / "manager" / "maintenance-capability.mjs"
 
 
 def test_public_render_lab_uses_fixed_target_lifecycle_registry() -> None:
@@ -24,6 +28,26 @@ def test_public_render_lab_uses_fixed_target_lifecycle_registry() -> None:
     assert 'lifecycle !== "disabled" && lifecycle !== "commissioned"' in entry
     assert 'alias !== fixedAlias' in entry
     assert "Fixed-target registry mutation is limited to one lifecycle field" in entry
+    assert "hasMaintenanceCapability(request, alias)" in entry
+
+
+def test_public_render_lab_requires_dedicated_browser_maintenance_secret() -> None:
+    blueprint = yaml.safe_load(BLUEPRINT.read_text(encoding="utf-8"))
+    service = next(item for item in blueprint["services"] if item["name"] == "plasma-control-station-lab")
+    env = {item["key"]: item for item in service["envVars"]}
+    capability = env["PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET"]
+    assert capability == {
+        "key": "PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET",
+        "generateValue": True,
+    }
+
+    source = CAPABILITY.read_text(encoding="utf-8")
+    assert 'CAPABILITY_COOKIE = "plasma-manager-maintenance"' in source
+    assert 'CAPABILITY_TTL_SECONDS = 15 * 60' in source
+    assert 'createHmac("sha256"' in source
+    assert "timingSafeEqual" in source
+    assert "HttpOnly; Secure; SameSite=Strict" in source
+    assert "sameOriginMutation" in source
 
 
 def test_public_render_lab_requires_https_root_endpoint_and_private_runtime_gateway_host() -> None:
