@@ -6,10 +6,12 @@ on:
     paths:
       - "**/*.md"
       - ".github/ci-workstreams.json"
+      - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
+      - "scripts/tests/test-device-catalog-ci-trigger-governance.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -18,16 +20,18 @@ on:
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/z2-ps-release.yml"
       - ".github/workflows/persistent-integration-host.yml"
-      - ".github/workflows/device-catalog-stm32-family-validation.yml"
+      - ".github/workflows/device-catalog-*.yml"
       - ".github/workflows/repository-contracts.yml"
   pull_request:
     paths:
       - "**/*.md"
       - ".github/ci-workstreams.json"
+      - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
+      - "scripts/tests/test-device-catalog-ci-trigger-governance.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -36,7 +40,7 @@ on:
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/z2-ps-release.yml"
       - ".github/workflows/persistent-integration-host.yml"
-      - ".github/workflows/device-catalog-stm32-family-validation.yml"
+      - ".github/workflows/device-catalog-*.yml"
       - ".github/workflows/repository-contracts.yml"
 
 concurrency:
@@ -111,7 +115,9 @@ jobs:
           }
           ci_boundary_exact = {
               ".github/ci-workstreams.json",
+              ".github/device-catalog-ci-trigger-debt.json",
               "scripts/tests/test-ci-domain-boundaries.py",
+              "scripts/tests/test-device-catalog-ci-trigger-governance.py",
               ".github/workflows/python-tests.yml",
               ".github/workflows/ic-support-validation.yml",
               ".github/workflows/ppu-release.yml",
@@ -131,7 +137,11 @@ jobs:
               or path in terminology_exact
               for path in changed
           )
-          ci_boundaries = any(path in ci_boundary_exact for path in changed)
+          ci_boundaries = any(
+              path in ci_boundary_exact
+              or path.startswith(".github/workflows/device-catalog-")
+              for path in changed
+          )
 
           output = Path(os.environ["GITHUB_OUTPUT"])
           with output.open("a", encoding="utf-8") as stream:
@@ -184,8 +194,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Lock Device Catalog / AI research / software CI boundaries
         run: python scripts/tests/test-ci-domain-boundaries.py
+      - name: Enforce Device Catalog CI trigger governance
+        env:
+          PLASMA_CI_GOVERNANCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python scripts/tests/test-device-catalog-ci-trigger-governance.py
