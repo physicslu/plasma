@@ -1,5 +1,6 @@
 import { requireManagerRegistryContractVersion } from "../../../../manager-contract";
 import { relayManagerBootstrapRequest } from "../../bootstrap-bff";
+import { hasMaintenanceCapability, maintenanceCapabilityRequired } from "../../maintenance-capability.mjs";
 import {
   relayManagerNetworkCommissioningRequest,
   relayManagerPpuAliasRequest,
@@ -87,6 +88,9 @@ async function enforceFixedEntryPolicy(request: Request, alias: string): Promise
     return fixedRegistryMutationRejected("This Control Station owns a fixed PPU target; registry removal is disabled");
   }
   if (request.method !== "PATCH") return null;
+  if (!hasMaintenanceCapability(request, alias)) {
+    return maintenanceCapabilityRequired();
+  }
 
   let payload: unknown;
   try {
