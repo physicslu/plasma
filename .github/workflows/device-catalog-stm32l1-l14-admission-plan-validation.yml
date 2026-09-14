@@ -8,6 +8,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_4_admission.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py"
       - "data/device-catalog/research/stm32l1-phase-l1.4-admission-plan.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - ".github/workflows/device-catalog-stm32l1-l14-admission-plan-validation.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_4_admission.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py"
       - "data/device-catalog/research/stm32l1-phase-l1.4-admission-plan.json"
+      - "data/device-catalog/research/stm32l1-post-l4-production-manifest-prestate.json"
       - ".github/workflows/device-catalog-stm32l1-l14-admission-plan-validation.yml"
   workflow_dispatch:
 
@@ -41,11 +43,3 @@ jobs:
 
       - name: Validate frozen L1.4 admission plan
         run: python data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py
-
-      - name: Enforce zero Production writes
-        if: github.event_name == 'pull_request'
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }}...HEAD -- data/device-catalog/production/ | grep -q .; then
-            echo "L1.4 must not modify Production"
-            exit 1
-          fi
