@@ -8,6 +8,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_4_admission.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py"
       - "data/device-catalog/research/stm32l1-phase-l1.4-admission-plan.json"
+      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l1-l14-admission-plan-validation.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "data/device-catalog/research/test_stm32l1_phase_l1_4_admission.py"
       - "data/device-catalog/research/validate_stm32l1_phase_l1_4_admission_plan.py"
       - "data/device-catalog/research/stm32l1-phase-l1.4-admission-plan.json"
+      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l1-l14-admission-plan-validation.yml"
   workflow_dispatch:
 
