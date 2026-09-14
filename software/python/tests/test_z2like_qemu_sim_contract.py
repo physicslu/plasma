@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 SIM = ROOT / "scripts" / "z2like-qemu-sim.py"
+SMOKE = ROOT / "scripts" / "z2like-qemu-bootstrap-smoke.py"
 INGRESS = ROOT / "scripts" / "plasmactl-z2like-qemu-managed-ingress"
 
 
@@ -46,6 +47,21 @@ def test_qemu_bootstrap_uses_current_verifiers_and_armv7_runtime() -> None:
     assert '"--engineering-configured-mock"' in source
     assert '("0.0.0.0", BOOTSTRAP_PORT)' in source
     assert '"--host", "0.0.0.0"' in source
+
+
+def test_private_bootstrap_smoke_uses_authenticated_chunked_api_without_exposing_token() -> None:
+    source = SMOKE.read_text(encoding="utf-8")
+    ast.parse(source)
+    assert 'BOOTSTRAP_ROOT = f"http://{APPLIANCE_IP}:18081"' in source
+    assert 'GATEWAY_ROOT = f"http://{APPLIANCE_IP}:18080"' in source
+    assert 'request.add_header("Authorization", f"Bearer {token}")' in source
+    assert '"/v1/uploads"' in source
+    assert 'f"/v1/uploads/{upload_id}/chunks"' in source
+    assert 'f"/v1/uploads/{upload_id}/commit"' in source
+    assert '"/v1/deployments"' in source
+    assert '"systemd_qualified": False' in source
+    assert '"real_z2_hil": "not_qualified"' in source
+    assert "print(token)" not in source
 
 
 def test_qemu_managed_ingress_is_distinct_and_keeps_bootstrap_private() -> None:
