@@ -61,6 +61,19 @@ Two calibration failures were execution/validation-wrapper defects, not commerci
 
 No exact ICPN, metadata row, route, or publication count was relaxed to resolve either failure.
 
+## Historical/current state separation
+
+L1.5 also exposed stale permanent-CI assumptions outside the publisher itself. Older L1.2/L1.3/L1.4 validators had bound their historical prestate checks to mutable current Production, and the L4.5 validator required global catalog totals to remain frozen forever.
+
+The closure keeps the original evidence hard-locks while separating state roles:
+- `stm32l1-post-l4-production-manifest-prestate.json` is byte-identical to the original post-L4 Production manifest, with Git blob `1aa2311a25a69742c428147a402816ed5071e04e`;
+- L1.2/L1.3/L1.4 replay their historical decisions against that immutable snapshot;
+- one-time zero-write PR guards are not used as permanent historical validators;
+- L4.5 continues to require exactly 446 STM32L4 rows but permits later monotonic global Production growth;
+- current cross-family prioritization removes STM32L1 from the research candidate pool after publication, while historical L1 structural negative controls use the frozen pre-L1 snapshot.
+
+Targeted validation confirmed the historical phases and current post-L1 policy can coexist without changing any frozen L1.5 publication bytes.
+
 ## Permanent validation
 
 Permanent validation hard-locks:
