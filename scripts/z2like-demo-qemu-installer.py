@@ -29,6 +29,7 @@ TARGET_MARKER = "PLASMA_Z2LIKE_DEMO_QEMU_TARGET"
 CORE_OVERRIDE = "PLASMA_Z2LIKE_DEMO_INSTALLER_CORE"
 EVIDENCE_LEVEL = "swpc-qemu-armv7-z2like-demo"
 ACTIVATION_MARKER = "z2like-demo-activation.json"
+DEFAULT_SIMULATION_SITE_COUNT = 8
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -135,6 +136,67 @@ def _atomic_symlink(link: Path, target: Path) -> None:
     os.replace(temporary, link)
 
 
+def _simulation_site_count() -> int:
+    raw = os.environ.get("PLASMA_Z2LIKE_DEMO_SITE_COUNT", str(DEFAULT_SIMULATION_SITE_COUNT)).strip()
+    try:
+        site_count = int(raw)
+    except ValueError as exc:
+        raise Z2InstallerError("PLASMA_Z2LIKE_DEMO_SITE_COUNT must be an integer") from exc
+    if not 1 <= site_count <= 8:
+        raise Z2InstallerError("PLASMA_Z2LIKE_DEMO_SITE_COUNT must be between 1 and 8")
+    return site_count
+
+
+def _config_lines(
+    *,
+    ppu_id: str,
+    facility_id: str,
+    display_name: str,
+    state_root: Path,
+    log_root: Path,
+    site_count: int,
+    legacy_empty_sites: bool,
+) -> list[str]:
+    max_concurrent_jobs = 1 if legacy_empty_sites else site_count
+    lines = [
+        "ppu:",
+        f"  id: {json.dumps(ppu_id)}",
+        f"  facility_id: {json.dumps(facility_id)}",
+        '  model: "QEMU ARMv7 Z2 Simulation"',
+        f"  display_name: {json.dumps(display_name)}",
+        "",
+        "server:",
+        "  host: 127.0.0.1",
+        "  port: 9900",
+        "  max_supported_sites: 8",
+        f"  max_concurrent_jobs: {max_concurrent_jobs}",
+        "  max_queue_depth_per_site: 16",
+        f"  output_root: {state_root / 'output'}",
+        f"  log_root: {log_root}",
+        "  max_metadata_bytes: 65536",
+        "  max_map_bytes: 1048576",
+        "  max_binary_bytes: 67108864",
+        "",
+    ]
+    if legacy_empty_sites:
+        lines.extend(["sites: []", ""])
+        return lines
+    lines.append("sites:")
+    for site_id in range(1, site_count + 1):
+        lines.extend(
+            [
+                f"  - id: {site_id}",
+                "    enabled: true",
+                "    interface: mock",
+                "    target: STM32F103C8T6",
+                "    mock:",
+                "      flash_size: 65536",
+            ]
+        )
+    lines.append("")
+    return lines
+
+
 def _simulation_config(
     *,
     ppu_id: str,
@@ -147,28 +209,36 @@ def _simulation_config(
         if not value or "\n" in value or "\r" in value:
             raise Z2InstallerError(f"{label} must be a non-empty single-line value")
     return "\n".join(
-        [
-            "ppu:",
-            f"  id: {json.dumps(ppu_id)}",
-            f"  facility_id: {json.dumps(facility_id)}",
-            '  model: "QEMU ARMv7 Z2 Simulation"',
-            f"  display_name: {json.dumps(display_name)}",
-            "",
-            "server:",
-            "  host: 127.0.0.1",
-            "  port: 9900",
-            "  max_supported_sites: 8",
-            "  max_concurrent_jobs: 1",
-            "  max_queue_depth_per_site: 16",
-            f"  output_root: {state_root / 'output'}",
-            f"  log_root: {log_root}",
-            "  max_metadata_bytes: 65536",
-            "  max_map_bytes: 1048576",
-            "  max_binary_bytes: 67108864",
-            "",
-            "sites: []",
-            "",
-        ]
+        _config_lines(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=state_root,
+            log_root=log_root,
+            site_count=_simulation_site_count(),
+            legacy_empty_sites=False,
+        )
+    )
+
+
+def _legacy_empty_simulation_config(
+    *,
+    ppu_id: str,
+    facility_id: str,
+    display_name: str,
+    state_root: Path,
+    log_root: Path,
+) -> str:
+    return "\n".join(
+        _config_lines(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=state_root,
+            log_root=log_root,
+            site_count=DEFAULT_SIMULATION_SITE_COUNT,
+            legacy_empty_sites=True,
+        )
     )
 
 
@@ -216,18 +286,25 @@ def install_release(
         directory.mkdir(parents=True, exist_ok=True)
     _copy_release(verified, release_target)
 
+    desired_config = _simulation_config(
+        ppu_id=ppu_id,
+        facility_id=facility_id,
+        display_name=display_name,
+        state_root=paths.state_root,
+        log_root=paths.log_root,
+    )
     if previous_config is None:
-        _atomic_text(
-            config_path,
-            _simulation_config(
-                ppu_id=ppu_id,
-                facility_id=facility_id,
-                display_name=display_name,
-                state_root=paths.state_root,
-                log_root=paths.log_root,
-            ),
-            0o640,
-        )
+        _atomic_text(config_path, desired_config, 0o640)
+    else:
+        legacy_empty = _legacy_empty_simulation_config(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=paths.state_root,
+            log_root=paths.log_root,
+        ).encode("utf-8")
+        if previous_config == legacy_empty:
+            _atomic_text(config_path, desired_config, 0o640)
 
     _atomic_symlink(paths.current, release_target)
     activation_marker = paths.state_root / ACTIVATION_MARKER
@@ -290,6 +367,7 @@ def install_release(
         "site_desired_state": {
             "config_path": str(config_path),
             "upgrade_preserves_existing_config": True,
+            "legacy_empty_topology_migration": True,
             "runtime_apply_supported": False,
         },
         "activation": {
