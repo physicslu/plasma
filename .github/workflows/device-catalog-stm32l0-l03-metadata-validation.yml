@@ -10,7 +10,6 @@ on:
       - "data/device-catalog/research/stm32l0-phase-l0.3-ordering-authority.json"
       - "data/device-catalog/research/stm32l0-phase-l0.3-policy-baseline.json"
       - "data/device-catalog/research/evidence/stm32l0-l0.2-official-st-discovery-live-2026-09-12/**"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l0-l03-metadata-validation.yml"
   workflow_dispatch:
 
