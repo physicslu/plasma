@@ -19,6 +19,7 @@ from .registry import (
     REGISTRY_LIFECYCLE_PENDING,
     RegistryEntryNotFound,
 )
+from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -59,7 +60,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             credentials = BootstrapCredentialStore(
                 BootstrapCredentialStore.path_for_registry(config.registry_state_path)
             )
-            cls.bootstrap_coordinator = ManagerBootstrapCoordinator(
+            cls.bootstrap_coordinator = VerifiedManagerBootstrapCoordinator(
                 self.registry_store,
                 credentials,
                 config.request_timeout_s,
@@ -177,8 +178,6 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         self._json(HTTPStatus.OK, payload)
 
     def _bootstrap_post(self, alias: str, action: str) -> None:
-        if not self._bootstrap_mutation_allowed(alias):
-            return
         coordinator = self._bootstrap()
         try:
             body = self._read_json_object()
@@ -186,6 +185,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 if set(body) != {"token"} or not isinstance(body.get("token"), str):
                     raise ValueError("Bootstrap pairing request requires only token")
                 self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
+                return
+            if not self._bootstrap_mutation_allowed(alias):
                 return
             if action == "uploads":
                 status, payload = coordinator.create_upload(alias, body)

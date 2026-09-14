@@ -146,6 +146,23 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertTrue(payload["pairing"]["paired"])
         self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
 
+    def test_commissioned_ppu_can_pair_before_entering_maintenance(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        token = "t" * 40
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": token})
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["pairing"]["paired"])
+        self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
+
+    def test_pairing_is_not_blocked_by_active_execution_because_it_does_not_mutate_runtime(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        BootstrapPlasmaManagerHandler.poller = FakePoller(active=True)
+        token = "t" * 40
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": token})
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["pairing"]["paired"])
+        self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
+
     def test_commissioned_ppu_requires_disable_before_runtime_maintenance(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
         status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})

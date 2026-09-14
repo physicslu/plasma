@@ -114,6 +114,7 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertEqual(control_station["healthCheckPath"], "/")
         control_environment = {item["key"]: item for item in control_station["envVars"]}
         self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "z2like-qemu")
+        self.assertEqual(control_environment["PLASMA_RENDER_PPU_RUNTIME_GATEWAY_HOST"]["value"], "172.30.77.2")
         for secret_key in (
             "PLASMA_RENDER_PPU_ENDPOINT",
             "PLASMA_RENDER_PPU_ACCESS_CLIENT_ID",
@@ -139,10 +140,12 @@ class RenderDeploymentContractTests(unittest.TestCase):
 
     def test_control_station_lab_is_manager_only_and_requires_managed_https_ppu_ingress(self) -> None:
         script = (REPOSITORY_ROOT / "scripts/render-control-station-start.sh").read_text(encoding="utf-8")
-        self.assertIn("python -m plasma_manager.server", script)
+        self.assertIn("python -m plasma_manager.bootstrap_server", script)
         self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
         self.assertIn('PLASMA_FLEET_UI_ENABLED="1"', script)
         self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
+        self.assertIn('PLASMA_MANAGER_BOOTSTRAP_TRANSPORT="managed-gateway-prefix-v1"', script)
+        self.assertIn('PLASMA_MANAGER_REGISTRY_POLICY="fixed-lifecycle"', script)
         self.assertIn('configured_ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-z2like-qemu}"', script)
         self.assertIn('ppu_alias="z2like-qemu"', script)
         self.assertIn("Ignoring deprecated PLASMA_RENDER_PPU_ALIAS", script)
