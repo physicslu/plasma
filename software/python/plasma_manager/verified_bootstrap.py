@@ -17,11 +17,15 @@ class VerifiedManagerBootstrapCoordinator(ManagerBootstrapCoordinator):
     Bootstrap authenticates the bearer first, then rejects the request before any
     upload state is created. Only that exact authenticated validation rejection is
     accepted as proof; every other response fails closed.
+
+    Verification and persistence use the same live device observation so a token
+    proven against one Bootstrap identity cannot be rebound to a different device
+    by a second status read between proof and credential persistence.
     """
 
     def pair(self, alias: str, token: str) -> dict[str, Any]:
         validated_token = _valid_token(token)
-        normalized, _record, client, _payload, _device_id = self._live(alias)
+        normalized, _record, client, _payload, device_id = self._live(alias)
         status, payload = client.create_upload(validated_token, PAIR_PROBE_BODY)
         if (
             status != 409
@@ -32,6 +36,12 @@ class VerifiedManagerBootstrapCoordinator(ManagerBootstrapCoordinator):
             raise BootstrapCredentialError(
                 "Bootstrap pairing token could not be verified against the registered device"
             )
-        result = super().pair(normalized, validated_token)
-        result["pairing"]["device_verified"] = True
-        return result
+        self.credentials.set(normalized, device_id, validated_token)
+        pairing = dict(self.credentials.public_state(normalized))
+        pairing["device_verified"] = True
+        return {
+            "ok": True,
+            "ppu_alias": normalized,
+            "pairing": pairing,
+            "token_verification": "verified_before_persistence",
+        }
