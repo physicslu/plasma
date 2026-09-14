@@ -84,8 +84,6 @@ export default function PpuRuntimeDeployment({
   const canPair = Boolean(
     alias
     && pairingToken.trim().length >= 32
-    && maintenanceReady
-    && !hasActiveExecution
     && busy === null,
   );
   const canDeploy = Boolean(
@@ -120,7 +118,7 @@ export default function PpuRuntimeDeployment({
     try {
       await pairManagerPpuBootstrap(alias, pairingToken);
       setPairingToken("");
-      setNotice("Bootstrap pairing stored by Manager for this immutable device identity.");
+      setNotice("Bootstrap token verified by the registered device. Browser maintenance authorization is active for a short window.");
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Bootstrap pairing failed");
@@ -182,7 +180,7 @@ export default function PpuRuntimeDeployment({
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Runtime deployment is blocked while this PPU has active Site execution.</p>}
-      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">Disable this commissioned PPU before Runtime maintenance.</p>}
+      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">Verify Bootstrap pairing, then disable this commissioned PPU before Runtime maintenance.</p>}
       {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Runtime maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
       {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Runtime deployment remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
@@ -206,13 +204,13 @@ export default function PpuRuntimeDeployment({
             type="password"
             autoComplete="off"
             value={pairingToken}
-            disabled={!maintenanceReady || hasActiveExecution || busy !== null}
+            disabled={busy !== null}
             placeholder="Factory pairing token"
             onChange={event => setPairingToken(event.target.value)}
           />
         </label>
         <button className="ppuSiteButton" type="button" disabled={!canPair} onClick={() => void pair()}>
-          {busy === "pair" ? "Pairing..." : "Pair Bootstrap"}
+          {busy === "pair" ? "Pairing..." : "Verify & Pair Bootstrap"}
         </button>
       </div>
 
