@@ -19,6 +19,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -168,7 +169,6 @@ def _registry_entry(manager: str, alias: str, endpoint: str) -> dict[str, Any]:
 
 def _set_lifecycle(manager: str, alias: str, lifecycle: str, *, retry_s: float = 0.0) -> dict[str, Any]:
     deadline = time.monotonic() + max(0.0, retry_s)
-    last: dict[str, Any] | None = None
     while True:
         status, payload = _json_request(
             f"{manager}/api/registry/{alias}",
@@ -180,7 +180,6 @@ def _set_lifecycle(manager: str, alias: str, lifecycle: str, *, retry_s: float =
             if not isinstance(entry, dict) or entry.get("lifecycle") != lifecycle:
                 raise DeployError(f"Manager did not persist lifecycle {lifecycle!r}: {payload!r}")
             return entry
-        last = payload
         if time.monotonic() >= deadline:
             raise DeployError(f"cannot set PPU lifecycle to {lifecycle!r}: HTTP {status} {payload!r}")
         time.sleep(1.0)
@@ -206,21 +205,104 @@ def _fleet_item_is_trusted_idle(item: Mapping[str, Any], alias: str) -> bool:
     return True
 
 
-def _wait_for_trusted_idle(manager: str, alias: str, *, timeout_s: float = 60.0) -> None:
-    def ready(payload: Mapping[str, Any]) -> bool:
-        ppus = payload.get("ppus")
-        return isinstance(ppus, list) and any(
-            isinstance(item, dict) and _fleet_item_is_trusted_idle(item, alias)
-            for item in ppus
-        )
-
+def _fleet_observed_at(payload: Mapping[str, Any]) -> datetime:
+    raw = payload.get("observed_at")
+    if not isinstance(raw, str) or not raw:
+        raise DeployError("Manager fleet snapshot omitted observed_at generation")
     try:
-        _wait_json(f"{manager}/api/fleet", ready, timeout_s=timeout_s)
+        observed_at = datetime.fromisoformat(raw)
+    except ValueError as exc:
+        raise DeployError(f"Manager fleet snapshot has invalid observed_at: {raw!r}") from exc
+    if observed_at.tzinfo is None:
+        raise DeployError("Manager fleet observed_at must be timezone-aware")
+    return observed_at
+
+
+def _read_fleet_generation(manager: str) -> datetime:
+    status, payload = _json_request(f"{manager}/api/fleet")
+    _expect(status, 200, payload, "Manager fleet snapshot")
+    return _fleet_observed_at(payload)
+
+
+def _fleet_has_trusted_idle_after(
+    payload: Mapping[str, Any], alias: str, after_observed_at: datetime
+) -> bool:
+    try:
+        observed_at = _fleet_observed_at(payload)
+    except DeployError:
+        return False
+    if observed_at <= after_observed_at:
+        return False
+    ppus = payload.get("ppus")
+    return isinstance(ppus, list) and any(
+        isinstance(item, dict) and _fleet_item_is_trusted_idle(item, alias)
+        for item in ppus
+    )
+
+
+def _wait_for_trusted_idle(
+    manager: str,
+    alias: str,
+    *,
+    after_observed_at: datetime,
+    timeout_s: float = 60.0,
+) -> datetime:
+    try:
+        payload = _wait_json(
+            f"{manager}/api/fleet",
+            lambda candidate: _fleet_has_trusted_idle_after(candidate, alias, after_observed_at),
+            timeout_s=timeout_s,
+        )
     except DeployError as exc:
         raise DeployError(
-            "Manager did not regain the current trusted idle PPU observation required for Runtime maintenance "
+            "Manager did not publish a newer current trusted idle PPU observation required for Runtime maintenance "
             "after the QEMU target restart"
         ) from exc
+    return _fleet_observed_at(payload)
+
+
+def _error_code(payload: Mapping[str, Any]) -> str | None:
+    error = payload.get("error")
+    code = error.get("code") if isinstance(error, dict) else None
+    return code if isinstance(code, str) else None
+
+
+def _create_upload_with_idle_retry(
+    bootstrap_url: str,
+    *,
+    manager: str,
+    alias: str,
+    size: int,
+    kit_sha: str,
+    trusted_generation: datetime,
+    timeout_s: float = 60.0,
+) -> tuple[dict[str, Any], datetime]:
+    deadline = time.monotonic() + timeout_s
+    generation = trusted_generation
+    while True:
+        status, created = _json_request(
+            f"{bootstrap_url}/uploads",
+            method="POST",
+            body={"size": size, "sha256": kit_sha},
+        )
+        if status == 201:
+            return created, generation
+        if status != 409 or _error_code(created) != "ppu_idle_state_unproven":
+            _expect(status, 201, created, "upload create")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise DeployError(
+                "upload create remained blocked because the Manager could not prove a current idle PPU observation"
+            )
+        current_generation = _read_fleet_generation(manager)
+        if current_generation > generation:
+            generation = current_generation
+        generation = _wait_for_trusted_idle(
+            manager,
+            alias,
+            after_observed_at=generation,
+            timeout_s=remaining,
+        )
 
 
 def _verify_programming_catalog(payload: Mapping[str, Any], *, site_count: int, ppu_id: str) -> None:
@@ -258,22 +340,32 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     entry = _registry_entry(manager, args.alias, endpoint)
     lifecycle_before = entry.get("lifecycle")
     maintenance_requires_idle = lifecycle_before in {"commissioned", "disabled"}
+    baseline_generation: datetime | None = None
     if lifecycle_before == "commissioned":
         _set_lifecycle(manager, args.alias, "disabled", retry_s=15.0)
     elif lifecycle_before not in {"pending", "disabled"}:
         raise DeployError(f"unsupported Manager lifecycle before maintenance: {lifecycle_before!r}")
+    if maintenance_requires_idle:
+        baseline_generation = _read_fleet_generation(manager)
 
     # The target remains non-operationally admitted while its simulation profile
     # is updated and the container is restarted. Restarting here also reloads the
     # current bind-mounted target harness after a git update.
     _prepare_target_scenario(args.container, args.site_count)
 
-    # Restarting the target deliberately invalidates the Manager's previous
-    # observation. Normal maintenance on a disabled PPU must wait until the
-    # poller has observed the restarted Gateway as current and idle again. This
-    # preserves the Manager's fail-closed maintenance gate instead of racing it.
+    # A cached fleet snapshot can still say current immediately after restart.
+    # Require a strictly newer completed fleet generation before maintenance so
+    # the admission evidence necessarily comes from after the target restart.
+    trusted_generation: datetime | None = None
     if maintenance_requires_idle:
-        _wait_for_trusted_idle(manager, args.alias, timeout_s=60.0)
+        if baseline_generation is None:
+            raise DeployError("internal error: maintenance fleet generation baseline is unavailable")
+        trusted_generation = _wait_for_trusted_idle(
+            manager,
+            args.alias,
+            after_observed_at=baseline_generation,
+            timeout_s=60.0,
+        )
 
     bootstrap_url = f"{manager}/api/registry/{args.alias}/bootstrap"
     before = _wait_json(
@@ -304,12 +396,25 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
         _expect(status, 200, paired, "Bootstrap pairing")
 
     size = kit.stat().st_size
-    status, created = _json_request(
-        f"{bootstrap_url}/uploads",
-        method="POST",
-        body={"size": size, "sha256": kit_sha},
-    )
-    _expect(status, 201, created, "upload create")
+    if maintenance_requires_idle:
+        if trusted_generation is None:
+            raise DeployError("internal error: trusted maintenance generation is unavailable")
+        created, trusted_generation = _create_upload_with_idle_retry(
+            bootstrap_url,
+            manager=manager,
+            alias=args.alias,
+            size=size,
+            kit_sha=kit_sha,
+            trusted_generation=trusted_generation,
+            timeout_s=60.0,
+        )
+    else:
+        status, created = _json_request(
+            f"{bootstrap_url}/uploads",
+            method="POST",
+            body={"size": size, "sha256": kit_sha},
+        )
+        _expect(status, 201, created, "upload create")
     upload = created.get("upload")
     upload_id = upload.get("upload_id") if isinstance(upload, dict) else None
     if not isinstance(upload_id, str) or len(upload_id) != 32:

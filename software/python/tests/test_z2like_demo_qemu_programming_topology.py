@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,23 @@ def _config(installer, tmp_path: Path, *, site_count: str | None = None) -> dict
     payload = yaml.safe_load(text)
     assert isinstance(payload, dict)
     return payload
+
+
+def _trusted_fleet(observed_at: datetime, *, state: str = "idle") -> dict:
+    return {
+        "ok": True,
+        "observed_at": observed_at.isoformat(),
+        "ppus": [
+            {
+                "alias": "z2like-qemu",
+                "gateway_live": True,
+                "identity_conflict": False,
+                "errors": [],
+                "observation": {"state": "current"},
+                "sites": [{"site_id": 1, "state": state, "current_job_id": None}],
+            }
+        ],
+    }
 
 
 def test_default_topology_has_eight_enabled_mock_sites(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -107,13 +125,15 @@ def test_target_enables_configured_mock_programming_provider() -> None:
     assert '"--engineering-mock"' not in source
 
 
-def test_deployer_keeps_target_reload_inside_lifecycle_gate() -> None:
+def test_deployer_requires_new_generation_after_target_restart() -> None:
     source = DEPLOYER.read_text(encoding="utf-8")
     disabled = source.index('_set_lifecycle(manager, args.alias, "disabled"')
+    generation_baseline = source.index("baseline_generation = _read_fleet_generation(manager)")
     reload_target = source.index("_prepare_target_scenario(args.container, args.site_count)")
-    idle_wait = source.index("_wait_for_trusted_idle(manager, args.alias")
+    idle_wait = source.index("trusted_generation = _wait_for_trusted_idle(")
+    upload_create = source.index("created, trusted_generation = _create_upload_with_idle_retry(")
     commissioned = source.index('_set_lifecycle(manager, args.alias, "commissioned"')
-    assert disabled < reload_target < idle_wait < commissioned
+    assert disabled < generation_baseline < reload_target < idle_wait < upload_create < commissioned
 
 
 def test_trusted_idle_predicate_matches_manager_maintenance_gate() -> None:
@@ -135,6 +155,36 @@ def test_trusted_idle_predicate_matches_manager_maintenance_gate() -> None:
     busy = dict(item)
     busy["sites"] = [{"site_id": 1, "state": "running", "current_job_id": "job-1"}]
     assert deployer._fleet_item_is_trusted_idle(busy, "z2like-qemu") is False
+
+
+def test_trusted_idle_generation_rejects_cached_pre_restart_snapshot() -> None:
+    deployer = _load(DEPLOYER, "plasma_z2like_demo_deployer_generation")
+    baseline = datetime(2026, 9, 14, 5, 30, tzinfo=timezone.utc)
+
+    cached_current = _trusted_fleet(baseline)
+    assert deployer._fleet_has_trusted_idle_after(cached_current, "z2like-qemu", baseline) is False
+
+    newer_current = _trusted_fleet(baseline + timedelta(seconds=1))
+    assert deployer._fleet_has_trusted_idle_after(newer_current, "z2like-qemu", baseline) is True
+
+    newer_busy = _trusted_fleet(baseline + timedelta(seconds=2), state="running")
+    assert deployer._fleet_has_trusted_idle_after(newer_busy, "z2like-qemu", baseline) is False
+
+
+def test_fleet_generation_fails_closed_for_invalid_timestamp() -> None:
+    deployer = _load(DEPLOYER, "plasma_z2like_demo_deployer_invalid_generation")
+    with pytest.raises(deployer.DeployError):
+        deployer._fleet_observed_at({"observed_at": "not-a-timestamp"})
+    with pytest.raises(deployer.DeployError):
+        deployer._fleet_observed_at({"observed_at": "2026-09-14T05:30:00"})
+
+
+def test_upload_retry_is_limited_to_idle_observation_conflict() -> None:
+    source = DEPLOYER.read_text(encoding="utf-8")
+    retry_helper = source[source.index("def _create_upload_with_idle_retry(") : source.index("def _verify_programming_catalog(")]
+    assert '"ppu_idle_state_unproven"' in retry_helper
+    assert "status != 409" in retry_helper
+    assert "_wait_for_trusted_idle(" in retry_helper
 
 
 def test_deployer_programming_catalog_validation() -> None:
