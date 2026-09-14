@@ -28,11 +28,16 @@ def test_e2e_never_mutates_bootstrap_directly():
     assert "lifecycle\") != \"pending\"" in source
 
 
-def test_public_boundary_is_console_only():
+def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     source = DOC.read_text(encoding="utf-8")
-    assert "127.0.0.1:18390" in source
+    assert "Render Control Station Console/BFF" in source
+    assert "ppu-managed-lab.open4th.com" in source
+    assert "127.0.0.1:18082" in source
     assert "QEMU container publishes **no host ports**" in source
-    assert "Never expose QEMU `:18080`, QEMU `:18081`" in source
+    assert "Do not repoint `z2like-demo.open4th.com` to SWPC" in source
+    assert "Do not expose QEMU `:18080` or `:18081` directly to the Internet" in source
+    assert "127.0.0.1:18390  internal acceptance Console/BFF" in source
+    assert "not the public z2like-demo Control Station" in source
     assert "swpc-z2like" in source
     assert "engineering surrogate only" in source
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source

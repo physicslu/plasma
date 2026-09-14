@@ -6,13 +6,18 @@ console_root="${repo_root}/software/web/dist/standalone"
 state_root="/tmp/plasma-render-control-station"
 public_port="${PORT:-10000}"
 manager_port="${PLASMA_RENDER_MANAGER_PORT:-18180}"
-ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-swpc-ppu}"
+configured_ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-z2like-qemu}"
+ppu_alias="z2like-qemu"
 ppu_endpoint="${PLASMA_RENDER_PPU_ENDPOINT:-}"
 ppu_access_client_id="${PLASMA_RENDER_PPU_ACCESS_CLIENT_ID:-}"
 ppu_access_client_secret="${PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET:-}"
 manager_pid=""
 console_pid=""
 
+if [[ "${configured_ppu_alias}" != "${ppu_alias}" ]]; then
+  printf '[render-control-station] Ignoring deprecated PLASMA_RENDER_PPU_ALIAS=%s; canonical z2like-demo alias is %s\n' \
+    "${configured_ppu_alias}" "${ppu_alias}" >&2
+fi
 if [[ ! "${public_port}" =~ ^[0-9]+$ ]] || (( public_port < 1 || public_port > 65535 )); then
   printf '[render-control-station] Invalid PORT: %s\n' "${public_port}" >&2
   exit 64
@@ -24,10 +29,6 @@ fi
 if [[ -z "${ppu_endpoint}" ]]; then
   printf '[render-control-station] PLASMA_RENDER_PPU_ENDPOINT is required\n' >&2
   exit 78
-fi
-if [[ ! "${ppu_alias}" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
-  printf '[render-control-station] PLASMA_RENDER_PPU_ALIAS is invalid\n' >&2
-  exit 64
 fi
 if [[ -n "${ppu_access_client_id}" || -n "${ppu_access_client_secret}" ]]; then
   if [[ -z "${ppu_access_client_id}" || -z "${ppu_access_client_secret}" ]]; then
@@ -83,10 +84,10 @@ mkdir -p "${state_root}"
 manager_config="${state_root}/manager.yaml"
 observation_db="${state_root}/manager-observations.sqlite3"
 
-# The public lab registry is deliberately immutable. Omitting
+# The public z2like-demo registry is deliberately immutable. Omitting
 # manager.registry_state_path keeps add/remove/lifecycle mutation disabled and
 # prevents an unauthenticated public Console/BFF caller from turning the fixed
-# SWPC lab target into an arbitrary Manager-side HTTP(S) request target.
+# QEMU lab target into an arbitrary Manager-side HTTP(S) request target.
 python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${ppu_endpoint}" <<'PY'
 import sys
 from pathlib import Path

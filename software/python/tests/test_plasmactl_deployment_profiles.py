@@ -11,6 +11,8 @@ PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
 INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
 LOCAL_CONTROL_STATION = REPO_ROOT / "scripts" / "plasmactl-local-control-station"
 SWPC_Z2LIKE = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like"
+Z2LIKE_DEMO = REPO_ROOT / "scripts" / "plasmactl-z2like-demo"
+Z2LIKE_DEMO_MANAGED = REPO_ROOT / "scripts" / "plasmactl-z2like-demo-managed-ingress"
 Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
 
 
@@ -28,7 +30,15 @@ def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedPr
 
 
 def test_profile_scripts_are_valid_bash() -> None:
-    for path in (PLASMACTL, INTEGRATION, LOCAL_CONTROL_STATION, SWPC_Z2LIKE, Z2_PS):
+    for path in (
+        PLASMACTL,
+        INTEGRATION,
+        LOCAL_CONTROL_STATION,
+        SWPC_Z2LIKE,
+        Z2LIKE_DEMO,
+        Z2LIKE_DEMO_MANAGED,
+        Z2_PS,
+    ):
         result = subprocess.run(
             ["bash", "-n", str(path)],
             cwd=REPO_ROOT,
@@ -178,6 +188,49 @@ def test_swpc_z2like_profile_delegates_to_backend_without_browser_selected_targe
     source = PLASMACTL.read_text(encoding="utf-8")
     assert "ppu-lab.open4th.com" not in source
     assert "target_url" not in source
+
+
+def test_z2like_demo_profile_delegates_deploy_verify_status_and_update(tmp_path: Path) -> None:
+    log = tmp_path / "z2like-demo-backend.log"
+    fake = tmp_path / "fake-z2like-demo-backend.sh"
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -Eeuo pipefail\n"
+        f"printf '%s\\n' \"$*\" >> {log!s}\n",
+        encoding="utf-8",
+    )
+    env = {"PLASMA_Z2LIKE_DEMO_BACKEND": str(fake)}
+    cases = (
+        (("deploy", "z2like-demo"), "deploy"),
+        (("verify", "z2like-demo"), "verify"),
+        (("status", "z2like-demo"), "status"),
+        (("update", "z2like-demo"), "update"),
+    )
+    for args, _ in cases:
+        result = run(*args, env=env)
+        assert result.returncode == 0, result.stderr
+    assert log.read_text(encoding="utf-8").splitlines() == [expected for _, expected in cases]
+
+    install = run("install", "z2like-demo", env=env)
+    assert install.returncode != 0
+    assert "no separate install transaction" in install.stderr
+
+
+def test_z2like_demo_profile_preserves_render_and_qemu_ownership() -> None:
+    profile = Z2LIKE_DEMO.read_text(encoding="utf-8")
+    ingress = Z2LIKE_DEMO_MANAGED.read_text(encoding="utf-8")
+    assert "https://z2like-demo.open4th.com" in profile
+    assert "Render Control Station" in profile
+    assert "ppu-managed-lab.open4th.com" in profile
+    assert "172.30.77.2" in profile
+    assert "git pull --ff-only origin main" in profile
+    assert "repository must be clean before z2like-demo deployment" in profile
+    assert "SWPC host 18081" in profile
+    assert "pending retirement and is not used here" in profile
+    assert 'qemu_gateway_root="${PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT:-http://172.30.77.2:18080}"' in ingress
+    assert "must not target the SWPC x86_64 surrogate Gateway" in ingress
+    assert "Cloudflare Access service token remains REQUIRED" in ingress
+    assert "legacy SWPC x86 managed ingress" in ingress
 
 
 def test_z2_ps_profile_delegates_without_aliasing_swpc_surrogate(tmp_path: Path) -> None:

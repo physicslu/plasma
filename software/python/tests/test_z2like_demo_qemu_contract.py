@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[3]
 HOST = ROOT / "scripts" / "z2like-demo-qemu.py"
 TARGET = ROOT / "scripts" / "z2like-demo-qemu-target.py"
 KIT = ROOT / "scripts" / "z2like-demo-qemu-kit.py"
+KIT_BUILDER = ROOT / "scripts" / "z2like-demo-qemu-build-kit.py"
+RUNTIME_DEPLOYER = ROOT / "scripts" / "z2like-demo-qemu-deploy.py"
+MANAGED_INGRESS = ROOT / "scripts" / "plasmactl-z2like-demo-managed-ingress"
+PROFILE = ROOT / "scripts" / "plasmactl-z2like-demo"
 INSTALLER = ROOT / "scripts" / "z2like-demo-qemu-installer.py"
 
 
@@ -30,7 +34,7 @@ def test_swpc_is_single_environment_and_qemu_is_canonical_demo_backend():
     assert "swpc-z2like:            engineering surrogate only" in source
 
 
-def test_qemu_target_is_private_and_does_not_reuse_swpc_surrogate_ports():
+def test_qemu_target_is_private_and_does_not_publish_host_ports():
     source = HOST.read_text(encoding="utf-8")
     assert '"--network",\n        NETWORK' in source
     assert '"--ip",\n        ppu_ip' in source
@@ -38,21 +42,66 @@ def test_qemu_target_is_private_and_does_not_reuse_swpc_surrogate_ports():
     assert '"PortBindings"' in source
     assert 'if bindings:' in source
     assert 'host_ports_published_by_qemu' in source
-    # Public access terminates at the dedicated Console, never at QEMU Gateway/Bootstrap.
+    assert "BOOTSTRAP_PORT = 18081" in source
+    assert "GATEWAY_PORT = 18080" in source
+
+
+def test_public_control_station_is_render_and_swpc_manager_console_are_internal_fixture():
+    source = HOST.read_text(encoding="utf-8")
+    profile = PROFILE.read_text(encoding="utf-8")
+    assert "Render" in source
+    assert "internal maintenance/acceptance" in source
     assert "CONSOLE_PORT = 18390" in source
     assert "MANAGER_PORT = 18380" in source
-    assert "never expose QEMU :18080/:18081 directly" in source
+    assert "route the operator-managed z2like-demo hostname only to" not in source
+    assert "z2like-demo.open4th.com (Render Console/BFF + Manager)" in profile
+    assert "ppu-managed-lab.open4th.com" in profile
+    assert "SWPC 127.0.0.1:18082 managed ingress" in profile
+    assert "QEMU ARMv7 simulated Z2 172.30.77.2:18080" in profile
 
 
-def test_manager_uses_private_http_gateway_and_bootstrap_composition():
+def test_internal_maintenance_manager_uses_private_gateway_and_bootstrap_composition():
     source = HOST.read_text(encoding="utf-8")
     assert 'endpoint = f"http://{ppu_ip}:{GATEWAY_PORT}"' in source
     assert "registry_state_path" in source
     assert "plasma_manager.bootstrap_server --config" in source
     assert '"ppus: []\\n"' in source
     assert 'method="POST"' in source
-    # Runtime registry add creates a pending PPU; config seeding would incorrectly create commissioned.
     assert 'body={"alias": alias, "endpoint": endpoint}' in source
+
+
+def test_managed_ingress_targets_qemu_not_x86_surrogate():
+    source = MANAGED_INGRESS.read_text(encoding="utf-8")
+    assert 'qemu_gateway_root="${PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT:-http://172.30.77.2:18080}"' in source
+    assert "must not target the SWPC x86_64 surrogate Gateway" in source
+    assert 'listen 127.0.0.1:$managed_port' in source
+    assert "Cloudflare Access service token remains REQUIRED" in source
+    assert "POST /api/settings/ppu-network" in source
+    assert "POST /api/settings/gateway" in source
+    assert "location / { return 404; }" in source
+
+
+def test_one_command_profile_has_explicit_fast_forward_and_full_verification():
+    source = PROFILE.read_text(encoding="utf-8")
+    assert "git pull --ff-only origin main" in source
+    assert "merge-base --is-ancestor" in source
+    assert "refusing destructive reconciliation" in source
+    assert "python3 \"$runtime_deployer\"" in source
+    assert "bash \"$managed_backend\" install" in source
+    assert "verify_public_path" in source
+    assert "/api/manager/registry" in source
+    assert "/api/manager/ppu/api/health/ready" in source
+
+
+def test_persistent_runtime_deployer_preserves_bootstrap_lifecycle_gates():
+    source = RUNTIME_DEPLOYER.read_text(encoding="utf-8")
+    assert 'lifecycle_before == "commissioned"' in source
+    assert '_set_lifecycle(manager, args.alias, "disabled"' in source
+    assert 'runtime_state_before not in {"runtime_absent", "runtime_active"}' in source
+    assert 'pairing.get("device_match") is False' in source
+    assert "do not retain or print" not in source or 'token = ""' in source
+    assert 'commissioned = _set_lifecycle(manager, args.alias, "commissioned"' in source
+    assert '"runtime_state_after": "runtime_active"' in source
 
 
 def test_qemu_target_keeps_bootstrap_alive_for_activation_rollback():
@@ -71,6 +120,17 @@ def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core()
     assert 'installer_core = kit_scripts / "ppu-z2-installer-core.py"' in source
     assert 'CORE_OVERRIDE: str(installer_core)' in source
     assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
+
+
+def test_local_kit_builder_keeps_simulation_python_boundary_explicit():
+    source = KIT_BUILDER.read_text(encoding="utf-8")
+    assert "ppu-runtime.py" in source
+    assert "ppu-release.py" in source
+    assert "ppu-z2-installer.py" in source
+    assert "simulation-only Python artifact fixture; never production-qualified" in source
+    assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
+    assert "stdout=subprocess.PIPE" in source
+    assert "file=sys.stderr" in source
 
 
 def test_simulation_validates_release_identity_from_coordinator_evidence():
@@ -110,10 +170,12 @@ def test_simulation_installer_requires_explicit_armv7_marker_and_core_binding(mo
 
 def test_simulation_does_not_claim_physical_z2_or_reboot_qualification():
     combined = "\n".join(
-        path.read_text(encoding="utf-8") for path in (HOST, TARGET, KIT, INSTALLER)
+        path.read_text(encoding="utf-8")
+        for path in (HOST, TARGET, KIT, KIT_BUILDER, RUNTIME_DEPLOYER, INSTALLER)
     )
     for boundary in (
         "PYNQ-Z2 hardware",
+        "Plasma-owned Python installation",
         "systemd/DAC",
         "reboot persistence",
         "PS-to-PL",

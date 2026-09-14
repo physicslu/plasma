@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Operate the canonical ``z2like-demo`` scenario on the SWPC simulation host.
+"""Operate the canonical ``z2like-demo`` QEMU backend on SWPC.
 
-SWPC remains the single Plasma simulation environment.  This script gives the
-``z2like-demo`` website exactly one PPU backend: a persistent QEMU ARMv7
-simulated Z2 on a private Docker bridge.
+SWPC remains the single Plasma simulation environment. This script gives the
+Render-hosted ``z2like-demo`` Control Station exactly one PPU backend: a
+persistent QEMU ARMv7 simulated Z2 on a private Docker bridge.
 
-The public website terminates only on the dedicated Control Station Console/BFF
-(:18390).  Manager (:18380), QEMU Gateway (:18080) and QEMU Bootstrap (:18081)
-remain private.  Existing ``swpc-z2like`` host ports 18080/18081/18082 are not
-reused or widened; that x86_64 profile remains an engineering surrogate.
+The public website remains on Render. SWPC ports :18380/:18390 are an internal
+maintenance/acceptance fixture only, used to exercise Bootstrap deployment and
+local acceptance without changing public ownership. QEMU Gateway (:18080) and
+QEMU Bootstrap (:18081) remain private. Existing ``swpc-z2like`` host ports
+18080/18081/18082 are not reused or widened by the container; that x86_64
+profile remains an engineering surrogate.
 """
 
 from __future__ import annotations
@@ -367,7 +369,7 @@ def _write_user_units(
             [
                 UNIT_MARKER,
                 "[Unit]",
-                "Description=Plasma z2like-demo Manager",
+                "Description=Plasma z2like-demo internal maintenance Manager",
                 "After=network-online.target",
                 "Wants=network-online.target",
                 "",
@@ -393,7 +395,7 @@ def _write_user_units(
             [
                 UNIT_MARKER,
                 "[Unit]",
-                "Description=Plasma z2like-demo Console/BFF",
+                "Description=Plasma z2like-demo internal acceptance Console/BFF",
                 "After=network-online.target plasma-z2like-demo-manager.service",
                 "Wants=network-online.target plasma-z2like-demo-manager.service",
                 "",
@@ -452,6 +454,7 @@ def _ensure_registry(alias: str, ppu_ip: str) -> None:
 
 
 def _configure_control_station(alias: str, ppu_ip: str) -> None:
+    """Configure the SWPC-local Bootstrap maintenance/acceptance fixture."""
     _require_command("systemctl")
     paths = _xdg_paths()
     python, web_server, node = _require_control_station_runtime(paths)
@@ -506,7 +509,7 @@ def _verify(alias: str, ppu_ip: str) -> dict[str, Any]:
         if isinstance(item, dict) and item.get("alias") == alias and item.get("endpoint") == expected_endpoint
     ]
     if len(matches) != 1:
-        raise DemoError("z2like-demo Manager registry is not bound to the canonical QEMU PPU")
+        raise DemoError("z2like-demo maintenance Manager registry is not bound to the canonical QEMU PPU")
     _wait_http(f"http://127.0.0.1:{CONSOLE_PORT}/")
     runtime = bootstrap.get("runtime") if isinstance(bootstrap.get("runtime"), dict) else {}
     runtime_state = runtime.get("state")
@@ -528,8 +531,9 @@ def _verify(alias: str, ppu_ip: str) -> dict[str, Any]:
         "gateway_endpoint": expected_endpoint,
         "bootstrap_endpoint": f"http://{ppu_ip}:{BOOTSTRAP_PORT}",
         "runtime_state": runtime_state,
-        "console_origin": f"http://127.0.0.1:{CONSOLE_PORT}",
-        "manager_origin": manager,
+        "maintenance_console_origin": f"http://127.0.0.1:{CONSOLE_PORT}",
+        "maintenance_manager_origin": manager,
+        "public_control_station": "Render",
         "host_ports_published_by_qemu": False,
         "engineering_surrogate": "swpc-z2like remains separate",
         "not_claimed": [
@@ -548,15 +552,16 @@ def _verify(alias: str, ppu_ip: str) -> dict[str, Any]:
 def _status(alias: str, ppu_ip: str) -> int:
     current = _container_inspect()
     running = bool(current and ((current.get("State") or {}).get("Running")))
-    print(f"Simulation environment: SWPC")
-    print(f"Scenario:               z2like-demo")
-    print(f"Canonical PPU backend:  QEMU ARMv7 simulated Z2")
+    print("Simulation environment: SWPC")
+    print("Scenario:               z2like-demo")
+    print("Public Control Station: Render")
+    print("Canonical PPU backend:  QEMU ARMv7 simulated Z2")
     print(f"Container:              {CONTAINER} ({'running' if running else 'stopped/not-created'})")
     print(f"PPU alias:              {alias}")
     print(f"Private Gateway:        http://{ppu_ip}:{GATEWAY_PORT}")
     print(f"Private Bootstrap:      http://{ppu_ip}:{BOOTSTRAP_PORT}")
-    print(f"Console origin:         http://127.0.0.1:{CONSOLE_PORT}")
-    print(f"Manager origin:         http://127.0.0.1:{MANAGER_PORT}")
+    print(f"Maintenance Console:    http://127.0.0.1:{CONSOLE_PORT} (internal only)")
+    print(f"Maintenance Manager:    http://127.0.0.1:{MANAGER_PORT} (internal only)")
     print("swpc-z2like:            engineering surrogate only")
     return 0 if running else 1
 
@@ -580,7 +585,7 @@ def _token() -> int:
 
 
 def _down() -> int:
-    # Preserve all durable QEMU/Manager state.  This is a stop, not a reset.
+    # Preserve all durable QEMU/maintenance-Manager state. This is a stop, not a reset.
     for unit in ("plasma-z2like-demo-console.service", "plasma-z2like-demo-manager.service"):
         _systemctl_user("stop", unit, check=False)
     current = _container_inspect()
@@ -591,7 +596,7 @@ def _down() -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="SWPC canonical z2like-demo QEMU ARMv7 scenario")
+    parser = argparse.ArgumentParser(description="SWPC canonical z2like-demo QEMU ARMv7 backend")
     parser.add_argument(
         "--subnet",
         default=os.environ.get("PLASMA_Z2LIKE_DEMO_SUBNET", DEFAULT_SUBNET),
@@ -605,7 +610,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--alias",
         default=os.environ.get("PLASMA_Z2LIKE_DEMO_PPU_ALIAS", DEFAULT_ALIAS),
-        help=f"Manager PPU alias (default {DEFAULT_ALIAS})",
+        help=f"maintenance Manager PPU alias (default {DEFAULT_ALIAS})",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ("up", "configure-control-station", "activate", "verify", "status", "token", "down"):
@@ -634,8 +639,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "activate":
             print(json.dumps(_verify(alias, ppu_ip), indent=2, sort_keys=True))
             print(
-                "Cloudflare boundary: route the operator-managed z2like-demo hostname only to "
-                f"http://127.0.0.1:{CONSOLE_PORT}; never expose QEMU :18080/:18081 directly"
+                "Public boundary: z2like-demo.open4th.com remains Render-hosted; "
+                "public PPU control reaches SWPC only through ppu-managed-lab.open4th.com -> :18082. "
+                "SWPC :18380/:18390 are internal maintenance/acceptance only; never expose QEMU :18080/:18081 directly."
             )
             return 0
         if args.command == "verify":
@@ -651,7 +657,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"QEMU ARMv7 target ready; private Bootstrap=http://{ppu_ip}:{BOOTSTRAP_PORT}")
             return 0
         if args.command == "configure-control-station":
-            print(f"z2like-demo Control Station ready at http://127.0.0.1:{CONSOLE_PORT}")
+            print(
+                f"z2like-demo internal maintenance/acceptance fixture ready at "
+                f"Manager=http://127.0.0.1:{MANAGER_PORT}, Console=http://127.0.0.1:{CONSOLE_PORT}"
+            )
             return 0
         raise AssertionError("unreachable command")
     except (DemoError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
