@@ -25,6 +25,9 @@ from typing import Any, Mapping, Sequence
 CHUNK_BYTES = 1024 * 1024
 MAX_SIMULATION_SITE_COUNT = 8
 SITE_COUNT_MARKER = "/var/lib/plasma/z2like-demo-site-count"
+ACTIVE_SITE_STATES = frozenset(
+    {"queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"}
+)
 
 
 class DeployError(RuntimeError):
@@ -183,6 +186,43 @@ def _set_lifecycle(manager: str, alias: str, lifecycle: str, *, retry_s: float =
         time.sleep(1.0)
 
 
+def _fleet_item_is_trusted_idle(item: Mapping[str, Any], alias: str) -> bool:
+    if item.get("alias") != alias:
+        return False
+    observation = item.get("observation")
+    if not isinstance(observation, dict) or observation.get("state") != "current":
+        return False
+    if item.get("gateway_live") is not True or item.get("identity_conflict") is not False or item.get("errors"):
+        return False
+    sites = item.get("sites")
+    if not isinstance(sites, list):
+        return False
+    for site in sites:
+        if not isinstance(site, dict):
+            continue
+        state = str(site.get("state", "")).strip().lower()
+        if state in ACTIVE_SITE_STATES or site.get("current_job_id"):
+            return False
+    return True
+
+
+def _wait_for_trusted_idle(manager: str, alias: str, *, timeout_s: float = 60.0) -> None:
+    def ready(payload: Mapping[str, Any]) -> bool:
+        ppus = payload.get("ppus")
+        return isinstance(ppus, list) and any(
+            isinstance(item, dict) and _fleet_item_is_trusted_idle(item, alias)
+            for item in ppus
+        )
+
+    try:
+        _wait_json(f"{manager}/api/fleet", ready, timeout_s=timeout_s)
+    except DeployError as exc:
+        raise DeployError(
+            "Manager did not regain the current trusted idle PPU observation required for Runtime maintenance "
+            "after the QEMU target restart"
+        ) from exc
+
+
 def _verify_programming_catalog(payload: Mapping[str, Any], *, site_count: int, ppu_id: str) -> None:
     if payload.get("ok") is not True or payload.get("provider") != "configured_mock":
         raise DeployError(f"QEMU configured Mock Programming provider is unavailable: {payload!r}")
@@ -217,6 +257,7 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     endpoint = f"http://{args.ppu_ip}:18080"
     entry = _registry_entry(manager, args.alias, endpoint)
     lifecycle_before = entry.get("lifecycle")
+    maintenance_requires_idle = lifecycle_before in {"commissioned", "disabled"}
     if lifecycle_before == "commissioned":
         _set_lifecycle(manager, args.alias, "disabled", retry_s=15.0)
     elif lifecycle_before not in {"pending", "disabled"}:
@@ -226,6 +267,13 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     # is updated and the container is restarted. Restarting here also reloads the
     # current bind-mounted target harness after a git update.
     _prepare_target_scenario(args.container, args.site_count)
+
+    # Restarting the target deliberately invalidates the Manager's previous
+    # observation. Normal maintenance on a disabled PPU must wait until the
+    # poller has observed the restarted Gateway as current and idle again. This
+    # preserves the Manager's fail-closed maintenance gate instead of racing it.
+    if maintenance_requires_idle:
+        _wait_for_trusted_idle(manager, args.alias, timeout_s=60.0)
 
     bootstrap_url = f"{manager}/api/registry/{args.alias}/bootstrap"
     before = _wait_json(

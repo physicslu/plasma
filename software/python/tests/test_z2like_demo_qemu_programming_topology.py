@@ -111,8 +111,30 @@ def test_deployer_keeps_target_reload_inside_lifecycle_gate() -> None:
     source = DEPLOYER.read_text(encoding="utf-8")
     disabled = source.index('_set_lifecycle(manager, args.alias, "disabled"')
     reload_target = source.index("_prepare_target_scenario(args.container, args.site_count)")
+    idle_wait = source.index("_wait_for_trusted_idle(manager, args.alias")
     commissioned = source.index('_set_lifecycle(manager, args.alias, "commissioned"')
-    assert disabled < reload_target < commissioned
+    assert disabled < reload_target < idle_wait < commissioned
+
+
+def test_trusted_idle_predicate_matches_manager_maintenance_gate() -> None:
+    deployer = _load(DEPLOYER, "plasma_z2like_demo_deployer_idle")
+    item = {
+        "alias": "z2like-qemu",
+        "gateway_live": True,
+        "identity_conflict": False,
+        "errors": [],
+        "observation": {"state": "current"},
+        "sites": [{"site_id": 1, "state": "idle", "current_job_id": None}],
+    }
+    assert deployer._fleet_item_is_trusted_idle(item, "z2like-qemu") is True
+
+    stale = dict(item)
+    stale["observation"] = {"state": "stale"}
+    assert deployer._fleet_item_is_trusted_idle(stale, "z2like-qemu") is False
+
+    busy = dict(item)
+    busy["sites"] = [{"site_id": 1, "state": "running", "current_job_id": "job-1"}]
+    assert deployer._fleet_item_is_trusted_idle(busy, "z2like-qemu") is False
 
 
 def test_deployer_programming_catalog_validation() -> None:
