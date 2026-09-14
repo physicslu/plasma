@@ -21,8 +21,8 @@ PRODUCTION_PROBES = (
 )
 
 # Only current-state/global validators may be triggered by canonical Production
-# paths.  Family/phase/research workflows are default-denied regardless of
-# filename vocabulary.  This prevents new roles such as qualification,
+# paths. Family/phase/research workflows are default-denied regardless of
+# filename vocabulary. This prevents new roles such as qualification,
 # security-scope, TrustZone, wireless, or H7 partitioning from escaping the
 # boundary merely because their names do not match an older regex.
 GLOBAL_PRODUCTION_TRIGGER_OWNERS = frozenset(
@@ -30,6 +30,7 @@ GLOBAL_PRODUCTION_TRIGGER_OWNERS = frozenset(
         ".github/workflows/device-catalog-validation.yml",
         ".github/workflows/device-catalog-current-validation.yml",
         ".github/workflows/device-catalog-production-doc-contract.yml",
+        ".github/workflows/device-catalog-production-invariants.yml",
     }
 )
 
@@ -64,7 +65,7 @@ def trigger_paths(text: str) -> list[str]:
 
 
 def _matches(path: str, pattern: str) -> bool:
-    # The repository uses simple GitHub path globs.  fnmatch is deliberately
+    # The repository uses simple GitHub path globs. fnmatch is deliberately
     # conservative here: '*' also matching '/' can only widen detection, which
     # is appropriate for a fail-closed governance check.
     return fnmatch.fnmatchcase(path, pattern)
@@ -91,7 +92,7 @@ def production_trigger_patterns(patterns: list[str]) -> set[str]:
             offenders.add(enabling_pattern)
 
     # Exact/prefix Production paths that may not coincide with a probe are also
-    # forbidden.  This catches future named files without needing to enumerate
+    # forbidden. This catches future named files without needing to enumerate
     # them in PRODUCTION_PROBES.
     for raw in patterns:
         if raw.startswith("!"):
