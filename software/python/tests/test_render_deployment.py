@@ -113,7 +113,7 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertEqual(control_station["startCommand"], "bash scripts/render-control-station-start.sh")
         self.assertEqual(control_station["healthCheckPath"], "/")
         control_environment = {item["key"]: item for item in control_station["envVars"]}
-        self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "swpc-ppu")
+        self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "z2like-qemu")
         for secret_key in (
             "PLASMA_RENDER_PPU_ENDPOINT",
             "PLASMA_RENDER_PPU_ACCESS_CLIENT_ID",
@@ -143,6 +143,9 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
         self.assertIn('PLASMA_FLEET_UI_ENABLED="1"', script)
         self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
+        self.assertIn('configured_ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-z2like-qemu}"', script)
+        self.assertIn('ppu_alias="z2like-qemu"', script)
+        self.assertIn("Ignoring deprecated PLASMA_RENDER_PPU_ALIAS", script)
         self.assertIn('parsed.scheme != "https"', script)
         self.assertIn("must identify the managed PPU ingress root", script)
         self.assertIn("PLASMA_RENDER_PPU_ACCESS_CLIENT_ID", script)

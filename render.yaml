@@ -35,7 +35,7 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: PLASMA_RENDER_PPU_ALIAS
-        value: swpc-ppu
+        value: z2like-qemu
       - key: PLASMA_RENDER_PPU_ENDPOINT
         sync: false
       - key: PLASMA_RENDER_PPU_ACCESS_CLIENT_ID

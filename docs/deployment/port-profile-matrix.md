@@ -12,18 +12,20 @@ Port numbers are profile defaults, not one global topology. A port is meaningful
 |---:|---|---|---|
 | `9900` | Plasma Server | PPU-local/private | Plasma Protocol v3.3 / `PLASMA33` |
 | `18080` | Full Plasma Gateway | profile-specific PPU interface | Web REST v3; full managed-control surface |
-| `18081` | profile-specific: SWPC Z2-like restricted ingress **or** real/simulated `z2-ps` Bootstrap | controlled profile boundary | SWPC x86 diagnostics/status only; real/QEMU-Z2 factory/recovery Bootstrap v1 |
-| `18082` | SWPC Z2-like managed Programming ingress | loopback behind Cloudflare Access | allowlisted managed Programming routes; separate from `18081` |
-| `18180` | Plasma Manager general/package default | loopback | Manager contract v1 |
+| `18081` | profile-specific: SWPC x86 restricted ingress **or** real/simulated `z2-ps` Bootstrap | controlled profile boundary | SWPC x86 diagnostics/status only; real/QEMU-Z2 factory/recovery Bootstrap v1 |
+| `18082` | SWPC host `z2like-demo` managed ingress | loopback behind Cloudflare Access | bounded managed routes to private QEMU Gateway; public hostname is `ppu-managed-lab.open4th.com` |
+| `18180` | Plasma Manager general/package/Render default | loopback | Manager contract v1 |
 | `18190` | Linux `local-control-station` Console/BFF | loopback | same-origin Control Station UI/BFF |
 | `18280` | Linux `local-control-station` Manager override | loopback | Manager contract v1 |
-| `18380` | SWPC `z2like-demo` dedicated Manager | loopback | Manager + Bootstrap policy; QEMU backend only |
-| `18390` | SWPC `z2like-demo` dedicated Console/BFF | loopback behind operator-managed Cloudflare route | same-origin Control Station UI/BFF; public demo terminates here |
+| `18380` | SWPC `z2like-demo` internal maintenance Manager | loopback | Bootstrap lifecycle/deployment fixture; not public Control Station ownership |
+| `18390` | SWPC `z2like-demo` internal acceptance Console/BFF | loopback | local acceptance fixture only; not a public hostname origin |
 | `5173` | integration/development Vite runtime | development profile only | development/demo Web runtime; not a production PPU service |
 
-`18180` and `18280` are therefore **not competing canonical Manager ports**. `18180` is the Manager default used by the generic/package and Render-oriented paths; `local-control-station` deliberately overrides its Manager to `18280` so its Console/BFF can own `18190` without colliding with an integration-host Manager. The SWPC `z2like-demo` scenario additionally uses `18380/18390` so its public QEMU-backed demo cannot silently retarget the engineering `local-control-station` pair.
+`18180` and `18280` are therefore **not competing canonical Manager ports**. `18180` is the Manager default used by generic/package and Render-oriented paths; `local-control-station` deliberately overrides its Manager to `18280` so its Console/BFF can own `18190` without colliding with an integration-host Manager.
 
-`18081` is likewise **not one global service identity**. On host `swpc-z2like` it remains the existing restricted diagnostics/status ingress. On a real `z2-ps` appliance, and inside the private QEMU ARMv7 simulated-Z2 network namespace, it is the independent Bootstrap/recovery service. Manager derives a Bootstrap endpoint from the registered Gateway host only for the explicitly selected Z2 deployment/simulation path; an arbitrary host `:18081` must not be treated as Bootstrap.
+`18380/18390` are not another public Control Station. They are SWPC-local maintenance/acceptance fixtures used to exercise the QEMU Bootstrap path. The public `z2like-demo.open4th.com` Control Station stays on Render.
+
+`18081` is likewise **not one global service identity**. On host `swpc-z2like` it remains the legacy restricted diagnostics/status ingress pending retirement. On a real `z2-ps` appliance, and inside the private QEMU ARMv7 simulated-Z2 network namespace, it is the independent Bootstrap/recovery service. Manager derives a Bootstrap endpoint from the registered Gateway host only for the explicitly selected Z2 deployment/simulation path; an arbitrary host `:18081` must not be treated as Bootstrap.
 
 ## Profile matrix
 
@@ -31,10 +33,11 @@ Port numbers are profile defaults, not one global topology. A port is meaningful
 |---|---|---|---|---|---|
 | `integration` | development runtime, normally `5173` | optional `127.0.0.1:18180` | `:18080` | none by default | SWPC development/integration ownership |
 | Render `plasma-demo` | public Render `$PORT` | `127.0.0.1:18180` | `127.0.0.1:18080` | none | single-service public Mock composition |
+| Render `z2like-demo` | public Render `$PORT` | Render loopback `:18180` | QEMU `172.30.77.2:18080` through protected SWPC bridge | public `ppu-managed-lab.open4th.com` -> SWPC `127.0.0.1:18082`; private QEMU `:18081` Bootstrap | QEMU ARMv7 is sole z2like PPU backend; Render owns public Control Station |
 | packaged macOS / Windows Control Station | package Console default `:18000` | `127.0.0.1:18180` | configured remote PPU | none | platform packaging default; product contract remains shared |
 | `local-control-station` | `127.0.0.1:18190` | `127.0.0.1:18280` | configured PPU endpoint | none | Linux user-systemd reference; loopback-only local services |
-| `swpc-z2like` PPU | separate Control Station | separate Control Station | `127.0.0.1:18080` full local Gateway | `127.0.0.1:18081` restricted; `127.0.0.1:18082` managed Programming | x86_64 engineering surrogate only; not `z2like-demo` backend |
-| SWPC `z2like-demo` QEMU scenario | `127.0.0.1:18390` | `127.0.0.1:18380` | `<private-QEMU-IP>:18080` | `<private-QEMU-IP>:18081` Bootstrap | single Simulation Environment = SWPC; QEMU ARMv7 simulated Z2 is the sole demo backend; QEMU publishes no host ports |
+| `swpc-z2like` PPU | separate Control Station | separate Control Station | `127.0.0.1:18080` full local Gateway | `127.0.0.1:18081` restricted diagnostics | x86_64 engineering surrogate only; not `z2like-demo` backend |
+| SWPC `z2like-demo` maintenance fixture | `127.0.0.1:18390` internal only | `127.0.0.1:18380` internal only | `<private-QEMU-IP>:18080` | `<private-QEMU-IP>:18081` Bootstrap | deployment/acceptance fixture only; no public hostname terminates here |
 | `z2-ps` | separate Control Station | separate Control Station | `<Z2-LAN-IP>:18080` | `<Z2-LAN-IP>:18081` Bootstrap/recovery | real ARMv7 PS profile; Bootstrap stays independently reachable when Product Runtime is absent/broken |
 
 ## Routing invariants
@@ -50,27 +53,38 @@ Browser
 
 The Browser must not receive Manager service credentials, Bootstrap pairing credentials, or Cloudflare Access service-token credentials.
 
-For the SWPC Z2-like engineering lane:
+For the SWPC x86 engineering lane:
 
 ```text
 host 18080 = full local Plasma Gateway
-host 18081 = restricted diagnostics/status ingress
-host 18082 = managed Programming ingress
+host 18081 = legacy restricted diagnostics/status ingress (pending retirement)
 ```
 
-Do not repurpose SWPC host `18081` as the managed Programming or Bootstrap surface and do not collapse `18081` and `18082` into one listener without a separate security/architecture decision.
+Do not repurpose SWPC host `18081` as the managed Programming or Bootstrap surface.
 
-For SWPC `z2like-demo`:
+For public `z2like-demo`:
 
 ```text
-host 18390 = dedicated Console/BFF
-host 18380 = dedicated Manager
-private QEMU 18080 = simulated Product Runtime Gateway
-private QEMU 18081 = simulated independent Bootstrap
-private QEMU 9900  = simulated Plasma Server
+z2like-demo.open4th.com
+  -> Render Console/BFF
+  -> Render Manager
+  -> ppu-managed-lab.open4th.com
+  -> Cloudflare Access/Tunnel
+  -> SWPC host 127.0.0.1:18082 bounded managed ingress
+  -> private QEMU 172.30.77.2:18080 Product Runtime Gateway
+
+private QEMU 172.30.77.2:18081 = simulated independent Bootstrap
+private QEMU 172.30.77.2:9900  = simulated Plasma Server
 ```
 
-The private QEMU ports are not Docker host-published ports. The operator-managed public `z2like-demo` hostname may terminate on host `127.0.0.1:18390` through Cloudflare Access/Tunnel; it must not terminate directly on either QEMU port.
+The private QEMU ports are not Docker host-published ports. `z2like-demo.open4th.com` must remain Render-hosted; it must not terminate on host `18390`, QEMU `18080`, or QEMU `18081`.
+
+The SWPC-local maintenance path is separate:
+
+```text
+host 18380 = internal Bootstrap-capable Manager
+host 18390 = internal acceptance Console/BFF
+```
 
 For real `z2-ps`:
 

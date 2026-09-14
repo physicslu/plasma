@@ -10,121 +10,155 @@ Plasma has one simulation environment:
 Simulation Environment
 └── SWPC
     ├── z2like-demo
-    │   └── QEMU ARMv7 simulated Z2   <- canonical public-demo PPU backend
+    │   └── QEMU ARMv7 simulated Z2   <- canonical z2like-demo PPU backend
     └── swpc-z2like                   <- engineering surrogate only
 ```
 
-`z2like-demo` has exactly one backend. It does not switch between the x86_64 `swpc-z2like` surrogate and QEMU.
+`z2like-demo` has exactly one PPU backend. It does not switch between the x86_64 `swpc-z2like` surrogate and QEMU.
 
-## Product-path topology
+The public Control Station remains **Render-hosted**. QEMU replaces only the PPU backend.
 
-The public `z2like-demo` hostname terminates only on a dedicated Control Station Console/BFF running on SWPC:
+## Canonical public topology
 
 ```text
 Browser
-  -> z2like-demo public hostname
-  -> Cloudflare Access/Tunnel
-  -> SWPC 127.0.0.1:18390  z2like-demo Console/BFF
-  -> SWPC 127.0.0.1:18380  z2like-demo Manager
+  -> https://z2like-demo.open4th.com
+  -> Render Control Station Console/BFF
+  -> Render Plasma Manager
+  -> https://ppu-managed-lab.open4th.com
+  -> Cloudflare Access service-token policy + Tunnel
+  -> SWPC 127.0.0.1:18082 managed ingress
   -> private Docker bridge
-  -> QEMU ARMv7 simulated Z2
-       :18081 independent Bootstrap
+  -> QEMU ARMv7 simulated Z2 172.30.77.2
        :18080 Plasma Gateway
+       :18081 independent Bootstrap
        :9900  Plasma Server
 ```
 
-The QEMU container publishes **no host ports**. Manager reaches its fixed private Docker-bridge IPv4 directly. This lets the merged Bootstrap policy derive `http://<QEMU-IP>:18081` from the registered `http://<QEMU-IP>:18080` Gateway endpoint while keeping Bootstrap on the controlled private HTTP commissioning link.
+The QEMU container publishes **no host ports**. SWPC Nginx owns the loopback-only `18082` boundary and forwards only the bounded managed-control allowlist to QEMU `172.30.77.2:18080`.
 
-The public Cloudflare hostname must route only to `http://127.0.0.1:18390`. Never expose QEMU `:18080`, QEMU `:18081`, or host `:18080` directly to the Internet.
+Do not repoint `z2like-demo.open4th.com` to SWPC. Its DNS/Render ownership is intentional. Do not expose QEMU `:18080` or `:18081` directly to the Internet.
 
-## Relationship to existing SWPC services
+## Five public hostname roles
 
-Existing SWPC `swpc-z2like` ports remain unchanged:
+| Hostname | Ownership | Role |
+| --- | --- | --- |
+| `plasma-demo.open4th.com` | Render | Public Mock Demo with Render-local Mock PPU |
+| `z2like-demo.open4th.com` | Render | Product Control Station whose PPU backend is SWPC QEMU ARMv7 |
+| `plasma.open4th.com` | SWPC | Local Control Station: `18190 -> 18280 -> 18080` x86 engineering surrogate |
+| `ppu-lab.open4th.com` | SWPC | Legacy restricted diagnostics/status/PS-loopback ingress on host `18081`; pending retirement |
+| `ppu-managed-lab.open4th.com` | SWPC | Cloudflare Access protected managed ingress on host `18082`, owned by z2like-demo QEMU path |
+
+These hostnames are different deployment/security boundaries. A shared port number in another profile does not imply shared ownership.
+
+## Port/profile ownership
+
+### SWPC x86 engineering surrogate
 
 ```text
-127.0.0.1:18080  x86_64 engineering-surrogate full Gateway
-127.0.0.1:18081  x86_64 restricted diagnostics/status ingress
-127.0.0.1:18082  x86_64 managed Programming ingress
+127.0.0.1:18080  x86_64 full Gateway used by plasma.open4th.com path
+127.0.0.1:18081  legacy restricted diagnostics/status ingress; pending retirement
 ```
 
-They are not the `z2like-demo` backend. In particular, do not widen or repurpose host `18081` for Bootstrap.
+### z2like-demo public backend bridge
 
-The normal SWPC Local Control Station remains on `18190/18280`; the z2like-demo scenario uses its own `18390/18380` Console/Manager pair so the engineering Control Station is not silently retargeted when the public demo is activated. Both pairs reuse the same qualified Control Station release rather than maintaining a second UI/control-plane implementation.
+```text
+127.0.0.1:18082       bounded managed ingress for ppu-managed-lab.open4th.com
+172.30.77.2:18080      private QEMU Plasma Gateway
+172.30.77.2:18081      private QEMU Bootstrap/recovery service
+```
 
-## Start the canonical QEMU target
+The migration of host `18082` from the historical x86 managed ingress to QEMU is explicit. It does not widen host `18081`, and it does not change the x86 full Gateway used by `plasma.open4th.com`.
 
-Prerequisites:
+### SWPC internal maintenance fixture
 
-- SWPC Linux with Docker;
-- current Plasma repository at a clean committed revision;
-- current `local-control-station` release deployed, including `plasma_manager.bootstrap_server`;
-- Cloudflare hostname/routing configured externally when public access is required.
+```text
+127.0.0.1:18380  internal Bootstrap-capable Manager
+127.0.0.1:18390  internal acceptance Console/BFF
+```
 
-Start QEMU and the dedicated Control Station:
+`18380/18390` are not the public z2like-demo Control Station. They exist only for SWPC-local Bootstrap deployment/acceptance and may be removed later if that maintenance function is replaced.
+
+## One-command operator flow
+
+Normal update from a clean local `main`:
 
 ```bash
 cd "$PLASMA_REPO"
-python3 scripts/z2like-demo-qemu.py activate
+sudo ./scripts/plasmactl update z2like-demo
 ```
 
-Defaults:
+This command:
+
+1. verifies the repository is clean and on `main`;
+2. fetches `origin/main` and refuses ahead/diverged history;
+3. performs only `git pull --ff-only origin main`;
+4. re-executes the newly pulled `plasmactl` code;
+5. starts/verifies the private ARMv7 QEMU target;
+6. builds a canonical ARMv7 PPU Runtime and simulation Z2 PS kit;
+7. deploys through the persistent SWPC-local Bootstrap Manager lifecycle gates;
+8. migrates/reconciles host `18082` to the QEMU managed ingress;
+9. verifies QEMU Gateway execution readiness;
+10. verifies the bounded `18082` ingress;
+11. verifies the Render public registry and public managed health path.
+
+No manual `git pull`, `curl`, or per-service health-check sequence is required.
+
+Deploy the already checked-out clean committed revision without changing Git:
+
+```bash
+sudo ./scripts/plasmactl deploy z2like-demo
+```
+
+Read-only verification/status:
+
+```bash
+sudo ./scripts/plasmactl verify z2like-demo
+sudo ./scripts/plasmactl status z2like-demo
+```
+
+Public verification is fail-closed by default. `PLASMA_Z2LIKE_DEMO_SKIP_PUBLIC_VERIFY=1` exists only for isolated engineering work and explicitly does **not** produce public-path qualification.
+
+## Bootstrap deployment behavior
+
+The SWPC-local maintenance Manager is the only component that drives the private QEMU Bootstrap mutation API:
 
 ```text
-Docker network       plasma-z2like-demo
-Private subnet       172.30.77.0/24
-QEMU PPU IPv4        172.30.77.2
-PPU alias            z2like-qemu
-QEMU Gateway         http://172.30.77.2:18080
-QEMU Bootstrap       http://172.30.77.2:18081
-Demo Manager         http://127.0.0.1:18380
-Demo Console         http://127.0.0.1:18390
-```
-
-Subnet, QEMU IPv4 and alias can be overridden explicitly with command-line options or the documented `PLASMA_Z2LIKE_DEMO_*` environment variables. Existing conflicting Docker topology fails closed; the script does not silently replace it.
-
-Read-only verification:
-
-```bash
-python3 scripts/z2like-demo-qemu.py verify
-python3 scripts/z2like-demo-qemu.py status
-```
-
-To retrieve the device-local pairing token for the explicit Console pairing step:
-
-```bash
-python3 scripts/z2like-demo-qemu.py token
-```
-
-That command deliberately exposes a secret to the terminal. Do not put the token in repository files, screenshots, CI artifacts or general logs.
-
-Stop without deleting persistent state:
-
-```bash
-python3 scripts/z2like-demo-qemu.py down
-```
-
-Persistent Docker volumes, Manager registry, pairing credentials and service units remain intact. This is a stop operation, not a factory reset.
-
-## Bootstrap deployment path
-
-Before a Product Runtime is installed, the QEMU target remains manageable through Bootstrap:
-
-```text
-Console Runtime Deployment
-  -> BFF
-  -> z2like-demo Manager
+SWPC local operator
+  -> internal Manager :18380
   -> QEMU Bootstrap :18081
-  -> authenticated chunked Z2 PS kit upload
-  -> canonical kit SHA-256 verification
-  -> kit-local ppu-bootstrap-deployment.py
-  -> kit-local retained Z2 installer core
+  -> device pairing if required
+  -> authenticated 1 MiB chunk upload
+  -> canonical Z2 PS kit verification
+  -> kit-local durable deployment coordinator
   -> QEMU userspace activation adapter
   -> packaged ARMv7 Plasma Server/Gateway
 ```
 
-The simulation uses the QEMU container's ARMv7 Python 3.12 interpreter to execute the packaged Runtime. It verifies the kit's Plasma Python artifact and sidecar for integrity but intentionally does **not** install or execute that artifact. Therefore the simulation does not qualify the real `z2-ps` Plasma-owned Python installation contract.
+Lifecycle remains fail-closed:
 
-The QEMU userspace supervisor watches `/opt/plasma/current`. A deployment activation failure does not kill Bootstrap: the failed release is left unstarted while the shared deployment transaction reaches its health deadline, restores the previous symlink/configuration, and then the supervisor resumes the restored release. This permits deterministic software rollback testing without pretending to test physical Z2 systemd behavior.
+- a fresh `pending` PPU may receive first Runtime deployment;
+- a `commissioned` PPU is first disabled through Manager lifecycle policy;
+- disabling is rejected while execution is active;
+- maintenance proceeds only from `pending` or `disabled`;
+- recovery/unknown Runtime state is rejected;
+- re-commissioning occurs only after Runtime readiness and a current trusted Manager observation.
+
+The device-local pairing token is read only from the local QEMU container when pairing is required and is never printed by the one-command deployment path.
+
+## Managed-ingress security boundary
+
+`ppu-managed-lab.open4th.com` continues to require the existing Cloudflare Access service identity owned by the Render deployment. Repository code does not create or weaken that external policy.
+
+The host `18082` Nginx ingress remains loopback-only and allowlisted. It permits the managed product surfaces required for observation, Site Desired, bounded Runtime Activation, Mock programming Jobs/Batches and diagnostics while excluding generic API proxying, Gateway-setting mutation and PPU-network mutation/activation.
+
+Cloudflare Access is transport identity only. Plasma Gateway remains the final application authorization, Site scope, idempotency and execution authority.
+
+## Relationship to `ppu-lab` retirement
+
+`z2like-demo` no longer depends on SWPC host `18081`. Host `18081` remains only the legacy `ppu-lab.open4th.com` diagnostics/status/PS-loopback boundary until Issue #549 retirement criteria are satisfied.
+
+QEMU `172.30.77.2:18081` and real-Z2 `<Z2-IP>:18081` are separate Bootstrap/recovery ports and are **not** part of that retirement.
 
 ## What this simulation can qualify
 
@@ -132,8 +166,9 @@ When the exact end-to-end scenario passes, evidence may support:
 
 ```text
 SWPC/QEMU ARMv7 z2like-demo software path
-+ Control Station/BFF
-+ Manager Bootstrap policy/lifecycle gates
++ Render Control Station/Manager product path
++ Cloudflare-protected bounded managed ingress contract
++ private Bootstrap lifecycle policy
 + device pairing
 + authenticated chunk upload
 + canonical Z2 kit format/integrity
@@ -143,6 +178,8 @@ SWPC/QEMU ARMv7 z2like-demo software path
 + software activation rollback/recovery semantics
 ```
 
+Repository CI can prove the software composition and QEMU path. Live SWPC, Render and Cloudflare routing remain deployment-state evidence and must be verified at deployment time.
+
 ## What it cannot qualify
 
 It does not prove:
@@ -150,7 +187,7 @@ It does not prove:
 - physical PYNQ-Z2 hardware behavior;
 - PYNQ/System-Python isolation on a real board;
 - Plasma-owned Python installation on a real board;
-- real systemd/DAC/socket ownership;
+- real systemd/DAC/socket ownership on Z2;
 - real Z2 reboot persistence;
 - Ethernet behavior of the physical board;
 - PS-to-PL or FPGA execution;
@@ -161,7 +198,3 @@ It does not prove:
 The qualification statement remains:
 
 > **Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED.**
-
-## Public hostname boundary
-
-Repository code intentionally does not invent or own the external DNS hostname. The operator-managed `z2like-demo` Cloudflare hostname must terminate on `127.0.0.1:18390` only. Cloudflare DNS/Tunnel/Access configuration is external deployment state and requires separate verification on SWPC; repository CI cannot prove it.

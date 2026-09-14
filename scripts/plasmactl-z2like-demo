@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+qemu_backend="${PLASMA_Z2LIKE_DEMO_QEMU_BACKEND:-$repo_root/scripts/z2like-demo-qemu.py}"
+kit_builder="${PLASMA_Z2LIKE_DEMO_KIT_BUILDER:-$repo_root/scripts/z2like-demo-qemu-build-kit.py}"
+runtime_deployer="${PLASMA_Z2LIKE_DEMO_RUNTIME_DEPLOYER:-$repo_root/scripts/z2like-demo-qemu-deploy.py}"
+managed_backend="${PLASMA_Z2LIKE_DEMO_MANAGED_BACKEND:-$repo_root/scripts/plasmactl-z2like-demo-managed-ingress}"
+public_origin="${PLASMA_Z2LIKE_DEMO_PUBLIC_ORIGIN:-https://z2like-demo.open4th.com}"
+expected_render_ppu_endpoint="${PLASMA_Z2LIKE_DEMO_RENDER_PPU_ENDPOINT:-https://ppu-managed-lab.open4th.com}"
+public_verify_timeout_s="${PLASMA_Z2LIKE_DEMO_PUBLIC_VERIFY_TIMEOUT_S:-600}"
+ppu_ip="${PLASMA_Z2LIKE_DEMO_PPU_IP:-172.30.77.2}"
+ppu_alias="${PLASMA_Z2LIKE_DEMO_PPU_ALIAS:-z2like-qemu}"
+manager_origin="${PLASMA_Z2LIKE_DEMO_MAINTENANCE_MANAGER:-http://127.0.0.1:18380}"
+container_name="${PLASMA_Z2LIKE_DEMO_CONTAINER:-plasma-z2like-demo-qemu}"
+
+say() {
+  printf '[plasmactl z2like-demo] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl z2like-demo] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_file() {
+  [[ -f "$1" ]] || die "$2 is missing: $1"
+}
+
+operator_user="${SUDO_USER:-${USER:-$(id -un)}}"
+if [[ -z "$operator_user" || "$operator_user" == "root" ]]; then
+  operator_user="$(id -un)"
+fi
+operator_uid="$(id -u "$operator_user")"
+operator_home="$(getent passwd "$operator_user" | awk -F: '{print $6}')"
+[[ -n "$operator_home" ]] || die "cannot resolve home directory for operator user: $operator_user"
+[[ "$public_verify_timeout_s" =~ ^[0-9]+$ ]] || die "public verify timeout must be an integer"
+(( public_verify_timeout_s >= 30 && public_verify_timeout_s <= 1800 )) || \
+  die "public verify timeout must be between 30 and 1800 seconds"
+
+operator_cmd() {
+  if (( EUID == 0 )) && [[ "$operator_user" != "root" ]]; then
+    command -v sudo >/dev/null 2>&1 || die "sudo is required to execute operator-owned Docker/systemd-user actions"
+    sudo -u "$operator_user" -H env \
+      HOME="$operator_home" USER="$operator_user" LOGNAME="$operator_user" \
+      XDG_RUNTIME_DIR="/run/user/$operator_uid" \
+      DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$operator_uid/bus" \
+      "$@"
+  else
+    "$@"
+  fi
+}
+
+root_cmd() {
+  if (( EUID == 0 )); then
+    "$@"
+  else
+    command -v sudo >/dev/null 2>&1 || die "sudo is required for Nginx managed-ingress installation"
+    sudo "$@"
+  fi
+}
+
+operator_git() {
+  operator_cmd git -C "$repo_root" "$@"
+}
+
+require_clean_source() {
+  [[ -d "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  local dirty
+  dirty="$(operator_git status --porcelain --untracked-files=normal)"
+  [[ -z "$dirty" ]] || die "repository must be clean before z2like-demo deployment"
+}
+
+update_source() {
+  require_clean_source
+  local branch head remote
+  branch="$(operator_git branch --show-current)"
+  [[ "$branch" == "main" ]] || die "one-command update requires local branch main; current=$branch"
+  say "fetching origin/main"
+  operator_git fetch origin main
+  head="$(operator_git rev-parse HEAD)"
+  remote="$(operator_git rev-parse origin/main)"
+  if [[ "$head" != "$remote" ]]; then
+    operator_git merge-base --is-ancestor "$head" "$remote" >/dev/null 2>&1 || \
+      die "local main is ahead/diverged from origin/main; refusing destructive reconciliation"
+  fi
+  operator_git pull --ff-only origin main
+  require_clean_source
+  say "source ready: main @ $(operator_git rev-parse --short HEAD)"
+  exec "$repo_root/scripts/plasmactl" deploy z2like-demo
+}
+
+build_kit() {
+  local sha build_root build_python build_json
+  sha="$(operator_git rev-parse HEAD)"
+  build_root="$operator_home/.cache/plasma/z2like-demo/$sha"
+  operator_cmd mkdir -p "$build_root"
+  build_python="python3"
+  if [[ -x "$repo_root/software/python/.venv/bin/python" ]]; then
+    build_python="$repo_root/software/python/.venv/bin/python"
+  fi
+  say "building canonical ARMv7 PPU Runtime and simulation Z2 kit"
+  build_json="$(operator_cmd env PLASMA_Z2LIKE_DEMO_BUILD_PYTHON="$build_python" \
+    python3 "$kit_builder" --output-dir "$build_root")"
+  kit_path="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["kit"])' <<<"$build_json")"
+  kit_sidecar="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["sidecar"])' <<<"$build_json")"
+  [[ -f "$kit_path" && -f "$kit_sidecar" ]] || die "kit builder did not produce the declared artifacts"
+}
+
+verify_ready_json() {
+  python3 -c '
+import json,sys
+payload=json.load(sys.stdin)
+if payload.get("ok") is not True or payload.get("gateway") != "alive" or payload.get("execution") != "ready":
+    raise SystemExit(f"unexpected readiness payload: {payload!r}")
+'
+}
+
+verify_registry_alias_json() {
+  python3 -c '
+import json,sys
+alias=sys.argv[1]
+expected=sys.argv[2].rstrip("/")
+payload=json.load(sys.stdin)
+ppus=payload.get("ppus")
+if not isinstance(ppus,list):
+    raise SystemExit(f"registry omitted ppus: {payload!r}")
+matches=[item for item in ppus if isinstance(item,dict) and item.get("alias")==alias]
+if len(matches)!=1:
+    raise SystemExit(f"public Render registry does not contain exactly one {alias!r}: {payload!r}")
+endpoint=str(matches[0].get("endpoint") or "").rstrip("/")
+if endpoint != expected:
+    raise SystemExit(f"public Render registry endpoint mismatch: {endpoint!r} != {expected!r}")
+' "$ppu_alias" "$expected_render_ppu_endpoint"
+}
+
+wait_public_registry() {
+  local deadline payload last="no successful response"
+  deadline=$(( $(date +%s) + public_verify_timeout_s ))
+  while (( $(date +%s) < deadline )); do
+    if payload="$(curl --fail --silent --show-error --max-time 15 \
+      "$public_origin/api/manager/registry" 2>/dev/null)"; then
+      if verify_registry_alias_json <<<"$payload" >/dev/null 2>&1; then
+        return 0
+      fi
+      last="$payload"
+    fi
+    sleep 5
+  done
+  printf '[plasmactl z2like-demo] last public registry response: %.1000s\n' "$last" >&2
+  return 1
+}
+
+wait_public_ready() {
+  local deadline payload last="no successful response"
+  deadline=$(( $(date +%s) + public_verify_timeout_s ))
+  while (( $(date +%s) < deadline )); do
+    if payload="$(curl --fail --silent --show-error --max-time 15 \
+      "$public_origin/api/manager/ppu/api/health/ready" 2>/dev/null)"; then
+      if verify_ready_json <<<"$payload" >/dev/null 2>&1; then
+        return 0
+      fi
+      last="$payload"
+    fi
+    sleep 5
+  done
+  printf '[plasmactl z2like-demo] last public readiness response: %.1000s\n' "$last" >&2
+  return 1
+}
+
+verify_public_path() {
+  if [[ "${PLASMA_Z2LIKE_DEMO_SKIP_PUBLIC_VERIFY:-0}" == "1" ]]; then
+    say "public Render/Cloudflare verification explicitly skipped; deployment is not public-path qualified"
+    return 0
+  fi
+  say "waiting for Render Control Station -> ppu-managed-lab -> SWPC/QEMU convergence"
+  wait_public_registry || \
+    die "public Render registry did not converge to $ppu_alias -> $expected_render_ppu_endpoint within ${public_verify_timeout_s}s"
+  wait_public_ready || \
+    die "public managed QEMU readiness did not converge through $public_origin within ${public_verify_timeout_s}s"
+}
+
+verify_profile() {
+  require_file "$qemu_backend" "QEMU backend"
+  require_file "$managed_backend" "managed-ingress backend"
+  operator_cmd python3 "$qemu_backend" --ppu-ip "$ppu_ip" --alias "$ppu_alias" verify >/dev/null
+  local direct_ready
+  direct_ready="$(operator_cmd curl --noproxy '*' --fail --silent --show-error --max-time 5 \
+    "http://$ppu_ip:18080/api/health/ready")"
+  verify_ready_json <<<"$direct_ready"
+  root_cmd env PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT="http://$ppu_ip:18080" \
+    bash "$managed_backend" verify
+  verify_public_path
+  say "PASS: Source=$(operator_git rev-parse --short HEAD) QEMU=armv7 Runtime=ready ManagedIngress=ready RenderPath=ready"
+}
+
+deploy_profile() {
+  require_file "$qemu_backend" "QEMU backend"
+  require_file "$kit_builder" "QEMU kit builder"
+  require_file "$runtime_deployer" "QEMU runtime deployer"
+  require_file "$managed_backend" "managed-ingress backend"
+  require_clean_source
+
+  say "starting QEMU ARMv7 target and SWPC-local maintenance fixture"
+  operator_cmd python3 "$qemu_backend" --ppu-ip "$ppu_ip" --alias "$ppu_alias" activate >/dev/null
+  build_kit
+  say "deploying Runtime through the persistent maintenance Manager lifecycle gate"
+  operator_cmd python3 "$runtime_deployer" \
+    --kit "$kit_path" \
+    --sidecar "$kit_sidecar" \
+    --manager "$manager_origin" \
+    --ppu-ip "$ppu_ip" \
+    --alias "$ppu_alias" \
+    --container "$container_name"
+  say "migrating ppu-managed-lab host ingress from x86 surrogate to QEMU"
+  root_cmd env PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT="http://$ppu_ip:18080" \
+    bash "$managed_backend" install
+  verify_profile
+}
+
+status_profile() {
+  require_file "$qemu_backend" "QEMU backend"
+  require_file "$managed_backend" "managed-ingress backend"
+  operator_cmd python3 "$qemu_backend" --ppu-ip "$ppu_ip" --alias "$ppu_alias" status || true
+  root_cmd env PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT="http://$ppu_ip:18080" \
+    bash "$managed_backend" status
+  printf 'Public Control Station: %s (Render)\n' "$public_origin"
+  printf 'Render PPU endpoint:    %s\n' "$expected_render_ppu_endpoint"
+  printf 'Managed public ingress: ppu-managed-lab.open4th.com -> SWPC 127.0.0.1:18082 -> QEMU %s:18080\n' "$ppu_ip"
+  printf 'Maintenance Manager:    %s (SWPC-local/internal only)\n' "$manager_origin"
+  printf 'SWPC x86 surrogate:     separate engineering backend; not z2like-demo\n'
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-z2like-demo COMMAND
+
+Commands:
+  deploy   Deploy current clean committed source to SWPC/QEMU and verify the full public path
+  update   Fast-forward a clean local main from origin/main, re-exec latest tooling, then deploy
+  verify   Run QEMU Runtime + managed ingress + Render public-path health checks
+  status   Show current z2like-demo backend/ingress ownership
+
+Canonical topology:
+  z2like-demo.open4th.com (Render Console/BFF + Manager)
+    -> ppu-managed-lab.open4th.com (Cloudflare Access/Tunnel)
+    -> SWPC 127.0.0.1:18082 managed ingress
+    -> QEMU ARMv7 simulated Z2 172.30.77.2:18080
+
+The SWPC 18380/18390 pair is an internal maintenance/acceptance fixture only;
+it is not the public z2like-demo website. SWPC host 18081 remains the legacy
+restricted diagnostics ingress pending retirement and is not used here.
+EOF
+}
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  deploy)
+    (($# == 0)) || die "deploy accepts no additional arguments"
+    deploy_profile
+    ;;
+  update)
+    (($# == 0)) || die "update accepts no additional arguments"
+    update_source
+    ;;
+  verify)
+    (($# == 0)) || die "verify accepts no additional arguments"
+    verify_profile
+    ;;
+  status)
+    (($# == 0)) || die "status accepts no additional arguments"
+    status_profile
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    die "unknown command: $command"
+    ;;
+esac
