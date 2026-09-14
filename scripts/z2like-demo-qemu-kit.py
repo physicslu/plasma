@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Simulation-only consumer for a canonical Plasma Z2 PS kit.
 
-The outer kit format, internal SHA256SUMS, individual PPU/Python sidecars, and
-production PPU release are verified.  Activation then delegates to the shared
-``ppu-bootstrap-deployment.py`` transaction engine with the QEMU userspace
-installer adapter.
+The outer kit format, internal SHA256SUMS, individual PPU/Python sidecars and
+production PPU release are verified. Activation uses the kit-local durable
+``ppu-bootstrap-deployment.py`` plus the kit-local retained installer core, but
+replaces physical-Z2/systemd activation with the explicit QEMU userspace adapter.
 
 This script intentionally does NOT install or qualify the kit's Plasma-owned
-Python artifact; the ARMv7 QEMU container interpreter is used instead.  That
+Python artifact; the ARMv7 QEMU container interpreter is used instead. That
 boundary is explicit in returned evidence.
 """
 
@@ -28,6 +28,7 @@ from typing import Sequence
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TARGET_MARKER = "PLASMA_Z2LIKE_DEMO_QEMU_TARGET"
+CORE_OVERRIDE = "PLASMA_Z2LIKE_DEMO_INSTALLER_CORE"
 
 
 class QEMUSimulationKitError(RuntimeError):
@@ -101,10 +102,13 @@ def deploy(
             verified.python_sidecar,
             "Plasma Python artifact",
         )
-        coordinator = SCRIPT_DIR / "ppu-bootstrap-deployment.py"
+        kit_scripts = verified.root / "scripts"
+        coordinator = kit_scripts / "ppu-bootstrap-deployment.py"
+        installer_core = kit_scripts / "ppu-z2-installer-core.py"
         installer = SCRIPT_DIR / "z2like-demo-qemu-installer.py"
-        if not coordinator.is_file() or not installer.is_file():
-            raise QEMUSimulationKitError("QEMU simulation deployment tooling is incomplete")
+        for path in (coordinator, installer_core, installer):
+            if not path.is_file():
+                raise QEMUSimulationKitError(f"QEMU simulation deployment tooling is incomplete: {path}")
         argv = [
             sys.executable,
             str(coordinator),
@@ -145,7 +149,11 @@ def deploy(
             stderr=subprocess.STDOUT,
             text=True,
             timeout=900,
-            env={**os.environ, TARGET_MARKER: "1"},
+            env={
+                **os.environ,
+                TARGET_MARKER: "1",
+                CORE_OVERRIDE: str(installer_core),
+            },
         )
         if completed.returncode != 0:
             tail = completed.stdout[-8000:] if completed.stdout else ""
@@ -168,6 +176,8 @@ def deploy(
             "ppu_artifact_sha256": ppu_sha,
             "python_artifact_sha256": python_sha,
             "python_artifact_execution": "not_executed_in_qemu-simulation",
+            "kit_local_deployment_coordinator": str(coordinator),
+            "kit_local_installer_core": str(installer_core),
             "deployment": payload,
             "publisher_authenticity": "not_yet_qualified",
             "fpga_update": False,
