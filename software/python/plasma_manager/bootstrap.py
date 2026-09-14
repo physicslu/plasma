@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import tempfile
@@ -19,6 +20,10 @@ from .registry import PPURegistryStore, RegistryEntryNotFound, normalize_registr
 BOOTSTRAP_PORT = 18081
 BOOTSTRAP_CREDENTIAL_SCHEMA = 1
 MAX_BOOTSTRAP_RESPONSE_BYTES = 4 * 1024 * 1024
+MANAGED_BOOTSTRAP_TRANSPORT_ENV = "PLASMA_MANAGER_BOOTSTRAP_TRANSPORT"
+MANAGED_BOOTSTRAP_TRANSPORT = "managed-gateway-prefix-v1"
+MANAGED_BOOTSTRAP_PATH_PREFIX = "/__plasma/bootstrap"
+MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV = "PLASMA_MANAGER_BOOTSTRAP_RUNTIME_GATEWAY_HOST"
 
 
 class BootstrapManagerError(RuntimeError):
@@ -41,21 +46,93 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _managed_bootstrap_transport_enabled() -> bool:
+    value = os.environ.get(MANAGED_BOOTSTRAP_TRANSPORT_ENV)
+    if value is None:
+        return False
+    if value != MANAGED_BOOTSTRAP_TRANSPORT:
+        raise BootstrapManagerError(
+            f"unsupported Manager Bootstrap transport policy: {value!r}"
+        )
+    return True
+
+
+def _bootstrap_api_path(path: str) -> str:
+    if not path.startswith("/"):
+        raise BootstrapManagerError("Bootstrap API path must be absolute")
+    if _managed_bootstrap_transport_enabled():
+        return f"{MANAGED_BOOTSTRAP_PATH_PREFIX}{path}"
+    return path
+
+
+def _bootstrap_endpoint_policy() -> str:
+    if _managed_bootstrap_transport_enabled():
+        return MANAGED_BOOTSTRAP_TRANSPORT
+    return "z2-ps-same-host:18081"
+
+
 def bootstrap_endpoint_for_gateway(gateway_endpoint: str) -> str:
-    """Derive real-z2 Bootstrap endpoint without changing registry semantics."""
+    """Resolve Bootstrap transport without changing registry endpoint semantics.
+
+    Direct/private Manager deployments keep the same-host ``:18081`` contract.
+    The Render-managed z2like-demo profile instead reuses the exact managed
+    Gateway origin and reaches Bootstrap only through the fixed, allowlisted
+    ``/__plasma/bootstrap`` prefix. This lets Cloudflare Access remain scoped to
+    one origin while keeping the device Bootstrap on its independent :18081
+    service behind SWPC.
+    """
 
     canonical = normalize_endpoint(gateway_endpoint)
     parsed = urlsplit(canonical)
+    if parsed.hostname is None:
+        raise BootstrapManagerError("registered Plasma Gateway endpoint has no host")
+
+    if _managed_bootstrap_transport_enabled():
+        if parsed.scheme != "https":
+            raise BootstrapManagerError(
+                "managed Bootstrap transport requires the protected HTTPS Gateway origin"
+            )
+        return canonical
+
     if parsed.scheme != "http":
         raise BootstrapManagerError(
             "Bootstrap transport supports the controlled private HTTP commissioning link only"
         )
-    if parsed.hostname is None:
-        raise BootstrapManagerError("registered Plasma Gateway endpoint has no host")
     host = parsed.hostname
     if ":" in host:
         host = f"[{host}]"
     return urlunsplit(("http", f"{host}:{BOOTSTRAP_PORT}", "", "", ""))
+
+
+def _runtime_gateway_host(gateway_endpoint: str) -> str:
+    if _managed_bootstrap_transport_enabled():
+        raw = os.environ.get(MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV)
+        if raw is None or not raw.strip() or raw != raw.strip():
+            raise BootstrapManagerError(
+                "managed Bootstrap transport requires a Manager-owned runtime Gateway host"
+            )
+        try:
+            address = ipaddress.ip_address(raw)
+        except ValueError as exc:
+            raise BootstrapManagerError(
+                "managed Bootstrap runtime Gateway host must be a private IPv4 address"
+            ) from exc
+        if (
+            address.version != 4
+            or not address.is_private
+            or address.is_loopback
+            or address.is_unspecified
+            or address.is_multicast
+        ):
+            raise BootstrapManagerError(
+                "managed Bootstrap runtime Gateway host must be a private non-loopback IPv4 address"
+            )
+        return str(address)
+
+    parsed = urlsplit(gateway_endpoint)
+    if parsed.hostname is None:
+        raise BootstrapManagerError("registered Plasma Gateway endpoint has no host")
+    return parsed.hostname
 
 
 def _valid_token(value: object) -> str:
@@ -259,10 +336,11 @@ class BootstrapHttpClient:
         if body is not None:
             raw = json.dumps(dict(body), separators=(",", ":")).encode("utf-8")
             headers["Content-Type"] = "application/json"
+        request_path = _bootstrap_api_path(path)
         try:
             status, response_headers, response_body = self.client.relay(
                 method,
-                path,
+                request_path,
                 headers=headers,
                 body=raw,
                 timeout_s=self.timeout_s if timeout_s is None else timeout_s,
@@ -349,7 +427,7 @@ class ManagerBootstrapCoordinator:
         return {
             "ok": True,
             "ppu_alias": normalized,
-            "bootstrap_endpoint_policy": "z2-ps-same-host:18081",
+            "bootstrap_endpoint_policy": _bootstrap_endpoint_policy(),
             "pairing": pairing,
             "bootstrap": payload,
             "upstream_status": 200,
@@ -383,9 +461,6 @@ class ManagerBootstrapCoordinator:
         unexpected = set(body) - allowed
         if unexpected:
             raise BootstrapManagerError(f"unsupported Manager deployment fields: {', '.join(sorted(unexpected))}")
-        parsed = urlsplit(record.endpoint)
-        if parsed.hostname is None:
-            raise BootstrapManagerError("registered Plasma Gateway endpoint has no host")
         request = dict(body)
-        request["gateway_host"] = parsed.hostname
+        request["gateway_host"] = _runtime_gateway_host(record.endpoint)
         return client.start_deployment(token, request)

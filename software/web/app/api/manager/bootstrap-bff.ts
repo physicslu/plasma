@@ -1,4 +1,11 @@
 import { managerApiBase, managerRoutingRequired, validPpuAlias } from "./manager-bff";
+import {
+  hasMaintenanceCapability,
+  issueMaintenanceCapabilityCookie,
+  maintenanceCapabilityConfigured,
+  maintenanceCapabilityRequired,
+  maintenanceMutationOriginAllowed,
+} from "./maintenance-capability.mjs";
 
 const MAX_BOOTSTRAP_BROWSER_REQUEST_BYTES = 2 * 1024 * 1024;
 const BOOTSTRAP_TIMEOUT_MS = 45_000;
@@ -35,6 +42,16 @@ function responseHeaders(response: Response): Headers {
   });
 }
 
+function maintenanceCapabilityMisconfigured(): Response {
+  return json(503, {
+    ok: false,
+    error: {
+      code: "maintenance_authorization_unavailable",
+      message: "Browser maintenance authorization is not configured",
+    },
+  });
+}
+
 export async function relayManagerBootstrapRequest(
   request: Request,
   alias: string,
@@ -53,6 +70,18 @@ export async function relayManagerBootstrapRequest(
       ok: false,
       error: { code: "bootstrap_route_not_allowed", message: "Bootstrap browser route is not allowlisted" },
     });
+  }
+
+  if (request.method === "POST") {
+    try {
+      maintenanceCapabilityConfigured();
+      if (!maintenanceMutationOriginAllowed(request)) return maintenanceCapabilityRequired();
+      if (normalizedAction !== "pair" && !hasMaintenanceCapability(request, normalizedAlias)) {
+        return maintenanceCapabilityRequired();
+      }
+    } catch {
+      return maintenanceCapabilityMisconfigured();
+    }
   }
 
   try {
@@ -96,7 +125,12 @@ export async function relayManagerBootstrapRequest(
         },
       });
     }
-    return new Response(payload, { status: response.status, headers: responseHeaders(response) });
+    const headers = responseHeaders(response);
+    if (request.method === "POST" && normalizedAction === "pair" && response.ok) {
+      const cookie = issueMaintenanceCapabilityCookie(normalizedAlias);
+      if (cookie) headers.set("Set-Cookie", cookie);
+    }
+    return new Response(payload, { status: response.status, headers });
   } catch {
     return json(503, {
       ok: false,
