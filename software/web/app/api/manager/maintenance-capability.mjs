@@ -74,11 +74,13 @@ export function maintenanceCapabilityConfigured() {
 
 export function maintenanceMutationOriginAllowed(request) {
   if (!fixedLifecycleRegistry()) return true;
+  capabilitySecret();
   return sameOriginMutation(request);
 }
 
 export function issueMaintenanceCapabilityCookie(alias, nowMs = Date.now()) {
   if (!fixedLifecycleRegistry()) return null;
+  capabilitySecret();
   const expires = Math.floor(nowMs / 1000) + CAPABILITY_TTL_SECONDS;
   const nonce = randomBytes(24).toString("base64url");
   const token = [CAPABILITY_VERSION, String(expires), nonce, signature(alias, expires, nonce)].join(".");
@@ -87,6 +89,7 @@ export function issueMaintenanceCapabilityCookie(alias, nowMs = Date.now()) {
 
 export function hasMaintenanceCapability(request, alias, nowMs = Date.now()) {
   if (!fixedLifecycleRegistry()) return true;
+  capabilitySecret();
   if (!sameOriginMutation(request)) return false;
   const token = cookieValue(request);
   if (!token) return false;
