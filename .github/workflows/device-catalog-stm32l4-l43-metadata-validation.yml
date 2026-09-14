@@ -12,7 +12,6 @@ on:
       - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
       - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
       - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml"
   push:
     branches: [main]
@@ -26,7 +25,6 @@ on:
       - "data/device-catalog/research/stm32l4-phase-l4.3-exact-variant-exceptions.json"
       - "data/device-catalog/research/stm32l4-phase-l4.3-policy-baseline.json"
       - "data/device-catalog/research/evidence/stm32l4-l4.2-official-st-discovery-live-2026-09-13/**"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l4-l43-metadata-validation.yml"
   workflow_dispatch:
 

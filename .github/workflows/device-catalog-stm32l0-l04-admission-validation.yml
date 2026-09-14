@@ -10,7 +10,6 @@ on:
       - "data/device-catalog/research/stm32l0-phase-l0.4-admission-plan.json"
       - "data/device-catalog/research/stm32l0-phase-l0.3-policy-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
-      - "data/device-catalog/production/**"
       - ".github/workflows/device-catalog-stm32l0-l04-admission-validation.yml"
   workflow_dispatch:
 
