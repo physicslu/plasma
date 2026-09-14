@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32l5-security-scope-foundation",
+  "authority": "research_only",
+  "upstream_selection": "stm32-trustzone-cohort-gate1-qualification.json",
+  "series": "STM32L5",
+  "subfamily_scope": [
+    "STM32L5x2"
+  ],
+  "device_line_scope": [
+    "STM32L552",
+    "STM32L562"
+  ],
+  "manufacturer_evidence_accessed_at": "2026-09-14",
+  "manufacturer_sources": [
+    {
+      "id": "st-stm32l5x2-product-page",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l5x2.html",
+      "observations": [
+        "STM32L5x2 covers STM32L552 and STM32L562 device lines",
+        "the device lines use Arm Cortex-M33 with TrustZone for Armv8-M"
+      ]
+    },
+    {
+      "id": "st-stm32l5-trustzone-development-guidance",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/How_to_disable_TrustZone_in_STM32L5xx_devices_during_development_phase",
+      "observations": [
+        "TrustZone is disabled by default on STM32L5 devices",
+        "TrustZone activation uses the TZEN option bit when RDP is level 0",
+        "TrustZone deactivation is coupled to RDP regression and full-chip mass erase",
+        "debug and regression behavior can depend on secure versus non-secure execution state"
+      ]
+    },
+    {
+      "id": "st-stm32cubeprogrammer-2.23-errata",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/STM32CubeProgrammer_errata_2.23.x",
+      "observations": [
+        "STM32CubeProgrammer documents an STM32L5 external-flash read/write/erase limitation when TZEN is enabled",
+        "STM32CubeProgrammer does not support incremental programming when TrustZone is enabled and falls back to normal programming"
+      ]
+    },
+    {
+      "id": "st-stm32l5-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l5-series/documentation.html",
+      "observations": [
+        "ST lists RM0438 as the STM32L5 reference manual",
+        "ST lists DS12736 and DS12737 as STM32L5 datasheets"
+      ]
+    }
+  ],
+  "security_sensitive_controls": [
+    "TZEN",
+    "RDP",
+    "secure_nonsecure_execution_state",
+    "debug_interface_state"
+  ],
+  "research_partition": {
+    "manufacturer_identity_discovery_allowed": true,
+    "commercial_icpn_discovery_allowed": true,
+    "production_admission_allowed": false,
+    "security_semantics_supported": false,
+    "option_byte_writes_allowed": false,
+    "rdp_regression_allowed": false,
+    "mass_erase_allowed": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "external_flash_under_tzen_supported": false,
+    "incremental_programming_under_trustzone_supported": false,
+    "hil_validated": false
+  },
+  "required_future_runtime_gates": [
+    "explicit security-state model",
+    "option-byte policy and destructive-operation governance",
+    "programming algorithm and Flash geometry validation",
+    "debug-connect behavior validation by security state",
+    "HIL validation"
+  ],
+  "status": "eligible_for_identity_discovery_under_security_fence",
+  "next_research_gate": "stm32l5-manufacturer-identity-discovery"
+}
