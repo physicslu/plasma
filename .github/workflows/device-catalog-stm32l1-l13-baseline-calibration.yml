@@ -32,8 +32,7 @@ jobs:
 
       - name: Run L1.3 metadata negative controls
         run: |
-          python -m unittest \
-            data/device-catalog/research/test_stm32l1_phase_l1_3_policy.py
+          python data/device-catalog/research/test_stm32l1_phase_l1_3_policy.py
 
       - name: Replay full metadata plan
         run: |
