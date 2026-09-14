@@ -69,8 +69,8 @@
     "flash_geometry_validated": false,
     "programming_algorithm_equivalence": false,
     "runtime_programming_supported": false,
-    "external_flash_under_tzen_supported": false,
-    "incremental_programming_under_trustzone_supported": false,
+    "external_flash_under_tzen_runtime_claim_allowed": false,
+    "incremental_programming_under_trustzone_runtime_claim_allowed": false,
     "hil_validated": false
   },
   "required_future_runtime_gates": [
