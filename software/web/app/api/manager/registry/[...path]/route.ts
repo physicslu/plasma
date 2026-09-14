@@ -63,12 +63,71 @@ function managerContractMismatch(): Response {
   );
 }
 
+function fixedLifecycleRegistry(): boolean {
+  const policy = (process.env.PLASMA_MANAGER_REGISTRY_POLICY ?? "mutable").trim();
+  if (policy === "mutable") return false;
+  if (policy === "fixed-lifecycle") return true;
+  throw new Error("PLASMA_MANAGER_REGISTRY_POLICY is unsupported");
+}
+
+function fixedRegistryMutationRejected(message: string): Response {
+  return Response.json(
+    { ok: false, error: { code: "fixed_registry_policy", message } },
+    { status: 403, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+  );
+}
+
+async function enforceFixedEntryPolicy(request: Request, alias: string): Promise<Response | null> {
+  if (!fixedLifecycleRegistry()) return null;
+  const fixedAlias = (process.env.PLASMA_MANAGER_PPU_ALIAS ?? "").trim();
+  if (!fixedAlias || alias !== fixedAlias) {
+    return fixedRegistryMutationRejected("This Control Station may mutate lifecycle only for its canonical PPU alias");
+  }
+  if (request.method === "DELETE") {
+    return fixedRegistryMutationRejected("This Control Station owns a fixed PPU target; registry removal is disabled");
+  }
+  if (request.method !== "PATCH") return null;
+
+  let payload: unknown;
+  try {
+    payload = await request.clone().json();
+  } catch {
+    return Response.json(
+      { ok: false, error: { code: "invalid_request", message: "Registry lifecycle request must be JSON" } },
+      { status: 400, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+    );
+  }
+  if (
+    payload == null
+    || Array.isArray(payload)
+    || typeof payload !== "object"
+    || Object.keys(payload).length !== 1
+    || !("lifecycle" in payload)
+  ) {
+    return fixedRegistryMutationRejected("Fixed-target registry mutation is limited to one lifecycle field");
+  }
+  const lifecycle = (payload as { lifecycle?: unknown }).lifecycle;
+  if (lifecycle !== "disabled" && lifecycle !== "commissioned") {
+    return fixedRegistryMutationRejected("Fixed-target lifecycle must be disabled or commissioned");
+  }
+  return null;
+}
+
 async function relayEntry(request: Request): Promise<Response> {
   const parsed = registryPath(request);
   if (!parsed || parsed.resource !== "entry") {
     return Response.json(
       { ok: false, error: { code: "invalid_alias", message: "PPU registry alias is invalid" } },
       { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  try {
+    const policyResponse = await enforceFixedEntryPolicy(request, parsed.alias);
+    if (policyResponse) return policyResponse;
+  } catch {
+    return Response.json(
+      { ok: false, error: { code: "manager_bff_misconfigured", message: "Manager registry policy is invalid" } },
+      { status: 503, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
     );
   }
   const response = await relayManagerRegistryRequest(request, parsed.alias);
