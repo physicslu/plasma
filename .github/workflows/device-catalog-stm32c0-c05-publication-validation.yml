@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "data/device-catalog/production/icpn-v1-manifest.json"
       - "data/device-catalog/research/stm32c0-commercial-icpn.csv"
       - "data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json"
@@ -16,7 +15,6 @@ on:
       - ".github/workflows/device-catalog-stm32c0-c05-publication-validation.yml"
   pull_request:
     paths:
-      - "data/device-catalog/production/icpn-v1-manifest.json"
       - "data/device-catalog/research/stm32c0-commercial-icpn.csv"
       - "data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json"

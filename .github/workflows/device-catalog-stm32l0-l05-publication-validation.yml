@@ -8,7 +8,6 @@ on:
       - "data/device-catalog/research/device_catalog_*"
       - "data/device-catalog/research/st_*"
       - "data/device-catalog/research/test_st_*"
-      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32l0-l05-publication-validation.yml"
   workflow_dispatch:
 
