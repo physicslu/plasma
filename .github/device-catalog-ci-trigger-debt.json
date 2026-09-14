@@ -8,6 +8,7 @@
     "global_production_trigger_owners": [
       ".github/workflows/device-catalog-current-validation.yml",
       ".github/workflows/device-catalog-production-doc-contract.yml",
+      ".github/workflows/device-catalog-production-invariants.yml",
       ".github/workflows/device-catalog-validation.yml"
     ],
     "debt_may_only_shrink": true
