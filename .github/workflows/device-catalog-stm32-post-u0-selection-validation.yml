@@ -18,7 +18,6 @@ on:
       - "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11/**"
       - "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-qr-live-2026-09-11/**"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
-      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32-post-u0-selection-validation.yml"
   push:
     branches:
@@ -39,7 +38,6 @@ on:
       - "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11/**"
       - "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-qr-live-2026-09-11/**"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
-      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32-post-u0-selection-validation.yml"
 
 permissions:
