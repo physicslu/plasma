@@ -7,7 +7,6 @@ on:
       - 'docs/architecture/device-support-validation.md'
       - 'docs/architecture/ic-selector.md'
       - 'docs/architecture/icpn-catalog-admission-policy.json'
-      - 'docs/architecture/icpn-catalog-admission-separation.md'
       - 'scripts/ci/validate-icpn-catalog-admission-separation.py'
       - '.github/workflows/icpn-catalog-admission-separation-validation.yml'
   push:
@@ -17,7 +16,6 @@ on:
       - 'docs/architecture/device-support-validation.md'
       - 'docs/architecture/ic-selector.md'
       - 'docs/architecture/icpn-catalog-admission-policy.json'
-      - 'docs/architecture/icpn-catalog-admission-separation.md'
       - 'scripts/ci/validate-icpn-catalog-admission-separation.py'
       - '.github/workflows/icpn-catalog-admission-separation-validation.yml'
 
