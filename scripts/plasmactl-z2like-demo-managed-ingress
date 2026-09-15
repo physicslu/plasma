@@ -246,6 +246,48 @@ if not isinstance(bootstrap, dict) or bootstrap.get("state") != "bootstrap_ready
 '
 }
 
+wait_ingress_json() {
+  local label="$1"
+  local url="$2"
+  local verifier="$3"
+  local timeout_s="${4:-10}"
+  local deadline=$((SECONDS + timeout_s))
+  local body_file error_file code body curl_error reason
+
+  body_file="$(mktemp /tmp/plasma-z2like-demo-ingress-body.XXXXXX)"
+  error_file="$(mktemp /tmp/plasma-z2like-demo-ingress-error.XXXXXX)"
+  while true; do
+    : >"$body_file"
+    : >"$error_file"
+    code="$(curl --noproxy '*' --silent --show-error --max-time 2 \
+      --output "$body_file" --write-out '%{http_code}' "$url" 2>"$error_file" || true)"
+    body="$(cat "$body_file")"
+    curl_error="$(cat "$error_file")"
+
+    if [[ "$code" == "200" ]]; then
+      if "$verifier" <<<"$body" >/dev/null 2>&1; then
+        rm -f "$body_file" "$error_file"
+        printf '%s' "$body"
+        return 0
+      fi
+      reason="HTTP 200 payload contract mismatch"
+    elif [[ -n "$code" ]]; then
+      reason="HTTP $code"
+    else
+      reason="transport failure"
+    fi
+
+    if (( SECONDS >= deadline )); then
+      if [[ -n "$curl_error" ]]; then
+        printf '[plasmactl z2like-demo-managed] probe detail: %s\n' "$curl_error" >&2
+      fi
+      rm -f "$body_file" "$error_file"
+      die "$label did not converge at $url: $reason"
+    fi
+    sleep 0.25
+  done
+}
+
 verify_profile() {
   require_command curl
   require_command nginx
@@ -264,13 +306,13 @@ verify_profile() {
     [[ "$line" == *"127.0.0.1:$managed_port"* ]] || die "managed ingress is not loopback-only: $line"
   done <<<"$listeners"
 
-  ready="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 \
-    "http://127.0.0.1:$managed_port/api/health/ready")"
-  verify_json_ready <<<"$ready"
-
-  bootstrap_status="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 \
-    "http://127.0.0.1:$managed_port$bootstrap_prefix/v1/status")"
-  verify_bootstrap_ready <<<"$bootstrap_status"
+  # A successful nginx reload can briefly overlap with workers that still serve
+  # the previous ingress profile. Require bounded route convergence instead of
+  # treating the first post-reload response as authoritative.
+  ready="$(wait_ingress_json "Gateway readiness" \
+    "http://127.0.0.1:$managed_port/api/health/ready" verify_json_ready 10)"
+  bootstrap_status="$(wait_ingress_json "Bootstrap status" \
+    "http://127.0.0.1:$managed_port$bootstrap_prefix/v1/status" verify_bootstrap_ready 10)"
 
   sites_status="$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 5 \
     "http://127.0.0.1:$managed_port/api/settings/sites")"
