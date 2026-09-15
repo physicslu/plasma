@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,12 @@ def test_build_runtime_creates_console_manager_manifest_and_license(tmp_path: Pa
     manager = output / "manager" / "manager.pyz"
     assert manager.is_file()
     assert (output / "manager" / "THIRD_PARTY_LICENSES" / "PyYAML.txt").is_file()
+
+    with zipfile.ZipFile(manager, "r") as archive:
+        assert "plasma_manager/bootstrap_server.py" in archive.namelist()
+        entrypoint = archive.read("__main__.py").decode("utf-8")
+    assert "from plasma_manager.bootstrap_server import main" in entrypoint
+    assert "from plasma_manager.server import main" not in entrypoint
 
     manifest = json.loads((output / "control-station-runtime.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 1
