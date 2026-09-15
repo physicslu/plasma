@@ -1,6 +1,7 @@
 name: PPU bootstrap regression
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/workflows/ppu-bootstrap.yml"
@@ -22,6 +23,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
   push:
     branches: [main]
     paths:
@@ -44,6 +46,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -80,6 +83,7 @@ jobs:
           software/python/tests/test_ppu_bootstrap_core.py
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
+          software/python/tests/test_z2_hil_artifact_provenance_contract.py
 
   factory-bundle:
     needs: bootstrap-scripts
