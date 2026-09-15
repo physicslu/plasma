@@ -6,7 +6,7 @@ on:
       - ".github/workflows/z2like-demo-active-job-disable-live-negative.yml"
       - "scripts/z2like-demo-active-job-disable-live-acceptance.py"
       - "software/python/tests/test_z2like_demo_active_job_disable_live_contract.py"
-      - "docs/deployment/z2like-demo-active-job-disable-live-negative.md"
+      - "handover/H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
   push:
     branches:
       - main
@@ -22,7 +22,7 @@ on:
       - "software/python/plasma_web/shared_image_mock_provider.py"
       - "software/python/plasma_web/mock_runtime_settings.py"
       - "software/python/tests/test_z2like_demo_active_job_disable_live_contract.py"
-      - "docs/deployment/z2like-demo-active-job-disable-live-negative.md"
+      - "handover/H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
   workflow_dispatch: {}
 
 permissions:
