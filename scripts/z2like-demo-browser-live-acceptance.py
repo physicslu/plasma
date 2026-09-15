@@ -557,19 +557,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     ):
         raise AcceptanceError(f"verified pairing state is not device-bound: {paired_state!r}")
 
-    # Capability and origin negative gates are exercised while commissioned so
-    # any unexpected admission remains bounded by Manager's maintenance gate.
+    # Capability and origin negative gates are state-preserving. The target is
+    # already commissioned, so even an unexpected authorization success cannot
+    # disable the live target before cleanup protection is active.
     status, blocked, _ = anonymous.request(
         f"/api/manager/registry/{args.alias}",
         method="PATCH",
-        body={"lifecycle": "disabled"},
+        body={"lifecycle": "commissioned"},
     )
     _expect(status, 403, blocked, "lifecycle PATCH without capability", code="maintenance_authorization_required")
 
     status, blocked, _ = session.request(
         f"/api/manager/registry/{args.alias}",
         method="PATCH",
-        body={"lifecycle": "disabled"},
+        body={"lifecycle": "commissioned"},
         origin="https://cross-origin.invalid",
     )
     _expect(status, 403, blocked, "cross-origin lifecycle mutation", code="maintenance_authorization_required")
@@ -578,7 +579,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     status, blocked, _ = tampered.request(
         f"/api/manager/registry/{args.alias}",
         method="PATCH",
-        body={"lifecycle": "disabled"},
+        body={"lifecycle": "commissioned"},
         cookie=_tampered_cookie(capability),
     )
     _expect(status, 403, blocked, "tampered maintenance capability", code="maintenance_authorization_required")
