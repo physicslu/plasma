@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u3-security-state-admission-gate",
+  "authority": "research_only",
+  "family": "STM32U3",
+  "commercial_series_scope": ["STM32U375", "STM32U385", "STM32U3B5", "STM32U3C5"],
+  "candidate_subfamily_scope": ["STM32U335", "STM32U345", "STM32U356", "STM32U366", "STM32U375", "STM32U385", "STM32U3B5", "STM32U3C5"],
+  "production_exact_icpn_count": 1862,
+  "evidence_accessed_at": "2026-09-15",
+  "manufacturer_sources": [
+    {
+      "id": "st-rm0487",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/resource/en/reference_manual/rm0487-stm32u3-series-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "observations": [
+        "STM32U3 lifecycle security uses RDP levels 0, 0.5, 1, and 2",
+        "RDP level 0.5 applies only when TrustZone security is activated",
+        "debug availability depends on RDP level and secure versus nonsecure execution context",
+        "RDP level 2 closes normal debug access but may regress to RDP level 1 when the OEM2 unlocking mechanism was provisioned and activated"
+      ]
+    },
+    {
+      "id": "st-wiki-rdp-for-stm32u3",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/Security%3ARDP_for_STM32U3",
+      "observations": [
+        "OEM1LOCK controls whether RDP level 1 to level 0 regression requires the OEM1 unlock sequence",
+        "OEM2LOCK affects RDP level 1 to level 0.5 regression and can authorize RDP level 2 to level 1 regression",
+        "without the OEM2 unlocking mechanism, RDP level 2 to level 1 regression is not granted",
+        "once an OEM-key transition mechanism is configured it cannot be treated as freely removable"
+      ]
+    },
+    {
+      "id": "st-stm32u3-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u3-series/documentation.html",
+      "observations": ["ST lists RM0487 as the STM32U3 reference manual authority"]
+    }
+  ],
+  "dimensions": {
+    "trustzone": ["disabled", "enabled"],
+    "rdp": ["0", "0.5", "1", "2"],
+    "execution_state": ["not_applicable", "secure", "nonsecure", "unknown"],
+    "debug_access": ["open", "execution_state_conditioned", "requires_runtime_validation", "none", "unknown"],
+    "oem1_key_state": ["unprovisioned", "provisioned", "unknown"],
+    "oem1_lock_state": ["unset", "set", "unknown"],
+    "oem2_key_state": ["unprovisioned", "provisioned", "unknown"],
+    "oem2_lock_state": ["unset", "set", "unknown"]
+  },
+  "oem_state_policy": {
+    "orthogonal_to_lifecycle_state": true,
+    "key_material_must_never_be_stored": true,
+    "key_material_must_never_be_logged": true,
+    "lock_and_provisioning_state_must_be_observed_before_regression_decision": true,
+    "unknown_oem_state_is_deny": true,
+    "self_attested_oem_state_is_sufficient": false,
+    "oem_unlock_execution_authorized": false,
+    "oem_key_provisioning_authorized": false
+  },
+  "states": [
+    {"id": "TZ0_RDP0", "trustzone": "disabled", "rdp": "0", "execution_state": "not_applicable", "debug_access": "open", "unconditionally_terminal": false},
+    {"id": "TZ0_RDP1", "trustzone": "disabled", "rdp": "1", "execution_state": "not_applicable", "debug_access": "requires_runtime_validation", "unconditionally_terminal": false},
+    {"id": "TZ0_RDP2", "trustzone": "disabled", "rdp": "2", "execution_state": "not_applicable", "debug_access": "none", "unconditionally_terminal": false, "conditional_exit": "RDP2_to_RDP1_requires_verified_OEM2_unlock_mechanism"},
+    {"id": "TZ1_RDP0", "trustzone": "enabled", "rdp": "0", "execution_state": "unknown", "debug_access": "open", "unconditionally_terminal": false},
+    {"id": "TZ1_RDP0_5", "trustzone": "enabled", "rdp": "0.5", "execution_state": "unknown", "debug_access": "execution_state_conditioned", "unconditionally_terminal": false},
+    {"id": "TZ1_RDP1", "trustzone": "enabled", "rdp": "1", "execution_state": "unknown", "debug_access": "execution_state_conditioned", "unconditionally_terminal": false},
+    {"id": "TZ1_RDP2", "trustzone": "enabled", "rdp": "2", "execution_state": "unknown", "debug_access": "none", "unconditionally_terminal": false, "conditional_exit": "RDP2_to_RDP1_requires_verified_OEM2_unlock_mechanism"}
+  ],
+  "lifecycle_transition_rules": [
+    {
+      "id": "enable_trustzone",
+      "from": ["TZ0_RDP0"],
+      "to": ["TZ1_RDP0"],
+      "requires": ["RDP level 0", "TZEN security-state mutation"],
+      "destructive_class": "security_configuration_mutation",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "raise_to_rdp1",
+      "from": ["TZ0_RDP0", "TZ1_RDP0", "TZ1_RDP0_5"],
+      "to": ["TZ0_RDP1", "TZ1_RDP1"],
+      "requires": ["RDP security-state mutation"],
+      "destructive_class": "security_configuration_mutation",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "rdp1_to_rdp0",
+      "from": ["TZ0_RDP1", "TZ1_RDP1"],
+      "to": ["TZ0_RDP0", "TZ1_RDP0"],
+      "requires": ["RDP regression", "observed OEM1KEY/OEM1LOCK state", "OEM1 unlock sequence when required by observed state"],
+      "destructive_class": "treat_as_mass_erase_until_hil_validated",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "trustzone_rdp1_to_rdp0_5",
+      "from": ["TZ1_RDP1"],
+      "to": ["TZ1_RDP0_5"],
+      "requires": ["TrustZone enabled", "RDP regression", "observed OEM2KEY/OEM2LOCK state", "OEM2 authorization semantics validated for the observed state"],
+      "destructive_class": "treat_as_mass_erase_until_hil_validated",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "enter_rdp2",
+      "from": ["TZ0_RDP0", "TZ0_RDP1", "TZ1_RDP0", "TZ1_RDP0_5", "TZ1_RDP1"],
+      "to": ["TZ0_RDP2", "TZ1_RDP2"],
+      "requires": ["RDP security-state mutation"],
+      "destructive_class": "security_configuration_mutation",
+      "unconditionally_irreversible": false,
+      "conditional_regression_requires_oem2": true,
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "rdp2_to_rdp1_with_oem2",
+      "from": ["TZ0_RDP2", "TZ1_RDP2"],
+      "to": ["TZ0_RDP1", "TZ1_RDP1"],
+      "requires": ["observed OEM2KEY/OEM2LOCK provisioning state", "OEM2 unlocking mechanism provisioned and activated", "successful OEM2 authentication", "RDP regression semantics validated"],
+      "destructive_class": "treat_as_mass_erase_until_hil_validated",
+      "conditional": true,
+      "plasma_policy": "blocked"
+    }
+  ],
+  "oem_configuration_rules": [
+    {
+      "id": "configure_oem1_transition_mechanism",
+      "attribute": "OEM1KEY/OEM1LOCK",
+      "from": "unprovisioned_or_unknown",
+      "to": "provisioned_transition_mechanism",
+      "reversible": false,
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "configure_oem2_transition_mechanism",
+      "attribute": "OEM2KEY/OEM2LOCK",
+      "from": "unprovisioned_or_unknown",
+      "to": "provisioned_transition_mechanism",
+      "reversible": false,
+      "plasma_policy": "blocked"
+    }
+  ],
+  "unresolved_security_semantics": [
+    "exact TrustZone deactivation transition semantics are not admitted by this gate",
+    "exact destructive effects of each OEM-authenticated RDP regression require HIL validation",
+    "runtime debug behavior by execution context requires observer/debug validation"
+  ],
+  "operation_policy": {
+    "catalog_identity_visibility": "research_only_allowed",
+    "read_security_state": "blocked_pending_runtime_observer_contract",
+    "debug_attach": "blocked_pending_state_aware_runtime_enforcement",
+    "flash_read": "blocked_pending_state_aware_runtime_enforcement",
+    "flash_program": "blocked_pending_programming_algorithm_and_state_validation",
+    "flash_verify": "blocked_pending_programming_algorithm_and_state_validation",
+    "flash_erase": "blocked_pending_programming_algorithm_and_state_validation",
+    "option_byte_write": "blocked",
+    "tzen_change": "blocked",
+    "rdp_change": "blocked",
+    "rdp_regression": "blocked",
+    "oem1_key_provision": "blocked",
+    "oem2_key_provision": "blocked",
+    "oem_unlock_execute": "blocked",
+    "mass_erase": "blocked",
+    "enter_rdp2": "blocked"
+  },
+  "admission_result": {
+    "security_state_admission_model_complete": true,
+    "all_security_transition_semantics_validated": false,
+    "destructive_transition_policy_fail_closed": true,
+    "rdp2_conditional_regression_boundary_modeled": true,
+    "rdp2_unconditionally_terminal": false,
+    "oem_transition_dependency_modeled": true,
+    "unknown_oem_state_fail_closed": true,
+    "execution_state_dependency_modeled": true,
+    "canonical_identity_plan_remains_valid": true,
+    "production_manifest_admission_authorized": false,
+    "runtime_programming_authorized": false,
+    "security_mutation_authorized": false,
+    "oem_key_operation_authorized": false,
+    "hil_required_before_runtime_enablement": true
+  },
+  "next_research_gate": "stm32u3-runtime-enforcement-admission-gate"
+}
