@@ -1,17 +1,14 @@
 # H021 — z2like-demo Browser Runtime Deployment Management Path
 
 **Date:** 2026-09-14  
+**Updated:** 2026-09-15  
 **Project:** Plasma  
 **Scope:** Render Control Station -> controlled QEMU Bootstrap management path  
-**Status:** Implementation candidate; requires CI and live SWPC/Render acceptance before qualification
+**Status:** Implementation merged in PR #560; live SWPC/Render qualification still pending
 
-## What changed
+## Implemented path
 
-The existing browser Runtime Deployment UI and Manager Bootstrap API already
-existed. The missing production path was transport/lifecycle composition for the
-Render-hosted `z2like-demo` profile.
-
-This change adds:
+PR #560 merged the controlled Browser Runtime Deployment path:
 
 ```text
 Browser
@@ -39,9 +36,8 @@ The qualified Programming path remains independently mapped to QEMU `:18080`.
   Bootstrap authenticates the bearer first and then returns the exact
   side-effect-free validation rejection. Wrong bearer, unavailable control, an
   unexpected success, or any other response fails closed and creates no Manager
-  credential state. This negative challenge is contract-tested; a dedicated
-  read-only authentication probe remains a future protocol cleanup, not a reason
-  to weaken admission now.
+  credential state. A dedicated read-only authentication probe remains protocol
+  cleanup debt; it is not part of the current merged contract.
 - Successful verified pairing issues a short-lived browser maintenance
   capability. The capability is an alias-bound HMAC-SHA256 token carried only in
   an `HttpOnly; Secure; SameSite=Strict` cookie scoped to `/api/manager`.
@@ -76,35 +72,68 @@ Runtime returns runtime_active               observed evidence
 disabled -> commissioned                     capability + trusted enable gate
 ```
 
-## Acceptance still required
+## Post-merge live gate
 
-Do not call Browser Runtime Deployment qualified merely because CI passes.
-After merge/deploy, live acceptance must prove:
+The follow-up live-acceptance transaction adds:
+
+- `scripts/z2like-demo-browser-live-acceptance.py`
+- `.github/workflows/z2like-demo-browser-live-acceptance.yml`
+
+The workflow is intentionally split:
+
+- Pull requests run source/contract validation only.
+- Live mutation is permitted only for `physicslu/plasma`, `refs/heads/main`, on
+  the trusted `[self-hosted, linux, x64, plasma-integration]` SWPC runner.
+- The public Render deployment must be the triggering `main` commit or a later
+  descendant before Browser acceptance starts.
+- The canonical ARMv7 Z2 PS kit is built from the accepted source commit before
+  pairing, so the 15-minute Browser maintenance capability is not consumed by
+  the build stage.
+- Failure cleanup may return a disabled target to `commissioned` only through the
+  normal Manager gate. There is no force-commission fallback.
+- Device pairing tokens and browser maintenance capability values are never
+  written to the acceptance report.
+
+### Automated live coverage in this gate
 
 ```text
-GET Browser Bootstrap status                       -> PASS
+GET Browser Bootstrap status                       -> required
 wrong Bootstrap pairing token                      -> BLOCKED, no credential state
-correct Bootstrap pairing while commissioned       -> PASS
-verified pairing returns maintenance capability    -> PASS
+correct Bootstrap pairing while commissioned       -> required
+verified pairing returns maintenance capability    -> required
 lifecycle PATCH without capability                 -> BLOCKED
 cross-origin lifecycle/Bootstrap mutation          -> BLOCKED
+tampered capability                                -> BLOCKED
 commissioned Bootstrap upload/deploy mutation      -> BLOCKED
-commissioned -> disabled with active Site Job      -> BLOCKED
-commissioned -> disabled when idle                 -> PASS
-stale/non-idle maintenance proof                   -> BLOCKED
-bounded upload through Manager                     -> PASS
-Runtime deployment through Bootstrap               -> PASS
-Runtime returns runtime_active                      -> PASS
-disabled -> commissioned                           -> PASS
-expired/tampered capability                        -> BLOCKED
-8-Site Programming regression                      -> PASS
+commissioned -> disabled when idle                 -> required
+bounded upload through Manager                     -> required
+Runtime deployment through Bootstrap               -> required
+Runtime returns runtime_active                      -> required
+disabled -> commissioned                           -> required
+8-Site Programming regression before/after         -> required
 unknown Bootstrap route                            -> BLOCKED
 wrong Bootstrap method                             -> BLOCKED
+SWPC local Bootstrap allowlist projection           -> required
 ```
+
+### Still not live-qualified by this gate
+
+These cases remain explicit qualification debt and must not be inferred from a
+PASS of the automated live gate:
+
+```text
+commissioned -> disabled with active Site Job      -> live evidence still required
+forced stale/non-idle maintenance proof            -> live evidence still required
+15-minute capability expiry wall-clock rejection   -> live evidence still required
+```
+
+Their software contracts are regression-tested, but H021 is not fully closed
+until these remaining live-negative cases are either exercised safely or split
+into a separately approved qualification gate.
 
 ## Qualification boundary
 
 > **Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED.**
 
-This implementation makes no claim for PL/FPGA behavior, target power, real IC
-programming, or physical multi-Site concurrency.
+This implementation and live gate make no claim for PL/FPGA behavior, target
+power, real IC programming, or physical multi-Site concurrency.
