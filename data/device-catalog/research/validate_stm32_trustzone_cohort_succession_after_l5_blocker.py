@@ -50,9 +50,9 @@ def validate(decision: dict, gate1: dict, blocker: dict) -> None:
     _require(blocker_info.get("type") == "external_hardware_acquisition_required", "L5 blocker type drifted")
     _require(blocker.get("next_action") == "external_stm32l5_fixture_acquisition_and_provenance_submission", "L5 external next action drifted")
     _require(blocker.get("next_research_gate") is None, "L5 software-only chain no longer stops at blocker")
-    result = blocker.get("acquisition_result")
-    _require(isinstance(result, dict), "L5 acquisition result missing")
-    _require(result.get("physical_acquisition_present") is False, "L5 physical acquisition unexpectedly present")
+    result = blocker.get("admission_result")
+    _require(isinstance(result, dict), "L5 admission result missing")
+    _require(result.get("verified_physical_acquisition_present") is False, "L5 physical acquisition unexpectedly present")
     _require(result.get("hil_execution_ready") is False, "L5 HIL unexpectedly ready")
     _require(blocker.get("exact_icpn_count") == 1862, "L5 blocker ICPN count drifted")
 
