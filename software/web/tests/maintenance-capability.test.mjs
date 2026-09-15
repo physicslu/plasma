@@ -9,12 +9,13 @@ import {
 } from "../app/api/manager/maintenance-capability.mjs";
 
 const ORIGIN = "https://plasma-control-station-lab.example";
+const INTERNAL_ORIGIN = "https://plasma-control-station-lab.onrender.com";
 const ALIAS = "z2like-qemu";
 const SECRET = "test-maintenance-capability-secret-0123456789abcdef";
 const NOW = 1_800_000_000_000;
 
 function request(cookie, origin = ORIGIN) {
-  return new Request(`${ORIGIN}/api/manager/registry/${ALIAS}`, {
+  return new Request(`${INTERNAL_ORIGIN}/api/manager/registry/${ALIAS}`, {
     method: "PATCH",
     headers: {
       Origin: origin,
@@ -30,8 +31,10 @@ function cookieHeader(setCookie) {
 function withFixedPolicy(run) {
   const previousPolicy = process.env.PLASMA_MANAGER_REGISTRY_POLICY;
   const previousSecret = process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+  const previousOrigin = process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
   process.env.PLASMA_MANAGER_REGISTRY_POLICY = "fixed-lifecycle";
   process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = SECRET;
+  process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = ORIGIN;
   try {
     return run();
   } finally {
@@ -39,11 +42,14 @@ function withFixedPolicy(run) {
     else process.env.PLASMA_MANAGER_REGISTRY_POLICY = previousPolicy;
     if (previousSecret === undefined) delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
     else process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = previousSecret;
+    if (previousOrigin === undefined) delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+    else process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = previousOrigin;
   }
 }
 
-test("fixed lifecycle capability is short-lived, secure and alias-bound", () => withFixedPolicy(() => {
+test("fixed lifecycle capability is short-lived, secure, alias-bound and proxy-safe", () => withFixedPolicy(() => {
   assert.equal(maintenanceCapabilityConfigured(), true);
+  assert.equal(maintenanceCapabilityContract.publicOriginEnv, "PLASMA_CONTROL_STATION_PUBLIC_ORIGIN");
   const setCookie = issueMaintenanceCapabilityCookie(ALIAS, NOW);
   assert.ok(setCookie);
   assert.match(setCookie, /HttpOnly/);
@@ -80,7 +86,9 @@ test("tampered capability fails closed", () => withFixedPolicy(() => {
 test("fixed lifecycle policy fails closed when signing secret is missing", () => {
   const previousPolicy = process.env.PLASMA_MANAGER_REGISTRY_POLICY;
   const previousSecret = process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+  const previousOrigin = process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
   process.env.PLASMA_MANAGER_REGISTRY_POLICY = "fixed-lifecycle";
+  process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = ORIGIN;
   delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
   try {
     assert.throws(() => maintenanceCapabilityConfigured(), /MAINTENANCE_CAPABILITY_SECRET/);
@@ -90,14 +98,41 @@ test("fixed lifecycle policy fails closed when signing secret is missing", () =>
     else process.env.PLASMA_MANAGER_REGISTRY_POLICY = previousPolicy;
     if (previousSecret === undefined) delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
     else process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = previousSecret;
+    if (previousOrigin === undefined) delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+    else process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = previousOrigin;
+  }
+});
+
+test("fixed lifecycle policy fails closed when canonical public origin is missing or malformed", () => {
+  const previousPolicy = process.env.PLASMA_MANAGER_REGISTRY_POLICY;
+  const previousSecret = process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+  const previousOrigin = process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+  process.env.PLASMA_MANAGER_REGISTRY_POLICY = "fixed-lifecycle";
+  process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = SECRET;
+  try {
+    delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+    assert.throws(() => maintenanceCapabilityConfigured(), /PUBLIC_ORIGIN/);
+    process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = "http://plasma-control-station-lab.example";
+    assert.throws(() => maintenanceCapabilityConfigured(), /origin-only HTTPS URL/);
+    process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = `${ORIGIN}/path`;
+    assert.throws(() => maintenanceCapabilityConfigured(), /origin-only HTTPS URL/);
+  } finally {
+    if (previousPolicy === undefined) delete process.env.PLASMA_MANAGER_REGISTRY_POLICY;
+    else process.env.PLASMA_MANAGER_REGISTRY_POLICY = previousPolicy;
+    if (previousSecret === undefined) delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+    else process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = previousSecret;
+    if (previousOrigin === undefined) delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+    else process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = previousOrigin;
   }
 });
 
 test("mutable non-public registry policy does not require browser capability", () => {
   const previousPolicy = process.env.PLASMA_MANAGER_REGISTRY_POLICY;
   const previousSecret = process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+  const previousOrigin = process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
   process.env.PLASMA_MANAGER_REGISTRY_POLICY = "mutable";
   delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
+  delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
   try {
     assert.equal(hasMaintenanceCapability(request(null, "https://attacker.example"), ALIAS, NOW), true);
   } finally {
@@ -105,5 +140,7 @@ test("mutable non-public registry policy does not require browser capability", (
     else process.env.PLASMA_MANAGER_REGISTRY_POLICY = previousPolicy;
     if (previousSecret === undefined) delete process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET;
     else process.env.PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET = previousSecret;
+    if (previousOrigin === undefined) delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
+    else process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = previousOrigin;
   }
 });
