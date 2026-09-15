@@ -19,12 +19,14 @@ def test_swpc_managed_ingress_projects_only_allowlisted_qemu_bootstrap_routes() 
     for route in (
         "location = $bootstrap_prefix/v1/status {",
         "location = $bootstrap_prefix/v1/uploads {",
-        "location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/chunks$ {",
-        "location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/commit$ {",
+        'location ~ "^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/chunks$" {',
+        'location ~ "^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/commit$" {',
         "location = $bootstrap_prefix/v1/deployments {",
     ):
         assert route in source
 
+    assert "location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/chunks$ {" not in source
+    assert "location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/commit$ {" not in source
     assert "fixed prefix/method allowlist only" in source
     assert "arbitrary Bootstrap /v1/* paths" in source
     assert "direct public access to QEMU/SWPC :18081" in source
