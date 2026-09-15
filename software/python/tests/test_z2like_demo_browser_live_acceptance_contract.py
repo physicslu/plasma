@@ -12,6 +12,7 @@ HANDOVER = ROOT / "handover" / "H021-z2like-demo-browser-runtime-deployment-plan
 def test_live_gate_is_post_merge_swpc_only() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "github.event_name != 'pull_request'" in workflow
+    assert "github.repository == 'physicslu/plasma'" in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in workflow
     assert "persist-credentials: false" in workflow
@@ -32,6 +33,17 @@ def test_live_gate_keeps_pairing_secret_and_capability_out_of_evidence() -> None
     assert '"pairing_token"' not in source
 
 
+def test_negative_lifecycle_authorization_probes_are_state_preserving() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    negative_region = source[
+        source.index("lifecycle PATCH without capability") - 300:
+        source.index("bootstrap_root =", source.index("lifecycle PATCH without capability"))
+    ]
+    assert negative_region.count('body={"lifecycle": "commissioned"}') == 3
+    assert 'body={"lifecycle": "disabled"}' not in negative_region
+    assert '_set_lifecycle(session, args.alias, "disabled", timeout_s=30.0)' in source
+
+
 def test_live_gate_preserves_fail_closed_qualification_boundary() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     handover = HANDOVER.read_text(encoding="utf-8")
@@ -45,6 +57,7 @@ def test_live_gate_preserves_fail_closed_qualification_boundary() -> None:
     ):
         assert boundary in source
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in handover
+    assert "H021 is not fully closed" in handover
 
 
 def test_live_gate_covers_public_and_local_bootstrap_boundaries() -> None:
@@ -56,3 +69,4 @@ def test_live_gate_covers_public_and_local_bootstrap_boundaries() -> None:
     assert "wrong Browser Bootstrap method" in source
     assert "/api/manager/ppu/api/engineering/targets" in source
     assert "EXPECTED_SITE_COUNT = 8" in source
+    assert "172.30.77.2:18081" not in source
