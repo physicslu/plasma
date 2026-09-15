@@ -168,6 +168,8 @@ export PLASMA_CONTROL_STATION_MODE="managed"
 export PLASMA_MANAGER_API_URL="http://127.0.0.1:${manager_port}"
 export PLASMA_MANAGER_PPU_ALIAS="${ppu_alias}"
 export PLASMA_MANAGER_REGISTRY_POLICY="fixed-lifecycle"
+export PLASMA_DEPLOYMENT_IDENTITY_ENABLED="1"
+export PLASMA_DEPLOYMENT_IDENTITY_SERVICE="plasma-control-station-lab"
 
 printf '[render-control-station] Starting Control Station Console/BFF on 0.0.0.0:%s\n' "${public_port}"
 cd "${console_root}"

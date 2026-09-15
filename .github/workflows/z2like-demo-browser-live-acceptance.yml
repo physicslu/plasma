@@ -72,11 +72,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker inspect plasma-z2like-demo-qemu >/dev/null
-          curl --noproxy '*' --fail --silent --show-error --max-time 5 \
-            http://127.0.0.1:18082/__plasma/bootstrap/v1/status >/dev/null
-          curl --fail --silent --show-error --max-time 15 \
-            https://z2like-demo.open4th.com/deployment.json >/dev/null
+          if ! docker inspect plasma-z2like-demo-qemu >/dev/null; then
+            echo "::error::QEMU target container plasma-z2like-demo-qemu is unavailable"
+            exit 1
+          fi
+          if ! curl --noproxy '*' --fail --silent --show-error --max-time 5 \
+            http://127.0.0.1:18082/__plasma/bootstrap/v1/status >/dev/null; then
+            echo "::error::SWPC managed Bootstrap status probe failed at 127.0.0.1:18082"
+            exit 1
+          fi
+          if ! curl --fail --silent --show-error --max-time 15 \
+            https://z2like-demo.open4th.com/deployment.json >/dev/null; then
+            echo "::error::Public z2like-demo deployment identity probe failed"
+            exit 1
+          fi
 
       - name: Set up repository validation dependencies
         shell: bash
