@@ -36,7 +36,7 @@ def validate_upstream() -> None:
     runtime = build_runtime_gate_result()
     _require(security["security_state_model_complete"] is True, "security-state model not complete")
     _require(security["runtime_programming_authorized"] is False, "upstream security gate opened runtime programming")
-    _require(runtime["runtime_enforcement_contract_defined"] is True, "runtime enforcement contract missing")
+    _require(runtime["default_deny_enforced"] is True, "runtime default-deny enforcement missing")
     _require(runtime["target_touching_operation_authorized"] is False, "upstream runtime gate opened target access")
     _require(runtime["production_manifest_admission_authorized"] is False, "upstream runtime gate opened Production")
 
