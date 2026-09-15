@@ -12,6 +12,7 @@ on:
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
+      - "scripts/z2like-demo-nginx-ephemeral.py"
       - "scripts/ppu-bootstrap*.py"
       - "scripts/ppu-z2-installer*.py"
       - "scripts/ppu-runtime.py"
@@ -31,6 +32,7 @@ on:
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
+      - "scripts/z2like-demo-nginx-ephemeral.py"
       - "scripts/ppu-bootstrap*.py"
       - "scripts/ppu-z2-installer*.py"
       - "scripts/ppu-runtime.py"
@@ -73,7 +75,8 @@ jobs:
             scripts/z2like-demo-qemu-installer.py \
             scripts/z2like-demo-qemu-e2e.py \
             scripts/z2like-demo-qemu-build-kit.py \
-            scripts/z2like-demo-qemu-deploy.py
+            scripts/z2like-demo-qemu-deploy.py \
+            scripts/z2like-demo-nginx-ephemeral.py
           bash -n scripts/plasmactl
           bash -n scripts/plasmactl-z2like-demo
           bash -n scripts/plasmactl-z2like-demo-managed-ingress
@@ -85,6 +88,14 @@ jobs:
             software/python/tests/test_z2like_demo_qemu_contract.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
+
+      - name: Install disposable Nginx parser/runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y nginx
+
+      - name: Run ephemeral Nginx integration gate
+        run: python scripts/z2like-demo-nginx-ephemeral.py
 
       - name: Run documentation integrity
         run: python scripts/tests/test-documentation-integrity.py
