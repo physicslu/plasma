@@ -145,7 +145,7 @@ def _build_manager_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
         )
         (app_root / "__main__.py").write_text(
-            "from plasma_manager.server import main\n\nmain()\n",
+            "from plasma_manager.bootstrap_server import main\n\nmain()\n",
             encoding="utf-8",
         )
         zipapp.create_archive(app_root, destination, compressed=True)
@@ -154,10 +154,18 @@ def _build_manager_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]
         raise RuntimePackagingError("Manager zipapp was not created")
     with zipfile.ZipFile(destination, "r") as archive:
         names = set(archive.namelist())
-    required = {"__main__.py", "plasma_manager/server.py", "yaml/__init__.py"}
+        entrypoint = archive.read("__main__.py").decode("utf-8") if "__main__.py" in names else ""
+    required = {
+        "__main__.py",
+        "plasma_manager/server.py",
+        "plasma_manager/bootstrap_server.py",
+        "yaml/__init__.py",
+    }
     missing = sorted(required - names)
     if missing:
         raise RuntimePackagingError(f"Manager zipapp is incomplete: missing {missing}")
+    if "from plasma_manager.bootstrap_server import main" not in entrypoint:
+        raise RuntimePackagingError("Manager zipapp must start through bootstrap_server")
     return pyyaml_version, license_text
 
 
@@ -269,12 +277,21 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     try:
         with zipfile.ZipFile(manager_app, "r") as archive:
             names = set(archive.namelist())
+            entrypoint = archive.read("__main__.py").decode("utf-8") if "__main__.py" in names else ""
     except zipfile.BadZipFile as exc:
         raise RuntimePackagingError("Manager runtime is not a valid Python zipapp") from exc
-    if not {"__main__.py", "plasma_manager/server.py", "yaml/__init__.py"} <= names:
+    required_manager_files = {
+        "__main__.py",
+        "plasma_manager/server.py",
+        "plasma_manager/bootstrap_server.py",
+        "yaml/__init__.py",
+    }
+    if not required_manager_files <= names:
         raise RuntimePackagingError("Manager zipapp is missing required modules")
+    if "from plasma_manager.bootstrap_server import main" not in entrypoint:
+        raise RuntimePackagingError("Manager zipapp entrypoint does not expose Bootstrap routes")
 
-    third_party = _require_mapping(manifest.get("third_party"), "third_party")
+    third_party = _require_mapping(manifest.get("third_party"), "third_party.PyYAML") if False else _require_mapping(manifest.get("third_party"), "third_party")
     pyyaml = _require_mapping(third_party.get("PyYAML"), "third_party.PyYAML")
     license_path = pyyaml.get("license")
     if license_path != "manager/THIRD_PARTY_LICENSES/PyYAML.txt":
