@@ -146,6 +146,8 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
         self.assertIn('PLASMA_MANAGER_BOOTSTRAP_TRANSPORT="managed-gateway-prefix-v1"', script)
         self.assertIn('PLASMA_MANAGER_REGISTRY_POLICY="fixed-lifecycle"', script)
+        self.assertIn('PLASMA_DEPLOYMENT_IDENTITY_ENABLED="1"', script)
+        self.assertIn('PLASMA_DEPLOYMENT_IDENTITY_SERVICE="plasma-control-station-lab"', script)
         self.assertIn('configured_ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-z2like-qemu}"', script)
         self.assertIn('ppu_alias="z2like-qemu"', script)
         self.assertIn("Ignoring deprecated PLASMA_RENDER_PPU_ALIAS", script)
