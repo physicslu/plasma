@@ -98,6 +98,10 @@ The merge of PR #591 triggered Browser Runtime live run `34942047814`; its
 `live-swpc-render-qemu` job completed successfully for commit
 `19e6df408da7f01a5ea0ce777a1bf5f8c2db1ebe`.
 
+PR #595 also produced Browser Runtime live run `34946492407`; the exact merge
+commit `709e7e84876b7d5c8875679a0c68565367692a44` was built, deployed and returned
+`runtime_active` with the configured-Mock 8-Site Programming regression passing.
+
 ### Automated live coverage in this gate
 
 ```text
@@ -140,28 +144,47 @@ It must observe the exact configured-Mock Site Job through Manager before attemp
 The first post-merge execution (`34942047881`) failed safely before any test Job was
 created. The gate attempted to read `/api/mock/runtime` and received HTTP 503
 `MOCK_RUNTIME_UNAVAILABLE`. That endpoint belongs to the mutable Shared-Image Mock
-Runtime; the canonical QEMU Programming path uses `configured_mock`, whose timing is
-owned by the deployed PPU Site configuration. The failed run therefore produced no
-active-job disable evidence and closes no qualification debt.
+Runtime; the canonical QEMU Programming path uses `configured_mock`.
 
-The correction is intentionally structural rather than an SWPC operator workaround:
+PR #595 corrected that provider mismatch and ordered the active-job gate after a
+successful Browser Runtime deployment. Its post-merge Browser Runtime transaction
+passed, but the triggered active-job run `34946702280` still failed before the
+safety probe. The accepted erase Job completed in roughly 25 ms, so Manager never
+published the exact active Job ID. No `commissioned -> disabled` request was made
+while a Job was observed, and the qualification debt therefore remains open.
 
-- the QEMU simulation installer owns a deterministic 10-second configured-Mock erase
-  delay, giving the 2-second Render Manager poller multiple observation windows;
-- only previously Plasma-managed no-delay QEMU configs are admitted for automatic
-  migration; arbitrary operator-edited configs remain untouched;
-- the active-job script no longer reads, writes, enables, or restores
-  `/api/mock/runtime`;
-- the active-job workflow is triggered only after the Browser Runtime live workflow
-  completes successfully on `main`;
-- the exact triggering Browser workflow `head_sha` is checked out and passed as the
-  accepted source commit, preventing the single SWPC runner from testing an older
-  runtime merely because the active-job job happened to acquire the runner first;
-- the test still uses only the normal maintenance capability, performs bounded Job
-  cancellation/idle cleanup, and has no force lifecycle transition.
+The second failure exposed a deeper provenance defect rather than a timing-model
+defect. The long-lived QEMU container had `/sim` bind-mounted from the host checkout
+used when that container was originally created. GitHub Actions checked out the
+accepted commit in a different workspace, and deploying the accepted PPU release did
+not update that persistent `/sim` mount. In addition, `z2like-demo-qemu-kit.py` used
+the QEMU simulation installer adapter from `/sim` instead of from the verified kit.
+Consequently, a new release commit could be deployed while older simulation
+activation logic remained authoritative.
 
-A PASS of this corrected follow-up closes only the active-Site-Job disable rejection
-debt. The following remain explicit live qualification debt:
+The corrected control-plane contract is now:
+
+- before Browser Runtime deployment, the trusted SWPC runner stages the exact
+  checked-out `scripts/` Git tree into a commit-named Docker volume with both the
+  full source commit and `scripts` tree SHA recorded as provenance;
+- only the QEMU simulation container is replaced, and replacement is admitted only
+  when the five canonical durable product/config/bootstrap/runtime/log mounts and
+  private network/IP still match the managed topology;
+- the old container is retained as a rollback candidate until the commit-pinned
+  Bootstrap becomes healthy; no host sudo/root file mutation is introduced;
+- the persistent container receives `/sim` from that read-only commit-pinned volume,
+  not from the transient Actions workspace or a mutable operator checkout;
+- the canonical QEMU demo kit now contains `z2like-demo-qemu-installer.py`, and the
+  kit consumer requires and executes that verified kit-local adapter;
+- the configured-Mock 10-second erase delay remains simulation-only observability
+  and does not constitute Z2/FPGA/IC timing evidence;
+- the active-job script still does not mutate `/api/mock/runtime`, uses only the
+  normal maintenance capability, performs bounded Job cleanup, and has no force
+  lifecycle transition.
+
+A future PASS of the corrected follow-up closes only the active-Site-Job disable
+rejection debt. Until that post-merge live evidence exists, it remains NOT QUALIFIED.
+The following also remain explicit live qualification debt:
 
 - forced stale/non-idle maintenance proof rejection
 - 15-minute capability expiry wall-clock rejection
