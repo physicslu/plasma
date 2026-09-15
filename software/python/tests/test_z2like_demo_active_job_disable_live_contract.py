@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "z2like-demo-active-job-disable-live-acceptance.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-active-job-disable-live-negative.yml"
-DOC = ROOT / "docs" / "deployment" / "z2like-demo-active-job-disable-live-negative.md"
+H021 = ROOT / "handover" / "H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
 
 
 class Z2LikeDemoActiveJobDisableLiveContractTests(unittest.TestCase):
@@ -57,12 +57,18 @@ class Z2LikeDemoActiveJobDisableLiveContractTests(unittest.TestCase):
         self.assertNotIn('"pairing_token":', source)
         self.assertNotIn('"maintenance_capability":', source)
 
-    def test_document_keeps_remaining_qualification_debt_explicit(self) -> None:
-        doc = DOC.read_text(encoding="utf-8")
-        self.assertIn("forced stale/non-idle maintenance proof rejection", doc)
-        self.assertIn("15-minute capability expiry wall-clock rejection", doc)
-        self.assertIn("Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED", doc)
-        self.assertIn("active Site Job", doc)
+    def test_remaining_qualification_debt_stays_explicit(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        handover = H021.read_text(encoding="utf-8")
+        for boundary in (
+            "forced stale/non-idle maintenance proof rejection",
+            "15-minute capability expiry wall-clock rejection",
+            "real PYNQ-Z2 deployment/reboot/rollback",
+        ):
+            self.assertIn(boundary, source)
+            self.assertIn(boundary, handover)
+        self.assertIn("active-Site-Job disable rejection", handover)
+        self.assertIn("Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED", handover)
 
 
 if __name__ == "__main__":
