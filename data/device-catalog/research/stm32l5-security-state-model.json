@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32l5-security-state-admission-gate",
+  "authority": "research_only",
+  "family": "STM32L5",
+  "device_lines": ["STM32L552", "STM32L562"],
+  "evidence_accessed_at": "2026-09-15",
+  "manufacturer_sources": [
+    {
+      "id": "st-rm0438",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/resource/en/reference_manual/rm0438-stm32l5-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "sections": ["4.11.1 Lifecycle management with readout protection (RDP)", "4.12.1 Debug protection with readout protection (RDP)", "6 Embedded flash memory (FLASH)"],
+      "observations": [
+        "TZEN can be enabled only while RDP is level 0",
+        "RDP level 0.5 exists only when TrustZone is enabled",
+        "RDP regression can erase user Flash and secrets",
+        "RDP level 2 closes debug and cannot be regressed",
+        "debug availability depends on RDP level and, when TrustZone is enabled, secure versus non-secure execution state"
+      ]
+    },
+    {
+      "id": "st-trustzone-disable-guidance",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/How_to_disable_TrustZone_in_STM32L5xx_devices_during_development_phase",
+      "observations": [
+        "TrustZone deactivation is performed only through bootloader or debug interface",
+        "TrustZone cannot be disabled from RDP level 2",
+        "with TrustZone enabled at RDP 0.5 or 1, debug/regression availability depends on whether the CPU is in secure or non-secure state"
+      ]
+    },
+    {
+      "id": "st-stm32l5-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l5-series/documentation.html",
+      "observations": ["RM0438 is the STM32L5 reference manual authority"]
+    }
+  ],
+  "dimensions": {
+    "trustzone": ["disabled", "enabled"],
+    "rdp": ["0", "0.5", "1", "2"],
+    "execution_state": ["not_applicable", "secure", "nonsecure", "unknown"],
+    "debug_access": ["open", "nonsecure_only", "nonsecure_conditioned", "none", "unknown"]
+  },
+  "states": [
+    {"id": "TZ0_RDP0", "trustzone": "disabled", "rdp": "0", "execution_state": "not_applicable", "debug_access": "open", "terminal": false},
+    {"id": "TZ0_RDP1", "trustzone": "disabled", "rdp": "1", "execution_state": "not_applicable", "debug_access": "nonsecure_conditioned", "terminal": false},
+    {"id": "TZ0_RDP2", "trustzone": "disabled", "rdp": "2", "execution_state": "not_applicable", "debug_access": "none", "terminal": true},
+    {"id": "TZ1_RDP0", "trustzone": "enabled", "rdp": "0", "execution_state": "unknown", "debug_access": "open", "terminal": false},
+    {"id": "TZ1_RDP0_5", "trustzone": "enabled", "rdp": "0.5", "execution_state": "unknown", "debug_access": "nonsecure_only", "terminal": false},
+    {"id": "TZ1_RDP1", "trustzone": "enabled", "rdp": "1", "execution_state": "unknown", "debug_access": "nonsecure_conditioned", "terminal": false},
+    {"id": "TZ1_RDP2", "trustzone": "enabled", "rdp": "2", "execution_state": "unknown", "debug_access": "none", "terminal": true}
+  ],
+  "transition_rules": [
+    {
+      "id": "enable_trustzone",
+      "from": ["TZ0_RDP0"],
+      "to": ["TZ1_RDP0"],
+      "requires": ["RDP level 0", "TZEN option-byte mutation"],
+      "destructive": false,
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "trustzone_rdp1_to_rdp0_5",
+      "from": ["TZ1_RDP1"],
+      "to": ["TZ1_RDP0_5"],
+      "requires": ["RDP regression", "debug or bootloader path permitted by current execution state"],
+      "destructive": true,
+      "destructive_effect": "non-secure Flash erase plus secret erase per RM0438 lifecycle transition",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "trustzone_regress_to_rdp0",
+      "from": ["TZ1_RDP0_5", "TZ1_RDP1"],
+      "to": ["TZ1_RDP0"],
+      "requires": ["RDP regression", "debug or bootloader path permitted by current execution state"],
+      "destructive": true,
+      "destructive_effect": "Flash erase and secret erase are security-relevant consequences; exact execution path must be verified before any implementation",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "disable_trustzone",
+      "from": ["TZ1_RDP0_5", "TZ1_RDP1"],
+      "to": ["TZ0_RDP0"],
+      "requires": ["TZEN deactivation", "RDP regression to level 0", "debug or bootloader path permitted by current execution state"],
+      "destructive": true,
+      "destructive_effect": "full-device erase/security-state reset risk; treated as mass-erase class until HIL-qualified",
+      "plasma_policy": "blocked"
+    },
+    {
+      "id": "enter_rdp2",
+      "from": ["TZ0_RDP0", "TZ0_RDP1", "TZ1_RDP0", "TZ1_RDP0_5", "TZ1_RDP1"],
+      "to": ["TZ0_RDP2", "TZ1_RDP2"],
+      "requires": ["RDP option-byte mutation"],
+      "destructive": false,
+      "irreversible": true,
+      "plasma_policy": "blocked"
+    }
+  ],
+  "operation_policy": {
+    "catalog_identity_visibility": "research_only_allowed",
+    "read_security_state": "blocked_pending_runtime_enforcement",
+    "debug_attach": "blocked_pending_state_aware_runtime_enforcement",
+    "flash_read": "blocked_pending_state_aware_runtime_enforcement",
+    "flash_program": "blocked_pending_programming_algorithm_and_state_validation",
+    "flash_erase": "blocked_pending_programming_algorithm_and_state_validation",
+    "option_byte_write": "blocked",
+    "tzen_change": "blocked",
+    "rdp_change": "blocked",
+    "rdp_regression": "blocked",
+    "mass_erase": "blocked",
+    "enter_rdp2": "blocked"
+  },
+  "admission_result": {
+    "security_state_model_complete": true,
+    "destructive_transition_policy_fail_closed": true,
+    "rdp2_irreversible_boundary_modeled": true,
+    "execution_state_dependency_modeled": true,
+    "canonical_identity_plan_remains_valid": true,
+    "production_manifest_admission_authorized": false,
+    "runtime_programming_authorized": false,
+    "security_mutation_authorized": false,
+    "hil_required_before_runtime_enablement": true
+  },
+  "next_research_gate": "stm32l5-runtime-enforcement-admission-gate"
+}
