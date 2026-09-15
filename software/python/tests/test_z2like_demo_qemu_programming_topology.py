@@ -68,6 +68,10 @@ def test_default_topology_has_eight_enabled_mock_sites(monkeypatch: pytest.Monke
     assert all(site["enabled"] is True for site in payload["sites"])
     assert all(site["interface"] == "mock" for site in payload["sites"])
     assert all(site["mock"]["flash_size"] == 65536 for site in payload["sites"])
+    assert all(
+        site["mock"]["delays"]["erase"] == installer.CONFIGURED_MOCK_ERASE_OBSERVATION_DELAY_S
+        for site in payload["sites"]
+    )
 
 
 def test_site_count_marker_controls_topology_without_hard_coding_runtime_count(tmp_path: Path) -> None:
@@ -87,7 +91,7 @@ def test_site_count_marker_fails_closed_outside_supported_range(tmp_path: Path) 
         _config(installer, tmp_path, site_count="9")
 
 
-def test_managed_topology_set_includes_legacy_empty_and_variable_configs(tmp_path: Path) -> None:
+def test_managed_topology_set_includes_legacy_empty_and_previous_no_delay_configs(tmp_path: Path) -> None:
     installer = _load(INSTALLER, "plasma_z2like_demo_installer_managed_configs")
     state_root = tmp_path / "state"
     log_root = tmp_path / "logs"
@@ -113,10 +117,20 @@ def test_managed_topology_set_includes_legacy_empty_and_variable_configs(tmp_pat
         log_root=log_root,
         site_count=3,
     ).encode("utf-8")
+    previous_three = installer._simulation_config_for_count_without_observable_erase_delay(
+        ppu_id="z2like-qemu-01",
+        facility_id="swpc-simulation",
+        display_name="SWPC QEMU ARMv7 Z2 Simulation",
+        state_root=state_root,
+        log_root=log_root,
+        site_count=3,
+    ).encode("utf-8")
 
     assert legacy in managed
     assert three in managed
-    assert len(managed) == 9
+    assert previous_three in managed
+    assert previous_three != three
+    assert len(managed) == 17
 
 
 def test_target_enables_configured_mock_programming_provider() -> None:

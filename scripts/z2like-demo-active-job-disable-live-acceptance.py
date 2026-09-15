@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """Live-negative acceptance for active-Site-Job disable rejection.
 
-This gate is intentionally narrower than the main Browser Runtime deployment
-acceptance. It proves that the public Manager refuses commissioned -> disabled
+This gate proves that the public Manager refuses ``commissioned -> disabled``
 while a real configured-Mock Site Job is active on the canonical SWPC/QEMU
 z2like-demo target.
 
+The configured-Mock provider is the deployed QEMU Programming provider. It is
+not the legacy mutable Mock Runtime, so this gate never reads or writes
+``/api/mock/runtime``. The QEMU simulation installer owns the deterministic
+bounded erase delay used to make one Job observable across Manager poll cycles.
+
 The gate never reports the Bootstrap pairing token or browser maintenance
-capability. It temporarily lengthens the Mock erase timing, restores the
-previous Mock Runtime settings, cancels the live test Job, and never forces a
-lifecycle transition.
+capability. It cancels the live test Job on exit and never forces a lifecycle
+transition.
 """
 
 from __future__ import annotations
 
 import argparse
-import copy
 import importlib.util
 import json
 import sys
@@ -39,63 +41,6 @@ TERMINAL_JOB_STATES = frozenset(
     {"success", "failed", "cancelled", "timeout", "aborted"}
 )
 TEST_SITE_ID = 1
-LIVE_ERASE_BASE_TIME_MS = 30_000
-
-
-def _editable_mock_runtime(settings: Mapping[str, Any]) -> dict[str, Any]:
-    required = ("enabled", "default_image_size_bytes", "operations", "seed")
-    if not all(key in settings for key in required):
-        raise AcceptanceError("Mock Runtime settings omitted editable fields")
-    editable = {key: copy.deepcopy(settings[key]) for key in required}
-    if not isinstance(editable["operations"], dict):
-        raise AcceptanceError("Mock Runtime operations are malformed")
-    if not isinstance(editable["seed"], dict):
-        raise AcceptanceError("Mock Runtime seed settings are malformed")
-    return editable
-
-
-def _get_mock_runtime(session: BrowserSession) -> dict[str, Any]:
-    status, payload, _ = session.request("/api/manager/ppu/api/mock/runtime")
-    _live._expect(status, 200, payload, "Mock Runtime settings read")
-    settings = payload.get("mock_runtime")
-    if not isinstance(settings, dict):
-        raise AcceptanceError("Mock Runtime settings response omitted mock_runtime")
-    return settings
-
-
-def _set_mock_runtime(
-    session: BrowserSession,
-    editable: Mapping[str, Any],
-    *,
-    operation: str,
-) -> dict[str, Any]:
-    status, payload, _ = session.request(
-        "/api/manager/ppu/api/mock/runtime",
-        method="POST",
-        body=editable,
-    )
-    _live._expect(status, 200, payload, operation)
-    settings = payload.get("mock_runtime")
-    if not isinstance(settings, dict):
-        raise AcceptanceError(f"{operation} response omitted mock_runtime")
-    return settings
-
-
-def _long_erase_profile(settings: Mapping[str, Any]) -> dict[str, Any]:
-    editable = _editable_mock_runtime(settings)
-    if editable.get("enabled") is not True:
-        raise AcceptanceError("active-Job live-negative gate requires enabled Mock Runtime")
-    operations = editable["operations"]
-    erase = operations.get("erase")
-    if not isinstance(erase, dict):
-        raise AcceptanceError("Mock Runtime erase profile is missing")
-    erase["error_rate_per_mille"] = 0
-    erase["base_time_ms"] = LIVE_ERASE_BASE_TIME_MS
-    erase["jitter_ms"] = 0
-    throughput = erase.get("throughput_bytes_per_second")
-    if not isinstance(throughput, int) or throughput <= 0:
-        raise AcceptanceError("Mock Runtime erase throughput is invalid")
-    return editable
 
 
 def _safe_segment(value: str, label: str) -> str:
@@ -108,6 +53,21 @@ def _engineering_root(facility_id: str, ppu_id: str) -> str:
     facility = _safe_segment(facility_id, "facility_id")
     ppu = _safe_segment(ppu_id, "ppu_id")
     return f"/api/manager/ppu/api/engineering/targets/{facility}/{ppu}"
+
+
+def _require_configured_mock_catalog(session: BrowserSession) -> dict[str, Any]:
+    status, payload, _ = session.request("/api/manager/ppu/api/engineering/targets")
+    _live._expect(status, 200, payload, "configured-Mock Programming catalog")
+    if not (
+        payload.get("ok") is True
+        and payload.get("provider") == "configured_mock"
+        and payload.get("ppu_count") == 1
+        and payload.get("site_count") == _live.EXPECTED_SITE_COUNT
+    ):
+        raise AcceptanceError(
+            f"active-Job gate requires the canonical configured_mock 8-Site provider: {payload!r}"
+        )
+    return payload
 
 
 def _start_erase_job(
@@ -124,7 +84,7 @@ def _start_erase_job(
     )
     _live._expect(status, 202, payload, "configured-Mock live erase Job start")
     job = payload.get("job")
-    job_id = job.get("job_id") if isinstance(job, dict) else None
+    job_id = job.get("job_id") if isinstance(job, dict) else payload.get("job_id")
     if not isinstance(job_id, str) or not job_id:
         raise AcceptanceError("configured-Mock live erase Job omitted job_id")
     return job_id
@@ -252,6 +212,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     _, ppu = _live._wait_current_idle(session, args.alias, timeout_s=120.0)
+    _require_configured_mock_catalog(session)
     identity = ppu.get("identity")
     if not isinstance(identity, dict):
         raise AcceptanceError("public fleet omitted PPU identity")
@@ -273,9 +234,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if not session.capability_value():
         raise AcceptanceError("verified pairing did not issue maintenance capability")
 
-    original = _get_mock_runtime(session)
-    original_editable = _editable_mock_runtime(original)
-    test_profile = _long_erase_profile(original)
     job_id: str | None = None
     unexpected_disabled = False
     active_observed_at: str | None = None
@@ -283,14 +241,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     cleanup_errors: list[str] = []
 
     try:
-        applied = _set_mock_runtime(
-            session,
-            test_profile,
-            operation="apply bounded long-running Mock erase profile",
-        )
-        if _editable_mock_runtime(applied) != test_profile:
-            raise AcceptanceError("server-applied Mock Runtime profile does not match live-negative test profile")
-
         job_id = _start_erase_job(
             session,
             facility_id=str(facility_id),
@@ -344,17 +294,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             except AcceptanceError as exc:
                 cleanup_errors.append(f"lifecycle cleanup: {exc}")
 
-        try:
-            restored = _set_mock_runtime(
-                session,
-                original_editable,
-                operation="restore original Mock Runtime profile",
-            )
-            if _editable_mock_runtime(restored) != original_editable:
-                cleanup_errors.append("Mock Runtime restore verification failed")
-        except AcceptanceError as exc:
-            cleanup_errors.append(f"Mock Runtime restore: {exc}")
-
         if cleanup_errors and sys.exc_info()[0] is None:
             raise AcceptanceError("; ".join(cleanup_errors))
         if cleanup_errors and sys.exc_info()[0] is not None:
@@ -370,14 +309,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "public_origin": args.origin,
         "render_deployed_commit": deployed_commit,
         "accepted_source_commit": args.expected_commit,
+        "upstream_browser_workflow_run_id": args.upstream_browser_run_id,
         "ppu_alias": args.alias,
         "ppu_endpoint": args.expected_ppu_endpoint,
+        "programming_provider": "configured_mock",
+        "configured_mock_runtime_mutated": False,
         "test_site_id": TEST_SITE_ID,
         "active_site_job_observed": "PASS",
         "active_site_job_observed_at": active_observed_at,
         "disable_while_active_site_job": "BLOCKED_PPU_BUSY",
         "test_job_terminal_state": terminal_state,
-        "mock_runtime_profile_restored": "PASS",
         "pairing_secret_exposed": False,
         "maintenance_capability_exposed": False,
         "not_live_qualified_by_this_gate": [
@@ -405,6 +346,7 @@ def _parser() -> argparse.ArgumentParser:
         description="Prove z2like-demo rejects disable while an active configured-Mock Site Job exists"
     )
     parser.add_argument("--expected-commit", required=True)
+    parser.add_argument("--upstream-browser-run-id", required=True)
     parser.add_argument("--origin", default="https://z2like-demo.open4th.com")
     parser.add_argument("--expected-ppu-endpoint", default="https://ppu-managed-lab.open4th.com")
     parser.add_argument("--alias", default="z2like-qemu")
@@ -423,6 +365,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    if not args.upstream_browser_run_id.isdigit():
+        print(
+            "z2like-demo-active-job-disable-live-acceptance: upstream browser run id must be numeric",
+            file=sys.stderr,
+        )
+        return 2
     try:
         report = run(args)
     except (AcceptanceError, OSError) as exc:
@@ -430,10 +378,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "result": "FAIL",
             "evidence_level": "live-swpc-render-qemu-active-site-job-negative",
             "accepted_source_commit": args.expected_commit,
+            "upstream_browser_workflow_run_id": args.upstream_browser_run_id,
             "error": str(exc),
             "safety": (
-                "No force lifecycle transition is permitted; Mock Runtime restoration and "
-                "Job cancellation are attempted on every post-pairing exit."
+                "No force lifecycle transition is permitted; configured-Mock runtime settings are not mutated; "
+                "Job cancellation and normal lifecycle cleanup are attempted on every post-pairing exit."
             ),
         }
         _write_report(args.report, report)

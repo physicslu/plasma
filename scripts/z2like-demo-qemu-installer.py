@@ -32,6 +32,10 @@ ACTIVATION_MARKER = "z2like-demo-activation.json"
 SITE_COUNT_MARKER = "z2like-demo-site-count"
 DEFAULT_SIMULATION_SITE_COUNT = 8
 MAX_SIMULATION_SITE_COUNT = 8
+# Simulation-only timing contract. Render Manager polls the QEMU PPU every 2 s;
+# a bounded 10 s erase gives the live safety gate multiple observation windows.
+# This is test observability, not Z2/FPGA/IC performance evidence.
+CONFIGURED_MOCK_ERASE_OBSERVATION_DELAY_S = 10.0
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -170,6 +174,7 @@ def _config_lines(
     log_root: Path,
     site_count: int,
     legacy_empty_sites: bool,
+    erase_delay_s: float | None,
 ) -> list[str]:
     max_concurrent_jobs = 1 if legacy_empty_sites else site_count
     lines = [
@@ -207,6 +212,13 @@ def _config_lines(
                 "      flash_size: 65536",
             ]
         )
+        if erase_delay_s is not None:
+            lines.extend(
+                [
+                    "      delays:",
+                    f"        erase: {erase_delay_s:.1f}",
+                ]
+            )
     lines.append("")
     return lines
 
@@ -229,6 +241,32 @@ def _simulation_config_for_count(
             log_root=log_root,
             site_count=site_count,
             legacy_empty_sites=False,
+            erase_delay_s=CONFIGURED_MOCK_ERASE_OBSERVATION_DELAY_S,
+        )
+    )
+
+
+def _simulation_config_for_count_without_observable_erase_delay(
+    *,
+    ppu_id: str,
+    facility_id: str,
+    display_name: str,
+    state_root: Path,
+    log_root: Path,
+    site_count: int,
+) -> str:
+    """Render the pre-live-negative Plasma-managed config for bounded migration."""
+
+    return "\n".join(
+        _config_lines(
+            ppu_id=ppu_id,
+            facility_id=facility_id,
+            display_name=display_name,
+            state_root=state_root,
+            log_root=log_root,
+            site_count=site_count,
+            legacy_empty_sites=False,
+            erase_delay_s=None,
         )
     )
 
@@ -271,6 +309,7 @@ def _legacy_empty_simulation_config(
             log_root=log_root,
             site_count=DEFAULT_SIMULATION_SITE_COUNT,
             legacy_empty_sites=True,
+            erase_delay_s=None,
         )
     )
 
@@ -293,16 +332,23 @@ def _managed_simulation_configs(
         ).encode("utf-8")
     }
     for site_count in range(1, MAX_SIMULATION_SITE_COUNT + 1):
-        configs.add(
-            _simulation_config_for_count(
-                ppu_id=ppu_id,
-                facility_id=facility_id,
-                display_name=display_name,
-                state_root=state_root,
-                log_root=log_root,
-                site_count=site_count,
-            ).encode("utf-8")
-        )
+        # Accept both the current Plasma-managed config and the immediately
+        # preceding no-delay form. This permits a bounded product-owned migration
+        # without treating arbitrary operator-edited configuration as managed.
+        for renderer in (
+            _simulation_config_for_count,
+            _simulation_config_for_count_without_observable_erase_delay,
+        ):
+            configs.add(
+                renderer(
+                    ppu_id=ppu_id,
+                    facility_id=facility_id,
+                    display_name=display_name,
+                    state_root=state_root,
+                    log_root=log_root,
+                    site_count=site_count,
+                ).encode("utf-8")
+            )
     return configs
 
 
@@ -432,6 +478,7 @@ def install_release(
             "configured_site_count": _simulation_site_count(paths.state_root),
             "managed_topology_reconciliation": True,
             "upgrade_preserves_nonmanaged_config": True,
+            "configured_mock_erase_observation_delay_s": CONFIGURED_MOCK_ERASE_OBSERVATION_DELAY_S,
             "runtime_apply_supported": False,
         },
         "activation": {
