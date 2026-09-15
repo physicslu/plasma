@@ -70,6 +70,14 @@ curl -fsS http://<Z2_LAN_IP>:18081/v1/status
 
 Expected state: `bootstrap.state=bootstrap_ready`, `runtime.state=runtime_absent`, `capabilities.fpga_update=false`.
 
+## HIL artifact provenance
+
+Before touching a physical PYNQ-Z2, manually dispatch both **PPU bootstrap regression** and **Z2 PS release candidate** from the same `main` commit. The Real Z2 qualification record must retain both workflow run IDs, the accepted 40-character source commit, and the downloaded artifact SHA-256 values.
+
+The factory bundle `manifest.json` must report that exact source commit in `git_sha`. The Z2 PS kit must resolve to the same accepted source identity through its release metadata. A factory bundle from one commit and a Runtime kit from another commit are not an admissible HIL input pair even when both workflows are independently green.
+
+This provenance requirement exists so reboot/rollback evidence can be tied to one reproducible software baseline rather than an accidental mixture of CI artifacts.
+
 ## Console first install / upgrade path
 
 Register the PPU in Manager with its future Gateway endpoint on `:18080`. Manager derives the Bootstrap endpoint from the same host on real `z2-ps`; the Browser never selects `gateway_host` and does not receive the stored device token.
