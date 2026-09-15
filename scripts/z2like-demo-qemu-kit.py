@@ -3,8 +3,10 @@
 
 The outer kit format, internal SHA256SUMS, individual PPU/Python sidecars and
 production PPU release are verified. Activation uses the kit-local durable
-``ppu-bootstrap-deployment.py`` plus the kit-local retained installer core, but
-replaces physical-Z2/systemd activation with the explicit QEMU userspace adapter.
+``ppu-bootstrap-deployment.py``, retained installer core, and QEMU simulation
+installer adapter.  The accepted kit therefore pins all deployment logic that
+can mutate the simulated target; a mutable host ``/sim`` checkout is not trusted
+as the installer source.
 
 This script intentionally does NOT install or qualify the kit's Plasma-owned
 Python artifact; the ARMv7 QEMU container interpreter is used instead. That
@@ -121,7 +123,7 @@ def deploy(
         kit_scripts = verified.root / "scripts"
         coordinator = kit_scripts / "ppu-bootstrap-deployment.py"
         installer_core = kit_scripts / "ppu-z2-installer-core.py"
-        installer = SCRIPT_DIR / "z2like-demo-qemu-installer.py"
+        installer = kit_scripts / "z2like-demo-qemu-installer.py"
         for path in (coordinator, installer_core, installer):
             if not path.is_file():
                 raise QEMUSimulationKitError(f"QEMU simulation deployment tooling is incomplete: {path}")
@@ -195,6 +197,7 @@ def deploy(
             "python_artifact_execution": "not_executed_in_qemu-simulation",
             "kit_local_deployment_coordinator": str(coordinator),
             "kit_local_installer_core": str(installer_core),
+            "kit_local_simulation_installer": str(installer),
             "deployment": payload,
             "publisher_authenticity": "not_yet_qualified",
             "fpga_update": False,
