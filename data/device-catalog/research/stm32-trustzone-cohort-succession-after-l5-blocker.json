@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32-trustzone-cohort-succession-after-l5-blocker",
+  "authority": "research_only",
+  "source_gate1": "stm32-trustzone-cohort-gate1-qualification.json",
+  "source_l5_blocker": "stm32l5-hil-fixture-acquisition-provenance.json",
+  "exact_icpn_count": 1862,
+  "original_ranking": [
+    {"rank": 1, "plasma_series": "STM32L5", "subfamily_count": 1, "row_count": 38, "ordering_pattern_rows": 15, "target_config": "tcl/target/stm32l5x.cfg"},
+    {"rank": 2, "plasma_series": "STM32U3", "subfamily_count": 8, "row_count": 171, "ordering_pattern_rows": 75, "target_config": "tcl/target/stm32u3x.cfg"},
+    {"rank": 3, "plasma_series": "STM32U5", "subfamily_count": 12, "row_count": 162, "ordering_pattern_rows": 63, "target_config": "tcl/target/stm32u5x.cfg"}
+  ],
+  "l5_pause": {
+    "series": "STM32L5",
+    "research_status": "software_only_progression_paused_pending_external_hardware",
+    "blocker_type": "external_hardware_acquisition_required",
+    "verified_physical_fixtures": 0,
+    "hil_execution_ready": false,
+    "next_action": "external_stm32l5_fixture_acquisition_and_provenance_submission",
+    "permanent_family_rejection": false,
+    "resume_condition": "externally verifiable STM32L552/STM32L562 fixture acquisition, custody, exact-ICPN identity, and security-state provenance accepted"
+  },
+  "succession_policy": {
+    "preserve_original_ranking": true,
+    "skip_only_candidates_with_explicit_external_blocker": true,
+    "do_not_reclassify_blocked_candidate_as_failed": true,
+    "do_not_infer_production_or_runtime_support_from_selection": true,
+    "selected_series": "STM32U3",
+    "selected_rank": 2,
+    "selection_reason": "first originally ranked TrustZone candidate whose software-only research path is not blocked by the merged STM32L5 external-hardware dependency"
+  },
+  "selected_candidate": {
+    "plasma_series": "STM32U3",
+    "subfamilies": ["STM32U335", "STM32U345", "STM32U356", "STM32U366", "STM32U375", "STM32U385", "STM32U3B5", "STM32U3C5"],
+    "subfamily_count": 8,
+    "row_count": 171,
+    "cmsis_device_name_rows": 96,
+    "ordering_pattern_rows": 75,
+    "target_config": "tcl/target/stm32u3x.cfg",
+    "structural_gate_pass": true,
+    "complete_mapping_metadata": true,
+    "cohort": "trustzone_requires_security_scope"
+  },
+  "claims": {
+    "production_admission": false,
+    "programming_algorithm_equivalence": false,
+    "flash_geometry_validated": false,
+    "trustzone_security_semantics_supported": false,
+    "option_byte_semantics_supported": false,
+    "hil_validated": false,
+    "runtime_programming_supported": false
+  },
+  "next_research_gate": "stm32u3-security-scope-foundation"
+}
