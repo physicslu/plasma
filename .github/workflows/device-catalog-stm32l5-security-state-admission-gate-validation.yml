@@ -1,0 +1,53 @@
+name: STM32L5 security-state admission gate validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32l5-security-state-model.json'
+      - 'data/device-catalog/research/stm32l5_security_state_gate.py'
+      - 'data/device-catalog/research/validate_stm32l5_security_state_admission_gate.py'
+      - 'data/device-catalog/research/device-catalog-stm32l5-security-state-admission-gate.md'
+      - 'data/device-catalog/research/stm32l5-security-scope-foundation.json'
+      - 'data/device-catalog/research/stm32l5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/stm32l5_admission_policy.py'
+      - '.github/workflows/device-catalog-stm32l5-security-state-admission-gate-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32l5-security-state-model.json'
+      - 'data/device-catalog/research/stm32l5_security_state_gate.py'
+      - 'data/device-catalog/research/validate_stm32l5_security_state_admission_gate.py'
+      - 'data/device-catalog/research/device-catalog-stm32l5-security-state-admission-gate.md'
+      - 'data/device-catalog/research/stm32l5-security-scope-foundation.json'
+      - 'data/device-catalog/research/stm32l5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/stm32l5_admission_policy.py'
+      - '.github/workflows/device-catalog-stm32l5-security-state-admission-gate-validation.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate security-state admission gate
+        run: python data/device-catalog/research/validate_stm32l5_security_state_admission_gate.py
+      - name: Enforce zero Production writes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- data/device-catalog/production/)"
+          test -z "$changed" || { echo "Production writes are forbidden in STM32L5 security-state admission gate:"; echo "$changed"; exit 1; }
