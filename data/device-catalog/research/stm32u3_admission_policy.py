@@ -93,6 +93,18 @@ def route_binding_sha(assignments: list[dict[str, str]]) -> str:
     return hashlib.sha256(("\n".join(sorted(lines)) + "\n").encode()).hexdigest()
 
 
+def route_evidence_sha(rows: list[dict[str, str]]) -> str:
+    lines = [
+        "|".join((
+            row["subfamily"], row["part_number"], row["identifier_kind"], row["target_config"],
+            row["openocd_distribution"], row["mapping_status"], row["validation_status"],
+            row["catalog_origin"],
+        ))
+        for row in rows
+    ]
+    return hashlib.sha256(("\n".join(sorted(lines)) + "\n").encode()).hexdigest()
+
+
 def diagnostic_report() -> dict[str, Any]:
     security = load_security_fence()
     if security["research_partition"].get("production_admission_allowed") is not False:
@@ -117,28 +129,15 @@ def diagnostic_report() -> dict[str, Any]:
             "target_config": route["target_config"],
         })
 
-    route_rows = [
-        {
-            "subfamily": row["subfamily"],
-            "part_number": row["part_number"],
-            "identifier_kind": row["identifier_kind"],
-            "target_config": row["target_config"],
-            "openocd_distribution": row["openocd_distribution"],
-            "mapping_status": row["mapping_status"],
-            "validation_status": row["validation_status"],
-            "catalog_origin": row["catalog_origin"],
-        }
-        for row in routes
-    ]
     return {
         "route_rows": len(routes),
         "route_kind_counts": dict(Counter(row["identifier_kind"] for row in routes)),
         "subfamily_counts": dict(sorted(Counter(row["subfamily"] for row in routes).items())),
+        "route_evidence_sha256": route_evidence_sha(routes),
         "unique_assignments": len(assignments),
         "assignment_kind_counts": dict(Counter(row["identifier_kind"] for row in assignments)),
         "route_binding_sha256": route_binding_sha(assignments) if assignments else None,
         "unresolved": unresolved,
-        "route_evidence": route_rows,
     }
 
 
