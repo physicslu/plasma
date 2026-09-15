@@ -123,12 +123,15 @@ jobs:
           platforms: arm
 
       - name: Start legacy-bind QEMU ARMv7 Bootstrap target
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/z2like-demo-qemu.py up
           test "$(docker exec plasma-z2like-demo-qemu uname -m)" = "armv7l" \
             -o "$(docker exec plasma-z2like-demo-qemu uname -m)" = "armv7"
           test -z "$(docker port plasma-z2like-demo-qemu)"
-          test "$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Type}}{{end}}{{end}}' plasma-z2like-demo-qemu)" = "bind"
+          mount_type="$(docker inspect plasma-z2like-demo-qemu | python -c 'import json,sys; x=json.load(sys.stdin)[0]; print(next(m["Type"] for m in x["Mounts"] if m["Destination"]=="/sim"))')"
+          test "$mount_type" = "bind"
 
       - name: Prove bind-to-commit-pinned control-plane migration
         shell: bash
@@ -136,8 +139,10 @@ jobs:
           set -euo pipefail
           sha="$(git rev-parse HEAD)"
           python scripts/z2like-demo-qemu-control-plane.py --expected-commit "$sha"
-          mount_type="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Type}}{{end}}{{end}}' plasma-z2like-demo-qemu)"
-          mount_name="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Name}}{{end}}{{end}}' plasma-z2like-demo-qemu)"
+          read -r mount_type mount_name < <(
+            docker inspect plasma-z2like-demo-qemu | \
+              python -c 'import json,sys; x=json.load(sys.stdin)[0]; m=next(m for m in x["Mounts"] if m["Destination"]=="/sim"); print(m["Type"],m.get("Name",""))'
+          )
           test "$mount_type" = "volume"
           test "$mount_name" = "plasma-z2like-demo-scripts-$sha"
           docker exec plasma-z2like-demo-qemu python3 -c \
