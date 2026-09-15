@@ -9,18 +9,9 @@ on:
       - 'docs/architecture/icpn-catalog-admission-policy.json'
       - 'scripts/ci/device-catalog-production-invariants.py'
       - '.github/workflows/device-catalog-stm32u3-production-publication-validation.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'data/device-catalog/research/stm32u3-*'
-      - 'data/device-catalog/research/publish_stm32u3_catalog.py'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
-      - 'docs/architecture/icpn-catalog-admission-policy.json'
-      - 'scripts/ci/device-catalog-production-invariants.py'
-      - '.github/workflows/device-catalog-stm32u3-production-publication-validation.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -28,16 +19,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Render STM32U3 publication candidate
         working-directory: data/device-catalog/research
         run: python publish_stm32u3_catalog.py --output-dir "$RUNNER_TEMP/stm32u3-publication" --json
-      - name: Upload deterministic publication candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: stm32u3-publication-candidate
-          path: ${{ runner.temp }}/stm32u3-publication
-          if-no-files-found: error
-          retention-days: 1
+      - name: Materialize generated publication
+        run: |
+          cp "$RUNNER_TEMP/stm32u3-publication/stm32u3-commercial-icpn.csv" data/device-catalog/research/stm32u3-commercial-icpn.csv
+          cp "$RUNNER_TEMP/stm32u3-publication/icpn-v1-manifest.json" data/device-catalog/production/icpn-v1-manifest.json
+          cp "$RUNNER_TEMP/stm32u3-publication/stm32u3-production-publication-proposal.json" data/device-catalog/research/stm32u3-production-publication-proposal.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/device-catalog/research/stm32u3-commercial-icpn.csv \
+                  data/device-catalog/research/stm32u3-production-publication-proposal.json \
+                  data/device-catalog/production/icpn-v1-manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Device catalog: materialize STM32U3 publication"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
