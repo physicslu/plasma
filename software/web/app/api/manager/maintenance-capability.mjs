@@ -4,6 +4,7 @@ const CAPABILITY_COOKIE = "plasma-manager-maintenance";
 const CAPABILITY_VERSION = "v1";
 const CAPABILITY_TTL_SECONDS = 15 * 60;
 const CAPABILITY_SECRET_ENV = "PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET";
+const PUBLIC_ORIGIN_ENV = "PLASMA_CONTROL_STATION_PUBLIC_ORIGIN";
 
 function fixedLifecycleRegistry() {
   const policy = (process.env.PLASMA_MANAGER_REGISTRY_POLICY ?? "mutable").trim();
@@ -18,6 +19,31 @@ function capabilitySecret() {
     throw new Error(`${CAPABILITY_SECRET_ENV} must contain at least 32 non-whitespace-surrounded characters`);
   }
   return secret;
+}
+
+function configuredPublicOrigin() {
+  const raw = process.env[PUBLIC_ORIGIN_ENV] ?? "";
+  if (!raw || raw.trim() !== raw) {
+    throw new Error(`${PUBLIC_ORIGIN_ENV} must contain the canonical HTTPS Control Station origin`);
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`${PUBLIC_ORIGIN_ENV} must be a valid absolute HTTPS origin`);
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username ||
+    parsed.password ||
+    parsed.pathname !== "/" ||
+    parsed.search ||
+    parsed.hash ||
+    parsed.origin !== raw
+  ) {
+    throw new Error(`${PUBLIC_ORIGIN_ENV} must be an origin-only HTTPS URL without credentials, path, query, fragment, or trailing slash`);
+  }
+  return parsed.origin;
 }
 
 function signature(alias, expires, nonce) {
@@ -44,7 +70,7 @@ function sameOriginMutation(request) {
   const origin = request.headers.get("Origin");
   if (!origin) return false;
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    return new URL(origin).origin === configuredPublicOrigin();
   } catch {
     return false;
   }
@@ -69,12 +95,14 @@ export function maintenanceCapabilityRequired() {
 export function maintenanceCapabilityConfigured() {
   if (!fixedLifecycleRegistry()) return true;
   capabilitySecret();
+  configuredPublicOrigin();
   return true;
 }
 
 export function maintenanceMutationOriginAllowed(request) {
   if (!fixedLifecycleRegistry()) return true;
   capabilitySecret();
+  configuredPublicOrigin();
   return sameOriginMutation(request);
 }
 
@@ -90,6 +118,7 @@ export function issueMaintenanceCapabilityCookie(alias, nowMs = Date.now()) {
 export function hasMaintenanceCapability(request, alias, nowMs = Date.now()) {
   if (!fixedLifecycleRegistry()) return true;
   capabilitySecret();
+  configuredPublicOrigin();
   if (!sameOriginMutation(request)) return false;
   const token = cookieValue(request);
   if (!token) return false;
@@ -110,4 +139,5 @@ export const maintenanceCapabilityContract = Object.freeze({
   cookie: CAPABILITY_COOKIE,
   ttlSeconds: CAPABILITY_TTL_SECONDS,
   secretEnv: CAPABILITY_SECRET_ENV,
+  publicOriginEnv: PUBLIC_ORIGIN_ENV,
 });
