@@ -37,6 +37,11 @@ def test_swpc_managed_ingress_projects_only_allowlisted_qemu_bootstrap_routes() 
 def test_swpc_ingress_verifies_bootstrap_readiness_and_negative_security_cases() -> None:
     source = INGRESS.read_text(encoding="utf-8")
     assert "verify_bootstrap_ready" in source
+    assert "wait_ingress_json" in source
+    assert 'wait_ingress_json "Gateway readiness"' in source
+    assert 'wait_ingress_json "Bootstrap status"' in source
+    assert "did not converge at" in source
+    assert "sleep 0.25" in source
     assert "$bootstrap_prefix/v1/not-allowlisted" in source
     assert "unexpectedly exposed an unknown Bootstrap path" in source
     assert "did not reject POST Bootstrap status" in source
