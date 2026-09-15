@@ -68,19 +68,6 @@ jobs:
           clean: true
           persist-credentials: false
 
-      - name: Reconcile canonical SWPC managed ingress
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! docker inspect plasma-z2like-demo-qemu >/dev/null; then
-            echo "::error::QEMU target container plasma-z2like-demo-qemu is unavailable"
-            exit 1
-          fi
-          sudo -n env \
-            PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT="http://172.30.77.2:18080" \
-            PLASMA_Z2LIKE_DEMO_BOOTSTRAP_ROOT="http://172.30.77.2:18081" \
-            bash scripts/plasmactl-z2like-demo-managed-ingress install
-
       - name: Preflight canonical SWPC/QEMU target
         shell: bash
         run: |
@@ -91,7 +78,7 @@ jobs:
           fi
           if ! curl --noproxy '*' --fail --silent --show-error --max-time 5 \
             http://127.0.0.1:18082/__plasma/bootstrap/v1/status >/dev/null; then
-            echo "::error::SWPC managed Bootstrap status probe failed at 127.0.0.1:18082"
+            echo "::error::SWPC managed Bootstrap status probe failed at 127.0.0.1:18082. Run ./scripts/plasmactl update z2like-demo as an operator before rerunning this gate."
             exit 1
           fi
           if ! curl --fail --silent --show-error --max-time 15 \
