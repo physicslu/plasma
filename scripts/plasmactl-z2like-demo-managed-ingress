@@ -200,12 +200,12 @@ server {
         limit_except POST { deny all; }
         proxy_pass $qemu_bootstrap_root/v1/uploads;
     }
-    location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/chunks$ {
+    location ~ "^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/chunks$" {
         limit_except POST { deny all; }
         rewrite ^$bootstrap_prefix(/.*)$ \$1 break;
         proxy_pass $qemu_bootstrap_root;
     }
-    location ~ ^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/commit$ {
+    location ~ "^$bootstrap_prefix/v1/uploads/[0-9a-f]{32}/commit$" {
         limit_except POST { deny all; }
         rewrite ^$bootstrap_prefix(/.*)$ \$1 break;
         proxy_pass $qemu_bootstrap_root;
