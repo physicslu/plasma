@@ -19,6 +19,7 @@ on:
       - "scripts/ppu-release.py"
       - "software/python/plasma_manager/**"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
+      - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
       - "software/python/tests/test_render_deployment.py"
@@ -39,6 +40,7 @@ on:
       - "scripts/ppu-release.py"
       - "software/python/plasma_manager/**"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
+      - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
       - "software/python/tests/test_render_deployment.py"
@@ -71,6 +73,7 @@ jobs:
           python -m py_compile \
             scripts/z2like-demo-qemu.py \
             scripts/z2like-demo-qemu-target.py \
+            scripts/z2like-demo-qemu-control-plane.py \
             scripts/z2like-demo-qemu-kit.py \
             scripts/z2like-demo-qemu-installer.py \
             scripts/z2like-demo-qemu-e2e.py \
@@ -86,6 +89,7 @@ jobs:
         run: |
           python -m pytest -q \
             software/python/tests/test_z2like_demo_qemu_contract.py \
+            software/python/tests/test_z2like_demo_qemu_control_plane_contract.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
 
@@ -159,6 +163,7 @@ jobs:
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
+          cp scripts/z2like-demo-qemu-installer.py "$root/scripts/z2like-demo-qemu-installer.py"
           cp "$ppu" "$ppu.sha256" "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
 
@@ -177,7 +182,7 @@ jobs:
 
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
-            "$root/scripts/z2-python-runtime.py"
+            "$root/scripts/z2-python-runtime.py" "$root/scripts/z2like-demo-qemu-installer.py"
           (
             cd "$root"
             find scripts artifacts docs -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
