@@ -1,0 +1,31 @@
+{
+  "canonical_csv_git_blob_sha": "2a29ccb754b5da6332cb40bd992a1261a3b03237",
+  "canonical_csv_sha256": "a329e4146cf083f79f629b6df31db0922d0a611b6cae26dba8ec891f0ae9232f",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "debug_attach_support_claimed": false,
+  "exact_icpn_set_sha256": "f9a74a7badfb39f8fc52753fc3904cd63a8b3e0a2e4dcc37dee759809aaa68b1",
+  "family": "STM32L5",
+  "manufacturer": "STMicroelectronics",
+  "marketing_status_observed": {
+    "Active": 49
+  },
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2017,
+  "production_exact_icpns_before": 1968,
+  "production_family_count_after": 15,
+  "production_family_count_before": 14,
+  "production_manifest_git_blob_sha_after": "09053c0c2feb5587157a1ea5d01dd6a99e29037f",
+  "production_manifest_sha256_after": "f926809fede4e68baed6f0c58d9ca4f0f581f18125b399ae4ec8b0221785f4ef",
+  "production_manifest_sha256_before": "6f77133bffe0fa5fbd5b059d1c89fdfb681a3ad08da09bc8d38f975d0fec7f31",
+  "published_base_devices": 17,
+  "published_exact_icpns": 49,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "transaction": "stm32l5-production-catalog-publication"
+}
