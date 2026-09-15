@@ -1,0 +1,43 @@
+name: STM32U3 Production catalog publication validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32u3-*'
+      - 'data/device-catalog/research/publish_stm32u3_catalog.py'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
+      - '.github/workflows/device-catalog-stm32u3-production-publication-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32u3-*'
+      - 'data/device-catalog/research/publish_stm32u3_catalog.py'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
+      - '.github/workflows/device-catalog-stm32u3-production-publication-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Render STM32U3 publication candidate
+        working-directory: data/device-catalog/research
+        run: python publish_stm32u3_catalog.py --output-dir "$RUNNER_TEMP/stm32u3-publication" --json
+      - name: Upload deterministic publication candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32u3-publication-candidate
+          path: ${{ runner.temp }}/stm32u3-publication
+          if-no-files-found: error
+          retention-days: 1
