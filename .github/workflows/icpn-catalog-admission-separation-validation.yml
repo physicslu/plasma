@@ -1,0 +1,41 @@
+name: ICPN catalog admission separation validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/**'
+      - 'docs/architecture/device-support-validation.md'
+      - 'docs/architecture/ic-selector.md'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'docs/architecture/icpn-catalog-admission-separation.md'
+      - 'scripts/ci/validate-icpn-catalog-admission-separation.py'
+      - '.github/workflows/icpn-catalog-admission-separation-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/**'
+      - 'docs/architecture/device-support-validation.md'
+      - 'docs/architecture/ic-selector.md'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'docs/architecture/icpn-catalog-admission-separation.md'
+      - 'scripts/ci/validate-icpn-catalog-admission-separation.py'
+      - '.github/workflows/icpn-catalog-admission-separation-validation.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate ICPN catalog admission separation invariant
+        run: python scripts/ci/validate-icpn-catalog-admission-separation.py
