@@ -3,11 +3,14 @@ name: STM32U3 canonical admission plan validation
 on:
   pull_request:
     paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
       - 'data/device-catalog/research/stm32u3_admission_policy.py'
       - 'data/device-catalog/research/stm32u3-canonical-admission-plan.json'
-      - 'data/device-catalog/research/stm32u3-admission-route-evidence.csv'
       - 'data/device-catalog/research/validate_stm32u3_canonical_admission_plan.py'
       - 'data/device-catalog/research/device-catalog-stm32u3-canonical-admission-plan.md'
+      - 'data/device-catalog/research/stm32u3_metadata_policy.py'
+      - 'data/device-catalog/research/stm32u3-metadata-policy-baseline.json'
+      - 'data/device-catalog/research/stm32u3-security-scope-foundation.json'
       - '.github/workflows/device-catalog-stm32u3-canonical-admission-plan-validation.yml'
   workflow_dispatch:
 
@@ -22,6 +25,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Probe STM32U3 route surface
+      - name: Validate STM32U3 canonical admission plan
         working-directory: data/device-catalog/research
-        run: python stm32u3_admission_policy.py
+        run: python validate_stm32u3_canonical_admission_plan.py
