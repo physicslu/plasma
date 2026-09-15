@@ -7,7 +7,8 @@ on:
       - "scripts/z2like-demo-browser-live-acceptance.py"
       - "handover/H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - ".github/workflows/z2like-demo-browser-live-acceptance.yml"
       - "scripts/z2like-demo-browser-live-acceptance.py"
@@ -20,11 +21,10 @@ on:
       - "software/python/plasma_manager/verified_bootstrap.py"
       - "software/web/app/api/manager/bootstrap-bff.ts"
       - "software/web/app/api/manager/maintenance-capability.mjs"
-      - "software/web/app/api/manager/registry/route.ts"
-      - "software/web/app/api/manager/registry/[...path]/route.ts"
+      - "software/web/app/api/manager/registry/**"
       - "software/web/app/engineering/ppu-runtime-deployment.tsx"
       - "handover/H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -48,10 +48,7 @@ jobs:
 
   live-swpc-render-qemu:
     needs: contract
-    if: >-
-      github.event_name != 'pull_request' &&
-      github.repository == 'physicslu/plasma' &&
-      github.ref == 'refs/heads/main'
+    if: ${{ github.event_name != 'pull_request' && github.repository == 'physicslu/plasma' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, linux, x64, plasma-integration]
     timeout-minutes: 35
     steps:
