@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32l5-hil-fixture-inventory-binding-gate",
+  "authority": "research_only",
+  "family": "STM32L5",
+  "device_lines": ["STM32L552", "STM32L562"],
+  "upstream_readiness_plan": "stm32l5-hil-observer-debug-readiness.json",
+  "commercial_identity_source": "stm32l5-commercial-identity-discovery.csv",
+  "exact_icpn_count": 1862,
+  "stm32l5_commercial_icpn_count": 49,
+  "inventory_binding_boundary": {
+    "verified_physical_inventory_required": true,
+    "placeholder_or_synthetic_fixture_allowed": false,
+    "self_attested_fixture_without_evidence_allowed": false,
+    "exact_commercial_icpn_required": true,
+    "unique_fixture_identifier_required": true,
+    "preprovisioned_security_state_required": true,
+    "security_state_creation_by_plasma_authorized": false,
+    "security_mutation_by_binding_gate_authorized": false,
+    "rdp2_fixture_must_be_terminal_sacrificial": true,
+    "hil_execution_authorized": false,
+    "runtime_debug_attach_authorized": false,
+    "runtime_programming_authorized": false,
+    "production_manifest_admission_authorized": false
+  },
+  "required_fixture_fields": [
+    "fixture_identifier",
+    "physical_asset_record_ref",
+    "commercial_icpn",
+    "device_line",
+    "fixture_class",
+    "preprovisioned_security_state",
+    "security_state_provenance_ref",
+    "security_state_evidence_digest",
+    "custodian_or_lab_identity",
+    "availability_status",
+    "last_inventory_verified_at_utc"
+  ],
+  "allowed_fixture_classes": [
+    "preprovisioned_recoverable_test_device",
+    "preprovisioned_terminal_sacrificial_device"
+  ],
+  "allowed_availability_status": ["available", "reserved", "unavailable"],
+  "repository_inventory_assessment": {
+    "repository_search_completed": true,
+    "verified_stm32l5_fixture_records_found": 0,
+    "external_inventory_supplied": false,
+    "physical_fixture_claim_permitted_without_evidence": false,
+    "assessment_result": "no_verified_physical_inventory_available"
+  },
+  "fixtures": [],
+  "coverage": {
+    "verified_fixture_count": 0,
+    "device_lines_with_verified_fixture": 0,
+    "security_states_with_verified_fixture": 0,
+    "rdp2_terminal_fixture_count": 0,
+    "hil_test_cells_bound": 0,
+    "hil_test_cells_total": 20
+  },
+  "binding_result": {
+    "fixture_inventory_schema_defined": true,
+    "commercial_identity_scope_validated": true,
+    "repository_inventory_assessment_complete": true,
+    "verified_fixture_inventory_present": false,
+    "fixture_inventory_bound": false,
+    "hil_execution_ready": false,
+    "hil_executed": false,
+    "observer_hil_validated": false,
+    "debug_attach_hil_validated": false,
+    "production_manifest_admission_authorized": false,
+    "runtime_programming_authorized": false
+  },
+  "blocker": {
+    "type": "external_physical_asset_dependency",
+    "description": "No verified STM32L552/STM32L562 physical fixture inventory with security-state provenance exists in the repository or supplied evidence.",
+    "resolution": "Acquire or register real STM32L5 fixtures, capture immutable asset and security-state provenance, then bind them to the 20-cell HIL matrix without creating security states from Plasma."
+  },
+  "next_research_gate": "stm32l5-hil-fixture-acquisition-and-provenance-gate"
+}
