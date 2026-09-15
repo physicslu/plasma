@@ -44,5 +44,7 @@ services:
         sync: false
       - key: PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET
         sync: false
+      - key: PLASMA_CONTROL_STATION_PUBLIC_ORIGIN
+        value: https://z2like-demo.open4th.com
       - key: PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET
         generateValue: true

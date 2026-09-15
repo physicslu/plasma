@@ -31,7 +31,7 @@ def test_public_render_lab_uses_fixed_target_lifecycle_registry() -> None:
     assert "hasMaintenanceCapability(request, alias)" in entry
 
 
-def test_public_render_lab_requires_dedicated_browser_maintenance_secret() -> None:
+def test_public_render_lab_requires_dedicated_browser_maintenance_secret_and_canonical_origin() -> None:
     blueprint = yaml.safe_load(BLUEPRINT.read_text(encoding="utf-8"))
     service = next(item for item in blueprint["services"] if item["name"] == "plasma-control-station-lab")
     env = {item["key"]: item for item in service["envVars"]}
@@ -40,10 +40,18 @@ def test_public_render_lab_requires_dedicated_browser_maintenance_secret() -> No
         "key": "PLASMA_MANAGER_MAINTENANCE_CAPABILITY_SECRET",
         "generateValue": True,
     }
+    public_origin = env["PLASMA_CONTROL_STATION_PUBLIC_ORIGIN"]
+    assert public_origin == {
+        "key": "PLASMA_CONTROL_STATION_PUBLIC_ORIGIN",
+        "value": "https://z2like-demo.open4th.com",
+    }
 
     source = CAPABILITY.read_text(encoding="utf-8")
     assert 'CAPABILITY_COOKIE = "plasma-manager-maintenance"' in source
     assert 'CAPABILITY_TTL_SECONDS = 15 * 60' in source
+    assert 'PUBLIC_ORIGIN_ENV = "PLASMA_CONTROL_STATION_PUBLIC_ORIGIN"' in source
+    assert 'parsed.origin !== raw' in source
+    assert 'new URL(origin).origin === configuredPublicOrigin()' in source
     assert 'createHmac("sha256"' in source
     assert "timingSafeEqual" in source
     assert "HttpOnly; Secure; SameSite=Strict" in source
