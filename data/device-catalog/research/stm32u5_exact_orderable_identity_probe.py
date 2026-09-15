@@ -10,6 +10,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -17,7 +18,7 @@ BASE_CSV = HERE / "stm32u5-base-device-discovery.csv"
 USER_AGENT = "Mozilla/5.0 (compatible; PlasmaDeviceCatalogResearch/1.0; +https://github.com/physicslu/plasma)"
 
 
-def fetch(url: str, attempts: int = 3) -> str:
+def fetch(url: str, attempts: int = 2) -> str:
     last: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
@@ -29,24 +30,33 @@ def fetch(url: str, attempts: int = 3) -> str:
                     "Accept-Language": "en-US,en;q=0.9",
                 },
             )
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=15) as response:
                 raw = response.read()
                 charset = response.headers.get_content_charset() or "utf-8"
                 return raw.decode(charset, errors="replace")
         except (urllib.error.URLError, TimeoutError) as exc:
             last = exc
             if attempt != attempts:
-                time.sleep(attempt * 2)
+                time.sleep(1)
     raise RuntimeError(f"failed to fetch {url}: {last}")
 
 
 def exact_tokens(base: str, page: str) -> list[str]:
-    # Exact commercial order codes are accepted only when the literal token is
-    # present on the manufacturer product page. We do not generate suffixes.
+    # Accept only literal tokens already present on the ST product page.
+    # No ordering suffix is generated or completed by Plasma.
     text = html.unescape(page).upper()
     pattern = re.compile(rf"(?<![A-Z0-9]){re.escape(base)}[A-Z0-9]{{2,10}}(?![A-Z0-9])")
-    tokens = sorted(set(pattern.findall(text)))
-    return [token for token in tokens if token != base]
+    return sorted(set(pattern.findall(text)))
+
+
+def probe(row: dict[str, str]) -> tuple[str, str, str, list[str]]:
+    base = row["base_device"].strip().upper()
+    subfamily = row["subfamily"].strip().upper()
+    url = row["manufacturer_url"].strip()
+    tokens = exact_tokens(base, fetch(url))
+    if not tokens:
+        raise RuntimeError(f"{base}: no exact manufacturer Part Number token observed")
+    return base, subfamily, url, tokens
 
 
 def main() -> int:
@@ -62,27 +72,24 @@ def main() -> int:
 
     rows: list[dict[str, str]] = []
     per_base: dict[str, int] = {}
-    for index, row in enumerate(bases, 1):
-        base = row["base_device"].strip().upper()
-        subfamily = row["subfamily"].strip().upper()
-        url = row["manufacturer_url"].strip()
-        page = fetch(url)
-        tokens = exact_tokens(base, page)
-        if not tokens:
-            raise SystemExit(f"{base}: no exact manufacturer Part Number token observed")
-        per_base[base] = len(tokens)
-        for token in tokens:
-            rows.append(
-                {
-                    "exact_icpn": token,
-                    "base_device": base,
-                    "subfamily": subfamily,
-                    "manufacturer_url": url,
-                    "observation_scope": "literal_token_on_st_product_page",
-                }
-            )
-        print(f"[{index:02d}/74] {base}: {len(tokens)} exact tokens")
-        time.sleep(0.15)
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futures = {executor.submit(probe, row): row["base_device"] for row in bases}
+        completed = 0
+        for future in as_completed(futures):
+            base, subfamily, url, tokens = future.result()
+            completed += 1
+            per_base[base] = len(tokens)
+            for token in tokens:
+                rows.append(
+                    {
+                        "exact_icpn": token,
+                        "base_device": base,
+                        "subfamily": subfamily,
+                        "manufacturer_url": url,
+                        "observation_scope": "literal_token_on_st_product_page",
+                    }
+                )
+            print(f"[{completed:02d}/74] {base}: {len(tokens)} exact tokens", flush=True)
 
     identities = sorted({row["exact_icpn"] for row in rows})
     if len(identities) != len(rows):
