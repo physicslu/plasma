@@ -5,11 +5,22 @@ on:
     paths:
       - 'data/device-catalog/research/stm32l5-*'
       - 'data/device-catalog/research/publish_stm32l5_catalog.py'
+      - 'data/device-catalog/research/validate_stm32l5_production_publication.py'
       - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
+      - '.github/workflows/device-catalog-stm32l5-production-publication-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32l5-*'
+      - 'data/device-catalog/research/publish_stm32l5_catalog.py'
+      - 'data/device-catalog/research/validate_stm32l5_production_publication.py'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
       - '.github/workflows/device-catalog-stm32l5-production-publication-validation.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -17,25 +28,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Render STM32L5 publication candidate
+      - name: Replay deterministic STM32L5 publication
         working-directory: data/device-catalog/research
         run: python publish_stm32l5_catalog.py --output-dir "$RUNNER_TEMP/stm32l5-publication" --json
-      - name: Materialize generated publication
-        run: |
-          cp "$RUNNER_TEMP/stm32l5-publication/stm32l5-commercial-icpn.csv" data/device-catalog/research/stm32l5-commercial-icpn.csv
-          cp "$RUNNER_TEMP/stm32l5-publication/icpn-v1-manifest.json" data/device-catalog/production/icpn-v1-manifest.json
-          cp "$RUNNER_TEMP/stm32l5-publication/stm32l5-production-publication-proposal.json" data/device-catalog/research/stm32l5-production-publication-proposal.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/device-catalog/research/stm32l5-commercial-icpn.csv \
-                  data/device-catalog/research/stm32l5-production-publication-proposal.json \
-                  data/device-catalog/production/icpn-v1-manifest.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Device catalog: materialize STM32L5 publication"
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
+      - name: Validate checked-in STM32L5 publication
+        working-directory: data/device-catalog/research
+        run: python validate_stm32l5_production_publication.py
+      - name: Validate Production manifest invariants
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Load Production catalog through runtime implementation
+        run: PYTHONPATH=software/python python -m plasma_web.device_catalog --json
