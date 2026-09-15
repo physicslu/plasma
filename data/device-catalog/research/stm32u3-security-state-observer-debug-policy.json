@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u3-security-state-observer-and-debug-validation-gate",
+  "authority": "research_only",
+  "family": "STM32U3",
+  "production_exact_icpn_count": 1862,
+  "commercial_series_scope": ["STM32U375", "STM32U385", "STM32U3B5", "STM32U3C5"],
+  "upstream_security_state_model": "stm32u3-security-state-model.json",
+  "upstream_runtime_policy": "stm32u3-runtime-enforcement-policy.json",
+  "evidence_accessed_at": "2026-09-15",
+  "manufacturer_sources": [
+    {
+      "id": "st-rm0487-rev3",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/resource/en/reference_manual/rm0487-stm32u3-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "observations": [
+        "RDP level 0 permits secure and nonsecure debug, except while executing RSS code",
+        "RDP level 0.5 is available only with TrustZone enabled and permits nonsecure debug only",
+        "RDP level 1 permits nonsecure debug only under documented conditions",
+        "RDP level 2 disables normal debug through the JTAG fuse",
+        "RDP level 2 may regress to RDP level 1 only when the OEM2 unlocking mechanism was previously provisioned and activated"
+      ]
+    },
+    {
+      "id": "st-wiki-rdp-for-stm32u3",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/Security%3ARDP_for_STM32U3",
+      "observations": [
+        "RDP level 0.5 debug is nonsecure only",
+        "RDP level 1 debug is nonsecure only and conditioned",
+        "RDP level 2 normal debug is none",
+        "OEM2LOCK authorizes an OEM2-authenticated RDP level 2 to level 1 regression only when the OEM2 mechanism is active",
+        "when OEM2LOCK is not active, RDP level 2 to level 1 regression is never granted"
+      ]
+    },
+    {
+      "id": "st-stm32u3-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u3-series/documentation.html",
+      "observations": ["ST lists RM0487 as the STM32U3 reference-manual authority"]
+    }
+  ],
+  "observer_contract": {
+    "mode": "passive_fail_closed",
+    "required_observations_for_debug_classification": [
+      "tzen_state",
+      "rdp_level",
+      "cpu_security_execution_state",
+      "debug_attach_outcome"
+    ],
+    "observation_quality": ["observed", "inferred", "unknown"],
+    "minimum_quality_for_target_enablement": "observed",
+    "unknown_dimension_decision": "deny",
+    "stale_observation_decision": "deny",
+    "observation_cache_reuse_authorized": false,
+    "state_mutation_for_observation_authorized": false,
+    "reset_for_observation_authorized": false,
+    "option_byte_write_for_observation_authorized": false,
+    "rdp_regression_for_observation_authorized": false,
+    "oem_unlock_for_observation_authorized": false,
+    "mass_erase_for_observation_authorized": false
+  },
+  "oem_observer_contract": {
+    "mode": "public_metadata_only_fail_closed",
+    "observable_without_secret_key_material": [
+      "oem1_lock_state",
+      "oem2_lock_state",
+      "oem1_key_crc_status",
+      "oem2_key_crc_status"
+    ],
+    "secret_key_material_read_authorized": false,
+    "secret_key_material_input_authorized": false,
+    "secret_key_material_persistence_authorized": false,
+    "secret_key_material_logging_authorized": false,
+    "observer_only_oem_transition_authorization": false,
+    "unknown_oem_state_decision": "deny",
+    "public_metadata_is_sufficient_to_prove_authentication_success": false,
+    "oem_unlock_execution_authorized": false
+  },
+  "debug_expectations": [
+    {
+      "state_id": "TZ0_RDP0",
+      "expected_debug_class": "open",
+      "execution_state_dependency": false,
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ0_RDP1",
+      "expected_debug_class": "conditioned_nonsecure",
+      "execution_state_dependency": false,
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ0_RDP2",
+      "expected_debug_class": "none",
+      "execution_state_dependency": false,
+      "unconditionally_terminal": false,
+      "conditional_lifecycle_exit_requires_oem2": true,
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ1_RDP0",
+      "expected_debug_class": "secure_and_nonsecure_with_rss_exception",
+      "execution_state_dependency": true,
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ1_RDP0_5",
+      "expected_debug_class": "nonsecure_only",
+      "execution_state_dependency": true,
+      "secure_execution_attach_expected": "deny",
+      "nonsecure_execution_attach_expected": "potentially_available_requires_hil",
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ1_RDP1",
+      "expected_debug_class": "conditioned_nonsecure",
+      "execution_state_dependency": true,
+      "secure_execution_attach_expected": "deny",
+      "nonsecure_execution_attach_expected": "potentially_available_requires_hil",
+      "runtime_debug_attach_authorized": false
+    },
+    {
+      "state_id": "TZ1_RDP2",
+      "expected_debug_class": "none",
+      "execution_state_dependency": true,
+      "unconditionally_terminal": false,
+      "conditional_lifecycle_exit_requires_oem2": true,
+      "runtime_debug_attach_authorized": false
+    }
+  ],
+  "validation_boundary": {
+    "offline_contract_validation": true,
+    "hardware_observation_executed": false,
+    "hil_debug_matrix_executed": false,
+    "oem_state_observation_hil_validated": false,
+    "openocd_debug_behavior_validated": false,
+    "stlink_debug_behavior_validated": false,
+    "oem2_authentication_path_validated": false,
+    "programming_algorithm_validated": false,
+    "flash_geometry_validated": false,
+    "security_mutation_validated": false
+  },
+  "admission_result": {
+    "observer_contract_defined": true,
+    "oem_observer_contract_defined": true,
+    "debug_expectation_matrix_complete": true,
+    "unknown_and_stale_state_fail_closed": true,
+    "unknown_oem_state_fail_closed": true,
+    "security_mutation_for_observation_blocked": true,
+    "rdp2_normal_debug_closed_modeled": true,
+    "rdp2_unconditionally_terminal": false,
+    "observer_hil_validated": false,
+    "oem_state_observer_hil_validated": false,
+    "debug_attach_hil_validated": false,
+    "backend_state_enforcement_integrated": false,
+    "target_touching_operation_authorized": false,
+    "production_manifest_admission_authorized": false,
+    "runtime_programming_authorized": false,
+    "oem_key_operation_authorized": false,
+    "hil_validated": false
+  },
+  "next_research_gate": "stm32u3-hil-observer-debug-matrix-readiness-gate"
+}
