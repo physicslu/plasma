@@ -4,7 +4,7 @@
 **Updated:** 2026-09-15  
 **Project:** Plasma  
 **Scope:** Render Control Station -> controlled QEMU Bootstrap management path  
-**Status:** Implementation merged in PR #560; live SWPC/Render qualification still pending
+**Status:** Browser Runtime live path qualified on SWPC/QEMU; active-Site-Job negative follow-up still pending corrected live evidence
 
 ## Implemented path
 
@@ -72,9 +72,9 @@ Runtime returns runtime_active               observed evidence
 disabled -> commissioned                     capability + trusted enable gate
 ```
 
-## Post-merge live gate
+## Post-merge Browser Runtime live gate
 
-The follow-up live-acceptance transaction adds:
+The live-acceptance transaction uses:
 
 - `scripts/z2like-demo-browser-live-acceptance.py`
 - `.github/workflows/z2like-demo-browser-live-acceptance.yml`
@@ -93,6 +93,10 @@ The workflow is intentionally split:
   normal Manager gate. There is no force-commission fallback.
 - Device pairing tokens and browser maintenance capability values are never
   written to the acceptance report.
+
+The merge of PR #591 triggered Browser Runtime live run `34942047814`; its
+`live-swpc-render-qemu` job completed successfully for commit
+`19e6df408da7f01a5ea0ce777a1bf5f8c2db1ebe`.
 
 ### Automated live coverage in this gate
 
@@ -116,31 +120,48 @@ wrong Bootstrap method                             -> BLOCKED
 SWPC local Bootstrap allowlist projection           -> required
 ```
 
-### Still not live-qualified by this gate
+### Still not live-qualified by the Browser Runtime gate
 
 These cases remain explicit qualification debt and must not be inferred from a
-PASS of the automated live gate:
+PASS of the Browser Runtime gate:
 
 ```text
-commissioned -> disabled with active Site Job      -> live evidence still required
+commissioned -> disabled with active Site Job      -> corrected live evidence still required
 forced stale/non-idle maintenance proof            -> live evidence still required
 15-minute capability expiry wall-clock rejection   -> live evidence still required
 ```
 
-Their software contracts are regression-tested, but H021 is not fully closed
-until these remaining live-negative cases are either exercised safely or split
-into a separately approved qualification gate.
-
 ## Active-Site-Job disable rejection follow-up gate
 
-PR #591 adds a separate post-merge live-negative gate for **active-Site-Job disable rejection**.
+PR #591 added a separate live-negative gate for **active-Site-Job disable rejection**.
 It must observe the exact configured-Mock Site Job through Manager before attempting
-`commissioned -> disabled`, and PASS requires HTTP 409 `ppu_busy`. The gate uses only
-the normal maintenance capability, performs bounded Job cleanup, restores the prior
-Mock Runtime profile, and has no force lifecycle transition.
+`commissioned -> disabled`, and PASS requires HTTP 409 `ppu_busy`.
 
-A PASS of this follow-up closes only the active-Site-Job disable rejection debt.
-The following remain explicit live qualification debt:
+The first post-merge execution (`34942047881`) failed safely before any test Job was
+created. The gate attempted to read `/api/mock/runtime` and received HTTP 503
+`MOCK_RUNTIME_UNAVAILABLE`. That endpoint belongs to the mutable Shared-Image Mock
+Runtime; the canonical QEMU Programming path uses `configured_mock`, whose timing is
+owned by the deployed PPU Site configuration. The failed run therefore produced no
+active-job disable evidence and closes no qualification debt.
+
+The correction is intentionally structural rather than an SWPC operator workaround:
+
+- the QEMU simulation installer owns a deterministic 10-second configured-Mock erase
+  delay, giving the 2-second Render Manager poller multiple observation windows;
+- only previously Plasma-managed no-delay QEMU configs are admitted for automatic
+  migration; arbitrary operator-edited configs remain untouched;
+- the active-job script no longer reads, writes, enables, or restores
+  `/api/mock/runtime`;
+- the active-job workflow is triggered only after the Browser Runtime live workflow
+  completes successfully on `main`;
+- the exact triggering Browser workflow `head_sha` is checked out and passed as the
+  accepted source commit, preventing the single SWPC runner from testing an older
+  runtime merely because the active-job job happened to acquire the runner first;
+- the test still uses only the normal maintenance capability, performs bounded Job
+  cancellation/idle cleanup, and has no force lifecycle transition.
+
+A PASS of this corrected follow-up closes only the active-Site-Job disable rejection
+debt. The following remain explicit live qualification debt:
 
 - forced stale/non-idle maintenance proof rejection
 - 15-minute capability expiry wall-clock rejection
@@ -150,9 +171,12 @@ The following remain explicit live qualification debt:
 - real IC programming
 - physical multi-Site concurrency
 
+Until those debts are closed or explicitly re-scoped, H021 is not fully closed.
+
 ## Qualification boundary
 
 > **Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED.**
 
-This implementation and live gate make no claim for PL/FPGA behavior, target
-power, real IC programming, or physical multi-Site concurrency.
+This implementation and its SWPC/QEMU live gates make no claim for PL/FPGA behavior,
+target power, real IC programming, physical multi-Site concurrency, or physical Z2
+reboot/rollback qualification.
