@@ -122,12 +122,27 @@ jobs:
           image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
           platforms: arm
 
-      - name: Start clean QEMU ARMv7 Bootstrap target
+      - name: Start legacy-bind QEMU ARMv7 Bootstrap target
         run: |
           python scripts/z2like-demo-qemu.py up
           test "$(docker exec plasma-z2like-demo-qemu uname -m)" = "armv7l" \
             -o "$(docker exec plasma-z2like-demo-qemu uname -m)" = "armv7"
           test -z "$(docker port plasma-z2like-demo-qemu)"
+          test "$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Type}}{{end}}{{end}}' plasma-z2like-demo-qemu)" = "bind"
+
+      - name: Prove bind-to-commit-pinned control-plane migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          python scripts/z2like-demo-qemu-control-plane.py --expected-commit "$sha"
+          mount_type="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Type}}{{end}}{{end}}' plasma-z2like-demo-qemu)"
+          mount_name="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/sim\"}}{{.Name}}{{end}}{{end}}' plasma-z2like-demo-qemu)"
+          test "$mount_type" = "volume"
+          test "$mount_name" = "plasma-z2like-demo-scripts-$sha"
+          docker exec plasma-z2like-demo-qemu python3 -c \
+            'import json,pathlib,sys; p=json.loads(pathlib.Path("/sim/.plasma-control-plane-provenance.json").read_text()); sys.exit(0 if p.get("source_commit")==sys.argv[1] else 1)' \
+            "$sha"
 
       - name: Install Manager and PPU build dependencies
         run: python -m pip install ./software/python pytest
