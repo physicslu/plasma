@@ -18,7 +18,7 @@ BASE_CSV = HERE / "stm32u5-base-device-discovery.csv"
 USER_AGENT = "Mozilla/5.0 (compatible; PlasmaDeviceCatalogResearch/1.0; +https://github.com/physicslu/plasma)"
 
 
-def fetch(url: str, attempts: int = 2) -> str:
+def fetch(url: str, attempts: int = 4, timeout: int = 30) -> str:
     last: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
@@ -28,16 +28,17 @@ def fetch(url: str, attempts: int = 2) -> str:
                     "User-Agent": USER_AGENT,
                     "Accept": "text/html,application/xhtml+xml",
                     "Accept-Language": "en-US,en;q=0.9",
+                    "Connection": "close",
                 },
             )
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
                 raw = response.read()
                 charset = response.headers.get_content_charset() or "utf-8"
                 return raw.decode(charset, errors="replace")
         except (urllib.error.URLError, TimeoutError) as exc:
             last = exc
             if attempt != attempts:
-                time.sleep(1)
+                time.sleep(attempt * 2)
     raise RuntimeError(f"failed to fetch {url}: {last}")
 
 
@@ -49,14 +50,37 @@ def exact_tokens(base: str, page: str) -> list[str]:
     return sorted(set(pattern.findall(text)))
 
 
-def probe(row: dict[str, str]) -> tuple[str, str, str, list[str]]:
+def probe(row: dict[str, str], *, attempts: int = 4, timeout: int = 30) -> tuple[str, str, str, list[str]]:
     base = row["base_device"].strip().upper()
     subfamily = row["subfamily"].strip().upper()
     url = row["manufacturer_url"].strip()
-    tokens = exact_tokens(base, fetch(url))
+    tokens = exact_tokens(base, fetch(url, attempts=attempts, timeout=timeout))
     if not tokens:
         raise RuntimeError(f"{base}: no exact manufacturer Part Number token observed")
     return base, subfamily, url, tokens
+
+
+def append_result(
+    result: tuple[str, str, str, list[str]],
+    rows: list[dict[str, str]],
+    per_base: dict[str, int],
+    completed: int,
+) -> int:
+    base, subfamily, url, tokens = result
+    per_base[base] = len(tokens)
+    for token in tokens:
+        rows.append(
+            {
+                "exact_icpn": token,
+                "base_device": base,
+                "subfamily": subfamily,
+                "manufacturer_url": url,
+                "observation_scope": "literal_token_on_st_product_page",
+            }
+        )
+    completed += 1
+    print(f"[{completed:02d}/74] {base}: {len(tokens)} exact tokens", flush=True)
+    return completed
 
 
 def main() -> int:
@@ -72,24 +96,35 @@ def main() -> int:
 
     rows: list[dict[str, str]] = []
     per_base: dict[str, int] = {}
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        futures = {executor.submit(probe, row): row["base_device"] for row in bases}
-        completed = 0
+    failed_rows: list[dict[str, str]] = []
+    completed = 0
+
+    # Keep concurrency deliberately low. ST product pages are an evidence source,
+    # not a load target, and transient throttling must not become false evidence.
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(probe, row): row for row in bases}
         for future in as_completed(futures):
-            base, subfamily, url, tokens = future.result()
-            completed += 1
-            per_base[base] = len(tokens)
-            for token in tokens:
-                rows.append(
-                    {
-                        "exact_icpn": token,
-                        "base_device": base,
-                        "subfamily": subfamily,
-                        "manufacturer_url": url,
-                        "observation_scope": "literal_token_on_st_product_page",
-                    }
-                )
-            print(f"[{completed:02d}/74] {base}: {len(tokens)} exact tokens", flush=True)
+            row = futures[future]
+            try:
+                result = future.result()
+            except RuntimeError as exc:
+                print(f"parallel probe deferred for serial retry: {row['base_device']}: {exc}", flush=True)
+                failed_rows.append(row)
+                continue
+            completed = append_result(result, rows, per_base, completed)
+
+    # Fail-closed fallback: retry every transient failure serially with a longer
+    # timeout. No Base Device may be skipped and no missing row is treated as an
+    # unsupported-device claim.
+    for row in failed_rows:
+        base = row["base_device"].strip().upper()
+        print(f"serial fallback probe: {base}", flush=True)
+        result = probe(row, attempts=6, timeout=60)
+        completed = append_result(result, rows, per_base, completed)
+        time.sleep(1)
+
+    if completed != 74 or len(per_base) != 74:
+        raise SystemExit(f"incomplete manufacturer observation: completed={completed}, unique_bases={len(per_base)}")
 
     identities = sorted({row["exact_icpn"] for row in rows})
     if len(identities) != len(rows):
