@@ -20,6 +20,17 @@ def test_live_gate_is_post_merge_swpc_only() -> None:
     assert "--expected-commit \"$GITHUB_SHA\"" in workflow
 
 
+def test_live_gate_reconciles_managed_ingress_before_preflight() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    reconcile = workflow.index("- name: Reconcile canonical SWPC managed ingress")
+    preflight = workflow.index("- name: Preflight canonical SWPC/QEMU target")
+    assert reconcile < preflight
+    assert "sudo -n env" in workflow
+    assert 'PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT="http://172.30.77.2:18080"' in workflow
+    assert 'PLASMA_Z2LIKE_DEMO_BOOTSTRAP_ROOT="http://172.30.77.2:18081"' in workflow
+    assert "bash scripts/plasmactl-z2like-demo-managed-ingress install" in workflow
+
+
 def test_live_gate_keeps_pairing_secret_and_capability_out_of_evidence() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     assert "/var/lib/plasma-bootstrap/control-token" in source
