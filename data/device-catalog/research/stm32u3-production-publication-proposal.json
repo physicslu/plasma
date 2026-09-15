@@ -1,0 +1,33 @@
+{
+  "canonical_csv_git_blob_sha": "c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
+  "canonical_csv_sha256": "171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "debug_attach_support_claimed": false,
+  "evaluation_status_is_identity_observation_not_execution_authorization": true,
+  "exact_icpn_set_sha256": "6ff4f01a009e28aff1a6ebf3f74544c973ce9e2a229bc72f4574f71c47ea4918",
+  "family": "STM32U3",
+  "manufacturer": "STMicroelectronics",
+  "marketing_status_observed": {
+    "Active": 100,
+    "Evaluation": 6
+  },
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 1968,
+  "production_exact_icpns_before": 1862,
+  "production_family_count_after": 14,
+  "production_family_count_before": 13,
+  "production_manifest_git_blob_sha_after": "a2a057f5883b95c5873e9eaa3edd9f3c06803913",
+  "production_manifest_sha256_after": "6f77133bffe0fa5fbd5b059d1c89fdfb681a3ad08da09bc8d38f975d0fec7f31",
+  "production_manifest_sha256_before": "64074683cb01d3584da314f15e499f3db2c4b586d96def3ab8371dd2b50d93f5",
+  "published_base_devices": 33,
+  "published_exact_icpns": 106,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "transaction": "stm32u3-production-catalog-publication"
+}
