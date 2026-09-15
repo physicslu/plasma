@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u3-security-scope-foundation",
+  "authority": "research_only",
+  "upstream_selection": "stm32-trustzone-cohort-succession-after-l5-blocker.json",
+  "exact_icpn_count": 1862,
+  "series": "STM32U3",
+  "subfamily_scope": [
+    "STM32U335",
+    "STM32U345",
+    "STM32U356",
+    "STM32U366",
+    "STM32U375",
+    "STM32U385",
+    "STM32U3B5",
+    "STM32U3C5"
+  ],
+  "manufacturer_evidence_accessed_at": "2026-09-15",
+  "manufacturer_sources": [
+    {
+      "id": "st-stm32u3-product-page",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u3-series/products.html",
+      "observations": [
+        "STM32U3 devices are Arm Cortex-M33 MCUs with TrustZone",
+        "the STM32U3 product family contains commercial device lines spanning the selected research subfamilies"
+      ]
+    },
+    {
+      "id": "st-stm32u3-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u3-series/documentation.html",
+      "observations": [
+        "ST lists RM0487 as the STM32U3 reference manual",
+        "ST lists STM32U3 datasheets and security guidance for the family"
+      ]
+    },
+    {
+      "id": "st-rm0487",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/resource/en/reference_manual/rm0487-stm32u3-series-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "observations": [
+        "STM32U3 lifecycle security uses RDP levels 0, 0.5, 1, and 2",
+        "RDP level 0.5 applies only when TrustZone security is activated",
+        "debug availability depends on RDP level and secure versus nonsecure execution context",
+        "RDP level 2 closes normal debug access but may regress to RDP level 1 when the OEM2 unlocking mechanism was provisioned and activated"
+      ]
+    },
+    {
+      "id": "st-wiki-rdp-for-stm32u3",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/Security%3ARDP_for_STM32U3",
+      "observations": [
+        "OEM1LOCK controls whether RDP level 1 to level 0 regression requires the OEM1 unlock sequence",
+        "OEM2LOCK can block RDP level 1 to level 0.5 regression and can authorize RDP level 2 to level 1 regression",
+        "without OEM2LOCK, RDP level 2 to level 1 regression is not granted",
+        "once the OEM-key transition mechanism is set it cannot be disabled"
+      ]
+    }
+  ],
+  "security_sensitive_controls": [
+    "TZEN",
+    "RDP",
+    "secure_nonsecure_execution_state",
+    "debug_interface_state",
+    "OEM1KEY",
+    "OEM1LOCK",
+    "OEM2KEY",
+    "OEM2LOCK"
+  ],
+  "u3_specific_security_invariants": {
+    "rdp0_5_requires_trustzone": true,
+    "rdp2_debug_closed": true,
+    "rdp2_is_unconditionally_terminal": false,
+    "rdp2_to_rdp1_requires_oem2_unlock_mechanism": true,
+    "oem_key_lock_state_affects_regression_policy": true,
+    "plasma_may_not_infer_oem_key_state": true,
+    "plasma_may_not_mutate_security_state_for_discovery": true
+  },
+  "research_partition": {
+    "manufacturer_identity_discovery_allowed": true,
+    "commercial_icpn_discovery_allowed": true,
+    "production_admission_allowed": false,
+    "security_semantics_supported": false,
+    "option_byte_writes_allowed": false,
+    "oem_key_provisioning_allowed": false,
+    "oem_unlock_execution_allowed": false,
+    "rdp_regression_allowed": false,
+    "mass_erase_allowed": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "debug_attach_supported": false,
+    "hil_validated": false
+  },
+  "required_future_runtime_gates": [
+    "explicit STM32U3 security-state model including OEM1/OEM2 lock state",
+    "option-byte and OEM-key destructive-operation governance",
+    "programming algorithm and Flash geometry validation",
+    "debug-connect behavior validation by RDP and execution state",
+    "HIL validation"
+  ],
+  "status": "eligible_for_identity_discovery_under_security_fence",
+  "next_research_gate": "stm32u3-manufacturer-identity-discovery"
+}
