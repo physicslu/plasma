@@ -13,6 +13,8 @@ KIT = ROOT / "scripts" / "z2like-demo-qemu-kit.py"
 KIT_BUILDER = ROOT / "scripts" / "z2like-demo-qemu-build-kit.py"
 RUNTIME_DEPLOYER = ROOT / "scripts" / "z2like-demo-qemu-deploy.py"
 MANAGED_INGRESS = ROOT / "scripts" / "plasmactl-z2like-demo-managed-ingress"
+NGINX_EPHEMERAL = ROOT / "scripts" / "z2like-demo-nginx-ephemeral.py"
+QEMU_WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-qemu.yml"
 PROFILE = ROOT / "scripts" / "plasmactl-z2like-demo"
 INSTALLER = ROOT / "scripts" / "z2like-demo-qemu-installer.py"
 
@@ -79,6 +81,20 @@ def test_managed_ingress_targets_qemu_not_x86_surrogate():
     assert "POST /api/settings/ppu-network" in source
     assert "POST /api/settings/gateway" in source
     assert "location / { return 404; }" in source
+
+
+def test_pr_contracts_job_runs_real_ephemeral_nginx_integration_gate():
+    workflow = QEMU_WORKFLOW.read_text(encoding="utf-8")
+    harness = NGINX_EPHEMERAL.read_text(encoding="utf-8")
+    assert 'scripts/z2like-demo-nginx-ephemeral.py' in workflow
+    assert "Install disposable Nginx parser/runtime" in workflow
+    assert "Run ephemeral Nginx integration gate" in workflow
+    assert "python scripts/z2like-demo-nginx-ephemeral.py" in workflow
+    assert 'subprocess.run(\n            ["nginx", "-p", f"{tmp}/", "-c", str(config), "-t"]' in harness
+    assert 'f"/__plasma/bootstrap/v1/uploads/{UPLOAD_ID}/chunks"' in harness
+    assert 'expect_record("bootstrap", "POST", f"/v1/uploads/{UPLOAD_ID}/chunks")' in harness
+    assert 'expect_status(base, "/__plasma/bootstrap/v1/not-allowlisted", 404)' in harness
+    assert '"requires_swpc": False' in harness
 
 
 def test_one_command_profile_has_explicit_fast_forward_and_full_verification():
