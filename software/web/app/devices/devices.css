@@ -131,12 +131,14 @@
   color: var(--muted);
   font: 650 9px var(--font-mono);
 }
+.icSelectorDetail .icSelectorEyebrow { font-size: 10px; }
+.icSelectorDetail .icSelectorKind { font-size: 10px; }
 .icSelectorDetail dl { display: grid; gap: 0; margin: 18px 0 0; }
-.icSelectorDetail dl > div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
-.icSelectorDetail dt { color: var(--muted); font-size: 9px; }
-.icSelectorDetail dd { margin: 0; min-width: 0; color: var(--text-soft); font-size: 10px; overflow-wrap: anywhere; }
-.icSelectorDetail code { font: 9px var(--font-mono); }
-.icSelectorBoundary { margin-top: 16px; padding: 10px; border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--amber) 6%, var(--panel)); color: var(--text-soft); font-size: 10px; line-height: 1.5; }
+.icSelectorDetail dl > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.icSelectorDetail dt { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.icSelectorDetail dd { margin: 0; min-width: 0; color: var(--text-soft); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.icSelectorDetail code { font: 12px/1.45 var(--font-mono); }
+.icSelectorBoundary { margin-top: 16px; padding: 10px; border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--amber) 6%, var(--panel)); color: var(--text-soft); font-size: 12px; line-height: 1.55; }
 .icSelectorDetailEmpty { display: grid; place-items: center; min-height: 250px; text-align: center; color: var(--muted); }
 .icSelectorDetailEmpty b { color: var(--text-soft); font-size: 13px; }
 .icSelectorDetailEmpty p { max-width: 240px; margin: 6px 0 0; font-size: 10px; line-height: 1.5; }
