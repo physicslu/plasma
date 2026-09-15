@@ -5,6 +5,11 @@ on:
     paths:
       - ".github/workflows/z2like-demo-browser-live-acceptance.yml"
       - "scripts/z2like-demo-browser-live-acceptance.py"
+      - "scripts/z2like-demo-qemu-control-plane.py"
+      - "scripts/z2like-demo-qemu-build-kit.py"
+      - "scripts/z2like-demo-qemu-kit.py"
+      - "scripts/z2like-demo-qemu-installer.py"
+      - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "handover/H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
   push:
     branches:
@@ -14,6 +19,9 @@ on:
       - ".github/workflows/z2like-demo-active-job-disable-live-negative.yml"
       - "scripts/z2like-demo-browser-live-acceptance.py"
       - "scripts/z2like-demo-active-job-disable-live-acceptance.py"
+      - "scripts/z2like-demo-qemu-control-plane.py"
+      - "scripts/z2like-demo-qemu-build-kit.py"
+      - "scripts/z2like-demo-qemu-kit.py"
       - "scripts/z2like-demo-qemu-installer.py"
       - "scripts/plasmactl-z2like-demo-managed-ingress"
       - "scripts/render-control-station-start.sh"
@@ -23,6 +31,7 @@ on:
       - "software/python/plasma_manager/bootstrap_server.py"
       - "software/python/plasma_manager/verified_bootstrap.py"
       - "software/python/tests/test_z2like_demo_active_job_disable_live_contract.py"
+      - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/web/app/api/manager/bootstrap-bff.ts"
       - "software/web/app/api/manager/maintenance-capability.mjs"
       - "software/web/app/api/manager/registry/**"
@@ -47,8 +56,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/z2like-demo-browser-live-acceptance.py
+          python3 -m py_compile \
+            scripts/z2like-demo-browser-live-acceptance.py \
+            scripts/z2like-demo-qemu-control-plane.py \
+            scripts/z2like-demo-qemu-build-kit.py \
+            scripts/z2like-demo-qemu-kit.py
           python3 scripts/z2like-demo-browser-live-acceptance.py --help >/dev/null
+          python3 scripts/z2like-demo-qemu-control-plane.py --help >/dev/null
+          python3 software/python/tests/test_z2like_demo_qemu_control_plane_contract.py
 
   live-swpc-render-qemu:
     needs: contract
@@ -71,6 +86,13 @@ jobs:
           fetch-depth: 0
           clean: true
           persist-credentials: false
+
+      - name: Reconcile exact-commit QEMU control plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/z2like-demo-qemu-control-plane.py \
+            --expected-commit "$GITHUB_SHA"
 
       - name: Preflight canonical SWPC/QEMU target
         shell: bash
