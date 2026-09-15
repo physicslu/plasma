@@ -1,0 +1,32 @@
+name: STM32L5 Production catalog publication validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32l5-*'
+      - 'data/device-catalog/research/publish_stm32l5_catalog.py'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - '.github/workflows/device-catalog-stm32l5-production-publication-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Render STM32L5 publication candidate
+        working-directory: data/device-catalog/research
+        run: python publish_stm32l5_catalog.py --output-dir "$RUNNER_TEMP/stm32l5-publication" --json
+      - name: Upload deterministic publication candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32l5-publication-candidate
+          path: ${{ runner.temp }}/stm32l5-publication
+          if-no-files-found: error
+          retention-days: 1
