@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u5-security-scope-foundation",
+  "authority": "research_only",
+  "upstream_selection": "stm32-trustzone-cohort-gate1-qualification.json",
+  "production_catalog_manifest": "../production/icpn-v1-manifest.json",
+  "exact_icpn_count": 2017,
+  "series": "STM32U5",
+  "subfamily_scope": [
+    "STM32U535",
+    "STM32U545",
+    "STM32U575",
+    "STM32U585",
+    "STM32U595",
+    "STM32U599",
+    "STM32U5A5",
+    "STM32U5A9",
+    "STM32U5F7",
+    "STM32U5F9",
+    "STM32U5G7",
+    "STM32U5G9"
+  ],
+  "manufacturer_evidence_accessed_at": "2026-09-15",
+  "manufacturer_sources": [
+    {
+      "id": "st-stm32u5-product-page",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u5-series/products.html",
+      "observations": [
+        "STM32U5 devices are Arm Cortex-M33 MCUs with TrustZone",
+        "the STM32U5 product family contains multiple commercial lines within the bounded upstream candidate scope"
+      ]
+    },
+    {
+      "id": "st-stm32u5-documentation-index",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u5-series/documentation.html",
+      "observations": [
+        "ST lists RM0456 as the STM32U5 reference manual",
+        "ST lists STM32U5 datasheets and security material for the family"
+      ]
+    },
+    {
+      "id": "st-rm0456",
+      "authority": "STMicroelectronics",
+      "url": "https://www.st.com/resource/en/reference_manual/rm0456-stm32u5-series-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "observations": [
+        "STM32U5 lifecycle security uses RDP levels 0, 0.5, 1, and 2",
+        "RDP level 0.5 applies only when TrustZone security is activated",
+        "debug availability depends on RDP level and secure versus nonsecure execution context",
+        "RDP level 2 closes normal debug access but may regress to RDP level 1 when the OEM2 unlocking key mechanism is activated"
+      ]
+    },
+    {
+      "id": "st-wiki-rdp",
+      "authority": "STMicroelectronics",
+      "url": "https://wiki.st.com/stm32mcu/wiki/Security%3ARDP",
+      "observations": [
+        "OEM1 and OEM2 keys can condition RDP regressions when provisioned by the OEM",
+        "RDP level 2 to level 1 regression requires the OEM2 unlocking mechanism rather than ordinary debug access",
+        "RDP level 1 regressions can have destructive flash effects",
+        "OEM key lock state affects regression policy"
+      ]
+    }
+  ],
+  "security_sensitive_controls": [
+    "TZEN",
+    "RDP",
+    "secure_nonsecure_execution_state",
+    "debug_interface_state",
+    "OEM1KEY",
+    "OEM1LOCK",
+    "OEM2KEY",
+    "OEM2LOCK"
+  ],
+  "u5_specific_security_invariants": {
+    "rdp0_5_requires_trustzone": true,
+    "rdp2_debug_closed": true,
+    "rdp2_is_unconditionally_terminal": false,
+    "rdp2_to_rdp1_requires_oem2_unlock_mechanism": true,
+    "oem_key_lock_state_affects_regression_policy": true,
+    "rdp_regressions_may_have_destructive_flash_effects": true,
+    "plasma_may_not_infer_oem_key_state": true,
+    "plasma_may_not_mutate_security_state_for_discovery": true,
+    "catalog_admission_independent_from_hil": true,
+    "catalog_membership_does_not_authorize_execution": true
+  },
+  "research_partition": {
+    "manufacturer_identity_discovery_allowed": true,
+    "commercial_icpn_discovery_allowed": true,
+    "catalog_admission_governed_separately": true,
+    "security_semantics_supported": false,
+    "option_byte_writes_allowed": false,
+    "oem_key_provisioning_allowed": false,
+    "oem_unlock_execution_allowed": false,
+    "rdp_regression_allowed": false,
+    "mass_erase_allowed": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "debug_attach_supported": false,
+    "hil_validated": false
+  },
+  "required_future_runtime_gates": [
+    "explicit STM32U5 security-state model including OEM1/OEM2 lock state",
+    "option-byte and OEM-key destructive-operation governance",
+    "programming algorithm and Flash geometry validation",
+    "debug-connect behavior validation by RDP and execution state",
+    "HIL validation for physical execution claims"
+  ],
+  "status": "eligible_for_identity_discovery_under_security_fence",
+  "next_research_gate": "stm32u5-manufacturer-identity-discovery"
+}
