@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u3-hil-observer-debug-matrix-readiness-gate",
+  "authority": "research_only",
+  "family": "STM32U3",
+  "production_exact_icpn_count": 1862,
+  "commercial_series_scope": [
+    "STM32U375",
+    "STM32U385",
+    "STM32U3B5",
+    "STM32U3C5"
+  ],
+  "candidate_only_subfamilies_excluded_from_hil_matrix": [
+    "STM32U335",
+    "STM32U345",
+    "STM32U356",
+    "STM32U366"
+  ],
+  "candidate_only_exclusion_reason": "no retained exact commercial ICPN observed in current manufacturer identity evidence; exclusion is not an unsupported-device claim",
+  "upstream_observer_policy": "stm32u3-security-state-observer-debug-policy.json",
+  "readiness_boundary": {
+    "hil_execution_authorized": false,
+    "runtime_debug_attach_authorized": false,
+    "runtime_programming_authorized": false,
+    "production_manifest_admission_authorized": false,
+    "security_state_creation_by_plasma_authorized": false,
+    "security_mutation_by_test_harness_authorized": false,
+    "oem_transition_execution_authorized": false,
+    "fixture_state_must_be_preprovisioned": true,
+    "fixture_provenance_required": true,
+    "public_oem_metadata_observation_required": true,
+    "secret_oem_key_material_required": false,
+    "secret_oem_key_material_allowed": false,
+    "observation_cache_reuse_authorized": false,
+    "unknown_or_stale_observation_decision": "deny"
+  },
+  "required_hil_evidence": [
+    "fixture_identifier",
+    "commercial_series",
+    "commercial_icpn",
+    "fixture_provenance_digest",
+    "preprovisioned_security_state",
+    "execution_context",
+    "debug_probe_identity",
+    "debug_probe_firmware_version",
+    "backend_identity_and_version",
+    "connection_mode",
+    "raw_attach_result",
+    "observed_tzen_state",
+    "observed_rdp_level",
+    "observed_execution_state",
+    "observed_oem1_lock_state",
+    "observed_oem2_lock_state",
+    "observed_oem1_key_crc_status",
+    "observed_oem2_key_crc_status",
+    "timestamp_utc",
+    "operator_or_automation_identity",
+    "evidence_digest"
+  ],
+  "fixture_policy": {
+    "normal_state_fixture_class": "preprovisioned_recoverable_test_device",
+    "rdp2_fixture_class": "preprovisioned_rdp2_dedicated_device",
+    "rdp2_creation_by_plasma_authorized": false,
+    "rdp2_regression_by_test_harness_authorized": false,
+    "rdp2_recovery_assumed": false,
+    "oem2_unlock_execution_by_test_harness_authorized": false,
+    "secret_oem_key_material_input_allowed": false,
+    "secret_oem_key_material_persistence_allowed": false,
+    "secret_oem_key_material_logging_allowed": false,
+    "test_harness_may_write_option_bytes": false,
+    "test_harness_may_regress_rdp": false,
+    "test_harness_may_mass_erase": false,
+    "test_harness_may_reset_for_state_discovery": false
+  },
+  "matrix_design": {
+    "commercial_series_count": 4,
+    "logical_security_state_count": 7,
+    "test_cell_count": 40,
+    "coverage_rule": "all_observed_commercial_series_all_security_debug_contexts",
+    "cells_per_commercial_series": 10,
+    "execution_context_split_states": [
+      "TZ1_RDP0",
+      "TZ1_RDP0_5",
+      "TZ1_RDP1"
+    ],
+    "single_context_states": [
+      "TZ0_RDP0",
+      "TZ0_RDP1",
+      "TZ0_RDP2",
+      "TZ1_RDP2"
+    ],
+    "cell_template_count": 10
+  },
+  "stop_conditions": [
+    "observed lifecycle security state differs from fixture provenance",
+    "observed public OEM metadata differs from fixture provenance or is unknown when required",
+    "any operation would require option-byte mutation, RDP regression, OEM unlock execution, mass erase, or RDP2 creation",
+    "debug behavior contradicts the upstream expectation matrix",
+    "fixture identity, exact commercial ICPN, or evidence provenance is missing",
+    "backend or debug probe identity/version is unknown",
+    "observation is stale, inferred-only, or internally inconsistent",
+    "secret OEM key material would need to be read, entered, persisted, or logged"
+  ],
+  "readiness_result": {
+    "hil_matrix_plan_complete": true,
+    "required_evidence_schema_complete": true,
+    "destructive_state_creation_blocked": true,
+    "rdp2_dedicated_fixture_policy_defined": true,
+    "oem_public_metadata_evidence_required": true,
+    "secret_oem_key_material_excluded": true,
+    "fixture_inventory_bound": false,
+    "hil_execution_ready": false,
+    "hil_executed": false,
+    "observer_hil_validated": false,
+    "oem_state_observer_hil_validated": false,
+    "debug_attach_hil_validated": false,
+    "production_manifest_admission_authorized": false,
+    "runtime_programming_authorized": false,
+    "oem_key_operation_authorized": false
+  },
+  "next_research_gate": "stm32u3-hil-fixture-inventory-binding-gate",
+  "test_cell_templates": [
+    {
+      "id_suffix": "TZ0-RDP0",
+      "state_id": "TZ0_RDP0",
+      "execution_context": "not_applicable",
+      "expected_debug_class": "open"
+    },
+    {
+      "id_suffix": "TZ0-RDP1",
+      "state_id": "TZ0_RDP1",
+      "execution_context": "not_applicable",
+      "expected_debug_class": "conditioned_nonsecure"
+    },
+    {
+      "id_suffix": "TZ0-RDP2",
+      "state_id": "TZ0_RDP2",
+      "execution_context": "not_applicable",
+      "expected_debug_class": "none",
+      "fixture_class": "preprovisioned_rdp2_dedicated_device",
+      "unconditionally_terminal": false,
+      "conditional_lifecycle_exit_requires_oem2": true
+    },
+    {
+      "id_suffix": "TZ1-RDP0-S",
+      "state_id": "TZ1_RDP0",
+      "execution_context": "secure",
+      "expected_debug_class": "secure_and_nonsecure_with_rss_exception"
+    },
+    {
+      "id_suffix": "TZ1-RDP0-NS",
+      "state_id": "TZ1_RDP0",
+      "execution_context": "nonsecure",
+      "expected_debug_class": "secure_and_nonsecure_with_rss_exception"
+    },
+    {
+      "id_suffix": "TZ1-RDP0_5-S",
+      "state_id": "TZ1_RDP0_5",
+      "execution_context": "secure",
+      "expected_attach": "deny"
+    },
+    {
+      "id_suffix": "TZ1-RDP0_5-NS",
+      "state_id": "TZ1_RDP0_5",
+      "execution_context": "nonsecure",
+      "expected_attach": "potentially_available_requires_hil"
+    },
+    {
+      "id_suffix": "TZ1-RDP1-S",
+      "state_id": "TZ1_RDP1",
+      "execution_context": "secure",
+      "expected_attach": "deny"
+    },
+    {
+      "id_suffix": "TZ1-RDP1-NS",
+      "state_id": "TZ1_RDP1",
+      "execution_context": "nonsecure",
+      "expected_attach": "potentially_available_requires_hil"
+    },
+    {
+      "id_suffix": "TZ1-RDP2",
+      "state_id": "TZ1_RDP2",
+      "execution_context": "unknown",
+      "expected_debug_class": "none",
+      "fixture_class": "preprovisioned_rdp2_dedicated_device",
+      "unconditionally_terminal": false,
+      "conditional_lifecycle_exit_requires_oem2": true
+    }
+  ]
+}
