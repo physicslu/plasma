@@ -291,7 +291,7 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     if "from plasma_manager.bootstrap_server import main" not in entrypoint:
         raise RuntimePackagingError("Manager zipapp entrypoint does not expose Bootstrap routes")
 
-    third_party = _require_mapping(manifest.get("third_party"), "third_party.PyYAML") if False else _require_mapping(manifest.get("third_party"), "third_party")
+    third_party = _require_mapping(manifest.get("third_party"), "third_party")
     pyyaml = _require_mapping(third_party.get("PyYAML"), "third_party.PyYAML")
     license_path = pyyaml.get("license")
     if license_path != "manager/THIRD_PARTY_LICENSES/PyYAML.txt":
