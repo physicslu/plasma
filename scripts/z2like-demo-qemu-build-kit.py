@@ -155,6 +155,7 @@ def build(output_dir: Path) -> dict[str, str]:
         "ppu-z2-installer.py",
         "ppu-z2-installer-core.py",
         "z2-python-runtime.py",
+        "z2like-demo-qemu-installer.py",
     ):
         _copy(repo / "scripts" / name, scripts_dir / name)
     _copy(ppu, artifacts_dir / ppu.name)
@@ -180,6 +181,7 @@ def build(output_dir: Path) -> dict[str, str]:
         "ppu-bootstrap-deployment.py",
         "ppu-z2-installer.py",
         "z2-python-runtime.py",
+        "z2like-demo-qemu-installer.py",
     ):
         (scripts_dir / name).chmod(0o755)
 
