@@ -171,6 +171,8 @@ debt. The following remain explicit live qualification debt:
 - real IC programming
 - physical multi-Site concurrency
 
+Until those debts are closed or explicitly re-scoped, H021 is not fully closed.
+
 ## Qualification boundary
 
 > **Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED.**
