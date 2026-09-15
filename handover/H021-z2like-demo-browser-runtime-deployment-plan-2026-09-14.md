@@ -131,6 +131,25 @@ Their software contracts are regression-tested, but H021 is not fully closed
 until these remaining live-negative cases are either exercised safely or split
 into a separately approved qualification gate.
 
+## Active-Site-Job disable rejection follow-up gate
+
+PR #591 adds a separate post-merge live-negative gate for **active-Site-Job disable rejection**.
+It must observe the exact configured-Mock Site Job through Manager before attempting
+`commissioned -> disabled`, and PASS requires HTTP 409 `ppu_busy`. The gate uses only
+the normal maintenance capability, performs bounded Job cleanup, restores the prior
+Mock Runtime profile, and has no force lifecycle transition.
+
+A PASS of this follow-up closes only the active-Site-Job disable rejection debt.
+The following remain explicit live qualification debt:
+
+- forced stale/non-idle maintenance proof rejection
+- 15-minute capability expiry wall-clock rejection
+- real PYNQ-Z2 deployment/reboot/rollback
+- PL/FPGA behavior
+- target power/electrical behavior
+- real IC programming
+- physical multi-Site concurrency
+
 ## Qualification boundary
 
 > **Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED.**
