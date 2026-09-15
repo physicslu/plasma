@@ -34,6 +34,7 @@ EXPECTED_PRESTATE_FAMILIES = 13
 EXPECTED_POSTSTATE_FAMILIES = 14
 EXPECTED_STATUS_COUNTS = {"Active": 100, "Evaluation": 6}
 EXPECTED_EXACT_SET_SHA256 = "6ff4f01a009e28aff1a6ebf3f74544c973ce9e2a229bc72f4574f71c47ea4918"
+EXPECTED_PRESTATE_MANIFEST_SHA256 = "64074683cb01d3584da314f15e499f3db2c4b586d96def3ab8371dd2b50d93f5"
 CANONICAL_VERIFICATION_STATUS = "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
 
 PRODUCTION_FIELDS = (
@@ -64,6 +65,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RuntimeError(f"{path}: expected JSON object")
     return value
+
+
+def _json_bytes(value: dict[str, Any]) -> bytes:
+    return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
 def _git_blob_sha(data: bytes) -> str:
@@ -119,6 +124,31 @@ def _production_snapshot(manifest: dict[str, Any]) -> tuple[int, int, set[str]]:
     return exact_count, len(families), families
 
 
+def _derive_prestate(current: dict[str, Any]) -> tuple[dict[str, Any], bytes, dict[str, Any] | None]:
+    sources = current.get("sources")
+    if not isinstance(sources, list):
+        raise RuntimeError("Production manifest sources missing")
+    u3_sources = [source for source in sources if isinstance(source, dict) and source.get("family") == FAMILY]
+    if len(u3_sources) > 1:
+        raise RuntimeError("duplicate STM32U3 Production sources")
+    retained_sources = [
+        source for source in sources
+        if not (isinstance(source, dict) and source.get("family") == FAMILY)
+    ]
+    prestate = {**current, "sources": retained_sources}
+    prestate_bytes = _json_bytes(prestate)
+    if _sha256(prestate_bytes) != EXPECTED_PRESTATE_MANIFEST_SHA256:
+        raise RuntimeError("STM32U3 frozen Production prestate drifted")
+    exact, families, family_set = _production_snapshot(prestate)
+    if (
+        exact != EXPECTED_PRESTATE_EXACT
+        or families != EXPECTED_PRESTATE_FAMILIES
+        or FAMILY in family_set
+    ):
+        raise RuntimeError(f"Production prestate drifted: exact={exact} families={families}")
+    return prestate, prestate_bytes, u3_sources[0] if u3_sources else None
+
+
 def _publication_rows() -> tuple[list[dict[str, str]], Counter[str]]:
     rows = build_canonical_rows()
     if len(rows) != EXPECTED_ROWS:
@@ -162,36 +192,30 @@ def _render_csv(rows: list[dict[str, str]]) -> bytes:
 
 def render_publication() -> tuple[bytes, bytes, dict[str, Any]]:
     _validate_architecture_policy()
-    manifest = _read_json(PRODUCTION_MANIFEST)
+    current = _read_json(PRODUCTION_MANIFEST)
     if (
-        manifest.get("schema_version") != 1
-        or manifest.get("status") != "production"
-        or manifest.get("selection_policy") != "admitted_exact_manufacturer_part_number_only"
+        current.get("schema_version") != 1
+        or current.get("status") != "production"
+        or current.get("selection_policy") != "admitted_exact_manufacturer_part_number_only"
     ):
         raise RuntimeError("Production manifest contract drifted")
-    before_exact, before_family_count, families = _production_snapshot(manifest)
-    if before_exact != EXPECTED_PRESTATE_EXACT or before_family_count != EXPECTED_PRESTATE_FAMILIES:
-        raise RuntimeError(
-            f"Production prestate drifted: exact={before_exact} families={before_family_count}"
-        )
-    if FAMILY in families:
-        raise RuntimeError("STM32U3 is already present in Production manifest")
+    prestate, prestate_bytes, existing_u3_source = _derive_prestate(current)
 
     rows, statuses = _publication_rows()
     canonical = _render_csv(rows)
-    sources = list(manifest["sources"])
-    sources.append(
-        {
-            "manufacturer": MANUFACTURER,
-            "family": FAMILY,
-            "path": "../research/stm32u3-commercial-icpn.csv",
-            "row_count": EXPECTED_ROWS,
-            "git_blob_sha": _git_blob_sha(canonical),
-            "sha256": _sha256(canonical),
-        }
-    )
-    post_manifest = {**manifest, "sources": sources}
-    manifest_bytes = (json.dumps(post_manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    u3_source = {
+        "manufacturer": MANUFACTURER,
+        "family": FAMILY,
+        "path": "../research/stm32u3-commercial-icpn.csv",
+        "row_count": EXPECTED_ROWS,
+        "git_blob_sha": _git_blob_sha(canonical),
+        "sha256": _sha256(canonical),
+    }
+    if existing_u3_source is not None and existing_u3_source != u3_source:
+        raise RuntimeError("checked-in STM32U3 Production source binding drifted")
+
+    post_manifest = {**prestate, "sources": [*prestate["sources"], u3_source]}
+    manifest_bytes = _json_bytes(post_manifest)
     after_exact, after_family_count, after_families = _production_snapshot(post_manifest)
     if (
         after_exact != EXPECTED_POSTSTATE_EXACT
@@ -199,6 +223,8 @@ def render_publication() -> tuple[bytes, bytes, dict[str, Any]]:
         or FAMILY not in after_families
     ):
         raise RuntimeError("STM32U3 proposed Production poststate drifted")
+    if existing_u3_source is not None and PRODUCTION_MANIFEST.read_bytes() != manifest_bytes:
+        raise RuntimeError("checked-in Production manifest is not deterministic STM32U3 poststate")
 
     proposal = {
         "schema_version": 1,
@@ -214,7 +240,7 @@ def render_publication() -> tuple[bytes, bytes, dict[str, Any]]:
         "exact_icpn_set_sha256": EXPECTED_EXACT_SET_SHA256,
         "canonical_csv_sha256": _sha256(canonical),
         "canonical_csv_git_blob_sha": _git_blob_sha(canonical),
-        "production_manifest_sha256_before": _sha256(PRODUCTION_MANIFEST.read_bytes()),
+        "production_manifest_sha256_before": _sha256(prestate_bytes),
         "production_manifest_sha256_after": _sha256(manifest_bytes),
         "production_manifest_git_blob_sha_after": _git_blob_sha(manifest_bytes),
         "production_exact_icpns_before": EXPECTED_PRESTATE_EXACT,
