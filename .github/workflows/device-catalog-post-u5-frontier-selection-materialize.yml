@@ -27,12 +27,12 @@ jobs:
         run: python data/device-catalog/research/stm32_post_u5_frontier_selection.py --output data/device-catalog/research/stm32-post-u5-frontier-selection.json
       - name: Commit deterministic selection
         run: |
-          if git diff --quiet -- data/device-catalog/research/stm32-post-u5-frontier-selection.json; then
+          git add data/device-catalog/research/stm32-post-u5-frontier-selection.json
+          if git diff --cached --quiet; then
             echo 'Selection already materialized.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/device-catalog/research/stm32-post-u5-frontier-selection.json
           git commit -m 'Device catalog: materialize post-U5 frontier selection'
           git push origin HEAD:agent/post-u5-frontier-selection
