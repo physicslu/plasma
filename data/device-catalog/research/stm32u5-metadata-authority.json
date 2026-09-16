@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u5-metadata-policy",
+  "authority": "research_only",
+  "authority_version": "stm32u5-metadata-retained266-v1",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32U5",
+  "identity_source": "stm32u5-exact-orderable-identity-enumeration.json",
+  "parent_identity_source": "stm32u5-manufacturer-identity-discovery.json",
+  "expected_base_devices": 74,
+  "expected_exact_icpns": 266,
+  "expected_base_device_set_sha256": "ab83ea88d30d173e3809b3c1245691a0fb6be4a78f6fa35bd47f6caa8533bcdf",
+  "expected_exact_icpn_set_sha256": "ea5e3edc302a022281618ecfa73af8ac6109ad287dcf36e6f1175d20f567caf3",
+  "governance": {
+    "scope_expansion_authorized": false,
+    "production_admission_authorized": false,
+    "preview_status_implies_production_admission": false,
+    "security_semantics_supported": false,
+    "option_byte_semantics_supported": false,
+    "oem_key_semantics_supported": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "debug_attach_supported": false,
+    "physical_validation_claimed": false,
+    "hil_validated": false
+  },
+  "suffix_grammar": {
+    "package_position": 0,
+    "temperature_position": 1,
+    "packing_codes": {
+      "TR": "tape_and_reel"
+    },
+    "programmed_parts_wildcard_admission_authorized": false
+  },
+  "records": [
+    {
+      "series": "STM32U535",
+      "subfamilies": ["STM32U535"],
+      "document_id": "DS14217",
+      "revision": 5,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u535ce.pdf",
+      "pin_codes": {"C": "48", "N": "56", "R": "64", "J": "72", "V": "100"},
+      "pin_package_overrides": {},
+      "flash": {"B": "128 KiB", "C": "256 KiB", "E": "512 KiB"},
+      "package_codes": {"T": "LQFP", "I": "UFBGA", "U": "UFQFPN", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U545",
+      "subfamilies": ["STM32U545"],
+      "document_id": "DS14216",
+      "revision": 5,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u545ce.pdf",
+      "pin_codes": {"C": "48", "N": "56", "R": "64", "J": "72", "V": "100"},
+      "pin_package_overrides": {},
+      "flash": {"E": "512 KiB"},
+      "package_codes": {"T": "LQFP", "I": "UFBGA", "U": "UFQFPN", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U575",
+      "subfamilies": ["STM32U575"],
+      "document_id": "DS13737",
+      "revision": 10,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u575zi.pdf",
+      "pin_codes": {"C": "48", "R": "64", "O": "90", "V": "100", "Q": "132", "Z": "144", "A": "169"},
+      "pin_package_overrides": {},
+      "flash": {"G": "1 MiB", "I": "2 MiB"},
+      "package_codes": {"T": "LQFP", "I": "UFBGA", "U": "UFQFPN", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U585",
+      "subfamilies": ["STM32U585"],
+      "document_id": "DS13086",
+      "revision": 10,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u585zi.pdf",
+      "pin_codes": {"C": "48", "R": "64", "O": "90", "V": "100", "Q": "132", "Z": "144", "A": "169"},
+      "pin_package_overrides": {},
+      "flash": {"I": "2 MiB"},
+      "package_codes": {"T": "LQFP", "I": "UFBGA", "U": "UFQFPN", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U59xxx",
+      "subfamilies": ["STM32U595", "STM32U599"],
+      "document_id": "DS13633",
+      "revision": 3,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u595ai.pdf",
+      "pin_codes": {"R": "64", "V": "100", "Q": "132", "Z": "144", "A": "169", "B": "208", "N": "216"},
+      "pin_package_overrides": {"Z:Y": "150"},
+      "flash": {"I": "2 MiB", "J": "4 MiB"},
+      "package_codes": {"T": "LQFP", "H": "TFBGA", "I": "UFBGA", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U5Axxx",
+      "subfamilies": ["STM32U5A5", "STM32U5A9"],
+      "document_id": "DS13543",
+      "revision": 3,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u5a5aj.pdf",
+      "pin_codes": {"R": "64", "V": "100", "Q": "132", "Z": "144", "A": "169", "B": "208", "N": "216"},
+      "pin_package_overrides": {"Z:Y": "150"},
+      "flash": {"I": "2 MiB", "J": "4 MiB"},
+      "package_codes": {"T": "LQFP", "H": "TFBGA", "I": "UFBGA", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C", "3": "-40..125 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U5Fxxx",
+      "subfamilies": ["STM32U5F7", "STM32U5F9"],
+      "document_id": "DS14395",
+      "revision": 4,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u5f7vj.pdf",
+      "pin_codes": {"V": "100", "Z": "144", "B": "208", "N": "216"},
+      "pin_package_overrides": {},
+      "flash": {"I": "2 MiB", "J": "4 MiB"},
+      "package_codes": {"J": "UFBGA", "T": "LQFP", "H": "TFBGA", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"]
+    },
+    {
+      "series": "STM32U5Gxxx",
+      "subfamilies": ["STM32U5G7", "STM32U5G9"],
+      "document_id": "DS14102",
+      "revision": 5,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u5g9nj.pdf",
+      "pin_codes": {"V": "100", "Z": "144", "B": "208", "N": "216"},
+      "pin_package_overrides": {},
+      "flash": {"J": "4 MiB"},
+      "package_codes": {"J": "UFBGA", "T": "LQFP", "H": "TFBGA", "Y": "WLCSP"},
+      "temperature_codes": {"6": "-40..85 C"},
+      "dedicated_pinout_codes": {"Q": "smps_step_down"},
+      "retained_allowed_tails": ["", "Q", "TR", "QTR"],
+      "known_authority_gaps": [
+        {
+          "icpn": "STM32U5G9ZJJ3Q",
+          "field": "temperature_grade",
+          "code": "3",
+          "reason": "DS14102 Rev 5 does not define temperature code 3 for STM32U5Gxxx; exact Preview identity remains retained from ST Quality & Reliability and metadata inference is blocked."
+        }
+      ]
+    }
+  ]
+}
