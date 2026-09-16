@@ -61,6 +61,31 @@ export type ManagerBootstrapStatus = {
   };
 };
 
+export type PlatformPsLoopbackPayload = {
+  ok: true;
+  diagnostic_protocol_version?: string;
+  loopback: {
+    endpoint: string;
+    source: string;
+    test_id: string;
+    sequence: number;
+    transform?: string;
+    pattern?: string;
+    seed?: string;
+    payload_length?: number;
+    tx_crc32?: string;
+    rx_crc32?: string;
+    ppu_rtt_ms?: number;
+  };
+  payload_base64?: string;
+  manager: {
+    relay: "platform-maintenance";
+    context: "platform";
+    ppu_alias: string;
+    manager_rtt_ms: number;
+  };
+};
+
 type ErrorPayload = {
   error?: { code?: string; message?: string } | string;
   message?: string;
@@ -118,6 +143,24 @@ export function pairManagerPpuBootstrap(alias: string, token: string): Promise<M
   return jsonRequest<ManagerBootstrapStatus>(`${root(alias)}/pair`, {
     method: "POST",
     body: JSON.stringify({ token }),
+  });
+}
+
+export function runManagerPpuPlatformPsLoopback(alias: string): Promise<PlatformPsLoopbackPayload> {
+  const sequence = Date.now();
+  return jsonRequest<PlatformPsLoopbackPayload>(`${root(alias)}/ps-loopback`, {
+    method: "POST",
+    body: JSON.stringify({
+      endpoint: "ps",
+      test_id: `platform-ps-${sequence}`,
+      sequence,
+      pattern: "zero",
+      seed: "",
+      payload_length: 1,
+      payload_base64: "AA==",
+      tx_crc32: "d202ef8d",
+      timeout_ms: 5000,
+    }),
   });
 }
 
