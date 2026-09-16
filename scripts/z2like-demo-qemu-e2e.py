@@ -9,7 +9,9 @@ After Runtime activation it proves the lifecycle split required by Platform
 management: a pending/unregistered PPU can run the maintenance-authorized
 Platform PS Loop Test, the normal Managed PS route remains blocked, and the same
 Runtime PS loopback becomes available through the Managed route only after the
-PPU is validated and commissioned.
+PPU is validated and commissioned. The Platform path remains available after
+commissioning, proving that the two admission contexts are independent rather
+than mutually exclusive modes.
 
 It never calls the QEMU Bootstrap mutation API directly. The only direct target
 reads are final health/readiness evidence and retrieval of the device-local token
@@ -374,6 +376,22 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
             if not isinstance(managed_proof, dict) or managed_proof.get("relay") != "pass-through":
                 raise AcceptanceError(f"Managed PS Loop Test omitted Manager relay proof: {managed_loopback!r}")
 
+            status, platform_commissioned = _json_request(
+                f"{bootstrap_url}/ps-loopback",
+                method="POST",
+                body=_loopback_body("qemu-platform-commissioned"),
+            )
+            _expect(status, 200, platform_commissioned, "commissioned Platform PS Loop Test")
+            _assert_ps_loopback(platform_commissioned, operation="commissioned Platform PS Loop Test")
+            commissioned_platform_proof = platform_commissioned.get("manager")
+            if (
+                not isinstance(commissioned_platform_proof, dict)
+                or commissioned_platform_proof.get("context") != "platform"
+            ):
+                raise AcceptanceError(
+                    f"commissioned Platform PS Loop Test omitted platform admission proof: {platform_commissioned!r}"
+                )
+
             return {
                 "result": "PASS",
                 "evidence_level": "ci-qemu-armv7-z2like-demo",
@@ -391,6 +409,7 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
                 "managed_ps_loopback_pending": "BLOCKED",
                 "registration_state": "commissioned",
                 "managed_ps_loopback_commissioned": "PASS",
+                "platform_ps_loopback_commissioned": "PASS",
                 "not_claimed": [
                     "SWPC host deployment",
                     "public Cloudflare hostname routing",
