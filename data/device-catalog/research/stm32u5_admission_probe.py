@@ -133,6 +133,10 @@ def main() -> int:
             "target_config": row["target_config"],
         })
 
+    u5a5_routes = [
+        {"part_number": row["part_number"], "identifier_kind": row["identifier_kind"]}
+        for row in routes if row["subfamily"] == "STM32U5A5"
+    ]
     result = {
         "transaction": "stm32u5-canonical-admission-plan-under-security-fence-probe",
         "retained_exact_icpns": 266,
@@ -146,6 +150,7 @@ def main() -> int:
         "route_binding_sha256": route_binding_sha(assignments),
         "unresolved_count": len(unresolved),
         "unresolved": unresolved,
+        "u5a5_route_rows": u5a5_routes,
         "required_target_config": TARGET_CONFIG,
         "production_exact_icpn_count": 2017,
         "production_write_authorized": False,
