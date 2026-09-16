@@ -1,107 +1,39 @@
-name: STM32U5 exact orderable identity live retry
+name: STM32U5 exact orderable identity validation
 
 on:
-  workflow_dispatch:
-  # Temporary research-branch trigger. Remove this live workflow after the
-  # merged evidence snapshot is frozen and replace it with offline validation.
-  push:
-    branches:
-      - agent/stm32u5-exact-orderable-identity-enumeration
+  pull_request:
     paths:
-      - 'data/device-catalog/research/stm32u5_exact_orderable_identity_probe.py'
-      - 'data/device-catalog/research/stm32u5-exact-orderable-first-pass-seed.json'
+      - 'data/device-catalog/research/stm32u5-exact-orderable-identity-enumeration.json'
+      - 'data/device-catalog/research/stm32u5-manufacturer-identity-discovery.json'
       - 'data/device-catalog/research/stm32u5-base-device-discovery.csv'
+      - 'data/device-catalog/research/stm32u5-security-scope-foundation.json'
+      - 'data/device-catalog/research/validate_stm32u5_exact_orderable_identity_enumeration.py'
+      - 'data/device-catalog/research/validate_stm32u5_manufacturer_identity_discovery.py'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
       - '.github/workflows/device-catalog-stm32u5-exact-orderable-identity-probe.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: stm32u5-exact-orderable-live-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  live-retry:
+  offline-validation:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install bounded browser acquisition dependencies
+      - name: Validate completed STM32U5 parent identity discovery
+        run: python data/device-catalog/research/validate_stm32u5_manufacturer_identity_discovery.py
+
+      - name: Validate frozen STM32U5 exact orderable identities
+        run: python data/device-catalog/research/validate_stm32u5_exact_orderable_identity_enumeration.py
+
+      - name: Enforce offline-only gate
         run: |
-          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
-          python -m playwright install --with-deps chromium
-
-      - name: Retry only unresolved STM32U5 Q&R identities
-        id: acquire
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          mkdir -p .artifacts/stm32u5-exact-orderable/retry-evidence
-          xvfb-run -a python data/device-catalog/research/stm32u5_exact_orderable_identity_probe.py \
-            --seed data/device-catalog/research/stm32u5-exact-orderable-first-pass-seed.json \
-            --delay 1.0 \
-            --timeout 90 \
-            --output-csv .artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.csv \
-            --output-json .artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json \
-            --evidence-dir .artifacts/stm32u5-exact-orderable/retry-evidence
-
-      - name: Validate merged 63 plus 11 acquisition summary
-        id: validate
-        if: always() && hashFiles('.artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json') != ''
-        continue-on-error: true
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          path = Path('.artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json')
-          p = json.loads(path.read_text())
-          assert p['transaction'] == 'stm32u5-exact-orderable-identity-enumeration'
-          assert p['authority'] == 'official_st_quality_and_reliability_exact_part_number_identity'
-          assert p['first_pass_seed']['run_id'] == 35041196885
-          assert p['first_pass_seed']['successful_base_devices'] == 63
-          assert p['first_pass_seed']['exact_icpn_count'] == 211
-          assert p['retry_base_device_count'] == 11
-          assert len(p['retry_base_devices']) == 11
-          assert p['observed_base_devices'] == 74
-          assert p['successful_base_devices'] == 74
-          assert p['base_devices_with_exact_identity'] == 74
-          assert p['acquisition_failures'] == 0
-          assert p['exact_icpn_count'] > 211
-          assert p['synthesized_exact_icpns'] == 0
-          assert p['duplicate_exact_icpns'] == []
-          assert p['complete_exact_identity_observation'] is True
-          assert all(v is False for v in p['claims'].values())
-          print(json.dumps({
-              'exact_icpn_count': p['exact_icpn_count'],
-              'exact_icpn_set_sha256': p['exact_icpn_set_sha256'],
-              'marketing_status_counts': p['marketing_status_counts'],
-              'retry_base_devices': p['retry_base_devices'],
-              'browser': p['browser'],
-          }, indent=2, sort_keys=True))
-          PY
-
-      - name: Upload immutable merged live candidate artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: stm32u5-exact-orderable-merged-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .artifacts/stm32u5-exact-orderable/
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Enforce bounded retry gate
-        if: always()
-        run: |
-          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
-            echo "STM32U5 exact identity retry requires review." >&2
-            exit 1
-          fi
-          if [ "${{ steps.validate.outcome }}" != "success" ]; then
-            echo "STM32U5 merged exact identity evidence failed validation." >&2
-            exit 1
-          fi
+          test ! -e .artifacts/stm32u5-exact-orderable
+          echo "STM32U5 exact identity validation uses repository-retained evidence only."
