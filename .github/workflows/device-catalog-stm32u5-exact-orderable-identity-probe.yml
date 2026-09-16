@@ -2,6 +2,17 @@ name: STM32U5 exact orderable identity live acquisition
 
 on:
   workflow_dispatch:
+  # Temporary research-branch trigger. This exists only because a newly added
+  # workflow cannot be manually dispatched until the workflow exists on the
+  # default branch. Remove this live workflow after evidence is frozen and
+  # replace it with deterministic offline validation before Gate 2.
+  push:
+    branches:
+      - agent/stm32u5-exact-orderable-identity-enumeration
+    paths:
+      - 'data/device-catalog/research/stm32u5_exact_orderable_identity_probe.py'
+      - 'data/device-catalog/research/stm32u5-base-device-discovery.csv'
+      - '.github/workflows/device-catalog-stm32u5-exact-orderable-identity-probe.yml'
 
 permissions:
   contents: read
