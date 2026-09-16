@@ -40,6 +40,13 @@
   letter-spacing: .17em;
 }
 
+.globalAppNavVersion {
+  color: var(--text-soft);
+  font: 700 9px var(--font-sans);
+  letter-spacing: .04em;
+  opacity: .78;
+}
+
 .globalNavControls,
 .globalAppNav nav,
 .globalLocale {

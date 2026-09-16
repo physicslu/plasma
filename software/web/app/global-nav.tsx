@@ -13,6 +13,7 @@ import {
   subscribeBatchExecutionActivity,
 } from "./batch-execution-activity";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
+import { PLASMA_PRODUCT_VERSION } from "./product-version";
 import ThemeSwitch from "./theme-switch";
 
 function subscribeHydration(): () => void {
@@ -68,6 +69,7 @@ export function GlobalNav() {
       >
         <span>P</span>
         <b>PLASMA</b>
+        <small className="globalAppNavVersion">{`v${PLASMA_PRODUCT_VERSION}`}</small>
       </Link>
 
       <div className="globalNavControls">
