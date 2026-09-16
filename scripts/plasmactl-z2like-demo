@@ -249,8 +249,8 @@ Canonical topology:
     -> QEMU ARMv7 simulated Z2 172.30.77.2:18080
 
 The SWPC 18380/18390 pair is an internal maintenance/acceptance fixture only;
-it is not the public z2like-demo website. SWPC host 18081 remains the legacy
-restricted diagnostics ingress pending retirement and is not used here.
+it is not the public z2like-demo website. SWPC host 18081 is retired and must
+remain unused. QEMU private 172.30.77.2:18081 remains Bootstrap/recovery.
 EOF
 }
 
