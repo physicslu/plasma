@@ -4,11 +4,13 @@ import test from "node:test";
 
 const readabilityPath = new URL("../app/engineering/engineering-readability.css", import.meta.url);
 const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url);
+const engineeringCssPath = new URL("../app/engineering/engineering.css", import.meta.url);
 const sharedControlsPath = new URL("../app/operator-ui/programming-job-controls.css", import.meta.url);
 const designContractPath = new URL("../app/operator-ui/operator-design-contract.css", import.meta.url);
 const panelCssPath = new URL("../app/operator-ui/operator-panel.css", import.meta.url);
 const operatorSurfacePrimitivesPath = new URL("../app/operator-ui/operator-surface-primitives.css", import.meta.url);
 const ppuSiteCssPath = new URL("../app/engineering/ppu-site-configuration.css", import.meta.url);
+const ppuRegistryLiveCssPath = new URL("../app/engineering/ppu-site-registry-live.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
@@ -122,7 +124,7 @@ test("PPU Site management consumes canonical shared operator primitives and stay
 
   assert.match(primitives, /\.operatorCard,[\s\S]*\.ppuSiteCard,[\s\S]*\.settingsCard,[\s\S]*\.diagnosticsTestCard\s*\{[\s\S]*border-radius:\s*10px[\s\S]*box-shadow:/);
   assert.match(primitives, /\.operatorButton,[\s\S]*\.ppuSiteButton,[\s\S]*\.settingsActions button,[\s\S]*\.loopbackExecutionActions button\s*\{[\s\S]*min-height:\s*38px[\s\S]*font:\s*700 11px\/1\.2 var\(--font-sans\)/);
-  assert.match(primitives, /^\.ppuRegistryAddForm input\s*\{[\s\S]*min-height:\s*36px[\s\S]*font:\s*11px var\(--font-mono\)/m);
+  assert.match(primitives, /\.ppuRegistryAddForm input,\s*\n\.ppuRegistryAddForm select\s*\{[\s\S]*min-height:\s*36px[\s\S]*font:\s*11px var\(--font-mono\)/);
 
   assert.doesNotMatch(ppuCss, /^\.ppuSiteCard\s*\{/m, "PPU cards must not redeclare the shared card primitive");
   assert.doesNotMatch(ppuCss, /^\.ppuSiteButton\s*\{/m, "PPU actions must not redeclare the shared action primitive");
@@ -133,4 +135,48 @@ test("PPU Site management consumes canonical shared operator primitives and stay
   assert.match(ppuCss, /first-child > \.ppuSiteCard:first-child \{ order: 1; \}/);
   assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:first-child \{ order: 2; \}/);
   assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:nth-child\(2\) \{ order: 3; \}/);
+});
+
+test("Productized PPU pages stay on the Diagnostics engineering visual scale", async () => {
+  const [engineeringCss, primitives, registryLive] = await Promise.all([
+    source(engineeringCssPath),
+    source(operatorSurfacePrimitivesPath),
+    source(ppuRegistryLiveCssPath),
+  ]);
+
+  assert.match(
+    engineeringCss,
+    /\.engineeringCanvas\.ppuSitesActive\s*\{[\s\S]*padding:\s*18px clamp\(18px,\s*3vw,\s*42px\) 48px;[\s\S]*background:\s*var\(--panel-3\)/,
+    "PPU pages must use the same desktop canvas rhythm as Diagnostics",
+  );
+
+  for (const pageLabel of [
+    "PPU Overview",
+    "PPU Platform Release Workspace",
+    "PPU Registration",
+    "PPU Sites",
+  ]) {
+    assert.ok(primitives.includes(`[aria-label="${pageLabel}"]`), `missing PPU visual contract for ${pageLabel}`);
+  }
+
+  assert.match(
+    primitives,
+    /\.ppuSiteConfiguration:is\([\s\S]*\) \.ppuSiteCardHeader\s*\{[\s\S]*padding:\s*15px 16px 0;[\s\S]*border-bottom:\s*0/,
+    "Productized PPU cards must use the Diagnostics card-header composition",
+  );
+  assert.match(
+    primitives,
+    /\.ppuSiteConfiguration \.ppuRegistryAddForm > div:not\(\.ppuSiteCardHeaderActions\) > strong\s*\{[\s\S]*font-size:\s*14px/,
+    "Nested PPU workflow headings must stay on the canonical card title scale",
+  );
+  assert.match(
+    primitives,
+    /\.ppuSiteConfiguration \.ppuRegistryAddForm > div:not\(\.ppuSiteCardHeaderActions\) > p\s*\{[\s\S]*font-size:\s*11px[\s\S]*line-height:\s*1\.5/,
+    "Nested PPU workflow copy must stay on the canonical engineering body scale",
+  );
+  assert.match(
+    registryLive,
+    /\.ppuRegistryMessage\s*\{[\s\S]*padding:\s*10px 12px[\s\S]*font-size:\s*11px[\s\S]*line-height:\s*1\.5/,
+    "PPU status notices must use the Diagnostics message scale",
+  );
 });
