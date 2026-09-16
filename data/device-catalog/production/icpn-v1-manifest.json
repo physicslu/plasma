@@ -124,6 +124,14 @@
       "row_count": 49,
       "git_blob_sha": "2a29ccb754b5da6332cb40bd992a1261a3b03237",
       "sha256": "a329e4146cf083f79f629b6df31db0922d0a611b6cae26dba8ec891f0ae9232f"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32U5",
+      "path": "../research/stm32u5-commercial-icpn.csv",
+      "row_count": 265,
+      "git_blob_sha": "fbdc3269b3e989058a6644355afe53f981814aec",
+      "sha256": "49144dc8bd1855861ca4059880c256d19af31a9abcfcdf2cddae83cf44560fe6"
     }
   ]
 }
