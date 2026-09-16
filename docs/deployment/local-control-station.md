@@ -98,7 +98,7 @@ Real Z2 on a trusted local network
 http://192.168.10.21:18080
 ```
 
-The SWPC Z2-like `127.0.0.1:18081` listener is intentionally a restricted diagnostics/status ingress. It does not expose Site Desired writes or runtime activation and **must not** be configured as the local Control Station PPU endpoint.
+The former SWPC host `127.0.0.1:18081` diagnostics/status ingress was retired by Issue #549 and must remain unused. It is not a valid Local Control Station PPU endpoint. Port `18081` remains architecturally valid only as the independent Bootstrap/recovery service on real Z2 and inside the private QEMU simulated-Z2 target.
 
 The Manager/BFF target alias is fixed by deployment configuration. Browser selection does not rewrite the backend target.
 

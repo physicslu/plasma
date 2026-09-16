@@ -11,7 +11,9 @@ usage: sudo bash scripts/swpc-z2like-ppu-install.sh \
 Installs a PS-only, closed-hardware PPU surrogate on SWPC using the same
 filesystem, bounded runtime-activation, and systemd ownership model as the Z2
 PS installer. This is an x86_64 integration surrogate, not ARMv7/Z2
-qualification evidence.
+qualification evidence. The retired SWPC host diagnostics ingress on :18081
+is never recreated; public/managed access belongs to the maintained Control
+Station and z2like-demo managed-ingress paths.
 EOF
 }
 
@@ -19,18 +21,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 plasma_python=""
 ppu_id=""
 facility_id=""
-proxy_port="18081"
-nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
-managed_evidence="/opt/plasma/install/last-swpc-z2like-install.json"
-managed_current_link="/opt/plasma/current"
-managed_release_root="/opt/plasma/releases"
+legacy_nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"
+legacy_nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
 
 while (($#)); do
   case "$1" in
     --plasma-python) plasma_python="${2:-}"; shift 2 ;;
     --ppu-id) ppu_id="${2:-}"; shift 2 ;;
     --facility-id) facility_id="${2:-}"; shift 2 ;;
-    --proxy-port) proxy_port="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'unknown argument: %s\n' "$1" >&2; usage >&2; exit 64 ;;
   esac
@@ -51,65 +49,34 @@ if [[ ! -x "$plasma_python" ]]; then
   printf 'swpc-z2like-ppu-install: Plasma Python is not executable: %s\n' "$plasma_python" >&2
   exit 78
 fi
-if [[ ! "$proxy_port" =~ ^[0-9]+$ ]] || (( proxy_port < 1 || proxy_port > 65535 || proxy_port == 9900 || proxy_port == 18080 )); then
-  printf 'swpc-z2like-ppu-install: invalid restricted proxy port: %s\n' "$proxy_port" >&2
-  exit 64
-fi
 if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
   printf 'swpc-z2like-ppu-install: repository must be clean for qualification staging\n' >&2
   exit 78
 fi
-for command in git ss systemctl nginx install useradd; do
+for command in git ss systemctl install useradd; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'swpc-z2like-ppu-install: required host command is missing: %s\n' "$command" >&2
     exit 69
   }
 done
 
-nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"
-if [[ -e "$nginx_conf" ]] && ! grep -Fxq "$nginx_marker" "$nginx_conf"; then
-  printf 'swpc-z2like-ppu-install: refusing to overwrite unmanaged Nginx config: %s\n' "$nginx_conf" >&2
-  exit 78
-fi
-
-qualified_managed_proxy_residual_listener() {
-  # During a managed deploy the wrapper has already validated ownership, stopped
-  # Plasma runtime services, removed only the Plasma-owned Nginx config, and
-  # reloaded Nginx. A graceful reload can leave the old Nginx worker/listener
-  # alive briefly. Accept only that narrowly proven residual state; first install
-  # and all unrelated listeners remain fail-closed.
-  [[ ! -e "$nginx_conf" ]] || return 1
-  [[ -f "$managed_evidence" && -L "$managed_current_link" ]] || return 1
-  ss -H -ltnp "sport = :$proxy_port" | grep -Fq '"nginx"' || return 1
-
-  "$plasma_python" - "$managed_evidence" "$proxy_port" "$managed_current_link" "$managed_release_root" <<'PY'
-import json
-import os
-import sys
-
-evidence_path, proxy_port, current_link, release_root = sys.argv[1:]
-with open(evidence_path, encoding="utf-8") as handle:
-    payload = json.load(handle)
-expected = {
-    "schema_version": 1,
-    "role": "ppu-surrogate",
-    "platform": "linux",
-    "z2_equivalent": False,
-    "hardware_boundary": "closed",
+retire_legacy_restricted_ingress() {
+  [[ -e "$legacy_nginx_conf" ]] || return 0
+  if ! grep -Fxq "$legacy_nginx_marker" "$legacy_nginx_conf"; then
+    printf 'swpc-z2like-ppu-install: refusing to remove unmanaged Nginx config: %s\n' "$legacy_nginx_conf" >&2
+    exit 78
+  fi
+  command -v nginx >/dev/null 2>&1 || {
+    printf 'swpc-z2like-ppu-install: nginx is required to retire legacy ingress: %s\n' "$legacy_nginx_conf" >&2
+    exit 69
+  }
+  rm -f "$legacy_nginx_conf"
+  nginx -t
+  systemctl reload nginx
+  printf '[swpc-z2like] retired legacy SWPC host diagnostics ingress: 127.0.0.1:18081\n'
 }
-for field, value in expected.items():
-    if payload.get(field) != value:
-        raise SystemExit(f"managed upgrade evidence field {field} is invalid")
-if payload.get("restricted_ingress") != f"127.0.0.1:{proxy_port}":
-    raise SystemExit("managed upgrade evidence does not own the requested restricted ingress")
-release_id = payload.get("release_id")
-if not isinstance(release_id, str) or not release_id:
-    raise SystemExit("managed upgrade evidence is missing release identity")
-expected_current = os.path.join(release_root, release_id)
-if os.path.realpath(current_link) != expected_current:
-    raise SystemExit("managed upgrade evidence/current release identity mismatch")
-PY
-}
+
+retire_legacy_restricted_ingress
 
 for port in 9900 18080; do
   if ss -H -ltn "sport = :$port" | grep -q .; then
@@ -118,16 +85,6 @@ for port in 9900 18080; do
     exit 78
   fi
 done
-
-if ss -H -ltn "sport = :$proxy_port" | grep -q .; then
-  if qualified_managed_proxy_residual_listener; then
-    printf '[swpc-z2like] accepting qualified residual Nginx listener on restricted ingress 127.0.0.1:%s during managed upgrade\n' "$proxy_port"
-  else
-    printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$proxy_port" >&2
-    ss -H -ltnp "sport = :$proxy_port" >&2 || true
-    exit 78
-  fi
-fi
 
 read -r py_version py_releaselevel py_machine < <("$plasma_python" - <<'PY'
 import platform, sys
@@ -311,51 +268,12 @@ for name, content in units.items():
 PY
 chmod 0644 "$server_unit" "$gateway_unit" "$activation_unit"
 
-# The public tunnel must terminate on this restricted proxy, never on :18080.
-# This Gate-1 transaction deliberately keeps the historical public allowlist
-# unchanged; full managed-control ingress is a separate architecture/security task.
-cat >"$nginx_conf" <<EOF
-$nginx_marker
-server {
-    listen 127.0.0.1:$proxy_port;
-    server_name _;
-
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Forwarded-Proto https;
-
-    location = /api/health/live {
-        limit_except GET { deny all; }
-        proxy_pass http://127.0.0.1:18080;
-    }
-    location = /api/health/ready {
-        limit_except GET { deny all; }
-        proxy_pass http://127.0.0.1:18080;
-    }
-    location = /api/node {
-        limit_except GET { deny all; }
-        proxy_pass http://127.0.0.1:18080;
-    }
-    location = /api/status {
-        limit_except GET { deny all; }
-        proxy_pass http://127.0.0.1:18080;
-    }
-    location = /api/engineering/diagnostics/loopback {
-        limit_except POST { deny all; }
-        proxy_pass http://127.0.0.1:18080;
-    }
-    location / { return 404; }
-}
-EOF
-
 ln -sfn "$release_dir" /opt/plasma/current.new
 mv -Tf /opt/plasma/current.new /opt/plasma/current
 systemctl daemon-reload
 # plasma-web.service Requires=plasma-runtime-activation.service and owns helper
 # lifecycle through PartOf=. The helper is intentionally not independently enabled.
 systemctl enable --now plasma-server.service plasma-web.service
-nginx -t
-systemctl reload nginx
 
 "$plasma_python" - <<'PY'
 import json
@@ -397,7 +315,7 @@ cat >/opt/plasma/install/last-swpc-z2like-install.json <<EOF
   "plasma_python": "$plasma_python",
   "plasma_python_version": "$py_version",
   "gateway_bind": "127.0.0.1:18080",
-  "restricted_ingress": "127.0.0.1:$proxy_port",
+  "legacy_restricted_ingress_retired": true,
   "hardware_boundary": "closed",
   "site_desired_config": "$config_path",
   "runtime_apply_supported": true,
@@ -417,5 +335,5 @@ cat >/opt/plasma/install/last-swpc-z2like-install.json <<EOF
 EOF
 chmod 0644 /opt/plasma/install/last-swpc-z2like-install.json
 
-printf '[swpc-z2like] PASS: local P3-capable PPU ready; restricted ingress is http://127.0.0.1:%s\n' "$proxy_port"
-printf '[swpc-z2like] Cloudflare Tunnel must target the restricted ingress, never 127.0.0.1:18080\n'
+printf '[swpc-z2like] PASS: local P3-capable PPU ready on 127.0.0.1:18080; SWPC host :18081 remains retired\n'
+printf '[swpc-z2like] public/managed traffic must use the maintained Control Station or z2like-demo managed-ingress path\n'

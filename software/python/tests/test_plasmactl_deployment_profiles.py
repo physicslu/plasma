@@ -99,8 +99,8 @@ def test_local_control_station_profile_delegates_to_dedicated_backend(tmp_path: 
 
     cases = (
         (
-            ("install", "local-control-station", "--ppu-endpoint", "http://127.0.0.1:18081"),
-            "install --ppu-endpoint http://127.0.0.1:18081",
+            ("install", "local-control-station", "--ppu-endpoint", "http://127.0.0.1:18080"),
+            "install --ppu-endpoint http://127.0.0.1:18080",
         ),
         (
             ("deploy", "local-control-station", "--ppu-alias", "z2-lab"),
@@ -176,7 +176,7 @@ def test_swpc_z2like_profile_delegates_to_backend_without_browser_selected_targe
 
     cases = (
         (("install", "swpc-z2like", "--ppu-id", "lab-ppu"), "install --ppu-id lab-ppu"),
-        (("deploy", "swpc-z2like", "--proxy-port", "19081"), "deploy --proxy-port 19081"),
+        (("deploy", "swpc-z2like", "--facility-id", "lab"), "deploy --facility-id lab"),
         (("verify", "swpc-z2like"), "verify"),
         (("status", "swpc-z2like"), "status"),
     )
@@ -226,7 +226,8 @@ def test_z2like_demo_profile_preserves_render_and_qemu_ownership() -> None:
     assert "git pull --ff-only origin main" in profile
     assert "repository must be clean before z2like-demo deployment" in profile
     assert "SWPC host 18081" in profile
-    assert "pending retirement and is not used here" in profile
+    assert "retired" in profile
+    assert "pending retirement and is not used here" not in profile
     assert 'qemu_gateway_root="${PLASMA_Z2LIKE_DEMO_GATEWAY_ROOT:-http://172.30.77.2:18080}"' in ingress
     assert "must not target the SWPC x86_64 surrogate Gateway" in ingress
     assert "Cloudflare Access service token remains REQUIRED" in ingress
@@ -320,10 +321,12 @@ def test_swpc_backend_keeps_system_profile_separate_from_integration_user_servic
     assert '"max_supported_sites": 8' in source
 
 
-def test_swpc_backend_verifies_restricted_ingress_and_ps_only_boundary() -> None:
+def test_swpc_backend_verifies_host_18081_retirement_and_ps_only_boundary() -> None:
     source = SWPC_Z2LIKE.read_text(encoding="utf-8")
     assert "/api/settings/sites" in source
-    assert '[[ "$blocked_status" == "404" ]]' in source
+    assert "verify_legacy_ingress_retired" in source
+    assert 'legacy_host_port="18081"' in source
+    assert "retired SWPC host ingress is still listening" in source
     assert "/api/engineering/diagnostics/loopback" in source
     assert 'loopback.get("endpoint") != "ps"' in source
     assert 'loopback.get("source") != "ps"' in source
@@ -335,7 +338,7 @@ def test_swpc_activation_requires_evidence_current_and_system_ownership_consiste
     assert "PPU configuration is missing" in source
     assert "install evidence/current release mismatch" in source
     assert "plasma-server.service is not owned by the Plasma system runtime" in source
-    assert "restricted Nginx ingress is not Plasma-owned" in source
+    assert "retired SWPC Nginx ingress config still exists" in source
 
 
 def test_swpc_deploy_has_explicit_rollback_retry_cleanup_and_does_not_mutate_git() -> None:
