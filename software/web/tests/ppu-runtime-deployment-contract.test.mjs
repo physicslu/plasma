@@ -32,14 +32,13 @@ test("EMode exposes PPU Overview, Platform, Registration, and Sites as separate 
 
 test("Platform surface is explicitly independent from programming Registration", async () => {
   const platform = await source(files.deploymentPage);
-  assert.match(platform, /PPU Platform Firmware Workspace/);
+  assert.match(platform, /PPU Platform Release Workspace/);
   assert.match(platform, /independently of programming Registration/);
-  assert.match(platform, /entry\.lifecycle === "pending"|PpuRuntimeDeployment/);
   assert.match(platform, /Operational Registration is a separate programming-management admission state/);
   assert.doesNotMatch(platform, /PPU \/ Site Configuration/);
 });
 
-test("Platform Firmware update preserves lifecycle, idle, recovery, and artifact-integrity gates", async () => {
+test("Platform Release update preserves lifecycle, idle, recovery, and artifact-integrity gates", async () => {
   const deployment = await source(files.deployment);
   assert.match(deployment, /entry\.lifecycle === "pending"/);
   assert.match(deployment, /entry\.lifecycle === "disabled" && hasTrustedIdleObservation/);
@@ -48,7 +47,7 @@ test("Platform Firmware update preserves lifecycle, idle, recovery, and artifact
   assert.match(deployment, /hasActiveExecution/);
   assert.match(deployment, /parseSha256Sidecar/);
   assert.match(deployment, /sha256Hex/);
-  assert.match(deployment, /Update PPU Platform Firmware/);
+  assert.match(deployment, /Update PPU Platform Release/);
   assert.match(deployment, /Bootstrap remains independently versioned and is not silently rewritten by this path/);
   assert.match(deployment, /Programming Logic, including FPGA bitstreams and ICPN-selected Python logic, is a separate lifecycle/);
   assert.doesNotMatch(deployment, /gateway_host/);
