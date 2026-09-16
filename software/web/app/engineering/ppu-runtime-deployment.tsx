@@ -28,6 +28,12 @@ function stateLabel(value: string | null | undefined): string {
   return value.replaceAll("_", " ");
 }
 
+function platformFirmwareIdentity(status: ManagerBootstrapStatus | null): string {
+  if (status?.bootstrap.runtime.release_id) return status.bootstrap.runtime.release_id;
+  if (status?.bootstrap.bootstrap.state === "bootstrap_ready") return "Bootstrap only";
+  return "Unavailable";
+}
+
 export default function PpuRuntimeDeployment({
   entry,
   hasActiveExecution,
@@ -81,11 +87,7 @@ export default function PpuRuntimeDeployment({
   const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
   const firstInstall = entry.lifecycle === "pending";
   const maintenanceReady = firstInstall || (entry.lifecycle === "disabled" && hasTrustedIdleObservation);
-  const canPair = Boolean(
-    alias
-    && pairingToken.trim().length >= 32
-    && busy === null,
-  );
+  const canPair = Boolean(alias && pairingToken.trim().length >= 32 && busy === null);
   const canDeploy = Boolean(
     alias
     && maintenanceReady
@@ -118,10 +120,10 @@ export default function PpuRuntimeDeployment({
     try {
       await pairManagerPpuBootstrap(alias, pairingToken);
       setPairingToken("");
-      setNotice("Bootstrap token verified by the registered device. Browser maintenance authorization is active for a short window.");
+      setNotice("Platform maintenance credential verified by this PPU. Maintenance authorization is active for the bounded deployment workflow.");
       await refresh(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Bootstrap pairing failed");
+      setError(reason instanceof Error ? reason.message : "Platform maintenance pairing failed");
     } finally {
       setBusy(null);
     }
@@ -137,7 +139,7 @@ export default function PpuRuntimeDeployment({
       const sidecarText = await sidecar.text();
       const expected = parseSha256Sidecar(sidecarText, kit.name);
       const wholeDigest = await sha256Hex(await kit.arrayBuffer());
-      if (wholeDigest !== expected) throw new Error("Selected Z2 PS kit SHA-256 does not match its sidecar");
+      if (wholeDigest !== expected) throw new Error("Selected PPU Platform Firmware package SHA-256 does not match its sidecar");
 
       const created = await createManagerPpuBootstrapUpload(alias, kit.size, expected);
       let offset = 0;
@@ -155,10 +157,10 @@ export default function PpuRuntimeDeployment({
         facility_id: facilityId.trim(),
         display_name: displayName.trim(),
       });
-      setNotice("Runtime deployment accepted by PPU Bootstrap. Status will continue updating asynchronously.");
+      setNotice("PPU Platform Firmware update accepted by Bootstrap. Deployment status will continue updating asynchronously.");
       await refresh(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Runtime deployment failed");
+      setError(reason instanceof Error ? reason.message : "PPU Platform Firmware update failed");
     } finally {
       setUploadProgress(null);
       setBusy(null);
@@ -166,57 +168,58 @@ export default function PpuRuntimeDeployment({
   }
 
   return (
-    <section className="ppuSiteCard" aria-label="PPU Runtime Deployment">
+    <section className="ppuSiteCard" aria-label="PPU Platform Firmware">
       <header className="ppuSiteCardHeader">
         <div>
-          <small>FACTORY / RECOVERY</small>
-          <h3>Runtime Deployment</h3>
+          <small>PLATFORM FIRMWARE</small>
+          <h3>{platformFirmwareIdentity(status)}</h3>
         </div>
         <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
-          {loading ? "Checking..." : "Refresh Bootstrap"}
+          {loading ? "Checking..." : "Refresh Platform Status"}
         </button>
       </header>
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
-      {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Runtime deployment is blocked while this PPU has active Site execution.</p>}
-      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">Verify Bootstrap pairing, then disable this commissioned PPU before Runtime maintenance.</p>}
-      {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Runtime maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
-      {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Runtime deployment remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
+      {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Platform Firmware update is blocked while this PPU has active Site execution.</p>}
+      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">This PPU is registered for programming. Disable Registration after jobs are idle before Platform Firmware maintenance.</p>}
+      {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Platform maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
+      {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Platform Firmware update remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
       <div className="ppuInfoBody">
         <dl className="ppuInfoGrid">
-          <div><dt>Bootstrap</dt><dd>{stateLabel(bootstrap?.bootstrap.state)}</dd></div>
-          <div><dt>Device ID</dt><dd>{bootstrap?.identity.device_id ?? "Unavailable"}</dd></div>
-          <div><dt>Runtime</dt><dd>{stateLabel(runtime?.state)}</dd></div>
+          <div className="wide"><dt>PPU Platform Firmware</dt><dd>{platformFirmwareIdentity(status)}</dd></div>
+          <div><dt>Bootstrap State</dt><dd>{stateLabel(bootstrap?.bootstrap.state)}</dd></div>
+          <div><dt>Bootstrap Version</dt><dd>{bootstrap?.bootstrap.version ?? "Unavailable"}</dd></div>
+          <div><dt>Runtime State</dt><dd>{stateLabel(runtime?.state)}</dd></div>
           <div><dt>Runtime Version</dt><dd>{runtime?.product_version ?? "Not installed"}</dd></div>
-          <div><dt>Pairing</dt><dd>{pairing?.paired && pairing.device_match ? "Paired" : "Required"}</dd></div>
-          <div><dt>Runtime Deployment</dt><dd>{bootstrap?.capabilities.runtime_deployment ? "Available" : "Unavailable"}</dd></div>
-          <div><dt>FPGA Image</dt><dd>{stateLabel(bootstrap?.fpga.pl_compatibility)}</dd></div>
-          <div><dt>FPGA Update</dt><dd>{bootstrap?.capabilities.fpga_update ? "Available" : "Reserved / Disabled"}</dd></div>
+          <div className="wide"><dt>Runtime Commit</dt><dd>{runtime?.git_sha ?? "—"}</dd></div>
+          <div><dt>Device ID</dt><dd>{bootstrap?.identity.device_id ?? "Unavailable"}</dd></div>
+          <div><dt>Maintenance Authorization</dt><dd>{pairing?.paired && pairing.device_match ? "Paired" : "Required"}</dd></div>
         </dl>
       </div>
 
-      <div className="ppuRegistryAddForm" aria-label="Bootstrap pairing">
+      <div className="ppuRegistryAddForm" aria-label="Platform maintenance pairing">
         <label>
-          <span>Bootstrap Pairing Token</span>
+          <span>Platform Maintenance Pairing Token</span>
           <input
             type="password"
             autoComplete="off"
             value={pairingToken}
             disabled={busy !== null}
-            placeholder="Factory pairing token"
+            placeholder="Factory / recovery pairing token"
             onChange={event => setPairingToken(event.target.value)}
           />
         </label>
         <button className="ppuSiteButton" type="button" disabled={!canPair} onClick={() => void pair()}>
-          {busy === "pair" ? "Pairing..." : "Verify & Pair Bootstrap"}
+          {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
         </button>
+        <p>This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
       </div>
 
-      <div className="ppuRegistryAddForm" aria-label="Runtime release deployment">
+      <div className="ppuRegistryAddForm" aria-label="PPU Platform Firmware update">
         <label>
-          <span>Z2 PS Kit</span>
+          <span>PPU Platform Firmware Package</span>
           <input type="file" disabled={busy !== null} onChange={event => setKit(event.target.files?.[0] ?? null)} />
         </label>
         <label>
@@ -236,15 +239,17 @@ export default function PpuRuntimeDeployment({
           <input value={displayName} disabled={busy !== null} onChange={event => setDisplayName(event.target.value)} />
         </label>
         <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
-          {busy === "deploy" ? `Uploading${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Deploy Runtime"}
+          {busy === "deploy" ? `Updating${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Update PPU Platform Firmware"}
         </button>
-        <p>Console verifies the Z2 PS kit SHA-256 for integrity, then uploads it through Manager to the independent PPU Bootstrap. SHA-256 does not prove publisher authenticity. FPGA bitstream loading remains disabled.</p>
+        <p>
+          The current qualified update authority deploys the Runtime component through the installed Bootstrap and preserves existing rollback/recovery gates. Bootstrap remains independently versioned and is not silently rewritten by this path. Programming Logic, including FPGA bitstreams and ICPN-selected Python logic, is a separate lifecycle.
+        </p>
       </div>
 
-      <div className="ppuReadinessPanel" aria-label="Deployment status">
+      <div className="ppuReadinessPanel" aria-label="Platform deployment status">
         <header>
           <div>
-            <small>DEPLOYMENT</small>
+            <small>PLATFORM DEPLOYMENT</small>
             <h4>{stateLabel(deployment?.state)}</h4>
           </div>
           <span data-tone={deploymentTone}>{deployment?.transaction_id ?? "No deployment transaction"}</span>
