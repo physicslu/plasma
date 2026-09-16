@@ -44,7 +44,10 @@ Operator-facing Platform scope includes:
 - Bootstrap component version;
 - Runtime component version;
 - platform health and deployment state;
-- PPU Platform Firmware update/recovery workflow.
+- PPU Platform Firmware update/recovery workflow;
+- Bootstrap maintenance authorization used by the update/recovery path.
+
+The Bootstrap pairing token is a Platform maintenance credential. Possessing or verifying it does **not** register the PPU for managed programming operations.
 
 Bootstrap and Runtime remain distinct implementation components and retain their existing deployment/provenance contracts. Product UI must not create a second installer authority.
 
@@ -52,13 +55,13 @@ Bootstrap and Runtime remain distinct implementation components and retain their
 
 Registration means admission of the PPU into this Console's managed programming fleet. It owns:
 
-- add/remove Manager inventory identity;
-- pairing/trust state required for managed operations;
-- pending/commissioned/disabled lifecycle;
+- add/remove the known Manager inventory connection;
+- pending/commissioned/disabled operational lifecycle;
 - validate-and-enable admission;
-- selection for managed programming operations.
+- selection for managed programming operations;
+- operational network commissioning after admission under the existing Manager write gate.
 
-Registration is not a prerequisite for Platform maintenance.
+Registration does not own the Bootstrap Platform-maintenance credential and is not a prerequisite for Platform inspection or firmware maintenance.
 
 ### Sites
 
@@ -67,6 +70,8 @@ Sites are child resources of a PPU. Site configuration and programming operation
 ## PPU Platform Firmware product model
 
 To the operator, Bootstrap + Runtime are one PPU Platform Firmware release domain. The Console may display component versions separately for diagnosis, but normal product workflow presents one Platform maintenance surface.
+
+The currently qualified browser update authority deploys the Runtime component through the installed Bootstrap. The UI must state this truthfully: Bootstrap is independently versioned and is not silently rewritten by the Runtime deployment path. A future combined Bootstrap + Runtime package may be admitted only when its Bootstrap update mechanism has its own verified transactional semantics.
 
 The implementation must preserve:
 
