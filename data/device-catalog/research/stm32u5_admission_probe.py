@@ -25,6 +25,9 @@ FAMILY = "STM32U5"
 TARGET_CONFIG = "tcl/target/stm32u5x.cfg"
 EXPECTED_ROUTE_ROWS = 162
 EXPECTED_ROUTE_KIND_COUNTS = {"ordering_pattern": 63, "cmsis_device_name": 99}
+BRIDGE_ICPN = "STM32U5A5QII3Q"
+BRIDGE_IDENTIFIER = "STM32U5A5xx"
+BRIDGE_KIND = "cmsis_exact_membership_bridge"
 
 
 def commercial_core(icpn: str) -> str:
@@ -133,10 +136,19 @@ def main() -> int:
             "target_config": row["target_config"],
         })
 
-    u5a5_routes = [
-        {"part_number": row["part_number"], "identifier_kind": row["identifier_kind"]}
-        for row in routes if row["subfamily"] == "STM32U5A5"
-    ]
+    if unresolved != [{"icpn": BRIDGE_ICPN, "match_count": 0, "matches": []}]:
+        raise SystemExit(f"unexpected STM32U5 unresolved route set: {unresolved}")
+    u5a5_routes = [row for row in routes if row["subfamily"] == "STM32U5A5"]
+    if len(u5a5_routes) != 11 or {row["target_config"] for row in u5a5_routes} != {TARGET_CONFIG}:
+        raise SystemExit("STM32U5A5 route target evidence drifted")
+
+    assignments.append({
+        "icpn": BRIDGE_ICPN,
+        "identifier_kind": BRIDGE_KIND,
+        "identifier": BRIDGE_IDENTIFIER,
+        "target_config": TARGET_CONFIG,
+    })
+
     result = {
         "transaction": "stm32u5-canonical-admission-plan-under-security-fence-probe",
         "retained_exact_icpns": 266,
@@ -145,12 +157,20 @@ def main() -> int:
         "route_evidence_rows": len(routes),
         "route_evidence_kind_counts": dict(Counter(row["identifier_kind"] for row in routes)),
         "route_evidence_sha256": route_evidence_sha(routes),
+        "u5a5_route_evidence_rows": len(u5a5_routes),
+        "u5a5_route_evidence_sha256": route_evidence_sha(u5a5_routes),
+        "standard_route_assignments": len(assignments) - 1,
+        "supplemental_cmsis_bridges": 1,
         "unique_route_assignments": len(assignments),
         "route_assignment_kind_counts": dict(Counter(row["identifier_kind"] for row in assignments)),
         "route_binding_sha256": route_binding_sha(assignments),
-        "unresolved_count": len(unresolved),
-        "unresolved": unresolved,
-        "u5a5_route_rows": u5a5_routes,
+        "unresolved_after_bridge": 0,
+        "bridge": {
+            "icpn": BRIDGE_ICPN,
+            "cmsis_device_group": BRIDGE_IDENTIFIER,
+            "identifier_kind": BRIDGE_KIND,
+            "target_config": TARGET_CONFIG,
+        },
         "required_target_config": TARGET_CONFIG,
         "production_exact_icpn_count": 2017,
         "production_write_authorized": False,
