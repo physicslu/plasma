@@ -9,9 +9,8 @@ python_root="${PLASMA_SWPC_Z2LIKE_PYTHON_ROOT:-/opt/plasma/python}"
 plasma_python_override="${PLASMA_SWPC_Z2LIKE_PYTHON:-}"
 ppu_id="${PLASMA_SWPC_Z2LIKE_PPU_ID:-swpc-z2like-01}"
 facility_id="${PLASMA_SWPC_Z2LIKE_FACILITY_ID:-lab}"
-proxy_port="${PLASMA_SWPC_Z2LIKE_PROXY_PORT:-18081}"
-nginx_conf="${PLASMA_SWPC_Z2LIKE_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf}"
-nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
+legacy_host_port="18081"
+legacy_nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"
 server_unit="/etc/systemd/system/plasma-server.service"
 gateway_unit="/etc/systemd/system/plasma-web.service"
 activation_unit="/etc/systemd/system/plasma-runtime-activation.service"
@@ -42,9 +41,6 @@ require_root() {
 validate_identity() {
   [[ "$ppu_id" =~ ^[A-Za-z0-9._:-]+$ ]] || die "invalid PPU id: $ppu_id"
   [[ "$facility_id" =~ ^[A-Za-z0-9._:-]+$ ]] || die "invalid Facility id: $facility_id"
-  [[ "$proxy_port" =~ ^[0-9]+$ ]] || die "invalid restricted proxy port: $proxy_port"
-  (( proxy_port >= 1 && proxy_port <= 65535 && proxy_port != 9900 && proxy_port != 18080 )) || \
-    die "restricted proxy port conflicts with reserved runtime ports: $proxy_port"
 }
 
 json_field() {
@@ -127,7 +123,8 @@ require_clean_source() {
 
 # Legacy P2 evidence used the fixed literal "configured_site_count": 0. P3
 # accepts any validated dynamic Site count in 0..8 and does not make zero Sites
-# an invariant of the surrogate profile.
+# an invariant of the surrogate profile. Historical evidence may still contain
+# restricted_ingress; it is not an active runtime contract after Issue #549.
 validate_install_evidence() {
   [[ -f "$evidence" ]] || die "SWPC Z2-like install evidence is missing: $evidence"
   python3 - "$evidence" <<'PY'
@@ -154,6 +151,9 @@ if site_count is not None and (
     raise SystemExit(f"invalid SWPC Z2-like configured_site_count: {site_count!r}")
 if not payload.get("release_id") or not payload.get("git_sha") or not payload.get("plasma_python"):
     raise SystemExit("SWPC Z2-like evidence is missing release identity/runtime fields")
+retired = payload.get("legacy_restricted_ingress_retired")
+if retired is not None and retired is not True:
+    raise SystemExit("SWPC Z2-like evidence has invalid legacy ingress retirement state")
 PY
 }
 
@@ -191,9 +191,9 @@ for field, value in expected.items():
 PY
 }
 
-# This check intentionally accepts the prior P2 SWPC installation so deploy can
-# promote it transactionally to P3. P3-only unit/evidence checks live in
-# verify_p3_activation_operational_contract and run after activation.
+# This check intentionally accepts prior SWPC installation evidence so deploy can
+# promote it transactionally to the post-#549 contract. Host :18081 is verified
+# separately and must remain retired regardless of runtime rollback.
 require_managed_installation() {
   validate_install_evidence
   [[ -L "$current_link" ]] || die "current release symlink is missing: $current_link"
@@ -203,14 +203,21 @@ require_managed_installation() {
   grep -Fq '/opt/plasma/current/runtime/ppu/ppu.pyz' "$server_unit" || die "plasma-server.service does not target the managed immutable runtime"
   grep -Fq 'User=plasma' "$gateway_unit" || die "plasma-web.service is not owned by the Plasma system runtime"
   grep -Fq '/opt/plasma/current/runtime/ppu/ppu.pyz' "$gateway_unit" || die "plasma-web.service does not target the managed immutable runtime"
-  [[ -f "$nginx_conf" ]] || die "restricted Nginx ingress is missing: $nginx_conf"
-  grep -Fxq "$nginx_marker" "$nginx_conf" || die "restricted Nginx ingress is not Plasma-owned"
 
   local expected_current observed_current
   expected_current="$release_root/$(json_field "$evidence" release_id)"
   observed_current="$(readlink -f "$current_link")"
   [[ "$observed_current" == "$expected_current" ]] || \
     die "install evidence/current release mismatch: evidence=$expected_current current=$observed_current"
+}
+
+verify_legacy_ingress_retired() {
+  require_command ss
+  [[ ! -e "$legacy_nginx_conf" ]] || die "retired SWPC Nginx ingress config still exists: $legacy_nginx_conf"
+  if ss -H -ltn "sport = :$legacy_host_port" | grep -q .; then
+    ss -H -ltnp "sport = :$legacy_host_port" >&2 || true
+    die "retired SWPC host ingress is still listening on 127.0.0.1:$legacy_host_port"
+  fi
 }
 
 verify_site_desired_operational_contract() {
@@ -247,7 +254,7 @@ verify_p3_activation_operational_contract() {
 
 require_clean_first_install_boundary() {
   local artifact
-  for artifact in "$current_link" "$ppu_config" "$server_unit" "$gateway_unit" "$activation_unit" "$nginx_conf"; do
+  for artifact in "$current_link" "$ppu_config" "$server_unit" "$gateway_unit" "$activation_unit"; do
     [[ ! -e "$artifact" && ! -L "$artifact" ]] || \
       die "first install found unmanaged/pre-existing appliance artifact without install evidence: $artifact"
   done
@@ -298,6 +305,7 @@ verify_profile() {
   require_command systemctl
   validate_identity
   require_managed_installation
+  verify_legacy_ingress_retired
   verify_site_desired_operational_contract
   verify_p3_activation_operational_contract
 
@@ -305,7 +313,7 @@ verify_profile() {
   systemctl is-active --quiet plasma-runtime-activation.service || die "plasma-runtime-activation.service is not active"
   systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
 
-  local ready restricted_ready blocked_status local_sites_status loopback test_id
+  local ready local_sites_status loopback test_id
   ready="$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:18080/api/health/ready)"
   verify_ready_json <<<"$ready"
 
@@ -315,24 +323,17 @@ verify_profile() {
     http://127.0.0.1:18080/api/settings/sites)"
   [[ "$local_sites_status" == "200" ]] || die "local Site Desired API is not operational: HTTP $local_sites_status"
 
-  restricted_ready="$(curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$proxy_port/api/health/ready")"
-  verify_ready_json <<<"$restricted_ready"
-
-  # Public z2like-demo ingress remains diagnostics/status-only in this transaction.
-  blocked_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
-    "http://127.0.0.1:$proxy_port/api/settings/sites")"
-  [[ "$blocked_status" == "404" ]] || die "restricted ingress unexpectedly exposed /api/settings/sites: HTTP $blocked_status"
-
   test_id="plasmactl-swpc-z2like-$PPID-$(date +%s)"
   loopback="$(curl --fail --silent --show-error --max-time 8 \
     -H 'Accept: application/json' \
     -H 'Content-Type: application/json' \
     -H "Idempotency-Key: $test_id" \
     --data "{\"endpoint\":\"ps\",\"test_id\":\"$test_id\",\"sequence\":1,\"pattern\":\"zero\",\"seed\":\"\",\"payload_length\":1,\"payload_base64\":\"AA==\",\"tx_crc32\":\"d202ef8d\",\"timeout_ms\":5000}" \
-    "http://127.0.0.1:$proxy_port/api/engineering/diagnostics/loopback")"
+    http://127.0.0.1:18080/api/engineering/diagnostics/loopback)"
   verify_loopback_json <<<"$loopback"
 
   say "PASS: local P3-capable PS surrogate is ready; Site Desired and bounded runtime activation wiring are coherent"
+  say "SWPC host :18081 retirement is enforced; no legacy diagnostics/public ingress remains"
   say "qualification boundary: x86_64 SWPC PS surrogate only; no Z2/ARMv7/PL/FPGA/Site/IC claim"
 }
 
@@ -357,7 +358,6 @@ for label, field in (
     ("Architecture", "architecture"),
     ("Plasma Python", "plasma_python"),
     ("Gateway bind", "gateway_bind"),
-    ("Restricted", "restricted_ingress"),
     ("Install Sites", "configured_site_count"),
     ("Max Sites", "max_supported_sites"),
     ("Runtime apply", "runtime_apply_supported"),
@@ -366,6 +366,7 @@ for label, field in (
 print("Z2 equivalent:  NO")
 print("Hardware:       CLOSED")
 PY
+  printf 'Legacy 18081:  retired\n'
   printf 'Current:       %s\n' "$(readlink -f "$current_link" 2>/dev/null || echo missing)"
   if command -v systemctl >/dev/null 2>&1; then
     printf 'Server svc:    %s\n' "$(systemctl is-active plasma-server.service 2>/dev/null || true)"
@@ -379,8 +380,7 @@ run_installer() {
   bash "$installer" \
     --plasma-python "$plasma_python" \
     --ppu-id "$ppu_id" \
-    --facility-id "$facility_id" \
-    --proxy-port "$proxy_port"
+    --facility-id "$facility_id"
 }
 
 restore_config_root_metadata() {
@@ -397,7 +397,6 @@ cleanup_failed_first_install() {
   if [[ -L "$current_link" && "$(readlink -f "$current_link" 2>/dev/null)" == "$target_release" ]]; then
     rm -f "$current_link"
   fi
-  [[ -f "$nginx_conf" ]] && grep -Fxq "$nginx_marker" "$nginx_conf" && rm -f "$nginx_conf"
   rm -f "$server_unit" "$gateway_unit" "$activation_unit" "$ppu_config" "$evidence"
   if [[ "$config_root_existed" == "1" && -d "$config_root" ]]; then
     restore_config_root_metadata "$config_root_mode" "$config_root_uid" "$config_root_gid" >/dev/null 2>&1 || true
@@ -408,9 +407,6 @@ cleanup_failed_first_install() {
     rm -rf --one-file-system "$target_release"
   fi
   systemctl daemon-reload >/dev/null 2>&1
-  if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
-    systemctl reload nginx >/dev/null 2>&1
-  fi
   set -e
 }
 
@@ -469,7 +465,6 @@ deploy_profile() {
   require_command git
   require_command python3
   require_command systemctl
-  require_command nginx
   require_command stat
   validate_identity
   require_clean_source
@@ -480,8 +475,8 @@ deploy_profile() {
     return 0
   fi
 
-  # Accept a previously qualified P2 surrogate here; the post-activation verify
-  # requires the complete P3 contract.
+  # Accept previously qualified surrogate evidence here; the post-activation verify
+  # additionally enforces that the retired host :18081 ingress remains absent.
   require_managed_installation
   local current_sha installed_sha plasma_python previous_current target_release snapshot rollback_required=0
   local helper_existed=0
@@ -511,7 +506,6 @@ deploy_profile() {
     helper_existed=1
   fi
   cp -a "$ppu_config" "$snapshot/ppu.yaml"
-  cp -a "$nginx_conf" "$snapshot/nginx.conf"
   cp -a "$evidence" "$snapshot/install.json"
   stat -c '%a %u %g' "$config_root" >"$snapshot/config-root.stat"
   printf '%s\n' "$helper_existed" >"$snapshot/helper-existed"
@@ -533,7 +527,6 @@ deploy_profile() {
       rm -f "$activation_unit" || rollback_failed=1
     fi
     restore_file "$snapshot/ppu.yaml" "$ppu_config" || rollback_failed=1
-    restore_file "$snapshot/nginx.conf" "$nginx_conf" || rollback_failed=1
     restore_file "$snapshot/install.json" "$evidence" || rollback_failed=1
     read -r mode uid gid <"$snapshot/config-root.stat"
     restore_config_root_metadata "$mode" "$uid" "$gid" || rollback_failed=1
@@ -543,8 +536,6 @@ deploy_profile() {
       rollback_failed=1
     fi
     systemctl daemon-reload || rollback_failed=1
-    nginx -t || rollback_failed=1
-    systemctl reload nginx || rollback_failed=1
     systemctl start plasma-server.service plasma-web.service || rollback_failed=1
     set -e
     if (( rollback_failed )); then
@@ -575,12 +566,6 @@ deploy_profile() {
   # stops it already, so this is a bounded best-effort cleanup for transition cases.
   systemctl stop plasma-runtime-activation.service >/dev/null 2>&1 || true
 
-  # Existing restricted Nginx owns the profile port. Remove only the installer-owned
-  # config during activation so the hardened installer can repeat its port preflight.
-  rm -f "$nginx_conf"
-  nginx -t
-  systemctl reload nginx
-
   run_installer "$plasma_python"
   verify_profile
   rollback_required=0
@@ -596,15 +581,15 @@ Usage: plasmactl-swpc-z2like COMMAND [options]
 Commands:
   install    First provision of the x86_64 SWPC Z2-like P3-capable PS surrogate
   deploy     Activate current clean committed source; rollback to previous activation on failure
-  verify     Read-only P3 Site-Desired/runtime-activation/restricted-ingress/PS-loopback verification
+  verify     Read-only P3 Site-Desired/runtime-activation/PS-loopback and host-ingress-retirement verification
   status     Show installed release identity and system-service state
 
 Options:
   --plasma-python PATH   Override Plasma-owned runtime (otherwise reuse evidence or auto-select one unique runtime)
   --ppu-id ID            PPU identity (default: swpc-z2like-01)
   --facility-id ID       Facility identity (default: lab)
-  --proxy-port PORT      Restricted Nginx ingress (default: 18081)
 
+SWPC host 127.0.0.1:18081 is retired and must not be reintroduced by this profile.
 This profile is an x86_64 PS surrogate. It never constitutes ARMv7/Z2, PL, FPGA,
 Site electrical, real-IC programming, or production-readiness evidence.
 EOF
@@ -621,7 +606,6 @@ while (($#)); do
     --plasma-python) plasma_python_override="${2:-}"; shift 2 ;;
     --ppu-id) ppu_id="${2:-}"; shift 2 ;;
     --facility-id) facility_id="${2:-}"; shift 2 ;;
-    --proxy-port) proxy_port="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
