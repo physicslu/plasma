@@ -179,7 +179,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
               <strong>{health.label}</strong>
               <p>{health.reason}</p>
             </article>
-            <article className="ppuStateDimensionCard" data-tone={selectedEntry.lifecycle === "commissioned" ? "good" : "warning"}>
+            <article className="ppuStateDimensionCard" data-tone={selectedEntry.lifecycle === "commissioned" ? "healthy" : "warning"}>
               <small>Registration</small>
               <strong>{registrationLabel(selectedEntry)}</strong>
               <p>Programming management admission is separate from Platform maintenance.</p>
