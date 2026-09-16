@@ -12,6 +12,7 @@ import {
   type ManagerRegistryEntry,
   type ManagerRegistryPayload,
 } from "./ppu-registry-api";
+import PpuNetworkConfiguration from "./ppu-network-configuration";
 import {
   canValidateAndEnable,
   connectivityState,
@@ -169,37 +170,19 @@ export default function PpuRegistrationPage() {
 
       <section className="ppuSiteCard" aria-label="Known PPU inventory">
         <header className="ppuSiteCardHeader">
-          <div>
-            <small>INVENTORY</small>
-            <h3>Known PPU Connections</h3>
-          </div>
+          <div><small>INVENTORY</small><h3>Known PPU Connections</h3></div>
           <div className="ppuSiteCardHeaderActions">
             <button className="ppuSiteButton" type="button" disabled={loading || busyAction !== null} onClick={() => void refresh()}>Refresh</button>
-            <button
-              className="ppuSiteButton primary"
-              type="button"
-              disabled={!registryMutable || busyAction !== null}
-              onClick={() => setShowAddForm(value => !value)}
-            >
-              + Add PPU Connection
-            </button>
+            <button className="ppuSiteButton primary" type="button" disabled={!registryMutable || busyAction !== null} onClick={() => setShowAddForm(value => !value)}>+ Add PPU Connection</button>
           </div>
         </header>
 
         {showAddForm && (
           <div className="ppuRegistryAddForm" aria-label="Add known PPU connection">
-            <label>
-              <span>Console Alias</span>
-              <input value={newAlias} placeholder="line1-ppu-c" disabled={busyAction !== null} onChange={event => setNewAlias(event.target.value)} />
-            </label>
-            <label>
-              <span>Plasma Gateway Endpoint</span>
-              <input value={newGateway} placeholder="http://192.168.10.27:18080" disabled={busyAction !== null} onChange={event => setNewGateway(event.target.value)} />
-            </label>
+            <label><span>Console Alias</span><input value={newAlias} placeholder="line1-ppu-c" disabled={busyAction !== null} onChange={event => setNewAlias(event.target.value)} /></label>
+            <label><span>Plasma Gateway Endpoint</span><input value={newGateway} placeholder="http://192.168.10.27:18080" disabled={busyAction !== null} onChange={event => setNewGateway(event.target.value)} /></label>
             <div className="ppuSiteCardHeaderActions">
-              <button className="ppuSiteButton primary" type="button" disabled={!newAlias.trim() || !newGateway.trim() || busyAction !== null} onClick={() => void addPpu()}>
-                {busyAction === "add" ? "Adding..." : "Add Connection"}
-              </button>
+              <button className="ppuSiteButton primary" type="button" disabled={!newAlias.trim() || !newGateway.trim() || busyAction !== null} onClick={() => void addPpu()}>{busyAction === "add" ? "Adding..." : "Add Connection"}</button>
               <button className="ppuSiteButton" type="button" disabled={busyAction !== null} onClick={() => setShowAddForm(false)}>Cancel</button>
             </div>
             <p>Adding an endpoint makes the appliance known to Console and Platform maintenance. It does not register the PPU for programming.</p>
@@ -233,76 +216,68 @@ export default function PpuRegistrationPage() {
       </section>
 
       {selectedEntry && selectedLifecycle ? (
-        <section className="ppuSiteCard" aria-label="Selected PPU Registration">
-          <header className="ppuSiteCardHeader">
-            <div className="ppuSiteCardHeaderActions">
-              <h3>{selectedEntry.alias}</h3>
-              <span className="ppuDimensionPill" data-tone={selectedLifecycle.tone}>{selectedEntry.lifecycle === "commissioned" ? "Registered" : selectedEntry.lifecycle === "disabled" ? "Registered / Disabled" : "Not Registered"}</span>
-            </div>
-            <div className="ppuSiteCardHeaderActions">
-              {selectedEntry.lifecycle === "commissioned" && (
-                <button className="ppuSiteButton primary" type="button" disabled={busyAction !== null} onClick={() => void selectForManagedOperations()}>
-                  {busyAction === "select" ? "Selecting..." : "Use for Managed Operations"}
-                </button>
-              )}
-              {selectedEntry.lifecycle === "commissioned" && (
-                <button className="ppuSiteButton" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => void disableRegistration()}>
-                  {busyAction === "disable" ? "Disabling..." : "Disable Registration"}
-                </button>
-              )}
-              <button className="ppuSiteButton danger" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => setRemoveCandidate(selectedEntry.alias)}>
-                Remove Connection
-              </button>
-            </div>
-          </header>
-
-          {removeCandidate === selectedEntry.alias && (
-            <div className="ppuRemoveConfirm" role="alert">
-              <div><strong>Remove {selectedEntry.alias}?</strong><span>This removes Console inventory/Registration state only. It does not erase or reconfigure the physical PPU.</span></div>
+        <>
+          <section className="ppuSiteCard" aria-label="Selected PPU Registration">
+            <header className="ppuSiteCardHeader">
               <div className="ppuSiteCardHeaderActions">
-                <button className="ppuSiteButton danger" type="button" disabled={busyAction !== null} onClick={() => void removePpu()}>{busyAction === "remove" ? "Removing..." : "Confirm Remove"}</button>
-                <button className="ppuSiteButton" type="button" disabled={busyAction !== null} onClick={() => setRemoveCandidate(null)}>Cancel</button>
+                <h3>{selectedEntry.alias}</h3>
+                <span className="ppuDimensionPill" data-tone={selectedLifecycle.tone}>{selectedEntry.lifecycle === "commissioned" ? "Registered" : selectedEntry.lifecycle === "disabled" ? "Registered / Disabled" : "Not Registered"}</span>
               </div>
+              <div className="ppuSiteCardHeaderActions">
+                {selectedEntry.lifecycle === "commissioned" && <button className="ppuSiteButton primary" type="button" disabled={busyAction !== null} onClick={() => void selectForManagedOperations()}>{busyAction === "select" ? "Selecting..." : "Use for Managed Operations"}</button>}
+                {selectedEntry.lifecycle === "commissioned" && <button className="ppuSiteButton" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => void disableRegistration()}>{busyAction === "disable" ? "Disabling..." : "Disable Registration"}</button>}
+                <button className="ppuSiteButton danger" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => setRemoveCandidate(selectedEntry.alias)}>Remove Connection</button>
+              </div>
+            </header>
+
+            {removeCandidate === selectedEntry.alias && (
+              <div className="ppuRemoveConfirm" role="alert">
+                <div><strong>Remove {selectedEntry.alias}?</strong><span>This removes Console inventory/Registration state only. It does not erase or reconfigure the physical PPU.</span></div>
+                <div className="ppuSiteCardHeaderActions">
+                  <button className="ppuSiteButton danger" type="button" disabled={busyAction !== null} onClick={() => void removePpu()}>{busyAction === "remove" ? "Removing..." : "Confirm Remove"}</button>
+                  <button className="ppuSiteButton" type="button" disabled={busyAction !== null} onClick={() => setRemoveCandidate(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <div className="ppuStateDimensionGrid" aria-label="PPU Registration observations">
+              <article className="ppuStateDimensionCard" data-tone={selectedConnectivity.tone}><small>Connectivity</small><strong>{selectedConnectivity.label}</strong><p>{selectedConnectivity.reason}</p></article>
+              <article className="ppuStateDimensionCard" data-tone={selectedHealth.tone}><small>Health</small><strong>{selectedHealth.label}</strong><p>{selectedHealth.reason}</p></article>
+              <article className="ppuStateDimensionCard" data-tone={selectedLifecycle.tone}><small>Registration Lifecycle</small><strong>{selectedLifecycle.label}</strong><p>{selectedLifecycle.reason}</p></article>
             </div>
-          )}
 
-          <div className="ppuStateDimensionGrid" aria-label="PPU Registration observations">
-            <article className="ppuStateDimensionCard" data-tone={selectedConnectivity.tone}><small>Connectivity</small><strong>{selectedConnectivity.label}</strong><p>{selectedConnectivity.reason}</p></article>
-            <article className="ppuStateDimensionCard" data-tone={selectedHealth.tone}><small>Health</small><strong>{selectedHealth.label}</strong><p>{selectedHealth.reason}</p></article>
-            <article className="ppuStateDimensionCard" data-tone={selectedLifecycle.tone}><small>Registration Lifecycle</small><strong>{selectedLifecycle.label}</strong><p>{selectedLifecycle.reason}</p></article>
-          </div>
+            {selectedEntry.lifecycle !== "commissioned" && (
+              <div className="ppuReadinessPanel" aria-label="Registration prerequisites">
+                <header><div><small>REGISTRATION READINESS</small><h4>Validate PPU before programming admission</h4></div><span>Platform maintenance is allowed independently of this admission.</span></header>
+                <ul>{selectedPrerequisites.map(item => <li key={item.key} data-state={item.passed ? "pass" : "fail"}><span className="ppuReadinessIcon" aria-hidden="true">{item.passed ? "✓" : "×"}</span><strong>{item.label}</strong><span>{item.detail}</span><b>{item.passed ? "OK" : "FAIL"}</b></li>)}</ul>
+                <footer>
+                  {validationBlockedReason ? <div className="ppuReadinessBlocked"><strong>Blocked</strong><span>{validationBlockedReason}</span></div> : <div className="ppuReadinessReady"><strong>Ready</strong><span>Current observation satisfies programming Registration prerequisites.</span></div>}
+                  <button className="ppuSiteButton primary" type="button" disabled={!registryMutable || !selectedCanValidate || busyAction !== null} onClick={() => void registerPpu()}>{busyAction === "register" ? "Registering..." : "Validate & Register for Programming"}</button>
+                </footer>
+              </div>
+            )}
 
-          {selectedEntry.lifecycle !== "commissioned" && (
-            <div className="ppuReadinessPanel" aria-label="Registration prerequisites">
-              <header><div><small>REGISTRATION READINESS</small><h4>Validate PPU before programming admission</h4></div><span>Platform maintenance is allowed independently of this admission.</span></header>
-              <ul>
-                {selectedPrerequisites.map(item => (
-                  <li key={item.key} data-state={item.passed ? "pass" : "fail"}>
-                    <span className="ppuReadinessIcon" aria-hidden="true">{item.passed ? "✓" : "×"}</span><strong>{item.label}</strong><span>{item.detail}</span><b>{item.passed ? "OK" : "FAIL"}</b>
-                  </li>
-                ))}
-              </ul>
-              <footer>
-                {validationBlockedReason ? <div className="ppuReadinessBlocked"><strong>Blocked</strong><span>{validationBlockedReason}</span></div> : <div className="ppuReadinessReady"><strong>Ready</strong><span>Current observation satisfies programming Registration prerequisites.</span></div>}
-                <button className="ppuSiteButton primary" type="button" disabled={!registryMutable || !selectedCanValidate || busyAction !== null} onClick={() => void registerPpu()}>
-                  {busyAction === "register" ? "Registering..." : "Validate & Register for Programming"}
-                </button>
-              </footer>
+            <div className="ppuInfoBody">
+              <dl className="ppuInfoGrid">
+                <div><dt>Console Alias</dt><dd>{selectedEntry.alias}</dd></div>
+                <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
+                <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
+                <div><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
+                <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
+                <div><dt>Reported Sites</dt><dd>{selectedFleet?.topology.site_count ?? "—"}</dd></div>
+                <div><dt>Active Execution</dt><dd>{selectedHasActiveExecution ? "Yes" : "No"}</dd></div>
+              </dl>
             </div>
-          )}
+          </section>
 
-          <div className="ppuInfoBody">
-            <dl className="ppuInfoGrid">
-              <div><dt>Console Alias</dt><dd>{selectedEntry.alias}</dd></div>
-              <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
-              <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
-              <div><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
-              <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
-              <div><dt>Reported Sites</dt><dd>{selectedFleet?.topology.site_count ?? "—"}</dd></div>
-              <div><dt>Active Execution</dt><dd>{selectedHasActiveExecution ? "Yes" : "No"}</dd></div>
-            </dl>
-          </div>
-        </section>
+          {selectedEntry.lifecycle === "commissioned" ? (
+            <PpuNetworkConfiguration entry={selectedEntry} hasActiveExecution={selectedHasActiveExecution} />
+          ) : (
+            <section className="ppuSiteCard" aria-label="Network commissioning registration gate">
+              <p className="ppuSiteNote">Operational network commissioning remains locked until programming Registration is complete. The current endpoint remains sufficient for Bootstrap-based Platform maintenance.</p>
+            </section>
+          )}
+        </>
       ) : (
         <section className="ppuSiteCard ppuEmptyRegistry"><h3>{loading ? "Loading PPU inventory..." : "No PPU selected"}</h3></section>
       )}
