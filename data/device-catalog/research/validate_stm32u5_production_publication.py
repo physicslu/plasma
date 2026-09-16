@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Validate checked-in STM32U5 Production catalog publication bytes."""
+from __future__ import annotations
+
+import csv
+import hashlib
+import io
+import json
+from collections import Counter
+from pathlib import Path
+
+from publish_stm32u5_catalog import (
+    EXPECTED_BASES,
+    EXPECTED_POSTSTATE_EXACT,
+    EXPECTED_POSTSTATE_FAMILIES,
+    EXPECTED_ROWS,
+    FAMILY,
+    PRODUCTION_FIELDS,
+    PRODUCTION_MANIFEST,
+    QUARANTINED_PREVIEW,
+    render_publication,
+)
+
+HERE = Path(__file__).resolve().parent
+CANONICAL = HERE / "stm32u5-commercial-icpn.csv"
+PROPOSAL = HERE / "stm32u5-production-publication-proposal.json"
+EXPECTED_EXACT_SET_SHA256 = "4f4c7791e8432ec9b9e5eba016513f6094d0046eb8a5d2ec52925fab948d3fd6"
+EXPECTED_MAPPING_COUNTS = {
+    "deterministic_ordering_pattern": 117,
+    "deterministic_cmsis_device_name": 147,
+    "deterministic_cmsis_exact_membership_bridge": 1,
+}
+
+
+def req(condition: bool, message: str) -> None:
+    if not condition:
+        raise SystemExit(message)
+
+
+def set_sha(values: set[str]) -> str:
+    return hashlib.sha256(("\n".join(sorted(values)) + "\n").encode("utf-8")).hexdigest()
+
+
+def main() -> int:
+    canonical_bytes, manifest_bytes, proposal = render_publication()
+    req(CANONICAL.read_bytes() == canonical_bytes, "checked-in STM32U5 canonical CSV differs from deterministic renderer")
+    req(PRODUCTION_MANIFEST.read_bytes() == manifest_bytes, "checked-in Production manifest differs from deterministic STM32U5 poststate")
+    expected_proposal = (json.dumps(proposal, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    req(PROPOSAL.read_bytes() == expected_proposal, "checked-in STM32U5 publication proposal differs from deterministic renderer")
+
+    rows = list(csv.DictReader(io.StringIO(canonical_bytes.decode("utf-8"))))
+    req(tuple(rows[0].keys()) == PRODUCTION_FIELDS if rows else False, "STM32U5 canonical schema drifted")
+    req(len(rows) == EXPECTED_ROWS, f"STM32U5 canonical row count drifted: {len(rows)}")
+    icpns = {row["icpn"] for row in rows}
+    bases = {row["base_device"] for row in rows}
+    req(len(icpns) == EXPECTED_ROWS, "STM32U5 canonical ICPNs are not unique")
+    req(set_sha(icpns) == EXPECTED_EXACT_SET_SHA256, "STM32U5 exact ICPN set digest drifted")
+    req(QUARANTINED_PREVIEW not in icpns, "STM32U5 Preview identity entered Production")
+    req(len(bases) == EXPECTED_BASES, "STM32U5 Base Device count drifted")
+    req({row["family"] for row in rows} == {FAMILY}, "STM32U5 canonical file contains foreign family")
+    req({row["manufacturer"] for row in rows} == {"STMicroelectronics"}, "STM32U5 manufacturer drifted")
+    req(Counter(row["mapping_status"] for row in rows) == Counter(EXPECTED_MAPPING_COUNTS), "STM32U5 mapping method counts drifted")
+    req(all(row["verification_status"].startswith("verified_") for row in rows), "STM32U5 admitted identity lacks verified provenance status")
+    req(all(row["openocd_target_config"] == "tcl/target/stm32u5x.cfg" for row in rows), "STM32U5 target config drifted")
+
+    req(proposal.get("exact_icpn_set_sha256") == EXPECTED_EXACT_SET_SHA256, "STM32U5 proposal exact-set digest drifted")
+    req(proposal.get("production_exact_icpns_after") == EXPECTED_POSTSTATE_EXACT, "STM32U5 Production exact ICPN poststate drifted")
+    req(proposal.get("production_family_count_after") == EXPECTED_POSTSTATE_FAMILIES, "STM32U5 Production family poststate drifted")
+    req(proposal.get("marketing_status_observed") == {"Active": 265}, "STM32U5 observed marketing-status counts drifted")
+    req(proposal.get("quarantined_preview_exact_icpns") == [QUARANTINED_PREVIEW], "STM32U5 Preview quarantine drifted")
+    for key in (
+        "ppu_hil_required_for_catalog_admission",
+        "socket_hil_required_for_catalog_admission",
+        "physical_programming_success_required_for_catalog_admission",
+        "physical_validation_claimed",
+        "runtime_programming_support_claimed",
+        "security_mutation_support_claimed",
+        "debug_attach_support_claimed",
+        "catalog_membership_authorizes_target_execution",
+    ):
+        req(proposal.get(key) is False, f"unsafe STM32U5 publication claim enabled: {key}")
+
+    print(json.dumps({
+        "family": FAMILY,
+        "published_exact_icpns": len(rows),
+        "published_base_devices": len(bases),
+        "production_exact_icpns": EXPECTED_POSTSTATE_EXACT,
+        "production_families": EXPECTED_POSTSTATE_FAMILIES,
+        "quarantined_preview_exact_icpns": [QUARANTINED_PREVIEW],
+        "physical_validation_claimed": False,
+        "runtime_programming_support_claimed": False,
+    }, indent=2, sort_keys=True))
+    print("STM32U5 Production publication validation: PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
