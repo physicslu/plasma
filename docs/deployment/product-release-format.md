@@ -31,7 +31,7 @@ Control Station or PPU
 Canonical product metadata lives in `release/product.json`. The current product version is:
 
 ```text
-product_version = 0.1.1
+product_version = 0.2.0
 ```
 
 Product version is independent from Web/Python component package versions.
@@ -39,9 +39,9 @@ Product version is independent from Web/Python component package versions.
 Release Identity v2 separates three concerns:
 
 ```text
-product_version = 0.1.1
+product_version = 0.2.0
 full git_sha    = abcdef1234567890...40 hex characters...
-release_id      = 0.1.1-abcdef123456
+release_id      = 0.2.0-abcdef123456
 artifact_sha256 = <64 hex characters>
 ```
 
@@ -91,7 +91,7 @@ plasma-ppu-<release-id>-linux-armv7l.tar.gz
 Example:
 
 ```text
-plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz
+plasma-ppu-0.2.0-abcdef123456-linux-armv7l.tar.gz
 ```
 
 Common Release Format does not mean every operating system uses the same archive container:
@@ -102,8 +102,8 @@ Common Release Format does not mean every operating system uses the same archive
 Platform installers inherit the same release identity. Examples:
 
 ```text
-plasma-control-station-0.1.1-abcdef123456-macos-arm64.pkg
-plasma-control-station-0.1.1-abcdef123456-windows-x86_64.msi
+plasma-control-station-0.2.0-abcdef123456-macos-arm64.pkg
+plasma-control-station-0.2.0-abcdef123456-windows-x86_64.msi
 ```
 
 ## 5. Canonical bundle layout
@@ -129,7 +129,7 @@ Release Identity v2 does **not** change the release manifest schema. A represent
 {
   "schema_version": 1,
   "product": "plasma",
-  "product_version": "0.1.1",
+  "product_version": "0.2.0",
   "git_sha": "abcdef1234567890abcdef1234567890abcdef12",
   "role": "control-station",
   "platform": "linux",
@@ -190,8 +190,8 @@ The complete artifact has a detached sidecar:
 Example:
 
 ```text
-plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz
-plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz.sha256
+plasma-control-station-0.2.0-abcdef123456-linux-x86_64.tar.gz
+plasma-control-station-0.2.0-abcdef123456-linux-x86_64.tar.gz.sha256
 ```
 
 Verification order is:
@@ -233,21 +233,21 @@ python3 scripts/product-release.py build \
   --git-sha "$(git rev-parse HEAD)"
 ```
 
-For source SHA `abcdef123456...`, product version `0.1.1` produces a filename containing:
+For source SHA `abcdef123456...`, product version `0.2.0` produces a filename containing:
 
 ```text
-0.1.1-abcdef123456
+0.2.0-abcdef123456
 ```
 
 Verify:
 
 ```bash
 python3 scripts/product-release.py verify \
-  plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz \
+  plasma-control-station-0.2.0-abcdef123456-linux-x86_64.tar.gz \
   --expect-role control-station \
   --expect-platform linux \
   --expect-architecture x86_64 \
-  --expect-version 0.1.1
+  --expect-version 0.2.0
 ```
 
 ## 12. CI acceptance

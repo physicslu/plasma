@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("renders the Plasma Control Station product entry", async () => {
+  const productManifest = JSON.parse(
+    await readFile(new URL("../../../release/product.json", import.meta.url), "utf8"),
+  );
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -30,6 +34,10 @@ test("renders the Plasma Control Station product entry", async () => {
   assert.match(html, /<html\s+lang=["']zh-Hant["']/i);
   assert.match(html, /<title>Plasma Product Modes<\/title>/i);
   assert.match(html, />PLASMA</);
+  assert.ok(
+    html.includes(`>v${productManifest.product_version}<`),
+    "global header must render the canonical Plasma product version",
+  );
   assert.match(html, />選擇產品模式</);
   assert.match(html, /href="\/fleet"/);
   assert.match(html, />量產模式</);
