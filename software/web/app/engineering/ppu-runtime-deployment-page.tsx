@@ -75,7 +75,7 @@ export default function PpuRuntimeDeploymentPage() {
   const trustedIdle = trustedIdleObservation(selectedFleet);
 
   return (
-    <section className="ppuSiteConfiguration" aria-label="PPU Platform Firmware Workspace">
+    <section className="ppuSiteConfiguration" aria-label="PPU Platform Release Workspace">
       <header className="ppuSiteHeader">
         <div>
           <small>PPU PLATFORM</small>
