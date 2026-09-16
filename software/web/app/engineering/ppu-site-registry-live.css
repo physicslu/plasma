@@ -8,11 +8,11 @@
   margin: 0;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 9px 11px;
+  padding: 10px 12px;
   background: var(--panel-2);
   color: var(--text-soft);
-  font-size: 10px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .ppuRegistryMessage.error {
