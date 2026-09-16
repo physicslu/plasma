@@ -131,13 +131,18 @@
     "STM32U5G9ZJ"
   ],
   "exact_orderable_identity_enumeration": {
-    "complete": false,
-    "exact_icpn_count": null,
-    "reason": "This gate freezes manufacturer-observed base devices only. Exact orderable Part Number rows must be enumerated from each ST Quality & Reliability table without synthesis."
+    "complete": true,
+    "observed_at": "2026-09-16",
+    "identity_authority": "ST Quality & Reliability exact Part Number rows",
+    "snapshot": "stm32u5-exact-orderable-identity-enumeration.json",
+    "exact_icpn_count": 266,
+    "exact_icpn_set_sha256": "ea5e3edc302a022281618ecfa73af8ac6109ad287dcf36e6f1175d20f567caf3",
+    "synthesized_exact_icpns": 0
   },
   "result": {
     "bounded_discovery_clean": true,
     "all_12_upstream_subfamilies_have_current_base_device_observation": true,
+    "exact_icpn_enumeration_clean": true,
     "synthesized_base_devices": 0,
     "synthesized_exact_icpns": 0,
     "manual_intervention": 0,
@@ -145,12 +150,12 @@
   },
   "claims": {
     "catalog_admission_blocked_by_hil": false,
-    "exact_icpn_enumeration_complete": false,
+    "exact_icpn_enumeration_complete": true,
     "physical_validation_claimed": false,
     "security_semantics_supported": false,
     "runtime_programming_supported": false,
     "debug_attach_supported": false,
     "hil_validated": false
   },
-  "next_research_gate": "stm32u5-exact-orderable-identity-enumeration"
+  "next_research_gate": "stm32u5-metadata-policy"
 }
