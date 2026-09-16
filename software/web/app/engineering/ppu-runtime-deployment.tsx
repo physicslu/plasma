@@ -10,9 +10,11 @@ import {
   getManagerPpuBootstrap,
   pairManagerPpuBootstrap,
   parseSha256Sidecar,
+  runManagerPpuPlatformPsLoopback,
   sha256Hex,
   startManagerPpuBootstrapDeployment,
   type ManagerBootstrapStatus,
+  type PlatformPsLoopbackPayload,
 } from "./ppu-bootstrap-api";
 
 const CHUNK_BYTES = 1024 * 1024;
@@ -42,7 +44,7 @@ export default function PpuRuntimeDeployment({
   const alias = entry.alias ?? "";
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"pair" | "deploy" | null>(null);
+  const [busy, setBusy] = useState<"pair" | "deploy" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pairingToken, setPairingToken] = useState("");
@@ -52,6 +54,7 @@ export default function PpuRuntimeDeployment({
   const [facilityId, setFacilityId] = useState("lab");
   const [displayName, setDisplayName] = useState(alias || "Plasma PPU");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [loopback, setLoopback] = useState<PlatformPsLoopbackPayload | null>(null);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!alias) return;
@@ -88,6 +91,13 @@ export default function PpuRuntimeDeployment({
   const firstInstall = entry.lifecycle === "pending";
   const maintenanceReady = firstInstall || (entry.lifecycle === "disabled" && hasTrustedIdleObservation);
   const canPair = Boolean(alias && pairingToken.trim().length >= 32 && busy === null);
+  const canLoopback = Boolean(
+    alias
+    && pairing?.paired
+    && pairing.device_match
+    && runtime?.state === "runtime_active"
+    && busy === null,
+  );
   const canDeploy = Boolean(
     alias
     && maintenanceReady
@@ -120,10 +130,27 @@ export default function PpuRuntimeDeployment({
     try {
       await pairManagerPpuBootstrap(alias, pairingToken);
       setPairingToken("");
-      setNotice("Platform maintenance credential verified by this PPU. Maintenance authorization is active for the bounded deployment workflow.");
+      setNotice("Platform maintenance credential stored for this PPU. Maintenance authorization is active for the bounded Platform workflow.");
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Platform maintenance pairing failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runLoopback() {
+    if (!canLoopback) return;
+    setBusy("loopback");
+    setError(null);
+    setNotice(null);
+    setLoopback(null);
+    try {
+      const result = await runManagerPpuPlatformPsLoopback(alias);
+      setLoopback(result);
+      setNotice("Platform PS Loop Test passed through the active Runtime.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Platform PS Loop Test failed");
     } finally {
       setBusy(null);
     }
@@ -134,6 +161,7 @@ export default function PpuRuntimeDeployment({
     setBusy("deploy");
     setError(null);
     setNotice(null);
+    setLoopback(null);
     setUploadProgress(0);
     try {
       const sidecarText = await sidecar.text();
@@ -182,7 +210,7 @@ export default function PpuRuntimeDeployment({
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Platform Release update is blocked while this PPU has active Site execution.</p>}
-      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">This PPU is registered for programming. Disable Registration after jobs are idle before Platform Release maintenance.</p>}
+      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">This PPU is registered for programming. Disable Registration after jobs are idle before Platform Release maintenance. Platform PS Loop Test remains diagnostic-only and does not mutate Site execution.</p>}
       {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Platform maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
       {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Platform Release update remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
@@ -215,6 +243,28 @@ export default function PpuRuntimeDeployment({
           {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
         </button>
         <p>This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
+      </div>
+
+      <div className="ppuRegistryAddForm" aria-label="Platform PS Loop Test">
+        <div>
+          <strong>Platform PS Loop Test</strong>
+          <p>Runs the same Runtime PS loopback capability through the Platform maintenance admission path. Programming Registration is not required.</p>
+        </div>
+        <button className="ppuSiteButton" type="button" disabled={!canLoopback} onClick={() => void runLoopback()}>
+          {busy === "loopback" ? "Testing PS..." : "Run PS Loop Test"}
+        </button>
+        {!pairing?.paired && <p>Platform maintenance pairing is required before this diagnostic can run.</p>}
+        {pairing?.paired && runtime?.state !== "runtime_active" && <p>The Runtime must be active before PS Loop Test can run.</p>}
+        {loopback && (
+          <dl className="ppuInfoGrid">
+            <div><dt>Result</dt><dd>PASS</dd></div>
+            <div><dt>Context</dt><dd>{loopback.manager.context}</dd></div>
+            <div><dt>Test ID</dt><dd>{loopback.loopback.test_id}</dd></div>
+            <div><dt>Manager RTT</dt><dd>{loopback.manager.manager_rtt_ms} ms</dd></div>
+            <div><dt>PPU RTT</dt><dd>{loopback.loopback.ppu_rtt_ms ?? "—"}</dd></div>
+            <div><dt>Source</dt><dd>{loopback.loopback.source}</dd></div>
+          </dl>
+        )}
       </div>
 
       <div className="ppuRegistryAddForm" aria-label="PPU Platform Release update">
