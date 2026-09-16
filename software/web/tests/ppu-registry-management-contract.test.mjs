@@ -31,11 +31,11 @@ test("PPU is a first-class EMode object with four functional subpages", () => {
 
 test("PPU Overview is read-only and summarizes Platform, Registration, Sites, and alerts", () => {
   assert.match(overview, /aria-label="PPU Overview"/);
-  assert.match(overview, /PPU Platform Firmware/);
+  assert.match(overview, /PPU Platform Release/);
   assert.match(overview, /Bootstrap Version/);
   assert.match(overview, /Runtime Version/);
   assert.match(overview, /Registration/);
-  assert.match(overview, /Site summary|PPU Site summary/);
+  assert.match(overview, /PPU Site summary/);
   assert.match(overview, /Alerts/);
   assert.match(overview, /onNavigate\("platform"\)/);
   assert.match(overview, /onNavigate\("registration"\)/);
@@ -50,7 +50,7 @@ test("Registration owns Console programming admission, not Platform maintenance"
   assert.match(registration, /Validate & Register for Programming/);
   assert.match(registration, /Programming Registration is still pending/);
   assert.match(registration, /Platform maintenance remains a separate lifecycle/);
-  assert.match(registration, /Bootstrap maintenance authorization used by Platform Firmware update is a separate Platform security boundary/);
+  assert.match(registration, /Bootstrap maintenance authorization used by Platform Release update is a separate Platform security boundary/);
   assert.doesNotMatch(registration, /pairManagerPpuBootstrap|startManagerPpuBootstrapDeployment/);
 });
 
@@ -98,7 +98,7 @@ test("Sites are PPU child resources and operational configuration is Registratio
   assert.match(sitesPage, /\{registered \? \(/);
   assert.match(sitesPage, /<PpuSiteDesiredConfiguration/);
   assert.match(sitesPage, /Registration required/);
-  assert.match(sitesPage, /Platform Firmware inspection and maintenance remain available from Platform while Sites are locked/);
+  assert.match(sitesPage, /Platform Release inspection and maintenance remain available from Platform while Sites are locked/);
   assert.match(managerServer, /if self\.command == "POST" and self\._registry_lifecycle\(alias\) != REGISTRY_LIFECYCLE_COMMISSIONED/);
   assert.match(managerServer, /PPU must complete Validate & Enable before Manager write operations/);
 });
