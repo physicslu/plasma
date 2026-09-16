@@ -1,47 +1,56 @@
 # Device Catalog CI Coverage Map
 
-Status: **Phase 2 inventory in progress — no workflow retirement is authorized by this document yet**
+Status: **Phase 2 inventory complete for the current workflow set; no workflow retirement is authorized by this document alone**
 
 Baseline: `main` at `9aca1bb7bcb2c61105e56b195990e1ebbbeed9db`.
 
 Tracking: issue #622.
 
-## 1. Purpose
-
-This map records Device Catalog CI authority before any workflow consolidation or retirement.
-
-The governing rule is:
+## 1. Governing rule
 
 > Consolidate orchestration, not validation coverage.
 
-Workflow count is not itself the optimization target. Changes must preserve dependency ownership, fail-closed deterministic validation, failure-domain isolation, reproducibility, and auditability. Runner minutes and PR critical-path latency are secondary optimization metrics after coverage is proven equivalent.
+Workflow count is not itself the optimization target. A consolidation is acceptable only when dependency ownership, fail-closed deterministic validation, failure-domain isolation, reproducibility, and auditability remain explicit. Runner minutes and PR critical-path latency are optimization metrics after coverage parity is demonstrated.
 
-## 2. Lifecycle classes
+## 2. Existing repository governance
+
+The repository already enforces important CI boundaries:
+
+- `.github/ci-workstreams.json` defines `ICPN` as the owner of exact commercial identity, canonical metadata, and the user-selectable Production catalog.
+- The ICPN core workflow set is `device-catalog-validation.yml`, `device-catalog-current-validation.yml`, `device-catalog-stm32-family-validation.yml`, and `device-catalog-production-doc-contract.yml`.
+- `scripts/ci/device-catalog-trigger-governance.py` scans every `device-catalog-*.yml` workflow and default-denies canonical Production-path triggers for family/research workflows.
+- Only the historical/current/Production-document/Production-invariant workflows may own canonical Production triggers.
+- `.github/device-catalog-ci-trigger-debt.json` currently has an empty violation set and is a shrink-only ratchet.
+
+Therefore the current problem is primarily **specialized workflow lifecycle and orchestration sprawl**, not uncontrolled Production-path fan-out.
+
+## 3. Lifecycle classes
 
 | Class | Meaning | Default treatment |
 |---|---|---|
 | `core-regression` | Broad historical/current catalog regression | Keep unless validator-level equivalence is proven |
-| `family-dispatch` | Affected-family deterministic orchestration | Preferred consolidation primitive |
-| `stage-deterministic` | Family/stage-specific retained-evidence, policy, admission, or publication contract | Candidate for consolidation only after command/trigger parity is proven |
+| `family-dispatch` | Affected-family deterministic orchestration | Preferred deterministic family consolidation primitive |
+| `stage-deterministic` | Retained-evidence, metadata, admission, or publication stage contract | Consolidate only after command/trigger parity is proven |
 | `manual-live` | Network/browser/external-source acquisition | Keep outside ordinary PR critical path |
-| `security-hil` | Security state, HIL provenance/readiness, runtime enforcement | Preserve as a distinct authority unless a replacement gate proves the same boundary |
-| `governance-campaign` | Selection, prioritization, frontier, requalification, or campaign-specific governance | Review lifecycle; do not treat as permanent core by default |
-| `production-contract` | Production manifest/document/runtime-load invariants | Keep as product-facing catalog boundary |
-| `inventory-pending` | Workflow is present but exact trigger/validator mapping has not yet been audited in this phase | No retirement permitted |
+| `security-hil` | Security state, HIL provenance/readiness, runtime enforcement | Preserve distinct authority; reusable mechanics are allowed |
+| `governance-campaign` | Selection, prioritization, frontier, requalification, or frozen campaign decision | Candidate for a historical/governance replay authority after coverage migration |
+| `production-contract` | Production manifest/document/runtime-load invariant | Keep as product-facing boundary |
+| `domain-contract` | Cross-domain invariant such as catalog-selectability vs execution admission | Keep explicit unless moved to an equivalent repository/catalog contract gate |
 
-## 3. Core and production authority
+## 4. Core and Production authority
 
-| Workflow | Authority | Trigger | Validator / coverage | Overlap | Lifecycle |
-|---|---|---|---|---|---|
-| `device-catalog-validation.yml` | Historical/broad Device Catalog regression | PR + `main`, catalog-related paths | Historical/generic evidence, policy, admission and family regressions | Some assertions overlap current/family gates; not proven equivalent | `core-regression` |
-| `device-catalog-current-validation.yml` | Current catalog regression | PR + `main`, catalog-related paths | Current retained-evidence and post-admission replay | Different body from historical gate | `core-regression` |
-| `device-catalog-production-doc-contract.yml` | Production documentation/manifest single-source contract | PR + `main`, narrow production-doc paths | `validate_readme_contract.py` | No proven duplicate authority | `production-contract` |
-| `device-catalog-production-invariants.yml` | Canonical Production graph invariants | PR + `main`, production/research publication paths | `scripts/ci/device-catalog-production-invariants.py` | Reused by family publication gates by design | `production-contract` |
-| `device-catalog-stm32-family-validation.yml` | Affected-family deterministic dispatcher | PR + `main`, explicit family/shared paths | `scripts/device-catalog-family-ci.py` detect/self-test/run | Intentionally overlaps family-specific deterministic gates where both still exist | `family-dispatch` |
+| Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-validation.yml` | PR + `main`, catalog paths | Broad/historical evidence, policy, admission and family regressions | Not equivalent to current/family gates | `core-regression` |
+| `device-catalog-current-validation.yml` | PR + `main`, catalog paths | Current retained-evidence and post-admission regression | Distinct body from historical gate | `core-regression` |
+| `device-catalog-production-doc-contract.yml` | PR + `main`, narrow Production/doc paths | Production documentation/manifest single-source contract | No replacement identified | `production-contract` |
+| `device-catalog-production-invariants.yml` | PR + `main`, Production/publication paths | Canonical Production graph invariants | Reused by publication gates by design | `production-contract` |
+| `device-catalog-stm32-family-validation.yml` | PR + `main`, explicit family/shared paths | Detect affected families then run deterministic family profiles | Preferred family orchestration primitive; trigger defect noted below | `family-dispatch` |
+| `icpn-catalog-admission-separation-validation.yml` | PR + `main`, catalog/policy paths | `validate-icpn-catalog-admission-separation.py`; proves catalog admission/selectability stays separate from execution support | Could eventually move into a core catalog/repository contract gate only if the same invariant remains independently visible | `domain-contract` |
 
-## 4. STM32 family dispatcher: verified scope
+## 5. STM32 family dispatcher
 
-The dispatcher implementation currently defines deterministic profiles for:
+`scripts/device-catalog-family-ci.py` currently defines deterministic profiles for:
 
 ```text
 STM32F0
@@ -54,160 +63,157 @@ STM32U0
 STM32C0
 ```
 
-The workflow trigger currently covers the F0/F2/F3/F7/G0/G4/C0 family paths plus shared catalog infrastructure, but **does not include normal STM32U0 paths** even though the dispatcher has a U0 profile.
+The dispatcher workflow covers F0/F2/F3/F7/G0/G4/C0 and shared catalog infrastructure, but **does not include normal STM32U0 research/evidence paths**. The implementation has a U0 profile, while the workflow trigger does not reliably invoke it for ordinary U0 changes. This is a coverage defect to repair before the dispatcher is considered authoritative for U0.
 
-This is a coverage defect, not a consolidation opportunity: before the dispatcher can be considered authoritative for U0, its path filter must be brought into parity with the implementation.
+The workflow also carries path references to older family workflow filenames and a C0 live workflow filename that are no longer present. These are stale trigger references and should be removed in a hygiene PR only after the active trigger set is tested.
 
-The workflow also contains references to old family workflow filenames and a C0 live workflow filename that are not present in the current workflow directory. These are stale trigger references to classify during cleanup; removing them is not authorized by this inventory alone.
+## 6. STM32C0 overlap pilot
 
-## 5. STM32C0 overlap pilot
-
-C0 is the first family where duplicate orchestration can be measured precisely because both the family dispatcher and stage-specific workflows are active.
-
-| Workflow | Stage authority | Trigger | Stage-only or extra behavior relative to dispatcher | Current disposition |
+| Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
 |---|---|---|---|---|
-| `device-catalog-stm32c0-c01-foundation-validation.yml` | C0.1 foundation | PR + `main`, C0.1 paths | Replays `stm32c0_phase_c0_1_foundation.py --check` in addition to tests/validator | Consolidation candidate, **not retireable yet** |
-| `device-catalog-stm32c0-c02-discovery-validation.yml` | C0.2 deterministic discovery/retained evidence | PR + `main`, C0.2 paths | Explicit deterministic target-manifest replay plus retained-evidence validation | Consolidation candidate, **not retireable yet** |
-| `device-catalog-stm32c0-c03-metadata-validation.yml` | C0.3 metadata/policy | PR + `main`, C0.3 paths | Explicit C0.2 prerequisite replay before policy test/replay | Largely covered by dispatcher sequence; parity still must be proven |
-| `device-catalog-stm32c0-c04-admission-validation.yml` | C0.4 read-only admission | PR + `main`, C0.4 paths | Explicit retained-evidence and C0.3 prerequisite replay before admission tests | Largely covered by dispatcher sequence; parity still must be proven |
-| `device-catalog-stm32c0-c05-publication-validation.yml` | C0.5 publication | PR + `main`, C0.5 paths | Admission-plan validation plus publication script `--verify` | Consolidation candidate, **not retireable yet** |
+| `device-catalog-stm32c0-c01-foundation-validation.yml` | PR + `main` | C0.1 negative controls, frozen foundation `--check`, hard-lock | Dispatcher overlaps tests/validator but not all replay behavior | `stage-deterministic` |
+| `device-catalog-stm32c0-c02-discovery-validation.yml` | PR + `main` | C0.2 discovery tests, deterministic target-manifest replay, retained evidence | Partial dispatcher overlap | `stage-deterministic` |
+| `device-catalog-stm32c0-c03-metadata-validation.yml` | PR + `main` | C0.3 metadata policy plus prerequisite replay | Substantial dispatcher overlap; parity not yet proven | `stage-deterministic` |
+| `device-catalog-stm32c0-c04-admission-validation.yml` | PR + `main` | C0.4 admission plus retained-evidence/metadata prerequisites | Substantial dispatcher overlap; parity not yet proven | `stage-deterministic` |
+| `device-catalog-stm32c0-c05-publication-validation.yml` | PR + `main` | C0.5 tests, admission-plan validation, publication `--verify` | Dispatcher lacks full publication replay parity | `stage-deterministic` |
 
-Required before C0 retirement:
+C0 is the first safe consolidation target, but none of these five workflows is retireable yet. Replacement coverage must absorb every stage-only check, preserve trigger parity, and pass negative controls before deletion.
 
-1. Move every stage-only deterministic check into the family command profile or an explicitly owned replacement gate.
-2. Prove trigger parity for all C0 research/evidence/publication paths.
-3. Run negative controls showing the replacement fails when each stage contract is broken.
-4. Only then retire the five stage YAML files in a separate PR.
-
-## 6. Manual live acquisition
-
-The following workflows are verified as manual external-source acquisition and must remain outside the ordinary PR critical path unless product dependency ownership changes:
-
-| Workflow | Coverage | Trigger | Lifecycle |
-|---|---|---|---|
-| `device-catalog-stm32l0-l02-live-discovery.yml` | STM32L0 bounded live commercial discovery | `workflow_dispatch` | `manual-live` |
-| `device-catalog-stm32l4-l42-live-discovery.yml` | STM32L4 bounded live commercial discovery | `workflow_dispatch` | `manual-live` |
-| `device-catalog-stm32u0-u02-live-discovery.yml` | STM32U0 bounded live commercial discovery | `workflow_dispatch` | `manual-live` |
-
-These workflows intentionally acquire external manufacturer data and retain evidence artifacts. They are evidence-generation gates, not deterministic PR regression gates.
-
-## 7. Family/stage inventory still to audit
-
-The workflows below are present on the baseline and are now explicitly in the Phase 2 inventory. Until their exact trigger and validator parity is recorded, their lifecycle is `inventory-pending` and they must not be retired.
+## 7. STM32L0, L1 and L4 deterministic stage chains
 
 ### STM32L0
 
-- `device-catalog-stm32l0-l01-foundation-validation.yml`
-- `device-catalog-stm32l0-l02-discovery-validation.yml`
-- `device-catalog-stm32l0-l03-metadata-validation.yml`
-- `device-catalog-stm32l0-l04-admission-validation.yml`
-- `device-catalog-stm32l0-l05-publication-validation.yml`
+| Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32l0-l01-foundation-validation.yml` | PR + `main` | Foundation negative controls, baseline `--check`, hard-lock | Similar lifecycle shape to C0; no dispatcher profile | `stage-deterministic` |
+| `device-catalog-stm32l0-l02-discovery-validation.yml` | PR + `main` | 99-Base-Device deterministic discovery replay + retained evidence | No family-dispatch replacement | `stage-deterministic` |
+| `device-catalog-stm32l0-l03-metadata-validation.yml` | PR + dispatch | Frozen metadata policy, deterministic summary/assertions, artifact | Trigger/artifact semantics differ from C0/L1 | `stage-deterministic` |
+| `device-catalog-stm32l0-l04-admission-validation.yml` | PR + dispatch | Frozen read-only admission plan, summary/assertions, artifact | No equivalent family profile | `stage-deterministic` |
+| `device-catalog-stm32l0-l05-publication-validation.yml` | PR + dispatch | Publication tests, `--verify`, validator, Production boundary | Publication authority must remain explicit | `stage-deterministic` |
+| `device-catalog-stm32l0-l02-live-discovery.yml` | dispatch only | External live commercial discovery and evidence capture | Must not become ordinary PR gate | `manual-live` |
 
 ### STM32L1
 
-- `device-catalog-stm32l1-l11-foundation-validation.yml`
-- `device-catalog-stm32l1-l12-retained-validation.yml`
-- `device-catalog-stm32l1-l13-metadata-policy-validation.yml`
-- `device-catalog-stm32l1-l14-admission-plan-validation.yml`
-- `device-catalog-stm32l1-l15-publication-validation.yml`
-- `device-catalog-stm32l1-requalification-validation.yml`
+| Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32l1-l11-foundation-validation.yml` | PR + `main` | Foundation hard-lock; forbids Production writes | No dispatcher profile | `stage-deterministic` |
+| `device-catalog-stm32l1-l12-retained-validation.yml` | PR + `main` | Retained/sharded discovery evidence | Unique retained-evidence stage | `stage-deterministic` |
+| `device-catalog-stm32l1-l13-metadata-policy-validation.yml` | PR + `main` + dispatch | Frozen metadata policy | No equivalent family profile | `stage-deterministic` |
+| `device-catalog-stm32l1-l14-admission-plan-validation.yml` | PR + `main` + dispatch | Frozen admission plan | No equivalent family profile | `stage-deterministic` |
+| `device-catalog-stm32l1-l15-publication-validation.yml` | PR + `main` + dispatch | Publication hard-lock and bounded Production delta | Publication authority must remain explicit | `stage-deterministic` |
+| `device-catalog-stm32l1-requalification-validation.yml` | PR + `main` | Frozen requalification evidence/result; forbids Production writes | Not an ordinary lifecycle stage; keep separate unless moved to governance replay | `governance-campaign` |
 
 ### STM32L4
 
-- `device-catalog-stm32l4-l41-foundation-validation.yml`
-- `device-catalog-stm32l4-l42-discovery-validation.yml`
-- `device-catalog-stm32l4-l43-metadata-validation.yml`
-- `device-catalog-stm32l4-l44-admission-validation.yml`
-- `device-catalog-stm32l4-l45-publication-validation.yml`
+| Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32l4-l41-foundation-validation.yml` | PR + `main` | Foundation negative controls, baseline `--check`, hard-lock, zero Production writes | No dispatcher profile | `stage-deterministic` |
+| `device-catalog-stm32l4-l42-discovery-validation.yml` | PR + `main` | 138-Base-Device deterministic discovery replay + retained evidence | No dispatcher replacement | `stage-deterministic` |
+| `device-catalog-stm32l4-l43-metadata-validation.yml` | PR + `main` + dispatch | Byte-for-byte policy reconstruction, hard-lock, pre-publication Production boundary | Trigger/replay semantics are stage-specific | `stage-deterministic` |
+| `device-catalog-stm32l4-l44-admission-validation.yml` | PR + dispatch | Frozen admission plan, deterministic summary/assertions, artifact | No equivalent family profile | `stage-deterministic` |
+| `device-catalog-stm32l4-l45-publication-validation.yml` | PR + dispatch | Publication `--verify`, validator, Production-boundary assertions | Publication authority must remain explicit | `stage-deterministic` |
+| `device-catalog-stm32l4-l42-live-discovery.yml` | dispatch only | External live commercial discovery and evidence capture | Must not become ordinary PR gate | `manual-live` |
 
-### STM32L5 security/HIL/publication chain
+L0/L1/L4 share a broad lifecycle shape but their trigger, artifact, replay and Production-write semantics are not identical. They must not be absorbed by the existing family matrix by merely adding family names.
 
-- `device-catalog-stm32l5-canonical-admission-plan-validation.yml`
-- `device-catalog-stm32l5-hil-fixture-acquisition-provenance-validation.yml`
-- `device-catalog-stm32l5-hil-fixture-inventory-binding-validation.yml`
-- `device-catalog-stm32l5-hil-observer-debug-readiness-validation.yml`
-- `device-catalog-stm32l5-manufacturer-identity-discovery-validation.yml`
-- `device-catalog-stm32l5-metadata-policy-validation.yml`
-- `device-catalog-stm32l5-production-publication-validation.yml`
-- `device-catalog-stm32l5-runtime-enforcement-admission-gate-validation.yml`
-- `device-catalog-stm32l5-security-scope-foundation-validation.yml`
-- `device-catalog-stm32l5-security-state-admission-gate-validation.yml`
-- `device-catalog-stm32l5-security-state-observer-debug-validation.yml`
+## 8. STM32L5 security/HIL chain
 
-Default classification for this chain is `security-hil` or `stage-deterministic`, not bulk-consolidation. Security-state and HIL authority must stay explicit even if common YAML mechanics are later extracted.
+| Workflow | Trigger | Authority / validator coverage | Disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32l5-manufacturer-identity-discovery-validation.yml` | PR + `main` | Frozen manufacturer identity discovery; zero Production writes | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-metadata-policy-validation.yml` | PR + `main` | Metadata policy; zero Production writes | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-canonical-admission-plan-validation.yml` | PR + `main` | Canonical admission plan; zero Production writes | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-security-scope-foundation-validation.yml` | PR + `main` | Security-scope foundation | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-security-state-admission-gate-validation.yml` | PR + `main` | Security-state admission | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-runtime-enforcement-admission-gate-validation.yml` | PR + `main` | Runtime-enforcement admission | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-security-state-observer-debug-validation.yml` | PR + `main` | Observer/debug security-state gate | Keep distinct authority | `security-hil` |
+| `device-catalog-stm32l5-hil-observer-debug-readiness-validation.yml` | PR + `main` | HIL observer/debug readiness; zero Production writes | Keep distinct HIL authority | `security-hil` |
+| `device-catalog-stm32l5-hil-fixture-inventory-binding-validation.yml` | PR + `main` | HIL fixture inventory binding; zero Production writes | Keep distinct HIL authority | `security-hil` |
+| `device-catalog-stm32l5-hil-fixture-acquisition-provenance-validation.yml` | PR + `main` | HIL fixture acquisition provenance; zero Production writes | Keep distinct HIL authority | `security-hil` |
+| `device-catalog-stm32l5-production-publication-validation.yml` | PR + `main` | Deterministic publication + Production invariants + runtime catalog load | Dedicated publication boundary | `production-contract` |
 
-### STM32U3 security/publication chain
+Common setup and zero-Production-write mechanics can become reusable primitives, but the authority chain must not be flattened into an ordinary family matrix.
 
-- `device-catalog-stm32u3-canonical-admission-plan-validation.yml`
-- `device-catalog-stm32u3-hil-observer-debug-readiness-validation.yml`
-- `device-catalog-stm32u3-manufacturer-identity-discovery-validation.yml`
-- `device-catalog-stm32u3-metadata-policy-validation.yml`
-- `device-catalog-stm32u3-production-publication-validation.yml`
-- `device-catalog-stm32u3-runtime-enforcement-admission-gate-validation.yml`
-- `device-catalog-stm32u3-security-scope-foundation-validation.yml`
-- `device-catalog-stm32u3-security-state-admission-gate-validation.yml`
-- `device-catalog-stm32u3-security-state-observer-debug-validation.yml`
+## 9. STM32U3 security/publication chain
 
-Verified sample: the U3 security-state admission workflow is PR/path-scoped plus manual dispatch and runs `validate_stm32u3_security_state_admission_gate.py`. It is therefore a distinct security authority, not evidence that the entire U3 chain can be flattened into a generic matrix.
+| Workflow | Trigger | Authority / validator coverage | Disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32u3-manufacturer-identity-discovery-validation.yml` | PR + `main` | Manufacturer identity discovery; zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-metadata-policy-validation.yml` | PR + dispatch | Frozen metadata policy; zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-canonical-admission-plan-validation.yml` | PR + dispatch | Canonical admission plan | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-security-scope-foundation-validation.yml` | PR + dispatch | Security-scope negative controls + frozen foundation + zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-security-state-admission-gate-validation.yml` | PR + dispatch | Security-state admission gate | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-runtime-enforcement-admission-gate-validation.yml` | PR + dispatch | Runtime-enforcement gate | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-security-state-observer-debug-validation.yml` | PR + dispatch | Observer/debug gate | Keep distinct | `security-hil` |
+| `device-catalog-stm32u3-hil-observer-debug-readiness-validation.yml` | PR + `main` | HIL readiness + zero Production writes | Keep distinct HIL authority | `security-hil` |
+| `device-catalog-stm32u3-production-publication-validation.yml` | PR + `main` | Deterministic publication + Production invariants + runtime catalog load | Dedicated publication boundary | `production-contract` |
 
-### STM32U5 security/publication chain
+U3 intentionally has different trigger lifecycles from L5; normalization must be based on authority, not filename symmetry.
 
-- `device-catalog-stm32u5-canonical-admission-plan-validation.yml`
-- `device-catalog-stm32u5-catalog-runtime-governance-correction-validation.yml`
-- `device-catalog-stm32u5-exact-orderable-identity-probe.yml`
-- `device-catalog-stm32u5-manufacturer-identity-discovery-validation.yml`
-- `device-catalog-stm32u5-metadata-authority-delta-resolution-validation.yml`
-- `device-catalog-stm32u5-metadata-policy-validation.yml`
-- `device-catalog-stm32u5-production-publication-validation.yml`
-- `device-catalog-stm32u5-runtime-enforcement-admission-gate-validation.yml`
-- `device-catalog-stm32u5-security-scope-foundation-validation.yml`
-- `device-catalog-stm32u5-security-state-admission-gate-validation.yml`
-- `device-catalog-stm32u5-security-state-observer-debug-validation.yml`
+## 10. STM32U5 security/publication chain
 
-Verified samples:
+| Workflow | Trigger | Authority / validator coverage | Disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32u5-exact-orderable-identity-probe.yml` | PR + dispatch | Retained/offline exact-orderable identity evidence | Keep offline evidence authority | `security-hil` |
+| `device-catalog-stm32u5-manufacturer-identity-discovery-validation.yml` | PR | Manufacturer identity discovery + zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-metadata-policy-validation.yml` | PR + dispatch | Frozen metadata policy + zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-metadata-authority-delta-resolution-validation.yml` | PR + dispatch | Metadata-policy replay + authority-delta disposition + zero Production writes | Keep distinct until metadata governance is redesigned | `security-hil` |
+| `device-catalog-stm32u5-canonical-admission-plan-validation.yml` | PR + dispatch | Metadata policy + metadata delta + canonical admission plan | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-security-scope-foundation-validation.yml` | PR + `main` | Security-scope foundation + zero Production writes | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-security-state-admission-gate-validation.yml` | PR + dispatch | Upstream admission replay + security-state gate + Production-write rejection | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-runtime-enforcement-admission-gate-validation.yml` | PR + dispatch | Runtime-enforcement gate | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-security-state-observer-debug-validation.yml` | PR + dispatch | Runtime-enforcement replay + observer/debug gate + catalog-write rejection | Keep distinct | `security-hil` |
+| `device-catalog-stm32u5-production-publication-validation.yml` | PR + `main` | Deterministic publication + Production invariants + runtime catalog load | Dedicated publication boundary | `production-contract` |
+| `device-catalog-stm32u5-catalog-runtime-governance-correction-validation.yml` | PR | Catalog/runtime governance-correction validator | Keep until correction contract lifecycle is closed; contains stale trigger reference noted below | `governance-campaign` |
 
-- `device-catalog-stm32u5-exact-orderable-identity-probe.yml` is PR/path-scoped plus manual dispatch and explicitly enforces retained/offline evidence only.
-- `device-catalog-stm32u5-production-publication-validation.yml` is PR + `main` and also validates Production invariants plus runtime catalog loading.
+Hygiene defect: the governance-correction workflow includes `.github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml` in its path filter, but that workflow file does not exist on this baseline. The stale reference should be removed in a behavior-neutral hygiene PR.
 
-These own different authority and must not be merged merely because they share a family name.
+## 11. Governance / selection / frontier campaigns
 
-## 8. Governance / selection / frontier inventory
+| Workflow | Trigger | Authority / validator coverage | Disposition | Lifecycle |
+|---|---|---|---|---|
+| `device-catalog-stm32-cross-family-prioritization-validation.yml` | PR + `main` | Prioritization policy negative controls + immutable historical replay | Candidate for consolidated governance replay | `governance-campaign` |
+| `device-catalog-stm32-evidence-accessibility-validation.yml` | PR + `main` + dispatch | Retained evidence accessibility + U0/C0 ordering + U0 foundation replay | Multi-campaign historical gate; migrate only with explicit replacement | `governance-campaign` |
+| `device-catalog-stm32-post-u0-selection-validation.yml` | PR + `main` | Evidence/selection tests + frozen bytes + hard-lock | Candidate for historical/governance replay | `governance-campaign` |
+| `device-catalog-stm32-post-c0-selection-validation.yml` | PR + `main` | Evidence policy + selection controls + frozen bytes + hard-lock | Candidate for historical/governance replay | `governance-campaign` |
+| `device-catalog-stm32-post-l0-selection-validation.yml` | PR + dispatch | Selection tests + hard-locked replay + research-only boundary | Candidate for historical/governance replay | `governance-campaign` |
+| `device-catalog-post-u5-frontier-selection-validation.yml` | PR + `main` | Frozen post-U5 frontier selection | Unique validator today; migrate before retirement | `governance-campaign` |
+| `device-catalog-stm32-trustzone-cohort-gate1-validation.yml` | PR + `main` | Deterministic TrustZone cohort qualification + zero Production writes | Candidate for security/governance replay, not generic family matrix | `governance-campaign` |
+| `device-catalog-stm32-trustzone-cohort-succession-after-l5-blocker-validation.yml` | PR + `main` | Frozen TrustZone succession decision + zero Production writes | Unique validator today; migrate before retirement | `governance-campaign` |
+| `device-catalog-stm32h7-partitioned-scope-selection-validation.yml` | PR + `main` | Frozen H7 partition selection | Frontier campaign; migration/closure decision required | `governance-campaign` |
+| `device-catalog-stm32h7rs-evidence-accessibility-validation.yml` | PR + `main` | Retained H7RS official-ST accessibility evidence | Frontier evidence campaign; migration/closure decision required | `governance-campaign` |
 
-The following workflows are campaign/governance candidates rather than ordinary product-runtime gates. Exact lifecycle must be audited before any trigger change:
+These are the strongest workflow-count reduction candidates. Several validators are currently owned only by their dedicated workflow, so deleting the YAML today would remove unique regression coverage. Preferred migration is to an explicit historical/governance replay runner with path-based affected checks, or a documented campaign closure when the invariant no longer needs executable CI.
 
-- `device-catalog-post-u5-frontier-selection-validation.yml`
-- `device-catalog-stm32-cross-family-prioritization-validation.yml`
-- `device-catalog-stm32-evidence-accessibility-validation.yml`
-- `device-catalog-stm32-post-c0-selection-validation.yml`
-- `device-catalog-stm32-post-l0-selection-validation.yml`
-- `device-catalog-stm32-post-u0-selection-validation.yml`
-- `device-catalog-stm32-trustzone-cohort-gate1-validation.yml`
-- `device-catalog-stm32-trustzone-cohort-succession-after-l5-blocker-validation.yml`
-- `device-catalog-stm32h7-partitioned-scope-selection-validation.yml`
-- `device-catalog-stm32h7rs-evidence-accessibility-validation.yml`
+## 12. Manual live acquisition outside the `device-catalog-*` prefix
 
-The likely optimization is lifecycle/trigger normalization (`workflow_dispatch`, retained deterministic replay, or retirement after campaign closure), not loss of the evidence itself.
+| Workflow | Trigger | Authority / coverage | Disposition | Lifecycle |
+|---|---|---|---|---|
+| `stm32f1-live-acquisition-pilot.yml` | dispatch only | Live ST transport preflight, bounded F1 acquisition, drift evaluation, retained artifact | Keep manual; not a normal PR gate | `manual-live` |
 
-## 9. First consolidation sequence
+Together with the L0/L4/U0 live workflows, this confirms that external acquisition is already largely separated from deterministic PR validation.
 
-No workflow is retired in this inventory PR. The next implementation sequence should be:
+## 13. Consolidation sequence
 
-1. **Repair U0 dispatcher trigger parity** so the implementation and workflow trigger describe the same managed-family set.
-2. **Complete C0 command parity** by moving stage-only checks into the deterministic family profile or another explicit replacement gate.
-3. Prove C0 replacement coverage with negative controls.
-4. Retire only the proven-redundant C0 stage workflow files in a separate PR.
-5. Audit L0/L1/L4 next; add family profiles only where semantics are deterministic and truly equivalent.
-6. Treat L5/U3/U5 security/HIL chains separately from ordinary family stage consolidation.
-7. Audit governance/frontier workflows for lifecycle closure after deterministic/security authority is stable.
+No workflow is retired in this inventory PR. Implementation should proceed in separate, reviewable changes:
 
-## 10. Exit criteria for Phase 2
+1. **Behavior-neutral hygiene:** repair STM32U0 family-dispatch trigger parity; remove stale dispatcher path references; remove the missing U5 HIL-workflow trigger reference. Add trigger-contract tests so these defects cannot recur.
+2. **C0 parity consolidation:** move all C0 stage-only deterministic replay/publication checks into the family profile or another explicit replacement gate; prove trigger and negative-control parity; then retire only the redundant C0 stage YAML files.
+3. **L0/L1/L4 stage orchestration:** design reusable stage primitives only if they preserve each family’s trigger, artifact, replay and Production-boundary semantics. Do not mechanically add families to the existing dispatcher.
+4. **Security/HIL mechanics:** extract common setup and fail-closed Production-write checks where useful, while keeping L5/U3/U5 security/HIL authorities separately visible.
+5. **Historical/governance replay:** migrate completed selection/prioritization/frontier/requalification validators into a bounded historical/governance runner; retire campaign YAML only after each validator has a tested replacement or documented closure.
+6. **Domain contract review:** decide whether `icpn-catalog-admission-separation-validation.yml` remains standalone or becomes an explicitly named check inside a core catalog/repository contract workflow. Do not lose the invariant.
 
-Phase 2 is complete only when:
+## 14. Phase 2 exit criteria
 
-- every Device Catalog workflow has Authority / Trigger / Validator / Coverage / Overlap / Lifecycle recorded;
-- all `inventory-pending` entries are resolved;
-- historical, current, production, family, security/HIL, and live-source boundaries remain explicit;
+The current workflow set is inventoried. Phase 2 consolidation is complete only when implementation PRs additionally prove that:
+
+- historical, current, Production, family, security/HIL, live-source, and cross-domain boundaries remain explicit;
+- STM32U0 dispatcher trigger parity is repaired;
+- stale workflow trigger references are removed and regression-tested;
 - every retired workflow points to a tested replacement authority or a documented closed campaign;
+- C0 or later family-stage retirement includes validator-command parity and negative controls;
 - non-catalog PRs gain no new Device Catalog jobs;
 - live external acquisition remains non-mandatory for ordinary PRs;
-- CI architecture documentation is updated to the final authority model.
+- `scripts/ci/device-catalog-trigger-governance.py` remains green with zero trigger-debt violations;
+- CI architecture documentation reflects the resulting authority model.
