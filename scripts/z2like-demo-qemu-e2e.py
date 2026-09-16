@@ -5,6 +5,12 @@ This acceptance intentionally starts a temporary current Manager locally, then
 drives the same bounded Manager Bootstrap REST surface used by the Console BFF:
 registry add -> pair -> chunk upload -> commit -> deploy -> Runtime ready.
 
+After Runtime activation it proves the lifecycle split required by Platform
+management: a pending/unregistered PPU can run the maintenance-authorized
+Platform PS Loop Test, the normal Managed PS route remains blocked, and the same
+Runtime PS loopback becomes available through the Managed route only after the
+PPU is validated and commissioned.
+
 It never calls the QEMU Bootstrap mutation API directly. The only direct target
 reads are final health/readiness evidence and retrieval of the device-local token
 from the local Docker container for the explicit pairing step.
@@ -95,6 +101,48 @@ def _wait_json(url: str, predicate, *, timeout_s: float = 90.0) -> dict[str, Any
 def _expect(status: int, expected: int, payload: Mapping[str, Any], operation: str) -> None:
     if status != expected:
         raise AcceptanceError(f"{operation} returned HTTP {status}, expected {expected}: {payload!r}")
+
+
+def _loopback_body(test_id: str) -> dict[str, Any]:
+    return {
+        "endpoint": "ps",
+        "test_id": test_id,
+        "sequence": 1,
+        "pattern": "zero",
+        "seed": "",
+        "payload_length": 1,
+        "payload_base64": "AA==",
+        "tx_crc32": "d202ef8d",
+        "timeout_ms": 5000,
+    }
+
+
+def _assert_ps_loopback(payload: Mapping[str, Any], *, operation: str) -> None:
+    loopback = payload.get("loopback")
+    if payload.get("ok") is not True or not isinstance(loopback, dict) or loopback.get("source") != "ps":
+        raise AcceptanceError(f"{operation} did not return a PS loopback PASS: {payload!r}")
+    if payload.get("payload_base64") != "AA==" or loopback.get("rx_crc32") != "d202ef8d":
+        raise AcceptanceError(f"{operation} did not echo the expected payload: {payload!r}")
+
+
+def _commission_when_ready(manager: str, alias: str, *, timeout_s: float = 30.0) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_s
+    last: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        status, payload = _json_request(
+            f"{manager}/api/registry/{alias}",
+            method="PATCH",
+            body={"lifecycle": "commissioned"},
+        )
+        if status == 200:
+            return payload
+        last = payload
+        error = payload.get("error")
+        code = error.get("code") if isinstance(error, dict) else None
+        if status != 409 or code != "ppu_validation_incomplete":
+            raise AcceptanceError(f"programming Registration failed unexpectedly: HTTP {status}: {payload!r}")
+        time.sleep(0.25)
+    raise AcceptanceError(f"PPU never became eligible for programming Registration: {last!r}")
 
 
 def _read_pairing_token(container: str) -> str:
@@ -287,6 +335,45 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
             ):
                 raise AcceptanceError(f"QEMU Gateway readiness contract failed: {ready!r}")
 
+            platform_body = _loopback_body("qemu-platform-pending")
+            status, platform_loopback = _json_request(
+                f"{bootstrap_url}/ps-loopback",
+                method="POST",
+                body=platform_body,
+            )
+            _expect(status, 200, platform_loopback, "pending Platform PS Loop Test")
+            _assert_ps_loopback(platform_loopback, operation="pending Platform PS Loop Test")
+            manager_proof = platform_loopback.get("manager")
+            if not isinstance(manager_proof, dict) or manager_proof.get("context") != "platform":
+                raise AcceptanceError(f"Platform PS Loop Test omitted platform admission proof: {platform_loopback!r}")
+
+            managed_url = f"{manager}/api/ppus/{args.alias}/gateway/api/engineering/diagnostics/loopback"
+            status, managed_blocked = _json_request(
+                managed_url,
+                method="POST",
+                body=_loopback_body("qemu-managed-pending-blocked"),
+            )
+            _expect(status, 409, managed_blocked, "pending Managed PS Loop Test block")
+            error = managed_blocked.get("error")
+            if not isinstance(error, dict) or error.get("code") != "ppu_not_enabled":
+                raise AcceptanceError(f"pending Managed PS Loop Test did not fail closed: {managed_blocked!r}")
+
+            registration = _commission_when_ready(manager, args.alias)
+            registered = registration.get("entry")
+            if not isinstance(registered, dict) or registered.get("lifecycle") != "commissioned":
+                raise AcceptanceError(f"PPU did not enter commissioned Registration state: {registration!r}")
+
+            status, managed_loopback = _json_request(
+                managed_url,
+                method="POST",
+                body=_loopback_body("qemu-managed-commissioned"),
+            )
+            _expect(status, 200, managed_loopback, "commissioned Managed PS Loop Test")
+            _assert_ps_loopback(managed_loopback, operation="commissioned Managed PS Loop Test")
+            managed_proof = managed_loopback.get("manager")
+            if not isinstance(managed_proof, dict) or managed_proof.get("relay") != "pass-through":
+                raise AcceptanceError(f"Managed PS Loop Test omitted Manager relay proof: {managed_loopback!r}")
+
             return {
                 "result": "PASS",
                 "evidence_level": "ci-qemu-armv7-z2like-demo",
@@ -300,6 +387,10 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
                 "deployment_state": "succeeded",
                 "runtime_state": "runtime_active",
                 "gateway_readiness": "PASS",
+                "platform_ps_loopback_pending": "PASS",
+                "managed_ps_loopback_pending": "BLOCKED",
+                "registration_state": "commissioned",
+                "managed_ps_loopback_commissioned": "PASS",
                 "not_claimed": [
                     "SWPC host deployment",
                     "public Cloudflare hostname routing",
