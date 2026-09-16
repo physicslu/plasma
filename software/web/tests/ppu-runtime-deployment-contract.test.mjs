@@ -10,6 +10,8 @@ const files = {
   api: new URL("engineering/ppu-bootstrap-api.ts", root),
   bff: new URL("api/manager/bootstrap-bff.ts", root),
   route: new URL("api/manager/registry/[...path]/route.ts", root),
+  managerServer: new URL("../../python/plasma_manager/server.py", import.meta.url),
+  bootstrapServer: new URL("../../python/plasma_manager/bootstrap_server.py", import.meta.url),
 };
 
 async function source(url) {
@@ -61,12 +63,34 @@ test("Platform maintenance pairing is separate from programming Registration", a
   assert.match(deployment, /pairManagerPpuBootstrap/);
 });
 
-test("Browser upload path remains bounded and Manager-only", async () => {
+test("Platform PS Loop Test reuses Runtime loopback without requiring programming Registration", async () => {
+  const [deployment, api, bff, bootstrapServer, managerServer] = await Promise.all([
+    source(files.deployment),
+    source(files.api),
+    source(files.bff),
+    source(files.bootstrapServer),
+    source(files.managerServer),
+  ]);
+  assert.match(deployment, /Run PS Loop Test/);
+  assert.match(deployment, /runManagerPpuPlatformPsLoopback/);
+  assert.match(deployment, /runtime\?\.state === "runtime_active"/);
+  assert.match(deployment, /Programming Registration is not required/);
+  assert.match(api, /\/ps-loopback/);
+  assert.match(api, /endpoint: "ps"/);
+  assert.match(bff, /\^ps-loopback\$/);
+  assert.match(bootstrapServer, /action == "ps-loopback"/);
+  assert.match(bootstrapServer, /context": "platform"/);
+  assert.match(bootstrapServer, /client\.ps_loopback\(body/);
+  assert.match(managerServer, /self\.command == "POST" and self\._registry_lifecycle\(alias\) != REGISTRY_LIFECYCLE_COMMISSIONED/);
+});
+
+test("Browser Platform path remains bounded, maintenance-authorized, and Manager-only", async () => {
   const [api, bff, route] = await Promise.all([source(files.api), source(files.bff), source(files.route)]);
   assert.match(api, /appendManagerPpuBootstrapChunk|uploads\/\$\{encodeURIComponent\(uploadId\)\}\/chunks/);
   assert.match(bff, /MAX_BOOTSTRAP_BROWSER_REQUEST_BYTES = 2 \* 1024 \* 1024/);
   assert.match(bff, /managerApiBase\(\)/);
   assert.match(bff, /bootstrapActionAllowed/);
+  assert.match(bff, /hasMaintenanceCapability/);
   assert.doesNotMatch(bff, /Authorization/);
   assert.match(route, /relayManagerBootstrapRequest/);
   assert.match(route, /resource: "bootstrap"/);
