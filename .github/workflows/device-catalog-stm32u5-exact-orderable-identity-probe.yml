@@ -1,36 +1,89 @@
-name: STM32U5 exact orderable identity probe
+name: STM32U5 exact orderable identity live acquisition
 
 on:
-  pull_request:
-    paths:
-      - 'data/device-catalog/research/stm32u5_exact_orderable_identity_probe.py'
-      - 'data/device-catalog/research/stm32u5-base-device-discovery.csv'
-      - '.github/workflows/device-catalog-stm32u5-exact-orderable-identity-probe.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: stm32u5-exact-orderable-live-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  probe:
+  live-acquisition:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Probe ST exact Part Number tokens
-        working-directory: data/device-catalog/research
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Acquire STM32U5 exact Part Number evidence
+        id: acquire
+        continue-on-error: true
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/stm32u5-exact-probe"
-          python stm32u5_exact_orderable_identity_probe.py \
-            --output-csv "$RUNNER_TEMP/stm32u5-exact-probe/stm32u5-exact-orderable-identity-probe.csv" \
-            --output-json "$RUNNER_TEMP/stm32u5-exact-probe/stm32u5-exact-orderable-identity-probe.json"
-      - name: Upload probe evidence
+          mkdir -p .artifacts/stm32u5-exact-orderable/evidence
+          xvfb-run -a python data/device-catalog/research/stm32u5_exact_orderable_identity_probe.py \
+            --delay 1.0 \
+            --timeout 75 \
+            --output-csv .artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.csv \
+            --output-json .artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json \
+            --evidence-dir .artifacts/stm32u5-exact-orderable/evidence
+
+      - name: Validate bounded acquisition summary
+        id: validate
+        if: always() && hashFiles('.artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json') != ''
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.artifacts/stm32u5-exact-orderable/stm32u5-exact-orderable-identity.json')
+          p = json.loads(path.read_text())
+          assert p['transaction'] == 'stm32u5-exact-orderable-identity-enumeration'
+          assert p['observed_base_devices'] == 74
+          assert p['successful_base_devices'] == 74
+          assert p['base_devices_with_exact_identity'] == 74
+          assert p['acquisition_failures'] == 0
+          assert p['exact_icpn_count'] > 0
+          assert p['synthesized_exact_icpns'] == 0
+          assert p['duplicate_exact_icpns'] == []
+          assert p['complete_exact_identity_observation'] is True
+          assert all(v is False for v in p['claims'].values())
+          print(json.dumps({
+              'exact_icpn_count': p['exact_icpn_count'],
+              'exact_icpn_set_sha256': p['exact_icpn_set_sha256'],
+              'marketing_status_counts': p['marketing_status_counts'],
+              'browser': p['browser'],
+          }, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload immutable live acquisition candidate artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stm32u5-exact-orderable-identity-probe-${{ github.sha }}
-          path: ${{ runner.temp }}/stm32u5-exact-probe/
+          name: stm32u5-exact-orderable-live-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/stm32u5-exact-orderable/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
+
+      - name: Enforce bounded acquisition gate
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "STM32U5 exact identity live acquisition requires review." >&2
+            exit 1
+          fi
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            echo "STM32U5 exact identity evidence failed bounded summary validation." >&2
+            exit 1
+          fi
