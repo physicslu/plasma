@@ -1,0 +1,38 @@
+name: STM32U5 canonical admission plan validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/stm32u5_admission_policy.py'
+      - 'data/device-catalog/research/stm32u5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/stm32u5-cmsis-route-bridge.json'
+      - 'data/device-catalog/research/validate_stm32u5_canonical_admission_plan.py'
+      - 'data/device-catalog/research/device-catalog-stm32u5-canonical-admission-plan.md'
+      - 'data/device-catalog/research/stm32u5_metadata_policy.py'
+      - 'data/device-catalog/research/stm32u5-metadata-policy-baseline.json'
+      - 'data/device-catalog/research/stm32u5-metadata-authority-delta-resolution.json'
+      - 'data/device-catalog/research/stm32u5-security-scope-foundation.json'
+      - '.github/workflows/device-catalog-stm32u5-canonical-admission-plan-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate STM32U5 metadata policy
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_metadata_policy.py
+      - name: Validate STM32U5 metadata authority delta
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_metadata_authority_delta_resolution.py
+      - name: Validate STM32U5 canonical admission plan
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_canonical_admission_plan.py
