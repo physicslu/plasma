@@ -24,17 +24,17 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
     assert '"hardware_boundary": "closed"' in text
 
 
-def test_swpc_surrogate_keeps_gateway_private_and_public_ingress_allowlisted() -> None:
+def test_swpc_surrogate_keeps_gateway_private_and_retires_legacy_host_ingress() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert 'gateway_host="127.0.0.1"' in text
-    assert "listen 127.0.0.1:$proxy_port" in text
-    assert "location = /api/health/live" in text
-    assert "location = /api/health/ready" in text
-    assert "location = /api/node" in text
-    assert "location = /api/status" in text
-    assert "location = /api/engineering/diagnostics/loopback" in text
-    assert "location / { return 404; }" in text
-    assert "proxy_set_header Host \\$host;" in text
+    assert 'legacy_nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"' in text
+    assert "retire_legacy_restricted_ingress" in text
+    assert '"legacy_restricted_ingress_retired": true' in text
+    assert '"restricted_ingress":' not in text
+    assert "listen 127.0.0.1:$proxy_port" not in text
+    assert "location = /api/health/live" not in text
+    assert "location = /api/engineering/diagnostics/loopback" not in text
+    assert "Cloudflare Tunnel must target the restricted ingress" not in text
     assert "--engineering-mock" not in text
 
 
@@ -90,17 +90,18 @@ def test_swpc_surrogate_retries_readiness_before_failing_install() -> None:
     assert "python3 - <<'PY'" not in text
 
 
-def test_swpc_surrogate_fails_closed_on_runtime_ports_and_bounds_nginx_upgrade_exception() -> None:
+def test_swpc_surrogate_fails_closed_on_runtime_ports_and_retires_owned_legacy_nginx() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert 'for port in 9900 18080; do' in text
     assert 'ss -H -ltn "sport = :$port"' in text
-    assert 'qualified_managed_proxy_residual_listener()' in text
-    assert '[[ ! -e "$nginx_conf" ]] || return 1' in text
-    assert '"restricted_ingress": f"127.0.0.1:{proxy_port}"' not in text
-    assert 'payload.get("restricted_ingress") != f"127.0.0.1:{proxy_port}"' in text
-    assert 'os.path.realpath(current_link)' in text
-    assert 'ss -H -ltnp "sport = :$proxy_port" | grep -Fq \'"nginx"\'' in text
-    assert "accepting qualified residual Nginx listener" in text
+    assert "retire_legacy_restricted_ingress()" in text
+    assert 'grep -Fxq "$legacy_nginx_marker" "$legacy_nginx_conf"' in text
+    assert "refusing to remove unmanaged Nginx config" in text
+    assert 'rm -f "$legacy_nginx_conf"' in text
+    assert "nginx -t" in text
+    assert "systemctl reload nginx" in text
+    assert "qualified_managed_proxy_residual_listener" not in text
+    assert "proxy_port" not in text
     assert "TCP port %s is already in use" in text
     assert "stop or migrate the owning service explicitly before installation" in text
     assert "systemctl --user stop" not in text
@@ -108,8 +109,9 @@ def test_swpc_surrogate_fails_closed_on_runtime_ports_and_bounds_nginx_upgrade_e
     assert "killall" not in text
 
 
-def test_swpc_surrogate_refuses_unmanaged_nginx_config() -> None:
+def test_swpc_surrogate_never_recreates_retired_host_18081_listener() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert '# Managed by Plasma SWPC Z2-like lab installer' in text
-    assert 'grep -Fxq "$nginx_marker" "$nginx_conf"' in text
-    assert "refusing to overwrite unmanaged Nginx config" in text
+    assert "retired legacy SWPC host diagnostics ingress: 127.0.0.1:18081" in text
+    assert "SWPC host :18081 remains retired" in text
+    assert "cat >\"$legacy_nginx_conf\"" not in text
