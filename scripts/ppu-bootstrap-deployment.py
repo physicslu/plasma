@@ -24,6 +24,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
 SAFE_RESTART_STATES = {"runtime_active", "rolled_back", "verify_failed"}
+QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-check failure"
 
 
 class DeploymentError(RuntimeError):
@@ -57,6 +58,7 @@ class DeploymentRequest:
     ppu_id: str
     facility_id: str
     display_name: str
+    qualification_fail_health_check: bool = False
 
 
 @dataclass
@@ -188,6 +190,12 @@ class DeploymentCoordinator:
             except BlockingIOError as exc:
                 raise DeploymentError("another PPU deployment transaction is active") from exc
             self._admit_previous_transaction()
+            if request.qualification_fail_health_check:
+                previous = self.installer._previous_current(self._installer_paths().current)
+                if previous is None:
+                    raise DeploymentError(
+                        "qualification health-check failure injection requires an existing previous release"
+                    )
             return self._execute_locked(request)
 
     def _execute_locked(self, request: DeploymentRequest) -> Mapping[str, Any]:
@@ -246,6 +254,8 @@ class DeploymentCoordinator:
 
                 def health_check(host: str):
                     self.journal.write(record, "health_check")
+                    if request.qualification_fail_health_check:
+                        raise RuntimeError(QUALIFICATION_HEALTH_FAILURE)
                     return self.installer._health_ready(host)
 
                 self.journal.write(record, "activating")
@@ -324,6 +334,14 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--ppu-id", required=True)
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
+    deploy.add_argument(
+        "--qualification-fail-health-check",
+        action="store_true",
+        help=(
+            "HIL only: fail the post-activation health check so the real installer must restore "
+            "an existing previous release"
+        ),
+    )
     return parser
 
 
@@ -348,6 +366,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ppu_id=args.ppu_id,
         facility_id=args.facility_id,
         display_name=args.display_name,
+        qualification_fail_health_check=bool(args.qualification_fail_health_check),
     )
     try:
         result = DeploymentCoordinator(paths=paths, installer=installer).execute(request)
