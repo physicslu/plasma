@@ -77,6 +77,7 @@ jobs:
             scripts/z2like-demo-qemu-kit.py \
             scripts/z2like-demo-qemu-installer.py \
             scripts/z2like-demo-qemu-e2e.py \
+            scripts/z2like-demo-qemu-loopback-matrix.py \
             scripts/z2like-demo-qemu-build-kit.py \
             scripts/z2like-demo-qemu-deploy.py \
             scripts/z2like-demo-nginx-ephemeral.py
@@ -222,6 +223,9 @@ jobs:
           python scripts/z2like-demo-qemu-e2e.py \
             --kit "$KIT" \
             --sidecar "$KIT.sha256"
+
+      - name: Prove Platform and Managed PS loopback lifecycle matrix
+        run: python scripts/z2like-demo-qemu-loopback-matrix.py
 
       - name: Capture diagnostics on failure
         if: failure()
