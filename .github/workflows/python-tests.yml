@@ -2,6 +2,8 @@ name: Python and PL source tests
 
 on:
   push:
+    branches:
+      - "**"
     paths:
       - ".gitignore"
       - ".clineignore"
