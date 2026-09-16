@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Select the next bounded STM32 research frontier after STM32U5 publication.
 
-This transaction is research-only. It does not admit ICPNs, modify Production,
-define programming behavior, or authorize target execution. The current
-standard non-wireless shortlist is expected to be exhausted after STM32U5
-publication. The remaining non-wireless frontier may be selected only for a
-bounded partitioning gate; wireless cohorts remain a separate dedicated-scope
-backlog.
+This transaction is research-only. It replays the retained cross-family
+prioritization inventory against an immutable post-U5 Production prestate.
+It does not admit ICPNs, modify Production, define programming behavior, or
+authorize target execution.
 """
 from __future__ import annotations
 
@@ -16,14 +14,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from stm32_cross_family_prioritization import (
-    DEFAULT_CATALOG,
-    DEFAULT_MANIFEST,
-    build_prioritization,
-)
-
 HERE = Path(__file__).resolve().parent
-EXPECTED_MANIFEST_SHA256 = "3fbab3198e813580e29c3388a9027d1993a44a6d66ec73349ad20da708cc66af"
+PRIORITIZATION_BASELINE = HERE / "stm32-cross-family-prioritization-baseline.json"
+FROZEN_PRESTATE = HERE / "stm32-post-u5-production-prestate.json"
+EXPECTED_SOURCE_MANIFEST_SHA256 = "3fbab3198e813580e29c3388a9027d1993a44a6d66ec73349ad20da708cc66af"
 EXPECTED_PRODUCTION_EXACT = 2282
 EXPECTED_PRODUCTION_FAMILIES = 16
 EXPECTED_H7 = {
@@ -44,23 +38,54 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{path.name}: expected object")
+    return value
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
 
 
-def build_selection() -> dict[str, Any]:
-    report = build_prioritization(catalog_path=DEFAULT_CATALOG, manifest_path=DEFAULT_MANIFEST)
-    production = report.get("production_invariants") or {}
-    _require(production.get("exact_icpn_count") == EXPECTED_PRODUCTION_EXACT, "Production exact ICPN count drifted")
-    production_series = production.get("production_series") or []
-    _require(len(production_series) == EXPECTED_PRODUCTION_FAMILIES, "Production family count drifted")
-    _require("STM32U5" in production_series, "STM32U5 is not in Production")
-    _require(_sha256(DEFAULT_MANIFEST) == EXPECTED_MANIFEST_SHA256, "post-U5 Production manifest drifted")
-    _require(report.get("research_shortlist") == [], "standard non-wireless shortlist is not exhausted")
+def _production_boundary() -> tuple[list[str], int]:
+    manifest = _read_json(FROZEN_PRESTATE)
+    _require(manifest.get("status") == "production", "frozen Production status drifted")
+    _require(manifest.get("selection_policy") == "admitted_exact_manufacturer_part_number_only", "frozen Production selection policy drifted")
+    sources = manifest.get("sources")
+    _require(isinstance(sources, list), "frozen Production sources missing")
+    families: list[str] = []
+    exact = 0
+    for source in sources:
+        _require(isinstance(source, dict), "frozen Production source must be object")
+        _require(source.get("manufacturer") == "STMicroelectronics", "frozen Production manufacturer drifted")
+        family = source.get("family")
+        rows = source.get("row_count")
+        _require(isinstance(family, str) and isinstance(rows, int), "frozen Production source identity/count invalid")
+        _require(family not in families, f"duplicate frozen Production family: {family}")
+        families.append(family)
+        exact += rows
+    return sorted(families), exact
 
-    candidates = report.get("candidates") or []
-    nonwireless = [item for item in candidates if not str(item.get("plasma_series", "")).startswith("STM32W")]
+
+def build_selection() -> dict[str, Any]:
+    baseline = _read_json(PRIORITIZATION_BASELINE)
+    _require(baseline.get("policy_id") == "stm32-cross-family-prioritization-v1", "prioritization policy drifted")
+    candidates = baseline.get("candidates")
+    _require(isinstance(candidates, list), "prioritization candidates missing")
+
+    production_series, exact = _production_boundary()
+    _require(exact == EXPECTED_PRODUCTION_EXACT, "frozen Production exact ICPN count drifted")
+    _require(len(production_series) == EXPECTED_PRODUCTION_FAMILIES, "frozen Production family count drifted")
+    _require("STM32U5" in production_series, "STM32U5 missing from frozen Production")
+
+    remaining = [item for item in candidates if isinstance(item, dict) and item.get("plasma_series") not in set(production_series)]
+    standard_shortlist = [item for item in remaining if item.get("shortlist_eligible") is True]
+    _require(standard_shortlist == [], "standard non-wireless shortlist is not exhausted")
+
+    nonwireless = [item for item in remaining if not str(item.get("plasma_series", "")).startswith("STM32W")]
     _require([item.get("plasma_series") for item in nonwireless] == ["STM32H7"], "remaining non-wireless frontier drifted")
     h7 = nonwireless[0]
     for key, expected in EXPECTED_H7.items():
@@ -78,7 +103,7 @@ def build_selection() -> dict[str, Any]:
                 "cohort": item["cohort"],
                 "structural_gate_pass": item["structural_gate_pass"],
             }
-            for item in candidates
+            for item in remaining
             if str(item.get("plasma_series", "")).startswith("STM32W")
         ),
         key=lambda item: item["plasma_series"],
@@ -92,19 +117,22 @@ def build_selection() -> dict[str, Any]:
         "scope": "next_frontier_research_only",
         "status": "selected_for_partitioning_only",
         "production_boundary": {
-            "manifest_sha256": EXPECTED_MANIFEST_SHA256,
+            "source_production_manifest_sha256": EXPECTED_SOURCE_MANIFEST_SHA256,
+            "frozen_prestate_sha256": _sha256(FROZEN_PRESTATE),
             "exact_icpns": EXPECTED_PRODUCTION_EXACT,
             "families": EXPECTED_PRODUCTION_FAMILIES,
+            "production_series": production_series,
             "stm32u5_published": True,
         },
         "upstream_policy": {
-            "policy_id": report.get("policy_id"),
-            "openocd_catalog_sha256": (report.get("inputs") or {}).get("openocd_catalog_sha256"),
+            "policy_id": baseline.get("policy_id"),
+            "prioritization_baseline_sha256": _sha256(PRIORITIZATION_BASELINE),
+            "openocd_catalog_sha256": (baseline.get("inputs") or {}).get("openocd_catalog_sha256"),
             "standard_nonwireless_shortlist_exhausted": True,
         },
         "selected_next_research_frontier": "STM32H7",
         "selection_basis": [
-            "all standard_nonwireless_research shortlist candidates are already in Production",
+            "all retained standard_nonwireless_research shortlist candidates are already in Production",
             "STM32H7 is the only remaining non-wireless candidate in the retained cross-family inventory",
             "STM32H7 has two target configs and therefore requires partitioning before bounded manufacturer-evidence discovery",
             "wireless STM32 cohorts remain separate because they require dedicated wireless/security scope",
