@@ -96,7 +96,7 @@ The Linux reference profile is documented in detail at `docs/deployment/local-co
   --ppu-endpoint http://127.0.0.1:18080
 ```
 
-The PPU endpoint is mandatory on first install and is deployment configuration, not Browser-owned state. HTTP and HTTPS **full Plasma Gateway roots** are accepted; credentials, query strings, fragments and nested paths are rejected. For the co-resident SWPC Z2-like surrogate, `127.0.0.1:18080` is the managed-control Gateway. The `127.0.0.1:18081` listener is intentionally restricted to diagnostics/status and is not a valid Control Station endpoint for Site Desired writes or runtime activation.
+The PPU endpoint is mandatory on first install and is deployment configuration, not Browser-owned state. HTTP and HTTPS **full Plasma Gateway roots** are accepted; credentials, query strings, fragments and nested paths are rejected. For the co-resident SWPC Z2-like surrogate, `127.0.0.1:18080` is the managed-control Gateway. The former SWPC host `127.0.0.1:18081` diagnostics ingress was retired by Issue #549 and is not a valid Control Station endpoint.
 
 Default local bindings:
 
@@ -171,7 +171,8 @@ Defaults:
 ```text
 PPU ID             swpc-z2like-01
 Facility           lab
-Restricted ingress 127.0.0.1:18081
+Local Gateway      127.0.0.1:18080
+Legacy host 18081  retired; no listener is created
 Plasma Python      reuse qualified evidence, or auto-select exactly one
                    /opt/plasma/python/*/bin/python3
 ```
@@ -182,13 +183,14 @@ Operator overrides are explicit:
 sudo ./scripts/plasmactl install swpc-z2like \
   --plasma-python /opt/plasma/python/3.12.13/bin/python3 \
   --ppu-id swpc-z2like-01 \
-  --facility-id lab \
-  --proxy-port 18081
+  --facility-id lab
 ```
+
+There is no `--proxy-port` option after Issue #549. The profile must not recreate the former SWPC host `127.0.0.1:18081` restricted diagnostics ingress.
 
 If zero or multiple Plasma-owned Python runtimes are available and no already-qualified evidence resolves the interpreter, installation fails closed rather than guessing.
 
-A first install is accepted only when no prior SWPC Z2-like install evidence or appliance-owned `/opt/plasma/current`, `/etc/plasma/ppu.yaml`, system units, or restricted Nginx configuration already exists. This prevents a missing evidence file from being interpreted as permission to overwrite an unknown installation.
+A first install is accepted only when no prior SWPC Z2-like install evidence or appliance-owned `/opt/plasma/current`, `/etc/plasma/ppu.yaml`, or system units already exist. A stale Plasma-owned legacy Nginx configuration at `/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf` is removed transactionally after ownership verification; an unowned file at that path fails closed. This prevents a missing evidence file from being interpreted as permission to overwrite an unknown installation.
 
 If first-install activation fails after that clean boundary is proven, the profile stops/removes only artifacts created inside that prechecked boundary and removes the unqualified target release. Persistent state/log directories are not treated as qualification evidence and are not used to claim installation success.
 
@@ -202,7 +204,7 @@ sudo ./scripts/plasmactl deploy swpc-z2like
 
 The privileged SWPC profile does **not** fetch or merge Git. It activates the repository's current **clean committed HEAD**. Source control update and privileged host activation are separate responsibilities.
 
-Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration, system units, and restricted Nginx ownership to agree. An evidence/current-release mismatch fails closed. An existing canonical `/etc/plasma/ppu.yaml` is preserved across the upgrade; deployment must not regenerate `sites: []` over saved Desired state.
+Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration and system units to agree. An evidence/current-release mismatch fails closed. An existing canonical `/etc/plasma/ppu.yaml` is preserved across the upgrade; deployment must not regenerate `sites: []` over saved Desired state. Historical evidence may still contain the former `restricted_ingress` field, but it no longer creates or authorizes a host listener.
 
 Deployment behavior:
 
@@ -227,9 +229,6 @@ snapshot active symlink + owned config/unit/evidence
 stop only Plasma system PPU services
         |
         v
-temporarily withdraw only Plasma-owned restricted Nginx config
-        |
-        v
 run hardened SWPC Z2-like installer
         |
         v
@@ -239,7 +238,7 @@ preserve canonical Site Desired + install P3 helper/quiesce wiring
 verify readiness + local Site Desired + bounded activation helper
         |
         v
-verify restricted public boundary + local PS loopback
+verify host 18081 remains retired + local PS loopback through 18080
         |
         +-- PASS -> keep new activation
         |
@@ -255,9 +254,9 @@ The backend never implicitly stops integration-host **user** systemd services. P
 sudo ./scripts/plasmactl verify swpc-z2like
 ```
 
-This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned canonical config, Server/Gateway/runtime-activation system units, active services, direct local Site Desired API, local/restricted health, negative-route isolation, and PS diagnostic loopback. Dynamic canonical Site configuration is accepted within the one-based `id` and `max_supported_sites <= 8` contract.
+This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned canonical config, Server/Gateway/runtime-activation system units, active services, direct local Site Desired API, PS diagnostic loopback through the local Gateway, and absence of the retired host `18081` listener/config. Dynamic canonical Site configuration is accepted within the one-based `id` and `max_supported_sites <= 8` contract.
 
-The public restricted ingress remains intentionally diagnostics/status-only in this profile revision: `/api/settings/sites` is still expected to return `404` there. Expanding the public `z2like-demo` managed-control surface is a separate architecture/security transaction.
+Managed/public access is a separate deployment role: Local Control Station uses the full configured Gateway, while public `z2like-demo` uses host `18082` to the private QEMU backend. The x86 surrogate no longer has a public restricted ingress.
 
 It does **not** prove the Render/Manager managed path, ARMv7/PYNQ behavior, PL/FPGA, Site electrical behavior, or real IC programming.
 
@@ -267,7 +266,7 @@ It does **not** prove the Render/Manager managed path, ARMv7/PYNQ behavior, PL/F
 ./scripts/plasmactl status swpc-z2like
 ```
 
-Status reports installed evidence and service state, including bounded runtime-activation capability; it does not manufacture a PASS claim.
+Status reports installed evidence and service state, including bounded runtime-activation capability and the retired `18081` state; it does not manufacture a PASS claim.
 
 ## Real Z2 PS operator flow
 
@@ -390,11 +389,12 @@ x86_64 SWPC
 + Plasma Server/Gateway
 + canonical Site Desired persistence
 + bounded P3 runtime-activation helper/quiesce wiring
-+ PS diagnostic behavior
++ PS diagnostic behavior through local Gateway
++ host 18081 retirement invariant
 + production-like filesystem/service ownership
 ```
 
-This is not Real Z2 qualification. The public restricted ingress remains narrower than the local Gateway capability until separately approved.
+This is not Real Z2 qualification. The retired SWPC host `18081` ingress must not be recreated.
 
 ### `z2-ps`
 
@@ -406,7 +406,7 @@ Real PYNQ-Z2 / ARMv7
 + local PS diagnostic behavior
 ```
 
-This remains PS-only qualification.
+This remains PS-only qualification. Real/simulated Z2 `:18081` remains the independent Bootstrap/recovery service and is outside the SWPC host-ingress retirement.
 
 Mock must not be enabled to turn missing PL/Site/IC boundaries green.
 

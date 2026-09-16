@@ -163,7 +163,7 @@ Required evidence:
 5. progress is observable through the normal Job status path;
 6. Cancel remains functional;
 7. `PPU / Sites` remains Online/Healthy with eight configured Sites;
-8. `18081` diagnostics ingress remains unchanged;
+8. SWPC host `18081` diagnostics ingress remains absent/retired;
 9. unauthenticated requests to the managed Cloudflare hostname remain denied.
 
 A PASS supports only this claim:

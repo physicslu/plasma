@@ -19,8 +19,11 @@ def test_managed_programming_ingress_is_separate_and_loopback_only() -> None:
     assert "/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf" in source
 
     base = BASE_INSTALLER.read_text(encoding="utf-8")
-    assert 'proxy_port="18081"' in base
-    assert "/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf" in base
+    assert 'legacy_nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"' in base
+    assert "retire_legacy_restricted_ingress" in base
+    assert 'proxy_port="18081"' not in base
+    assert "listen 127.0.0.1:$proxy_port" not in base
+    assert '"legacy_restricted_ingress_retired": true' in base
 
 
 def test_ingress_exposes_programming_and_site_runtime_routes_with_read_only_settings_visibility() -> None:

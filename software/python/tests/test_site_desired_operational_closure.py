@@ -136,4 +136,6 @@ def test_swpc_surrogate_matches_bounded_site_config_contract_and_rolls_permissio
     assert "verify_site_desired_operational_contract" in control_source
     assert "verify_p3_activation_operational_contract" in control_source
     assert "local Site Desired API is not operational" in control_source
-    assert "restricted ingress unexpectedly exposed /api/settings/sites" in control_source
+    assert "verify_legacy_ingress_retired" in control_source
+    assert "retired SWPC Nginx ingress config still exists" in control_source
+    assert "retired SWPC host ingress is still listening" in control_source

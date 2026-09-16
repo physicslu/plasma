@@ -107,8 +107,9 @@ def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state
     assert "verify_p3_activation_operational_contract" in control
     assert "plasma-runtime-activation.service is not active" in control
     assert "local Site Desired API is not operational" in control
-    assert "Accept a previously qualified P2 surrogate" in control
-    assert "restricted ingress unexpectedly exposed /api/settings/sites" in control
+    assert "Accept previously qualified surrogate evidence here" in control
+    assert "verify_legacy_ingress_retired" in control
+    assert "retired SWPC host ingress is still listening" in control
 
 
 def test_release_workflows_ship_both_installer_bootstrap_files() -> None:
