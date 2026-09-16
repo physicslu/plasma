@@ -116,6 +116,12 @@ const completed = {
   error_message: null,
 };
 
+async function openPpuRegistration(page: import("@playwright/test").Page) {
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "PPU", exact: true }).click();
+  await page.getByRole("button", { name: "Registration", exact: true }).click();
+}
+
 test("PPU Network commissions Static IPv4 through the Manager-owned transaction only", async ({ page }) => {
   let commissioningPostCount = 0;
   let directActivationRequests = 0;
@@ -171,8 +177,7 @@ test("PPU Network commissions Static IPv4 through the Manager-owned transaction 
     return route.fulfill({ status: 500, body: "browser must not call PPU activation directly" });
   });
 
-  await page.goto("/engineering");
-  await page.getByRole("button", { name: "PPU / Sites", exact: true }).click();
+  await openPpuRegistration(page);
 
   await expect(page.getByRole("heading", { name: "PPU Network Configuration", exact: true })).toBeVisible();
   const managerTxn = page.locator(".ppuSiteSummary span").filter({ hasText: "Manager Txn" });
@@ -223,8 +228,7 @@ test("Static commissioning stays fail-closed when the PPU has no activation help
     body: JSON.stringify({ ok: false, error: { code: "network_commissioning_not_found", message: "none" } }),
   }));
 
-  await page.goto("/engineering");
-  await page.getByRole("button", { name: "PPU / Sites", exact: true }).click();
+  await openPpuRegistration(page);
 
   await expect(page.getByText(/Commissioning unavailable:/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Commission Static Network", exact: true })).toBeDisabled();

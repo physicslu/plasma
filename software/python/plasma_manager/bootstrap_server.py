@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from http import HTTPStatus
 from threading import RLock
 from typing import Any
@@ -13,6 +14,7 @@ from .bootstrap import (
     BootstrapManagerError,
     ManagerBootstrapCoordinator,
 )
+from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
 from .registry import (
     REGISTRY_LIFECYCLE_COMMISSIONED,
     REGISTRY_LIFECYCLE_DISABLED,
@@ -34,6 +36,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
     """
 
     bootstrap_coordinator: ManagerBootstrapCoordinator | None = None
+    runtime_client_factory = PPUHttpClient
     _bootstrap_init_lock = RLock()
 
     @classmethod
@@ -177,6 +180,66 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             return
         self._json(HTTPStatus.OK, payload)
 
+    def _platform_ps_loopback(self, alias: str, body: dict[str, Any]) -> None:
+        try:
+            platform = self._bootstrap().status(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return
+        pairing = platform.get("pairing")
+        if not isinstance(pairing, dict) or pairing.get("paired") is not True or pairing.get("device_match") is not True:
+            self._bootstrap_error(
+                BootstrapCredentialError("Platform maintenance pairing is required before PS Loop Test")
+            )
+            return
+        if body.get("endpoint") != "ps":
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "unsupported_endpoint", "message": "Platform Loop Test supports PS only"}},
+            )
+            return
+        timeout_ms = body.get("timeout_ms")
+        if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms <= 0:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_request", "message": "timeout_ms must be a positive integer"}},
+            )
+            return
+        entry = self._resolve_ppu_alias(alias)
+        if entry is None:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": {"code": "ppu_not_found", "message": "configured PPU alias was not found"}},
+            )
+            return
+        relay_timeout_s = min(max(timeout_ms / 1000.0 + 1.0, self._config().request_timeout_s), 121.0)
+        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        started = time.monotonic()
+        try:
+            status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
+        except PPUTransportError:
+            self._json(
+                HTTPStatus.GATEWAY_TIMEOUT,
+                {"ok": False, "error": {"code": "ppu_transport_error", "message": "PPU Runtime loopback transport failed"}},
+            )
+            return
+        except PPUHTTPError:
+            self._json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": {"code": "ppu_protocol_error", "message": "PPU Runtime loopback response was invalid"}},
+            )
+            return
+        manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
+        if status == HTTPStatus.OK and payload.get("ok") is True:
+            payload = dict(payload)
+            payload["manager"] = {
+                "relay": "platform-maintenance",
+                "context": "platform",
+                "ppu_alias": alias,
+                "manager_rtt_ms": manager_rtt_ms,
+            }
+        self._json(status, payload)
+
     def _bootstrap_post(self, alias: str, action: str) -> None:
         coordinator = self._bootstrap()
         try:
@@ -185,6 +248,9 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 if set(body) != {"token"} or not isinstance(body.get("token"), str):
                     raise ValueError("Bootstrap pairing request requires only token")
                 self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
+                return
+            if action == "ps-loopback":
+                self._platform_ps_loopback(alias, body)
                 return
             if not self._bootstrap_mutation_allowed(alias):
                 return

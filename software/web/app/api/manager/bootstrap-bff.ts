@@ -12,6 +12,7 @@ const BOOTSTRAP_TIMEOUT_MS = 45_000;
 const UPLOAD_ID = "[0-9a-f]{32}";
 const BOOTSTRAP_POST_ACTIONS = [
   /^pair$/,
+  /^ps-loopback$/,
   /^uploads$/,
   /^deployments$/,
   new RegExp(`^uploads/${UPLOAD_ID}/chunks$`),
