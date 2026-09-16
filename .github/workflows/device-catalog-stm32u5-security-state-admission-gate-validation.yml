@@ -1,0 +1,39 @@
+name: STM32U5 security-state admission gate validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32u5-security-state-model.json'
+      - 'data/device-catalog/research/stm32u5_security_state_gate.py'
+      - 'data/device-catalog/research/validate_stm32u5_security_state_admission_gate.py'
+      - 'data/device-catalog/research/device-catalog-stm32u5-security-state-admission-gate.md'
+      - 'data/device-catalog/research/stm32u5_admission_policy.py'
+      - 'data/device-catalog/research/stm32u5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/stm32u5_metadata_policy.py'
+      - 'data/device-catalog/research/stm32u5-security-scope-foundation.json'
+      - '.github/workflows/device-catalog-stm32u5-security-state-admission-gate-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate upstream STM32U5 canonical admission plan
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_canonical_admission_plan.py
+      - name: Validate STM32U5 security-state admission gate
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_security_state_admission_gate.py
+      - name: Reject Production catalog writes in this transaction
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff --exit-code "${{ github.event.pull_request.base.sha }}"...HEAD -- data/device-catalog/production/
