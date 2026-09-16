@@ -51,17 +51,18 @@ class FakePoller:
 class FakeBootstrapCoordinator:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, object]] = []
+        self.paired = False
 
     def status(self, alias: str):
         self.calls.append(("status", alias, None))
         return {
             "ok": True,
             "ppu_alias": alias,
-            "pairing": {"paired": False, "device_match": True},
+            "pairing": {"paired": self.paired, "device_match": True},
             "bootstrap": {
                 "bootstrap": {"state": "bootstrap_ready"},
                 "identity": {"device_id": "ppu-device-0123456789abcdef"},
-                "runtime": {"state": "runtime_absent"},
+                "runtime": {"state": "runtime_active"},
                 "capabilities": {"runtime_deployment": True, "fpga_update": False},
                 "deployment": None,
             },
@@ -69,6 +70,7 @@ class FakeBootstrapCoordinator:
 
     def pair(self, alias: str, token: str):
         self.calls.append(("pair", alias, token))
+        self.paired = True
         return {"ok": True, "ppu_alias": alias, "pairing": {"paired": True}}
 
     def create_upload(self, alias: str, body):
@@ -88,6 +90,35 @@ class FakeBootstrapCoordinator:
         return 202, {"ok": True, "deployment": {"state": "queued"}}
 
 
+class FakeRuntimeClient:
+    calls: list[dict] = []
+
+    def __init__(self, endpoint: str, timeout_s: float) -> None:
+        self.endpoint = endpoint
+        self.timeout_s = timeout_s
+
+    def ps_loopback(self, body: dict, *, timeout_s: float):
+        self.__class__.calls.append({"endpoint": self.endpoint, "body": dict(body), "timeout_s": timeout_s})
+        return 200, {
+            "ok": True,
+            "diagnostic_protocol_version": "1",
+            "loopback": {
+                "endpoint": "ps",
+                "source": "ps",
+                "test_id": body["test_id"],
+                "sequence": body["sequence"],
+                "transform": "echo",
+                "pattern": body["pattern"],
+                "seed": body["seed"],
+                "payload_length": body["payload_length"],
+                "tx_crc32": body["tx_crc32"],
+                "rx_crc32": body["tx_crc32"],
+                "ppu_rtt_ms": 1.25,
+            },
+            "payload_base64": body["payload_base64"],
+        }
+
+
 class ManagerBootstrapRestTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = TemporaryDirectory()
@@ -95,16 +126,19 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.registry = PPURegistryStore((), root / "registry.json")
         self.registry.add(alias="z2", endpoint="http://192.168.2.99:18080")
         self.coordinator = FakeBootstrapCoordinator()
+        FakeRuntimeClient.calls.clear()
         self.previous = (
             BootstrapPlasmaManagerHandler.config,
             BootstrapPlasmaManagerHandler.registry_store,
             BootstrapPlasmaManagerHandler.poller,
             BootstrapPlasmaManagerHandler.bootstrap_coordinator,
+            BootstrapPlasmaManagerHandler.runtime_client_factory,
         )
         BootstrapPlasmaManagerHandler.config = ManagerConfig(registry_state_path=root / "registry.json")
         BootstrapPlasmaManagerHandler.registry_store = self.registry
         BootstrapPlasmaManagerHandler.poller = FakePoller()
         BootstrapPlasmaManagerHandler.bootstrap_coordinator = self.coordinator
+        BootstrapPlasmaManagerHandler.runtime_client_factory = FakeRuntimeClient
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), BootstrapPlasmaManagerHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -118,6 +152,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             BootstrapPlasmaManagerHandler.registry_store,
             BootstrapPlasmaManagerHandler.poller,
             BootstrapPlasmaManagerHandler.bootstrap_coordinator,
+            BootstrapPlasmaManagerHandler.runtime_client_factory,
         ) = self.previous
         self.temp.cleanup()
 
@@ -133,10 +168,39 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         connection.close()
         return response.status, data
 
+    @staticmethod
+    def loopback_body(endpoint: str = "ps") -> dict:
+        return {
+            "endpoint": endpoint,
+            "test_id": "platform-loopback",
+            "sequence": 1,
+            "pattern": "zero",
+            "seed": "",
+            "payload_length": 1,
+            "payload_base64": "AA==",
+            "tx_crc32": "d202ef8d",
+            "timeout_ms": 5000,
+        }
+
+    def assert_platform_loopback_passes(self) -> None:
+        self.coordinator.paired = True
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/ps-loopback",
+            self.loopback_body(),
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["loopback"]["source"], "ps")
+        self.assertEqual(payload["manager"]["context"], "platform")
+        self.assertEqual(payload["manager"]["relay"], "platform-maintenance")
+        self.assertEqual(payload["manager"]["ppu_alias"], "z2")
+        self.assertEqual(FakeRuntimeClient.calls[-1]["body"], self.loopback_body())
+
     def test_pending_ppu_can_read_bootstrap_before_runtime_exists(self) -> None:
         status, payload = self.request("GET", "/api/registry/z2/bootstrap")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["bootstrap"]["runtime"]["state"], "runtime_absent")
+        self.assertEqual(payload["bootstrap"]["runtime"]["state"], "runtime_active")
         self.assertEqual(self.coordinator.calls, [("status", "z2", None)])
 
     def test_pending_ppu_can_pair_without_being_commissioned(self) -> None:
@@ -163,6 +227,44 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertTrue(payload["pairing"]["paired"])
         self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
 
+    def test_platform_ps_loopback_requires_platform_pairing(self) -> None:
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/ps-loopback",
+            self.loopback_body(),
+        )
+        self.assertEqual(status, 409)
+        self.assertEqual(payload["error"]["code"], "bootstrap_pairing_required")
+        self.assertEqual(FakeRuntimeClient.calls, [])
+
+    def test_pending_ppu_can_run_platform_ps_loopback(self) -> None:
+        self.assert_platform_loopback_passes()
+
+    def test_disabled_ppu_can_run_platform_ps_loopback(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        self.registry.set_lifecycle("z2", "disabled")
+        self.assert_platform_loopback_passes()
+
+    def test_commissioned_ppu_can_run_platform_ps_loopback(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        self.assert_platform_loopback_passes()
+
+    def test_platform_ps_loopback_is_not_blocked_by_active_execution(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        BootstrapPlasmaManagerHandler.poller = FakePoller(active=True)
+        self.assert_platform_loopback_passes()
+
+    def test_platform_ps_loopback_rejects_non_ps_endpoint(self) -> None:
+        self.coordinator.paired = True
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/ps-loopback",
+            self.loopback_body("pl"),
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["code"], "unsupported_endpoint")
+        self.assertEqual(FakeRuntimeClient.calls, [])
+
     def test_commissioned_ppu_requires_disable_before_runtime_maintenance(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
         status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
@@ -171,6 +273,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertEqual(self.coordinator.calls, [])
 
     def test_disabled_ppu_requires_current_trusted_idle_observation(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
         self.registry.set_lifecycle("z2", "disabled")
         cases = [
             FakePoller(include_ppu=False),
@@ -189,6 +292,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
                 self.assertEqual(self.coordinator.calls, [])
 
     def test_disabled_ppu_with_current_trusted_idle_observation_can_upgrade(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
         self.registry.set_lifecycle("z2", "disabled")
         BootstrapPlasmaManagerHandler.poller = FakePoller()
         status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
