@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u5-canonical-admission-plan-under-security-fence",
+  "authority": "research_only",
+  "family": "STM32U5",
+  "manufacturer": "STMicroelectronics",
+  "production_exact_icpn_count": 2017,
+  "retained_exact_icpns": 266,
+  "metadata_ready_active_exact_icpns": 265,
+  "quarantined_preview_exact_icpns": [
+    "STM32U5G9ZJJ3Q"
+  ],
+  "route_evidence_rows": 162,
+  "route_evidence_kind_counts": {
+    "ordering_pattern": 63,
+    "cmsis_device_name": 99
+  },
+  "route_evidence_sha256": "01b9b9b36423752199bab34b8a3a4ba7adb3445d2d884a46c0501c09701f099d",
+  "supplemental_cmsis_bridges": 1,
+  "cmsis_bridge_evidence": "stm32u5-cmsis-route-bridge.json",
+  "standard_route_assignments": 264,
+  "unique_route_assignments": 265,
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 117,
+    "cmsis_device_name": 147,
+    "cmsis_exact_membership_bridge": 1
+  },
+  "route_binding_sha256": "0aa91868a0fd8dc66f0aded52748f7c95bc58b5fb01d11629ec22fcd0c3f9907",
+  "planned_canonical_rows": 265,
+  "marketing_status_counts": {
+    "Active Product is in volume production.": 265
+  },
+  "required_target_config": "tcl/target/stm32u5x.cfg",
+  "route_evidence_semantics": "OpenOCD/CMSIS mapping candidate plus one pinned ST CMSIS exact-membership bridge; not programming equivalence",
+  "catalog_admission_governed_separately": true,
+  "security_fence": {
+    "security_semantics_supported": false,
+    "option_byte_writes_allowed": false,
+    "oem_key_provisioning_allowed": false,
+    "oem_unlock_execution_allowed": false,
+    "rdp_regression_allowed": false,
+    "mass_erase_allowed": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "debug_attach_supported": false,
+    "hil_validated": false
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "production_admission_authorized": false,
+    "preview_identity_admission_authorized": false,
+    "security_semantics_supported": false,
+    "option_byte_semantics_supported": false,
+    "oem_key_semantics_supported": false,
+    "flash_geometry_validated": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_supported": false,
+    "debug_attach_supported": false,
+    "physical_validation_claimed": false,
+    "hil_validated": false
+  },
+  "next_research_gate": "stm32u5-security-state-admission-gate"
+}
