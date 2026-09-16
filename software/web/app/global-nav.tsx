@@ -69,7 +69,7 @@ export function GlobalNav() {
       >
         <span>P</span>
         <b>PLASMA</b>
-        <small className="globalAppNavVersion">v{PLASMA_PRODUCT_VERSION}</small>
+        <small className="globalAppNavVersion">{`v${PLASMA_PRODUCT_VERSION}`}</small>
       </Link>
 
       <div className="globalNavControls">
