@@ -15,6 +15,8 @@ import {
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 import ThemeSwitch from "./theme-switch";
 
+const productVersion = process.env.NEXT_PUBLIC_PLASMA_PRODUCT_VERSION;
+
 function subscribeHydration(): () => void {
   return () => {};
 }
@@ -68,6 +70,7 @@ export function GlobalNav() {
       >
         <span>P</span>
         <b>PLASMA</b>
+        {productVersion && <small className="globalAppNavVersion">v{productVersion}</small>}
       </Link>
 
       <div className="globalNavControls">
