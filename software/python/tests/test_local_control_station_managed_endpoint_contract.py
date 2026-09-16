@@ -26,16 +26,17 @@ def test_swpc_co_resident_control_station_example_uses_full_gateway() -> None:
     assert "--ppu-endpoint http://127.0.0.1:18080" in script
     assert "--ppu-endpoint http://127.0.0.1:18080" in document
     assert "127.0.0.1:18081" in document
-    assert "restricted diagnostics/status ingress" in document
-    assert "must not" in document.lower()
+    assert "retired by Issue #549" in document
+    assert "must remain unused" in document
 
 
-def test_swpc_restricted_ingress_remains_narrow_instead_of_exposing_site_writes() -> None:
+def test_swpc_legacy_host_18081_ingress_is_not_recreated() -> None:
     installer = SWPC_INSTALLER.read_text(encoding="utf-8")
 
-    assert "listen 127.0.0.1:$proxy_port" in installer
-    assert "location = /api/health/live" in installer
-    assert "location = /api/status" in installer
-    assert "location / { return 404; }" in installer
+    assert 'legacy_nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"' in installer
+    assert "retire_legacy_restricted_ingress" in installer
+    assert "listen 127.0.0.1:$proxy_port" not in installer
+    assert "location = /api/health/live" not in installer
+    assert "location = /api/status" not in installer
     assert "location = /api/settings/sites" not in installer
-    assert "location ~" not in installer or "/api/settings/sites" not in installer
+    assert '"legacy_restricted_ingress_retired": true' in installer
