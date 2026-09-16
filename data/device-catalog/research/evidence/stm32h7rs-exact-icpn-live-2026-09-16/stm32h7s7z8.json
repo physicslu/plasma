@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7S7Z8",
+  "evidence_section_sha256": "780464b8e63ea7ed70a71fae8edfab493403e7945608aba2b0ffa55cc2beef6a",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7S7Z8J6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7s7z8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7S7Z8J6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "9601e87225b590501f637644ca411898c51e8725f638ecdf11ba32f426231ccf",
+  "retrieved_at_utc": "2026-09-16T08:39:25Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7s7z8.html"
+}

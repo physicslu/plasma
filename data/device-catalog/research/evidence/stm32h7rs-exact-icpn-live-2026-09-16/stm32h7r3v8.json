@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7R3V8",
+  "evidence_section_sha256": "d8b329a303bf31ad7498b0fadde1d55beef2a3fe011131cc8c62589d19f00da0",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7R3V8H6",
+    "STM32H7R3V8T6",
+    "STM32H7R3V8Y6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7r3v8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7R3V8H6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7R3V8T6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7R3V8Y6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "857585d38acab4cbd94d70cf0cd59e1820facf23566368ecaa9301096a0ab92b",
+  "retrieved_at_utc": "2026-09-16T08:29:05Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7r3v8.html"
+}

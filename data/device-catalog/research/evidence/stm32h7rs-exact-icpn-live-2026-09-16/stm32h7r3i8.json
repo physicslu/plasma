@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7R3I8",
+  "evidence_section_sha256": "1f42e8c032e45c315e7c0b0f772acff055f032ff7c5021cfdc0047500eb7889c",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7R3I8K6",
+    "STM32H7R3I8T6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7r3i8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7R3I8K6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7R3I8T6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "d22c9a9e06562ffc57e84c9e8f5c4155deb8f5f8eb2ca69cf7e858ce948b32fe",
+  "retrieved_at_utc": "2026-09-16T08:26:59Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7r3i8.html"
+}
