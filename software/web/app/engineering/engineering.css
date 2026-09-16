@@ -86,11 +86,12 @@
   background: var(--panel-3);
 }
 
-/* PPU/Site management keeps the existing EMode sidebar and uses the remaining
- * canvas as an inventory/configuration workbench. */
+/* PPU product pages share the canonical Engineering surface spacing used by
+ * Diagnostics. Their information architecture differs, but the canvas rhythm
+ * must not introduce a second visual system. */
 .engineeringCanvas.ppuSitesActive {
   place-items: start stretch;
-  padding: 12px;
+  padding: 18px clamp(18px, 3vw, 42px) 48px;
   background: var(--panel-3);
 }
 
@@ -171,9 +172,12 @@
     grid-template-columns: 1fr;
   }
 
-  .engineeringCanvas.programmingActive,
-  .engineeringCanvas.ppuSitesActive {
+  .engineeringCanvas.programmingActive {
     padding: 8px;
+  }
+
+  .engineeringCanvas.ppuSitesActive {
+    padding: 12px;
   }
 
   .engineeringCanvas.settingsActive {
