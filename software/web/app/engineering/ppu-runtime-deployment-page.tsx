@@ -75,19 +75,19 @@ export default function PpuRuntimeDeploymentPage() {
   const trustedIdle = trustedIdleObservation(selectedFleet);
 
   return (
-    <section className="ppuSiteConfiguration" aria-label="PPU Runtime Deployment Workspace">
+    <section className="ppuSiteConfiguration" aria-label="PPU Platform Firmware Workspace">
       <header className="ppuSiteHeader">
         <div>
-          <small>PPU APPLIANCE MANAGEMENT</small>
-          <h2>Runtime Deployment</h2>
-          <p>Install or upgrade the Plasma PPU Runtime through the independent factory/recovery Bootstrap path.</p>
+          <small>PPU PLATFORM</small>
+          <h2>Platform</h2>
+          <p>Inspect Bootstrap and Runtime component versions and maintain the PPU platform independently of programming Registration.</p>
         </div>
-        <button className="ppuSiteButton" type="button" disabled={loading} onClick={() => void refresh()}>Refresh Registry</button>
+        <button className="ppuSiteButton" type="button" disabled={loading} onClick={() => void refresh()}>Refresh Platform</button>
       </header>
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      <section className="ppuSiteCard" aria-label="Deployment target">
+      <section className="ppuSiteCard" aria-label="Platform target">
         <header className="ppuSiteCardHeader">
           <div>
             <small>TARGET</small>
@@ -96,14 +96,20 @@ export default function PpuRuntimeDeploymentPage() {
         </header>
         <div className="ppuRegistryAddForm">
           <label>
-            <span>Manager Registry Alias</span>
+            <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
-                <option key={entry.alias!} value={entry.alias!}>{entry.alias} — {entry.lifecycle}</option>
+                <option key={entry.alias!} value={entry.alias!}>
+                  {entry.alias} — {entry.lifecycle === "commissioned" ? "Registered" : entry.lifecycle === "disabled" ? "Registered / Disabled" : "Not Registered"}
+                </option>
               ))}
             </select>
           </label>
-          {selectedEntry && <p>Plasma Gateway registry endpoint: <code>{selectedEntry.endpoint}</code>. On the real z2-ps profile, Bootstrap is the independent same-host <code>:18081</code> service; Browser traffic still goes through BFF and Manager.</p>}
+          {selectedEntry && (
+            <p>
+              Platform maintenance uses the known PPU connection <code>{selectedEntry.endpoint}</code>. Operational Registration is a separate programming-management admission state.
+            </p>
+          )}
         </div>
       </section>
 
@@ -116,8 +122,8 @@ export default function PpuRuntimeDeploymentPage() {
         />
       ) : (
         <section className="ppuSiteCard ppuEmptyRegistry">
-          <h3>{loading ? "Loading Manager registry..." : "No registered PPU"}</h3>
-          <p>Add a PPU to the Manager registry before starting factory Bootstrap pairing or Runtime deployment.</p>
+          <h3>{loading ? "Loading PPU inventory..." : "No known PPU connection"}</h3>
+          <p>Add a PPU connection from Registration before Platform inspection or maintenance. Programming Registration itself is not required.</p>
         </section>
       )}
     </section>
