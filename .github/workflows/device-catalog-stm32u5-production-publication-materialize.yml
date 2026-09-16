@@ -1,0 +1,38 @@
+name: STM32U5 Production publication materialization
+
+on:
+  push:
+    branches:
+      - agent/stm32u5-production-publication
+    paths:
+      - 'data/device-catalog/research/publish_stm32u5_catalog.py'
+      - '.github/workflows/device-catalog-stm32u5-production-publication-materialize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stm32u5-production-publication
+          fetch-depth: 0
+      - name: Render deterministic STM32U5 publication bytes
+        run: |
+          python3 data/device-catalog/research/publish_stm32u5_catalog.py --output-dir /tmp/stm32u5-publication --json
+          cp /tmp/stm32u5-publication/stm32u5-commercial-icpn.csv data/device-catalog/research/stm32u5-commercial-icpn.csv
+          cp /tmp/stm32u5-publication/stm32u5-production-publication-proposal.json data/device-catalog/research/stm32u5-production-publication-proposal.json
+          cp /tmp/stm32u5-publication/icpn-v1-manifest.json data/device-catalog/production/icpn-v1-manifest.json
+      - name: Commit deterministic publication outputs
+        run: |
+          if git diff --quiet -- data/device-catalog/research/stm32u5-commercial-icpn.csv data/device-catalog/research/stm32u5-production-publication-proposal.json data/device-catalog/production/icpn-v1-manifest.json; then
+            echo 'Publication outputs already materialized.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32u5-commercial-icpn.csv data/device-catalog/research/stm32u5-production-publication-proposal.json data/device-catalog/production/icpn-v1-manifest.json
+          git commit -m 'Device catalog: materialize STM32U5 publication outputs'
+          git push origin HEAD:agent/stm32u5-production-publication
