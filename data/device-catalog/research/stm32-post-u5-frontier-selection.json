@@ -14,14 +14,33 @@
   "production_boundary": {
     "exact_icpns": 2282,
     "families": 16,
-    "manifest_sha256": "3fbab3198e813580e29c3388a9027d1993a44a6d66ec73349ad20da708cc66af",
+    "frozen_prestate_sha256": "6e8fd44730c703b0f8f1c97f0872fec5c3ca8dea4c255f65822f27f8023ee9cd",
+    "production_series": [
+      "STM32C0",
+      "STM32F0",
+      "STM32F1",
+      "STM32F2",
+      "STM32F3",
+      "STM32F4",
+      "STM32F7",
+      "STM32G0",
+      "STM32G4",
+      "STM32L0",
+      "STM32L1",
+      "STM32L4",
+      "STM32L5",
+      "STM32U0",
+      "STM32U3",
+      "STM32U5"
+    ],
+    "source_production_manifest_sha256": "3fbab3198e813580e29c3388a9027d1993a44a6d66ec73349ad20da708cc66af",
     "stm32u5_published": true
   },
   "schema_version": 1,
   "scope": "next_frontier_research_only",
   "selected_next_research_frontier": "STM32H7",
   "selection_basis": [
-    "all standard_nonwireless_research shortlist candidates are already in Production",
+    "all retained standard_nonwireless_research shortlist candidates are already in Production",
     "STM32H7 is the only remaining non-wireless candidate in the retained cross-family inventory",
     "STM32H7 has two target configs and therefore requires partitioning before bounded manufacturer-evidence discovery",
     "wireless STM32 cohorts remain separate because they require dedicated wireless/security scope"
@@ -66,6 +85,7 @@
   "upstream_policy": {
     "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
     "policy_id": "stm32-cross-family-prioritization-v1",
+    "prioritization_baseline_sha256": "9a99865865f048e6a7636efd82cb17958fdc593240a329e18e3b68d8b0f862f9",
     "standard_nonwireless_shortlist_exhausted": true
   },
   "wireless_frontier_backlog": [
