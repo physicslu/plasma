@@ -88,13 +88,11 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!selectedAlias) {
-      setBootstrap(null);
-      return () => { cancelled = true; };
+    if (selectedAlias) {
+      void getManagerPpuBootstrap(selectedAlias)
+        .then(status => { if (!cancelled) setBootstrap(status); })
+        .catch(() => { if (!cancelled) setBootstrap(null); });
     }
-    void getManagerPpuBootstrap(selectedAlias)
-      .then(status => { if (!cancelled) setBootstrap(status); })
-      .catch(() => { if (!cancelled) setBootstrap(null); });
     return () => { cancelled = true; };
   }, [selectedAlias, registry, fleet]);
 
