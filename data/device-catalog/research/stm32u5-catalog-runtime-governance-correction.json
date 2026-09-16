@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "transaction": "stm32u5-catalog-runtime-governance-correction",
+  "authority": "governance_correction",
+  "family": "STM32U5",
+  "corrected_prs": [608, 610, 612, 613],
+  "reviewed_unchanged_prs": [611],
+  "governance_basis": {
+    "catalog_admission_independent_from_hil": true,
+    "catalog_admission_independent_from_physical_programming_success": true,
+    "catalog_membership_authorizes_target_execution": false,
+    "runtime_security_research_is_independent_from_catalog_publication": true
+  },
+  "superseded_legacy_semantics": [
+    {
+      "source": "stm32u5-canonical-admission-plan.json",
+      "field": "next_research_gate",
+      "legacy_value": "stm32u5-security-state-admission-gate",
+      "corrected_interpretation": "independent_runtime_security_research_only_not_catalog_prerequisite"
+    },
+    {
+      "source": "stm32u5-security-state-model.json",
+      "field": "admission_result.hil_required_before_runtime_enablement",
+      "legacy_value": true,
+      "corrected_interpretation": "physical_validation_required_before_future_target_execution_enablement_no_named_hil_gate"
+    },
+    {
+      "source": "stm32u5-security-state-observer-debug-policy.json",
+      "field": "next_research_gate",
+      "legacy_value": "stm32u5-hil-observer-debug-matrix-readiness-gate",
+      "corrected_interpretation": "canceled_no_successor_hil_gate"
+    }
+  ],
+  "catalog_track": {
+    "next_gate": "stm32u5-production-publication-gate",
+    "eligible_active_exact_icpns": 265,
+    "quarantined_preview_exact_icpns": ["STM32U5G9ZJJ3Q"],
+    "production_exact_icpns_before": 2017,
+    "expected_production_exact_icpns_after": 2282,
+    "ppu_hil_required": false,
+    "socket_hil_required": false,
+    "physical_programming_success_required": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_support_claimed": false,
+    "debug_attach_support_claimed": false
+  },
+  "runtime_security_track": {
+    "retained_contracts": [
+      "stm32u5-security-state-admission-gate",
+      "stm32u5-runtime-enforcement-admission-gate",
+      "stm32u5-security-state-observer-and-debug-validation-gate"
+    ],
+    "independent_from_catalog_publication": true,
+    "named_hil_gate_required": false,
+    "physical_validation_required_before_future_target_execution_enablement": true,
+    "current_target_execution_authorized": false,
+    "next_software_gate": null
+  },
+  "retired_hil_gate_artifacts": [
+    ".github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml",
+    "data/device-catalog/research/device-catalog-stm32u5-hil-observer-debug-readiness-gate.md",
+    "data/device-catalog/research/stm32u5-hil-observer-debug-readiness.json",
+    "data/device-catalog/research/stm32u5_hil_observer_debug_readiness.py",
+    "data/device-catalog/research/validate_stm32u5_hil_observer_debug_readiness_gate.py"
+  ],
+  "next_action": "stm32u5-production-publication-gate"
+}
