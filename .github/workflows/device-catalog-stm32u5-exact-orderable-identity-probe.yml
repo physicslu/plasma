@@ -9,7 +9,6 @@ on:
       - 'data/device-catalog/research/stm32u5-security-scope-foundation.json'
       - 'data/device-catalog/research/validate_stm32u5_exact_orderable_identity_enumeration.py'
       - 'data/device-catalog/research/validate_stm32u5_manufacturer_identity_discovery.py'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'docs/architecture/icpn-catalog-admission-policy.json'
       - '.github/workflows/device-catalog-stm32u5-exact-orderable-identity-probe.yml'
   workflow_dispatch:
