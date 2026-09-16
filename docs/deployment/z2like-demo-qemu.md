@@ -39,15 +39,16 @@ The QEMU container publishes **no host ports**. SWPC Nginx owns the loopback-onl
 
 Do not repoint `z2like-demo.open4th.com` to SWPC. Its DNS/Render ownership is intentional. Do not expose QEMU `:18080` or `:18081` directly to the Internet.
 
-## Five public hostname roles
+## Active public hostname roles
 
 | Hostname | Ownership | Role |
 | --- | --- | --- |
 | `plasma-demo.open4th.com` | Render | Public Mock Demo with Render-local Mock PPU |
 | `z2like-demo.open4th.com` | Render | Product Control Station whose PPU backend is SWPC QEMU ARMv7 |
 | `plasma.open4th.com` | SWPC | Local Control Station: `18190 -> 18280 -> 18080` x86 engineering surrogate |
-| `ppu-lab.open4th.com` | SWPC | Legacy restricted diagnostics/status/PS-loopback ingress on host `18081`; pending retirement |
 | `ppu-managed-lab.open4th.com` | SWPC | Cloudflare Access protected managed ingress on host `18082`, owned by z2like-demo QEMU path |
+
+The former `ppu-lab.open4th.com` hostname and its SWPC host `18081` diagnostics ingress were retired by Issue #549. They are not active routing surfaces.
 
 These hostnames are different deployment/security boundaries. A shared port number in another profile does not imply shared ownership.
 
@@ -57,7 +58,7 @@ These hostnames are different deployment/security boundaries. A shared port numb
 
 ```text
 127.0.0.1:18080  x86_64 full Gateway used by plasma.open4th.com path
-127.0.0.1:18081  legacy restricted diagnostics/status ingress; pending retirement
+127.0.0.1:18081  retired; no host diagnostics/public listener
 ```
 
 ### z2like-demo public backend bridge
@@ -68,7 +69,7 @@ These hostnames are different deployment/security boundaries. A shared port numb
 172.30.77.2:18081      private QEMU Bootstrap/recovery service
 ```
 
-The migration of host `18082` from the historical x86 managed ingress to QEMU is explicit. It does not widen host `18081`, and it does not change the x86 full Gateway used by `plasma.open4th.com`.
+The migration of host `18082` from the historical x86 managed ingress to QEMU is explicit. It does not recreate host `18081`, and it does not change the x86 full Gateway used by `plasma.open4th.com`.
 
 ### SWPC internal maintenance fixture
 
@@ -154,9 +155,9 @@ The host `18082` Nginx ingress remains loopback-only and allowlisted. It permits
 
 Cloudflare Access is transport identity only. Plasma Gateway remains the final application authorization, Site scope, idempotency and execution authority.
 
-## Relationship to `ppu-lab` retirement
+## `ppu-lab` retirement boundary
 
-`z2like-demo` no longer depends on SWPC host `18081`. Host `18081` remains only the legacy `ppu-lab.open4th.com` diagnostics/status/PS-loopback boundary until Issue #549 retirement criteria are satisfied.
+Issue #549 retired the former `ppu-lab.open4th.com` route and SWPC host `127.0.0.1:18081` diagnostics/status/PS-loopback listener. Current repository contracts must not recreate either surface.
 
 QEMU `172.30.77.2:18081` and real-Z2 `<Z2-IP>:18081` are separate Bootstrap/recovery ports and are **not** part of that retirement.
 
