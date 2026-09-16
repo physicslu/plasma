@@ -1,0 +1,31 @@
+name: STM32U5 catalog runtime governance correction validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32u5-catalog-runtime-governance-correction.json'
+      - 'data/device-catalog/research/device-catalog-stm32u5-catalog-runtime-governance-correction.md'
+      - 'data/device-catalog/research/validate_stm32u5_catalog_runtime_governance_correction.py'
+      - 'data/device-catalog/research/stm32u5-canonical-admission-plan.json'
+      - 'data/device-catalog/research/stm32u5-security-state-model.json'
+      - 'data/device-catalog/research/stm32u5-runtime-enforcement-policy.json'
+      - 'data/device-catalog/research/stm32u5-security-state-observer-debug-policy.json'
+      - '.github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml'
+      - 'data/device-catalog/research/device-catalog-stm32u5-hil-observer-debug-readiness-gate.md'
+      - 'data/device-catalog/research/stm32u5-hil-observer-debug-readiness.json'
+      - 'data/device-catalog/research/stm32u5_hil_observer_debug_readiness.py'
+      - 'data/device-catalog/research/validate_stm32u5_hil_observer_debug_readiness_gate.py'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate STM32U5 catalog/runtime governance correction
+        run: python data/device-catalog/research/validate_stm32u5_catalog_runtime_governance_correction.py
