@@ -99,19 +99,14 @@ export default function PpuSitesPage() {
 
       <section className="ppuSiteCard" aria-label="Sites target PPU">
         <header className="ppuSiteCardHeader">
-          <div>
-            <small>TARGET</small>
-            <h3>Select PPU</h3>
-          </div>
+          <div><small>TARGET</small><h3>Select PPU</h3></div>
         </header>
         <div className="ppuRegistryAddForm">
           <label>
             <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
-                <option key={entry.alias!} value={entry.alias!}>
-                  {entry.alias} — {entry.lifecycle === "commissioned" ? "Registered" : "Not Registered"}
-                </option>
+                <option key={entry.alias!} value={entry.alias!}>{entry.alias} — {entry.lifecycle === "commissioned" ? "Registered" : "Not Registered"}</option>
               ))}
             </select>
           </label>
@@ -122,10 +117,7 @@ export default function PpuSitesPage() {
         <>
           <section className="ppuSiteCard" aria-label="Site status summary">
             <header className="ppuSiteCardHeader">
-              <div>
-                <small>SITE STATUS</small>
-                <h3>{selectedEntry.alias}</h3>
-              </div>
+              <div><small>SITE STATUS</small><h3>{selectedEntry.alias}</h3></div>
               <span className="ppuSiteFilter">{siteSummary.total} reported</span>
             </header>
             <div className="ppuStateSummaryGrid">
@@ -144,22 +136,12 @@ export default function PpuSitesPage() {
           </section>
 
           {registered ? (
-            <PpuSiteDesiredConfiguration
-              entry={selectedEntry}
-              hasActiveExecution={activeExecution}
-            />
+            <PpuSiteDesiredConfiguration entry={selectedEntry} hasActiveExecution={activeExecution} />
           ) : (
             <section className="ppuSiteCard" aria-label="Sites locked until Registration">
-              <header className="ppuSiteCardHeader">
-                <div>
-                  <small>LOCKED</small>
-                  <h3>Registration required</h3>
-                </div>
-              </header>
-              <p className="ppuRegistryMessage warning" role="status">
-                This PPU is known to Console, but it is not registered for managed programming. Complete Registration before changing Site desired configuration or activating programming runtime state.
-              </p>
-              <p className="ppuSiteNote">PPU Platform Firmware inspection and maintenance remain available from Platform while Sites are locked.</p>
+              <header className="ppuSiteCardHeader"><div><small>LOCKED</small><h3>Registration required</h3></div></header>
+              <p className="ppuRegistryMessage warning" role="status">This PPU is known to Console, but it is not registered for managed programming. Complete Registration before changing Site desired configuration or activating programming runtime state.</p>
+              <p className="ppuSiteNote">PPU Platform Release inspection and maintenance remain available from Platform while Sites are locked.</p>
             </section>
           )}
         </>
