@@ -40,7 +40,7 @@ function registrationLabel(entry: ManagerRegistryEntry | null): string {
   return "Not Registered";
 }
 
-function platformFirmwareLabel(status: ManagerBootstrapStatus | null): string {
+function platformReleaseLabel(status: ManagerBootstrapStatus | null): string {
   const runtime = status?.bootstrap.runtime;
   if (runtime?.release_id) return runtime.release_id;
   if (status?.bootstrap.bootstrap.state === "bootstrap_ready") return "Bootstrap only";
@@ -190,13 +190,13 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
             <header className="ppuSiteCardHeader">
               <div>
                 <small>PLATFORM</small>
-                <h3>PPU Platform Firmware</h3>
+                <h3>PPU Platform Release</h3>
               </div>
               <button className="ppuSiteButton" type="button" onClick={() => onNavigate("platform")}>View Platform</button>
             </header>
             <div className="ppuInfoBody">
               <dl className="ppuInfoGrid">
-                <div className="wide"><dt>Platform Firmware</dt><dd>{platformFirmwareLabel(bootstrap)}</dd></div>
+                <div className="wide"><dt>Platform Release</dt><dd>{platformReleaseLabel(bootstrap)}</dd></div>
                 <div><dt>Bootstrap Version</dt><dd>{bootstrap?.bootstrap.bootstrap.version ?? "Unavailable"}</dd></div>
                 <div><dt>Runtime Version</dt><dd>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</dd></div>
                 <div className="wide"><dt>Runtime Commit</dt><dd>{bootstrap?.bootstrap.runtime.git_sha ?? "—"}</dd></div>
@@ -212,7 +212,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
               </div>
               <button className="ppuSiteButton" type="button" onClick={() => onNavigate("registration")}>View Registration</button>
             </header>
-            <p className="ppuSiteNote">Registration controls whether this Console may use the PPU for managed programming. It is not required to inspect or maintain Platform Firmware.</p>
+            <p className="ppuSiteNote">Registration controls whether this Console may use the PPU for managed programming. It is not required to inspect or maintain the Platform Release.</p>
           </section>
 
           <section className="ppuSiteCard" aria-label="PPU Site summary">
