@@ -1,0 +1,39 @@
+name: STM32U5 security-state observer debug validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32u5-security-state-observer-debug-policy.json'
+      - 'data/device-catalog/research/stm32u5_security_state_observer_debug.py'
+      - 'data/device-catalog/research/validate_stm32u5_security_state_observer_debug_gate.py'
+      - 'data/device-catalog/research/device-catalog-stm32u5-security-state-observer-debug-validation-gate.md'
+      - 'data/device-catalog/research/stm32u5-security-state-model.json'
+      - 'data/device-catalog/research/stm32u5_security_state_gate.py'
+      - 'data/device-catalog/research/stm32u5-runtime-enforcement-policy.json'
+      - 'data/device-catalog/research/stm32u5_runtime_enforcement.py'
+      - '.github/workflows/device-catalog-stm32u5-security-state-observer-debug-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate upstream STM32U5 runtime enforcement gate
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_runtime_enforcement_admission_gate.py
+      - name: Validate STM32U5 observer/debug gate
+        working-directory: data/device-catalog/research
+        run: python validate_stm32u5_security_state_observer_debug_gate.py
+      - name: Reject Production catalog writes in this transaction
+        shell: bash
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+            | grep -E '^data/device-catalog/(current|production|manifest)' \
+            && { echo 'Production catalog write detected'; exit 1; } || true
