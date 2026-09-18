@@ -21,6 +21,7 @@ import os
 import platform
 import secrets
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -64,6 +65,22 @@ def _request_json(url: str, timeout_s: float = 2.0) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise TargetError(f"response is not a JSON object: {url}")
     return payload
+
+
+def _wait_tcp(host: str, port: int, timeout_s: float, *processes: subprocess.Popen[Any]) -> None:
+    deadline = time.monotonic() + timeout_s
+    last = "no connection"
+    while time.monotonic() < deadline:
+        for process in processes:
+            if process.poll() is not None:
+                raise TargetError(f"process exited before TCP readiness: pid={process.pid} rc={process.returncode}")
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return
+        except OSError as exc:
+            last = str(exc)
+        time.sleep(0.1)
+    raise TargetError(f"TCP readiness deadline exceeded for {host}:{port}: {last}")
 
 
 def _wait_url(url: str, predicate, timeout_s: float, *processes: subprocess.Popen[Any]) -> dict[str, Any]:
@@ -204,29 +221,35 @@ def _start_runtime(
         cwd=state_root,
         env=env,
     )
-    gateway = subprocess.Popen(
-        [
-            sys.executable,
-            str(app),
-            "gateway",
-            "--ppu-config",
-            str(config),
-            "--host",
-            gateway_host,
-            "--port",
-            str(GATEWAY_PORT),
-            "--plasma-host",
-            "127.0.0.1",
-            "--plasma-port",
-            str(SERVER_PORT),
-            "--output-root",
-            str(state_root / "gateway-output"),
-            "--engineering-configured-mock",
-        ],
-        cwd=state_root,
-        env=env,
-    )
+    gateway: subprocess.Popen[Any] | None = None
     try:
+        # The configured Engineering provider performs an immediate Plasma
+        # Server status call during Gateway startup. Synchronize on the
+        # independently owned Server listener first so QEMU scheduling cannot
+        # turn that fail-closed probe into a startup race.
+        _wait_tcp("127.0.0.1", SERVER_PORT, 30.0, server)
+        gateway = subprocess.Popen(
+            [
+                sys.executable,
+                str(app),
+                "gateway",
+                "--ppu-config",
+                str(config),
+                "--host",
+                gateway_host,
+                "--port",
+                str(GATEWAY_PORT),
+                "--plasma-host",
+                "127.0.0.1",
+                "--plasma-port",
+                str(SERVER_PORT),
+                "--output-root",
+                str(state_root / "gateway-output"),
+                "--engineering-configured-mock",
+            ],
+            cwd=state_root,
+            env=env,
+        )
         _wait_url(
             f"http://127.0.0.1:{GATEWAY_PORT}/api/health/ready",
             lambda payload: payload.get("ok") is True
@@ -240,6 +263,7 @@ def _start_runtime(
         _terminate(gateway)
         _terminate(server)
         raise
+    assert gateway is not None
     return release_id, server, gateway
 
 
