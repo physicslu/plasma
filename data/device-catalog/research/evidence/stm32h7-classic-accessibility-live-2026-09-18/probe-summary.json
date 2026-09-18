@@ -1,0 +1,725 @@
+{
+  "active_exact_icpns_observed_on_representative_pages": 24,
+  "attempted_targets": 16,
+  "bounded_probe_complete": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "representative_probe_is_full_family_enumeration": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false
+  },
+  "excluded_non_active_part_numbers_observed": 6,
+  "manual_review_targets": 0,
+  "next_gate": "stm32h7-classic-bounded-exact-icpn-discovery-gate",
+  "official_st_evidence_accessible_for_all_subfamilies": true,
+  "probe_id": "stm32h7-classic-bounded-official-st-evidence-accessibility-v1",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 3,
+      "base_device": "STM32H723VE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H723VE",
+        "evidence_section_sha256": "b5531883e45d2c157b466f8f69a76ce77cd508595c34cfe985a24b921198ad7e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H723VEH6",
+          "STM32H723VET6",
+          "STM32H723VET6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H723VEH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H723VET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H723VET6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e5fec18335d7c82e62e847ea023d9563a206ec41ccef4e5a8fa80b74c639da01",
+        "retrieved_at_utc": "2026-09-18T02:57:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723ve.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723ve.html",
+      "subfamily": "STM32H723"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H725AE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H725AE",
+        "evidence_section_sha256": "1e4cbfe5b51547ea00650657e267bd7b6707a38d687c90b57b72d336893791a5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H725AEI6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725ae.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H725AEI6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6514050251329f6ad441bec1f45c7869a741a740f18f3186dbc080a3a09a6f25",
+        "retrieved_at_utc": "2026-09-18T02:57:47Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725ae.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725ae.html",
+      "subfamily": "STM32H725"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32H730VB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H730VB",
+        "evidence_section_sha256": "f9c6f098fdf89f1bfe269001aabeed44d520fd2cf3ec18b11e9d7faa05251c6e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H730VBH6",
+          "STM32H730VBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h730vb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H730VBH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H730VBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "21a270cae9746d5389c032088226ef174a90861008b97483d9628537ce1b572b",
+        "retrieved_at_utc": "2026-09-18T02:57:52Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h730vb.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h730vb.html",
+      "subfamily": "STM32H730"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32H733VG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H733VG",
+        "evidence_section_sha256": "5a65449f5698efe0dd376fa469f52db949d323cec58ab22467a6370183ea44d5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H733VGH6",
+          "STM32H733VGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h733vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H733VGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H733VGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b27663b029326c2fa8609e01302807605014b1995857eb5481af7b82e44ef99a",
+        "retrieved_at_utc": "2026-09-18T02:57:57Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h733vg.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h733vg.html",
+      "subfamily": "STM32H733"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H735AG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H735AG",
+        "evidence_section_sha256": "f7068ff7267dddb415654ffc92f4a8f43a24fb2e33618951d20441115cd3e020",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H735AGI6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h735ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H735AGI6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ca2b9d4d143b7e8b5f2cc4ca370f130f7dce6d4ddc5e79ea0a2dc78ee3285ed5",
+        "retrieved_at_utc": "2026-09-18T02:58:02Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h735ag.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h735ag.html",
+      "subfamily": "STM32H735"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32H742AG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H742AG",
+        "evidence_section_sha256": "b961b2ebdb0302c1aea47a053b784fe361410c3fcbe76439edbc99d6e9e3c414",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H742AGI6",
+          "STM32H742AGI6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H742AGI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H742AGI6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "039adf30a354ef709b348b898c8d0facc9a4a8b06ef848e411c6e9589aa7e9bb",
+        "retrieved_at_utc": "2026-09-18T02:58:08Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ag.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ag.html",
+      "subfamily": "STM32H742"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H743AG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H743AG",
+        "evidence_section_sha256": "8d06db94bf3f535a53c1be85ca6614e789ccb50233d24bf9cb89f7e02ff12abd",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H743AGI6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H743AGI6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "184fa08ffd6238e828e7516eeaeb36f3132c86336455721af0fa3639fe8f85d6",
+        "retrieved_at_utc": "2026-09-18T02:59:52Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743ag.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743ag.html",
+      "subfamily": "STM32H743"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 0,
+      "base_device": "STM32H745BG",
+      "commercial_identity_status": "verified_non_active_only",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H745BG",
+        "evidence_section_sha256": "e59321218bd79c62e249eaa00a359b5cb0e22110608f2e8d4c7fedf3e15d1585",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32H745BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745bg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32H745BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "a5806017242d34e27e9b6b54a155c30d9f41b17d45c908b141cb58027e04bedf",
+        "retrieved_at_utc": "2026-09-18T02:59:56Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745bg.html"
+      },
+      "excluded_non_active_count": 1,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745bg.html",
+      "subfamily": "STM32H745"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H747AG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H747AG",
+        "evidence_section_sha256": "567f1c17364fde3358905367692ee41afcc2bc1e84b9ff8fe0136725049a3e4e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H747AGI6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H747AGI6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "1dad4bcdce6463f889cf1e1a2f6e6f10aefa315bb27fbd3d8bfe511bb650247d",
+        "retrieved_at_utc": "2026-09-18T03:07:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ag.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ag.html",
+      "subfamily": "STM32H747"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32H750IB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H750IB",
+        "evidence_section_sha256": "44ff0d7bb2e36423e0278decd0bc10259d152d812b79865c9f45bf587d226af4",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H750IBK6",
+          "STM32H750IBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h750ib.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H750IBK6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H750IBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c2f5998cad9b0f4a789e9e7476452a32510563d3ece8adc447e6d939c99bc0f5",
+        "retrieved_at_utc": "2026-09-18T03:09:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h750ib.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h750ib.html",
+      "subfamily": "STM32H750"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H753AI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H753AI",
+        "evidence_section_sha256": "d63e7fa7a779f486849235f23b0c2cc5d2234d07b77c1d27aaf1f83d8e83e0ac",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H753AII6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H753AII6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "10a34cf5d98d068bab026521a4b35bf79f1933f3f898a645c57620e6ee261190",
+        "retrieved_at_utc": "2026-09-18T03:09:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753ai.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753ai.html",
+      "subfamily": "STM32H753"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 0,
+      "base_device": "STM32H755BI",
+      "commercial_identity_status": "verified_non_active_only",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H755BI",
+        "evidence_section_sha256": "b505d55e7d3046df121299fd4c76a66272fa4090dfdea6127716bfbde54d208d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32H755BIT3",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32H755BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h755bi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32H755BIT3",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32H755BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "24761d13d0649569b2f476e1138e22b8129658badedabfdd92f04ddde63e8056",
+        "retrieved_at_utc": "2026-09-18T03:09:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h755bi.html"
+      },
+      "excluded_non_active_count": 2,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h755bi.html",
+      "subfamily": "STM32H755"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H757AI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H757AI",
+        "evidence_section_sha256": "e61b33040a5afe1274438930f8722b2ca70ec77681dcd304a5dfb9961cdc4cd6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H757AII6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H757AII6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "0b2076593028182d10af67b5e7c609d47cef5ba04190e7b6cb1b75256ada9308",
+        "retrieved_at_utc": "2026-09-18T03:09:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757ai.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757ai.html",
+      "subfamily": "STM32H757"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32H7A3IG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H7A3IG",
+        "evidence_section_sha256": "afb2dd5dac7db20c932f41d37d85a75f0188d40615490b334011ff404964cf70",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H7A3IGT6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32H7A3IGK6",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "icpn": "STM32H7A3IGK6Q",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "icpn": "STM32H7A3IGT6Q",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3ig.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32H7A3IGK6",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32H7A3IGK6Q",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32H7A3IGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32H7A3IGT6Q",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "rendered_dom_sha256": "e609663bea16dc3310897ce1e0393b4d8fcb1d13b6f68dadadf25f4429f60422",
+        "retrieved_at_utc": "2026-09-18T03:09:29Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3ig.html"
+      },
+      "excluded_non_active_count": 3,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3ig.html",
+      "subfamily": "STM32H7A3"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32H7B0IB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H7B0IB",
+        "evidence_section_sha256": "d6e7beca0f8509254714a4971e63bac10adf1f7869e1a6412a29dc2965181324",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H7B0IBK6Q",
+          "STM32H7B0IBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b0ib.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H7B0IBK6Q",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H7B0IBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "049f7de8af8ebcd6acf138cee3d85a605987bf26350d3ed3cc37d98ffb4f6bb2",
+        "retrieved_at_utc": "2026-09-18T03:09:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b0ib.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b0ib.html",
+      "subfamily": "STM32H7B0"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 4,
+      "base_device": "STM32H7B3II",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32H7B3II",
+        "evidence_section_sha256": "d3ffa1a41e5ceec6c4e36d73dbe1e5ec5e704cd39a93495070f6f4664a569e1e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32H7B3IIK6",
+          "STM32H7B3IIK6Q",
+          "STM32H7B3IIT6",
+          "STM32H7B3IIT6Q"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ii.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32H7B3IIK6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H7B3IIK6Q",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H7B3IIT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32H7B3IIT6Q",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "1bb5ce1423fe8beae5bf6fadd7861364d026e11d7f41d7d6d9ad2b7a69cbd9b4",
+        "retrieved_at_utc": "2026-09-18T03:09:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ii.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32H7-classic ordering-pattern subfamily",
+      "series": "STM32H7-classic",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ii.html",
+      "subfamily": "STM32H7B3"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32H7-classic bounded representative official-ST commercial identity/lifecycle evidence accessibility",
+  "selected_partition": "STM32H7-classic",
+  "status": "accessible",
+  "successful_targets": 16,
+  "target_config": "tcl/target/stm32h7x.cfg"
+}

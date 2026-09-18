@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7B0IB",
+  "evidence_section_sha256": "d6e7beca0f8509254714a4971e63bac10adf1f7869e1a6412a29dc2965181324",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7B0IBK6Q",
+    "STM32H7B0IBT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b0ib.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7B0IBK6Q",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7B0IBT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "049f7de8af8ebcd6acf138cee3d85a605987bf26350d3ed3cc37d98ffb4f6bb2",
+  "retrieved_at_utc": "2026-09-18T03:09:34Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b0ib.html"
+}

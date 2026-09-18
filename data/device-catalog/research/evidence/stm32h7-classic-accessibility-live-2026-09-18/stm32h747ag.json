@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H747AG",
+  "evidence_section_sha256": "567f1c17364fde3358905367692ee41afcc2bc1e84b9ff8fe0136725049a3e4e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H747AGI6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ag.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H747AGI6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "1dad4bcdce6463f889cf1e1a2f6e6f10aefa315bb27fbd3d8bfe511bb650247d",
+  "retrieved_at_utc": "2026-09-18T03:07:35Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ag.html"
+}
