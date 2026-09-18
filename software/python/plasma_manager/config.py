@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -106,7 +107,12 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     request_timeout_s = manager_raw.get("request_timeout_s", 2.0)
     poll_interval_s = manager_raw.get("poll_interval_s", 2.0)
     observation_db_path = _absolute_optional_path(manager_raw.get("observation_db_path"), "observation_db_path")
-    registry_state_path = _absolute_optional_path(manager_raw.get("registry_state_path"), "registry_state_path")
+    registry_state_raw = (
+        manager_raw.get("registry_state_path")
+        if "registry_state_path" in manager_raw
+        else os.environ.get("PLASMA_MANAGER_REGISTRY_STATE_PATH_FALLBACK")
+    )
+    registry_state_path = _absolute_optional_path(registry_state_raw, "registry_state_path")
     if not isinstance(host, str) or not host.strip():
         raise ManagerConfigError("manager.host must be a non-empty string")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
