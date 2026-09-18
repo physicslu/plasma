@@ -686,6 +686,50 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(status, payload)
 
     def _relay_managed_ppu_request(self, alias: str, target_path: str, query: str) -> None:
+        if self.command != "POST":
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+
+        # Perform the cheap static admission checks before taking the operation
+        # gate. The unlocked implementation repeats them so there is only one
+        # authoritative error contract.
+        if not self._managed_route_allowed(self.command, target_path):
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+        if self._resolve_ppu_alias(alias) is None:
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+        if self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; managed PPU writes are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _relay_managed_ppu_request_unlocked(self, alias: str, target_path: str, query: str) -> None:
         if not self._managed_route_allowed(self.command, target_path):
             self._json(
                 HTTPStatus.NOT_FOUND,
