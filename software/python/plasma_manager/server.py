@@ -467,6 +467,36 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"ok": True, "commissioning": record.as_dict()})
 
     def _handle_network_commissioning_post(self, alias: str) -> None:
+        if self.registry_store is None or self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._handle_network_commissioning_post_unlocked(alias)
+            return
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; network commissioning is temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_network_commissioning_post_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_network_commissioning_post_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
