@@ -4,6 +4,7 @@ import json
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -93,6 +94,38 @@ class RuntimeRegistryStoreTests(unittest.TestCase):
             )
             with self.assertRaises(ManagerConfigError):
                 load_manager_config(config_path)
+
+    def test_manager_config_uses_registry_state_fallback_only_when_field_is_omitted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fallback = root / "fallback-registry.json"
+            config_path = root / "manager.yaml"
+            config_path.write_text("manager:\n  port: 18180\nppus: []\n", encoding="utf-8")
+            with patch.dict(
+                "os.environ",
+                {"PLASMA_MANAGER_REGISTRY_STATE_PATH_FALLBACK": str(fallback)},
+                clear=False,
+            ):
+                config = load_manager_config(config_path)
+            self.assertEqual(config.registry_state_path, fallback)
+
+    def test_explicit_null_registry_state_path_disables_installer_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fallback = root / "fallback-registry.json"
+            config_path = root / "manager.yaml"
+            config_path.write_text(
+                "manager:\n  registry_state_path: null\nppus: []\n",
+                encoding="utf-8",
+            )
+            with patch.dict(
+                "os.environ",
+                {"PLASMA_MANAGER_REGISTRY_STATE_PATH_FALLBACK": str(fallback)},
+                clear=False,
+            ):
+                config = load_manager_config(config_path)
+            self.assertIsNone(config.registry_state_path)
+
 
 
 class RuntimeRegistryHTTPTests(unittest.TestCase):
