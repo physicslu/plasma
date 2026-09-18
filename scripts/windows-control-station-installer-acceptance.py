@@ -249,6 +249,14 @@ def _assert_preserved_config_registry_fallback(program_data: Path) -> None:
             f"Windows preserved-config registry fallback did not enable file-backed runtime registry: "
             f"status={status} payload={payload}"
         )
+    ppus = payload.get("ppus")
+    if not isinstance(ppus, list) or not any(
+        isinstance(item, dict) and item.get("alias") == "installer-smoke-ppu"
+        for item in ppus
+    ):
+        raise InstallerAcceptanceError(
+            f"Windows preserved-config registry fallback did not seed preserved ppus: {payload}"
+        )
     state_path = program_data / "state" / "manager-registry.json"
     if not state_path.is_file():
         raise InstallerAcceptanceError(
