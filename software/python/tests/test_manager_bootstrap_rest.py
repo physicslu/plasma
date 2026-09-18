@@ -52,6 +52,8 @@ class FakeBootstrapCoordinator:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, object]] = []
         self.paired = False
+        self.runtime_state = "runtime_active"
+        self.deployment_state: str | None = None
 
     def status(self, alias: str):
         self.calls.append(("status", alias, None))
@@ -62,9 +64,13 @@ class FakeBootstrapCoordinator:
             "bootstrap": {
                 "bootstrap": {"state": "bootstrap_ready"},
                 "identity": {"device_id": "ppu-device-0123456789abcdef"},
-                "runtime": {"state": "runtime_active"},
+                "runtime": {"state": self.runtime_state},
                 "capabilities": {"runtime_deployment": True, "fpga_update": False},
-                "deployment": None,
+                "deployment": (
+                    {"state": self.deployment_state}
+                    if self.deployment_state is not None
+                    else None
+                ),
             },
         }
 
@@ -265,16 +271,15 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "unsupported_endpoint")
         self.assertEqual(FakeRuntimeClient.calls, [])
 
-    def test_commissioned_ppu_requires_disable_before_runtime_maintenance(self) -> None:
-        self.registry.set_lifecycle("z2", "commissioned")
+    def test_runtime_absent_first_install_does_not_require_programming_registration_or_fleet_idle(self) -> None:
+        self.coordinator.runtime_state = "runtime_absent"
+        BootstrapPlasmaManagerHandler.poller = FakePoller(include_ppu=False)
         status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
-        self.assertEqual(status, 409)
-        self.assertEqual(payload["error"]["code"], "ppu_maintenance_required")
-        self.assertEqual(self.coordinator.calls, [])
+        self.assertEqual(status, 201)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(self.coordinator.calls[-1][0], "create_upload")
 
-    def test_disabled_ppu_requires_current_trusted_idle_observation(self) -> None:
-        self.registry.set_lifecycle("z2", "commissioned")
-        self.registry.set_lifecycle("z2", "disabled")
+    def test_runtime_active_requires_current_trusted_idle_independent_of_registration(self) -> None:
         cases = [
             FakePoller(include_ppu=False),
             FakePoller(observation_state="stale"),
@@ -283,13 +288,33 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             FakePoller(errors=["gateway_unreachable"]),
             FakePoller(active=True),
         ]
-        for poller in cases:
-            with self.subTest(poller=poller.__dict__):
-                BootstrapPlasmaManagerHandler.poller = poller
-                status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
-                self.assertEqual(status, 409)
-                self.assertIn(payload["error"]["code"], {"ppu_idle_state_unproven", "ppu_busy"})
-                self.assertEqual(self.coordinator.calls, [])
+        for lifecycle in ("pending", "commissioned", "disabled"):
+            if lifecycle == "commissioned":
+                self.registry.set_lifecycle("z2", "commissioned")
+            elif lifecycle == "disabled":
+                if self.registry.record_by_alias("z2").lifecycle != "commissioned":
+                    self.registry.set_lifecycle("z2", "commissioned")
+                self.registry.set_lifecycle("z2", "disabled")
+            else:
+                # Each subtest needs pending; reset through a fresh registry record.
+                self.registry.remove("z2")
+                self.registry.add(alias="z2", endpoint="http://192.168.2.99:18080")
+            for poller in cases:
+                with self.subTest(lifecycle=lifecycle, poller=poller.__dict__):
+                    BootstrapPlasmaManagerHandler.poller = poller
+                    before = len(self.coordinator.calls)
+                    status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
+                    self.assertEqual(status, 409)
+                    self.assertIn(payload["error"]["code"], {"ppu_idle_state_unproven", "ppu_busy"})
+                    self.assertNotIn("create_upload", [call[0] for call in self.coordinator.calls[before:]])
+
+    def test_commissioned_ppu_with_current_trusted_idle_observation_can_upgrade(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        BootstrapPlasmaManagerHandler.poller = FakePoller()
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
+        self.assertEqual(status, 201)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(self.coordinator.calls[-1][0], "create_upload")
 
     def test_disabled_ppu_with_current_trusted_idle_observation_can_upgrade(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
@@ -299,6 +324,16 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertTrue(payload["ok"])
         self.assertEqual(self.coordinator.calls[-1][0], "create_upload")
+
+    def test_recovery_required_blocks_platform_mutation_independent_of_registration(self) -> None:
+        for lifecycle in ("pending", "commissioned"):
+            if lifecycle == "commissioned":
+                self.registry.set_lifecycle("z2", "commissioned")
+            self.coordinator.runtime_state = "recovery_required"
+            status, payload = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
+            self.assertEqual(status, 409)
+            self.assertEqual(payload["error"]["code"], "ppu_recovery_required")
+            self.coordinator.runtime_state = "runtime_active"
 
     def test_explicit_upload_commit_and_deployment_routes(self) -> None:
         status, _ = self.request("POST", "/api/registry/z2/bootstrap/uploads", {"size": 3, "sha256": "0" * 64})
