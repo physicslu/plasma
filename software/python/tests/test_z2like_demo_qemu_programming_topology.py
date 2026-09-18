@@ -139,15 +139,18 @@ def test_target_enables_configured_mock_programming_provider() -> None:
     assert '"--engineering-mock"' not in source
 
 
-def test_deployer_requires_new_generation_after_target_restart() -> None:
+def test_deployer_requires_new_generation_after_target_restart_for_existing_runtime() -> None:
     source = DEPLOYER.read_text(encoding="utf-8")
-    disabled = source.index('_set_lifecycle(manager, args.alias, "disabled"')
     generation_baseline = source.index("baseline_generation = _read_fleet_generation(manager)")
     reload_target = source.index("_prepare_target_scenario(args.container, args.site_count)")
+    runtime_state = source.index('runtime_state_before = runtime.get("state")')
+    maintenance_gate = source.index('maintenance_requires_idle = runtime_state_before == "runtime_active"')
     idle_wait = source.index("trusted_generation = _wait_for_trusted_idle(")
     upload_create = source.index("created, trusted_generation = _create_upload_with_idle_retry(")
-    commissioned = source.index('_set_lifecycle(manager, args.alias, "commissioned"')
-    assert disabled < generation_baseline < reload_target < idle_wait < upload_create < commissioned
+    preserve_registration = source.index("lifecycle_after != lifecycle_before")
+    assert generation_baseline < reload_target < runtime_state < maintenance_gate < idle_wait < upload_create < preserve_registration
+    assert '_set_lifecycle(manager, args.alias, "disabled"' not in source
+    assert '_set_lifecycle(manager, args.alias, "commissioned"' not in source
 
 
 def test_trusted_idle_predicate_matches_manager_maintenance_gate() -> None:
