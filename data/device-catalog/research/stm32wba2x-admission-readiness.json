@@ -1,0 +1,55 @@
+{
+  "authority": "research_only",
+  "canonical_candidate_csv": "stm32wba2x-commercial-icpn.csv",
+  "canonical_candidate_csv_sha256": "8d21112ab6d9c8a865e5ce6ccda221b1fee17cbac750ceb042ea41111379fe8d",
+  "catalog_admission_ready": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_number_count": 0,
+  "family": "STM32WBA2X",
+  "frozen_exact_icpn_count": 14,
+  "frozen_exact_icpn_set_sha256": "56efc2b0fe64354ba9bdb626e592aae0cc2f2ae4208cadd7cbe6e08f9585887e",
+  "gate_id": "stm32wba2x-bounded-exact-icpn-admission-readiness-v1",
+  "identity_ready_count": 14,
+  "lifecycle_ready_count": 14,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "metadata_authority": "stm32wba2x-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 14,
+  "next_gate": "stm32wba2x-production-publication-gate",
+  "package_counts": {
+    "Thin WLCSP": 2,
+    "UFQFPN": 12
+  },
+  "production_exact_icpn_count": 2509,
+  "production_family_count": 18,
+  "required_target_config": "tcl/target/stm32wba2x.cfg",
+  "research_series": "STM32WBA2X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 14
+  },
+  "route_bridge_count": 0,
+  "route_ready_count": 14,
+  "schema_version": 1,
+  "series_counts": {
+    "STM32WBA23": 8,
+    "STM32WBA25": 6
+  },
+  "temperature_grade_counts": {
+    "-40..105 C": 7,
+    "-40..85 C": 7
+  }
+}
