@@ -1,0 +1,10 @@
+{
+  "accessibility_summary_sha256": "30388076d7e947605b9d3f7eedd288e973d03780ee2058dbc6a0176c54bbb7cf",
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser_version": "151.0.7922.34",
+  "discovery_id": "stm32h7rs-bounded-exact-icpn-discovery-v1",
+  "generated_at_utc": "2026-09-16T08:39:25Z",
+  "partition_source_sha256": "a07dce72b836922fbaa3f5baf93653e0d974cc14fb4a1a6916f255d01c1021da",
+  "schema_version": 1,
+  "selection_sha256": "181842b9ae92a002ab4b7afcc6eb285721c80f382591903d28de240f46bdf133"
+}
