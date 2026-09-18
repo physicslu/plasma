@@ -1,0 +1,72 @@
+{
+  "claims": {
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32h7_classic_admission_ready": false
+  },
+  "next_gate": "stm32h7-classic-bounded-official-manufacturer-evidence-accessibility-gate",
+  "production_boundary": {
+    "exact_icpns": 2318,
+    "families": 17,
+    "frozen_manifest_git_blob_sha": "41e795a722a836215b796c5743549a0081d95973",
+    "stm32h7rs_published": true,
+    "stm32h7rs_source": {
+      "family": "STM32H7RS",
+      "git_blob_sha": "c8457006dbe45bef5203ed061b47c2f00224d717",
+      "manufacturer": "STMicroelectronics",
+      "path": "../research/stm32h7rs-commercial-icpn.csv",
+      "row_count": 36,
+      "sha256": "e86083329eaceb013aa19ea7fdb85d4b8c55339f7879dc02237c15a549d498a3"
+    }
+  },
+  "schema_version": 1,
+  "scope": "remaining_partition_selection_research_only",
+  "selected_identifier_kind_counts": {
+    "cmsis_device_name": 28,
+    "ordering_pattern": 138
+  },
+  "selected_partition": "STM32H7-classic",
+  "selected_row_count": 166,
+  "selected_subfamilies": [
+    "STM32H723",
+    "STM32H725",
+    "STM32H730",
+    "STM32H733",
+    "STM32H735",
+    "STM32H742",
+    "STM32H743",
+    "STM32H745",
+    "STM32H747",
+    "STM32H750",
+    "STM32H753",
+    "STM32H755",
+    "STM32H757",
+    "STM32H7A3",
+    "STM32H7B0",
+    "STM32H7B3"
+  ],
+  "selected_subfamily_count": 16,
+  "selected_target_config": "tcl/target/stm32h7x.cfg",
+  "selection_basis": [
+    "STM32H7RS was the first bounded partition selected by the frozen H7 partition policy",
+    "STM32H7RS is now published in Production as 36 exact ICPNs",
+    "STM32H7-classic is the only remaining bounded-research-eligible STM32H7 partition",
+    "selection is sequencing only and does not claim programming-algorithm equivalence"
+  ],
+  "selection_id": "stm32h7-classic-scope-selection-v1",
+  "status": "selected_for_bounded_manufacturer_evidence_only",
+  "upstream": {
+    "classic_rejected": false,
+    "historical_first_partition": "STM32H7RS",
+    "historical_partition_count": 2,
+    "selection_git_blob_sha": "9f52207a2febb6312649bbf8caace9d79eda5000",
+    "selection_id": "stm32h7-partitioned-scope-selection-v1"
+  }
+}
