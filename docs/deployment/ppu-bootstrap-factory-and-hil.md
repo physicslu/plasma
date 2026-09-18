@@ -1,6 +1,6 @@
 # PPU Bootstrap Factory Provisioning and Z2 HIL
 
-Status: physical PYNQ-Z2 first install, Runtime verification, reboot persistence and normal upgrade are evidenced; controlled activation-failure rollback and reboot-after-rollback remain hardware qualification steps.
+Status: physical PYNQ-Z2 PS first install, Runtime verification, reboot persistence, normal upgrade, controlled activation-failure rollback and reboot-after-rollback are evidenced. FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency remain separate qualification domains.
 
 ## Responsibility boundary
 
@@ -186,7 +186,7 @@ post-reboot verifier = PASS
 
 An invalid archive, missing file, network unplug, process kill or manual symlink corruption is not equivalent evidence.
 
-## Physical PYNQ-Z2 evidence — 2026-09-15/16
+## Physical PYNQ-Z2 evidence — 2026-09-15/16 and 2026-09-18
 
 The following evidence was collected on a physical PYNQ-Z2 over a controlled private commissioning link. The session crossed midnight local time; the sequence below is one continuous qualification session.
 
@@ -349,6 +349,96 @@ formal z2-ps verifier PASS
 
 No manual repair was required.
 
+### Controlled activation-failure rollback — PASS
+
+The final rollback gate was executed on the same physical `z2-hil` PYNQ-Z2 on 2026-09-18. Before injection, Console showed the PPU as `Registered / Disabled`, `Online`, `Healthy`, with no active Site execution. The known-good Runtime remained:
+
+```text
+current=/opt/plasma/releases/0.1.1-310a082a783f
+/etc/plasma/ppu.yaml sha256=ab6ebc8ba106907f08a3a3b51c2cdf1f43bd9c53cd938797b30c1f9d71637807
+Plasma Python=/opt/plasma/python/3.12.13/bin/python3
+Gateway http://192.168.2.99:18080/api/health/ready = alive / execution ready
+```
+
+The rollback candidate came from the merged PR #603 main commit:
+
+```text
+commit: dacf6951510f54a335d484d74c5f7ca046723b92
+workflow run: 34995918648
+artifact ID: 10406614713
+artifact: plasma-z2-ps-kit-0.1.1-dacf6951510f
+GitHub artifact ZIP digest:
+sha256:7606e4aa2bc82ae97248e376a5d43086484115d9c7ce3d4a97940fda7e6560cf
+inner kit tar.gz digest:
+sha256:20b86408e9ecf81d045329b8e5955e535de24af42aead481258384235d70f500
+candidate PPU release archive digest:
+sha256:db89c3f0bcc7ac2c1c352d70e5cca8db9d96cb5806f93f800242107a7352293c
+```
+
+The downloaded ZIP, detached kit sidecar and kit-local `SHA256SUMS` all verified successfully before deployment.
+
+The qualification-only coordinator path was then invoked from the verified kit with:
+
+```text
+--qualification-fail-health-check
+```
+
+using `gateway_host=192.168.2.99`, `ppu_id=z2-hil`, `facility_id=lab` and `display_name=z2-hil`. The command returned non-zero as designed:
+
+```text
+ppu-bootstrap-deployment: deployment failed: activation failed and previous configuration/release was restored: qualification-injected post-activation health-check failure
+```
+
+The durable Bootstrap journal recorded:
+
+```text
+state=rolled_back
+error_code=activation_failed_rolled_back
+release_id=0.1.1-dacf6951510f
+previous_release=/opt/plasma/releases/0.1.1-310a082a783f
+artifact_sha256=db89c3f0bcc7ac2c1c352d70e5cca8db9d96cb5806f93f800242107a7352293c
+transaction_id=7ed52b89-7c8a-479d-9640-9907b42724e1
+```
+
+Post-rollback acceptance confirmed:
+
+```text
+/opt/plasma/current -> /opt/plasma/releases/0.1.1-310a082a783f
+/etc/plasma/ppu.yaml sha256 unchanged
+Gateway alive
+execution ready
+ppu_id=z2-hil
+sudo bash scripts/plasmactl verify z2-ps = PASS
+```
+
+This proves the qualification injection reached the production activation path and the production installer restored the previous known-good Runtime without manual symlink repair or configuration rewrite.
+
+### Reboot after rollback — PASS
+
+The PYNQ-Z2 was rebooted after the successful rollback. After boot:
+
+```text
+/opt/plasma/current -> /opt/plasma/releases/0.1.1-310a082a783f
+/etc/plasma/ppu.yaml sha256=ab6ebc8ba106907f08a3a3b51c2cdf1f43bd9c53cd938797b30c1f9d71637807
+plasma-bootstrap.service=active
+plasma-server.service=active
+plasma-web.service=active
+```
+
+`plasma-runtime-activation.service` was initially observed as `inactive` and subsequently became `active` without manual repair. A bounded readiness probe then returned:
+
+```json
+{"ok": true, "service": "plasma-web-rest-gateway", "gateway": "alive", "execution": "ready", "ppu_id": "z2-hil"}
+```
+
+The formal post-reboot verifier also passed:
+
+```text
+[plasmactl z2-ps] PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback + P3 runtime-activation wiring
+```
+
+This reinforces the earlier boot-timing finding: service-manager state alone is not an appliance readiness signal; acceptance must wait for the bounded Gateway readiness contract.
+
 ### Evidence status
 
 ```text
@@ -362,11 +452,11 @@ Disabled maintenance transition                 PASS
 Normal upgrade                                  PASS
 Canonical ppu.yaml preservation                 PASS
 Upgrade reboot persistence                      PASS
-Controlled activation-failure rollback          PENDING PHYSICAL HIL
-Reboot after rollback                           PENDING PHYSICAL HIL
+Controlled activation-failure rollback          PASS
+Reboot after rollback                           PASS
 ```
 
-Until the final two physical gates pass, the correct claim is **Real Z2 PS deployment/upgrade qualified to the completed gates**, not complete Z2 appliance deployment qualification.
+All required Real Z2 PS deployment/upgrade/rollback gates in this document are now evidenced. The qualified claim remains bounded to the PS deployment path; FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency are still outside this evidence.
 
 ## Qualification claims deliberately not made
 
