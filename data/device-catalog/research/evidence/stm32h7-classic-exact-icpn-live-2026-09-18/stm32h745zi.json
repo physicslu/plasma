@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H745ZI",
+  "evidence_section_sha256": "90f886b574d91d5778e3fdf63ef2a69a820e8da412742662ad0c7ef6b984c7c3",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H745ZIT3",
+    "STM32H745ZIT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745zi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H745ZIT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H745ZIT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "0c4da8da8a236b3579e15fd3ddb7e4956aa014dff8adff7fe495873fe89b1d5a",
+  "retrieved_at_utc": "2026-09-18T03:30:24Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745zi.html"
+}

@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H755II",
+  "evidence_section_sha256": "e225a0f3cafb290ce745121fa011b7b94ddac547ef73761aaeea92ee938fc417",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H755IIK3",
+    "STM32H755IIK6",
+    "STM32H755IIT3",
+    "STM32H755IIT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h755ii.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H755IIK3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H755IIK6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H755IIT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H755IIT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "311996613c323bc8f1fde765407f7c227ef88991dd33e3286e69bbb853ef475d",
+  "retrieved_at_utc": "2026-09-18T03:31:49Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h755ii.html"
+}

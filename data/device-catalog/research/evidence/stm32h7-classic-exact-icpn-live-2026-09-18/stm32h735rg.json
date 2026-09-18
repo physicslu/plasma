@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H735RG",
+  "evidence_section_sha256": "6378077bbf9ec3f0116454d91620e6d24036801b8c39f654d102663db896d97d",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H735RGV6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h735rg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H735RGV6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "83717ff1e612d28f445c18365df751b873e65ed738b33eafb5e639e135250cb3",
+  "retrieved_at_utc": "2026-09-18T03:33:35Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h735rg.html"
+}

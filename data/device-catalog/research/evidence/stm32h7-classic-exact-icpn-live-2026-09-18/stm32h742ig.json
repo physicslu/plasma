@@ -1,0 +1,35 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H742IG",
+  "evidence_section_sha256": "0f25d356dd5719467ca517cfe6590c98cfcdfd071cac373680dc48618adf1a8e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H742IGK6"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32H742IGT6",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ig.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H742IGK6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32H742IGT6",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "rendered_dom_sha256": "0baf75ef61b70ae8b8047c6ae4c50f9bd554898861349fd821d28a4eadc55237",
+  "retrieved_at_utc": "2026-09-18T03:31:01Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ig.html"
+}

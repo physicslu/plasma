@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H742XG",
+  "evidence_section_sha256": "06236308f86298c15e852c06e9e2a86fdddff74cfd25bed7ec43a7a80f290db4",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H742XGH6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742xg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H742XGH6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "5afaea8b77e0a2740ec1e6b1d0baf3ba13f2dbec41255819382f2ebfb19bf294",
+  "retrieved_at_utc": "2026-09-18T03:23:13Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742xg.html"
+}

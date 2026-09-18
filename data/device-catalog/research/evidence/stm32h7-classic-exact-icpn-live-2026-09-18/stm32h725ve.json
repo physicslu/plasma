@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H725VE",
+  "evidence_section_sha256": "796b4e1227e4bdeaeda3fba89efacd5dd1e793ec2758fdc354078529e8e99d26",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H725VEH6",
+    "STM32H725VET6",
+    "STM32H725VET6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725ve.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H725VEH6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H725VET6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H725VET6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "656d32348b37a59cabb0f7c89661764384e37a4d2b55fea1e0a809b28aec6939",
+  "retrieved_at_utc": "2026-09-18T03:33:15Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725ve.html"
+}

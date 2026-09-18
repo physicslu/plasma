@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H725ZG",
+  "evidence_section_sha256": "5856e9322f7dae490f6b31edef31fbdbcb6141670b8b3618d686163b0a62143f",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H725ZGT3",
+    "STM32H725ZGT3TR",
+    "STM32H725ZGT6",
+    "STM32H725ZGT6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725zg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H725ZGT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H725ZGT3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H725ZGT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H725ZGT6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "ffea563af62ea3f47a2c31ea717a31324d7922758a1ee847000ab8fb8793a6ee",
+  "retrieved_at_utc": "2026-09-18T03:22:22Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725zg.html"
+}

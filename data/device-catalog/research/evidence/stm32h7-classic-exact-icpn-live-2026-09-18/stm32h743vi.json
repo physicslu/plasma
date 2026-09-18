@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H743VI",
+  "evidence_section_sha256": "71f95c41b32e0e221b697c56a4b559edb39a337720a459712cd2cd0fa9223738",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H743VIH6",
+    "STM32H743VIH6TR",
+    "STM32H743VIT6",
+    "STM32H743VIT6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743vi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H743VIH6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H743VIH6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H743VIT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H743VIT6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "6e8a83331f0814d8f992810c912417e0f87f3f147a9e3bf7bf527a5a74de8ca4",
+  "retrieved_at_utc": "2026-09-18T03:28:19Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743vi.html"
+}

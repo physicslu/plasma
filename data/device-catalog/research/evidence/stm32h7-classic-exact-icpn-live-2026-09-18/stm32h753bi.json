@@ -1,0 +1,28 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H753BI",
+  "evidence_section_sha256": "273554faf1ab461bfcc71b3f0e6391766d6ba645d628d72795c0183dea445e68",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32H753BIT6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753bi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32H753BIT6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "rendered_dom_sha256": "ce5e73f9e0ef1590e4f1a8de7171c6a138e00fdc948768e38a3e1e004bb2038f",
+  "retrieved_at_utc": "2026-09-18T03:31:43Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753bi.html"
+}

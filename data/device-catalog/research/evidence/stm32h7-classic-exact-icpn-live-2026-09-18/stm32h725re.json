@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H725RE",
+  "evidence_section_sha256": "7c081fea36daaa2286bf7dc14ce9471bbca1322641d53d8ee31ff66bd6ed728c",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H725REV6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725re.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H725REV6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "2b497ab51d7a73491380648f1dd20722fc35ed84e2d31d43dcee5d6a50f49433",
+  "retrieved_at_utc": "2026-09-18T03:25:27Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h725re.html"
+}

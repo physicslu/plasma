@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H747AI",
+  "evidence_section_sha256": "8fc6947865312836935aec6eff54ec15dc82e48b09e937b1705220a46b275efe",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H747AII6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ai.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H747AII6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "11313b4f0fca47fe53a565ad5c86611527497bc9d27b616451a0dd64813e10e5",
+  "retrieved_at_utc": "2026-09-18T03:36:16Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747ai.html"
+}

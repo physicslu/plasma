@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H723VE",
+  "evidence_section_sha256": "b5531883e45d2c157b466f8f69a76ce77cd508595c34cfe985a24b921198ad7e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H723VEH6",
+    "STM32H723VET6",
+    "STM32H723VET6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723ve.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H723VEH6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H723VET6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H723VET6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "a0959e715c12389c060fe11a71a375819a6930647df17ad9d548ceefd8aa7dab",
+  "retrieved_at_utc": "2026-09-18T03:23:57Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723ve.html"
+}

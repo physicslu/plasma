@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H742ZI",
+  "evidence_section_sha256": "194317aac3008d26e2c41f6d58305e7e2be55f87ffaa7f5011b4341c8c3f4d8c",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H742ZIT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742zi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H742ZIT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "0f2a0e6fa50b321588849953fdf5a7015d12c0f32681c19dbb35ebd20acacd39",
+  "retrieved_at_utc": "2026-09-18T03:33:53Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742zi.html"
+}

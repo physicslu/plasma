@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H750ZB",
+  "evidence_section_sha256": "f47f0ff7680f20314de1f46938c023d2e2b2fed47b9b5ef71fd44a75854ef4ca",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H750ZBT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h750zb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H750ZBT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "4ad24968b9cf992362a1068322fbd217337e710cd74d574d50ea83734ed64422",
+  "retrieved_at_utc": "2026-09-18T03:27:04Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h750zb.html"
+}
