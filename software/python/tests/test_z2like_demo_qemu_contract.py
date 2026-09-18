@@ -133,6 +133,16 @@ def test_qemu_target_keeps_bootstrap_alive_for_activation_rollback():
     assert '"--port",\n            str(BOOTSTRAP_PORT)' in source
 
 
+def test_qemu_target_waits_for_server_before_gateway_startup():
+    source = TARGET.read_text(encoding="utf-8")
+    start = source.index("server = subprocess.Popen(")
+    wait = source.index('_wait_tcp("127.0.0.1", SERVER_PORT, 30.0, server)')
+    gateway = source.index("gateway = subprocess.Popen(", start)
+    assert start < wait < gateway
+    assert "process exited before TCP readiness" in source
+    assert "TCP readiness deadline exceeded" in source
+
+
 def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core():
     source = KIT.read_text(encoding="utf-8")
     assert 'kit_scripts = verified.root / "scripts"' in source
