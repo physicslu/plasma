@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H723ZG",
+  "evidence_section_sha256": "06c82568c6bcb77cf33c1bba3e3a3835588323fd814f8694d9b4d8b4cbc8bdac",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H723ZGI6",
+    "STM32H723ZGT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723zg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H723ZGI6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H723ZGT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "608ad4c985b058e31e97722b394f3bb572a7069e7883420ffd0bb57b7a8c2916",
+  "retrieved_at_utc": "2026-09-18T03:29:01Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h723zg.html"
+}

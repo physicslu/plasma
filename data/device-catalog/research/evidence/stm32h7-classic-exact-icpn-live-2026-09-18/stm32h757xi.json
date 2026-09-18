@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H757XI",
+  "evidence_section_sha256": "4d2496b6103a1fa9203a6ca4db398fdc69530d3bce46309f38afe31fb2a52580",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H757XIH6",
+    "STM32H757XIH6A"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757xi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H757XIH6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H757XIH6A",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "7e40c6457e51d46baea71fb1d0730d5da39782682f6893a6a86e0207818f1b09",
+  "retrieved_at_utc": "2026-09-18T03:31:56Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757xi.html"
+}

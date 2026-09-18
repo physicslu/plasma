@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H743XG",
+  "evidence_section_sha256": "38c63a57f0c49038accfd065e668d3932807ec70ab37acd77dae4cdb158c12ca",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H743XGH6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743xg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H743XGH6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "e71d657b2f7a872d6af0862cc1f1de115358ccb473c7c39cfc96fc14d946f359",
+  "retrieved_at_utc": "2026-09-18T03:23:41Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743xg.html"
+}

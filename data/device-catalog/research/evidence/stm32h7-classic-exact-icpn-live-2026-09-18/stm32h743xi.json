@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H743XI",
+  "evidence_section_sha256": "3b16cc8c78684c9aa1f1a3cc598bcc5d36134776927c08096fc434c26c07e993",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H743XIH6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743xi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H743XIH6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "1951eb9b3760a7e5decb1f0c5b14b7a08969406501ae0288134891ce52ea8214",
+  "retrieved_at_utc": "2026-09-18T03:34:14Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h743xi.html"
+}

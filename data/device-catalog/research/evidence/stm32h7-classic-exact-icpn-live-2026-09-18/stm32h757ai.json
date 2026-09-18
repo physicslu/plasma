@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H757AI",
+  "evidence_section_sha256": "e61b33040a5afe1274438930f8722b2ca70ec77681dcd304a5dfb9961cdc4cd6",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H757AII6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757ai.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H757AII6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "833bfa296836c3afca024811f4dcc7bb0398f3d0bf7cc7805bf685adbf649ee5",
+  "retrieved_at_utc": "2026-09-18T03:34:31Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h757ai.html"
+}

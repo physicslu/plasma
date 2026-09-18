@@ -1,0 +1,35 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7A3ZG",
+  "evidence_section_sha256": "4931a5f52170a9e7659fa7ae710a32fda0ca6436aecd47664fd16aad7b975c78",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7A3ZGT6"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32H7A3ZGT6Q",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3zg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7A3ZGT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32H7A3ZGT6Q",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "rendered_dom_sha256": "9e1921e31f0ce1cfe10b83889d3dc45ce77553eaf0a49bee558e2dbd2c82b051",
+  "retrieved_at_utc": "2026-09-18T03:28:00Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3zg.html"
+}

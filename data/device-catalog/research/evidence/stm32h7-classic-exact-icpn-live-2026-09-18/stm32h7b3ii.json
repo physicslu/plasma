@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7B3II",
+  "evidence_section_sha256": "d3ffa1a41e5ceec6c4e36d73dbe1e5ec5e704cd39a93495070f6f4664a569e1e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7B3IIK6",
+    "STM32H7B3IIK6Q",
+    "STM32H7B3IIT6",
+    "STM32H7B3IIT6Q"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ii.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7B3IIK6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7B3IIK6Q",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7B3IIT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7B3IIT6Q",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "a124a072175b3f6712d7e383ad1c9ce0c0a4614d336542504ba8dcf367d5e7b1",
+  "retrieved_at_utc": "2026-09-18T03:28:14Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ii.html"
+}

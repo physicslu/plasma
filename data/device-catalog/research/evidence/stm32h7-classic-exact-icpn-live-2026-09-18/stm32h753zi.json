@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H753ZI",
+  "evidence_section_sha256": "938cff2c26f1873b4d7e0fd1cd74472edcb4b0a456f88569b6fc3002fd55d919",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H753ZIT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753zi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H753ZIT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "5d42642fd01365c4a35b59638fcd82c946c81c04aa6e6fe302028c8c5e4169fd",
+  "retrieved_at_utc": "2026-09-18T03:27:09Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h753zi.html"
+}
