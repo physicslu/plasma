@@ -236,6 +236,26 @@ def _write_smoke_config(program_data: Path) -> None:
     (config / "selected-ppu-alias").write_text("installer-smoke-ppu\n", encoding="utf-8")
 
 
+def _assert_preserved_config_registry_fallback(program_data: Path) -> None:
+    config_path = program_data / "config" / "manager.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    if "registry_state_path:" in text:
+        raise InstallerAcceptanceError(
+            "preserved-config fallback acceptance requires manager.yaml without registry_state_path"
+        )
+    status, payload = _request_json(f"http://127.0.0.1:{MANAGER_PORT}/api/registry")
+    if status != 200 or payload.get("mutable") is not True or payload.get("storage") != "file":
+        raise InstallerAcceptanceError(
+            f"Windows preserved-config registry fallback did not enable file-backed runtime registry: "
+            f"status={status} payload={payload}"
+        )
+    state_path = program_data / "state" / "manager-registry.json"
+    if not state_path.is_file():
+        raise InstallerAcceptanceError(
+            f"Windows preserved-config registry fallback did not create state file: {state_path}"
+        )
+
+
 def _browser_fetch(node: Path, deadline_s: float = 25) -> None:
     if not node.is_file():
         raise InstallerAcceptanceError(f"bundled Node.js is unavailable for browser-style Fetch smoke: {node}")
@@ -352,11 +372,16 @@ def run_acceptance(msi: Path) -> None:
     print("Windows installer Control Station product entry and static assets: PASS", flush=True)
     print("Windows installer clean-install managed routing: PASS", flush=True)
 
+    # Simulate an older MSI-preserved Manager config that predates
+    # registry_state_path. The current launcher must recover the product-owned
+    # mutable registry path without rewriting manager.yaml.
     _write_smoke_config(program_data)
     _stop_services()
     _start_services()
+    _assert_preserved_config_registry_fallback(program_data)
     _assert_console_static_assets()
     _browser_fetch(bundled_node)
+    print("Windows installer preserved-config mutable registry fallback: PASS", flush=True)
     print("Windows installer Browser -> Console/BFF -> Manager: PASS", flush=True)
 
     _stop_services()
