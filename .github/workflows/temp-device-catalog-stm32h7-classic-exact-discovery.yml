@@ -1,0 +1,117 @@
+name: TEMP STM32H7-classic sharded exact ICPN discovery
+
+on:
+  push:
+    branches:
+      - agent/stm32h7-classic-exact-icpn-discovery
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-stm32h7-classic-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run deterministic discovery shard
+        id: acquire
+        continue-on-error: true
+        run: |
+          rm -rf ".artifacts/shard-${{ matrix.shard }}"
+          mkdir -p ".artifacts/shard-${{ matrix.shard }}"
+          xvfb-run -a python data/device-catalog/research/stm32h7_classic_exact_icpn_discovery.py             --shard-index "${{ matrix.shard }}"             --shard-count 6             --output-dir ".artifacts/shard-${{ matrix.shard }}"             --delay-seconds 2.0             --timeout-seconds 90
+
+      - name: Upload shard candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32h7-classic-discovery-shard-${{ matrix.shard }}
+          retention-days: 30
+          if-no-files-found: error
+          path: ".artifacts/shard-${{ matrix.shard }}/shard-summary.json"
+
+      - name: Enforce shard gate
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "STM32H7-classic discovery shard ${{ matrix.shard }} requires manual review." >&2
+            exit 1
+          fi
+
+  aggregate:
+    if: always()
+    needs: shard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download all shard summaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: stm32h7-classic-discovery-shard-*
+          path: .artifacts/shards
+
+      - name: Aggregate deterministic full discovery
+        id: aggregate
+        continue-on-error: true
+        run: |
+          rm -rf .artifacts/aggregate
+          mkdir -p .artifacts/aggregate
+          python data/device-catalog/research/stm32h7_classic_exact_icpn_discovery.py             --aggregate-root .artifacts/shards             --shard-count 6             --output-dir .artifacts/aggregate
+
+      - name: Emit aggregate retained candidate evidence to workflow log
+        if: always() && hashFiles('.artifacts/aggregate/*.json') != ''
+        run: |
+          python - <<'PY'
+          import base64
+          import pathlib
+          root = pathlib.Path(".artifacts/aggregate")
+          for path in sorted(root.glob("*.json")):
+              print(f"EVIDENCE_FILE_BEGIN {path.name}")
+              print(base64.b64encode(path.read_bytes()).decode("ascii"))
+              print(f"EVIDENCE_FILE_END {path.name}")
+          PY
+
+      - name: Upload aggregate candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32h7-classic-exact-discovery-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: .artifacts/aggregate/*.json
+
+      - name: Enforce aggregate gate
+        if: always()
+        run: |
+          if [ "${{ needs.shard.result }}" != "success" ]; then
+            echo "At least one STM32H7-classic discovery shard failed." >&2
+            exit 1
+          fi
+          if [ "${{ steps.aggregate.outcome }}" != "success" ]; then
+            echo "STM32H7-classic aggregate discovery failed closed." >&2
+            exit 1
+          fi
