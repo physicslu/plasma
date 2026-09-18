@@ -1,0 +1,54 @@
+{
+  "authority": "research_only",
+  "canonical_candidate_csv": "stm32h7rs-commercial-icpn.csv",
+  "canonical_candidate_csv_sha256": "e86083329eaceb013aa19ea7fdb85d4b8c55339f7879dc02237c15a549d498a3",
+  "catalog_admission_ready": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false
+  },
+  "family": "STM32H7RS",
+  "frozen_exact_icpn_count": 36,
+  "frozen_exact_icpn_set_sha256": "82c7aadf665af597bd02b0bfae2a5649bed3407e44ed58074c86b76e2d2e0fce",
+  "gate_id": "stm32h7rs-bounded-exact-icpn-admission-readiness-v1",
+  "identity_ready_count": 36,
+  "lifecycle_ready_count": 36,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "metadata_authority": "stm32h7rs-metadata-authority.json",
+  "metadata_ready_count": 36,
+  "next_gate": "stm32h7rs-production-publication-gate",
+  "option_suffix_counts": {
+    "": 28,
+    "H": 4,
+    "HTR": 1,
+    "TR": 3
+  },
+  "package_counts": {
+    "LQFP": 8,
+    "TFBGA": 12,
+    "UFBGA": 12,
+    "VFQFPN": 2,
+    "WLCSP": 2
+  },
+  "production_exact_icpn_count": 2282,
+  "required_target_config": "tcl/target/stm32h7rsx.cfg",
+  "route_assignment_kind_counts": {
+    "cmsis_device_name": 5,
+    "ordering_pattern": 31
+  },
+  "route_ready_count": 36,
+  "schema_version": 1,
+  "series_counts": {
+    "STM32H7R3": 11,
+    "STM32H7R7": 6,
+    "STM32H7S3": 12,
+    "STM32H7S7": 7
+  }
+}
