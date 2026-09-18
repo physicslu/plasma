@@ -25,6 +25,25 @@ def require(condition: bool, message: str) -> None:
         raise CoverageError(message)
 
 
+def parse_pin_count(value: str) -> int:
+    """Normalize canonical pin-count text for the numeric IC-support inventory.
+
+    Device Catalog preserves manufacturer package notation as text. Most parts
+    use a plain integer; STM32H7 also has official TFBGA notation such as
+    240+25. The derived IC-support inventory exposes a numeric count, so it
+    sums explicit decimal components and rejects every other notation.
+    """
+    text = value.strip()
+    require(bool(text), "pin_count must not be empty")
+    parts = text.split("+")
+    require(
+        all(part.isdigit() and part for part in parts),
+        f"unsupported pin_count notation: {value!r}",
+    )
+    count = sum(int(part) for part in parts)
+    require(count > 0, f"pin_count must be positive: {value!r}")
+    return count
+
 def load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -209,7 +228,7 @@ def build_inventory() -> dict[str, Any]:
                 "icpn": row["icpn"],
                 "base_device": base_device,
                 "package": row["package"],
-                "pin_count": int(row["pin_count"]),
+                "pin_count": parse_pin_count(row["pin_count"]),
                 "flash_size": row["flash_size"],
                 "openocd": {
                     "state": "deterministic_target_mapped" if deterministic_openocd else "unresolved",
