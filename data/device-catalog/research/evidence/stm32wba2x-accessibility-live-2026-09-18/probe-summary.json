@@ -1,0 +1,145 @@
+{
+  "active_exact_icpns_observed_on_representative_pages": 8,
+  "attempted_targets": 2,
+  "bounded_probe_complete": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "representative_probe_is_full_family_enumeration": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba2x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_numbers_observed": 0,
+  "manual_review_targets": 0,
+  "next_gate": "stm32wba2x-bounded-exact-icpn-discovery-gate",
+  "official_st_evidence_accessible_for_all_subfamilies": true,
+  "probe_id": "stm32wba2x-bounded-official-st-evidence-accessibility-v1",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 4,
+      "base_device": "STM32WBA23CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA23CE",
+        "evidence_section_sha256": "8de2fea81c916480d87e21e4dc48130b6f2eb1b7587ca76444a0833cb70b150d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA23CEU6",
+          "STM32WBA23CEU6TR",
+          "STM32WBA23CEU7",
+          "STM32WBA23CEU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba23ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA23CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA23CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA23CEU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA23CEU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b062448e248949f78528d2b5d96fc8dd337053d22c86acf685552a346361c378",
+        "retrieved_at_utc": "2026-09-18T06:17:04Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba23ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA2X ordering-pattern subfamily",
+      "series": "STM32WBA2X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba23ce.html",
+      "subfamily": "STM32WBA23"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 4,
+      "base_device": "STM32WBA25CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA25CE",
+        "evidence_section_sha256": "70e04f448b6f351e659fa5adc76c2ccb713c6b9834c28f9b7c6f4a8a25ab86d1",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA25CEU6",
+          "STM32WBA25CEU6TR",
+          "STM32WBA25CEU7",
+          "STM32WBA25CEU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba25ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA25CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA25CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA25CEU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA25CEU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d2f799783e08f0027608f7aeec503355d6c1e6f825978f8bcbb5e58697d343f2",
+        "retrieved_at_utc": "2026-09-18T06:17:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba25ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA2X ordering-pattern subfamily",
+      "series": "STM32WBA2X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba25ce.html",
+      "subfamily": "STM32WBA25"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WBA2X bounded representative official-ST commercial identity/lifecycle evidence accessibility",
+  "selected_wireless_frontier": "STM32WBA2X",
+  "status": "accessible",
+  "successful_targets": 2,
+  "target_config": "tcl/target/stm32wba2x.cfg"
+}
