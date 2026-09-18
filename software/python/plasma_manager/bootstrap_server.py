@@ -15,12 +15,7 @@ from .bootstrap import (
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
-from .registry import (
-    REGISTRY_LIFECYCLE_COMMISSIONED,
-    REGISTRY_LIFECYCLE_DISABLED,
-    REGISTRY_LIFECYCLE_PENDING,
-    RegistryEntryNotFound,
-)
+from .registry import RegistryEntryNotFound
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
@@ -101,36 +96,53 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         )
 
     def _bootstrap_mutation_allowed(self, alias: str) -> bool:
-        lifecycle = self._registry_lifecycle(alias)
-        if lifecycle == REGISTRY_LIFECYCLE_PENDING:
-            if self._alias_has_active_execution(alias):
-                self._json(
-                    HTTPStatus.CONFLICT,
-                    {
-                        "ok": False,
-                        "error": {
-                            "code": "ppu_busy",
-                            "message": "active PPU Jobs must finish or be cancelled before runtime deployment",
-                        },
-                    },
-                )
-                return False
-            return True
-
-        if lifecycle == REGISTRY_LIFECYCLE_COMMISSIONED:
+        # Platform maintenance authorization is independent from programming
+        # Registration. Registration controls managed Site/programming admission;
+        # this gate instead proves the PPU is safe to mutate at the Platform layer.
+        if self._alias_has_active_execution(alias):
             self._json(
                 HTTPStatus.CONFLICT,
                 {
                     "ok": False,
                     "error": {
-                        "code": "ppu_maintenance_required",
-                        "message": "disable this commissioned PPU before Runtime maintenance",
+                        "code": "ppu_busy",
+                        "message": "active PPU Jobs must finish or be cancelled before Platform maintenance",
                     },
                 },
             )
             return False
 
-        if lifecycle == REGISTRY_LIFECYCLE_DISABLED:
+        try:
+            platform = self._bootstrap().status(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return False
+        bootstrap = platform.get("bootstrap")
+        runtime = bootstrap.get("runtime") if isinstance(bootstrap, dict) else None
+        deployment = bootstrap.get("deployment") if isinstance(bootstrap, dict) else None
+        runtime_state = runtime.get("state") if isinstance(runtime, dict) else None
+        deployment_state = deployment.get("state") if isinstance(deployment, dict) else None
+
+        if runtime_state == "recovery_required" or deployment_state == "recovery_required":
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_recovery_required",
+                        "message": "explicit Platform recovery is required before normal Runtime maintenance",
+                    },
+                },
+            )
+            return False
+
+        # A factory/first-install target has no Runtime whose idle state can be
+        # observed yet. Pairing/authentication remains enforced by the Bootstrap
+        # coordinator before any mutation reaches the device.
+        if runtime_state == "runtime_absent":
+            return True
+
+        if runtime_state == "runtime_active":
             if not self._trusted_idle_observation(alias):
                 self._json(
                     HTTPStatus.CONFLICT,
@@ -140,7 +152,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                             "code": "ppu_idle_state_unproven",
                             "message": (
                                 "a current trusted idle PPU observation is required for normal Runtime maintenance; "
-                                "use the explicit recovery procedure when Runtime health cannot be observed"
+                                "programming Registration state does not lower this Platform safety gate"
                             ),
                         },
                     },
@@ -153,8 +165,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             {
                 "ok": False,
                 "error": {
-                    "code": "ppu_lifecycle_invalid",
-                    "message": f"PPU lifecycle {lifecycle!r} is not eligible for Runtime maintenance",
+                    "code": "ppu_platform_state_invalid",
+                    "message": f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance",
                 },
             },
         )
