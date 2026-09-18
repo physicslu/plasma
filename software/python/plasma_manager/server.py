@@ -395,6 +395,33 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_registry_lifecycle(self, alias: str) -> None:
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; Registration changes are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_registry_lifecycle_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_registry_lifecycle_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
@@ -436,6 +463,33 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"ok": True, "entry": record.as_dict(), "registry": self._registry_snapshot()})
 
     def _handle_registry_remove(self, alias: str) -> None:
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; PPU removal are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_registry_remove_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_registry_remove_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
