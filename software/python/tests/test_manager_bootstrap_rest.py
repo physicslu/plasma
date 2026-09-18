@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from plasma_manager.bootstrap_server import BootstrapPlasmaManagerHandler
 from plasma_manager.config import ManagerConfig
 from plasma_manager.registry import PPURegistryStore
+from plasma_manager.server import PPUOperationGate
 
 
 class FakePoller:
@@ -93,6 +94,7 @@ class FakeBootstrapCoordinator:
 
     def start_deployment(self, alias: str, body):
         self.calls.append(("start_deployment", alias, dict(body)))
+        self.deployment_state = "queued"
         return 202, {"ok": True, "deployment": {"state": "queued"}}
 
 
@@ -139,12 +141,14 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             BootstrapPlasmaManagerHandler.poller,
             BootstrapPlasmaManagerHandler.bootstrap_coordinator,
             BootstrapPlasmaManagerHandler.runtime_client_factory,
+            BootstrapPlasmaManagerHandler.operation_gate,
         )
         BootstrapPlasmaManagerHandler.config = ManagerConfig(registry_state_path=root / "registry.json")
         BootstrapPlasmaManagerHandler.registry_store = self.registry
         BootstrapPlasmaManagerHandler.poller = FakePoller()
         BootstrapPlasmaManagerHandler.bootstrap_coordinator = self.coordinator
         BootstrapPlasmaManagerHandler.runtime_client_factory = FakeRuntimeClient
+        BootstrapPlasmaManagerHandler.operation_gate = PPUOperationGate()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), BootstrapPlasmaManagerHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -159,6 +163,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             BootstrapPlasmaManagerHandler.poller,
             BootstrapPlasmaManagerHandler.bootstrap_coordinator,
             BootstrapPlasmaManagerHandler.runtime_client_factory,
+            BootstrapPlasmaManagerHandler.operation_gate,
         ) = self.previous
         self.temp.cleanup()
 
@@ -351,6 +356,59 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         })
         self.assertEqual(status, 202)
         self.assertEqual(payload["deployment"]["state"], "queued")
+
+    def test_platform_deployment_launch_is_serialized_against_managed_write(self) -> None:
+        gate = BootstrapPlasmaManagerHandler.operation_gate
+        self.assertTrue(gate.try_begin_managed_write("z2"))
+        try:
+            status, payload = self.request(
+                "POST",
+                "/api/registry/z2/bootstrap/deployments",
+                {
+                    "upload_id": "a" * 32,
+                    "ppu_id": "z2-dev-01",
+                    "facility_id": "lab",
+                    "display_name": "Plasma Z2",
+                },
+            )
+        finally:
+            gate.end_managed_write("z2")
+        self.assertEqual(status, 409)
+        self.assertEqual(payload["error"]["code"], "ppu_control_plane_busy")
+        self.assertNotIn("start_deployment", [call[0] for call in self.coordinator.calls])
+
+    def test_durable_platform_deployment_state_blocks_registration_changes_until_terminal(self) -> None:
+        self.registry.set_lifecycle("z2", "commissioned")
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/deployments",
+            {
+                "upload_id": "a" * 32,
+                "ppu_id": "z2-dev-01",
+                "facility_id": "lab",
+                "display_name": "Plasma Z2",
+            },
+        )
+        self.assertEqual(status, 202)
+        self.assertEqual(payload["deployment"]["state"], "queued")
+
+        status, payload = self.request(
+            "PATCH",
+            "/api/registry/z2",
+            {"lifecycle": "disabled"},
+        )
+        self.assertEqual(status, 409)
+        self.assertEqual(payload["error"]["code"], "ppu_platform_maintenance_active")
+        self.assertEqual(self.registry.record_by_alias("z2").lifecycle, "commissioned")
+
+        self.coordinator.deployment_state = "succeeded"
+        status, payload = self.request(
+            "PATCH",
+            "/api/registry/z2",
+            {"lifecycle": "disabled"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["entry"]["lifecycle"], "disabled")
 
     def test_active_execution_blocks_pending_mutations(self) -> None:
         BootstrapPlasmaManagerHandler.poller = FakePoller(active=True)
