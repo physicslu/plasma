@@ -2,6 +2,8 @@ name: Product release format acceptance
 
 on:
   push:
+    branches:
+      - "**"
     paths:
       - "release/**"
       - "scripts/product-release.py"
