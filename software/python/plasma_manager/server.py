@@ -8,6 +8,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import RLock
 from typing import Any
 from urllib.parse import unquote, urlparse
 
@@ -91,6 +92,51 @@ _MANAGED_POST_PATTERNS = tuple(
 )
 
 
+class PPUOperationGate:
+    """Serialize Platform launch admission against managed PPU writes.
+
+    Registration is not used as the maintenance lock. This process-local gate
+    closes the race between the final trusted-idle check and Bootstrap accepting
+    a deployment. The device's durable Bootstrap deployment state remains the
+    authority for the longer queued/running interval and survives Manager restart.
+    """
+
+    def __init__(self) -> None:
+        self._lock = RLock()
+        self._managed_writes: dict[str, int] = {}
+        self._platform_launching: set[str] = set()
+
+    def try_begin_managed_write(self, alias: str) -> bool:
+        with self._lock:
+            if alias in self._platform_launching:
+                return False
+            self._managed_writes[alias] = self._managed_writes.get(alias, 0) + 1
+            return True
+
+    def end_managed_write(self, alias: str) -> None:
+        with self._lock:
+            count = self._managed_writes.get(alias, 0)
+            if count <= 1:
+                self._managed_writes.pop(alias, None)
+            else:
+                self._managed_writes[alias] = count - 1
+
+    def try_begin_platform_launch(self, alias: str) -> bool:
+        with self._lock:
+            if alias in self._platform_launching or self._managed_writes.get(alias, 0) > 0:
+                return False
+            self._platform_launching.add(alias)
+            return True
+
+    def end_platform_launch(self, alias: str) -> None:
+        with self._lock:
+            self._platform_launching.discard(alias)
+
+    def platform_launching(self, alias: str) -> bool:
+        with self._lock:
+            return alias in self._platform_launching
+
+
 class PlasmaManagerHTTPServer(ThreadingHTTPServer):
     """Threaded Manager HTTP server whose bind path never depends on DNS."""
 
@@ -107,6 +153,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     config: ManagerConfig | None = None
     registry_store: PPURegistryStore | None = None
     network_commissioning: NetworkCommissioningCoordinator | None = None
+    operation_gate: PPUOperationGate = PPUOperationGate()
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -144,6 +191,13 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if self.config is None:
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
+
+    def _operation_gate(self) -> PPUOperationGate:
+        return type(self).operation_gate
+
+    def _platform_write_block(self, alias: str) -> tuple[str, str] | None:
+        """Subclass hook for durable Platform-deployment admission state."""
+        return None
 
     def _network_commissioning(self) -> NetworkCommissioningCoordinator:
         if self.network_commissioning is None:
