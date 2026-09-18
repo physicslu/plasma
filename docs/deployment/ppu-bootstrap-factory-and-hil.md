@@ -80,7 +80,7 @@ This provenance requirement exists so reboot/rollback evidence can be tied to on
 
 ## Console first install / upgrade path
 
-Register the PPU in Manager with its future Gateway endpoint on `:18080`. Manager derives the Bootstrap endpoint from the same host on real `z2-ps`; the Browser never selects `gateway_host` and does not receive the stored device token.
+Add the PPU connection to the Manager registry with its future Gateway endpoint on `:18080`. This registry entry identifies a reachable PPU connection; it is **not** programming Registration. Manager derives the Bootstrap endpoint from the same host on real `z2-ps`; the Browser never selects `gateway_host` and does not receive the stored device token.
 
 ```text
 Browser
