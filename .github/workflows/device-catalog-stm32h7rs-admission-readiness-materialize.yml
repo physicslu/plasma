@@ -1,0 +1,38 @@
+name: Device catalog STM32H7RS admission readiness materialize
+
+on:
+  push:
+    branches:
+      - agent/stm32h7rs-admission-readiness
+    paths:
+      - 'data/device-catalog/research/stm32h7rs_admission_readiness.py'
+      - 'data/device-catalog/research/stm32h7rs-metadata-authority.json'
+      - '.github/workflows/device-catalog-stm32h7rs-admission-readiness-materialize.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stm32h7rs-admission-readiness
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize deterministic readiness artifacts
+        run: |
+          python data/device-catalog/research/stm32h7rs_admission_readiness.py \
+            --csv-output data/device-catalog/research/stm32h7rs-commercial-icpn.csv \
+            --json-output data/device-catalog/research/stm32h7rs-admission-readiness.json
+      - name: Commit deterministic artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/device-catalog/research/stm32h7rs-commercial-icpn.csv \
+                  data/device-catalog/research/stm32h7rs-admission-readiness.json
+          git diff --cached --quiet || git commit -m "Device catalog: materialize STM32H7RS admission readiness"
+          git push origin HEAD:agent/stm32h7rs-admission-readiness
