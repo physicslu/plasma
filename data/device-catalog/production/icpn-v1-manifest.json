@@ -132,6 +132,14 @@
       "row_count": 265,
       "git_blob_sha": "fbdc3269b3e989058a6644355afe53f981814aec",
       "sha256": "49144dc8bd1855861ca4059880c256d19af31a9abcfcdf2cddae83cf44560fe6"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32H7RS",
+      "path": "../research/stm32h7rs-commercial-icpn.csv",
+      "row_count": 36,
+      "git_blob_sha": "c8457006dbe45bef5203ed061b47c2f00224d717",
+      "sha256": "e86083329eaceb013aa19ea7fdb85d4b8c55339f7879dc02237c15a549d498a3"
     }
   ]
 }
