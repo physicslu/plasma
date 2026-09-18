@@ -43,9 +43,10 @@ def main() -> None:
     digest = hashlib.sha256(("\n".join(exact) + "\n").encode()).hexdigest()
     req(digest == EXPECTED_SHA256, "recomputed exact digest mismatch")
 
-    req(e.get("active_exact_icpn_count") == EXPECTED_COUNT, "exact snapshot count drifted")
-    req(e.get("active_exact_icpn_set_sha256") == EXPECTED_SHA256, "exact snapshot digest drifted")
-    req(e.get("active_exact_icpns") == exact, "exact snapshot set differs from summary")
+    req(e.get("discovery_id") == s.get("discovery_id"), "exact snapshot discovery id drifted")
+    req(e.get("exact_icpn_count") == EXPECTED_COUNT, "exact snapshot count drifted")
+    req(e.get("exact_icpn_set_sha256") == EXPECTED_SHA256, "exact snapshot digest drifted")
+    req(e.get("exact_icpns") == exact, "exact snapshot set differs from summary")
 
     claims = s.get("claims") or {}
     req(claims.get("exact_icpn_discovery_completed") is True, "discovery completion must be true")
