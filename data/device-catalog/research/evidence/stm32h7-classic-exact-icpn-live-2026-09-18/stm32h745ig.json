@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H745IG",
+  "evidence_section_sha256": "01a5a38a60006010ee49ad2ea08501a0ee03fe01e5f13a495b26413a1c74f712",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H745IGK6",
+    "STM32H745IGT6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745ig.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H745IGK6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H745IGT6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "bbcd4e69587ebd1d60fb473e18e265a6ef959828aec8c5b11b0cb5226d81ac8b",
+  "retrieved_at_utc": "2026-09-18T03:25:17Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h745ig.html"
+}

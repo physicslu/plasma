@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7B3NI",
+  "evidence_section_sha256": "05385a8ef7160b2cc94ea69870ea2bdf40414c48c3c459bd91829a32bf8c9d8e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7B3NIH6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ni.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7B3NIH6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "cef932dbeaa60da9a788df5cca7cb5a5ef34d79c328f17bb05d9e31071af5bc2",
+  "retrieved_at_utc": "2026-09-18T03:38:58Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7b3ni.html"
+}

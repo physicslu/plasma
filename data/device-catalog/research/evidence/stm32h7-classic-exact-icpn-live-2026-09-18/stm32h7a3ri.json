@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H7A3RI",
+  "evidence_section_sha256": "2fdd43623067d20db6ee8d4abdf7fe442411b55767129bd9b985f24111a48aae",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H7A3RIT6",
+    "STM32H7A3RIT6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3ri.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H7A3RIT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32H7A3RIT6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "854df35a7f741c8d152d1367921b6c5e705372afad0c6a522ad9ba0515c457b8",
+  "retrieved_at_utc": "2026-09-18T03:39:45Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h7a3ri.html"
+}

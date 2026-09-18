@@ -1,0 +1,28 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H747BG",
+  "evidence_section_sha256": "fa6556eaf64ef15e7a695fa5ad4978ee463d729d784ecac8e9a786609cda8e6d",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32H747BGT6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747bg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32H747BGT6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "rendered_dom_sha256": "59d597859e022020b6284840434b6817b21dbec20784daab215a58299a9b8f5a",
+  "retrieved_at_utc": "2026-09-18T03:31:32Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h747bg.html"
+}

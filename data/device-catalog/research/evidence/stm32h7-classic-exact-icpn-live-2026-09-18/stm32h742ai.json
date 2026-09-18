@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32H742AI",
+  "evidence_section_sha256": "8eb42621a6cf10832a4938361a1935b3e522869e0b8cfd6bdd79b84b9bb6d46e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32H742AII6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ai.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32H742AII6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "4ccc00b376fd8a78d4b9d37120e63d8e69933b3174225a40706af0932756b5f7",
+  "retrieved_at_utc": "2026-09-18T03:26:20Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h742ai.html"
+}
