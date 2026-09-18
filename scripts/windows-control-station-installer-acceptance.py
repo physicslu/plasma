@@ -372,11 +372,13 @@ def run_acceptance(msi: Path) -> None:
     print("Windows installer Control Station product entry and static assets: PASS", flush=True)
     print("Windows installer clean-install managed routing: PASS", flush=True)
 
-    # Simulate an older MSI-preserved Manager config that predates
-    # registry_state_path. The current launcher must recover the product-owned
-    # mutable registry path without rewriting manager.yaml.
-    _write_smoke_config(program_data)
+    # Simulate an older MSI-preserved Manager config that predates both
+    # registry_state_path and the runtime registry state file. The current
+    # launcher must recover the product-owned mutable registry path, seed it
+    # from the preserved ppus list, and avoid rewriting manager.yaml.
     _stop_services()
+    (program_data / "state" / "manager-registry.json").unlink(missing_ok=True)
+    _write_smoke_config(program_data)
     _start_services()
     _assert_preserved_config_registry_fallback(program_data)
     _assert_console_static_assets()
