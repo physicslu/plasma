@@ -6,10 +6,10 @@
   "debug_attach_support_claimed": false,
   "exact_icpn_set_sha256": "82c7aadf665af597bd02b0bfae2a5649bed3407e44ed58074c86b76e2d2e0fce",
   "family": "STM32H7RS",
+  "manufacturer": "STMicroelectronics",
   "marketing_status_observed": {
     "Active": 36
   },
-  "manufacturer": "STMicroelectronics",
   "physical_programming_success_required_for_catalog_admission": false,
   "physical_validation_claimed": false,
   "ppu_hil_required_for_catalog_admission": false,
