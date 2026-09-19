@@ -36,7 +36,7 @@ require_command() {
 }
 
 require_root() {
-  (( EUID == 0 )) || die "z2-ps install/deploy requires root privileges"
+  (( EUID == 0 )) || die "z2-ps install/deploy/verify requires root privileges to inspect protected appliance state"
 }
 
 json_field() {
@@ -186,6 +186,43 @@ local_health_url() {
   printf 'http://%s:18080\n' "$gateway_host"
 }
 
+wait_runtime_readiness() {
+  local base="$1"
+  python3 - "$base/api/health/ready" <<'PY'
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+
+url = sys.argv[1]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+deadline = time.monotonic() + 30.0
+last = "no response"
+while time.monotonic() < deadline:
+    try:
+        with opener.open(url, timeout=2.0) as response:
+            raw = response.read()
+            status = int(response.status)
+        payload = json.loads(raw.decode("utf-8"))
+        if (
+            status == 200
+            and isinstance(payload, dict)
+            and payload.get("ok") is True
+            and payload.get("gateway") == "alive"
+            and payload.get("execution") == "ready"
+        ):
+            print(json.dumps(payload, separators=(",", ":")))
+            raise SystemExit(0)
+        last = f"HTTP {status}: {payload!r}"
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        last = str(exc)
+    time.sleep(0.25)
+print(f"Gateway readiness deadline exceeded: {last}", file=sys.stderr)
+raise SystemExit(1)
+PY
+}
+
 verify_site_desired_operational_contract() {
   require_command stat
   require_file "$ppu_config" "canonical PPU configuration"
@@ -266,6 +303,7 @@ verify_p3_runtime_activation_contract() {
 }
 
 verify_runtime() {
+  require_root
   require_command python3
   require_command systemctl
   require_command curl
@@ -296,14 +334,18 @@ if machine not in {"armv7", "armv7l"}:
 PY
 
   verify_site_desired_operational_contract
-  systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
-  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
-  verify_p3_runtime_activation_contract
 
   local base readiness loopback test_id loopback_request
   base="$(local_health_url)" || die "install evidence is missing gateway_host"
-  readiness="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 "$base/api/health/ready")" || \
-    die "Z2 Gateway readiness failed: $base/api/health/ready"
+  readiness="$(wait_runtime_readiness "$base")" || \
+    die "Z2 Gateway did not reach the bounded readiness contract: $base/api/health/ready"
+
+  # Physical Z2 boot evidence shows unit state can lead appliance readiness.
+  # Treat the bounded Runtime contract as the boot synchronization point, then
+  # verify that the expected service/socket wiring has converged.
+  systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active after Runtime readiness"
+  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active after Runtime readiness"
+  verify_p3_runtime_activation_contract
   test_id="z2-local-verify-$$"
   loopback_request="{\"endpoint\":\"ps\",\"test_id\":\"$test_id\",\"sequence\":1,\"pattern\":\"zero\",\"seed\":\"\",\"payload_length\":1,\"payload_base64\":\"AA==\",\"tx_crc32\":\"d202ef8d\",\"timeout_ms\":5000}"
   loopback="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 \

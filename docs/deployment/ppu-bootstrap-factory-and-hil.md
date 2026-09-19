@@ -80,7 +80,7 @@ This provenance requirement exists so reboot/rollback evidence can be tied to on
 
 ## Console first install / upgrade path
 
-Register the PPU in Manager with its future Gateway endpoint on `:18080`. Manager derives the Bootstrap endpoint from the same host on real `z2-ps`; the Browser never selects `gateway_host` and does not receive the stored device token.
+Add the PPU connection to the Manager registry with its future Gateway endpoint on `:18080`. This registry entry identifies a reachable PPU connection; it is **not** programming Registration. Manager derives the Bootstrap endpoint from the same host on real `z2-ps`; the Browser never selects `gateway_host` and does not receive the stored device token.
 
 ```text
 Browser
@@ -97,20 +97,22 @@ Browser
 
 In **EMode -> PPU Sites -> Runtime Deployment**:
 
-1. Select the registered PPU.
+1. Select the known PPU connection. Programming Registration may still be pending, commissioned or disabled.
 2. Confirm Bootstrap status and immutable `device_id`.
-3. Enter the one-time pairing token.
+3. Enter the one-time Platform maintenance pairing token.
 4. Select the CI-produced `plasma-z2-ps-kit-*.tar.gz` and matching `.sha256` sidecar.
 5. Confirm PPU ID, Facility ID and Display Name.
 6. Start Runtime deployment.
 7. Wait for Bootstrap deployment state `succeeded` and Runtime state `runtime_active`.
 
-Lifecycle gates are fail-closed:
+Platform maintenance gates are fail-closed and independent from programming Registration:
 
-- `pending`: first install is allowed if no Site execution is active.
-- `commissioned`: normal Runtime maintenance is rejected; Disable the PPU first.
-- `disabled`: requires a current trusted idle observation.
-- `recovery_required`: normal deployment is rejected until explicit recovery resolves the uncertain state.
+- device-bound Bootstrap pairing authenticates Platform maintenance;
+- active Site execution blocks Platform mutation;
+- `runtime_absent`: first install is allowed because no Runtime idle observation exists yet;
+- `runtime_active`: normal maintenance requires a current trusted idle PPU observation;
+- `recovery_required`: normal deployment is rejected until explicit recovery resolves the uncertain state;
+- programming Registration lifecycle is preserved by Platform deployment and controls Site/programming admission only.
 
 The Console mirrors these gates for operator feedback; Manager/Bootstrap remain authoritative.
 
@@ -130,7 +132,7 @@ Before claiming **Z2 appliance deployment qualified**, run and retain evidence f
 2. Console first install through `Browser -> BFF -> Manager -> Bootstrap`.
 3. Runtime active: Gateway readiness and managed PS loopback pass.
 4. Reboot: Bootstrap and the same Runtime release recover without manual repair.
-5. Normal upgrade from a disabled/current/trusted/idle PPU.
+5. Normal upgrade from a paired/current/trusted/idle PPU without changing programming Registration solely for Platform maintenance.
 6. Controlled activation failure: installer restores the previous known-good Runtime and deployment journal reports rollback/failure consistently.
 7. Reboot again: restored Runtime remains selected and managed PS loopback passes.
 
@@ -148,7 +150,7 @@ This option is deliberately not routed through the normal `plasmactl z2-ps`, Con
 
 The coordinator refuses this qualification injection unless an existing previous release is selected by `/opt/plasma/current`. The injected failure occurs from the installer's post-activation health callback, after the production activation path has been entered. The production installer must therefore perform its ordinary rollback transaction; the qualification mechanism does not rewrite the current symlink, canonical configuration, units or journal itself.
 
-Before using it, the PPU must already be `disabled` with current trusted idle observation, and the candidate kit must be a verified CI artifact. Resolve the installed Plasma Python from the existing evidence and invoke the kit-local coordinator directly:
+Before using it, Platform maintenance pairing must be valid, no Site execution may be active, an installed Runtime must have a current trusted idle observation, and the candidate kit must be a verified CI artifact. Programming Registration state is not a Platform-maintenance prerequisite. Resolve the installed Plasma Python from the existing evidence and invoke the kit-local coordinator directly:
 
 ```bash
 plasma_python="$(python3 - <<'PY'
@@ -288,15 +290,15 @@ sudo bash scripts/plasmactl verify z2-ps
 
 The same release remained selected, all services recovered, Gateway reached `alive/ready`, and the formal verifier passed without manual repair.
 
-One timing observation was retained: immediately after reboot, systemd units could already report `active` while TCP `:18080` still returned `Connection refused`; Gateway became ready later without repair. Appliance readiness must therefore use `/api/health/ready` with a bounded deadline rather than treating `systemctl active` as sufficient. That improvement is intentionally deferred to a separate PR.
+One timing observation was retained: immediately after reboot, systemd units could already report `active` while TCP `:18080` still returned `Connection refused`; Gateway became ready later without repair. Appliance readiness must therefore use `/api/health/ready` with a bounded deadline rather than treating `systemctl active` as sufficient. The canonical `z2-ps` verifier now waits on that bounded readiness contract before asserting converged service/socket state.
 
-A second observation was retained: running `verify z2-ps` as unprivileged `xilinx` reported protected `/etc/plasma/ppu.yaml` as missing, while root verification passed and the file was present as `plasma:plasma 0640` under `root:plasma 0770`. Permission-denied versus missing diagnostics are intentionally deferred to a separate PR.
+A second observation was retained: running `verify z2-ps` as unprivileged `xilinx` reported protected `/etc/plasma/ppu.yaml` as missing, while root verification passed and the file was present as `plasma:plasma 0640` under `root:plasma 0770`. The canonical verifier now requires root explicitly, avoiding the misleading unprivileged “missing” diagnosis.
 
 ### Commissioning and maintenance transition — PASS
 
 Console `Validate & Enable` moved the PPU from `pending` to `commissioned` with `Online`, `Healthy`, `execution=ready` and Runtime `In Sync`. `Reported Sites=0` was expected because this is PS-only qualification.
 
-Before Runtime maintenance, `Disable` moved lifecycle to `disabled` while Runtime remained active.
+Before the historical Runtime-maintenance run, `Disable` moved lifecycle to `disabled` while Runtime remained active. This was required by the then-current admission implementation; it is retained here as historical evidence, not as the Platform/Registration architecture contract.
 
 ### Normal upgrade — PASS
 
@@ -317,7 +319,7 @@ current=/opt/plasma/releases/0.1.1-0a78bd4af352
 /etc/plasma/ppu.yaml sha256=ab6ebc8ba106907f08a3a3b51c2cdf1f43bd9c53cd938797b30c1f9d71637807
 ```
 
-After Console deployment while lifecycle was `disabled`:
+After Console deployment while lifecycle happened to be `disabled` in this historical qualification run:
 
 ```text
 current=/opt/plasma/releases/0.1.1-310a082a783f
@@ -351,7 +353,7 @@ No manual repair was required.
 
 ### Controlled activation-failure rollback — PASS
 
-The final rollback gate was executed on the same physical `z2-hil` PYNQ-Z2 on 2026-09-18. Before injection, Console showed the PPU as `Registered / Disabled`, `Online`, `Healthy`, with no active Site execution. The known-good Runtime remained:
+The final rollback gate was executed on the same physical `z2-hil` PYNQ-Z2 on 2026-09-18. Before injection, Console showed the PPU as `Registered / Disabled`, `Online`, `Healthy`, with no active Site execution. The disabled Registration state reflects the historical admission implementation used for this run; later Platform admission is intentionally independent from programming Registration. The known-good Runtime remained:
 
 ```text
 current=/opt/plasma/releases/0.1.1-310a082a783f

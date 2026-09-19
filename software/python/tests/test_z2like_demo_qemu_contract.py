@@ -109,14 +109,18 @@ def test_one_command_profile_has_explicit_fast_forward_and_full_verification():
     assert "/api/manager/ppu/api/health/ready" in source
 
 
-def test_persistent_runtime_deployer_preserves_bootstrap_lifecycle_gates():
+def test_persistent_runtime_deployer_preserves_registration_and_platform_gates():
     source = RUNTIME_DEPLOYER.read_text(encoding="utf-8")
-    assert 'lifecycle_before == "commissioned"' in source
-    assert '_set_lifecycle(manager, args.alias, "disabled"' in source
+    assert 'lifecycle_before not in {"pending", "commissioned", "disabled"}' in source
+    assert '_set_lifecycle(manager, args.alias, "disabled"' not in source
+    assert '_set_lifecycle(manager, args.alias, "commissioned"' not in source
     assert 'runtime_state_before not in {"runtime_absent", "runtime_active"}' in source
+    assert 'maintenance_requires_idle = runtime_state_before == "runtime_active"' in source
+    assert "_wait_for_trusted_idle(" in source
     assert 'pairing.get("device_match") is False' in source
     assert "do not retain or print" not in source or 'token = ""' in source
-    assert 'commissioned = _set_lifecycle(manager, args.alias, "commissioned"' in source
+    assert "lifecycle_after != lifecycle_before" in source
+    assert '"lifecycle_after": lifecycle_after' in source
     assert '"runtime_state_after": "runtime_active"' in source
 
 
@@ -127,6 +131,16 @@ def test_qemu_target_keeps_bootstrap_alive_for_activation_rollback():
     assert "wait for the rollback/current-link transition" in source
     assert '"--kit-tool",\n            str(kit_tool)' in source
     assert '"--port",\n            str(BOOTSTRAP_PORT)' in source
+
+
+def test_qemu_target_waits_for_server_before_gateway_startup():
+    source = TARGET.read_text(encoding="utf-8")
+    start = source.index("server = subprocess.Popen(")
+    wait = source.index('_wait_tcp("127.0.0.1", SERVER_PORT, 30.0, server)')
+    gateway = source.index("gateway = subprocess.Popen(", start)
+    assert start < wait < gateway
+    assert "process exited before TCP readiness" in source
+    assert "TCP readiness deadline exceeded" in source
 
 
 def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core():

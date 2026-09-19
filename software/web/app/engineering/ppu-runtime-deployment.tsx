@@ -88,8 +88,8 @@ export default function PpuRuntimeDeployment({
   const runtime = bootstrap?.runtime ?? null;
   const deployment = bootstrap?.deployment ?? null;
   const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
-  const firstInstall = entry.lifecycle === "pending";
-  const maintenanceReady = firstInstall || (entry.lifecycle === "disabled" && hasTrustedIdleObservation);
+  const firstInstall = runtime?.state === "runtime_absent";
+  const maintenanceReady = firstInstall || (runtime?.state === "runtime_active" && hasTrustedIdleObservation);
   const canPair = Boolean(alias && pairingToken.trim().length >= 32 && busy === null);
   const canLoopback = Boolean(
     alias
@@ -210,8 +210,7 @@ export default function PpuRuntimeDeployment({
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Platform Release update is blocked while this PPU has active Site execution.</p>}
-      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">This PPU is registered for programming. Disable Registration after jobs are idle before Platform Release maintenance. Platform PS Loop Test remains diagnostic-only and does not mutate Site execution.</p>}
-      {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Platform maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
+      {runtime?.state === "runtime_active" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Platform maintenance requires a current trusted idle PPU observation. Programming Registration does not control this Platform gate. If Runtime health cannot be observed, use the explicit recovery procedure.</p>}
       {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Platform Release update remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
       <div className="ppuInfoBody">

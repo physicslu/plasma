@@ -53,7 +53,9 @@ Windows
 
 The installer-created `manager.yaml` points to those paths. The immutable application release does not contain registry state.
 
-Existing integration-host or manually maintained Manager configuration is not silently rewritten during this change. Those deployments remain config-backed/read-only until an operator explicitly adds an absolute `manager.registry_state_path` and applies the normal deployment reconciliation/restart gate. This is intentional: enabling Browser-driven inventory mutation changes control-plane authority and must not appear as an implicit software upgrade side effect.
+Windows MSI upgrades preserve an existing `%ProgramData%\Plasma\config\manager.yaml` rather than overwriting operator configuration. Some pre-runtime-registry installer generations therefore preserve a product-created config that does not contain `registry_state_path`. The Windows Manager launcher supplies the product-owned ProgramData registry path as a **fallback only when that field is absent**. An explicit `registry_state_path` value, including explicit `null`, remains authoritative. This repairs installer-version migration without rewriting `manager.yaml` or overriding an explicit operator choice.
+
+Existing integration-host or manually maintained Manager configuration is not silently rewritten or implicitly made mutable. Those deployments do not set the Windows packaging fallback and remain config-backed/read-only until an operator explicitly adds an absolute `manager.registry_state_path` and applies the normal deployment reconciliation/restart gate. This distinction is intentional: Browser-driven inventory mutation changes control-plane authority and must not appear as an implicit upgrade side effect outside the packaged Control Station ownership boundary.
 
 When runtime registry persistence is enabled, Manager derives its network-commissioning journal beside the registry state file. The journal is Manager-owned operational state and is not source controlled.
 

@@ -15,12 +15,7 @@ from .bootstrap import (
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
-from .registry import (
-    REGISTRY_LIFECYCLE_COMMISSIONED,
-    REGISTRY_LIFECYCLE_DISABLED,
-    REGISTRY_LIFECYCLE_PENDING,
-    RegistryEntryNotFound,
-)
+from .registry import RegistryEntryNotFound
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
@@ -100,37 +95,85 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             and not item.get("errors")
         )
 
-    def _bootstrap_mutation_allowed(self, alias: str) -> bool:
-        lifecycle = self._registry_lifecycle(alias)
-        if lifecycle == REGISTRY_LIFECYCLE_PENDING:
-            if self._alias_has_active_execution(alias):
-                self._json(
-                    HTTPStatus.CONFLICT,
-                    {
-                        "ok": False,
-                        "error": {
-                            "code": "ppu_busy",
-                            "message": "active PPU Jobs must finish or be cancelled before runtime deployment",
-                        },
-                    },
-                )
-                return False
-            return True
+    def _platform_write_block(self, alias: str) -> tuple[str, str] | None:
+        # Programming Registration remains independent, but managed writes must
+        # not race a Platform deployment. Bootstrap deployment API state is
+        # durable on the PPU, so this also survives a Manager restart.
+        try:
+            platform = self._bootstrap().status(alias)
+        except Exception:
+            # Bootstrap availability is not a normal programming prerequisite.
+            # The process-local operation gate still closes the launch race;
+            # ordinary Runtime writes are allowed when no durable state can be
+            # observed here.
+            return None
+        bootstrap = platform.get("bootstrap")
+        if not isinstance(bootstrap, dict):
+            return None
+        deployment = bootstrap.get("deployment")
+        deployment_state = deployment.get("state") if isinstance(deployment, dict) else None
+        runtime = bootstrap.get("runtime")
+        runtime_state = runtime.get("state") if isinstance(runtime, dict) else None
+        if deployment_state in {"queued", "running"}:
+            return (
+                "ppu_platform_maintenance_active",
+                "Platform deployment is active; managed PPU writes are temporarily blocked",
+            )
+        if deployment_state == "recovery_required" or runtime_state == "recovery_required":
+            return (
+                "ppu_platform_recovery_required",
+                "Platform recovery is required before managed PPU writes may resume",
+            )
+        return None
 
-        if lifecycle == REGISTRY_LIFECYCLE_COMMISSIONED:
+    def _bootstrap_mutation_allowed(self, alias: str) -> bool:
+        # Platform maintenance authorization is independent from programming
+        # Registration. Registration controls managed Site/programming admission;
+        # this gate instead proves the PPU is safe to mutate at the Platform layer.
+        if self._alias_has_active_execution(alias):
             self._json(
                 HTTPStatus.CONFLICT,
                 {
                     "ok": False,
                     "error": {
-                        "code": "ppu_maintenance_required",
-                        "message": "disable this commissioned PPU before Runtime maintenance",
+                        "code": "ppu_busy",
+                        "message": "active PPU Jobs must finish or be cancelled before Platform maintenance",
                     },
                 },
             )
             return False
 
-        if lifecycle == REGISTRY_LIFECYCLE_DISABLED:
+        try:
+            platform = self._bootstrap().status(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return False
+        bootstrap = platform.get("bootstrap")
+        runtime = bootstrap.get("runtime") if isinstance(bootstrap, dict) else None
+        deployment = bootstrap.get("deployment") if isinstance(bootstrap, dict) else None
+        runtime_state = runtime.get("state") if isinstance(runtime, dict) else None
+        deployment_state = deployment.get("state") if isinstance(deployment, dict) else None
+
+        if runtime_state == "recovery_required" or deployment_state == "recovery_required":
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_recovery_required",
+                        "message": "explicit Platform recovery is required before normal Runtime maintenance",
+                    },
+                },
+            )
+            return False
+
+        # A factory/first-install target has no Runtime whose idle state can be
+        # observed yet. Pairing/authentication remains enforced by the Bootstrap
+        # coordinator before any mutation reaches the device.
+        if runtime_state == "runtime_absent":
+            return True
+
+        if runtime_state == "runtime_active":
             if not self._trusted_idle_observation(alias):
                 self._json(
                     HTTPStatus.CONFLICT,
@@ -140,7 +183,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                             "code": "ppu_idle_state_unproven",
                             "message": (
                                 "a current trusted idle PPU observation is required for normal Runtime maintenance; "
-                                "use the explicit recovery procedure when Runtime health cannot be observed"
+                                "programming Registration state does not lower this Platform safety gate"
                             ),
                         },
                     },
@@ -153,8 +196,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             {
                 "ok": False,
                 "error": {
-                    "code": "ppu_lifecycle_invalid",
-                    "message": f"PPU lifecycle {lifecycle!r} is not eligible for Runtime maintenance",
+                    "code": "ppu_platform_state_invalid",
+                    "message": f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance",
                 },
             },
         )
@@ -252,6 +295,31 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             if action == "ps-loopback":
                 self._platform_ps_loopback(alias, body)
                 return
+            if action == "deployments":
+                gate = self._operation_gate()
+                if not gate.try_begin_platform_launch(alias):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {
+                            "ok": False,
+                            "error": {
+                                "code": "ppu_control_plane_busy",
+                                "message": (
+                                    "a managed PPU write or another Platform deployment launch "
+                                    "is already in progress"
+                                ),
+                            },
+                        },
+                    )
+                    return
+                try:
+                    if not self._bootstrap_mutation_allowed(alias):
+                        return
+                    status, payload = coordinator.start_deployment(alias, body)
+                    self._json(status, payload)
+                    return
+                finally:
+                    gate.end_platform_launch(alias)
             if not self._bootstrap_mutation_allowed(alias):
                 return
             if action == "uploads":
@@ -269,10 +337,6 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                     if set(body) != {"action"} or body.get("action") != "commit":
                         raise ValueError("Bootstrap upload commit requires action=commit")
                     status, payload = coordinator.commit_upload(alias, upload_id)
-                self._json(status, payload)
-                return
-            if action == "deployments":
-                status, payload = coordinator.start_deployment(alias, body)
                 self._json(status, payload)
                 return
         except Exception as exc:

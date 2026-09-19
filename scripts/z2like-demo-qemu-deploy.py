@@ -167,24 +167,6 @@ def _registry_entry(manager: str, alias: str, endpoint: str) -> dict[str, Any]:
     return matches[0]
 
 
-def _set_lifecycle(manager: str, alias: str, lifecycle: str, *, retry_s: float = 0.0) -> dict[str, Any]:
-    deadline = time.monotonic() + max(0.0, retry_s)
-    while True:
-        status, payload = _json_request(
-            f"{manager}/api/registry/{alias}",
-            method="PATCH",
-            body={"lifecycle": lifecycle},
-        )
-        if status == 200:
-            entry = payload.get("entry")
-            if not isinstance(entry, dict) or entry.get("lifecycle") != lifecycle:
-                raise DeployError(f"Manager did not persist lifecycle {lifecycle!r}: {payload!r}")
-            return entry
-        if time.monotonic() >= deadline:
-            raise DeployError(f"cannot set PPU lifecycle to {lifecycle!r}: HTTP {status} {payload!r}")
-        time.sleep(1.0)
-
-
 def _fleet_item_is_trusted_idle(item: Mapping[str, Any], alias: str) -> bool:
     if item.get("alias") != alias:
         return False
@@ -339,33 +321,17 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     endpoint = f"http://{args.ppu_ip}:18080"
     entry = _registry_entry(manager, args.alias, endpoint)
     lifecycle_before = entry.get("lifecycle")
-    maintenance_requires_idle = lifecycle_before in {"commissioned", "disabled"}
-    baseline_generation: datetime | None = None
-    if lifecycle_before == "commissioned":
-        _set_lifecycle(manager, args.alias, "disabled", retry_s=15.0)
-    elif lifecycle_before not in {"pending", "disabled"}:
-        raise DeployError(f"unsupported Manager lifecycle before maintenance: {lifecycle_before!r}")
-    if maintenance_requires_idle:
-        baseline_generation = _read_fleet_generation(manager)
+    if lifecycle_before not in {"pending", "commissioned", "disabled"}:
+        raise DeployError(f"unsupported programming Registration lifecycle: {lifecycle_before!r}")
 
-    # The target remains non-operationally admitted while its simulation profile
-    # is updated and the container is restarted. Restarting here also reloads the
-    # current bind-mounted target harness after a git update.
+    # Platform deployment must not mutate programming Registration. Capture a
+    # pre-restart fleet generation only as a stale-observation boundary; whether
+    # idle proof is required is decided from the actual Runtime state below.
+    baseline_generation = _read_fleet_generation(manager)
+
+    # Restarting here reloads the current bind-mounted target harness after a git
+    # update. Registration is deliberately preserved across this Platform action.
     _prepare_target_scenario(args.container, args.site_count)
-
-    # A cached fleet snapshot can still say current immediately after restart.
-    # Require a strictly newer completed fleet generation before maintenance so
-    # the admission evidence necessarily comes from after the target restart.
-    trusted_generation: datetime | None = None
-    if maintenance_requires_idle:
-        if baseline_generation is None:
-            raise DeployError("internal error: maintenance fleet generation baseline is unavailable")
-        trusted_generation = _wait_for_trusted_idle(
-            manager,
-            args.alias,
-            after_observed_at=baseline_generation,
-            timeout_s=60.0,
-        )
 
     bootstrap_url = f"{manager}/api/registry/{args.alias}/bootstrap"
     before = _wait_json(
@@ -380,6 +346,21 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     runtime_state_before = runtime.get("state") if isinstance(runtime, dict) else None
     if runtime_state_before not in {"runtime_absent", "runtime_active"}:
         raise DeployError(f"unsafe Bootstrap runtime state before deploy: {runtime_state_before!r}")
+
+    # Existing Runtime maintenance requires a fresh trusted-idle observation,
+    # regardless of programming Registration. First install has no Runtime whose
+    # idle state can be observed, so pairing + no-active-execution remains the
+    # applicable Platform admission boundary.
+    maintenance_requires_idle = runtime_state_before == "runtime_active"
+    trusted_generation: datetime | None = None
+    if maintenance_requires_idle:
+        trusted_generation = _wait_for_trusted_idle(
+            manager,
+            args.alias,
+            after_observed_at=baseline_generation,
+            timeout_s=60.0,
+        )
+
     pairing = before.get("pairing")
     if not isinstance(pairing, dict):
         raise DeployError("Manager Bootstrap status omitted pairing state")
@@ -488,9 +469,16 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     _expect(targets_status, 200, targets, "QEMU Programming catalog")
     _verify_programming_catalog(targets, site_count=args.site_count, ppu_id=args.ppu_id)
 
-    # Re-enable only after Runtime, topology and the configured Programming
-    # provider are all coherent and the Manager has a current trusted observation.
-    commissioned = _set_lifecycle(manager, args.alias, "commissioned", retry_s=45.0)
+    # Platform maintenance must preserve programming Registration exactly as it
+    # was. Commissioning/disable belongs to the Registration workflow, not this
+    # Runtime deployment workflow.
+    entry_after = _registry_entry(manager, args.alias, endpoint)
+    lifecycle_after = entry_after.get("lifecycle")
+    if lifecycle_after != lifecycle_before:
+        raise DeployError(
+            f"Platform deployment changed programming Registration lifecycle: "
+            f"{lifecycle_before!r} -> {lifecycle_after!r}"
+        )
 
     return {
         "result": "PASS",
@@ -500,7 +488,7 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
         "manager_origin": manager,
         "alias": args.alias,
         "lifecycle_before": lifecycle_before,
-        "lifecycle_after": commissioned.get("lifecycle"),
+        "lifecycle_after": lifecycle_after,
         "runtime_state_before": runtime_state_before,
         "runtime_state_after": "runtime_active",
         "deployment_state": "succeeded",

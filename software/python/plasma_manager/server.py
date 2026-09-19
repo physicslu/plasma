@@ -8,6 +8,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import RLock
 from typing import Any
 from urllib.parse import unquote, urlparse
 
@@ -91,6 +92,51 @@ _MANAGED_POST_PATTERNS = tuple(
 )
 
 
+class PPUOperationGate:
+    """Serialize Platform launch admission against managed PPU writes.
+
+    Registration is not used as the maintenance lock. This process-local gate
+    closes the race between the final trusted-idle check and Bootstrap accepting
+    a deployment. The device's durable Bootstrap deployment state remains the
+    authority for the longer queued/running interval and survives Manager restart.
+    """
+
+    def __init__(self) -> None:
+        self._lock = RLock()
+        self._managed_writes: dict[str, int] = {}
+        self._platform_launching: set[str] = set()
+
+    def try_begin_managed_write(self, alias: str) -> bool:
+        with self._lock:
+            if alias in self._platform_launching:
+                return False
+            self._managed_writes[alias] = self._managed_writes.get(alias, 0) + 1
+            return True
+
+    def end_managed_write(self, alias: str) -> None:
+        with self._lock:
+            count = self._managed_writes.get(alias, 0)
+            if count <= 1:
+                self._managed_writes.pop(alias, None)
+            else:
+                self._managed_writes[alias] = count - 1
+
+    def try_begin_platform_launch(self, alias: str) -> bool:
+        with self._lock:
+            if alias in self._platform_launching or self._managed_writes.get(alias, 0) > 0:
+                return False
+            self._platform_launching.add(alias)
+            return True
+
+    def end_platform_launch(self, alias: str) -> None:
+        with self._lock:
+            self._platform_launching.discard(alias)
+
+    def platform_launching(self, alias: str) -> bool:
+        with self._lock:
+            return alias in self._platform_launching
+
+
 class PlasmaManagerHTTPServer(ThreadingHTTPServer):
     """Threaded Manager HTTP server whose bind path never depends on DNS."""
 
@@ -107,6 +153,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     config: ManagerConfig | None = None
     registry_store: PPURegistryStore | None = None
     network_commissioning: NetworkCommissioningCoordinator | None = None
+    operation_gate: PPUOperationGate = PPUOperationGate()
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -144,6 +191,13 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if self.config is None:
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
+
+    def _operation_gate(self) -> PPUOperationGate:
+        return type(self).operation_gate
+
+    def _platform_write_block(self, alias: str) -> tuple[str, str] | None:
+        """Subclass hook for durable Platform-deployment admission state."""
+        return None
 
     def _network_commissioning(self) -> NetworkCommissioningCoordinator:
         if self.network_commissioning is None:
@@ -341,6 +395,33 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_registry_lifecycle(self, alias: str) -> None:
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; Registration changes are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_registry_lifecycle_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_registry_lifecycle_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
@@ -382,6 +463,33 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"ok": True, "entry": record.as_dict(), "registry": self._registry_snapshot()})
 
     def _handle_registry_remove(self, alias: str) -> None:
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; PPU removal are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_registry_remove_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_registry_remove_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
@@ -413,6 +521,36 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"ok": True, "commissioning": record.as_dict()})
 
     def _handle_network_commissioning_post(self, alias: str) -> None:
+        if self.registry_store is None or self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._handle_network_commissioning_post_unlocked(alias)
+            return
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; network commissioning is temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._handle_network_commissioning_post_unlocked(alias)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _handle_network_commissioning_post_unlocked(self, alias: str) -> None:
         if self.registry_store is None:
             self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
             return
@@ -632,6 +770,50 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(status, payload)
 
     def _relay_managed_ppu_request(self, alias: str, target_path: str, query: str) -> None:
+        if self.command != "POST":
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+
+        # Perform the cheap static admission checks before taking the operation
+        # gate. The unlocked implementation repeats them so there is only one
+        # authoritative error contract.
+        if not self._managed_route_allowed(self.command, target_path):
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+        if self._resolve_ppu_alias(alias) is None:
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+        if self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+            return
+
+        gate = self._operation_gate()
+        if not gate.try_begin_managed_write(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_platform_maintenance_starting",
+                        "message": "Platform maintenance is starting; managed PPU writes are temporarily blocked",
+                    },
+                },
+            )
+            return
+        try:
+            blocked = self._platform_write_block(alias)
+            if blocked is not None:
+                code, message = blocked
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": {"code": code, "message": message}},
+                )
+                return
+            self._relay_managed_ppu_request_unlocked(alias, target_path, query)
+        finally:
+            gate.end_managed_write(alias)
+
+    def _relay_managed_ppu_request_unlocked(self, alias: str, target_path: str, query: str) -> None:
         if not self._managed_route_allowed(self.command, target_path):
             self._json(
                 HTTPStatus.NOT_FOUND,
