@@ -1,0 +1,45 @@
+name: TEMP STM32WBA2X Production publication materialization
+
+on:
+  push:
+    branches:
+      - agent/stm32wba2x-production-publication
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-stm32wba2x-production-publication-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize deterministic publication
+        run: |
+          mkdir -p .artifacts/publication
+          python data/device-catalog/research/publish_stm32wba2x_catalog.py \
+            --output-dir .artifacts/publication
+      - name: Emit publication bytes to workflow log
+        run: |
+          python - <<'PY'
+          import base64, pathlib
+          root = pathlib.Path(".artifacts/publication")
+          for path in sorted(root.iterdir()):
+              print(f"PUBLICATION_FILE_BEGIN {path.name}")
+              print(base64.b64encode(path.read_bytes()).decode("ascii"))
+              print(f"PUBLICATION_FILE_END {path.name}")
+          PY
+      - name: Upload publication candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32wba2x-production-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: .artifacts/publication/*
