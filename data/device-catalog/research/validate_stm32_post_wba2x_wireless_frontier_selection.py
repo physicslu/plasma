@@ -65,6 +65,7 @@ def validate(value: dict) -> None:
     deferred = value.get("deferred_wireless_frontiers")
     req(isinstance(deferred, list) and len(deferred) == 1, "deferred wireless list drifted")
     req(deferred[0].get("plasma_series") == "STM32W108", "STM32W108 deferred identity drifted")
+    req(deferred[0].get("structural_gate_pass") is False, "STM32W108 structural boundary opened")
     req(
         deferred[0].get("defer_reasons")
         == ["structural_gate_fail", "no_bounded_subfamilies", "no_ordering_pattern_rows"],
