@@ -1,0 +1,41 @@
+name: STM32 post-WBA2X wireless frontier selection validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32-post-wba2x-production-prestate.json'
+      - 'data/device-catalog/research/stm32-post-wba2x-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32_post_wba2x_wireless_frontier_selection.py'
+      - 'data/device-catalog/research/validate_stm32_post_wba2x_wireless_frontier_selection.py'
+      - 'data/device-catalog/research/stm32-post-h7-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32-cross-family-prioritization-baseline.json'
+      - '.github/workflows/device-catalog-stm32-post-wba2x-wireless-frontier-selection-validation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/device-catalog/research/stm32-post-wba2x-production-prestate.json'
+      - 'data/device-catalog/research/stm32-post-wba2x-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32_post_wba2x_wireless_frontier_selection.py'
+      - 'data/device-catalog/research/validate_stm32_post_wba2x_wireless_frontier_selection.py'
+      - 'data/device-catalog/research/stm32-post-h7-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32-cross-family-prioritization-baseline.json'
+      - '.github/workflows/device-catalog-stm32-post-wba2x-wireless-frontier-selection-validation.yml'
+  workflow_dispatch:
+
+# Research-only deterministic reselection validation; no live acquisition or writes.
+# Final-head PR synchronization validation.
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate post-WBA2X wireless frontier selection
+        run: python data/device-catalog/research/validate_stm32_post_wba2x_wireless_frontier_selection.py
