@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WLE5CB",
+  "evidence_section_sha256": "ffa786ade764e978f2f47e2ff29aa40af590517faf06d32ff287d5a29470df9f",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WLE5CBU6",
+    "STM32WLE5CBU6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WLE5CBU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WLE5CBU6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "d0ff9852b556cd9eae1362f30bb8ce6cc031380bb5b6d9b7d9b1477ffab5fdef",
+  "retrieved_at_utc": "2026-09-21T06:05:48Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html"
+}

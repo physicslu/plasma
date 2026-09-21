@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WLE5J8",
+  "evidence_section_sha256": "04037bd2d486f3e98e2fd6c109275f8ac9d5764dfd87d55b52161e53bc795603",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WLE5J8I6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WLE5J8I6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "ff81b045aef7518e1b72d207fd83fc7c37a84190dde2153d8f711eba62b52f3b",
+  "retrieved_at_utc": "2026-09-21T06:07:34Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html"
+}
