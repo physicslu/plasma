@@ -1,0 +1,79 @@
+{
+  "authority": "research_only",
+  "canonical_candidate_csv": "stm32wlx-commercial-icpn.csv",
+  "canonical_candidate_csv_sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c",
+  "catalog_admission_ready": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false,
+    "wl5m_alias_normalized": false
+  },
+  "excluded_non_active_part_number_count": 2,
+  "excluded_non_active_part_numbers": [
+    "STM32WLE4CCU7",
+    "STM32WLE4JCI7"
+  ],
+  "family": "STM32WLX",
+  "frozen_exact_icpn_count": 31,
+  "frozen_exact_icpn_set_sha256": "928a6d292a524d7fbf1834af17446e2ad801c09c7daacc693b18d24020a7b7c2",
+  "gate_id": "stm32wlx-bounded-exact-icpn-admission-readiness-v1",
+  "identity_ready_count": 31,
+  "lifecycle_ready_count": 31,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 30,
+    "deterministic_ordering_pattern_via_stsafe_provisioning_bridge": 1
+  },
+  "metadata_authority": "stm32wlx-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 31,
+  "next_gate": "stm32wlx-production-publication-gate",
+  "package_counts": {
+    "LGA": 2,
+    "UFBGA": 14,
+    "UFQFPN": 15
+  },
+  "production_exact_icpn_count": 2523,
+  "production_family_count": 19,
+  "required_target_config": "tcl/target/stm32wlx.cfg",
+  "research_series": "STM32WLX",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 31
+  },
+  "route_bridge_count": 1,
+  "route_ready_count": 31,
+  "schema_version": 1,
+  "series_counts": {
+    "STM32WL54": 4,
+    "STM32WL55": 6,
+    "STM32WL5MOC": 2,
+    "STM32WLE4": 8,
+    "STM32WLE5": 11
+  },
+  "temperature_grade_counts": {
+    "-40..105 C": 6,
+    "-40..85 C": 25
+  },
+  "wl5m_non_prefix_boundary": {
+    "active_exact_icpns": [
+      "STM32WL5MOCH6STR",
+      "STM32WL5MOCH6TR"
+    ],
+    "alias_normalized": false,
+    "commercial_series": "STM32WL5MOC",
+    "frozen_route_subfamily": "STM32WL55",
+    "route_pattern": "STM32WL5MOCHx",
+    "stsafe_bridge_identity": "STM32WL5MOCH6STR"
+  }
+}
