@@ -1,1 +1,0 @@
-"""Browser gateway for Plasma."""
