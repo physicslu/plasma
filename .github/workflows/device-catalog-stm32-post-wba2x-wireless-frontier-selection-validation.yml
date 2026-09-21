@@ -24,6 +24,7 @@ on:
   workflow_dispatch:
 
 # Research-only deterministic reselection validation; no live acquisition or writes.
+# Final-head PR synchronization validation.
 permissions:
   contents: read
 
