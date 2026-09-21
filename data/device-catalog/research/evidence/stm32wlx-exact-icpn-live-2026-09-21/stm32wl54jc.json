@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WL54JC",
+  "evidence_section_sha256": "1f366e7f026d57e6c0c1224ebf47ee886f8bbede71ce541a24dafb2a54901b65",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WL54JCI6",
+    "STM32WL54JCI7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WL54JCI6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WL54JCI7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "0f42f2e080b29e616fe4e92a75c72941251f0feaa2f63da823fc6f4a23688c12",
+  "retrieved_at_utc": "2026-09-21T06:01:21Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html"
+}

@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WLE5JB",
+  "evidence_section_sha256": "cf712ba84a1e94cd78c2a779a8397f8ca2153b7540d5385802d90a5562c4f5a0",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WLE5JBI6",
+    "STM32WLE5JBI6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WLE5JBI6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WLE5JBI6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "484d67738b68640b71e24198860ae39be8c4afc648a1f7f539590f76ac181c2f",
+  "retrieved_at_utc": "2026-09-21T06:07:38Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html"
+}

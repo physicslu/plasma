@@ -1,0 +1,41 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WLE4CC",
+  "evidence_section_sha256": "f752e5491c18e276c271fa236f4c4be0fc76f9f6473acf9fa0835d77e98da146",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WLE4CCU6",
+    "STM32WLE4CCU6TR"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32WLE4CCU7",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WLE4CCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WLE4CCU6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32WLE4CCU7",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "rendered_dom_sha256": "d734890337a0c1fe56f6a7af0167f115fb5ae87fd891af61f75edfa1a48fb95d",
+  "retrieved_at_utc": "2026-09-21T06:02:08Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html"
+}

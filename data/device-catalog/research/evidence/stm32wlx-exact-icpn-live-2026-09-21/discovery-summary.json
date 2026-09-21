@@ -1,0 +1,860 @@
+{
+  "active_exact_icpn_count": 31,
+  "active_exact_icpn_set_sha256": "928a6d292a524d7fbf1834af17446e2ad801c09c7daacc693b18d24020a7b7c2",
+  "active_exact_icpns": [
+    "STM32WL54CCU6",
+    "STM32WL54CCU7",
+    "STM32WL54JCI6",
+    "STM32WL54JCI7",
+    "STM32WL55CCU6",
+    "STM32WL55CCU6TR",
+    "STM32WL55CCU7",
+    "STM32WL55JCI6",
+    "STM32WL55JCI6TR",
+    "STM32WL55JCI7",
+    "STM32WL5MOCH6STR",
+    "STM32WL5MOCH6TR",
+    "STM32WLE4C8U6",
+    "STM32WLE4C8U6TR",
+    "STM32WLE4CBU6",
+    "STM32WLE4CCU6",
+    "STM32WLE4CCU6TR",
+    "STM32WLE4J8I6",
+    "STM32WLE4JBI6",
+    "STM32WLE4JCI6",
+    "STM32WLE5C8U6",
+    "STM32WLE5CBU6",
+    "STM32WLE5CBU6TR",
+    "STM32WLE5CCU6",
+    "STM32WLE5CCU7",
+    "STM32WLE5J8I6",
+    "STM32WLE5JBI6",
+    "STM32WLE5JBI6TR",
+    "STM32WLE5JCI6",
+    "STM32WLE5JCI6TR",
+    "STM32WLE5JCI7"
+  ],
+  "attempted_targets": 17,
+  "base_device_count": 17,
+  "bounded_exact_discovery_complete": true,
+  "browser_version": "151.0.7922.34",
+  "claims": {
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": true,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wlx_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false,
+    "wl5m_alias_normalized": false
+  },
+  "discovery_id": "stm32wlx-bounded-exact-icpn-discovery-v1",
+  "excluded_non_active_part_number_count": 2,
+  "excluded_non_active_part_numbers": [
+    "STM32WLE4CCU7",
+    "STM32WLE4JCI7"
+  ],
+  "known_non_prefix_base_device": "STM32WL5MOC",
+  "manual_review_targets": 0,
+  "next_gate": "stm32wlx-bounded-exact-icpn-admission-readiness-gate",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WL54CCU6",
+        "STM32WL54CCU7"
+      ],
+      "base_device": "STM32WL54CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WL54CC",
+        "evidence_section_sha256": "ef6293405926b5fe206c1416ca11043ff5343403cefbb7b75e7a57e214fd2f3c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WL54CCU6",
+          "STM32WL54CCU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WL54CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL54CCU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e4cc10479351652c9eb32aec475218d4b742fbb251b744602dbdc5de262ab0d2",
+        "retrieved_at_utc": "2026-09-21T06:01:16Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54cc.html",
+      "subfamily": "STM32WL54"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WL54JCI6",
+        "STM32WL54JCI7"
+      ],
+      "base_device": "STM32WL54JC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WL54JC",
+        "evidence_section_sha256": "1f366e7f026d57e6c0c1224ebf47ee886f8bbede71ce541a24dafb2a54901b65",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WL54JCI6",
+          "STM32WL54JCI7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WL54JCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL54JCI7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "0f42f2e080b29e616fe4e92a75c72941251f0feaa2f63da823fc6f4a23688c12",
+        "retrieved_at_utc": "2026-09-21T06:01:21Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html",
+      "subfamily": "STM32WL54"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WL55CCU6",
+        "STM32WL55CCU6TR",
+        "STM32WL55CCU7"
+      ],
+      "base_device": "STM32WL55CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WL55CC",
+        "evidence_section_sha256": "75cc79f72ab044b3d5c620158e19d43c5cef229c3b1ca90943b935744f79b94f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WL55CCU6",
+          "STM32WL55CCU6TR",
+          "STM32WL55CCU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WL55CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL55CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL55CCU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "38267e6a982db3500f67a6587cd98f0f1dff033e9ff96022cb7427b0d44dc119",
+        "retrieved_at_utc": "2026-09-21T06:01:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55cc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WL55JCI6",
+        "STM32WL55JCI6TR",
+        "STM32WL55JCI7"
+      ],
+      "base_device": "STM32WL55JC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WL55JC",
+        "evidence_section_sha256": "8c6df49632f7cc4263ea2bf48410ce1d384d671844854f646b8054839a26be3f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WL55JCI6",
+          "STM32WL55JCI6TR",
+          "STM32WL55JCI7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55jc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WL55JCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL55JCI6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL55JCI7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6f16b6a40bbd16d3193c63207deb4e16ebc8363a6f21c1e2ab9e3abe5c42e1cf",
+        "retrieved_at_utc": "2026-09-21T06:01:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55jc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55jc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WL5MOCH6STR",
+        "STM32WL5MOCH6TR"
+      ],
+      "base_device": "STM32WL5MOC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WL5MOC",
+        "evidence_section_sha256": "641f1d93bd15b397b3fe125d16f30bf09d25871ff0c793d5a954fdf4cf59a3fe",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WL5MOCH6STR",
+          "STM32WL5MOCH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl5moc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WL5MOCH6STR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WL5MOCH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "a09d3fbe6ab780769a5f60db68cf5379c8d79806f0fde0530c1da2bb0c1d363e",
+        "retrieved_at_utc": "2026-09-21T06:01:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl5moc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": false,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl5moc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4C8U6",
+        "STM32WLE4C8U6TR"
+      ],
+      "base_device": "STM32WLE4C8",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4C8",
+        "evidence_section_sha256": "1526a8d65549ad368433f2eecc01b7871978f22e304766363a0f54c8cfe3d49f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4C8U6",
+          "STM32WLE4C8U6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4C8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE4C8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ba0a0055dded42451dabc90509fb7148d77cfdbbe5902d1b02152ad7cb73b241",
+        "retrieved_at_utc": "2026-09-21T06:01:45Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4c8.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4c8.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4CBU6"
+      ],
+      "base_device": "STM32WLE4CB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4CB",
+        "evidence_section_sha256": "a09f3244ee768123045150058ce7e16dc37dd95c4a474882abacb51ea2d5cdff",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4CBU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4CBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "44509bd82855ebe79c929c950a3d4c567da43f688ad66f4efd922286843dfc55",
+        "retrieved_at_utc": "2026-09-21T06:02:02Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cb.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cb.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4CCU6",
+        "STM32WLE4CCU6TR"
+      ],
+      "base_device": "STM32WLE4CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4CC",
+        "evidence_section_sha256": "f752e5491c18e276c271fa236f4c4be0fc76f9f6473acf9fa0835d77e98da146",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4CCU6",
+          "STM32WLE4CCU6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WLE4CCU7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE4CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32WLE4CCU7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "rendered_dom_sha256": "d734890337a0c1fe56f6a7af0167f115fb5ae87fd891af61f75edfa1a48fb95d",
+        "retrieved_at_utc": "2026-09-21T06:02:08Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html"
+      },
+      "excluded_non_active_icpns": [
+        "STM32WLE4CCU7"
+      ],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4J8I6"
+      ],
+      "base_device": "STM32WLE4J8",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4J8",
+        "evidence_section_sha256": "bf4e4c432ccc9c905851c073c2ae284aaba88ea7767b663973aea61de457c6a7",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4J8I6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4j8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4J8I6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9f5908f1a48e102be34dd4d63b425dd9f4ed42d974070adb66671f33550005d2",
+        "retrieved_at_utc": "2026-09-21T06:03:53Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4j8.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4j8.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4JBI6"
+      ],
+      "base_device": "STM32WLE4JB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4JB",
+        "evidence_section_sha256": "59d0a796c8740d538ff27a42794143f9b330589e56a6f4c049857c08549c4303",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4JBI6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4JBI6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "7b88a52e1998f51d30163254568f4bddbd2cd02953e7099d797c8a067831566e",
+        "retrieved_at_utc": "2026-09-21T06:03:59Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jb.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jb.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE4JCI6"
+      ],
+      "base_device": "STM32WLE4JC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE4JC",
+        "evidence_section_sha256": "30821a322288bbe9e79679d2d8031f1ef535892f1504c0391d465915d5a7c612",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE4JCI6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WLE4JCI7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE4JCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32WLE4JCI7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "rendered_dom_sha256": "45c61de85318a8c0494ee6378d40bdfb249f5e1cfce4840cb64c1198eec67e7d",
+        "retrieved_at_utc": "2026-09-21T06:05:38Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jc.html"
+      },
+      "excluded_non_active_icpns": [
+        "STM32WLE4JCI7"
+      ],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jc.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5C8U6"
+      ],
+      "base_device": "STM32WLE5C8",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5C8",
+        "evidence_section_sha256": "2113f17d9f17d0b3be6a1a7b8f81f4454f428b7a16a85a69f4eb8346d2844111",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5C8U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5C8U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "941da013ebfa92220146841f7a099e8ad58fe422799abb781d437dc459bd8bc9",
+        "retrieved_at_utc": "2026-09-21T06:05:43Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5c8.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5c8.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5CBU6",
+        "STM32WLE5CBU6TR"
+      ],
+      "base_device": "STM32WLE5CB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5CB",
+        "evidence_section_sha256": "ffa786ade764e978f2f47e2ff29aa40af590517faf06d32ff287d5a29470df9f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5CBU6",
+          "STM32WLE5CBU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5CBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE5CBU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d0ff9852b556cd9eae1362f30bb8ce6cc031380bb5b6d9b7d9b1477ffab5fdef",
+        "retrieved_at_utc": "2026-09-21T06:05:48Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5CCU6",
+        "STM32WLE5CCU7"
+      ],
+      "base_device": "STM32WLE5CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5CC",
+        "evidence_section_sha256": "47a0ad6d8286b21d05e3ddb383426dcc34e28a6d3dc8b76d7567a0038f3e09c0",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5CCU6",
+          "STM32WLE5CCU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE5CCU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "7c63ef2d96d65bef04aa23f55ec5ecdfc34634620f3037c9efb9cf309cc7fdc4",
+        "retrieved_at_utc": "2026-09-21T06:07:29Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cc.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5J8I6"
+      ],
+      "base_device": "STM32WLE5J8",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5J8",
+        "evidence_section_sha256": "04037bd2d486f3e98e2fd6c109275f8ac9d5764dfd87d55b52161e53bc795603",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5J8I6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5J8I6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ff81b045aef7518e1b72d207fd83fc7c37a84190dde2153d8f711eba62b52f3b",
+        "retrieved_at_utc": "2026-09-21T06:07:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5JBI6",
+        "STM32WLE5JBI6TR"
+      ],
+      "base_device": "STM32WLE5JB",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5JB",
+        "evidence_section_sha256": "cf712ba84a1e94cd78c2a779a8397f8ca2153b7540d5385802d90a5562c4f5a0",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5JBI6",
+          "STM32WLE5JBI6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5JBI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE5JBI6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "484d67738b68640b71e24198860ae39be8c4afc648a1f7f539590f76ac181c2f",
+        "retrieved_at_utc": "2026-09-21T06:07:38Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WLE5JCI6",
+        "STM32WLE5JCI6TR",
+        "STM32WLE5JCI7"
+      ],
+      "base_device": "STM32WLE5JC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WLE5JC",
+        "evidence_section_sha256": "c96392f6bc0f4634fcef04f43edd42d6a7d0b5c31bcfb9b00840d08babc4a38e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WLE5JCI6",
+          "STM32WLE5JCI6TR",
+          "STM32WLE5JCI7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WLE5JCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE5JCI6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WLE5JCI7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d3fac3b77d469f8406500c9dc9e761977492b14782a261a7ab6ee861ffaa5e2a",
+        "retrieved_at_utc": "2026-09-21T06:07:44Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "prefix_consistent_with_frozen_subfamily": true,
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jc.html",
+      "subfamily": "STM32WLE5"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WLX bounded official-ST exact ICPN discovery",
+  "selected_wireless_frontier": "STM32WLX",
+  "status": "discovered",
+  "successful_targets": 17,
+  "target_config": "tcl/target/stm32wlx.cfg"
+}

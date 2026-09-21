@@ -1,0 +1,158 @@
+{
+  "accessibility_summary_sha256": "5fc9313d2303956d55219be17dd79246e8a43dd53c17c76f0dd51b13c676e2a6",
+  "base_device_count": 17,
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "discovery_id": "stm32wlx-bounded-exact-icpn-discovery-v1",
+  "known_non_prefix_ordering_targets": [
+    {
+      "alias_normalized": false,
+      "base_device": "STM32WL5MOC",
+      "frozen_subfamily": "STM32WL55",
+      "included_in_exact_discovery": true,
+      "part_number_pattern": "STM32WL5MOCHx"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "bounded exact ICPN discovery from official ST Q&R surfaces",
+  "selected_wireless_frontier": "STM32WLX",
+  "selection_sha256": "fd7eccd8c1e11da10e279152a128a13b130bc97b77d2cf7da5ac77392aacea8e",
+  "target_config": "tcl/target/stm32wlx.cfg",
+  "targets": [
+    {
+      "base_device": "STM32WL54CC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54cc.html",
+      "subfamily": "STM32WL54"
+    },
+    {
+      "base_device": "STM32WL54JC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl54jc.html",
+      "subfamily": "STM32WL54"
+    },
+    {
+      "base_device": "STM32WL55CC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55cc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "base_device": "STM32WL55JC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl55jc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "base_device": "STM32WL5MOC",
+      "prefix_consistent_with_frozen_subfamily": false,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl5moc.html",
+      "subfamily": "STM32WL55"
+    },
+    {
+      "base_device": "STM32WLE4C8",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4c8.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE4CB",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cb.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE4CC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4cc.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE4J8",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4j8.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE4JB",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jb.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE4JC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle4jc.html",
+      "subfamily": "STM32WLE4"
+    },
+    {
+      "base_device": "STM32WLE5C8",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5c8.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "base_device": "STM32WLE5CB",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cb.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "base_device": "STM32WLE5CC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5cc.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "base_device": "STM32WLE5J8",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5j8.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "base_device": "STM32WLE5JB",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jb.html",
+      "subfamily": "STM32WLE5"
+    },
+    {
+      "base_device": "STM32WLE5JC",
+      "prefix_consistent_with_frozen_subfamily": true,
+      "selection_reason": "unique Base Device derived from frozen STM32WLX ordering-pattern row; frozen cohort label retained even when Base Device is non-prefix",
+      "series": "STM32WLX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wle5jc.html",
+      "subfamily": "STM32WLE5"
+    }
+  ]
+}
