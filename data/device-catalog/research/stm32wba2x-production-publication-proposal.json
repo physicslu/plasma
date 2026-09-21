@@ -1,0 +1,46 @@
+{
+  "canonical_csv_git_blob_sha": "15a0d57b7f94c05f745a1768036fef9f01ec1fd9",
+  "canonical_csv_sha256": "8d21112ab6d9c8a865e5ce6ccda221b1fee17cbac750ceb042ea41111379fe8d",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "debug_attach_support_claimed": false,
+  "discovery_base_devices": 4,
+  "exact_icpn_set_sha256": "56efc2b0fe64354ba9bdb626e592aae0cc2f2ae4208cadd7cbe6e08f9585887e",
+  "excluded_non_active_part_numbers": 0,
+  "family": "STM32WBA2X",
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 14
+  },
+  "marketing_status_observed": {
+    "Active": 14
+  },
+  "metadata_exception_count": 0,
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2523,
+  "production_exact_icpns_before": 2509,
+  "production_family_count_after": 19,
+  "production_family_count_before": 18,
+  "production_manifest_git_blob_before": "3b59475ad7a45710e9015a8d1cfbb38d8dee7ece",
+  "programming_algorithm_equivalence_claimed": false,
+  "published_active_base_devices": 4,
+  "published_exact_icpns": 14,
+  "readiness_baseline": "stm32wba2x-admission-readiness.json",
+  "readiness_git_blob_sha": "1038b32f0dc9e81958e42eb9df6478bf393c60f3",
+  "remaining_wireless_families_rejected": false,
+  "research_series": "STM32WBA2X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 14
+  },
+  "route_bridge_count": 0,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "transaction": "stm32wba2x-production-catalog-publication",
+  "wireless_radio_operation_authorized": false,
+  "wireless_security_operation_authorized": false
+}
