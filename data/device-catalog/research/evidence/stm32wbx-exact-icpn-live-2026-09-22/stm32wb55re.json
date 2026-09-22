@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB55RE",
+  "evidence_section_sha256": "7b3535d26a3608ac4463c8c18ed4abc9a6b371dc1d8842848cc2bc08ea646bc2",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB55REV6",
+    "STM32WB55REV6TR",
+    "STM32WB55REV7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB55REV6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55REV6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55REV7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "65a49182cf7266b3e2d3b293765b87eaf6bdf37275bf1ca4bbd813cb03ddf77b",
+  "retrieved_at_utc": "2026-09-22T06:41:14Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html"
+}

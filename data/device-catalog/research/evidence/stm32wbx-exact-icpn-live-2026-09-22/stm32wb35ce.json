@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB35CE",
+  "evidence_section_sha256": "bab7822afa413ffa6e0789e4dfdee4a0b5a4ba7d1c816ba964526aae4204c99f",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB35CEU6A",
+    "STM32WB35CEU7A"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB35CEU6A",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB35CEU7A",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "c6ea3f1c4cd907ae540a97345488325ffdfdda1ad48b4f034ded0d5c6d9c19eb",
+  "retrieved_at_utc": "2026-09-22T06:40:13Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html"
+}

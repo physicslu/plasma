@@ -1,0 +1,49 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB15CC",
+  "evidence_section_sha256": "9812316f2c31e5f32a874289a280247021b1be07c77e0e69abd406ecdc569618",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB15CCU6",
+    "STM32WB15CCU6E",
+    "STM32WB15CCU7",
+    "STM32WB15CCU7E",
+    "STM32WB15CCY6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB15CCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB15CCU6E",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB15CCU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB15CCU7E",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB15CCY6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "884dba562a31061b209de97b3d31b154349fcc436b05f708d4d2dae7b361fdcb",
+  "retrieved_at_utc": "2026-09-22T06:39:39Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html"
+}
