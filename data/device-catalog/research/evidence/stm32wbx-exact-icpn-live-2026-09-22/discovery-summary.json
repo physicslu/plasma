@@ -1,0 +1,1013 @@
+{
+  "active_exact_icpn_count": 50,
+  "active_exact_icpn_set_sha256": "faaa262a535e5397894d2ecfdd4589a044371fdeb6926ffc3dfaab63f219fe96",
+  "active_exact_icpns": [
+    "STM32WB10CCU5",
+    "STM32WB15CCU6",
+    "STM32WB15CCU6E",
+    "STM32WB15CCU7",
+    "STM32WB15CCU7E",
+    "STM32WB15CCY6TR",
+    "STM32WB1MMCH6TR",
+    "STM32WB30CEU5A",
+    "STM32WB30CEU5ATR",
+    "STM32WB35CCU6A",
+    "STM32WB35CCU6ATR",
+    "STM32WB35CCU7A",
+    "STM32WB35CEU6A",
+    "STM32WB35CEU7A",
+    "STM32WB50CGU5",
+    "STM32WB55CCU6",
+    "STM32WB55CCU6TR",
+    "STM32WB55CCU7",
+    "STM32WB55CEU6",
+    "STM32WB55CEU6TR",
+    "STM32WB55CEU7",
+    "STM32WB55CGU6",
+    "STM32WB55CGU6TR",
+    "STM32WB55CGU7",
+    "STM32WB55RCV6",
+    "STM32WB55RCV7",
+    "STM32WB55REV6",
+    "STM32WB55REV6TR",
+    "STM32WB55REV7",
+    "STM32WB55RGV6",
+    "STM32WB55RGV6TR",
+    "STM32WB55RGV7",
+    "STM32WB55RGV7TR",
+    "STM32WB55VCQ6",
+    "STM32WB55VCQ7",
+    "STM32WB55VCY6TR",
+    "STM32WB55VCY7TR",
+    "STM32WB55VEQ6",
+    "STM32WB55VEQ6TR",
+    "STM32WB55VEQ7",
+    "STM32WB55VEY6TR",
+    "STM32WB55VEY7TR",
+    "STM32WB55VGQ6",
+    "STM32WB55VGQ6TR",
+    "STM32WB55VGQ7",
+    "STM32WB55VGY6TR",
+    "STM32WB55VGY7TR",
+    "STM32WB55VYY6TR",
+    "STM32WB55VYY7TR",
+    "STM32WB5MMGH6TR"
+  ],
+  "attempted_targets": 18,
+  "base_device_count": 18,
+  "bounded_exact_discovery_complete": true,
+  "browser_version": "151.0.7922.34",
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": true,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6x_rejected": false,
+    "stm32wbx_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "discovery_id": "stm32wbx-bounded-exact-icpn-discovery-v1",
+  "excluded_non_active_part_number_count": 1,
+  "excluded_non_active_part_numbers": [
+    "STM32WB5MMGH6"
+  ],
+  "manual_review_targets": 0,
+  "next_gate": "stm32wbx-bounded-exact-icpn-admission-readiness-gate",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB10CCU5"
+      ],
+      "base_device": "STM32WB10CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB10CC",
+        "evidence_section_sha256": "465a829e66c991f2151e93a4f5b16a407e6902898d5b8f88d7de1a41176f85d5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB10CCU5"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB10CCU5",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "add84fc7792f6c3161b82aa923f35ea33022ebc949b1dcb5cdc59baf23196dd3",
+        "retrieved_at_utc": "2026-09-22T06:39:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+      "subfamily": "STM32WB10"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB15CCU6",
+        "STM32WB15CCU6E",
+        "STM32WB15CCU7",
+        "STM32WB15CCU7E",
+        "STM32WB15CCY6TR"
+      ],
+      "base_device": "STM32WB15CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB15CC",
+        "evidence_section_sha256": "9812316f2c31e5f32a874289a280247021b1be07c77e0e69abd406ecdc569618",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB15CCU6",
+          "STM32WB15CCU6E",
+          "STM32WB15CCU7",
+          "STM32WB15CCU7E",
+          "STM32WB15CCY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU6E",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU7E",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "884dba562a31061b209de97b3d31b154349fcc436b05f708d4d2dae7b361fdcb",
+        "retrieved_at_utc": "2026-09-22T06:39:39Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+      "subfamily": "STM32WB15"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB1MMCH6TR"
+      ],
+      "base_device": "STM32WB1MMC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB1MMC",
+        "evidence_section_sha256": "916014651af4d17ebcda0db0c15291e7b0a22194d7d42946fe4dca447afd1360",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB1MMCH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB1MMCH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9799dfd39d4b6822c6b0f7d2a3696f7f6ff7c3c66c179f8acfc93932f1ee4d6b",
+        "retrieved_at_utc": "2026-09-22T06:39:45Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+      "subfamily": "STM32WB1M"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB30CEU5A",
+        "STM32WB30CEU5ATR"
+      ],
+      "base_device": "STM32WB30CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB30CE",
+        "evidence_section_sha256": "5efdd2b0ff2263f81c7259f35bbe5a05e37c8c2911cb75d7534e86c56ac1893c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB30CEU5A",
+          "STM32WB30CEU5ATR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB30CEU5A",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB30CEU5ATR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "0e98e0cc554570f0a41a59a3325354fdd0a5f454f15c50e523ebaee175e029ab",
+        "retrieved_at_utc": "2026-09-22T06:39:50Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+      "subfamily": "STM32WB30"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB35CCU6A",
+        "STM32WB35CCU6ATR",
+        "STM32WB35CCU7A"
+      ],
+      "base_device": "STM32WB35CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB35CC",
+        "evidence_section_sha256": "02cc6a954c5b763dcd310478e72d6d3e6a04b0de2a29fb8b07fb761a5a0c5cb3",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB35CCU6A",
+          "STM32WB35CCU6ATR",
+          "STM32WB35CCU7A"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU6A",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU6ATR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU7A",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "74559394e6fded8d847a36773f25041b4fdb6d4b5bf7a18614d242e736db486f",
+        "retrieved_at_utc": "2026-09-22T06:39:56Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB35CEU6A",
+        "STM32WB35CEU7A"
+      ],
+      "base_device": "STM32WB35CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB35CE",
+        "evidence_section_sha256": "bab7822afa413ffa6e0789e4dfdee4a0b5a4ba7d1c816ba964526aae4204c99f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB35CEU6A",
+          "STM32WB35CEU7A"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB35CEU6A",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB35CEU7A",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c6ea3f1c4cd907ae540a97345488325ffdfdda1ad48b4f034ded0d5c6d9c19eb",
+        "retrieved_at_utc": "2026-09-22T06:40:13Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB50CGU5"
+      ],
+      "base_device": "STM32WB50CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB50CG",
+        "evidence_section_sha256": "80c92d6d742d59de1ad303eee1969daba64268474a4205df3ac193c34fa4d0ac",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB50CGU5"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB50CGU5",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f77a18f19669229e74520a2472f6473a8e785f628ef636927bf3a50166530796",
+        "retrieved_at_utc": "2026-09-22T06:40:18Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+      "subfamily": "STM32WB50"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55CCU6",
+        "STM32WB55CCU6TR",
+        "STM32WB55CCU7"
+      ],
+      "base_device": "STM32WB55CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55CC",
+        "evidence_section_sha256": "ca0395933f950f8e89a55b2c0f3215211ef0418ee198c6943b69350d851b5a70",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55CCU6",
+          "STM32WB55CCU6TR",
+          "STM32WB55CCU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8af10990ac7424f66111855643c3be1e964a1ebf0b6d859fa650e9275c225c15",
+        "retrieved_at_utc": "2026-09-22T06:40:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55CEU6",
+        "STM32WB55CEU6TR",
+        "STM32WB55CEU7"
+      ],
+      "base_device": "STM32WB55CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55CE",
+        "evidence_section_sha256": "03b0b28fe8bcce13e781506f3bf4642da3f9b0c2479a6471ffd4049c7841bf35",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55CEU6",
+          "STM32WB55CEU6TR",
+          "STM32WB55CEU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CEU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f6aa9b27f288aa71722130fe5c3ff461a0241b09ae0cf672235aca6f292ed58a",
+        "retrieved_at_utc": "2026-09-22T06:40:28Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ce.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ce.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55CGU6",
+        "STM32WB55CGU6TR",
+        "STM32WB55CGU7"
+      ],
+      "base_device": "STM32WB55CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55CG",
+        "evidence_section_sha256": "c0c72807d5cbc5e87d4ebe3c78d04688ba2997769bd3a0412f3ccf21537db482",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55CGU6",
+          "STM32WB55CGU6TR",
+          "STM32WB55CGU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CGU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CGU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3d3d72db000c4e24d3b350f9fbb95f5c4c5eb570cc5fadea1b4909b7b4ad8ba1",
+        "retrieved_at_utc": "2026-09-22T06:40:46Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55RCV6",
+        "STM32WB55RCV7"
+      ],
+      "base_device": "STM32WB55RC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55RC",
+        "evidence_section_sha256": "3547c3a7e578768136b06fa906471ec649922bc422c975596068f95f410d3306",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55RCV6",
+          "STM32WB55RCV7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55RCV6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55RCV7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "efc0eb84d83a59878b9bf917498597539ed77af903165e696b3602ae2f1f97b3",
+        "retrieved_at_utc": "2026-09-22T06:41:00Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55REV6",
+        "STM32WB55REV6TR",
+        "STM32WB55REV7"
+      ],
+      "base_device": "STM32WB55RE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55RE",
+        "evidence_section_sha256": "7b3535d26a3608ac4463c8c18ed4abc9a6b371dc1d8842848cc2bc08ea646bc2",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55REV6",
+          "STM32WB55REV6TR",
+          "STM32WB55REV7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55REV6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55REV6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55REV7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "65a49182cf7266b3e2d3b293765b87eaf6bdf37275bf1ca4bbd813cb03ddf77b",
+        "retrieved_at_utc": "2026-09-22T06:41:14Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55RGV6",
+        "STM32WB55RGV6TR",
+        "STM32WB55RGV7",
+        "STM32WB55RGV7TR"
+      ],
+      "base_device": "STM32WB55RG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55RG",
+        "evidence_section_sha256": "089a2b8ea839bfb4652ee859be428981b46198b3a8be344b3be52559061e3fe9",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55RGV6",
+          "STM32WB55RGV6TR",
+          "STM32WB55RGV7",
+          "STM32WB55RGV7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55RGV6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55RGV6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55RGV7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55RGV7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "35fb6f9c2cc4535d0e9061f26c6ca7bfcce86d94b75b465f73223dda2f9ec33a",
+        "retrieved_at_utc": "2026-09-22T06:41:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55VCQ6",
+        "STM32WB55VCQ7",
+        "STM32WB55VCY6TR",
+        "STM32WB55VCY7TR"
+      ],
+      "base_device": "STM32WB55VC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55VC",
+        "evidence_section_sha256": "b0db074c2b5de79fc6f3281222b2e606ad1368d727aac29011083c3cccb5b398",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55VCQ6",
+          "STM32WB55VCQ7",
+          "STM32WB55VCY6TR",
+          "STM32WB55VCY7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55VCQ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VCQ7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VCY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VCY7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "0f538d4d7d70666408d1c4b2681a5aa380807a78cd54334163be310110bef631",
+        "retrieved_at_utc": "2026-09-22T06:41:32Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vc.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55VEQ6",
+        "STM32WB55VEQ6TR",
+        "STM32WB55VEQ7",
+        "STM32WB55VEY6TR",
+        "STM32WB55VEY7TR"
+      ],
+      "base_device": "STM32WB55VE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55VE",
+        "evidence_section_sha256": "2a2bd016717fe6e58283dcc6c4745ac1c7e3b27bdf014137e232edf433bade41",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55VEQ6",
+          "STM32WB55VEQ6TR",
+          "STM32WB55VEQ7",
+          "STM32WB55VEY6TR",
+          "STM32WB55VEY7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55VEQ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VEQ6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VEQ7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VEY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VEY7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5eb8d4455fb4fe48b32b4f2c992122601f71ac25348228b5530696a51d8327f5",
+        "retrieved_at_utc": "2026-09-22T06:43:20Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55VGQ6",
+        "STM32WB55VGQ6TR",
+        "STM32WB55VGQ7",
+        "STM32WB55VGY6TR",
+        "STM32WB55VGY7TR"
+      ],
+      "base_device": "STM32WB55VG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55VG",
+        "evidence_section_sha256": "943c01656952cfaff6f8d3cb53d1f61bb46f3eb9205afc9dd48f37868a0d4c9e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55VGQ6",
+          "STM32WB55VGQ6TR",
+          "STM32WB55VGQ7",
+          "STM32WB55VGY6TR",
+          "STM32WB55VGY7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55VGQ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VGQ6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VGQ7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VGY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VGY7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "004e044012ddc87f324de19a92cb258ecfa167585edb16b964b8707ccaa01c5a",
+        "retrieved_at_utc": "2026-09-22T06:44:59Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB55VYY6TR",
+        "STM32WB55VYY7TR"
+      ],
+      "base_device": "STM32WB55VY",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55VY",
+        "evidence_section_sha256": "a12b860b64a1861217890d5eb66dd21c8a3073cc81fe620cfbeb768731914c5d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55VYY6TR",
+          "STM32WB55VYY7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vy.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55VYY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55VYY7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "266729256479d1f11ddd938c8129e118667ab51bd62537179cd16691ba79a6a7",
+        "retrieved_at_utc": "2026-09-22T06:46:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vy.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vy.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WB5MMGH6TR"
+      ],
+      "base_device": "STM32WB5MMG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB5MMG",
+        "evidence_section_sha256": "e57005528437cbb787e392b73c6dd9ec1a9f87fafd16646ccaa23ce7c4aa0b92",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB5MMGH6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WB5MMGH6",
+            "marketing_status": "Preview Product is in design stage. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32WB5MMGH6",
+            "marketing_status": "Preview Product is in design stage. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB5MMGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9896cfd264e506084669c1da4ccd3ecab314a79e7f4651dce73e03f06e479125",
+        "retrieved_at_utc": "2026-09-22T06:46:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html"
+      },
+      "excluded_non_active_icpns": [
+        "STM32WB5MMGH6"
+      ],
+      "manual_intervention_required": false,
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+      "subfamily": "STM32WB5M"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WBX bounded official-ST exact ICPN discovery",
+  "selected_wireless_frontier": "STM32WBX",
+  "status": "discovered",
+  "successful_targets": 18,
+  "target_config": "tcl/target/stm32wbx.cfg"
+}
