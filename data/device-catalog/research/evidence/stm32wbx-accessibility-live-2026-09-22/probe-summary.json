@@ -1,0 +1,395 @@
+{
+  "active_exact_icpns_observed_on_representative_pages": 17,
+  "attempted_targets": 8,
+  "bounded_probe_complete": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "representative_probe_is_full_family_enumeration": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wbx_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_numbers_observed": 1,
+  "manual_review_targets": 0,
+  "next_gate": "stm32wbx-bounded-exact-icpn-discovery-gate",
+  "official_st_evidence_accessible_for_all_subfamilies": true,
+  "probe_id": "stm32wbx-bounded-official-st-evidence-accessibility-v1",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32WB10CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB10CC",
+        "evidence_section_sha256": "465a829e66c991f2151e93a4f5b16a407e6902898d5b8f88d7de1a41176f85d5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB10CCU5"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB10CCU5",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bc6cb6cb5083bcea34c18eeb8be033cd62cb97a12f88d8dac5adf4e69ca318a9",
+        "retrieved_at_utc": "2026-09-22T06:31:28Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+      "subfamily": "STM32WB10"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 5,
+      "base_device": "STM32WB15CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB15CC",
+        "evidence_section_sha256": "9812316f2c31e5f32a874289a280247021b1be07c77e0e69abd406ecdc569618",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB15CCU6",
+          "STM32WB15CCU6E",
+          "STM32WB15CCU7",
+          "STM32WB15CCU7E",
+          "STM32WB15CCY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU6E",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCU7E",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB15CCY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "a28ca493936b3375919bd1bbee6601c001f86b26a18f0c5d7ae5e99872097f87",
+        "retrieved_at_utc": "2026-09-22T06:31:33Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name+ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+      "subfamily": "STM32WB15"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32WB1MMC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB1MMC",
+        "evidence_section_sha256": "916014651af4d17ebcda0db0c15291e7b0a22194d7d42946fe4dca447afd1360",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB1MMCH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB1MMCH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6a0e91bbd357b8d5d8a7aa611cfe83c224f1db6a94e9da6e9f90e391c6c3c21d",
+        "retrieved_at_utc": "2026-09-22T06:33:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+      "subfamily": "STM32WB1M"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32WB30CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB30CE",
+        "evidence_section_sha256": "5efdd2b0ff2263f81c7259f35bbe5a05e37c8c2911cb75d7534e86c56ac1893c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB30CEU5A",
+          "STM32WB30CEU5ATR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB30CEU5A",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB30CEU5ATR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "357012da93e2042e6e3ad4e0cf007af52675fb07e67479b04fad79bf021e4459",
+        "retrieved_at_utc": "2026-09-22T06:33:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+      "subfamily": "STM32WB30"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 3,
+      "base_device": "STM32WB35CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB35CC",
+        "evidence_section_sha256": "02cc6a954c5b763dcd310478e72d6d3e6a04b0de2a29fb8b07fb761a5a0c5cb3",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB35CCU6A",
+          "STM32WB35CCU6ATR",
+          "STM32WB35CCU7A"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU6A",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU6ATR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB35CCU7A",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f2518b4590b0935de4b3810f5c3dfa835e8cec7b83435188e2e5b563d0615e2f",
+        "retrieved_at_utc": "2026-09-22T06:33:20Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32WB50CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB50CG",
+        "evidence_section_sha256": "80c92d6d742d59de1ad303eee1969daba64268474a4205df3ac193c34fa4d0ac",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB50CGU5"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB50CGU5",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3b07d6b94c1c3b914d1a228396151ebfa0b79c4cd8665bf9a5cfccd9dde1c516",
+        "retrieved_at_utc": "2026-09-22T06:33:25Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+      "subfamily": "STM32WB50"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 3,
+      "base_device": "STM32WB55CC",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB55CC",
+        "evidence_section_sha256": "ca0395933f950f8e89a55b2c0f3215211ef0418ee198c6943b69350d851b5a70",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB55CCU6",
+          "STM32WB55CCU6TR",
+          "STM32WB55CCU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB55CCU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e66f18a50fe1968882869d90867079af2488ab6302882111498472336564e223",
+        "retrieved_at_utc": "2026-09-22T06:33:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32WB5MMG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WB5MMG",
+        "evidence_section_sha256": "e57005528437cbb787e392b73c6dd9ec1a9f87fafd16646ccaa23ce7c4aa0b92",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WB5MMGH6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WB5MMGH6",
+            "marketing_status": "Preview Product is in design stage. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32WB5MMGH6",
+            "marketing_status": "Preview Product is in design stage. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32WB5MMGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "709ce5755e42c79515ba0e97f659dfab7091c85b3bca44b83ca834cf2a10a131",
+        "retrieved_at_utc": "2026-09-22T06:33:45Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html"
+      },
+      "excluded_non_active_count": 1,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+      "subfamily": "STM32WB5M"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WBX bounded representative official-ST commercial identity/lifecycle evidence accessibility",
+  "selected_wireless_frontier": "STM32WBX",
+  "status": "accessible",
+  "successful_targets": 8,
+  "target_config": "tcl/target/stm32wbx.cfg"
+}

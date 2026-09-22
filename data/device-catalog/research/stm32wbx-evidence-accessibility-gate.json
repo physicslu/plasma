@@ -1,0 +1,90 @@
+{
+  "catalog_admission_ready": false,
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6x_rejected": false,
+    "stm32wbx_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "cmsis_evidence_bridge": {
+    "affected_subfamilies": [
+      "STM32WB15",
+      "STM32WB30",
+      "STM32WB35"
+    ],
+    "production_route_authorized": false,
+    "scope": "representative_manufacturer_evidence_targeting_only"
+  },
+  "decision": "accessible_for_bounded_exact_icpn_discovery",
+  "family": "STM32WBX",
+  "gate_id": "stm32wbx-bounded-official-st-evidence-accessibility-v1",
+  "lifecycle_exclusions": [
+    {
+      "icpn": "STM32WB5MMGH6",
+      "marketing_status_class": "Preview",
+      "representative_base": "STM32WB5MMG"
+    }
+  ],
+  "live_acquisition": {
+    "active_exact_icpns_observed": 17,
+    "artifact_id": 10680377009,
+    "artifact_zip_sha256": "3efcb3dd79f0ce09580c64d40ff66af7947ef1796d45c0eaf467342cf9082831",
+    "attempted_targets": 8,
+    "browser_version": "151.0.7922.34",
+    "excluded_non_active_part_numbers_observed": 1,
+    "executed_head": "33a575bab18abc1fe878d7f820a2117c9bcf1748",
+    "manual_review_targets": 0,
+    "successful_targets": 8,
+    "workflow_run_id": 35695157193
+  },
+  "manufacturer": "STMicroelectronics",
+  "next_gate": "stm32wbx-bounded-exact-icpn-discovery-gate",
+  "production_state": {
+    "exact_icpns": 2554,
+    "families": 20,
+    "wbx_published": false
+  },
+  "representative_bases": [
+    "STM32WB10CC",
+    "STM32WB15CC",
+    "STM32WB1MMC",
+    "STM32WB30CE",
+    "STM32WB35CC",
+    "STM32WB50CG",
+    "STM32WB55CC",
+    "STM32WB5MMG"
+  ],
+  "schema_version": 1,
+  "scope": "research_only",
+  "selected_surface": {
+    "identifier_kind_counts": {
+      "cmsis_device_name": 4,
+      "ordering_pattern": 19
+    },
+    "source_rows": 23,
+    "subfamilies": [
+      "STM32WB10",
+      "STM32WB15",
+      "STM32WB1M",
+      "STM32WB30",
+      "STM32WB35",
+      "STM32WB50",
+      "STM32WB55",
+      "STM32WB5M"
+    ],
+    "subfamily_count": 8,
+    "target_config": "tcl/target/stm32wbx.cfg"
+  }
+}

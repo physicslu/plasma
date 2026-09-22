@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB1MMC",
+  "evidence_section_sha256": "916014651af4d17ebcda0db0c15291e7b0a22194d7d42946fe4dca447afd1360",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB1MMCH6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB1MMCH6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "6a0e91bbd357b8d5d8a7aa611cfe83c224f1db6a94e9da6e9f90e391c6c3c21d",
+  "retrieved_at_utc": "2026-09-22T06:33:10Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html"
+}

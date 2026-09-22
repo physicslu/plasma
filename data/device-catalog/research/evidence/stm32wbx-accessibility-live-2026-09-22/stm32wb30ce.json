@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB30CE",
+  "evidence_section_sha256": "5efdd2b0ff2263f81c7259f35bbe5a05e37c8c2911cb75d7534e86c56ac1893c",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB30CEU5A",
+    "STM32WB30CEU5ATR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB30CEU5A",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB30CEU5ATR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "357012da93e2042e6e3ad4e0cf007af52675fb07e67479b04fad79bf021e4459",
+  "retrieved_at_utc": "2026-09-22T06:33:15Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html"
+}
