@@ -1,0 +1,68 @@
+{
+  "candidate_source": "data/device-catalog/research/openocd-parts-canonical.csv",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "probe_id": "stm32wbx-bounded-official-st-evidence-accessibility-v1",
+  "schema_version": 1,
+  "scope": "bounded representative official-ST evidence accessibility only",
+  "selection_sha256": "6ab706fc91bd2631f66a43f83618a7a66fadc7eaeced6ef0e2fcd05423419768",
+  "selection_source": "data/device-catalog/research/stm32-post-wba6x-blocked-wireless-frontier-selection.json",
+  "target_count": 8,
+  "targets": [
+    {
+      "base_device": "STM32WB10CC",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+      "subfamily": "STM32WB10"
+    },
+    {
+      "base_device": "STM32WB15CC",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name+ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+      "subfamily": "STM32WB15"
+    },
+    {
+      "base_device": "STM32WB1MMC",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+      "subfamily": "STM32WB1M"
+    },
+    {
+      "base_device": "STM32WB30CE",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+      "subfamily": "STM32WB30"
+    },
+    {
+      "base_device": "STM32WB35CC",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (cmsis_device_name)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "base_device": "STM32WB50CG",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+      "subfamily": "STM32WB50"
+    },
+    {
+      "base_device": "STM32WB55CC",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB5MMG",
+      "selection_reason": "deterministic lexical-min Base Device from frozen STM32WBX commercial identifier surface (ordering_pattern)",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+      "subfamily": "STM32WB5M"
+    }
+  ]
+}
