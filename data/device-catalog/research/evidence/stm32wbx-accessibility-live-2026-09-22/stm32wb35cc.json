@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB35CC",
+  "evidence_section_sha256": "02cc6a954c5b763dcd310478e72d6d3e6a04b0de2a29fb8b07fb761a5a0c5cb3",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB35CCU6A",
+    "STM32WB35CCU6ATR",
+    "STM32WB35CCU7A"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB35CCU6A",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB35CCU6ATR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB35CCU7A",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "f2518b4590b0935de4b3810f5c3dfa835e8cec7b83435188e2e5b563d0615e2f",
+  "retrieved_at_utc": "2026-09-22T06:33:20Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html"
+}
