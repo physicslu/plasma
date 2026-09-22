@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB10CC",
+  "evidence_section_sha256": "465a829e66c991f2151e93a4f5b16a407e6902898d5b8f88d7de1a41176f85d5",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB10CCU5"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB10CCU5",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "add84fc7792f6c3161b82aa923f35ea33022ebc949b1dcb5cdc59baf23196dd3",
+  "retrieved_at_utc": "2026-09-22T06:39:34Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html"
+}
