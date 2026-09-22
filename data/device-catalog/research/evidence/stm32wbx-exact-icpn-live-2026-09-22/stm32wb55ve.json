@@ -1,0 +1,49 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB55VE",
+  "evidence_section_sha256": "2a2bd016717fe6e58283dcc6c4745ac1c7e3b27bdf014137e232edf433bade41",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB55VEQ6",
+    "STM32WB55VEQ6TR",
+    "STM32WB55VEQ7",
+    "STM32WB55VEY6TR",
+    "STM32WB55VEY7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB55VEQ6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55VEQ6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55VEQ7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55VEY6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55VEY7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "5eb8d4455fb4fe48b32b4f2c992122601f71ac25348228b5530696a51d8327f5",
+  "retrieved_at_utc": "2026-09-22T06:43:20Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html"
+}
