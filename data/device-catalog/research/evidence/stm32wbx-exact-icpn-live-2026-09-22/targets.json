@@ -1,0 +1,139 @@
+{
+  "accessibility_summary_sha256": "2f3f21ec54c676778bba6e226b8fd79f82eb988b8effe87e8b3328d828ca74af",
+  "base_device_count": 18,
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "discovery_id": "stm32wbx-bounded-exact-icpn-discovery-v1",
+  "schema_version": 1,
+  "scope": "bounded exact ICPN discovery from official ST Q&R surfaces",
+  "selected_wireless_frontier": "STM32WBX",
+  "selection_sha256": "6ab706fc91bd2631f66a43f83618a7a66fadc7eaeced6ef0e2fcd05423419768",
+  "target_config": "tcl/target/stm32wbx.cfg",
+  "targets": [
+    {
+      "base_device": "STM32WB10CC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb10cc.html",
+      "subfamily": "STM32WB10"
+    },
+    {
+      "base_device": "STM32WB15CC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb15cc.html",
+      "subfamily": "STM32WB15"
+    },
+    {
+      "base_device": "STM32WB1MMC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb1mmc.html",
+      "subfamily": "STM32WB1M"
+    },
+    {
+      "base_device": "STM32WB30CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb30ce.html",
+      "subfamily": "STM32WB30"
+    },
+    {
+      "base_device": "STM32WB35CC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35cc.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "base_device": "STM32WB35CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb35ce.html",
+      "subfamily": "STM32WB35"
+    },
+    {
+      "base_device": "STM32WB50CG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+      "subfamily": "STM32WB50"
+    },
+    {
+      "base_device": "STM32WB55CC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ce.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55CG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55cg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55RC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55RE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55re.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55RG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55VC",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vc.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55VE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55ve.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55VG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vg.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB55VY",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55vy.html",
+      "subfamily": "STM32WB55"
+    },
+    {
+      "base_device": "STM32WB5MMG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBX identifier rows",
+      "series": "STM32WBX",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+      "subfamily": "STM32WB5M"
+    }
+  ]
+}
