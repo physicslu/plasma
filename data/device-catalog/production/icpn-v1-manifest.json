@@ -164,6 +164,14 @@
       "row_count": 31,
       "git_blob_sha": "3b9b7281058ca1248d83880ca96b21d6f02a65a3",
       "sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WBX",
+      "path": "../research/stm32wbx-commercial-icpn.csv",
+      "row_count": 50,
+      "git_blob_sha": "caff19debecf190fc02c2a8af4b3f301e7ae4d67",
+      "sha256": "0a97caf4afc336a762d9f504b860cafeffdf0ff8a6f603665b564f10b42bd664"
     }
   ]
 }

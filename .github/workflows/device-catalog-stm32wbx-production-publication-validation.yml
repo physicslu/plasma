@@ -1,0 +1,43 @@
+name: STM32WBX Production catalog publication validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32wbx-*'
+      - 'data/device-catalog/research/publish_stm32wbx_catalog.py'
+      - 'data/device-catalog/research/validate_stm32wbx_production_publication.py'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
+      - '.github/workflows/device-catalog-stm32wbx-production-publication-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32wbx-*'
+      - 'data/device-catalog/research/publish_stm32wbx_catalog.py'
+      - 'data/device-catalog/research/validate_stm32wbx_production_publication.py'
+      - 'docs/architecture/icpn-catalog-admission-policy.json'
+      - 'scripts/ci/device-catalog-production-invariants.py'
+      - '.github/workflows/device-catalog-stm32wbx-production-publication-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay deterministic STM32WBX publication
+        working-directory: data/device-catalog/research
+        run: python publish_stm32wbx_catalog.py --output-dir "$RUNNER_TEMP/stm32wbx-publication" --json
+      - name: Validate checked-in STM32WBX publication
+        working-directory: data/device-catalog/research
+        run: python validate_stm32wbx_production_publication.py
+      - name: Validate Production manifest invariants
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Load Production catalog through runtime implementation
+        run: PYTHONPATH=software/python python -m plasma_web.device_catalog --json
