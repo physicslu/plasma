@@ -1,0 +1,47 @@
+{
+  "canonical_csv_git_blob_sha": "3b9b7281058ca1248d83880ca96b21d6f02a65a3",
+  "canonical_csv_sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "debug_attach_support_claimed": false,
+  "discovery_base_devices": 17,
+  "exact_icpn_set_sha256": "928a6d292a524d7fbf1834af17446e2ad801c09c7daacc693b18d24020a7b7c2",
+  "excluded_non_active_part_numbers": 2,
+  "family": "STM32WLX",
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 30,
+    "deterministic_ordering_pattern_via_stsafe_provisioning_bridge": 1
+  },
+  "marketing_status_observed": {
+    "Active": 31
+  },
+  "metadata_exception_count": 0,
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2554,
+  "production_exact_icpns_before": 2523,
+  "production_family_count_after": 20,
+  "production_family_count_before": 19,
+  "production_manifest_git_blob_before": "b2c6850e0c9246a8cf344ac7090b3f3d01573f1e",
+  "programming_algorithm_equivalence_claimed": false,
+  "published_active_base_devices": 17,
+  "published_exact_icpns": 31,
+  "readiness_baseline": "stm32wlx-admission-readiness.json",
+  "readiness_git_blob_sha": "097e496c333a277162d635a982e73ec024e484f5",
+  "remaining_wireless_families_rejected": false,
+  "research_series": "STM32WLX",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 31
+  },
+  "route_bridge_count": 1,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "transaction": "stm32wlx-production-catalog-publication",
+  "wireless_radio_operation_authorized": false,
+  "wireless_security_operation_authorized": false
+}
