@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB50CG",
+  "evidence_section_sha256": "80c92d6d742d59de1ad303eee1969daba64268474a4205df3ac193c34fa4d0ac",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB50CGU5"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB50CGU5",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "3b07d6b94c1c3b914d1a228396151ebfa0b79c4cd8665bf9a5cfccd9dde1c516",
+  "retrieved_at_utc": "2026-09-22T06:33:25Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb50cg.html"
+}
