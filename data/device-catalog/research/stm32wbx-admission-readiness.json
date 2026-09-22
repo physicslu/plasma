@@ -1,0 +1,67 @@
+{
+  "authority": "research_only",
+  "canonical_candidate": "stm32wbx-commercial-icpn.csv",
+  "canonical_candidate_git_blob_sha": "caff19debecf190fc02c2a8af4b3f301e7ae4d67",
+  "canonical_candidate_sha256": "0a97caf4afc336a762d9f504b860cafeffdf0ff8a6f603665b564f10b42bd664",
+  "catalog_admission_ready": true,
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6x_rejected": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_number_count": 1,
+  "excluded_non_active_part_numbers": [
+    "STM32WB5MMGH6"
+  ],
+  "family": "STM32WBX",
+  "frozen_exact_icpn_count": 50,
+  "frozen_exact_icpn_set_sha256": "faaa262a535e5397894d2ecfdd4589a044371fdeb6926ffc3dfaab63f219fe96",
+  "identity_ready_count": 50,
+  "lifecycle_ready_count": 50,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_cmsis_commercial_bridge": 9,
+    "deterministic_ordering_pattern": 41
+  },
+  "metadata_authority": "stm32wbx-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 50,
+  "next_gate": "stm32wbx-production-publication-gate",
+  "package_counts": {
+    "LGA": 2,
+    "UFBGA": 8,
+    "UFQFPN": 22,
+    "VFQFPN": 9,
+    "WLCSP": 9
+  },
+  "production_exact_icpn_count": 2554,
+  "production_family_count": 20,
+  "readiness_id": "stm32wbx-bounded-exact-icpn-admission-readiness-v1",
+  "research_series": "STM32WBX",
+  "route_assignment_kind_counts": {
+    "cmsis_device_name": 9,
+    "ordering_pattern": 41
+  },
+  "route_bridge_count": 9,
+  "route_ready_count": 50,
+  "schema_version": 1,
+  "status": "catalog_admission_ready",
+  "target_config": "tcl/target/stm32wbx.cfg",
+  "temperature_grade_counts": {
+    "-10..85 C": 4,
+    "-40..105 C": 18,
+    "-40..85 C": 28
+  }
+}
