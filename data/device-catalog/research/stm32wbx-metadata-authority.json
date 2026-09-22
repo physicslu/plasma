@@ -1,0 +1,96 @@
+{
+  "authority_id": "stm32wbx-ordering-information-v1",
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6x_rejected": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "documents": [
+    {
+      "document_id": "DS11929",
+      "revision": "Rev 17",
+      "scope": [
+        "STM32WB35",
+        "STM32WB55"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb55ce.pdf"
+    },
+    {
+      "document_id": "DS13047",
+      "revision": "Rev 9",
+      "scope": [
+        "STM32WB30",
+        "STM32WB50"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb30ce.pdf"
+    },
+    {
+      "document_id": "DS13258",
+      "revision": "Rev 10",
+      "scope": [
+        "STM32WB15"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb15cc.pdf"
+    },
+    {
+      "document_id": "DS13259",
+      "revision": "Rev 7",
+      "scope": [
+        "STM32WB10"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb10cc.pdf"
+    },
+    {
+      "document_id": "DS13252",
+      "revision": "Rev 8",
+      "scope": [
+        "STM32WB5M"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb5mmg.pdf"
+    },
+    {
+      "document_id": "DS14096",
+      "revision": "Rev 8",
+      "scope": [
+        "STM32WB1M"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb1mmc.pdf"
+    }
+  ],
+  "family": "STM32WBX",
+  "manufacturer": "STMicroelectronics",
+  "metadata_notes": {
+    "STM32WB10": "DS13259: C=48 pins, C=320 KiB, U=UFQFPN48, temperature code 5=-10..85 C.",
+    "STM32WB15": "DS13258: C=48 pins/49 balls, C=320 KiB, U=UFQFPN48, Y=WLCSP49, 6=-40..85 C, 7=-40..105 C, E=extended I/O specificity.",
+    "STM32WB1M": "DS14096: STM32WB1MMC module; retained exact identity STM32WB1MMCH6TR, LGA77, 320 KiB, -40..85 C.",
+    "STM32WB30_STM32WB50": "DS13047: C=48 pins, E=512 KiB, G=1 MiB, U=UFQFPN48, temperature code 5=-10..85 C, A=proprietary identification code.",
+    "STM32WB35_STM32WB55": "DS11929: C/R/V pin-count codes, C/E/Y/G flash codes, U/V/Y/Q packages, temperature 6/7, A proprietary identification code.",
+    "STM32WB5M": "DS13252: module, M=86 pins, G=1 MiB, H=LGA86, 6=-40..85 C, TR=tape and reel."
+  },
+  "research_series": "STM32WBX",
+  "route_semantics": {
+    "cmsis_bridge": "Frozen cmsis_device_name identifier rows may provide deterministic commercial-pattern matching only when an exact ICPN has exactly one such match and no ordering-pattern match. This bridge does not authorize Production publication or target execution.",
+    "packing_normalization": "Strip only terminal commercial packing suffix TR before backend route matching; retain TR in commercial metadata.",
+    "target_config": "tcl/target/stm32wbx.cfg",
+    "wildcard": "Only lowercase x is a one-character wildcard."
+  },
+  "schema_version": 1,
+  "verified_at": "2026-09-22"
+}
