@@ -1,0 +1,35 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB5MMG",
+  "evidence_section_sha256": "e57005528437cbb787e392b73c6dd9ec1a9f87fafd16646ccaa23ce7c4aa0b92",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB5MMGH6TR"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32WB5MMGH6",
+      "marketing_status": "Preview Product is in design stage. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32WB5MMGH6",
+      "marketing_status": "Preview Product is in design stage. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB5MMGH6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "709ce5755e42c79515ba0e97f659dfab7091c85b3bca44b83ca834cf2a10a131",
+  "retrieved_at_utc": "2026-09-22T06:33:45Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb5mmg.html"
+}
