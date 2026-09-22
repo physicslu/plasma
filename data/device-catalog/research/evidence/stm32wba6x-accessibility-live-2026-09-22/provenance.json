@@ -1,0 +1,9 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser_version": "151.0.7922.34",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "generated_at_utc": "2026-09-22T06:20:28Z",
+  "probe_id": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+  "schema_version": 1,
+  "selection_sha256": "6243c80f97b2c159bc964935fc2f87371a596ee9f2d2e397e1c7ee9c3b6a178d"
+}

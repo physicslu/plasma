@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA65CG",
+  "evidence_section_sha256": "fbb193f99d1bd53c78c5560df1b75474aea2da1b6aee29768a5aed52407a1674",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA65CGU6",
+    "STM32WBA65CGU7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA65CGU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65CGU7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "9b0e08135e90ae3ca73ec18e34f0e37d3eedb0cab1104530764ee9ea9d4b167f",
+  "retrieved_at_utc": "2026-09-22T06:20:25Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html"
+}

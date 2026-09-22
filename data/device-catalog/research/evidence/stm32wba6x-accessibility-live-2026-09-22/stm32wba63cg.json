@@ -1,0 +1,41 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA63CG",
+  "evidence_section_sha256": "c13d653d27dab3267081ee3af296cfb2791509f1a9c714ab759b99063f41b10a",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA63CGU6",
+    "STM32WBA63CGU7"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32WBA63CGU6TR",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA63CGU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": false,
+      "icpn": "STM32WBA63CGU6TR",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA63CGU7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "a6993c9093dae424b4fcbb58fe0f748303cf166a0a874e7daf208c701afe72df",
+  "retrieved_at_utc": "2026-09-22T06:20:14Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html"
+}

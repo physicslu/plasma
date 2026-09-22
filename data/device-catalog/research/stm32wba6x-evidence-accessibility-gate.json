@@ -1,0 +1,107 @@
+{
+  "catalog_admission_ready": false,
+  "claims": {
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6m_rejected": false,
+    "stm32wba6x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "decision": "defer_frontier_pending_official_product_evidence",
+  "family": "STM32WBA6X",
+  "gate_id": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+  "live_acquisition": {
+    "active_exact_icpns_observed": 7,
+    "artifact_id": 10680295411,
+    "artifact_zip_sha256": "7f5db9ce0fceecd670cdcefc41f491aa56328ae8aaf5f198082a01254474b317",
+    "attempted_targets": 5,
+    "browser_version": "151.0.7922.34",
+    "excluded_non_active_part_numbers_observed": 1,
+    "executed_head": "3982be122a43be062054f0be25f6f897e3b2a498",
+    "manual_review_targets": 1,
+    "successful_targets": 4,
+    "workflow_run_id": 35694311469
+  },
+  "manufacturer": "STMicroelectronics",
+  "next_gate": "stm32-post-wba6x-evidence-block-wireless-frontier-reselection-gate",
+  "production_state": {
+    "exact_icpns": 2554,
+    "families": 20,
+    "wba6x_published": false
+  },
+  "representative_results": {
+    "STM32WBA62": {
+      "active_exact_icpns": [
+        "STM32WBA62CGU6"
+      ],
+      "base_device": "STM32WBA62CG",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA63": {
+      "active_exact_icpns": [
+        "STM32WBA63CGU6",
+        "STM32WBA63CGU7"
+      ],
+      "base_device": "STM32WBA63CG",
+      "excluded_non_active": [
+        {
+          "icpn": "STM32WBA63CGU6TR",
+          "marketing_status_class": "Proposal"
+        }
+      ],
+      "status": "accessible"
+    },
+    "STM32WBA64": {
+      "active_exact_icpns": [
+        "STM32WBA64CGU6",
+        "STM32WBA64CGU7"
+      ],
+      "base_device": "STM32WBA64CG",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA65": {
+      "active_exact_icpns": [
+        "STM32WBA65CGU6",
+        "STM32WBA65CGU7"
+      ],
+      "base_device": "STM32WBA65CG",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA6M": {
+      "base_device": "STM32WBA6MOI",
+      "error": "browser navigation returned HTTP 404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba6moi.html",
+      "status": "blocked_manual_review"
+    }
+  },
+  "schema_version": 1,
+  "scope": "research_only",
+  "selected_surface": {
+    "identifier_kind_counts": {
+      "ordering_pattern": 19
+    },
+    "source_rows": 19,
+    "subfamilies": [
+      "STM32WBA62",
+      "STM32WBA63",
+      "STM32WBA64",
+      "STM32WBA65",
+      "STM32WBA6M"
+    ],
+    "subfamily_count": 5,
+    "target_config": "tcl/target/stm32wba6x.cfg"
+  }
+}

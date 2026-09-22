@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA62CG",
+  "evidence_section_sha256": "9c83e07584abb36a968217ee72515cc01d729327c53126e9edc997a90075ad75",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA62CGU6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA62CGU6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "abc8469d6fd8f98a1b5340440e3294dc193bf81fbbf7f1e4e8027dd6c3070fd0",
+  "retrieved_at_utc": "2026-09-22T06:20:09Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html"
+}
