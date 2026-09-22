@@ -1,0 +1,47 @@
+name: TEMP STM32WBX admission readiness materialization
+
+on:
+  push:
+    branches:
+      - agent/stm32wbx-admission-readiness
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-stm32wbx-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize deterministic STM32WBX readiness artifacts
+        run: |
+          rm -rf .artifacts/stm32wbx-readiness
+          mkdir -p .artifacts/stm32wbx-readiness
+          python data/device-catalog/research/stm32wbx_admission_readiness.py \
+            --csv-output .artifacts/stm32wbx-readiness/stm32wbx-commercial-icpn.csv \
+            --readiness-output .artifacts/stm32wbx-readiness/stm32wbx-admission-readiness.json
+      - name: Emit materialized artifacts
+        run: |
+          python - <<'PY'
+          import base64
+          import pathlib
+          root = pathlib.Path(".artifacts/stm32wbx-readiness")
+          for path in sorted(root.iterdir()):
+              print(f"MATERIALIZED_FILE_BEGIN {path.name}")
+              print(base64.b64encode(path.read_bytes()).decode("ascii"))
+              print(f"MATERIALIZED_FILE_END {path.name}")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32wbx-readiness-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: .artifacts/stm32wbx-readiness/*
