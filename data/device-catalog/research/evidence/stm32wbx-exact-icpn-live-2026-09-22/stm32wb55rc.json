@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WB55RC",
+  "evidence_section_sha256": "3547c3a7e578768136b06fa906471ec649922bc422c975596068f95f410d3306",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WB55RCV6",
+    "STM32WB55RCV7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WB55RCV6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WB55RCV7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "efc0eb84d83a59878b9bf917498597539ed77af903165e696b3602ae2f1f97b3",
+  "retrieved_at_utc": "2026-09-22T06:41:00Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb55rc.html"
+}
