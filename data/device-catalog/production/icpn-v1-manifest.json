@@ -156,6 +156,14 @@
       "row_count": 14,
       "git_blob_sha": "15a0d57b7f94c05f745a1768036fef9f01ec1fd9",
       "sha256": "8d21112ab6d9c8a865e5ce6ccda221b1fee17cbac750ceb042ea41111379fe8d"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WLX",
+      "path": "../research/stm32wlx-commercial-icpn.csv",
+      "row_count": 31,
+      "git_blob_sha": "3b9b7281058ca1248d83880ca96b21d6f02a65a3",
+      "sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c"
     }
   ]
 }
