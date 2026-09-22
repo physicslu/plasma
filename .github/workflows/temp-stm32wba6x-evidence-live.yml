@@ -1,0 +1,67 @@
+name: TEMP STM32WBA6X live evidence acquisition
+
+on:
+  push:
+    branches:
+      - agent/stm32wba6x-evidence-accessibility-live
+    paths:
+      - 'data/device-catalog/research/stm32wba6x_evidence_accessibility_probe.py'
+      - '.github/workflows/temp-stm32wba6x-evidence-live.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-stm32wba6x-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acquire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run WBA6X representative live acquisition
+        id: acquire
+        continue-on-error: true
+        run: |
+          rm -rf .artifacts/stm32wba6x-accessibility
+          mkdir -p .artifacts/stm32wba6x-accessibility
+          python data/device-catalog/research/stm32wba6x_evidence_accessibility_probe.py \
+            --headless \
+            --delay-seconds 1.0 \
+            --timeout-seconds 90 \
+            --output-dir .artifacts/stm32wba6x-accessibility
+
+      - name: Print retained candidate JSON
+        if: always()
+        run: |
+          echo '=== STM32WBA6X_EVIDENCE_BEGIN ==='
+          find .artifacts/stm32wba6x-accessibility -maxdepth 1 -type f -name '*.json' -print -exec cat {} \; || true
+          echo '=== STM32WBA6X_EVIDENCE_END ==='
+
+      - name: Upload candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32wba6x-accessibility-live-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: .artifacts/stm32wba6x-accessibility/*.json
+
+      - name: Enforce accessibility gate
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "STM32WBA6X live accessibility is not clean; inspect emitted evidence." >&2
+            exit 1
+          fi
