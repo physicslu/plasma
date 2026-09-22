@@ -36,8 +36,7 @@ jobs:
         run: |
           rm -rf .artifacts/stm32wba6x-accessibility
           mkdir -p .artifacts/stm32wba6x-accessibility
-          python data/device-catalog/research/stm32wba6x_evidence_accessibility_probe.py \
-            --headless \
+          xvfb-run -a python data/device-catalog/research/stm32wba6x_evidence_accessibility_probe.py \
             --delay-seconds 1.0 \
             --timeout-seconds 90 \
             --output-dir .artifacts/stm32wba6x-accessibility
