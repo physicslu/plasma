@@ -1,0 +1,47 @@
+{
+  "candidate_source": "data/device-catalog/research/openocd-parts-canonical.csv",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "probe_id": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+  "schema_version": 1,
+  "scope": "bounded representative official-ST evidence accessibility only",
+  "selection_sha256": "6243c80f97b2c159bc964935fc2f87371a596ee9f2d2e397e1c7ee9c3b6a178d",
+  "selection_source": "data/device-catalog/research/stm32-post-wlx-wireless-frontier-selection.json",
+  "target_count": 5,
+  "targets": [
+    {
+      "base_device": "STM32WBA62CG",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA6X ordering-pattern subfamily",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA63CG",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA6X ordering-pattern subfamily",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html",
+      "subfamily": "STM32WBA63"
+    },
+    {
+      "base_device": "STM32WBA64CG",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA6X ordering-pattern subfamily",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64cg.html",
+      "subfamily": "STM32WBA64"
+    },
+    {
+      "base_device": "STM32WBA65CG",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA6X ordering-pattern subfamily",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA6MOI",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA6X ordering-pattern subfamily",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba6moi.html",
+      "subfamily": "STM32WBA6M"
+    }
+  ]
+}
