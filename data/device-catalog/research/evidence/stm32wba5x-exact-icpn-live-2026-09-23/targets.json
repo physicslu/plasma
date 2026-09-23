@@ -1,0 +1,119 @@
+{
+  "accessibility_summary_sha256": "0e9d7fe6dade69227444c8719c1e5bff858cb86370dafd04a4c7d284c236262b",
+  "base_device_count": 15,
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "commercial_scope_reconciliation_sha256": "5c3a82628796390a18ff5cba6e0cda5d9439c700791b2f84ea5776a4e2d6cdd0",
+  "discovery_id": "stm32wba5x-bounded-exact-icpn-discovery-v2",
+  "schema_version": 1,
+  "scope": "bounded exact ICPN discovery from official ST Q&R surfaces",
+  "selected_wireless_frontier": "STM32WBA5X",
+  "selection_sha256": "6cc5a67f3bac67ee6633c206620af487a65301214b60dd62e35dfef48c395b43",
+  "target_config": "tcl/target/stm32wba5x.cfg",
+  "targets": [
+    {
+      "base_device": "STM32WBA50KG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50kg.html",
+      "subfamily": "STM32WBA50"
+    },
+    {
+      "base_device": "STM32WBA52CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ce.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "base_device": "STM32WBA52CG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52cg.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "base_device": "STM32WBA52KE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ke.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "base_device": "STM32WBA52KG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52kg.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "base_device": "STM32WBA54CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ce.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "base_device": "STM32WBA54CG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54cg.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "base_device": "STM32WBA54KE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ke.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "base_device": "STM32WBA54KG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54kg.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "base_device": "STM32WBA55CE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA55CG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55cg.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA55HG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55hg.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA55UE",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ue.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA55UG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ug.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA5MMG",
+      "selection_reason": "unique commercial Base Device derived from frozen STM32WBA5X identifier rows",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html",
+      "subfamily": "STM32WBA5M"
+    }
+  ]
+}

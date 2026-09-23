@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA55UG",
+  "evidence_section_sha256": "d5363a60d442acdb99fe6f09af3e9194b88d54d8e5e47a89ea17a8bb0cc29a3e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA55UGI6",
+    "STM32WBA55UGI6TR",
+    "STM32WBA55UGI7",
+    "STM32WBA55UGI7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ug.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA55UGI6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA55UGI6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA55UGI7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA55UGI7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "3fc2edb103f507741fe0ce5b3d4a4abc0312dd3321ca36f4962d21bf3111e086",
+  "retrieved_at_utc": "2026-09-23T07:29:05Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ug.html"
+}

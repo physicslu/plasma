@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA55CE",
+  "evidence_section_sha256": "bf5ca03baa6544abb2e89cfe2b838705ca28862b5602a6ed5478fcb28f8af128",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA55CEU6",
+    "STM32WBA55CEU6TR",
+    "STM32WBA55CEU7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA55CEU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA55CEU6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA55CEU7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "13d3fccae395226aaa6f1f4a78193b4c4f5f2f5f1e517d3d43a5e3e43729b3b9",
+  "retrieved_at_utc": "2026-09-23T07:20:37Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html"
+}

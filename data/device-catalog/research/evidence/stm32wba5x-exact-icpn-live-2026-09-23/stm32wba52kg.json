@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA52KG",
+  "evidence_section_sha256": "c5ba06f75a16aa11f9a156090f9ef28418281c24436ed4a340a49b8b1b9fa3a5",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA52KGU6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52kg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA52KGU6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "e0ca7ab1abeecf663921dfd662c457102e25304eecdfe4ed93739dd319d3a35c",
+  "retrieved_at_utc": "2026-09-23T07:19:40Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52kg.html"
+}

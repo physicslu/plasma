@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA52KE",
+  "evidence_section_sha256": "68b519495ab0cc5f3fc5abc9cadef78a89107ef29d0981824c6bfc7a2e663935",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA52KEU6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ke.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA52KEU6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "9f97294aad93a4ebeb5c6580a7acb23d8a9084095f1ef6b8182295e7d5b9dc9e",
+  "retrieved_at_utc": "2026-09-23T07:18:04Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ke.html"
+}
