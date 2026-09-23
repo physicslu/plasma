@@ -1137,3 +1137,354 @@
     min-width: 0;
   }
 }
+
+
+/* PPU workspace density pass: keep domain semantics, reduce repeated cards and scan distance. */
+.ppuOverviewTargetBody,
+.ppuSitesTargetBody {
+  display: grid;
+  grid-template-columns: minmax(240px, .7fr) minmax(0, 1.3fr);
+  gap: 14px;
+  align-items: end;
+  padding: 12px 16px 16px;
+}
+
+.ppuOverviewIdentity,
+.ppuRegistrationIdentityGrid {
+  display: grid;
+  margin: 0;
+}
+
+.ppuOverviewIdentity {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.ppuOverviewIdentity > div,
+.ppuRegistrationIdentityGrid > div {
+  min-width: 0;
+}
+
+.ppuOverviewIdentity dt,
+.ppuRegistrationIdentityGrid dt,
+.ppuOverviewDomainCard dt {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.ppuOverviewIdentity dd,
+.ppuRegistrationIdentityGrid dd,
+.ppuOverviewDomainCard dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ppuOverviewSnapshotGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  padding: 0 16px 16px;
+}
+
+.ppuOverviewMetric {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: color-mix(in srgb, var(--panel-3) 72%, transparent);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuOverviewMetric[data-tone="healthy"] { box-shadow: inset 3px 0 0 var(--green); }
+.ppuOverviewMetric[data-tone="warning"] { box-shadow: inset 3px 0 0 var(--amber); }
+.ppuOverviewMetric[data-tone="danger"] { box-shadow: inset 3px 0 0 var(--red); }
+.ppuOverviewMetric[data-tone="info"] { box-shadow: inset 3px 0 0 var(--cyan); }
+
+.ppuOverviewMetric small,
+.ppuSitesSummaryGrid small,
+.ppuRegistrationStateCard small,
+.ppuRegistrationActionStrip small {
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.ppuOverviewMetric strong,
+.ppuSitesSummaryGrid strong,
+.ppuRegistrationStateCard strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ppuOverviewMetric span,
+.ppuRegistrationStateCard span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ppuOverviewDomainGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ppuOverviewDomainCard {
+  padding: 13px 14px;
+}
+
+.ppuOverviewDomainCard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ppuOverviewDomainCard > header small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--cyan);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+}
+
+.ppuOverviewDomainCard > header h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ppuOverviewDomainCard dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.ppuOverviewAlerts {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel-3) 65%, transparent);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ppuOverviewAlerts strong {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 10px;
+}
+
+.ppuOverviewAlerts[data-state="active"] {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  background: color-mix(in srgb, var(--amber) 6%, var(--panel));
+}
+
+.ppuRegistrationSelected {
+  overflow: visible;
+}
+
+.ppuRegistrationActionStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-3) 72%, transparent);
+}
+
+.ppuRegistrationActionStrip > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.ppuRegistrationActionStrip strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.ppuRegistrationStateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  padding: 12px 16px 0;
+}
+
+.ppuRegistrationStateCard {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--panel);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuRegistrationStateCard[data-tone="healthy"] { box-shadow: inset 3px 0 0 var(--green); }
+.ppuRegistrationStateCard[data-tone="warning"] { box-shadow: inset 3px 0 0 var(--amber); }
+.ppuRegistrationStateCard[data-tone="danger"] { box-shadow: inset 3px 0 0 var(--red); }
+.ppuRegistrationStateCard[data-tone="info"] { box-shadow: inset 3px 0 0 var(--cyan); }
+
+.ppuRegistrationIdentityGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.ppuRegistrationIdentityGrid .wide {
+  grid-column: span 2;
+}
+
+.ppuRegistrationNetworkPanel {
+  opacity: .94;
+}
+
+.ppuRegistrationNetworkPanel .ppuSiteCardHeader {
+  padding-top: 12px;
+}
+
+.ppuSitesTargetBody {
+  grid-template-columns: minmax(220px, .55fr) minmax(0, 1.45fr);
+}
+
+.ppuSitesSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ppuSitesSummaryGrid article {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 9px;
+  background: color-mix(in srgb, var(--panel-3) 72%, transparent);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuSitesSummaryGrid article[data-tone="healthy"] { box-shadow: inset 3px 0 0 var(--green); }
+.ppuSitesSummaryGrid article[data-tone="warning"] { box-shadow: inset 3px 0 0 var(--amber); }
+.ppuSitesSummaryGrid article[data-tone="danger"] { box-shadow: inset 3px 0 0 var(--red); }
+.ppuSitesSummaryGrid article[data-tone="info"] { box-shadow: inset 3px 0 0 var(--cyan); }
+
+.ppuSitesWorkflow {
+  display: grid;
+  gap: 14px;
+}
+
+.ppuSitesWorkflow .ppuConfigurationStateFlow {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 9px 16px 10px;
+}
+
+.ppuSitesWorkflow .ppuConfigurationStateStep {
+  padding: 8px 10px;
+}
+
+.ppuSitesWorkflow .ppuConfigurationStateStep span {
+  font-size: 9px;
+}
+
+.ppuSitesWorkflow .ppuSiteNote {
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.ppuPlatformCard > .ppuPlatformSection:first-of-type {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.ppuPlatformSummaryActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1180px) {
+  .ppuOverviewSnapshotGrid,
+  .ppuOverviewDomainGrid,
+  .ppuRegistrationStateGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ppuRegistrationIdentityGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ppuSitesTargetBody {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuSitesSummaryGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .ppuOverviewTargetBody,
+  .ppuSitesTargetBody,
+  .ppuOverviewSnapshotGrid,
+  .ppuOverviewDomainGrid,
+  .ppuRegistrationStateGrid,
+  .ppuRegistrationIdentityGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuOverviewIdentity,
+  .ppuOverviewDomainCard dl,
+  .ppuSitesSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ppuRegistrationIdentityGrid .wide {
+    grid-column: span 1;
+  }
+
+  .ppuRegistrationActionStrip,
+  .ppuOverviewDomainCard > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ppuRegistrationActionStrip .ppuSiteCardHeaderActions,
+  .ppuPlatformSummaryActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .ppuOverviewIdentity,
+  .ppuOverviewDomainCard dl,
+  .ppuSitesSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuOverviewAlerts {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
