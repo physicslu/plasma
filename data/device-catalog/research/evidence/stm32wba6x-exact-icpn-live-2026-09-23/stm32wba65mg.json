@@ -1,0 +1,41 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA65MG",
+  "evidence_section_sha256": "b133913d9322c7195695c20d830a5d35d918cb2b83c4a8a7b2ab5e8e8845f3b6",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA65MGF6TR",
+    "STM32WBA65MGF7TR"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32WBA65MGF6",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32WBA65MGF6",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65MGF6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65MGF7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "5ccf4439fea2a8ad09ea46c636f9eb26cbff12bdc6ffa3b3e9b25cbf4edc48e0",
+  "retrieved_at_utc": "2026-09-23T08:08:51Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html"
+}
