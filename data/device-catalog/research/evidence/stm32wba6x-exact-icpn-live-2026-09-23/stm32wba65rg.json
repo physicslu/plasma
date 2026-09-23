@@ -1,0 +1,37 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA65RG",
+  "evidence_section_sha256": "d023dfe5c9ebdfe193b2191e215424f37d9feab6addfdcac3c453215f5bdfd8d",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA65RGV6",
+    "STM32WBA65RGV6TR",
+    "STM32WBA65RGV7"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA65RGV6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65RGV6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65RGV7",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "2065567020d10c37485447f86b6d51dd9083659a6afb61efab5ba00cfc087ad5",
+  "retrieved_at_utc": "2026-09-23T08:11:24Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html"
+}
