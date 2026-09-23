@@ -97,7 +97,7 @@ This command:
 4. re-executes the newly pulled `plasmactl` code;
 5. starts/verifies the private ARMv7 QEMU target;
 6. builds a canonical ARMv7 PPU Runtime and simulation Z2 PS kit;
-7. deploys through the persistent SWPC-local Bootstrap Manager lifecycle gates;
+7. deploys through the persistent SWPC-local Bootstrap Manager Platform-maintenance gates without changing programming Registration;
 8. migrates/reconciles host `18082` to the QEMU managed ingress;
 9. verifies QEMU Gateway execution readiness;
 10. verifies the bounded `18082` ingress;
@@ -136,14 +136,15 @@ SWPC local operator
   -> packaged ARMv7 Plasma Server/Gateway
 ```
 
-Lifecycle remains fail-closed:
+Platform maintenance remains fail-closed and independent from programming Registration:
 
-- a fresh `pending` PPU may receive first Runtime deployment;
-- a `commissioned` PPU is first disabled through Manager lifecycle policy;
-- disabling is rejected while execution is active;
-- maintenance proceeds only from `pending` or `disabled`;
+- the existing programming Registration lifecycle (`pending`, `commissioned`, or `disabled`) is preserved;
+- device-bound Bootstrap pairing is required for authenticated mutation;
+- active Site execution blocks Platform mutation;
+- a `runtime_absent` target may receive first Runtime deployment without a Runtime-idle observation;
+- an existing `runtime_active` target requires a newer current trusted idle Manager observation after target restart;
 - recovery/unknown Runtime state is rejected;
-- re-commissioning occurs only after Runtime readiness and a current trusted Manager observation.
+- commissioning and disabling are handled only by the separate Registration workflow.
 
 The device-local pairing token is read only from the local QEMU container when pairing is required and is never printed by the one-command deployment path.
 

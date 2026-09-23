@@ -40,11 +40,14 @@ test("Platform surface is explicitly independent from programming Registration",
   assert.doesNotMatch(platform, /PPU \/ Site Configuration/);
 });
 
-test("Platform Release update preserves lifecycle, idle, recovery, and artifact-integrity gates", async () => {
+test("Platform Release update is registration-independent while preserving idle, recovery, and artifact-integrity gates", async () => {
   const deployment = await source(files.deployment);
-  assert.match(deployment, /entry\.lifecycle === "pending"/);
-  assert.match(deployment, /entry\.lifecycle === "disabled" && hasTrustedIdleObservation/);
-  assert.match(deployment, /entry\.lifecycle === "commissioned"/);
+  assert.match(deployment, /runtime\?\.state === "runtime_absent"/);
+  assert.match(deployment, /runtime\?\.state === "runtime_active" && hasTrustedIdleObservation/);
+  assert.doesNotMatch(deployment, /entry\.lifecycle === "pending"/);
+  assert.doesNotMatch(deployment, /entry\.lifecycle === "disabled"/);
+  assert.doesNotMatch(deployment, /entry\.lifecycle === "commissioned"/);
+  assert.match(deployment, /Programming Registration does not control this Platform gate/);
   assert.match(deployment, /recovery_required/);
   assert.match(deployment, /hasActiveExecution/);
   assert.match(deployment, /parseSha256Sidecar/);

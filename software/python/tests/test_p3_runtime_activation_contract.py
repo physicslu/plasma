@@ -89,6 +89,15 @@ def test_z2_verifier_accepts_p3_installer_evidence_and_checks_runtime_wiring() -
     assert "runtime_activation.quiesce_ttl_bounded" in control
     assert "plasma-runtime-activation.service is not active" in control
     assert "runtime activation helper socket must be mode 0660" in control
+    assert "wait_runtime_readiness" in control
+    assert "deadline = time.monotonic() + 30.0" in control
+    assert "urllib.request.ProxyHandler({})" in control
+    verify_start = control.index("verify_runtime() {")
+    verify_body = control[verify_start:]
+    assert "verify_runtime() {\n  require_root" in verify_body
+    assert verify_body.index('readiness="$(wait_runtime_readiness "$base")"') < verify_body.index(
+        "systemctl is-active --quiet plasma-server.service"
+    )
     assert "Runtime apply is not claimed" not in control
 
 

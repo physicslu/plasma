@@ -42,6 +42,13 @@ $configPath = Join-Path $programDataRoot 'config\manager.yaml'
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "Manager config is missing: $configPath"
 }
+
+# Upgrade compatibility: older preserved manager.yaml files predate
+# registry_state_path. Supply the product-owned ProgramData state path only as
+# a fallback when the config omits the field. An explicit config value,
+# including null, remains authoritative.
+$env:PLASMA_MANAGER_REGISTRY_STATE_PATH_FALLBACK = Join-Path $programDataRoot 'state\manager-registry.json'
+
 $runtime = Join-Path $PSScriptRoot '..\runtime\manager\manager.pyz'
 & $python $runtime --config $configPath
 exit $LASTEXITCODE
