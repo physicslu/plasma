@@ -1,0 +1,256 @@
+{
+  "active_exact_icpns_observed_on_representative_pages": 11,
+  "attempted_targets": 5,
+  "bounded_probe_complete": true,
+  "claims": {
+    "debug_attach_supported": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "representative_probe_is_full_family_enumeration": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba5x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_numbers_observed": 0,
+  "manual_review_targets": 0,
+  "next_gate": "stm32wba5x-bounded-exact-icpn-discovery-gate",
+  "official_st_evidence_accessible_for_all_subfamilies": true,
+  "probe_id": "stm32wba5x-bounded-official-st-evidence-remediation-v1",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32WBA50KG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA50KG",
+        "evidence_section_sha256": "2f96716b96e5270d7b6fee8f7c33dbf24c598556d00c4bb765cd3a46ffae0d80",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA50KGU6",
+          "STM32WBA50KGU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50kg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA50KGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA50KGU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "05e660f2cad8087f0860f5f97309a45308861d085cb4e47a1e52e0332ec84eb6",
+        "retrieved_at_utc": "2026-09-23T03:31:22Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50kg.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic second lexical Base Device after retained STM32WBA50KE official-ST HTTP 404 blocker",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50kg.html",
+      "subfamily": "STM32WBA50"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 2,
+      "base_device": "STM32WBA52CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA52CE",
+        "evidence_section_sha256": "09944dbfbfe66d022e04fa7309efc8c85cd8064f36e594c3487d67b579382df3",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA52CEU6",
+          "STM32WBA52CEU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA52CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA52CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9b09cabbf132c56e036dc523311183b37d5bb9540cb975dec9092acf4dc16f58",
+        "retrieved_at_utc": "2026-09-23T03:31:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ce.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 3,
+      "base_device": "STM32WBA54CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA54CE",
+        "evidence_section_sha256": "bad017d325ee70a4c9af585467260a4261151ef4d82d64e3f6e7ecf7e824737d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA54CEU6",
+          "STM32WBA54CEU7",
+          "STM32WBA54CEU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA54CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA54CEU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA54CEU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9e68c3cf641041bd10bf669b8506429a698cdbd6c3a3760c891fb670a9facee8",
+        "retrieved_at_utc": "2026-09-23T03:31:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ce.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 3,
+      "base_device": "STM32WBA55CE",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA55CE",
+        "evidence_section_sha256": "bf5ca03baa6544abb2e89cfe2b838705ca28862b5602a6ed5478fcb28f8af128",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA55CEU6",
+          "STM32WBA55CEU6TR",
+          "STM32WBA55CEU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA55CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA55CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA55CEU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5ef6689a6aaeccd9c7009679086bafe7ab099441d34fae6b5666c9af60d8734a",
+        "retrieved_at_utc": "2026-09-23T03:33:18Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpn_count": 1,
+      "base_device": "STM32WBA5MMG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA5MMG",
+        "evidence_section_sha256": "4a3d6aa84ba5d37e04c12f77ca9c62f211a1692490b368b9a0cfc7c509a7ae00",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA5MMGH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA5MMGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "375e5077732d4714f1575d9436b5863198d8f941f10670ae7eb7c6883350836d",
+        "retrieved_at_utc": "2026-09-23T03:34:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html"
+      },
+      "excluded_non_active_count": 0,
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html",
+      "subfamily": "STM32WBA5M"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WBA5X bounded official-ST evidence remediation using deterministic alternate representative",
+  "selected_wireless_frontier": "STM32WBA5X",
+  "status": "accessible",
+  "successful_targets": 5,
+  "target_config": "tcl/target/stm32wba5x.cfg"
+}

@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA5MMG",
+  "evidence_section_sha256": "4a3d6aa84ba5d37e04c12f77ca9c62f211a1692490b368b9a0cfc7c509a7ae00",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA5MMGH6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA5MMGH6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "375e5077732d4714f1575d9436b5863198d8f941f10670ae7eb7c6883350836d",
+  "retrieved_at_utc": "2026-09-23T03:34:54Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html"
+}
