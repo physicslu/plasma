@@ -84,20 +84,20 @@ def render() -> dict[str, Any]:
 
     return {
     "claims": {
-        "catalog_admission_ready": false,
-        "debug_attach_supported": false,
-        "excluded_candidates_never_existed": false,
-        "full_exact_icpn_discovery_completed": false,
-        "hil_required_for_catalog_admission": false,
-        "icpn_admission_authorized": false,
-        "physical_validation_claimed": false,
-        "production_write_authorized": false,
-        "programming_algorithm_equivalence_claimed": false,
-        "runtime_programming_support_claimed": false,
-        "security_mutation_authorized": false,
-        "target_execution_authorized": false,
-        "wireless_radio_operation_authorized": false,
-        "wireless_security_operation_authorized": false
+        "catalog_admission_ready": False,
+        "debug_attach_supported": False,
+        "excluded_candidates_never_existed": False,
+        "full_exact_icpn_discovery_completed": False,
+        "hil_required_for_catalog_admission": False,
+        "icpn_admission_authorized": False,
+        "physical_validation_claimed": False,
+        "production_write_authorized": False,
+        "programming_algorithm_equivalence_claimed": False,
+        "runtime_programming_support_claimed": False,
+        "security_mutation_authorized": False,
+        "target_execution_authorized": False,
+        "wireless_radio_operation_authorized": False,
+        "wireless_security_operation_authorized": False
     },
     "decision": "current_commercial_scope_reconciled",
     "excluded_research_candidates": [
@@ -140,7 +140,7 @@ def render() -> dict[str, Any]:
         "exact_icpns": 2604,
         "families": 21,
         "frozen_manifest_git_blob_sha": EXPECTED_PRODUCTION_BLOB,
-        "wba5x_published": false
+        "wba5x_published": False
     },
     "reconciled_surface": {
         "base_device_count": 16,
