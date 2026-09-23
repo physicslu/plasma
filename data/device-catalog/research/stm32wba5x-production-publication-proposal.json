@@ -1,0 +1,47 @@
+{
+  "canonical_csv_git_blob_sha": "21cd808371f4d6f05a813e35b06cb1227f96195a",
+  "canonical_csv_sha256": "653dca4184eab05c3a0c8e6714e73adacf3d6927310855faf064b7d8d0b322d6",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "cmsis_bridge_authorizes_production_route": false,
+  "debug_attach_support_claimed": false,
+  "exact_icpn_set_sha256": "de7b479493688ad5ac4417682f384da64af391850e876b45a649823fbe395485",
+  "excluded_non_active_part_numbers": 0,
+  "family": "STM32WBA5X",
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 40
+  },
+  "marketing_status_observed": {
+    "Active": 40
+  },
+  "metadata_exception_count": 0,
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2644,
+  "production_exact_icpns_before": 2604,
+  "production_family_count_after": 22,
+  "production_family_count_before": 21,
+  "production_manifest_git_blob_before": "6e0fc69bec067259a1c52e150a313591cf4523e8",
+  "programming_algorithm_equivalence_claimed": false,
+  "published_active_base_devices": 15,
+  "published_exact_icpns": 40,
+  "readiness_baseline": "stm32wba5x-admission-readiness.json",
+  "readiness_git_blob_sha": "ae1fa1399f9260c7d90005cb38c7dac6fa4c58e9",
+  "remaining_wireless_families_rejected": false,
+  "research_series": "STM32WBA5X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 40
+  },
+  "route_bridge_count": 0,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "stm32wba6x_rejected": false,
+  "transaction": "stm32wba5x-production-catalog-publication",
+  "wireless_radio_operation_authorized": false,
+  "wireless_security_operation_authorized": false
+}

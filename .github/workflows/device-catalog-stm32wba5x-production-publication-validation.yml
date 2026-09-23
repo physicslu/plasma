@@ -1,0 +1,39 @@
+name: STM32WBA5X Production catalog publication validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32wba5x-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32wba5x-admission-readiness.json'
+      - 'data/device-catalog/research/publish_stm32wba5x_catalog.py'
+      - 'data/device-catalog/research/stm32wba5x-production-publication-proposal.json'
+      - 'data/device-catalog/research/validate_stm32wba5x_production_publication.py'
+      - '.github/workflows/device-catalog-stm32wba5x-production-publication-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32wba5x-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32wba5x-admission-readiness.json'
+      - 'data/device-catalog/research/publish_stm32wba5x_catalog.py'
+      - 'data/device-catalog/research/stm32wba5x-production-publication-proposal.json'
+      - 'data/device-catalog/research/validate_stm32wba5x_production_publication.py'
+      - '.github/workflows/device-catalog-stm32wba5x-production-publication-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate deterministic STM32WBA5X publication
+        run: python data/device-catalog/research/validate_stm32wba5x_production_publication.py
+      - name: Validate Production manifest invariants
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Load Production catalog through runtime implementation
+        run: PYTHONPATH=software/python python -m plasma_web.device_catalog --json
