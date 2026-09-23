@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "catalog_id": "plasma-icpn",
+  "catalog_version": "1.0.0",
+  "status": "production",
+  "selection_policy": "admitted_exact_manufacturer_part_number_only",
+  "sources": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F0",
+      "path": "../research/stm32f0-commercial-icpn.csv",
+      "row_count": 42,
+      "git_blob_sha": "ad9a5b0e643dcbee3118dff9f9863c637d66e3d6",
+      "sha256": "c5e138eced2389cf99948536308142a2488bdaefa619130b9b50b6fc52cd80c9"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F1",
+      "path": "../research/stm32f1-commercial-icpn.csv",
+      "row_count": 75,
+      "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+      "sha256": "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F2",
+      "path": "../research/stm32f2-commercial-icpn.csv",
+      "row_count": 33,
+      "git_blob_sha": "1bec0770179f3849c6cfbb66aea9ad9d63610f55",
+      "sha256": "69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F3",
+      "path": "../research/stm32f3-commercial-icpn.csv",
+      "row_count": 10,
+      "git_blob_sha": "39f0d18c8e54ece6098090b24277bd365462106e",
+      "sha256": "c371b7a1c3b271afb9c8c823a4d12071be57da1aa11d138b59d39911489e1ee8"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F4",
+      "path": "../research/stm32f4-commercial-icpn.csv",
+      "row_count": 384,
+      "git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
+      "sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F7",
+      "path": "../research/stm32f7-commercial-icpn.csv",
+      "row_count": 19,
+      "git_blob_sha": "d61ebd2c56edf6bb7b1cadc381c23d071fe7967f",
+      "sha256": "c71434cc85068353a1aabdfe24059573c3e8092505fcdb1d6eda7f2374fa64d7"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32G0",
+      "path": "../research/stm32g0-commercial-icpn.csv",
+      "row_count": 47,
+      "git_blob_sha": "514f3a9b15b7ba31982f7b1ed322b1bac610909a",
+      "sha256": "70cc049b7e4c282af407c65bbf41a8f7128e54285b76275cb5f3071b9d03e012"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32G4",
+      "path": "../research/stm32g4-commercial-icpn.csv",
+      "row_count": 25,
+      "git_blob_sha": "52958c5313e95f924a628c6a69c9f3b2f4ca5e05",
+      "sha256": "2e20c585687e9bc3148c7835575695a7d06f497c29409818b9b56064df7b07a8"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32U0",
+      "path": "../research/stm32u0-commercial-icpn.csv",
+      "row_count": 68,
+      "git_blob_sha": "df9f8901e0d455dd2da497c5c0ec347f8052eb1b",
+      "sha256": "6a18ec5c8501e08a3bedd3a7bc21fdb8ece1afb4c92464aadc0d7aecfc944a75"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32C0",
+      "path": "../research/stm32c0-commercial-icpn.csv",
+      "row_count": 209,
+      "git_blob_sha": "0bf125dd071312cf31c57cfa7ebe3b29ffdda845",
+      "sha256": "d473c7a1b3b72b75314732ffd59bf8a8b0a39eaf8d632ba935e9e1b71509f96b"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32L0",
+      "path": "../research/stm32l0-commercial-icpn.csv",
+      "row_count": 360,
+      "git_blob_sha": "8484a3ca22ae141621247e1a947b993803710467",
+      "sha256": "2a40e482b0e9084feb930b94fd2cac7029d8ecbdf4b69743f99d1e5a3c2439b7"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32L4",
+      "path": "../research/stm32l4-commercial-icpn.csv",
+      "row_count": 446,
+      "git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
+      "sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32L1",
+      "path": "../research/stm32l1-commercial-icpn.csv",
+      "row_count": 144,
+      "git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
+      "sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32U3",
+      "path": "../research/stm32u3-commercial-icpn.csv",
+      "row_count": 106,
+      "git_blob_sha": "c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
+      "sha256": "171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32L5",
+      "path": "../research/stm32l5-commercial-icpn.csv",
+      "row_count": 49,
+      "git_blob_sha": "2a29ccb754b5da6332cb40bd992a1261a3b03237",
+      "sha256": "a329e4146cf083f79f629b6df31db0922d0a611b6cae26dba8ec891f0ae9232f"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32U5",
+      "path": "../research/stm32u5-commercial-icpn.csv",
+      "row_count": 265,
+      "git_blob_sha": "fbdc3269b3e989058a6644355afe53f981814aec",
+      "sha256": "49144dc8bd1855861ca4059880c256d19af31a9abcfcdf2cddae83cf44560fe6"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32H7RS",
+      "path": "../research/stm32h7rs-commercial-icpn.csv",
+      "row_count": 36,
+      "git_blob_sha": "c8457006dbe45bef5203ed061b47c2f00224d717",
+      "sha256": "e86083329eaceb013aa19ea7fdb85d4b8c55339f7879dc02237c15a549d498a3"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32H7",
+      "path": "../research/stm32h7-classic-commercial-icpn.csv",
+      "row_count": 191,
+      "git_blob_sha": "fda7d9a4eaa9978d0a67416e8b339fc9aab4e5cc",
+      "sha256": "35b9d2bc13da3a01809ea62b62557f5419b8d6f7139574ca4715a127f1e86465"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WBA2X",
+      "path": "../research/stm32wba2x-commercial-icpn.csv",
+      "row_count": 14,
+      "git_blob_sha": "15a0d57b7f94c05f745a1768036fef9f01ec1fd9",
+      "sha256": "8d21112ab6d9c8a865e5ce6ccda221b1fee17cbac750ceb042ea41111379fe8d"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WLX",
+      "path": "../research/stm32wlx-commercial-icpn.csv",
+      "row_count": 31,
+      "git_blob_sha": "3b9b7281058ca1248d83880ca96b21d6f02a65a3",
+      "sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WBX",
+      "path": "../research/stm32wbx-commercial-icpn.csv",
+      "row_count": 50,
+      "git_blob_sha": "caff19debecf190fc02c2a8af4b3f301e7ae4d67",
+      "sha256": "0a97caf4afc336a762d9f504b860cafeffdf0ff8a6f603665b564f10b42bd664"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WBA5X",
+      "path": "../research/stm32wba5x-commercial-icpn.csv",
+      "row_count": 40,
+      "git_blob_sha": "21cd808371f4d6f05a813e35b06cb1227f96195a",
+      "sha256": "653dca4184eab05c3a0c8e6714e73adacf3d6927310855faf064b7d8d0b322d6"
+    }
+  ]
+}

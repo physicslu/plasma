@@ -1,0 +1,124 @@
+{
+  "catalog_admission_ready": false,
+  "claims": {
+    "debug_attach_supported": false,
+    "excluded_candidate_never_existed": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32w108_rejected": false,
+    "stm32wba6x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "decision": "current_commercial_scope_reconciled",
+  "evidence_accessibility_ready": true,
+  "excluded_research_candidates": [
+    {
+      "base_device": "STM32WBA6MOI",
+      "identifier_kind": "ordering_pattern",
+      "part_number": "STM32WBA6MOIHx",
+      "reason": "current_official_st_wba6x_product_portfolio_omits_wba6m_and_canonical_product_url_returns_http_404",
+      "subfamily": "STM32WBA6M"
+    }
+  ],
+  "family": "STM32WBA6X",
+  "manufacturer": "STMicroelectronics",
+  "next_gate": "stm32wba6x-bounded-exact-icpn-discovery-gate",
+  "official_manufacturer_evidence": {
+    "absent_candidate_subfamily": "STM32WBA6M",
+    "blocked_live_result": "browser navigation returned HTTP 404",
+    "blocked_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba6moi.html",
+    "current_product_subfamilies": [
+      "STM32WBA62",
+      "STM32WBA63",
+      "STM32WBA64",
+      "STM32WBA65"
+    ],
+    "interpretation": "current-commercial scope excludes STM32WBA6M; historical existence is not denied",
+    "observed_at": "2026-09-23",
+    "product_portfolio_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba6x/products.html"
+  },
+  "production_boundary": {
+    "exact_icpns": 2644,
+    "families": 22,
+    "frozen_manifest_git_blob_sha": "5ddd901e6827a6c0a7f7fd2b0286c79411965777",
+    "wba6x_published": false
+  },
+  "reconciled_surface": {
+    "base_device_count": 18,
+    "base_devices": [
+      "STM32WBA62CG",
+      "STM32WBA62CI",
+      "STM32WBA62MG",
+      "STM32WBA62MI",
+      "STM32WBA62PG",
+      "STM32WBA62PI",
+      "STM32WBA63CG",
+      "STM32WBA63CI",
+      "STM32WBA64CG",
+      "STM32WBA64CI",
+      "STM32WBA65CG",
+      "STM32WBA65CI",
+      "STM32WBA65MG",
+      "STM32WBA65MI",
+      "STM32WBA65PG",
+      "STM32WBA65PI",
+      "STM32WBA65RG",
+      "STM32WBA65RI"
+    ],
+    "cmsis_device_name_rows": 0,
+    "ordering_pattern_rows": 18,
+    "retained_rows": 18,
+    "subfamilies": [
+      "STM32WBA62",
+      "STM32WBA63",
+      "STM32WBA64",
+      "STM32WBA65"
+    ],
+    "subfamily_count": 4
+  },
+  "reconciliation_id": "stm32wba6x-current-commercial-scope-reconciliation-v1",
+  "retained_accessibility_evidence": {
+    "manual_review_count_after_reconciliation": 0,
+    "retained_active_exact_icpns_observed": 7,
+    "retained_non_active_exclusions_observed": 1,
+    "successful_representative_count": 4,
+    "successful_subfamilies": [
+      "STM32WBA62",
+      "STM32WBA63",
+      "STM32WBA64",
+      "STM32WBA65"
+    ]
+  },
+  "schema_version": 1,
+  "scope": "research_only",
+  "source_surface": {
+    "cmsis_device_name_rows": 0,
+    "ordering_pattern_rows": 19,
+    "source_rows": 19,
+    "source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "subfamilies": [
+      "STM32WBA62",
+      "STM32WBA63",
+      "STM32WBA64",
+      "STM32WBA65",
+      "STM32WBA6M"
+    ]
+  },
+  "upstream": {
+    "blocked_decision": "defer_frontier_pending_official_product_evidence",
+    "blocked_gate_git_blob_sha": "3b30521db5cdf2b7e4348cd4e8ae479ea2d6a8e9",
+    "blocked_gate_id": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+    "probe_summary_git_blob_sha": "a21bda977a6b1ca9e2069a579f1968e8eb6e1acc",
+    "provenance_git_blob_sha": "3575323db9110ac23e5d4aa123244a875bc2feff",
+    "targets_git_blob_sha": "628141e5175bacad44e70d6e04db2dffebce4d5a"
+  }
+}
