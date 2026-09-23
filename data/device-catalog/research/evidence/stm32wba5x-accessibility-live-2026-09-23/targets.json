@@ -1,0 +1,47 @@
+{
+  "candidate_source": "data/device-catalog/research/openocd-parts-canonical.csv",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "probe_id": "stm32wba5x-bounded-official-st-evidence-accessibility-v1",
+  "schema_version": 1,
+  "scope": "bounded representative official-ST evidence accessibility only",
+  "selection_sha256": "6cc5a67f3bac67ee6633c206620af487a65301214b60dd62e35dfef48c395b43",
+  "selection_source": "data/device-catalog/research/stm32-post-wbx-wireless-frontier-selection.json",
+  "target_count": 5,
+  "targets": [
+    {
+      "base_device": "STM32WBA50KE",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50ke.html",
+      "subfamily": "STM32WBA50"
+    },
+    {
+      "base_device": "STM32WBA52CE",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba52ce.html",
+      "subfamily": "STM32WBA52"
+    },
+    {
+      "base_device": "STM32WBA54CE",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ce.html",
+      "subfamily": "STM32WBA54"
+    },
+    {
+      "base_device": "STM32WBA55CE",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba55ce.html",
+      "subfamily": "STM32WBA55"
+    },
+    {
+      "base_device": "STM32WBA5MMG",
+      "selection_reason": "deterministic lexical-min Base Device in frozen STM32WBA5X ordering-pattern subfamily",
+      "series": "STM32WBA5X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba5mmg.html",
+      "subfamily": "STM32WBA5M"
+    }
+  ]
+}

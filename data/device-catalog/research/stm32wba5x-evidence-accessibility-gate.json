@@ -1,0 +1,105 @@
+{
+  "catalog_admission_ready": false,
+  "claims": {
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba50_rejected": false,
+    "stm32wba5x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "decision": "defer_frontier_pending_official_product_evidence",
+  "family": "STM32WBA5X",
+  "gate_id": "stm32wba5x-bounded-official-st-evidence-accessibility-v1",
+  "live_acquisition": {
+    "active_exact_icpns_observed": 9,
+    "artifact_id": 10726794785,
+    "artifact_zip_sha256": "bb1c69502581bfe4a992053b61b2ae3795a1a1fb572eaf98e7032528fc429b9a",
+    "attempted_targets": 5,
+    "browser_version": "151.0.7922.34",
+    "excluded_non_active_part_numbers_observed": 0,
+    "executed_head": "0ddc6143360a254d1d3d2e22cdbf57b5329c1002",
+    "manual_review_targets": 1,
+    "successful_targets": 4,
+    "workflow_run_id": 35803914407
+  },
+  "manufacturer": "STMicroelectronics",
+  "next_gate": "stm32-post-wba5x-evidence-block-wireless-frontier-reselection-gate",
+  "production_state": {
+    "exact_icpns": 2604,
+    "families": 21,
+    "wba5x_published": false
+  },
+  "representative_results": {
+    "STM32WBA50": {
+      "base_device": "STM32WBA50KE",
+      "error": "browser navigation returned HTTP 404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50ke.html",
+      "status": "blocked_manual_review"
+    },
+    "STM32WBA52": {
+      "active_exact_icpns": [
+        "STM32WBA52CEU6",
+        "STM32WBA52CEU6TR"
+      ],
+      "base_device": "STM32WBA52CE",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA54": {
+      "active_exact_icpns": [
+        "STM32WBA54CEU6",
+        "STM32WBA54CEU7",
+        "STM32WBA54CEU7TR"
+      ],
+      "base_device": "STM32WBA54CE",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA55": {
+      "active_exact_icpns": [
+        "STM32WBA55CEU6",
+        "STM32WBA55CEU6TR",
+        "STM32WBA55CEU7"
+      ],
+      "base_device": "STM32WBA55CE",
+      "excluded_non_active": [],
+      "status": "accessible"
+    },
+    "STM32WBA5M": {
+      "active_exact_icpns": [
+        "STM32WBA5MMGH6TR"
+      ],
+      "base_device": "STM32WBA5MMG",
+      "excluded_non_active": [],
+      "status": "accessible"
+    }
+  },
+  "schema_version": 1,
+  "scope": "research_only",
+  "selected_surface": {
+    "identifier_kind_counts": {
+      "cmsis_device_name": 17,
+      "ordering_pattern": 17
+    },
+    "source_rows": 34,
+    "subfamilies": [
+      "STM32WBA50",
+      "STM32WBA52",
+      "STM32WBA54",
+      "STM32WBA55",
+      "STM32WBA5M"
+    ],
+    "subfamily_count": 5,
+    "target_config": "tcl/target/stm32wba5x.cfg"
+  }
+}
