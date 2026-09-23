@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32wba5x-ordering-information-v1",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32WBA5X",
+  "research_series": "STM32WBA5X",
+  "verified_at": "2026-09-23",
+  "documents": [
+    {
+      "document_id": "DS14688",
+      "revision": "Rev 2",
+      "scope": [
+        "STM32WBA50"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wba50kg.pdf"
+    },
+    {
+      "document_id": "DS14127",
+      "revision": "Rev 10",
+      "scope": [
+        "STM32WBA52",
+        "STM32WBA54",
+        "STM32WBA55"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wba55cg.pdf"
+    },
+    {
+      "document_id": "DS14801",
+      "revision": "Rev 4",
+      "scope": [
+        "STM32WBA5M"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wba5mmg.pdf"
+    }
+  ],
+  "metadata_notes": {
+    "STM32WBA50": "DS14688 Rev 2: K=32 pins, G=1 MiB, U=UFQFPN32, temperature code 6=-40..85 C, TR=tape and reel.",
+    "STM32WBA52_STM32WBA54_STM32WBA55": "DS14127 Rev 10: pin-count codes K=32, H=41 balls, C=48, U=59 balls; E=512 KiB, G=1 MiB; U=UFQFPN, F=Thin WLCSP, I=UFBGA; temperature codes 6=-40..85 C and 7=-40..105 C; TR=tape and reel.",
+    "STM32WBA5M": "DS14801 Rev 4: STM32WBA5MMG module, SIP LGA76 (8 x 12.5 mm), 1 MiB flash, -40..85 C; retained exact identity STM32WBA5MMGH6TR."
+  },
+  "route_semantics": {
+    "target_config": "tcl/target/stm32wba5x.cfg",
+    "wildcard": "Only lowercase x is a one-character wildcard.",
+    "packing_normalization": "Strip only terminal commercial packing suffix TR before route matching; retain TR in commercial metadata.",
+    "direct_route": "Current 40-exact-ICPN set resolves uniquely through retained ordering_pattern rows after v2 current-commercial reconciliation.",
+    "cmsis_bridge": "CMSIS identifiers remain retained research metadata but are not needed by the current exact set; bridge count must remain zero."
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "production_publication_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false,
+    "security_mutation_authorized": false,
+    "debug_attach_supported": false,
+    "target_execution_authorized": false,
+    "physical_validation_claimed": false,
+    "hil_required_for_catalog_admission": false,
+    "remaining_wireless_families_rejected": false,
+    "stm32wba6x_rejected": false,
+    "cmsis_bridge_authorizes_production_route": false
+  }
+}
