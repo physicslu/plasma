@@ -1,0 +1,244 @@
+{
+  "already_published_wireless_frontiers": [
+    {
+      "cmsis_device_name_rows": 4,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "identifier_kind_counts": {
+        "cmsis_device_name": 4,
+        "ordering_pattern": 4
+      },
+      "ordering_pattern_rows": 4,
+      "plasma_series": "STM32WBA2X",
+      "production_row_count": 14,
+      "publication_status": "published_in_production",
+      "row_count": 8,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA23",
+        "STM32WBA25"
+      ],
+      "subfamily_count": 2,
+      "target_configs": [
+        "tcl/target/stm32wba2x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 0,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "identifier_kind_counts": {
+        "ordering_pattern": 17
+      },
+      "ordering_pattern_rows": 17,
+      "plasma_series": "STM32WLX",
+      "production_row_count": 31,
+      "publication_status": "published_in_production",
+      "row_count": 17,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WL54",
+        "STM32WL55",
+        "STM32WLE4",
+        "STM32WLE5"
+      ],
+      "subfamily_count": 4,
+      "target_configs": [
+        "tcl/target/stm32wlx.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 4,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "identifier_kind_counts": {
+        "cmsis_device_name": 4,
+        "ordering_pattern": 19
+      },
+      "ordering_pattern_rows": 19,
+      "plasma_series": "STM32WBX",
+      "production_row_count": 50,
+      "publication_status": "published_in_production",
+      "row_count": 23,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WB10",
+        "STM32WB15",
+        "STM32WB1M",
+        "STM32WB30",
+        "STM32WB35",
+        "STM32WB50",
+        "STM32WB55",
+        "STM32WB5M"
+      ],
+      "subfamily_count": 8,
+      "target_configs": [
+        "tcl/target/stm32wbx.cfg"
+      ]
+    }
+  ],
+  "claims": {
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32w108_rejected": false,
+    "stm32wba5x_admission_ready": false,
+    "stm32wba6x_rejected": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "deferred_wireless_frontiers": [
+    {
+      "cmsis_device_name_rows": 1,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "defer_reasons": [
+        "structural_gate_fail",
+        "no_bounded_subfamilies",
+        "no_ordering_pattern_rows"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 1
+      },
+      "ordering_pattern_rows": 0,
+      "plasma_series": "STM32W108",
+      "row_count": 1,
+      "structural_gate_pass": false,
+      "subfamilies": [],
+      "subfamily_count": 0,
+      "target_configs": [
+        "tcl/target/stm32w108xx.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 0,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "defer_reasons": [
+        "official_st_evidence_incomplete",
+        "stm32wba6m_product_page_http_404"
+      ],
+      "evidence_gate": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+      "evidence_gate_decision": "defer_frontier_pending_official_product_evidence",
+      "identifier_kind_counts": {
+        "ordering_pattern": 19
+      },
+      "ordering_pattern_rows": 19,
+      "plasma_series": "STM32WBA6X",
+      "row_count": 19,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA62",
+        "STM32WBA63",
+        "STM32WBA64",
+        "STM32WBA65",
+        "STM32WBA6M"
+      ],
+      "subfamily_count": 5,
+      "target_configs": [
+        "tcl/target/stm32wba6x.cfg"
+      ]
+    }
+  ],
+  "eligible_wireless_frontiers": [
+    {
+      "cmsis_device_name_rows": 17,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "identifier_kind_counts": {
+        "cmsis_device_name": 17,
+        "ordering_pattern": 17
+      },
+      "ordering_pattern_rows": 17,
+      "plasma_series": "STM32WBA5X",
+      "row_count": 34,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA50",
+        "STM32WBA52",
+        "STM32WBA54",
+        "STM32WBA55",
+        "STM32WBA5M"
+      ],
+      "subfamily_count": 5,
+      "target_configs": [
+        "tcl/target/stm32wba5x.cfg"
+      ]
+    }
+  ],
+  "next_gate": "stm32wba5x-bounded-official-manufacturer-evidence-accessibility-gate",
+  "production_boundary": {
+    "exact_icpns": 2604,
+    "families": 21,
+    "frozen_manifest_git_blob_sha": "6e0fc69bec067259a1c52e150a313591cf4523e8",
+    "published_wireless_families": {
+      "STM32WBA2X": 14,
+      "STM32WBX": 50,
+      "STM32WLX": 31
+    },
+    "standard_nonwireless_frontier_exhausted": true
+  },
+  "schema_version": 1,
+  "scope": "wireless_frontier_reselection_research_only",
+  "selected_identifier_kind_counts": {
+    "cmsis_device_name": 17,
+    "ordering_pattern": 17
+  },
+  "selected_row_count": 34,
+  "selected_subfamilies": [
+    "STM32WBA50",
+    "STM32WBA52",
+    "STM32WBA54",
+    "STM32WBA55",
+    "STM32WBA5M"
+  ],
+  "selected_subfamily_count": 5,
+  "selected_target_config": "tcl/target/stm32wba5x.cfg",
+  "selected_wireless_frontier": "STM32WBA5X",
+  "selection_basis": [
+    "STM32WBA2X, STM32WLX, and STM32WBX are already published and excluded from remaining frontier selection",
+    "STM32WBA6X remains deferred because bounded official-ST evidence accessibility is incomplete at STM32WBA6M",
+    "STM32WBA6X and STM32W108 remain deferred, not rejected",
+    "STM32WBA5X is the only remaining structurally eligible bounded wireless candidate under the frozen sequencing policy",
+    "selection does not authorize radio, security, debug, programming, HIL, or target execution operations"
+  ],
+  "selection_id": "stm32-post-wbx-wireless-frontier-selection-v1",
+  "selection_policy": {
+    "eligibility": [
+      "cohort == wireless_requires_dedicated_scope",
+      "not already published in Production",
+      "structural_gate_pass == true",
+      "complete_mapping_metadata == true",
+      "exactly one target_config",
+      "row_count > 0",
+      "subfamily_count > 0",
+      "ordering_pattern_rows > 0"
+    ],
+    "sequencing": [
+      "fewest row_count",
+      "then fewest subfamily_count",
+      "then lexical plasma_series"
+    ],
+    "sequencing_only": true
+  },
+  "status": "selected_for_bounded_manufacturer_evidence_only",
+  "upstream": {
+    "blocked_evidence_gate_decision": "defer_frontier_pending_official_product_evidence",
+    "blocked_evidence_gate_git_blob_sha": "3b30521db5cdf2b7e4348cd4e8ae479ea2d6a8e9",
+    "blocked_evidence_gate_id": "stm32wba6x-bounded-official-st-evidence-accessibility-v1",
+    "blocked_frontier": "STM32WBA6X",
+    "deferred_wireless_count": 2,
+    "prior_selection_git_blob_sha": "5bfebad83abc48d5301d89ef1a05892fce2653ca",
+    "prior_selection_id": "stm32-post-wba6x-evidence-block-wireless-frontier-selection-v1",
+    "published_wireless_count": 3,
+    "remaining_structurally_eligible_count": 1
+  }
+}
