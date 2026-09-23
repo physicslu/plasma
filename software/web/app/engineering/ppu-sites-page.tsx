@@ -54,35 +54,7 @@ export default function PpuSitesPage() {
   useEffect(() => {
     const initial = window.setTimeout(() => { void refresh(); }, 0);
     const timer = window.setInterval(() => { void refresh(); }, 3000);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-    };
-  }, [refresh]);
-
-  const selectedEntry = useMemo(
-    () => registry?.ppus.find(entry => entry.alias === selectedAlias) ?? null,
-    [registry, selectedAlias],
-  );
-  const selectedFleet = selectedEntry ? fleetForEntry(selectedEntry, fleet) : null;
-  const activeExecution = hasActiveExecution(selectedFleet);
-  const registered = selectedEntry?.lifecycle === "commissioned";
-
-  const siteSummary = useMemo(() => {
-    const sites = selectedFleet?.topology.sites ?? [];
-    let ready = 0;
-    let busy = 0;
-    let fault = 0;
-    for (const site of sites) {
-      const state = site.state.toLowerCase();
-      if (site.current_job_id || ACTIVE_SITE_STATES.has(state)) busy += 1;
-      else if (FAULT_SITE_STATES.has(state)) fault += 1;
-      else if (site.enabled) ready += 1;
-    }
-    return { total: selectedFleet?.topology.site_count ?? 0, ready, busy, fault };
-  }, [selectedFleet]);
-
-  return (
+    return (
     <section className="ppuSiteConfiguration" aria-label="PPU Sites">
       <header className="ppuSiteHeader">
         <div>
@@ -97,12 +69,14 @@ export default function PpuSitesPage() {
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      <section className="ppuSiteCard" aria-label="Sites target PPU">
-        <header className="ppuSiteCardHeader">
-          <div><small>TARGET</small><h3>Select PPU</h3></div>
-        </header>
-        <div className="ppuRegistryAddForm">
-          <label>
+      <section className="ppuSiteCard ppuSitesSnapshot" aria-label="Sites target PPU">
+        <header className="ppuSitesSnapshotHeader">
+          <div>
+            <small>SITE STATUS</small>
+            <h3>{selectedEntry?.alias ?? "Select PPU"}</h3>
+            <span>{siteSummary.total} reported · {selectedFleet?.topology.source ?? "topology unavailable"}</span>
+          </div>
+          <label className="operatorField ppuSitesSelector">
             <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
@@ -110,35 +84,27 @@ export default function PpuSitesPage() {
               ))}
             </select>
           </label>
-        </div>
+        </header>
+
+        {selectedEntry && (
+          <div className="ppuSitesSummaryGrid">
+            <article data-tone={siteSummary.fault ? "danger" : "healthy"}><small>Ready</small><strong>{siteSummary.ready}</strong><span>Enabled and idle</span></article>
+            <article data-tone={siteSummary.busy ? "warning" : "healthy"}><small>Busy</small><strong>{siteSummary.busy}</strong><span>Active programming work</span></article>
+            <article data-tone={siteSummary.fault ? "danger" : "healthy"}><small>Fault</small><strong>{siteSummary.fault}</strong><span>Reported fault states</span></article>
+            <article data-tone={registered ? "healthy" : "warning"}><small>Registration</small><strong>{registered ? "Registered" : "Required"}</strong><span>{selectedFleet?.topology.enabled_site_count ?? 0} enabled Sites</span></article>
+            <article data-tone={activeExecution ? "warning" : "healthy"}><small>Active Execution</small><strong>{activeExecution ? "Yes" : "No"}</strong><span>{activeExecution ? "Configuration writes may be gated" : "PPU is idle"}</span></article>
+          </div>
+        )}
       </section>
 
       {selectedEntry ? (
         <>
-          <section className="ppuSiteCard" aria-label="Site status summary">
-            <header className="ppuSiteCardHeader">
-              <div><small>SITE STATUS</small><h3>{selectedEntry.alias}</h3></div>
-              <span className="ppuSiteFilter">{siteSummary.total} reported</span>
-            </header>
-            <div className="ppuStateSummaryGrid">
-              <div className="ppuStateSummaryGroup"><small>Ready</small><strong>{siteSummary.ready}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Busy</small><strong>{siteSummary.busy}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Fault</small><strong>{siteSummary.fault}</strong></div>
-            </div>
-            <div className="ppuInfoBody">
-              <dl className="ppuInfoGrid">
-                <div><dt>Registration</dt><dd>{registered ? "Registered" : "Required"}</dd></div>
-                <div><dt>Topology Source</dt><dd>{selectedFleet?.topology.source ?? "none"}</dd></div>
-                <div><dt>Enabled Sites</dt><dd>{selectedFleet?.topology.enabled_site_count ?? 0}</dd></div>
-                <div><dt>Active Execution</dt><dd>{activeExecution ? "Yes" : "No"}</dd></div>
-              </dl>
-            </div>
-          </section>
-
           {registered ? (
-            <PpuSiteDesiredConfiguration entry={selectedEntry} hasActiveExecution={activeExecution} />
+            <div className="ppuSitesWorkflow">
+              <PpuSiteDesiredConfiguration entry={selectedEntry} hasActiveExecution={activeExecution} />
+            </div>
           ) : (
-            <section className="ppuSiteCard" aria-label="Sites locked until Registration">
+            <section className="ppuSiteCard ppuSitesLocked" aria-label="Sites locked until Registration">
               <header className="ppuSiteCardHeader"><div><small>LOCKED</small><h3>Registration required</h3></div></header>
               <p className="ppuRegistryMessage warning" role="status">This PPU is known to Console, but it is not registered for managed programming. Complete Registration before changing Site desired configuration or activating programming runtime state.</p>
               <p className="ppuSiteNote">PPU Platform Release inspection and maintenance remain available from Platform while Sites are locked.</p>
