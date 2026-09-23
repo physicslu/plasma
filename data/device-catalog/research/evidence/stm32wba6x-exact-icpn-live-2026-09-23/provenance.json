@@ -1,0 +1,15 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser_version": "151.0.7922.34",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "commercial_scope_reconciliation_sha256": "149a31146f4952f0850dbe039236e87ea3c67e3c53ea0ba5a97fed0c3ca8e377",
+  "discovery_id": "stm32wba6x-bounded-exact-icpn-discovery-v1",
+  "executed_git_sha": "c3f3caff0db656b130e8e42b283779af04f879a6",
+  "generated_at_utc": "2026-09-23T08:11:39Z",
+  "schema_version": 1,
+  "selection_sha256": "6243c80f97b2c159bc964935fc2f87371a596ee9f2d2e397e1c7ee9c3b6a178d",
+  "source_repository": "physicslu/plasma",
+  "workflow_role": "authoritative_exact_icpn_discovery",
+  "workflow_run_attempt": 1,
+  "workflow_run_id": 35834958903
+}
