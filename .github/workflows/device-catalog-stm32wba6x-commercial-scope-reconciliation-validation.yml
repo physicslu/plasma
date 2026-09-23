@@ -1,0 +1,39 @@
+name: STM32WBA6X commercial scope reconciliation validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/stm32wba6x-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/evidence/stm32wba6x-accessibility-live-2026-09-22/**'
+      - 'data/device-catalog/research/stm32wba6x-commercial-scope-production-prestate.json'
+      - 'data/device-catalog/research/stm32wba6x-commercial-scope-reconciliation.json'
+      - 'data/device-catalog/research/stm32wba6x_commercial_scope_reconciliation.py'
+      - 'data/device-catalog/research/validate_stm32wba6x_commercial_scope_reconciliation.py'
+      - '.github/workflows/device-catalog-stm32wba6x-commercial-scope-reconciliation-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/stm32wba6x-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/evidence/stm32wba6x-accessibility-live-2026-09-22/**'
+      - 'data/device-catalog/research/stm32wba6x-commercial-scope-production-prestate.json'
+      - 'data/device-catalog/research/stm32wba6x-commercial-scope-reconciliation.json'
+      - 'data/device-catalog/research/stm32wba6x_commercial_scope_reconciliation.py'
+      - 'data/device-catalog/research/validate_stm32wba6x_commercial_scope_reconciliation.py'
+      - '.github/workflows/device-catalog-stm32wba6x-commercial-scope-reconciliation-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate STM32WBA6X current commercial scope reconciliation
+        run: python data/device-catalog/research/validate_stm32wba6x_commercial_scope_reconciliation.py
