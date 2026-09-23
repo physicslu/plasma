@@ -3,7 +3,6 @@ name: STM32WBA5X Production catalog publication validation
 on:
   pull_request:
     paths:
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/stm32wba5x-commercial-icpn.csv'
       - 'data/device-catalog/research/stm32wba5x-admission-readiness.json'
       - 'data/device-catalog/research/publish_stm32wba5x_catalog.py'
@@ -13,7 +12,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/stm32wba5x-commercial-icpn.csv'
       - 'data/device-catalog/research/stm32wba5x-admission-readiness.json'
       - 'data/device-catalog/research/publish_stm32wba5x_catalog.py'
