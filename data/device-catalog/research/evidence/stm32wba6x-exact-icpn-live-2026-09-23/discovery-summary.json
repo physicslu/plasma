@@ -1,0 +1,938 @@
+{
+  "active_exact_icpn_count": 39,
+  "active_exact_icpn_set_sha256": "b5acc2f981635fa0464456fae74365407492d3345ded9b7c9edf885ffdfeddac",
+  "active_exact_icpns": [
+    "STM32WBA62CGU6",
+    "STM32WBA62CIU6",
+    "STM32WBA62CIU6TR",
+    "STM32WBA62MGF6TR",
+    "STM32WBA62MIF6TR",
+    "STM32WBA62PGI6",
+    "STM32WBA62PGI6TR",
+    "STM32WBA62PII6",
+    "STM32WBA62PII7",
+    "STM32WBA63CGU6",
+    "STM32WBA63CGU7",
+    "STM32WBA63CIU6",
+    "STM32WBA63CIU6TR",
+    "STM32WBA63CIU7",
+    "STM32WBA64CGU6",
+    "STM32WBA64CGU7",
+    "STM32WBA64CIU6",
+    "STM32WBA64CIU7",
+    "STM32WBA65CGU6",
+    "STM32WBA65CGU7",
+    "STM32WBA65CIU6",
+    "STM32WBA65CIU7",
+    "STM32WBA65MGF6TR",
+    "STM32WBA65MGF7TR",
+    "STM32WBA65MIF6TR",
+    "STM32WBA65MIF7TR",
+    "STM32WBA65PGI6",
+    "STM32WBA65PGI7",
+    "STM32WBA65PII6",
+    "STM32WBA65PII6TR",
+    "STM32WBA65PII7",
+    "STM32WBA65PII7TR",
+    "STM32WBA65RGV6",
+    "STM32WBA65RGV6TR",
+    "STM32WBA65RGV7",
+    "STM32WBA65RIV6",
+    "STM32WBA65RIV6TR",
+    "STM32WBA65RIV7",
+    "STM32WBA65RIV7TR"
+  ],
+  "attempted_targets": 18,
+  "base_device_count": 18,
+  "bounded_exact_discovery_complete": true,
+  "browser_version": "151.0.7922.34",
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "exact_icpn_discovery_completed": true,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32w108_rejected": false,
+    "stm32wba6x_admission_ready": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "discovery_id": "stm32wba6x-bounded-exact-icpn-discovery-v1",
+  "excluded_non_active_part_number_count": 2,
+  "excluded_non_active_part_numbers": [
+    "STM32WBA63CGU6TR",
+    "STM32WBA65MGF6"
+  ],
+  "manual_review_targets": 0,
+  "next_gate": "stm32wba6x-bounded-exact-icpn-admission-readiness-gate",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62CGU6"
+      ],
+      "base_device": "STM32WBA62CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62CG",
+        "evidence_section_sha256": "9c83e07584abb36a968217ee72515cc01d729327c53126e9edc997a90075ad75",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62CGU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62CGU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ddddc86d9b3680f44e77973141da34e1bee444658ef7abe17defd39b3074bc71",
+        "retrieved_at_utc": "2026-09-23T08:03:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62CIU6",
+        "STM32WBA62CIU6TR"
+      ],
+      "base_device": "STM32WBA62CI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62CI",
+        "evidence_section_sha256": "87684cac494c99f12f1b2c4737adbf220bcb8441ec423c79fe863c6f6e2404eb",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62CIU6",
+          "STM32WBA62CIU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62CIU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA62CIU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "633acf9cc4be77ec8ae1ccc67f4e15b3d36cdc2536e35fcb56a18508fc262efa",
+        "retrieved_at_utc": "2026-09-23T08:04:05Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62MGF6TR"
+      ],
+      "base_device": "STM32WBA62MG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62MG",
+        "evidence_section_sha256": "9908286b3b367f1697411a32761bca927d772387286f7f1487703d9fb3774015",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62MGF6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62MGF6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "edb1629149014f831d20905f6a0437545b280f0ef3059657eadaeb9d44bb7e37",
+        "retrieved_at_utc": "2026-09-23T08:05:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62MIF6TR"
+      ],
+      "base_device": "STM32WBA62MI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62MI",
+        "evidence_section_sha256": "54484fefae9bb9394d85a24227226126c721af4b56dbb0ff63b2413aecedadcd",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62MIF6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62MIF6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6f6b5b5ab1e1b744d563d50f0f86c1d2cd0410e440bc6d5a6721303db21ecdab",
+        "retrieved_at_utc": "2026-09-23T08:05:51Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62PGI6",
+        "STM32WBA62PGI6TR"
+      ],
+      "base_device": "STM32WBA62PG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62PG",
+        "evidence_section_sha256": "3976cd08811f169aaba04a145d9a00e6585e1a43b7b9268213ffa265ffdc25e4",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62PGI6",
+          "STM32WBA62PGI6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62PGI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA62PGI6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4bd1131855dad261336358ebba7b5ec328a9c38846b288ad92ad16d49bb2acf4",
+        "retrieved_at_utc": "2026-09-23T08:05:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA62PII6",
+        "STM32WBA62PII7"
+      ],
+      "base_device": "STM32WBA62PI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA62PI",
+        "evidence_section_sha256": "02e00985535d7797672f3da1a5906c7855a294bdb16ac2db9f5266447c2ef4bf",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA62PII6",
+          "STM32WBA62PII7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA62PII6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA62PII7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5a66047e9c74644795f5a4be55437019f75b5f64f5a8f4cff2b26f42fadbd6f7",
+        "retrieved_at_utc": "2026-09-23T08:07:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pi.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pi.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA63CGU6",
+        "STM32WBA63CGU7"
+      ],
+      "base_device": "STM32WBA63CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA63CG",
+        "evidence_section_sha256": "c13d653d27dab3267081ee3af296cfb2791509f1a9c714ab759b99063f41b10a",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA63CGU6",
+          "STM32WBA63CGU7"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WBA63CGU6TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA63CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32WBA63CGU6TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA63CGU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9926f959b6d8d782c3a1c205db7d94531bef6c4418e3c25143f498d5955dee34",
+        "retrieved_at_utc": "2026-09-23T08:07:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html"
+      },
+      "excluded_non_active_icpns": [
+        "STM32WBA63CGU6TR"
+      ],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html",
+      "subfamily": "STM32WBA63"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA63CIU6",
+        "STM32WBA63CIU6TR",
+        "STM32WBA63CIU7"
+      ],
+      "base_device": "STM32WBA63CI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA63CI",
+        "evidence_section_sha256": "fa33e3dd10d7e1326da5c55257939dc90cae41e5e67447f53767bd4d517cf708",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA63CIU6",
+          "STM32WBA63CIU6TR",
+          "STM32WBA63CIU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63ci.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA63CIU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA63CIU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA63CIU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "114aaa71d79c49ef3550900319b94ccb1286751598df8d6fb557e3236ae717d8",
+        "retrieved_at_utc": "2026-09-23T08:07:53Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63ci.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63ci.html",
+      "subfamily": "STM32WBA63"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA64CGU6",
+        "STM32WBA64CGU7"
+      ],
+      "base_device": "STM32WBA64CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA64CG",
+        "evidence_section_sha256": "a513463e00f26e817ea3a95898e738e7a28f8bac67b0c16278392ecff23436ac",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA64CGU6",
+          "STM32WBA64CGU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA64CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA64CGU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "61ef8619178d0b2f0dce4a7e93546d2be9b88baf9cea10944f8e8c7af6643dd4",
+        "retrieved_at_utc": "2026-09-23T08:08:07Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64cg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64cg.html",
+      "subfamily": "STM32WBA64"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA64CIU6",
+        "STM32WBA64CIU7"
+      ],
+      "base_device": "STM32WBA64CI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA64CI",
+        "evidence_section_sha256": "6716c7ff60f65084915c26ed4a7c084816303d3d6e9feabbd630629bceb4ba81",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA64CIU6",
+          "STM32WBA64CIU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64ci.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA64CIU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA64CIU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f0fd84250c3a650af7f86fb38da5f159cb4531c615473a7b7503a89a611dc0ab",
+        "retrieved_at_utc": "2026-09-23T08:08:11Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64ci.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64ci.html",
+      "subfamily": "STM32WBA64"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65CGU6",
+        "STM32WBA65CGU7"
+      ],
+      "base_device": "STM32WBA65CG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65CG",
+        "evidence_section_sha256": "fbb193f99d1bd53c78c5560df1b75474aea2da1b6aee29768a5aed52407a1674",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65CGU6",
+          "STM32WBA65CGU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65CGU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "643c24fece838645c6735b004515df7cc9864a6253caeb4cce419de4f284b007",
+        "retrieved_at_utc": "2026-09-23T08:08:25Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65CIU6",
+        "STM32WBA65CIU7"
+      ],
+      "base_device": "STM32WBA65CI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65CI",
+        "evidence_section_sha256": "bce9db774f52f0f23527148f337a2f0cd60cbdb484fd7f06bce0d2abac884020",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65CIU6",
+          "STM32WBA65CIU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ci.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65CIU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65CIU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3bddb7a4124ad82b48e59f82f7cc766315c28841ea60815aa25930a40c81029f",
+        "retrieved_at_utc": "2026-09-23T08:08:39Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ci.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ci.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65MGF6TR",
+        "STM32WBA65MGF7TR"
+      ],
+      "base_device": "STM32WBA65MG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65MG",
+        "evidence_section_sha256": "b133913d9322c7195695c20d830a5d35d918cb2b83c4a8a7b2ab5e8e8845f3b6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65MGF6TR",
+          "STM32WBA65MGF7TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32WBA65MGF6",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32WBA65MGF6",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65MGF6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65MGF7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5ccf4439fea2a8ad09ea46c636f9eb26cbff12bdc6ffa3b3e9b25cbf4edc48e0",
+        "retrieved_at_utc": "2026-09-23T08:08:51Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html"
+      },
+      "excluded_non_active_icpns": [
+        "STM32WBA65MGF6"
+      ],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65MIF6TR",
+        "STM32WBA65MIF7TR"
+      ],
+      "base_device": "STM32WBA65MI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65MI",
+        "evidence_section_sha256": "1b461c2439bcad208db0231747699cdc7b86c1fdfecd04b017b47f9e809ea071",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65MIF6TR",
+          "STM32WBA65MIF7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65MIF6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65MIF7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9927eaf404496f9658daf95e0d752e2e4789ee51226093df24db54507a2cdeec",
+        "retrieved_at_utc": "2026-09-23T08:10:38Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65PGI6",
+        "STM32WBA65PGI7"
+      ],
+      "base_device": "STM32WBA65PG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65PG",
+        "evidence_section_sha256": "3ec2d63c28c7a1a4d1a486388f923213b7636cb4f82dd5625d9db1cd9f5eeaab",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65PGI6",
+          "STM32WBA65PGI7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65PGI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65PGI7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "52bd387c2d7b9149b99924d16afd2c695777df05825c0bfca236f277fed6b71e",
+        "retrieved_at_utc": "2026-09-23T08:10:49Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65PII6",
+        "STM32WBA65PII6TR",
+        "STM32WBA65PII7",
+        "STM32WBA65PII7TR"
+      ],
+      "base_device": "STM32WBA65PI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65PI",
+        "evidence_section_sha256": "ee748e1c6a6334617498fd8601fb1f2528d98a8cbc0954a4961267f963684155",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65PII6",
+          "STM32WBA65PII6TR",
+          "STM32WBA65PII7",
+          "STM32WBA65PII7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65PII6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65PII6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65PII7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65PII7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "796b04708855620a43120e0e2b5c402376094b2415b85427ad344109e23d8e66",
+        "retrieved_at_utc": "2026-09-23T08:11:05Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pi.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pi.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65RGV6",
+        "STM32WBA65RGV6TR",
+        "STM32WBA65RGV7"
+      ],
+      "base_device": "STM32WBA65RG",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65RG",
+        "evidence_section_sha256": "d023dfe5c9ebdfe193b2191e215424f37d9feab6addfdcac3c453215f5bdfd8d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65RGV6",
+          "STM32WBA65RGV6TR",
+          "STM32WBA65RGV7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65RGV6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65RGV6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65RGV7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2065567020d10c37485447f86b6d51dd9083659a6afb61efab5ba00cfc087ad5",
+        "retrieved_at_utc": "2026-09-23T08:11:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "acquisition_status": "success",
+      "active_exact_icpns": [
+        "STM32WBA65RIV6",
+        "STM32WBA65RIV6TR",
+        "STM32WBA65RIV7",
+        "STM32WBA65RIV7TR"
+      ],
+      "base_device": "STM32WBA65RI",
+      "commercial_identity_status": "verified_active",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32WBA65RI",
+        "evidence_section_sha256": "ffcedd9b9fa4cc2d0a41693594203a70cf8fb6336af22b7a68a6896c7e10b924",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32WBA65RIV6",
+          "STM32WBA65RIV6TR",
+          "STM32WBA65RIV7",
+          "STM32WBA65RIV7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ri.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32WBA65RIV6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65RIV6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65RIV7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32WBA65RIV7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5f728465c8dd75d3d7d47e2deb98ca894b387c04dd6798bde32fae8a1b688af6",
+        "retrieved_at_utc": "2026-09-23T08:11:39Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ri.html"
+      },
+      "excluded_non_active_icpns": [],
+      "manual_intervention_required": false,
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ri.html",
+      "subfamily": "STM32WBA65"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "STM32WBA6X bounded official-ST exact ICPN discovery",
+  "selected_wireless_frontier": "STM32WBA6X",
+  "status": "discovered",
+  "successful_targets": 18,
+  "target_config": "tcl/target/stm32wba6x.cfg"
+}
