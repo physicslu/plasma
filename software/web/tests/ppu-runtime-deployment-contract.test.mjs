@@ -12,6 +12,7 @@ const files = {
   route: new URL("api/manager/registry/[...path]/route.ts", root),
   managerServer: new URL("../../python/plasma_manager/server.py", import.meta.url),
   bootstrapServer: new URL("../../python/plasma_manager/bootstrap_server.py", import.meta.url),
+  ppuCss: new URL("engineering/ppu-site-configuration.css", root),
 };
 
 async function source(url) {
@@ -85,6 +86,23 @@ test("Platform PS Loop Test reuses Runtime loopback without requiring programmin
   assert.match(bootstrapServer, /context": "platform"/);
   assert.match(bootstrapServer, /client\.ps_loopback\(body/);
   assert.match(managerServer, /self\.command == "POST" and self\._registry_lifecycle\(alias\) != REGISTRY_LIFECYCLE_COMMISSIONED/);
+});
+
+test("Platform UI groups status, maintenance, loopback evidence, and deployment without changing API ownership", async () => {
+  const [deployment, ppuCss] = await Promise.all([source(files.deployment), source(files.ppuCss)]);
+  assert.match(deployment, /ppuPlatformSummaryGrid/);
+  assert.match(deployment, /ppuPlatformActionGrid/);
+  assert.match(deployment, /ppuPlatformLoopbackResult/);
+  assert.match(deployment, /No test result yet/);
+  assert.match(deployment, /ppuPlatformDeploymentForm/);
+  assert.match(deployment, /ppuPlatformDeploymentStatus/);
+  assert.match(deployment, /className="operatorField/);
+  assert.match(deployment, /className="operatorButton/);
+  assert.doesNotMatch(deployment, /className="ppuRegistryAddForm" aria-label="Platform PS Loop Test"/);
+  assert.match(ppuCss, /Platform workspace composition/);
+  assert.match(ppuCss, /\.ppuPlatformSummaryGrid/);
+  assert.match(ppuCss, /\.ppuPlatformLoopbackResult/);
+  assert.match(ppuCss, /\.ppuPlatformDeploymentForm/);
 });
 
 test("Browser Platform path remains bounded, maintenance-authorized, and Manager-only", async () => {
