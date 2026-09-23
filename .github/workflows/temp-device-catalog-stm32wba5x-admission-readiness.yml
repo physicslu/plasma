@@ -1,0 +1,48 @@
+name: TEMP STM32WBA5X admission readiness generation
+
+on:
+  push:
+    branches:
+      - agent/stm32wba5x-admission-readiness
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-stm32wba5x-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate deterministic STM32WBA5X admission artifacts
+        run: |
+          mkdir -p .artifacts/stm32wba5x-readiness
+          python data/device-catalog/research/stm32wba5x_admission_readiness.py \
+            --csv-output .artifacts/stm32wba5x-readiness/stm32wba5x-commercial-icpn.csv \
+            --readiness-output .artifacts/stm32wba5x-readiness/stm32wba5x-admission-readiness.json
+
+      - name: Emit generated artifacts to workflow log
+        run: |
+          python - <<'PY'
+          import base64, pathlib
+          root = pathlib.Path(".artifacts/stm32wba5x-readiness")
+          for path in sorted(root.iterdir()):
+              print(f"ARTIFACT_FILE_BEGIN {path.name}")
+              print(base64.b64encode(path.read_bytes()).decode("ascii"))
+              print(f"ARTIFACT_FILE_END {path.name}")
+          PY
+
+      - name: Upload generated readiness artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32wba5x-readiness-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          path: .artifacts/stm32wba5x-readiness/*
