@@ -70,82 +70,7 @@ export default function PpuRegistrationPage() {
   useEffect(() => {
     const initial = window.setTimeout(() => { void refresh(); }, 0);
     const timer = window.setInterval(() => { void refresh(true); }, 2500);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-    };
-  }, [refresh]);
-
-  const aliases = useMemo(
-    () => (registry?.ppus ?? []).map(entry => entry.alias).filter((alias): alias is string => Boolean(alias)),
-    [registry],
-  );
-  const effectiveAlias = selectedAlias && aliases.includes(selectedAlias) ? selectedAlias : aliases[0] ?? null;
-  const selectedEntry = registry?.ppus.find(entry => entry.alias === effectiveAlias) ?? null;
-  const selectedFleet = selectedEntry ? fleetForEntry(selectedEntry, fleet) : null;
-  const selectedLifecycle = selectedEntry ? lifecycleState(selectedEntry) : null;
-  const selectedConnectivity = connectivityState(selectedFleet);
-  const selectedHealth = healthState(selectedFleet);
-  const selectedPrerequisites = validationPrerequisites(selectedFleet);
-  const selectedCanValidate = canValidateAndEnable(selectedFleet);
-  const selectedHasActiveExecution = hasActiveExecution(selectedFleet);
-  const registryMutable = registry?.mutable === true;
-  const validationBlockedReason = !registryMutable
-    ? "Manager registry is read-only on this deployment."
-    : selectedCanValidate
-      ? null
-      : `Failing prerequisites: ${validationBlockSummary(selectedFleet)}.`;
-
-  async function runMutation(label: string, action: () => Promise<unknown>, success: string) {
-    setBusyAction(label);
-    setError(null);
-    setNotice(null);
-    try {
-      await action();
-      setNotice(success);
-      await refresh(true);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : `${label} failed`);
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function addPpu() {
-    const alias = newAlias.trim();
-    const endpoint = newGateway.trim();
-    if (!alias || !endpoint) return;
-    await runMutation("add", () => addManagerPpu(alias, endpoint), `${alias} added as a known PPU connection. Programming Registration is still pending.`);
-    setSelectedAlias(alias);
-    setNewAlias("");
-    setNewGateway("");
-    setShowAddForm(false);
-  }
-
-  async function registerPpu() {
-    if (!selectedEntry?.alias) return;
-    await runMutation("register", () => setManagerPpuLifecycle(selectedEntry.alias!, "commissioned"), `${selectedEntry.alias} validated and registered for managed programming.`);
-  }
-
-  async function disableRegistration() {
-    if (!selectedEntry?.alias) return;
-    await runMutation("disable", () => setManagerPpuLifecycle(selectedEntry.alias!, "disabled"), `${selectedEntry.alias} programming Registration disabled.`);
-  }
-
-  async function selectForManagedOperations() {
-    if (!selectedEntry?.alias || selectedEntry.lifecycle !== "commissioned") return;
-    const alias = selectedEntry.alias;
-    await runMutation("select", () => selectManagerPpuForManagedOperations(alias), `${alias} selected for managed programming operations.`);
-  }
-
-  async function removePpu() {
-    if (!selectedEntry?.alias) return;
-    const alias = selectedEntry.alias;
-    await runMutation("remove", () => removeManagerPpu(alias), `${alias} removed from this Console's known PPU inventory.`);
-    setRemoveCandidate(null);
-  }
-
-  return (
+    return (
     <section className="ppuSiteConfiguration" aria-label="PPU Registration">
       <header className="ppuSiteHeader">
         <div><small>PPU</small><h2>Registration</h2><p>Manage which known PPU connections are admitted to this Console for programming operations. Platform maintenance remains a separate lifecycle.</p></div>
@@ -156,7 +81,7 @@ export default function PpuRegistrationPage() {
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {fleetError && registry && <p className="ppuRegistryMessage warning" role="status">Registry is available, but live Fleet status is unavailable: {fleetError}</p>}
 
-      <section className="ppuSiteCard" aria-label="Known PPU inventory">
+      <section className="ppuSiteCard ppuRegistrationInventory" aria-label="Known PPU inventory">
         <header className="ppuSiteCardHeader">
           <div><small>INVENTORY</small><h3>Known PPU Connections</h3></div>
           <div className="ppuSiteCardHeaderActions">
@@ -194,21 +119,38 @@ export default function PpuRegistrationPage() {
 
       {selectedEntry && selectedLifecycle ? (
         <>
-          <section className="ppuSiteCard" aria-label="Selected PPU Registration">
-            <header className="ppuSiteCardHeader">
-              <div className="ppuSiteCardHeaderActions"><h3>{selectedEntry.alias}</h3><span className="ppuDimensionPill" data-tone={selectedLifecycle.tone}>{selectedEntry.lifecycle === "commissioned" ? "Registered" : selectedEntry.lifecycle === "disabled" ? "Registered / Disabled" : "Not Registered"}</span></div>
-              <div className="ppuSiteCardHeaderActions">
+          <section className="ppuSiteCard ppuRegistrationControlPanel" aria-label="Selected PPU Registration">
+            <header className="ppuRegistrationControlHeader">
+              <div>
+                <small>SELECTED PPU</small>
+                <div className="ppuRegistrationIdentity"><h3>{selectedEntry.alias}</h3><span className="ppuDimensionPill" data-tone={selectedLifecycle.tone}>{selectedEntry.lifecycle === "commissioned" ? "Registered" : selectedEntry.lifecycle === "disabled" ? "Registered / Disabled" : "Not Registered"}</span></div>
+                <span>{selectedFleet?.identity.display_name ?? "Display name unavailable"} · {selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</span>
+              </div>
+              <div className="ppuRegistrationActionStrip">
                 {selectedEntry.lifecycle === "commissioned" && <button className="ppuSiteButton primary" type="button" disabled={busyAction !== null} onClick={() => void selectForManagedOperations()}>{busyAction === "select" ? "Selecting..." : "Use for Managed Operations"}</button>}
                 {selectedEntry.lifecycle === "commissioned" && <button className="ppuSiteButton" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => void disableRegistration()}>{busyAction === "disable" ? "Disabling..." : "Disable Registration"}</button>}
                 <button className="ppuSiteButton danger" type="button" disabled={!registryMutable || selectedHasActiveExecution || busyAction !== null} onClick={() => setRemoveCandidate(selectedEntry.alias)}>Remove Connection</button>
               </div>
             </header>
+
             {removeCandidate === selectedEntry.alias && <div className="ppuRemoveConfirm" role="alert"><div><strong>Remove {selectedEntry.alias}?</strong><span>This removes Console inventory/Registration state only. It does not erase or reconfigure the physical PPU.</span></div><div className="ppuSiteCardHeaderActions"><button className="ppuSiteButton danger" type="button" disabled={busyAction !== null} onClick={() => void removePpu()}>{busyAction === "remove" ? "Removing..." : "Confirm Remove"}</button><button className="ppuSiteButton" type="button" disabled={busyAction !== null} onClick={() => setRemoveCandidate(null)}>Cancel</button></div></div>}
-            <div className="ppuStateDimensionGrid" aria-label="PPU Registration observations">
-              <article className="ppuStateDimensionCard" data-tone={selectedConnectivity.tone}><small>Connectivity</small><strong>{selectedConnectivity.label}</strong><p>{selectedConnectivity.reason}</p></article>
-              <article className="ppuStateDimensionCard" data-tone={selectedHealth.tone}><small>Health</small><strong>{selectedHealth.label}</strong><p>{selectedHealth.reason}</p></article>
-              <article className="ppuStateDimensionCard" data-tone={selectedLifecycle.tone}><small>Registration Lifecycle</small><strong>{selectedLifecycle.label}</strong><p>{selectedLifecycle.reason}</p></article>
+
+            <div className="ppuRegistrationSummaryGrid" aria-label="PPU Registration observations">
+              <article data-tone={selectedConnectivity.tone}><small>Connectivity</small><strong>{selectedConnectivity.label}</strong><span>{selectedConnectivity.reason}</span></article>
+              <article data-tone={selectedHealth.tone}><small>Health</small><strong>{selectedHealth.label}</strong><span>{selectedHealth.reason}</span></article>
+              <article data-tone={selectedLifecycle.tone}><small>Registration Lifecycle</small><strong>{selectedLifecycle.label}</strong><span>{selectedLifecycle.reason}</span></article>
+              <article><small>Active Execution</small><strong>{selectedHasActiveExecution ? "Yes" : "No"}</strong><span>{selectedFleet?.topology.site_count ?? "—"} reported Sites</span></article>
             </div>
+
+            <dl className="ppuRegistrationIdentityGrid">
+              <div><dt>Console Alias</dt><dd>{selectedEntry.alias}</dd></div>
+              <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
+              <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
+              <div><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
+              <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
+              <div><dt>Reported Sites</dt><dd>{selectedFleet?.topology.site_count ?? "—"}</dd></div>
+            </dl>
+
             {selectedEntry.lifecycle !== "commissioned" && (
               <div className="ppuReadinessPanel" aria-label="Registration prerequisites">
                 <header><div><small>REGISTRATION READINESS</small><h4>Validate PPU before programming admission</h4></div><span>Platform maintenance is allowed independently of this admission.</span></header>
@@ -216,9 +158,13 @@ export default function PpuRegistrationPage() {
                 <footer>{validationBlockedReason ? <div className="ppuReadinessBlocked"><strong>Blocked</strong><span>{validationBlockedReason}</span></div> : <div className="ppuReadinessReady"><strong>Ready</strong><span>Current observation satisfies programming Registration prerequisites.</span></div>}<button className="ppuSiteButton primary" type="button" disabled={!registryMutable || !selectedCanValidate || busyAction !== null} onClick={() => void registerPpu()}>{busyAction === "register" ? "Registering..." : "Validate & Register for Programming"}</button></footer>
               </div>
             )}
-            <div className="ppuInfoBody"><dl className="ppuInfoGrid"><div><dt>Console Alias</dt><dd>{selectedEntry.alias}</dd></div><div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div><div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div><div><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div><div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div><div><dt>Reported Sites</dt><dd>{selectedFleet?.topology.site_count ?? "—"}</dd></div><div><dt>Active Execution</dt><dd>{selectedHasActiveExecution ? "Yes" : "No"}</dd></div></dl></div>
           </section>
-          {selectedEntry.lifecycle === "commissioned" ? <PpuNetworkConfiguration entry={selectedEntry} hasActiveExecution={selectedHasActiveExecution} /> : <section className="ppuSiteCard" aria-label="Network commissioning registration gate"><p className="ppuSiteNote">Operational network commissioning remains locked until programming Registration is complete. The current endpoint remains sufficient for Bootstrap-based Platform maintenance.</p></section>}
+
+          <section className="ppuRegistrationNetworkRegion" aria-label="Registration network commissioning">
+            {selectedEntry.lifecycle === "commissioned"
+              ? <PpuNetworkConfiguration entry={selectedEntry} hasActiveExecution={selectedHasActiveExecution} />
+              : <section className="ppuSiteCard" aria-label="Network commissioning registration gate"><p className="ppuSiteNote">Operational network commissioning remains locked until programming Registration is complete. The current endpoint remains sufficient for Bootstrap-based Platform maintenance.</p></section>}
+          </section>
         </>
       ) : <section className="ppuSiteCard ppuEmptyRegistry"><h3>{loading ? "Loading PPU inventory..." : "No PPU selected"}</h3></section>}
 
