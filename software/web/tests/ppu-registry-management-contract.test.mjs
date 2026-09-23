@@ -10,6 +10,7 @@ const ppuSiteDesired = await readFile(new URL("../app/engineering/ppu-site-desir
 const ppuSiteDesiredCore = await readFile(new URL("../app/engineering/ppu-site-desired-configuration-core.tsx", import.meta.url), "utf8");
 const ppuRuntimeActivation = await readFile(new URL("../app/engineering/ppu-runtime-activation.tsx", import.meta.url), "utf8");
 const ppuUiState = await readFile(new URL("../app/engineering/ppu-ui-state.ts", import.meta.url), "utf8");
+const ppuCss = await readFile(new URL("../app/engineering/ppu-site-configuration.css", import.meta.url), "utf8");
 const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
@@ -41,6 +42,26 @@ test("PPU Overview is read-only and summarizes Platform, Registration, Sites, an
   assert.match(overview, /onNavigate\("registration"\)/);
   assert.match(overview, /onNavigate\("sites"\)/);
   assert.doesNotMatch(overview, /addManagerPpu|setManagerPpuLifecycle|removeManagerPpu|saveManagerPpuSite/);
+});
+
+test("PPU workspace consolidates Overview, Registration, and Sites without changing domain APIs", () => {
+  assert.match(overview, /ppuOverviewSnapshot/);
+  assert.match(overview, /ppuOverviewStatusGrid/);
+  assert.match(overview, /ppuOverviewDomainGrid/);
+  assert.match(overview, /ppuOverviewAlerts/);
+  assert.match(registration, /ppuRegistrationControlPanel/);
+  assert.match(registration, /ppuRegistrationSummaryGrid/);
+  assert.match(registration, /ppuRegistrationIdentityGrid/);
+  assert.match(registration, /ppuRegistrationActionStrip/);
+  assert.match(sitesPage, /ppuSitesSnapshot/);
+  assert.match(sitesPage, /ppuSitesSummaryGrid/);
+  assert.match(sitesPage, /ppuSitesWorkflow/);
+  assert.match(ppuCss, /PPU workspace consolidation/);
+  assert.match(ppuCss, /\.ppuOverviewDomainGrid/);
+  assert.match(ppuCss, /\.ppuRegistrationSummaryGrid/);
+  assert.match(ppuCss, /\.ppuSitesSummaryGrid/);
+  assert.doesNotMatch(overview, /addManagerPpu|setManagerPpuLifecycle|saveManagerPpuSite/);
+  assert.doesNotMatch(sitesPage, /addManagerPpu|setManagerPpuLifecycle|pairManagerPpuBootstrap/);
 });
 
 test("Registration owns Console programming admission, not Platform maintenance", () => {
