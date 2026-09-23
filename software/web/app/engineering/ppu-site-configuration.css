@@ -778,3 +778,362 @@
     flex-direction: column;
   }
 }
+
+
+/* Platform workspace composition.
+ * Inputs/buttons intentionally consume shared operator-surface primitives;
+ * this file owns only Platform-specific layout and information hierarchy.
+ */
+.ppuPlatformCard {
+  display: grid;
+  gap: 0;
+}
+
+.ppuPlatformSummaryHeader p,
+.ppuPlatformSectionHeader p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ppuPlatformAlert {
+  display: grid;
+  gap: 3px;
+  margin: 12px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ppuPlatformAlert strong {
+  font-size: 11px;
+}
+
+.ppuPlatformAlert[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--line));
+  background: color-mix(in srgb, var(--red) 6%, var(--panel));
+  color: var(--red);
+}
+
+.ppuPlatformAlert[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+  background: color-mix(in srgb, var(--green) 6%, var(--panel));
+  color: var(--green);
+}
+
+.ppuPlatformAlert span {
+  color: var(--text-soft);
+}
+
+.ppuPlatformSection {
+  margin: 14px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel-3) 54%, var(--panel));
+  overflow: hidden;
+}
+
+.ppuPlatformSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+}
+
+.ppuPlatformSectionHeader > div {
+  min-width: 0;
+}
+
+.ppuPlatformSectionHeader small,
+.ppuPlatformDeploymentStatus small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--cyan);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ppuPlatformSectionHeader h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ppuPlatformStatusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+  white-space: nowrap;
+}
+
+.ppuPlatformStatusPill[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+  color: var(--green);
+}
+
+.ppuPlatformStatusPill[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel));
+  color: var(--amber);
+}
+
+.ppuPlatformSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0 13px 13px;
+}
+
+.ppuPlatformMetric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: var(--panel);
+}
+
+.ppuPlatformMetric dt,
+.ppuPlatformLoopbackResult dt {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.ppuPlatformMetric dd,
+.ppuPlatformLoopbackResult dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ppuPlatformMonoValue {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.ppuPlatformActionGrid {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  gap: 14px;
+  margin: 14px 16px 0;
+}
+
+.ppuPlatformActionGrid > .ppuPlatformSection {
+  margin: 0;
+}
+
+.ppuPlatformMaintenanceControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 0 13px;
+}
+
+.ppuPlatformMaintenanceControls .operatorButton {
+  min-width: 205px;
+}
+
+.ppuPlatformSectionNote {
+  margin: 9px 13px 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuPlatformLoopback {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .72fr);
+  align-items: stretch;
+}
+
+.ppuPlatformLoopbackAction {
+  min-width: 0;
+  padding-bottom: 12px;
+}
+
+.ppuPlatformLoopbackAction > .operatorButton {
+  width: calc(100% - 26px);
+  margin: 0 13px;
+}
+
+.ppuPlatformLoopbackResult {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  margin: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 11px;
+  background: var(--panel);
+}
+
+.ppuPlatformLoopbackResult[data-state="pass"] {
+  align-content: start;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--green) 38%, var(--line));
+  background: color-mix(in srgb, var(--green) 4%, var(--panel));
+}
+
+.ppuPlatformLoopbackResult > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.ppuPlatformLoopbackResult > header strong {
+  font-size: 11px;
+}
+
+.ppuPlatformLoopbackResult dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.ppuPlatformLoopbackResult dl .wide {
+  grid-column: 1 / -1;
+}
+
+.ppuPlatformLoopbackEmpty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.ppuPlatformLoopbackEmpty strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.ppuPlatformLoopbackEmpty span {
+  max-width: 240px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuPlatformRuntimeDeployment {
+  margin-top: 14px;
+}
+
+.ppuPlatformDeploymentForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(160px, .52fr);
+  align-items: end;
+  gap: 10px;
+  padding: 0 13px;
+}
+
+.ppuPlatformDisplayNameField {
+  grid-column: span 1;
+}
+
+.ppuPlatformDeployButton {
+  min-width: 205px;
+}
+
+.ppuPlatformDeploymentStatus {
+  display: grid;
+  grid-template-columns: minmax(180px, .7fr) minmax(240px, 1.3fr);
+  gap: 16px;
+  align-items: center;
+  margin: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 12px;
+  background: color-mix(in srgb, var(--panel-3) 70%, transparent);
+}
+
+.ppuPlatformDeploymentStatus > div {
+  min-width: 0;
+}
+
+.ppuPlatformDeploymentStatus strong,
+.ppuPlatformDeploymentStatus span {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.ppuPlatformDeploymentStatus[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--green) 36%, var(--line));
+}
+
+.ppuPlatformDeploymentStatus[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--red) 40%, var(--line));
+}
+
+.ppuPlatformDeploymentStatus[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+}
+
+.ppuPlatformDeploymentStatus > .ppuRegistryMessage {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1180px) {
+  .ppuPlatformSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ppuPlatformActionGrid,
+  .ppuPlatformLoopback {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuPlatformLoopbackResult {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .ppuPlatformDeploymentForm {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ppuPlatformDeployButton {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .ppuPlatformSummaryGrid,
+  .ppuPlatformDeploymentForm,
+  .ppuPlatformDeploymentStatus,
+  .ppuPlatformMaintenanceControls {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuPlatformSectionHeader {
+    flex-direction: column;
+  }
+
+  .ppuPlatformMaintenanceControls .operatorButton,
+  .ppuPlatformDeployButton {
+    width: 100%;
+    min-width: 0;
+  }
+}
