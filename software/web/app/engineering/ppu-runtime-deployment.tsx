@@ -196,115 +196,198 @@ export default function PpuRuntimeDeployment({
   }
 
   return (
-    <section className="ppuSiteCard" aria-label="PPU Platform Release">
-      <header className="ppuSiteCardHeader">
+    <section className="ppuSiteCard ppuPlatformCard" aria-label="PPU Platform Release">
+      <header className="ppuSiteCardHeader ppuPlatformSummaryHeader">
         <div>
-          <small>PLATFORM RELEASE</small>
-          <h3>{platformReleaseIdentity(status)}</h3>
+          <small>PLATFORM SUMMARY</small>
+          <h3>Current platform state</h3>
+          <p>Bootstrap, Runtime, device identity, and maintenance authorization for the selected PPU.</p>
         </div>
         <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
           {loading ? "Checking..." : "Refresh Platform Status"}
         </button>
       </header>
 
-      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
-      {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
+      {error && (
+        <div className="ppuPlatformAlert" data-tone="danger" role="alert">
+          <strong>Platform status unavailable</strong>
+          <span>{error}</span>
+        </div>
+      )}
+      {notice && (
+        <div className="ppuPlatformAlert" data-tone="success" role="status">
+          <strong>Platform workflow updated</strong>
+          <span>{notice}</span>
+        </div>
+      )}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Platform Release update is blocked while this PPU has active Site execution.</p>}
       {runtime?.state === "runtime_active" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Platform maintenance requires a current trusted idle PPU observation. Programming Registration does not control this Platform gate. If Runtime health cannot be observed, use the explicit recovery procedure.</p>}
       {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Platform Release update remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
-      <div className="ppuInfoBody">
-        <dl className="ppuInfoGrid">
-          <div className="wide"><dt>PPU Platform Release</dt><dd>{platformReleaseIdentity(status)}</dd></div>
-          <div><dt>Bootstrap State</dt><dd>{stateLabel(bootstrap?.bootstrap.state)}</dd></div>
-          <div><dt>Bootstrap Version</dt><dd>{bootstrap?.bootstrap.version ?? "Unavailable"}</dd></div>
-          <div><dt>Runtime State</dt><dd>{stateLabel(runtime?.state)}</dd></div>
-          <div><dt>Runtime Version</dt><dd>{runtime?.product_version ?? "Not installed"}</dd></div>
-          <div className="wide"><dt>Runtime Commit</dt><dd>{runtime?.git_sha ?? "—"}</dd></div>
-          <div><dt>Device ID</dt><dd>{bootstrap?.identity.device_id ?? "Unavailable"}</dd></div>
-          <div><dt>Maintenance Authorization</dt><dd>{pairing?.paired && pairing.device_match ? "Paired" : "Required"}</dd></div>
+      <section className="ppuPlatformSection" aria-labelledby="platform-summary-heading">
+        <header className="ppuPlatformSectionHeader">
+          <div>
+            <small>STATUS</small>
+            <h4 id="platform-summary-heading">Platform Summary</h4>
+          </div>
+          <span className="ppuPlatformStatusPill" data-tone={pairing?.paired && pairing.device_match ? "success" : "warning"}>
+            {pairing?.paired && pairing.device_match ? "Maintenance paired" : "Maintenance required"}
+          </span>
+        </header>
+        <dl className="ppuPlatformSummaryGrid">
+          <div className="ppuPlatformMetric">
+            <dt>Platform Release</dt>
+            <dd>{platformReleaseIdentity(status)}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Runtime State</dt>
+            <dd>{stateLabel(runtime?.state)}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Runtime Version</dt>
+            <dd>{runtime?.product_version ?? "Not installed"}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Bootstrap State</dt>
+            <dd>{stateLabel(bootstrap?.bootstrap.state)}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Bootstrap Version</dt>
+            <dd>{bootstrap?.bootstrap.version ?? "Unavailable"}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Runtime Commit</dt>
+            <dd className="ppuPlatformMonoValue">{runtime?.git_sha ?? "—"}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Device ID</dt>
+            <dd className="ppuPlatformMonoValue">{bootstrap?.identity.device_id ?? "Unavailable"}</dd>
+          </div>
+          <div className="ppuPlatformMetric">
+            <dt>Maintenance Authorization</dt>
+            <dd>{pairing?.paired && pairing.device_match ? "Paired" : "Required"}</dd>
+          </div>
         </dl>
+      </section>
+
+      <div className="ppuPlatformActionGrid">
+        <section className="ppuPlatformSection ppuPlatformMaintenance" aria-labelledby="platform-maintenance-heading">
+          <header className="ppuPlatformSectionHeader">
+            <div>
+              <small>MAINTENANCE</small>
+              <h4 id="platform-maintenance-heading">Platform Maintenance</h4>
+              <p>Authorize maintenance independently from programming Registration.</p>
+            </div>
+          </header>
+          <div className="ppuPlatformMaintenanceControls">
+            <label className="operatorField">
+              <span>Platform Maintenance Pairing Token</span>
+              <input
+                type="password"
+                autoComplete="off"
+                value={pairingToken}
+                disabled={busy !== null}
+                placeholder="Factory / recovery pairing token"
+                onChange={event => setPairingToken(event.target.value)}
+              />
+            </label>
+            <button className="operatorButton" type="button" disabled={!canPair} onClick={() => void pair()}>
+              {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
+            </button>
+          </div>
+          <p className="ppuPlatformSectionNote">This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
+        </section>
+
+        <section className="ppuPlatformSection ppuPlatformLoopback" aria-labelledby="platform-loopback-heading">
+          <div className="ppuPlatformLoopbackAction">
+            <header className="ppuPlatformSectionHeader">
+              <div>
+                <small>DIAGNOSTIC</small>
+                <h4 id="platform-loopback-heading">Platform PS Loop Test</h4>
+                <p>Runs the active Runtime PS loopback through the Platform maintenance admission path.</p>
+              </div>
+            </header>
+            <button className="operatorButton" data-variant="primary" type="button" disabled={!canLoopback} onClick={() => void runLoopback()}>
+              {busy === "loopback" ? "Testing PS..." : "Run PS Loop Test"}
+            </button>
+            {!pairing?.paired && <p className="ppuPlatformSectionNote">Platform maintenance pairing is required before this diagnostic can run.</p>}
+            {pairing?.paired && runtime?.state !== "runtime_active" && <p className="ppuPlatformSectionNote">The Runtime must be active before PS Loop Test can run.</p>}
+          </div>
+
+          <aside className="ppuPlatformLoopbackResult" aria-label="Platform PS Loop Test result" data-state={loopback ? "pass" : "empty"}>
+            {loopback ? (
+              <>
+                <header>
+                  <span className="ppuPlatformStatusPill" data-tone="success">PASS</span>
+                  <strong>Loop Test Result</strong>
+                </header>
+                <dl>
+                  <div><dt>PPU RTT</dt><dd>{loopback.loopback.ppu_rtt_ms ?? "—"} ms</dd></div>
+                  <div><dt>Manager RTT</dt><dd>{loopback.manager.manager_rtt_ms} ms</dd></div>
+                  <div><dt>Context</dt><dd>{loopback.manager.context}</dd></div>
+                  <div><dt>Source</dt><dd>{loopback.loopback.source}</dd></div>
+                  <div className="wide"><dt>Test ID</dt><dd>{loopback.loopback.test_id}</dd></div>
+                </dl>
+              </>
+            ) : (
+              <div className="ppuPlatformLoopbackEmpty">
+                <strong>No test result yet</strong>
+                <span>{!pairing?.paired ? "Platform maintenance pairing is required before this diagnostic can run." : "Run the PS Loop Test to capture diagnostic evidence."}</span>
+              </div>
+            )}
+          </aside>
+        </section>
       </div>
 
-      <div className="ppuRegistryAddForm" aria-label="Platform maintenance pairing">
-        <label>
-          <span>Platform Maintenance Pairing Token</span>
-          <input
-            type="password"
-            autoComplete="off"
-            value={pairingToken}
-            disabled={busy !== null}
-            placeholder="Factory / recovery pairing token"
-            onChange={event => setPairingToken(event.target.value)}
-          />
-        </label>
-        <button className="ppuSiteButton" type="button" disabled={!canPair} onClick={() => void pair()}>
-          {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
-        </button>
-        <p>This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
-      </div>
-
-      <div className="ppuRegistryAddForm" aria-label="Platform PS Loop Test">
-        <div>
-          <strong>Platform PS Loop Test</strong>
-          <p>Runs the same Runtime PS loopback capability through the Platform maintenance admission path. Programming Registration is not required.</p>
+      <section className="ppuPlatformSection ppuPlatformRuntimeDeployment" aria-labelledby="platform-runtime-deployment-heading">
+        <header className="ppuPlatformSectionHeader">
+          <div>
+            <small>RUNTIME DEPLOYMENT</small>
+            <h4 id="platform-runtime-deployment-heading">Runtime Deployment</h4>
+            <p>Upload and deploy Platform Runtime components through the installed Bootstrap.</p>
+          </div>
+        </header>
+        <div className="ppuPlatformDeploymentForm">
+          <label className="operatorField ppuPlatformFileField">
+            <span>PPU Platform Release Package</span>
+            <input type="file" disabled={busy !== null} onChange={event => setKit(event.target.files?.[0] ?? null)} />
+          </label>
+          <label className="operatorField ppuPlatformFileField">
+            <span>SHA-256 Sidecar</span>
+            <input type="file" disabled={busy !== null} onChange={event => setSidecar(event.target.files?.[0] ?? null)} />
+          </label>
+          <label className="operatorField">
+            <span>PPU ID</span>
+            <input value={ppuId} disabled={busy !== null} onChange={event => setPpuId(event.target.value)} />
+          </label>
+          <label className="operatorField">
+            <span>Facility ID</span>
+            <input value={facilityId} disabled={busy !== null} onChange={event => setFacilityId(event.target.value)} />
+          </label>
+          <label className="operatorField ppuPlatformDisplayNameField">
+            <span>Display Name</span>
+            <input value={displayName} disabled={busy !== null} onChange={event => setDisplayName(event.target.value)} />
+          </label>
+          <button className="operatorButton ppuPlatformDeployButton" data-variant="primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
+            {busy === "deploy" ? `Updating${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Update PPU Platform Release"}
+          </button>
         </div>
-        <button className="ppuSiteButton" type="button" disabled={!canLoopback} onClick={() => void runLoopback()}>
-          {busy === "loopback" ? "Testing PS..." : "Run PS Loop Test"}
-        </button>
-        {!pairing?.paired && <p>Platform maintenance pairing is required before this diagnostic can run.</p>}
-        {pairing?.paired && runtime?.state !== "runtime_active" && <p>The Runtime must be active before PS Loop Test can run.</p>}
-        {loopback && (
-          <dl className="ppuInfoGrid">
-            <div><dt>Result</dt><dd>PASS</dd></div>
-            <div><dt>Context</dt><dd>{loopback.manager.context}</dd></div>
-            <div><dt>Test ID</dt><dd>{loopback.loopback.test_id}</dd></div>
-            <div><dt>Manager RTT</dt><dd>{loopback.manager.manager_rtt_ms} ms</dd></div>
-            <div><dt>PPU RTT</dt><dd>{loopback.loopback.ppu_rtt_ms ?? "—"}</dd></div>
-            <div><dt>Source</dt><dd>{loopback.loopback.source}</dd></div>
-          </dl>
-        )}
-      </div>
-
-      <div className="ppuRegistryAddForm" aria-label="PPU Platform Release update">
-        <label>
-          <span>PPU Platform Release Package</span>
-          <input type="file" disabled={busy !== null} onChange={event => setKit(event.target.files?.[0] ?? null)} />
-        </label>
-        <label>
-          <span>SHA-256 Sidecar</span>
-          <input type="file" disabled={busy !== null} onChange={event => setSidecar(event.target.files?.[0] ?? null)} />
-        </label>
-        <label>
-          <span>PPU ID</span>
-          <input value={ppuId} disabled={busy !== null} onChange={event => setPpuId(event.target.value)} />
-        </label>
-        <label>
-          <span>Facility ID</span>
-          <input value={facilityId} disabled={busy !== null} onChange={event => setFacilityId(event.target.value)} />
-        </label>
-        <label>
-          <span>Display Name</span>
-          <input value={displayName} disabled={busy !== null} onChange={event => setDisplayName(event.target.value)} />
-        </label>
-        <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
-          {busy === "deploy" ? `Updating${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Update PPU Platform Release"}
-        </button>
-        <p>
+        <p className="ppuPlatformSectionNote">
           The current qualified update authority deploys the Runtime component through the installed Bootstrap and preserves existing rollback/recovery gates. Bootstrap remains independently versioned and is not silently rewritten by this path. Programming Logic, including FPGA bitstreams and ICPN-selected Python logic, is a separate lifecycle.
         </p>
-      </div>
+      </section>
 
-      <div className="ppuReadinessPanel" aria-label="Platform deployment status">
-        <header>
-          <div>
-            <small>PLATFORM DEPLOYMENT</small>
-            <h4>{stateLabel(deployment?.state)}</h4>
-          </div>
-          <span data-tone={deploymentTone}>{deployment?.transaction_id ?? "No deployment transaction"}</span>
-        </header>
+      <section className="ppuPlatformDeploymentStatus" aria-label="Platform deployment status" data-tone={deploymentTone}>
+        <div>
+          <small>PLATFORM DEPLOYMENT</small>
+          <strong>{stateLabel(deployment?.state)}</strong>
+        </div>
+        <div>
+          <small>TRANSACTION</small>
+          <span className="ppuPlatformMonoValue">{deployment?.transaction_id ?? "No deployment transaction"}</span>
+        </div>
         {deployment?.error && <p className="ppuRegistryMessage error">{deployment.error}</p>}
-      </div>
+      </section>
     </section>
   );
 }
