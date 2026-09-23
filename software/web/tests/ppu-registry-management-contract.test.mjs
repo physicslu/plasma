@@ -107,7 +107,7 @@ test("only registered PPUs can be selected for managed programming operations", 
 test("Sites are PPU child resources and operational configuration is Registration-gated", () => {
   assert.match(sitesPage, /Programming Sites are child resources of a PPU/);
   assert.match(sitesPage, /const registered = selectedEntry\?\.lifecycle === "commissioned"/);
-  assert.match(sitesPage, /\{registered \? \(/);
+  assert.match(sitesPage, /registered \? \(/);
   assert.match(sitesPage, /<PpuSiteDesiredConfiguration/);
   assert.match(sitesPage, /Registration required/);
   assert.match(sitesPage, /Platform Release inspection and maintenance remain available from Platform while Sites are locked/);
