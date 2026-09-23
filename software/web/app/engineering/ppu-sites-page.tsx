@@ -97,12 +97,16 @@ export default function PpuSitesPage() {
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      <section className="ppuSiteCard" aria-label="Sites target PPU">
+      <section className="ppuSiteCard ppuSitesTargetSummary" aria-label="Sites target and status">
         <header className="ppuSiteCardHeader">
-          <div><small>TARGET</small><h3>Select PPU</h3></div>
+          <div>
+            <small>SELECTED PPU</small>
+            <h3>{selectedEntry?.alias ?? "No PPU selected"}</h3>
+          </div>
+          {selectedEntry && <span className="ppuSiteFilter">{siteSummary.total} reported</span>}
         </header>
-        <div className="ppuRegistryAddForm">
-          <label>
+        <div className="ppuSitesTargetBody">
+          <label className="operatorField">
             <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
@@ -110,41 +114,32 @@ export default function PpuSitesPage() {
               ))}
             </select>
           </label>
+          {selectedEntry && (
+            <div className="ppuSitesSummaryGrid" aria-label="Site status summary">
+              <article data-tone={siteSummary.fault > 0 ? "danger" : "healthy"}><small>Ready</small><strong>{siteSummary.ready}</strong></article>
+              <article data-tone={siteSummary.busy > 0 ? "info" : "neutral"}><small>Busy</small><strong>{siteSummary.busy}</strong></article>
+              <article data-tone={siteSummary.fault > 0 ? "danger" : "neutral"}><small>Fault</small><strong>{siteSummary.fault}</strong></article>
+              <article><small>Registration</small><strong>{registered ? "Registered" : "Required"}</strong></article>
+              <article><small>Enabled Sites</small><strong>{selectedFleet?.topology.enabled_site_count ?? 0}</strong></article>
+              <article><small>Topology Source</small><strong>{selectedFleet?.topology.source ?? "none"}</strong></article>
+              <article data-tone={activeExecution ? "warning" : "healthy"}><small>Active Execution</small><strong>{activeExecution ? "Yes" : "No"}</strong></article>
+            </div>
+          )}
         </div>
       </section>
 
       {selectedEntry ? (
-        <>
-          <section className="ppuSiteCard" aria-label="Site status summary">
-            <header className="ppuSiteCardHeader">
-              <div><small>SITE STATUS</small><h3>{selectedEntry.alias}</h3></div>
-              <span className="ppuSiteFilter">{siteSummary.total} reported</span>
-            </header>
-            <div className="ppuStateSummaryGrid">
-              <div className="ppuStateSummaryGroup"><small>Ready</small><strong>{siteSummary.ready}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Busy</small><strong>{siteSummary.busy}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Fault</small><strong>{siteSummary.fault}</strong></div>
-            </div>
-            <div className="ppuInfoBody">
-              <dl className="ppuInfoGrid">
-                <div><dt>Registration</dt><dd>{registered ? "Registered" : "Required"}</dd></div>
-                <div><dt>Topology Source</dt><dd>{selectedFleet?.topology.source ?? "none"}</dd></div>
-                <div><dt>Enabled Sites</dt><dd>{selectedFleet?.topology.enabled_site_count ?? 0}</dd></div>
-                <div><dt>Active Execution</dt><dd>{activeExecution ? "Yes" : "No"}</dd></div>
-              </dl>
-            </div>
-          </section>
-
-          {registered ? (
+        registered ? (
+          <div className="ppuSitesWorkflow">
             <PpuSiteDesiredConfiguration entry={selectedEntry} hasActiveExecution={activeExecution} />
-          ) : (
-            <section className="ppuSiteCard" aria-label="Sites locked until Registration">
-              <header className="ppuSiteCardHeader"><div><small>LOCKED</small><h3>Registration required</h3></div></header>
-              <p className="ppuRegistryMessage warning" role="status">This PPU is known to Console, but it is not registered for managed programming. Complete Registration before changing Site desired configuration or activating programming runtime state.</p>
-              <p className="ppuSiteNote">PPU Platform Release inspection and maintenance remain available from Platform while Sites are locked.</p>
-            </section>
-          )}
-        </>
+          </div>
+        ) : (
+          <section className="ppuSiteCard" aria-label="Sites locked until Registration">
+            <header className="ppuSiteCardHeader"><div><small>LOCKED</small><h3>Registration required</h3></div></header>
+            <p className="ppuRegistryMessage warning" role="status">This PPU is known to Console, but it is not registered for managed programming. Complete Registration before changing Site desired configuration or activating programming runtime state.</p>
+            <p className="ppuSiteNote">PPU Platform Release inspection and maintenance remain available from Platform while Sites are locked.</p>
+          </section>
+        )
       ) : (
         <section className="ppuSiteCard ppuEmptyRegistry"><h3>{loading ? "Loading PPU inventory..." : "No known PPU"}</h3><p>Add a PPU connection from Registration first.</p></section>
       )}
