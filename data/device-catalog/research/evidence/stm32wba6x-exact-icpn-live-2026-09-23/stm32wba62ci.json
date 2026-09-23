@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA62CI",
+  "evidence_section_sha256": "87684cac494c99f12f1b2c4737adbf220bcb8441ec423c79fe863c6f6e2404eb",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA62CIU6",
+    "STM32WBA62CIU6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA62CIU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA62CIU6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "633acf9cc4be77ec8ae1ccc67f4e15b3d36cdc2536e35fcb56a18508fc262efa",
+  "retrieved_at_utc": "2026-09-23T08:04:05Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html"
+}
