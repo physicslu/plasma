@@ -1,0 +1,31 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA65MI",
+  "evidence_section_sha256": "1b461c2439bcad208db0231747699cdc7b86c1fdfecd04b017b47f9e809ea071",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA65MIF6TR",
+    "STM32WBA65MIF7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA65MIF6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA65MIF7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "9927eaf404496f9658daf95e0d752e2e4789ee51226093df24db54507a2cdeec",
+  "retrieved_at_utc": "2026-09-23T08:10:38Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html"
+}
