@@ -1,0 +1,99 @@
+{
+  "claims": {
+    "catalog_admission_ready": false,
+    "debug_attach_supported": false,
+    "excluded_candidates_never_existed": false,
+    "full_exact_icpn_discovery_completed": false,
+    "hil_required_for_catalog_admission": false,
+    "icpn_admission_authorized": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "decision": "current_commercial_scope_reconciled",
+  "excluded_research_candidates": [
+    {
+      "identifier_kind": "ordering_pattern",
+      "part_number": "STM32WBA50KEUx",
+      "reason": "not_supported_by_current_official_stm32wba50kg_ordering_information"
+    },
+    {
+      "identifier_kind": "cmsis_device_name",
+      "part_number": "STM32WBA50KEUxT",
+      "reason": "not_supported_by_current_official_stm32wba50kg_ordering_information"
+    }
+  ],
+  "family": "STM32WBA5X",
+  "manufacturer": "STMicroelectronics",
+  "next_gate": "stm32wba5x-bounded-exact-icpn-discovery-gate",
+  "official_manufacturer_evidence": {
+    "constrained_fields": {
+      "device_subfamily": "A50",
+      "flash_memory_size": "G",
+      "optional_packing": "TR",
+      "package": "U",
+      "pin_count": "K",
+      "temperature_range": "6"
+    },
+    "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32wba50kg.pdf",
+    "document": "DS14688",
+    "observed_active_exact_icpns": [
+      "STM32WBA50KGU6",
+      "STM32WBA50KGU6TR"
+    ],
+    "ordering_example": "STM32 WBA50 K G U 6 TR",
+    "ordering_information_pdf_page": 108,
+    "product": "STM32WBA50KG",
+    "product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba50kg.html",
+    "revision": "Rev 2"
+  },
+  "production_boundary": {
+    "exact_icpns": 2604,
+    "families": 21,
+    "frozen_manifest_git_blob_sha": "6e0fc69bec067259a1c52e150a313591cf4523e8",
+    "wba5x_published": false
+  },
+  "reconciled_surface": {
+    "base_device_count": 16,
+    "base_devices": [
+      "STM32WBA50KG",
+      "STM32WBA52CE",
+      "STM32WBA52CG",
+      "STM32WBA52KE",
+      "STM32WBA52KG",
+      "STM32WBA54CE",
+      "STM32WBA54CG",
+      "STM32WBA54KE",
+      "STM32WBA54KG",
+      "STM32WBA55CE",
+      "STM32WBA55CG",
+      "STM32WBA55HE",
+      "STM32WBA55HG",
+      "STM32WBA55UE",
+      "STM32WBA55UG",
+      "STM32WBA5MMG"
+    ],
+    "cmsis_device_name_rows": 16,
+    "ordering_pattern_rows": 16,
+    "retained_rows": 32
+  },
+  "reconciliation_id": "stm32wba5x-current-commercial-scope-reconciliation-v1",
+  "schema_version": 1,
+  "scope": "research_only",
+  "source_surface": {
+    "cmsis_device_name_rows": 17,
+    "ordering_pattern_rows": 17,
+    "source_rows": 34,
+    "source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3"
+  },
+  "upstream": {
+    "remediation_decision": "remediation_success_exact_discovery_reopened",
+    "remediation_gate_git_blob_sha": "d25b1bb32fe23a4eff89e33cd9fcc11be34fa5dc",
+    "remediation_gate_id": "stm32wba5x-bounded-official-st-evidence-remediation-v1"
+  }
+}
