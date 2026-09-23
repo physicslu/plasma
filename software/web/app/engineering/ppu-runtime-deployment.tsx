@@ -197,17 +197,6 @@ export default function PpuRuntimeDeployment({
 
   return (
     <section className="ppuSiteCard ppuPlatformCard" aria-label="PPU Platform Release">
-      <header className="ppuSiteCardHeader ppuPlatformSummaryHeader">
-        <div>
-          <small>PLATFORM SUMMARY</small>
-          <h3>Current platform state</h3>
-          <p>Bootstrap, Runtime, device identity, and maintenance authorization for the selected PPU.</p>
-        </div>
-        <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
-          {loading ? "Checking..." : "Refresh Platform Status"}
-        </button>
-      </header>
-
       {error && (
         <div className="ppuPlatformAlert" data-tone="danger" role="alert">
           <strong>Platform status unavailable</strong>
@@ -229,10 +218,16 @@ export default function PpuRuntimeDeployment({
           <div>
             <small>STATUS</small>
             <h4 id="platform-summary-heading">Platform Summary</h4>
+            <p>Bootstrap, Runtime, device identity, and maintenance authorization for the selected PPU.</p>
           </div>
-          <span className="ppuPlatformStatusPill" data-tone={pairing?.paired && pairing.device_match ? "success" : "warning"}>
-            {pairing?.paired && pairing.device_match ? "Maintenance paired" : "Maintenance required"}
-          </span>
+          <div className="ppuPlatformSummaryActions">
+            <span className="ppuPlatformStatusPill" data-tone={pairing?.paired && pairing.device_match ? "success" : "warning"}>
+              {pairing?.paired && pairing.device_match ? "Maintenance paired" : "Maintenance required"}
+            </span>
+            <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
+              {loading ? "Checking..." : "Refresh Status"}
+            </button>
+          </div>
         </header>
         <dl className="ppuPlatformSummaryGrid">
           <div className="ppuPlatformMetric">
