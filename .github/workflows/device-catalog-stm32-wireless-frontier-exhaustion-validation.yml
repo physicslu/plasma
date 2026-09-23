@@ -1,0 +1,40 @@
+name: STM32 wireless frontier exhaustion validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32-wireless-frontier-exhaustion-production-prestate.json'
+      - 'data/device-catalog/research/stm32-wireless-frontier-exhaustion.json'
+      - 'data/device-catalog/research/stm32_wireless_frontier_exhaustion.py'
+      - 'data/device-catalog/research/validate_stm32_wireless_frontier_exhaustion.py'
+      - 'data/device-catalog/research/stm32-post-wbx-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32wba5x-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/stm32wba6x-evidence-accessibility-gate.json'
+      - '.github/workflows/device-catalog-stm32-wireless-frontier-exhaustion-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32-wireless-frontier-exhaustion-production-prestate.json'
+      - 'data/device-catalog/research/stm32-wireless-frontier-exhaustion.json'
+      - 'data/device-catalog/research/stm32_wireless_frontier_exhaustion.py'
+      - 'data/device-catalog/research/validate_stm32_wireless_frontier_exhaustion.py'
+      - 'data/device-catalog/research/stm32-post-wbx-wireless-frontier-selection.json'
+      - 'data/device-catalog/research/stm32wba5x-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/stm32wba6x-evidence-accessibility-gate.json'
+      - '.github/workflows/device-catalog-stm32-wireless-frontier-exhaustion-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate STM32 wireless frontier exhaustion
+        run: python data/device-catalog/research/validate_stm32_wireless_frontier_exhaustion.py
