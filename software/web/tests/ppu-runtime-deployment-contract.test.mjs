@@ -90,6 +90,7 @@ test("Platform PS Loop Test reuses Runtime loopback without requiring programmin
 
 test("Platform UI groups status, maintenance, loopback evidence, and deployment without changing API ownership", async () => {
   const [deployment, ppuCss] = await Promise.all([source(files.deployment), source(files.ppuCss)]);
+  assert.match(deployment, /ppuPlatformCardToolbar/);
   assert.match(deployment, /ppuPlatformSummaryGrid/);
   assert.match(deployment, /ppuPlatformActionGrid/);
   assert.match(deployment, /ppuPlatformLoopbackResult/);
@@ -100,6 +101,7 @@ test("Platform UI groups status, maintenance, loopback evidence, and deployment 
   assert.match(deployment, /className="operatorButton/);
   assert.doesNotMatch(deployment, /className="ppuRegistryAddForm" aria-label="Platform PS Loop Test"/);
   assert.match(ppuCss, /Platform workspace composition/);
+  assert.match(ppuCss, /\.ppuPlatformCardToolbar/);
   assert.match(ppuCss, /\.ppuPlatformSummaryGrid/);
   assert.match(ppuCss, /\.ppuPlatformLoopbackResult/);
   assert.match(ppuCss, /\.ppuPlatformDeploymentForm/);
