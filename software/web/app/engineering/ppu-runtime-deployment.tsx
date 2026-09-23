@@ -304,7 +304,7 @@ export default function PpuRuntimeDeployment({
               <div>
                 <small>DIAGNOSTIC</small>
                 <h4 id="platform-loopback-heading">Platform PS Loop Test</h4>
-                <p>Runs the active Runtime PS loopback through the Platform maintenance admission path.</p>
+                <p>Runs the active Runtime PS loopback through the Platform maintenance admission path. Programming Registration is not required.</p>
               </div>
             </header>
             <button className="operatorButton" data-variant="primary" type="button" disabled={!canLoopback} onClick={() => void runLoopback()}>
