@@ -1,0 +1,139 @@
+{
+  "base_device_count": 18,
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "commercial_scope_reconciliation_sha256": "149a31146f4952f0850dbe039236e87ea3c67e3c53ea0ba5a97fed0c3ca8e377",
+  "discovery_id": "stm32wba6x-bounded-exact-icpn-discovery-v1",
+  "schema_version": 1,
+  "scope": "bounded exact ICPN discovery from official ST Q&R surfaces",
+  "selected_wireless_frontier": "STM32WBA6X",
+  "selection_sha256": "6243c80f97b2c159bc964935fc2f87371a596ee9f2d2e397e1c7ee9c3b6a178d",
+  "target_config": "tcl/target/stm32wba6x.cfg",
+  "targets": [
+    {
+      "base_device": "STM32WBA62CG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62cg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA62CI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62ci.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA62MG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA62MI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA62PG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pg.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA62PI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62pi.html",
+      "subfamily": "STM32WBA62"
+    },
+    {
+      "base_device": "STM32WBA63CG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63cg.html",
+      "subfamily": "STM32WBA63"
+    },
+    {
+      "base_device": "STM32WBA63CI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba63ci.html",
+      "subfamily": "STM32WBA63"
+    },
+    {
+      "base_device": "STM32WBA64CG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64cg.html",
+      "subfamily": "STM32WBA64"
+    },
+    {
+      "base_device": "STM32WBA64CI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba64ci.html",
+      "subfamily": "STM32WBA64"
+    },
+    {
+      "base_device": "STM32WBA65CG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65cg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65CI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ci.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65MG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65MI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65mi.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65PG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65PI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65pi.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65RG",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65rg.html",
+      "subfamily": "STM32WBA65"
+    },
+    {
+      "base_device": "STM32WBA65RI",
+      "selection_reason": "unique current-commercial Base Device derived from reconciled STM32WBA6X ordering-pattern row",
+      "series": "STM32WBA6X",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba65ri.html",
+      "subfamily": "STM32WBA65"
+    }
+  ]
+}
