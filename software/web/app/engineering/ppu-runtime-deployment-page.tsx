@@ -87,15 +87,14 @@ export default function PpuRuntimeDeploymentPage() {
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      <section className="ppuSiteCard" aria-label="Platform target">
-        <header className="ppuSiteCardHeader">
+      <section className="ppuSiteCard ppuPlatformTargetSnapshot" aria-label="Platform target">
+        <header className="ppuPlatformTargetHeader">
           <div>
-            <small>TARGET</small>
-            <h3>Select PPU</h3>
+            <small>TARGET PPU</small>
+            <h3>{selectedEntry?.alias ?? "Select PPU"}</h3>
+            {selectedEntry && <span>{selectedEntry.endpoint}</span>}
           </div>
-        </header>
-        <div className="ppuRegistryAddForm">
-          <label>
+          <label className="operatorField ppuPlatformTargetSelector">
             <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
@@ -105,12 +104,12 @@ export default function PpuRuntimeDeploymentPage() {
               ))}
             </select>
           </label>
-          {selectedEntry && (
-            <p>
-              Platform maintenance uses the known PPU connection <code>{selectedEntry.endpoint}</code>. Operational Registration is a separate programming-management admission state.
-            </p>
-          )}
-        </div>
+        </header>
+        {selectedEntry && (
+          <p className="ppuPlatformTargetBoundary">
+            Platform maintenance uses the known PPU connection above. Operational Registration is a separate programming-management admission state.
+          </p>
+        )}
       </section>
 
       {selectedEntry ? (
