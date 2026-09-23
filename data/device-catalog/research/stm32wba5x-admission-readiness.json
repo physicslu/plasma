@@ -1,0 +1,61 @@
+{
+  "authority": "research_only",
+  "canonical_candidate": "stm32wba5x-commercial-icpn.csv",
+  "canonical_candidate_git_blob_sha": "21cd808371f4d6f05a813e35b06cb1227f96195a",
+  "canonical_candidate_sha256": "653dca4184eab05c3a0c8e6714e73adacf3d6927310855faf064b7d8d0b322d6",
+  "catalog_admission_ready": true,
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32wba6x_rejected": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_number_count": 0,
+  "excluded_non_active_part_numbers": [],
+  "family": "STM32WBA5X",
+  "frozen_exact_icpn_count": 40,
+  "frozen_exact_icpn_set_sha256": "de7b479493688ad5ac4417682f384da64af391850e876b45a649823fbe395485",
+  "identity_ready_count": 40,
+  "lifecycle_ready_count": 40,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 40
+  },
+  "metadata_authority": "stm32wba5x-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 40,
+  "next_gate": "stm32wba5x-production-publication-gate",
+  "package_counts": {
+    "SIP LGA": 1,
+    "Thin WLCSP": 2,
+    "UFBGA": 6,
+    "UFQFPN": 31
+  },
+  "production_exact_icpn_count": 2604,
+  "production_family_count": 21,
+  "readiness_id": "stm32wba5x-bounded-exact-icpn-admission-readiness-v1",
+  "research_series": "STM32WBA5X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 40
+  },
+  "route_bridge_count": 0,
+  "route_ready_count": 40,
+  "schema_version": 1,
+  "scope": "research_only_catalog_admission_readiness",
+  "target_config": "tcl/target/stm32wba5x.cfg",
+  "temperature_grade_counts": {
+    "-40..105 C": 16,
+    "-40..85 C": 24
+  }
+}
