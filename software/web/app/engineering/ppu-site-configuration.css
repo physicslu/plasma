@@ -1137,3 +1137,422 @@
     min-width: 0;
   }
 }
+
+
+/* PPU workspace consolidation: Overview / Platform / Registration / Sites.
+ * Shared chrome, fields and buttons remain owned by operator-surface-primitives.css.
+ * These rules only compose domain-specific information hierarchy.
+ */
+.ppuOverviewSnapshotHeader,
+.ppuPlatformTargetHeader,
+.ppuSitesSnapshotHeader,
+.ppuRegistrationControlHeader,
+.ppuPlatformCardToolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+}
+
+.ppuOverviewSnapshotHeader > div:first-child,
+.ppuPlatformTargetHeader > div:first-child,
+.ppuSitesSnapshotHeader > div:first-child,
+.ppuRegistrationControlHeader > div:first-child,
+.ppuPlatformCardToolbar > div:first-child {
+  min-width: 0;
+}
+
+.ppuOverviewSnapshotHeader small,
+.ppuPlatformTargetHeader small,
+.ppuSitesSnapshotHeader small,
+.ppuRegistrationControlHeader small,
+.ppuPlatformCardToolbar small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--cyan);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ppuOverviewSnapshotHeader h3,
+.ppuPlatformTargetHeader h3,
+.ppuSitesSnapshotHeader h3,
+.ppuRegistrationControlHeader h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ppuOverviewSnapshotHeader > div:first-child > span,
+.ppuPlatformTargetHeader > div:first-child > span,
+.ppuSitesSnapshotHeader > div:first-child > span,
+.ppuRegistrationControlHeader > div:first-child > span,
+.ppuPlatformCardToolbar span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ppuOverviewSnapshotActions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ppuOverviewSelector,
+.ppuPlatformTargetSelector,
+.ppuSitesSelector {
+  width: min(420px, 38vw);
+}
+
+.ppuOverviewStatusGrid,
+.ppuSitesSummaryGrid,
+.ppuRegistrationSummaryGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.ppuOverviewStatusGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.ppuSitesSummaryGrid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 0 14px 14px;
+}
+
+.ppuRegistrationSummaryGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 14px 12px;
+}
+
+.ppuOverviewStatusTile,
+.ppuSitesSummaryGrid article,
+.ppuRegistrationSummaryGrid article {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: var(--panel);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuOverviewStatusTile[data-tone="healthy"],
+.ppuSitesSummaryGrid article[data-tone="healthy"],
+.ppuRegistrationSummaryGrid article[data-tone="healthy"] {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.ppuOverviewStatusTile[data-tone="warning"],
+.ppuSitesSummaryGrid article[data-tone="warning"],
+.ppuRegistrationSummaryGrid article[data-tone="warning"] {
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.ppuOverviewStatusTile[data-tone="danger"],
+.ppuSitesSummaryGrid article[data-tone="danger"],
+.ppuRegistrationSummaryGrid article[data-tone="danger"] {
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.ppuOverviewStatusTile small,
+.ppuSitesSummaryGrid article small,
+.ppuRegistrationSummaryGrid article small {
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.ppuOverviewStatusTile strong,
+.ppuSitesSummaryGrid article strong,
+.ppuRegistrationSummaryGrid article strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ppuOverviewStatusTile span,
+.ppuSitesSummaryGrid article span,
+.ppuRegistrationSummaryGrid article span {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ppuOverviewDomainGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr) minmax(0, .82fr);
+  gap: 12px;
+}
+
+.ppuOverviewDomainCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.ppuOverviewDomainCard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuOverviewDomainCard > header small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--cyan);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+}
+
+.ppuOverviewDomainCard > header h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ppuOverviewDomainCard > p {
+  margin: 0;
+  padding: 11px 13px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuOverviewDomainCard > dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 0;
+  padding: 11px 13px 13px;
+}
+
+.ppuOverviewDomainCard > dl .wide {
+  grid-column: 1 / -1;
+}
+
+.ppuOverviewDomainCard dt,
+.ppuRegistrationIdentityGrid dt {
+  margin-bottom: 3px;
+  color: var(--text-soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.ppuOverviewDomainCard dd,
+.ppuRegistrationIdentityGrid dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ppuOverviewSiteCounts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 13px 13px;
+}
+
+.ppuOverviewSiteCounts > span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px;
+  background: var(--panel-3);
+}
+
+.ppuOverviewSiteCounts small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.ppuOverviewSiteCounts strong {
+  font-size: 14px;
+}
+
+.ppuOverviewAlerts {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel-3) 70%, transparent);
+  font-size: 10px;
+}
+
+.ppuOverviewAlerts strong {
+  color: var(--text);
+}
+
+.ppuOverviewAlerts span {
+  color: var(--muted);
+}
+
+.ppuRegistrationControlPanel {
+  overflow: visible;
+}
+
+.ppuRegistrationIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ppuRegistrationActionStrip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ppuRegistrationIdentityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+  padding: 0 14px 14px;
+}
+
+.ppuRegistrationIdentityGrid .wide {
+  grid-column: span 2;
+}
+
+.ppuRegistrationNetworkRegion {
+  display: grid;
+  gap: 10px;
+}
+
+.ppuPlatformTargetBoundary {
+  margin: 0;
+  padding: 0 14px 12px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.ppuPlatformCardToolbar {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-3) 45%, var(--panel));
+}
+
+.ppuPlatformCardToolbar > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ppuPlatformCardToolbar span {
+  margin-top: 0;
+}
+
+.ppuPlatformCard > .ppuPlatformSection:first-of-type {
+  margin-top: 12px;
+}
+
+.ppuSitesWorkflow {
+  display: grid;
+  gap: 12px;
+}
+
+.ppuSitesWorkflow > .ppuSiteCard {
+  margin: 0;
+}
+
+.ppuSitesWorkflow .ppuConfigurationStateFlow {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ppuSitesWorkflow .ppuSiteHeaderNote {
+  max-width: 980px;
+}
+
+.ppuSitesLocked {
+  overflow: hidden;
+}
+
+@media (max-width: 1280px) {
+  .ppuOverviewStatusGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ppuOverviewDomainGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ppuOverviewDomainCard:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .ppuSitesSummaryGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .ppuRegistrationSummaryGrid,
+  .ppuRegistrationIdentityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ppuRegistrationIdentityGrid .wide {
+    grid-column: span 2;
+  }
+
+  .ppuOverviewSnapshotHeader,
+  .ppuPlatformTargetHeader,
+  .ppuSitesSnapshotHeader,
+  .ppuRegistrationControlHeader,
+  .ppuPlatformCardToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ppuOverviewSelector,
+  .ppuPlatformTargetSelector,
+  .ppuSitesSelector {
+    width: 100%;
+  }
+
+  .ppuRegistrationActionStrip {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .ppuOverviewStatusGrid,
+  .ppuOverviewDomainGrid,
+  .ppuSitesSummaryGrid,
+  .ppuRegistrationSummaryGrid,
+  .ppuRegistrationIdentityGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuOverviewDomainCard:last-child,
+  .ppuRegistrationIdentityGrid .wide {
+    grid-column: span 1;
+  }
+
+  .ppuOverviewAlerts {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
