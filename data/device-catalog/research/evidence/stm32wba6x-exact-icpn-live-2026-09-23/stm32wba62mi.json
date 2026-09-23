@@ -1,0 +1,25 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA62MI",
+  "evidence_section_sha256": "54484fefae9bb9394d85a24227226126c721af4b56dbb0ff63b2413aecedadcd",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA62MIF6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA62MIF6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "6f6b5b5ab1e1b744d563d50f0f86c1d2cd0410e440bc6d5a6721303db21ecdab",
+  "retrieved_at_utc": "2026-09-23T08:05:51Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba62mi.html"
+}
