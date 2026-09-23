@@ -1,0 +1,43 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32WBA54KE",
+  "evidence_section_sha256": "cce36b2fa8e4e4addb21981e478d9966abbcafb3630cfcf4a5fc3afaaae56fb4",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32WBA54KEU6",
+    "STM32WBA54KEU6TR",
+    "STM32WBA54KEU7",
+    "STM32WBA54KEU7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ke.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32WBA54KEU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA54KEU6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA54KEU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32WBA54KEU7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "d95507ebca71586e3a54754dadbf01c7fb85ff1d04acc1e9295921d9f7d171db",
+  "retrieved_at_utc": "2026-09-23T07:20:10Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wba54ke.html"
+}
