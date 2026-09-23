@@ -197,11 +197,10 @@ export default function PpuRuntimeDeployment({
 
   return (
     <section className="ppuSiteCard ppuPlatformCard" aria-label="PPU Platform Release">
-      <header className="ppuSiteCardHeader ppuPlatformSummaryHeader">
+      <header className="ppuPlatformCardToolbar">
         <div>
-          <small>PLATFORM SUMMARY</small>
-          <h3>Current platform state</h3>
-          <p>Bootstrap, Runtime, device identity, and maintenance authorization for the selected PPU.</p>
+          <small>PLATFORM WORKSPACE</small>
+          <span>Bootstrap, Runtime, maintenance authorization, diagnostics, and deployment for the selected PPU.</span>
         </div>
         <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
           {loading ? "Checking..." : "Refresh Platform Status"}
@@ -228,7 +227,7 @@ export default function PpuRuntimeDeployment({
         <header className="ppuPlatformSectionHeader">
           <div>
             <small>STATUS</small>
-            <h4 id="platform-summary-heading">Platform Summary</h4>
+            <h4 id="platform-summary-heading">Status Summary</h4>
           </div>
           <span className="ppuPlatformStatusPill" data-tone={pairing?.paired && pairing.device_match ? "success" : "warning"}>
             {pairing?.paired && pairing.device_match ? "Maintenance paired" : "Maintenance required"}
