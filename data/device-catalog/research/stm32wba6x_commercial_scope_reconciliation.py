@@ -86,8 +86,14 @@ def render() -> dict[str, Any]:
     req(any(x.get("base_device")=="STM32WBA6MOI" for x in targets.get("targets",[]) if isinstance(x,dict)),"retained STM32WBA6MOI target missing")
 
     provenance=load_json(PROVENANCE)
-    req(provenance.get("workflow_run_id")==35694311469,"retained workflow run drifted")
+    req(provenance.get("probe_id")=="stm32wba6x-bounded-official-st-evidence-accessibility-v1","retained provenance probe id drifted")
     req(provenance.get("browser_version")=="151.0.7922.34","retained browser version drifted")
+    req(provenance.get("candidate_source_sha256")==EXPECTED_SOURCE_SHA256,"retained provenance source digest drifted")
+    req(provenance.get("selection_sha256")=="6243c80f97b2c159bc964935fc2f87371a596ee9f2d2e397e1c7ee9c3b6a178d","retained provenance selection digest drifted")
+    live=gate.get("live_acquisition") or {}
+    req(live.get("workflow_run_id")==35694311469,"retained workflow run drifted")
+    req(live.get("executed_head")=="3982be122a43be062054f0be25f6f897e3b2a498","retained executed head drifted")
+    req(live.get("artifact_id")==10680295411,"retained artifact id drifted")
 
     prod=load_json(PRESTATE)
     sources=prod.get("sources")
