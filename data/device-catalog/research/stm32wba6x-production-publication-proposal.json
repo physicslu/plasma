@@ -1,0 +1,52 @@
+{
+  "canonical_csv_git_blob_sha": "0ab09918b2d845c0f21f10c5edb4a150d0c8c4f5",
+  "canonical_csv_sha256": "87e5bde7efc3fd3aee7397a80e9f4f972eb5ff42370b8d54cf1a333b3252004d",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "cmsis_bridge_authorizes_production_route": false,
+  "debug_attach_support_claimed": false,
+  "exact_icpn_set_sha256": "b5acc2f981635fa0464456fae74365407492d3345ded9b7c9edf885ffdfeddac",
+  "excluded_non_active_identities": [
+    "STM32WBA63CGU6TR",
+    "STM32WBA65MGF6"
+  ],
+  "excluded_non_active_part_numbers": 2,
+  "family": "STM32WBA6X",
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 39
+  },
+  "marketing_status_observed": {
+    "Active": 39,
+    "Proposal": 2
+  },
+  "metadata_exception_count": 0,
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2683,
+  "production_exact_icpns_before": 2644,
+  "production_family_count_after": 23,
+  "production_family_count_before": 22,
+  "production_manifest_git_blob_before": "5ddd901e6827a6c0a7f7fd2b0286c79411965777",
+  "programming_algorithm_equivalence_claimed": false,
+  "published_active_base_devices": 18,
+  "published_exact_icpns": 39,
+  "readiness_baseline": "stm32wba6x-admission-readiness.json",
+  "readiness_git_blob_sha": "d62d3756e90d9d130512722de3dd8f92a3f398e4",
+  "remaining_wireless_families_rejected": false,
+  "research_series": "STM32WBA6X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 39
+  },
+  "route_bridge_count": 0,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "status": "publication_ready",
+  "stm32w108_rejected": false,
+  "transaction": "stm32wba6x-production-catalog-publication",
+  "wireless_radio_operation_authorized": false,
+  "wireless_security_operation_authorized": false
+}
