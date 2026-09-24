@@ -134,7 +134,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
         <div>
           <small>PPU</small>
           <h2>Overview</h2>
-          <p>Read-only summary of appliance reachability, platform state, Registration, and Site health.</p>
+          <p>Read-only operational snapshot of the selected PPU across Platform, Registration, and Sites.</p>
         </div>
         <button className="ppuSiteButton" type="button" disabled={loading} onClick={() => void refresh()}>
           {loading ? "Refreshing..." : "Refresh"}
@@ -143,16 +143,16 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      <section className="ppuSiteCard" aria-label="PPU overview target">
+      <section className="ppuSiteCard ppuOverviewTarget" aria-label="PPU overview target">
         <header className="ppuSiteCardHeader">
           <div>
-            <small>DEVICE</small>
+            <small>SELECTED PPU</small>
             <h3>{selectedFleet?.identity.display_name ?? selectedEntry?.alias ?? "No PPU selected"}</h3>
           </div>
           {lifecycle && <span className="ppuDimensionPill" data-tone={lifecycle.tone}>{lifecycle.label}</span>}
         </header>
-        <div className="ppuRegistryAddForm">
-          <label>
+        <div className="ppuOverviewTargetBody">
+          <label className="operatorField">
             <span>Known PPU</span>
             <select value={selectedAlias} disabled={loading || !registry?.ppus.length} onChange={event => setSelectedAlias(event.target.value)}>
               {(registry?.ppus ?? []).filter(entry => entry.alias).map(entry => (
@@ -160,81 +160,87 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
               ))}
             </select>
           </label>
+          {selectedEntry && (
+            <dl className="ppuOverviewIdentity">
+              <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
+              <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
+              <div><dt>Gateway</dt><dd>{selectedEntry.endpoint}</dd></div>
+              <div><dt>Active Execution</dt><dd>{siteSummary.busy > 0 ? "Yes" : "No"}</dd></div>
+            </dl>
+          )}
           {!loading && registry?.ppus.length === 0 && <p>No known PPU connection exists yet. Add one from Registration.</p>}
         </div>
       </section>
 
       {selectedEntry ? (
         <>
-          <div className="ppuStateDimensionGrid" aria-label="PPU overview state">
-            <article className="ppuStateDimensionCard" data-tone={connectivity.tone}>
-              <small>Connectivity</small>
-              <strong>{connectivity.label}</strong>
-              <p>{selectedEntry.endpoint}</p>
-            </article>
-            <article className="ppuStateDimensionCard" data-tone={health.tone}>
-              <small>Platform Health</small>
-              <strong>{health.label}</strong>
-              <p>{health.reason}</p>
-            </article>
-            <article className="ppuStateDimensionCard" data-tone={selectedEntry.lifecycle === "commissioned" ? "healthy" : "warning"}>
-              <small>Registration</small>
-              <strong>{registrationLabel(selectedEntry)}</strong>
-              <p>Programming management admission is separate from Platform maintenance.</p>
-            </article>
+          <section className="ppuSiteCard" aria-label="PPU operational snapshot">
+            <header className="ppuSiteCardHeader">
+              <div><small>OPERATIONAL SNAPSHOT</small><h3>Current state</h3></div>
+            </header>
+            <div className="ppuOverviewSnapshotGrid">
+              <article className="ppuOverviewMetric" data-tone={connectivity.tone}>
+                <small>Connectivity</small><strong>{connectivity.label}</strong><span>{selectedEntry.endpoint}</span>
+              </article>
+              <article className="ppuOverviewMetric" data-tone={health.tone}>
+                <small>Platform Health</small><strong>{health.label}</strong><span>{health.reason}</span>
+              </article>
+              <article className="ppuOverviewMetric" data-tone={selectedEntry.lifecycle === "commissioned" ? "healthy" : "warning"}>
+                <small>Registration</small><strong>{registrationLabel(selectedEntry)}</strong><span>{lifecycle?.label ?? "Unknown"}</span>
+              </article>
+              <article className="ppuOverviewMetric">
+                <small>Platform Release</small><strong>{platformReleaseLabel(bootstrap)}</strong><span>{bootstrap?.bootstrap.runtime.state?.replaceAll("_", " ") ?? "Unknown runtime state"}</span>
+              </article>
+              <article className="ppuOverviewMetric">
+                <small>Runtime Version</small><strong>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</strong><span>{bootstrap?.bootstrap.bootstrap.version ? `Bootstrap ${bootstrap.bootstrap.bootstrap.version}` : "Bootstrap unavailable"}</span>
+              </article>
+              <article className="ppuOverviewMetric" data-tone={siteSummary.fault > 0 ? "danger" : siteSummary.busy > 0 ? "info" : "healthy"}>
+                <small>Sites</small><strong>{siteSummary.total} reported</strong><span>{siteSummary.ready} ready · {siteSummary.busy} busy · {siteSummary.fault} fault</span>
+              </article>
+            </div>
+          </section>
+
+          <div className="ppuOverviewDomainGrid" aria-label="PPU management domains">
+            <section className="ppuSiteCard ppuOverviewDomainCard" aria-label="PPU platform summary">
+              <header>
+                <div><small>PLATFORM</small><h3>Platform Maintenance</h3></div>
+                <button className="ppuSiteButton" type="button" onClick={() => onNavigate("platform")}>Open Platform</button>
+              </header>
+              <dl>
+                <div><dt>Release</dt><dd>{platformReleaseLabel(bootstrap)}</dd></div>
+                <div><dt>Runtime</dt><dd>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</dd></div>
+                <div><dt>Bootstrap</dt><dd>{bootstrap?.bootstrap.bootstrap.version ?? "Unavailable"}</dd></div>
+              </dl>
+            </section>
+
+            <section className="ppuSiteCard ppuOverviewDomainCard" aria-label="PPU registration summary">
+              <header>
+                <div><small>REGISTRATION</small><h3>{registrationLabel(selectedEntry)}</h3></div>
+                <button className="ppuSiteButton" type="button" onClick={() => onNavigate("registration")}>Open Registration</button>
+              </header>
+              <dl>
+                <div><dt>Lifecycle</dt><dd>{lifecycle?.label ?? "Unknown"}</dd></div>
+                <div><dt>Connectivity</dt><dd>{connectivity.label}</dd></div>
+                <div><dt>Health</dt><dd>{health.label}</dd></div>
+              </dl>
+            </section>
+
+            <section className="ppuSiteCard ppuOverviewDomainCard" aria-label="PPU Site summary">
+              <header>
+                <div><small>SITES</small><h3>{siteSummary.total} reported</h3></div>
+                <button className="ppuSiteButton" type="button" onClick={() => onNavigate("sites")}>Open Sites</button>
+              </header>
+              <dl>
+                <div><dt>Ready</dt><dd>{siteSummary.ready}</dd></div>
+                <div><dt>Busy</dt><dd>{siteSummary.busy}</dd></div>
+                <div><dt>Fault</dt><dd>{siteSummary.fault}</dd></div>
+              </dl>
+            </section>
           </div>
 
-          <section className="ppuSiteCard" aria-label="PPU platform summary">
-            <header className="ppuSiteCardHeader">
-              <div>
-                <small>PLATFORM</small>
-                <h3>PPU Platform Release</h3>
-              </div>
-              <button className="ppuSiteButton" type="button" onClick={() => onNavigate("platform")}>View Platform</button>
-            </header>
-            <div className="ppuInfoBody">
-              <dl className="ppuInfoGrid">
-                <div className="wide"><dt>Platform Release</dt><dd>{platformReleaseLabel(bootstrap)}</dd></div>
-                <div><dt>Bootstrap Version</dt><dd>{bootstrap?.bootstrap.bootstrap.version ?? "Unavailable"}</dd></div>
-                <div><dt>Runtime Version</dt><dd>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</dd></div>
-                <div className="wide"><dt>Runtime Commit</dt><dd>{bootstrap?.bootstrap.runtime.git_sha ?? "—"}</dd></div>
-              </dl>
-            </div>
-          </section>
-
-          <section className="ppuSiteCard" aria-label="PPU registration summary">
-            <header className="ppuSiteCardHeader">
-              <div>
-                <small>REGISTRATION</small>
-                <h3>{registrationLabel(selectedEntry)}</h3>
-              </div>
-              <button className="ppuSiteButton" type="button" onClick={() => onNavigate("registration")}>View Registration</button>
-            </header>
-            <p className="ppuSiteNote">Registration controls whether this Console may use the PPU for managed programming. It is not required to inspect or maintain the Platform Release.</p>
-          </section>
-
-          <section className="ppuSiteCard" aria-label="PPU Site summary">
-            <header className="ppuSiteCardHeader">
-              <div>
-                <small>SITES</small>
-                <h3>{siteSummary.total} reported</h3>
-              </div>
-              <button className="ppuSiteButton" type="button" onClick={() => onNavigate("sites")}>View Sites</button>
-            </header>
-            <div className="ppuStateSummaryGrid">
-              <div className="ppuStateSummaryGroup"><small>Ready</small><strong>{siteSummary.ready}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Busy</small><strong>{siteSummary.busy}</strong></div>
-              <div className="ppuStateSummaryGroup"><small>Fault</small><strong>{siteSummary.fault}</strong></div>
-            </div>
-          </section>
-
-          <section className="ppuSiteCard" aria-label="PPU active alerts">
-            <header className="ppuSiteCardHeader"><h3>Alerts</h3></header>
-            {alerts.length ? (
-              <ul>{alerts.map(alert => <li key={alert}>{alert}</li>)}</ul>
-            ) : (
-              <p className="ppuSiteNote">No active alert is visible from current Manager and Bootstrap observations.</p>
-            )}
+          <section className="ppuOverviewAlerts" aria-label="PPU active alerts" data-state={alerts.length ? "active" : "clear"}>
+            <strong>{alerts.length ? `${alerts.length} active alert${alerts.length === 1 ? "" : "s"}` : "No active alerts"}</strong>
+            <span>{alerts.length ? alerts.join(" · ") : "No active alert is visible from current Manager and Bootstrap observations."}</span>
           </section>
         </>
       ) : (

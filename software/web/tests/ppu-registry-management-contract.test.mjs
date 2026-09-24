@@ -31,8 +31,8 @@ test("PPU is a first-class EMode object with four functional subpages", () => {
 
 test("PPU Overview is read-only and summarizes Platform, Registration, Sites, and alerts", () => {
   assert.match(overview, /aria-label="PPU Overview"/);
-  assert.match(overview, /PPU Platform Release/);
-  assert.match(overview, /Bootstrap Version/);
+  assert.match(overview, /Platform Maintenance/);
+  assert.match(overview, /Platform Release/);
   assert.match(overview, /Runtime Version/);
   assert.match(overview, /Registration/);
   assert.match(overview, /PPU Site summary/);
@@ -41,6 +41,18 @@ test("PPU Overview is read-only and summarizes Platform, Registration, Sites, an
   assert.match(overview, /onNavigate\("registration"\)/);
   assert.match(overview, /onNavigate\("sites"\)/);
   assert.doesNotMatch(overview, /addManagerPpu|setManagerPpuLifecycle|removeManagerPpu|saveManagerPpuSite/);
+});
+
+test("PPU workspace pages concentrate status before domain workflows without changing ownership", () => {
+  assert.match(overview, /ppuOverviewSnapshotGrid/);
+  assert.match(overview, /ppuOverviewDomainGrid/);
+  assert.match(overview, /ppuOverviewAlerts/);
+  assert.match(registration, /ppuRegistrationActionStrip/);
+  assert.match(registration, /ppuRegistrationStateGrid/);
+  assert.match(registration, /ppuRegistrationIdentityGrid/);
+  assert.match(sitesPage, /ppuSitesTargetSummary/);
+  assert.match(sitesPage, /ppuSitesSummaryGrid/);
+  assert.match(sitesPage, /ppuSitesWorkflow/);
 });
 
 test("Registration owns Console programming admission, not Platform maintenance", () => {
@@ -95,7 +107,7 @@ test("only registered PPUs can be selected for managed programming operations", 
 test("Sites are PPU child resources and operational configuration is Registration-gated", () => {
   assert.match(sitesPage, /Programming Sites are child resources of a PPU/);
   assert.match(sitesPage, /const registered = selectedEntry\?\.lifecycle === "commissioned"/);
-  assert.match(sitesPage, /\{registered \? \(/);
+  assert.match(sitesPage, /registered \? \(/);
   assert.match(sitesPage, /<PpuSiteDesiredConfiguration/);
   assert.match(sitesPage, /Registration required/);
   assert.match(sitesPage, /Platform Release inspection and maintenance remain available from Platform while Sites are locked/);
