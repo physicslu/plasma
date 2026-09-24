@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32wba6x-ordering-information-v1",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32WBA6X",
+  "research_series": "STM32WBA6X",
+  "verified_at": "2026-09-23",
+  "documents": [
+    {
+      "document_id": "DS14736",
+      "revision": "Rev 3",
+      "scope": [
+        "STM32WBA62",
+        "STM32WBA63",
+        "STM32WBA64",
+        "STM32WBA65"
+      ],
+      "section": "Ordering information",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wba64cg.pdf"
+    }
+  ],
+  "ordering_codes": {
+    "pin_count": {
+      "C": "48",
+      "R": "68",
+      "M": "88",
+      "P": "121"
+    },
+    "flash_memory_size": {
+      "G": "1 MiB",
+      "I": "2 MiB"
+    },
+    "package": {
+      "U": "UFQFPN",
+      "V": "VFQFPN",
+      "F": "Thin WLCSP",
+      "I": "UFBGA"
+    },
+    "temperature_range": {
+      "6": "-40..85 C",
+      "7": "-40..105 C"
+    },
+    "packing": {
+      "TR": "tape and reel"
+    }
+  },
+  "route_semantics": {
+    "target_config": "tcl/target/stm32wba6x.cfg",
+    "wildcard": "Only lowercase x is a one-character wildcard.",
+    "packing_normalization": "Strip only terminal commercial packing suffix TR before route matching; retain TR in metadata.",
+    "direct_route": "All current Active exact identities must resolve uniquely through reconciled ordering_pattern rows.",
+    "cmsis_bridge": "No CMSIS device-name rows exist for STM32WBA6X; bridge count must remain zero."
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "production_publication_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false,
+    "security_mutation_authorized": false,
+    "debug_attach_supported": false,
+    "target_execution_authorized": false,
+    "physical_validation_claimed": false,
+    "hil_required_for_catalog_admission": false,
+    "remaining_wireless_families_rejected": false,
+    "stm32w108_rejected": false,
+    "cmsis_bridge_authorizes_production_route": false
+  }
+}

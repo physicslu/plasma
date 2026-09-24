@@ -1,0 +1,64 @@
+{
+  "authority": "research_only",
+  "canonical_candidate": "stm32wba6x-commercial-icpn.csv",
+  "canonical_candidate_git_blob_sha": "0ab09918b2d845c0f21f10c5edb4a150d0c8c4f5",
+  "canonical_candidate_sha256": "87e5bde7efc3fd3aee7397a80e9f4f972eb5ff42370b8d54cf1a333b3252004d",
+  "catalog_admission_ready": true,
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "debug_attach_supported": false,
+    "hil_required_for_catalog_admission": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "remaining_wireless_families_rejected": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "stm32w108_rejected": false,
+    "target_execution_authorized": false,
+    "wireless_radio_operation_authorized": false,
+    "wireless_security_operation_authorized": false
+  },
+  "excluded_non_active_part_number_count": 2,
+  "excluded_non_active_part_numbers": [
+    "STM32WBA63CGU6TR",
+    "STM32WBA65MGF6"
+  ],
+  "family": "STM32WBA6X",
+  "frozen_exact_icpn_count": 39,
+  "frozen_exact_icpn_set_sha256": "b5acc2f981635fa0464456fae74365407492d3345ded9b7c9edf885ffdfeddac",
+  "identity_ready_count": 39,
+  "lifecycle_ready_count": 39,
+  "manual_review_count": 0,
+  "manufacturer": "STMicroelectronics",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 39
+  },
+  "metadata_authority": "stm32wba6x-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 39,
+  "next_gate": "stm32wba6x-production-publication-gate",
+  "package_counts": {
+    "Thin WLCSP": 6,
+    "UFBGA": 10,
+    "UFQFPN": 16,
+    "VFQFPN": 7
+  },
+  "production_exact_icpn_count": 2644,
+  "production_family_count": 22,
+  "readiness_id": "stm32wba6x-bounded-exact-icpn-admission-readiness-v1",
+  "research_series": "STM32WBA6X",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 39
+  },
+  "route_bridge_count": 0,
+  "route_ready_count": 39,
+  "schema_version": 1,
+  "scope": "research_only_catalog_admission_readiness",
+  "target_config": "tcl/target/stm32wba6x.cfg",
+  "temperature_grade_counts": {
+    "-40..105 C": 15,
+    "-40..85 C": 24
+  }
+}
