@@ -96,7 +96,7 @@ def render() -> tuple[dict[str,Any],dict[str,Any]]:
     sources=current.get("sources")
     req(isinstance(sources,list),"Production sources missing")
     existing=[s for s in sources if isinstance(s,dict) and s.get("family")==FAMILY]
-    req(len(existing)<=1,"duplicate WBA5X Production source")
+    req(len(existing)<=1,"duplicate WBA6X Production source")
     pre={**current,"sources":[s for s in sources if not (isinstance(s,dict) and s.get("family")==FAMILY)]}
     pre_bytes=(json.dumps(pre,indent=2,ensure_ascii=False)+"\n").encode("utf-8")
     req(git_blob(pre_bytes)==EXPECTED_PRESTATE_MANIFEST_GIT_BLOB_SHA,"Production prestate blob drifted")
@@ -113,7 +113,7 @@ def render() -> tuple[dict[str,Any],dict[str,Any]]:
     post={**pre,"sources":[*pre["sources"],source]}
     req(snapshot(post)==(EXPECTED_POSTSTATE_EXACT,EXPECTED_POSTSTATE_FAMILIES),"Production poststate counts drifted")
     if existing:
-        req(existing[0]==source,"checked-in WBA5X source binding drifted")
+        req(existing[0]==source,"checked-in WBA6X source binding drifted")
 
     proposal={
       "schema_version":1,
