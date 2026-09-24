@@ -23,13 +23,13 @@ def main()->int:
     expected_manifest,expected_proposal=render()
     checked_manifest=json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
     checked_proposal=json.loads(PROPOSAL.read_text(encoding="utf-8"))
-    req(checked_manifest==expected_manifest,"checked-in Production manifest differs from deterministic WBA5X poststate")
+    req(checked_manifest==expected_manifest,"checked-in Production manifest differs from deterministic WBA6X poststate")
     req(checked_proposal==expected_proposal,"checked-in publication proposal differs from deterministic renderer")
 
     sources=checked_manifest.get("sources")
     req(isinstance(sources,list),"Production sources missing")
     wba=[s for s in sources if isinstance(s,dict) and s.get("family")==FAMILY]
-    req(len(wba)==1,"WBA5X Production source missing or duplicated")
+    req(len(wba)==1,"WBA6X Production source missing or duplicated")
     req(wba[0]=={
       "manufacturer":"STMicroelectronics",
       "family":"STM32WBA6X",
@@ -37,7 +37,7 @@ def main()->int:
       "row_count":39,
       "git_blob_sha":"0ab09918b2d845c0f21f10c5edb4a150d0c8c4f5",
       "sha256":"87e5bde7efc3fd3aee7397a80e9f4f972eb5ff42370b8d54cf1a333b3252004d",
-    },"WBA5X source binding drifted")
+    },"WBA6X source binding drifted")
     req(sum(int(s["row_count"]) for s in sources)==EXPECTED_POSTSTATE_EXACT==2683,"Production exact poststate drifted")
     req(len(sources)==EXPECTED_POSTSTATE_FAMILIES==23,"Production family poststate drifted")
 
