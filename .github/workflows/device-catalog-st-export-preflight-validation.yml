@@ -1,0 +1,33 @@
+name: ST official selector export preflight validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/preflight_st_selector_export.py'
+      - 'data/device-catalog/research/test_preflight_st_selector_export.py'
+      - 'data/device-catalog/research/st-selector-export-provenance.example.json'
+      - 'data/device-catalog/research/ST_COVERAGE_GAP_EXPORT_RUNBOOK_2026-09-29.md'
+      - '.github/workflows/device-catalog-st-export-preflight-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/preflight_st_selector_export.py'
+      - 'data/device-catalog/research/test_preflight_st_selector_export.py'
+      - 'data/device-catalog/research/st-selector-export-provenance.example.json'
+      - 'data/device-catalog/research/ST_COVERAGE_GAP_EXPORT_RUNBOOK_2026-09-29.md'
+      - '.github/workflows/device-catalog-st-export-preflight-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test fail-closed ST selector CSV/XLSX parser and frozen Production baseline
+        run: python -m unittest discover -s data/device-catalog/research -p test_preflight_st_selector_export.py -v
