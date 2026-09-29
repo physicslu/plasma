@@ -1,0 +1,35 @@
+name: ST C5 pinned OpenOCD source and admission-boundary validation v0.8
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-c5-backend-source-boundary-v0.8.json'
+      - 'data/device-catalog/research/ST_C5_BACKEND_SOURCE_BOUNDARY_V08.md'
+      - 'data/device-catalog/research/validate_st_c5_backend_source_v08.py'
+      - 'data/device-catalog/research/test_validate_st_c5_backend_source_v08.py'
+      - '.github/workflows/device-catalog-st-c5-backend-source-v08.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-c5-backend-source-boundary-v0.8.json'
+      - 'data/device-catalog/research/ST_C5_BACKEND_SOURCE_BOUNDARY_V08.md'
+      - 'data/device-catalog/research/validate_st_c5_backend_source_v08.py'
+      - 'data/device-catalog/research/test_validate_st_c5_backend_source_v08.py'
+      - '.github/workflows/device-catalog-st-c5-backend-source-v08.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject unsupported C5 route/admission from official source candidate
+        run: |
+          python data/device-catalog/research/validate_st_c5_backend_source_v08.py
+          python -m unittest discover -s data/device-catalog/research -p test_validate_st_c5_backend_source_v08.py -v
