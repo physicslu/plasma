@@ -1,0 +1,38 @@
+name: NXP KL25 bounded exact ICPN discovery validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/nxp-kl25-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/nxp_kl25_exact_icpn_discovery.py'
+      - 'data/device-catalog/research/validate_nxp_kl25_exact_icpn_discovery.py'
+      - 'data/device-catalog/research/nxp-kl25-exact-icpn-discovery-gate.json'
+      - 'data/device-catalog/research/evidence/nxp-kl25-exact-icpn-live-2026-09-29/**'
+      - '.github/workflows/device-catalog-nxp-kl25-exact-discovery-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/nxp-kl25-evidence-accessibility-gate.json'
+      - 'data/device-catalog/research/nxp_kl25_exact_icpn_discovery.py'
+      - 'data/device-catalog/research/validate_nxp_kl25_exact_icpn_discovery.py'
+      - 'data/device-catalog/research/nxp-kl25-exact-icpn-discovery-gate.json'
+      - 'data/device-catalog/research/evidence/nxp-kl25-exact-icpn-live-2026-09-29/**'
+      - '.github/workflows/device-catalog-nxp-kl25-exact-discovery-validation.yml'
+
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install retained probe import dependency
+        run: python -m pip install playwright
+      - name: Validate retained official KL25 exact ICPN discovery
+        run: python data/device-catalog/research/validate_nxp_kl25_exact_icpn_discovery.py
