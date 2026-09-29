@@ -1,0 +1,60 @@
+{
+  "catalog_admission_ready": false,
+  "claims": {
+    "catalog_admission_ready": false,
+    "full_exact_icpn_discovery_completed": false,
+    "one_exact_representative_is_full_family_discovery": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "target_execution_authorized": false
+  },
+  "evidence_accessibility_ready_for_representative": true,
+  "evidence_dir": "data/device-catalog/research/evidence/nxp-kl25-accessibility-live-2026-09-29",
+  "exact_icpn_discovery_completed": false,
+  "family": "KL25",
+  "gate_id": "nxp-kl25-official-current-commercial-evidence-accessibility-v1",
+  "live_acquisition": {
+    "artifact_id": 11006364246,
+    "artifact_zip_sha256": "53d52aacb2627f2c133f53cda044df6fb9c7e3a5203069b2bb3fb9f6ddf06993",
+    "attempted_targets": 1,
+    "browser_version": "153.0.8010.12",
+    "executed_head": "fd904a931d09a85f9208c87fc749057be860882a",
+    "manual_review_targets": 0,
+    "successful_targets": 1,
+    "workflow_attempt": 1,
+    "workflow_run_id": 36505413690
+  },
+  "manufacturer": "NXP",
+  "manufacturer_source_lock_git_blob_sha": "4927139f202bee1ee3e813ef57e3cfdfd3333ba6",
+  "next_gate": "nxp-kl25-bounded-exact-icpn-discovery-gate",
+  "official_manufacturer_evidence": {
+    "acquisition_status": "success",
+    "active_commercial_rows": 1,
+    "exact_commercial_row_markup_sha256": "f64ffa1c5f90fed7c1be44dd116f9bd1498c7f1bc0ad2f14132c09911abbda2b",
+    "exact_commercial_row_visible_sha256": "cd4e5765936dc1ba4c6bdbe13d94e344658fbd6746c602eff0c2dd8be51e3deb",
+    "exact_icpn": "MKL25Z128VLK4",
+    "http_status": 200,
+    "identity_status": "verified_active_on_official_manufacturer_listing",
+    "marketing_status": "Active",
+    "matching_exact_sku_rows_seen": 2,
+    "non_lifecycle_quality_rows": 1,
+    "rendered_dom_sha256": "8fda353c7b698f2b80fce1a2d71ebaa0075055e0c06b845bbcfeed8b5ff91198",
+    "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab"
+  },
+  "production_boundary": {
+    "exact_icpns": 2683,
+    "families": 23,
+    "kl25_published": false,
+    "manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3"
+  },
+  "schema_version": 1,
+  "scope": "research_only_one_exact_representative",
+  "selected_exact_representative": "MKL25Z128VLK4",
+  "selection_git_blob_sha": "61aeaba4601101cc665c2830453bbf2cc416c8c0",
+  "selection_id": "post-stm32-nxp-kl25-bounded-cross-vendor-pilot-v1"
+}
