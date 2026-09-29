@@ -1,0 +1,50 @@
+{
+  "attempted_targets": 1,
+  "catalog_admission_ready": false,
+  "claims": {
+    "catalog_admission_ready": false,
+    "full_exact_icpn_discovery_completed": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false,
+    "runtime_programming_support_claimed": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "target_execution_authorized": false
+  },
+  "evidence_accessibility_ready_for_representative": true,
+  "exact_active_identity_observed": [
+    "MKL25Z128VLK4"
+  ],
+  "full_exact_icpn_discovery_completed": false,
+  "manual_review_targets": 0,
+  "next_gate": "nxp-kl25-bounded-exact-icpn-discovery-gate",
+  "probe_id": "nxp-kl25-official-current-commercial-evidence-accessibility-v1",
+  "result": {
+    "acquisition_status": "success",
+    "acquisition_transport": "chromium_rendered_dom",
+    "claim_scope": "one exact representative; no full-family enumeration",
+    "commercial_identity_status": "verified_active_on_official_manufacturer_listing",
+    "commercial_row": {
+      "identity_in_row_markup": true,
+      "matching_exact_sku_rows_seen": 2,
+      "non_lifecycle_quality_rows_seen": 1,
+      "row_markup_sha256": "f64ffa1c5f90fed7c1be44dd116f9bd1498c7f1bc0ad2f14132c09911abbda2b",
+      "same_row_active_status": true,
+      "same_row_other_status": false,
+      "visible_row_excerpt": "MKL25Z128VLK4\nPackage : LQFP80\n\n\tMKL25Z128VLK4\n(935323324557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "cd4e5765936dc1ba4c6bdbe13d94e344658fbd6746c602eff0c2dd8be51e3deb"
+    },
+    "exact_icpn": "MKL25Z128VLK4",
+    "final_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+    "http_status": 200,
+    "marketing_status": "Active",
+    "page_title": "Arm Cortex-M0+|Ultra-Low Power Kinetis KL2x USB MCU | NXP Semiconductors",
+    "rendered_dom_sha256": "8fda353c7b698f2b80fce1a2d71ebaa0075055e0c06b845bbcfeed8b5ff91198",
+    "retrieved_at_utc": "2026-09-29T00:55:57Z",
+    "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+    "visible_body_sha256": "c8f638700ce20c9818aa8fbdbb938886ac62fcd1a9f1975ccb5f82a0e0d258b6"
+  },
+  "schema_version": 1,
+  "scope": "one exact manufacturer-reviewed KL25 representative",
+  "status": "accessible",
+  "successful_targets": 1
+}
