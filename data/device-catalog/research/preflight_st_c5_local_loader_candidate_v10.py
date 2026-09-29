@@ -160,13 +160,10 @@ def local_loader_sha256(root: Path, expected_filename: str,
 
 def preflight(icpn: str, reported_dev_id: str | None = None,
               reported_flash_bytes: int | None = None,
-              loader_dir: Path | None = None,
-              cohort: dict[str, dict[str, str]] | None = None) -> dict:
+              loader_dir: Path | None = None) -> dict:
     if not isinstance(icpn, str) or EXACT.fullmatch(icpn) is None:
         return stable_result("BLOCKED_NONEXACT_ICPN", str(icpn), "Exact C5 MPN required")
-    candidates = load_and_reconcile() if cohort is None else cohort
-    # Injected cohorts are ONLY useful for unit tests, not an API authority;
-    # only the canonical loader/DEV_ID hashes may be accepted.
+    candidates = load_and_reconcile()
     row = candidates.get(icpn)
     if row is None:
         return stable_result("BLOCKED_NOT_IN_FROZEN_C5_COHORT", icpn,
