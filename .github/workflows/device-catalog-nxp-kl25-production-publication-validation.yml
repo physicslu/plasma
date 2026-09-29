@@ -1,0 +1,39 @@
+name: NXP KL25 Production catalog publication validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-kl25-commercial-icpn.csv'
+      - 'data/device-catalog/research/nxp-kl25-admission-readiness.json'
+      - 'data/device-catalog/research/publish_nxp_kl25_catalog.py'
+      - 'data/device-catalog/research/nxp-kl25-production-publication-proposal.json'
+      - 'data/device-catalog/research/validate_nxp_kl25_production_publication.py'
+      - '.github/workflows/device-catalog-nxp-kl25-production-publication-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/nxp-kl25-commercial-icpn.csv'
+      - 'data/device-catalog/research/nxp-kl25-admission-readiness.json'
+      - 'data/device-catalog/research/publish_nxp_kl25_catalog.py'
+      - 'data/device-catalog/research/nxp-kl25-production-publication-proposal.json'
+      - 'data/device-catalog/research/validate_nxp_kl25_production_publication.py'
+      - '.github/workflows/device-catalog-nxp-kl25-production-publication-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate deterministic NXP KL25 catalog publication
+        run: python data/device-catalog/research/validate_nxp_kl25_production_publication.py
+      - name: Validate Production manifest invariants
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Load proposed cross-vendor Production catalog through runtime
+        run: PYTHONPATH=software/python python -m plasma_web.device_catalog --json
