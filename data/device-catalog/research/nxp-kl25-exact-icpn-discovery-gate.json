@@ -1,0 +1,61 @@
+{
+  "active_per_pattern": {
+    "MKL25Z128xxx4": 4,
+    "MKL25Z32xxx4": 4,
+    "MKL25Z64xxx4": 4
+  },
+  "bounded_exact_discovery_complete": true,
+  "candidate_row_count": 3,
+  "catalog_admission_ready": false,
+  "claims": {
+    "absent_unlisted_part_numbers_proven_noncommercial": false,
+    "catalog_admission_ready": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "target_execution_authorized": false
+  },
+  "evidence_git_blobs": {
+    "commercial_rows": "61c1be96a3c14e28f05099762f64b9ab5e23c1fb",
+    "discovery_summary": "10dab614b1d6c2f8a8c1ae64c8b725be0c3f0cd6",
+    "exact_icpns": "3f0903108c515cd947a4330f757a478006959804",
+    "probe_status": "b6028e66223f354063405c43a03234c0319f072a",
+    "provenance": "dff48c725ed1eb33dc9bdfe85700698bbae42cc8",
+    "targets": "df06360bf0b3e0a53f9f216bc17b1218e143b6c9"
+  },
+  "exact_active_count": 12,
+  "exact_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "excluded_non_active_count": 0,
+  "family": "KL25",
+  "gate_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "live_acquisition": {
+    "artifact_id": 11006907910,
+    "artifact_zip_sha256": "c5beba673e4dfb1ff3a66534b576dc0d3b30525e0483ef638aee7ed4b7391677",
+    "attempt": 1,
+    "browser_version": "153.0.8010.12",
+    "executed_head": "2550eadb472bdd421f2ffc890f6f393d1675d537",
+    "http_status": 200,
+    "workflow_run_id": 36505881833
+  },
+  "manual_review_count": 0,
+  "manufacturer": "NXP",
+  "next_gate": "nxp-kl25-bounded-exact-icpn-admission-readiness-gate",
+  "official_product_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+  "production_boundary": {
+    "exact_icpns": 2683,
+    "families": 23,
+    "kl25_published": false,
+    "manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3"
+  },
+  "schema_version": 1,
+  "scope": "research_only_current_manufacturer_commercial_listing",
+  "source_patterns": [
+    "MKL25Z128xxx4",
+    "MKL25Z32xxx4",
+    "MKL25Z64xxx4"
+  ]
+}
