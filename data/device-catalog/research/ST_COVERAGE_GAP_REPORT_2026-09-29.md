@@ -1,6 +1,7 @@
 # STM32 Portfolio Coverage Gap Audit — v0.2 (bounded baseline)
 
-**Reference date:** 2026-09-29  
+**Reference date:** 2026-09-29
+
 **Record state:** Research-only. Not an admission, device support, software programming, or physical qualification claim.
 
 ## Executive finding
