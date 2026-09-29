@@ -46,6 +46,11 @@ EXPECTED_LOADERS = {
     "Flash/STM32C5[56]x.xldr": "c8f1dfbd183477f79db8fc8174d5d08d3b2fbdb7",
     "Flash/STM32C5[9A]x.xldr": "9b5326edebbed8f7ade21029d6d014aa56d66bba",
 }
+EXPECTED_LOADER_SHA256 = {
+    "Flash/STM32C5[34]x.xldr": "4645574f274f5274de869dbd2a6b35fd79d134f7ec07224c3f17ed2d40c7b8b6",
+    "Flash/STM32C5[56]x.xldr": "131784c2e4eb4589200b614e56b83abd21a34906c1fd485ca3d806378d28732d",
+    "Flash/STM32C5[9A]x.xldr": "b9aacec837613f273b0d88fb3ca41c5c52712752fd26271959dd03a41dab8e53",
+}
 EXPECTED_DFP_BLOB = "859649be212ea43bc524eb977e1279e45da644c8"
 EXPECTED_FORK_CFG_BLOB = "03bce02b166b669ca0d7515656bca68ff4db8b84"
 EXPECTED_LICENSE_BLOB = "f404bd9d1021334ecfbbb82da1ee4bbe68a82173"
@@ -175,6 +180,7 @@ def validate(pdsc: Path | None = None, loader_dir: Path | None = None,
     loaders = official["loader_files"]
     require(len(loaders) == 3 and
             {x["path"]: x["git_blob_sha"] for x in loaders} == EXPECTED_LOADERS and
+            {x["path"]: x["sha256"] for x in loaders} == EXPECTED_LOADER_SHA256 and
             {x["dev_id"]: tuple(x["family"]) for x in loaders} == {
                 "0x44F": ("C53", "C54"),
                 "0x44E": ("C55", "C56"),
@@ -190,11 +196,14 @@ def validate(pdsc: Path | None = None, loader_dir: Path | None = None,
             )) and fork["upstream_patch_merge_and_runtime_qualification_unverified"] is True,
             "incomplete fork patch or remote loader wrongly promoted")
     gates = report["safety_gates"]
+    require(gates["loader_sha256_retained_in_research_report"] is True and
+            gates["raw_official_loader_bytes_replayed_from_pinned_commit"] is True and
+            gates["official_pinned_source_replay_workflow_run_id"] == 36540249563,
+            "unreviewed official loader source SHA256 observation drifted")
     require(gates["frozen_production_st_exact_icpns"] == 2683 and
             gates["frozen_production_st_families"] == 23 and
             gates["true_whole_st_coverage_percent"] is None and
             all(gates[key] is False for key in (
-                "loader_sha256_retained_in_research_report",
                 "independent_license_and_binary_distribution_signoff",
                 "exact_metadata_review_for_33_complete",
                 "compiled_plasma_openocd_stldr_qualified",
@@ -250,7 +259,9 @@ def validate(pdsc: Path | None = None, loader_dir: Path | None = None,
         for relative, blob in EXPECTED_LOADERS.items():
             file = loader_dir / Path(relative).name
             raw = file.read_bytes()
-            require(git_blob(raw) == blob, f"official pinned Xldr blob mismatch: {file}")
+            require(git_blob(raw) == blob and
+                    sha256(raw) == EXPECTED_LOADER_SHA256[relative],
+                    f"official pinned Xldr Git blob / SHA256 mismatch: {file}")
             require(len(raw) > 4096 and raw[:4] == b"\x7fELF" and
                     raw[4] == 1 and raw[5] == 1,
                     f"official Xldr not an expected ELF32 little-endian source: {file}")
