@@ -1,0 +1,104 @@
+name: ST C5 pinned DFP and loader crosswalk v0.9 validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.json'
+      - 'data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py'
+      - 'data/device-catalog/research/test_validate_st_c5_dfp_loader_crosswalk_v09.py'
+      - 'data/device-catalog/research/test_c5_scalar_array_v09.tcl'
+      - 'data/device-catalog/research/ST_C5_DFP_LOADER_CROSSWALK_V09.md'
+      - '.github/workflows/device-catalog-st-c5-dfp-loader-crosswalk-v09.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.json'
+      - 'data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py'
+      - 'data/device-catalog/research/test_validate_st_c5_dfp_loader_crosswalk_v09.py'
+      - 'data/device-catalog/research/test_c5_scalar_array_v09.tcl'
+      - 'data/device-catalog/research/ST_C5_DFP_LOADER_CROSSWALK_V09.md'
+      - '.github/workflows/device-catalog-st-c5-dfp-loader-crosswalk-v09.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay commercial frozen cohort, DFP crosswalk and non-admission gates
+        run: |
+          python data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py
+          python -m unittest discover -s data/device-catalog/research -p test_validate_st_c5_dfp_loader_crosswalk_v09.py -v
+      - name: Reproduce Tcl scalar-vs-array blocker without loading OpenOCD
+        run: |
+          if ! command -v tclsh >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq tcl
+          fi
+          tclsh data/device-catalog/research/test_c5_scalar_array_v09.tcl
+
+  official-pinned-source-replay:
+    needs: offline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch bounded fixed-commit official source bytes, no runtime loader execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from urllib.parse import quote
+          out = Path('/tmp/plasma-c5-dfp-v09')
+          out.mkdir(parents=True, exist_ok=True)
+          (out/'Flash').mkdir(exist_ok=True)
+          commit = 'a5f65bc64535cfa723e9d25f58d7ce23d0937aed'
+          base = 'https://raw.githubusercontent.com/STMicroelectronics/stm32c5xx-dfp/' + commit + '/'
+          names = [
+              'STMicroelectronics.stm32c5xx_dfp.pdsc', 'LICENSE.md',
+              'Flash/STM32C5[34]x.xldr', 'Flash/STM32C5[56]x.xldr',
+              'Flash/STM32C5[9A]x.xldr',
+          ]
+          for path in names:
+              url = base + quote(path, safe='/')
+              with urlopen(Request(url, headers={'User-Agent':'PlasmaResearch-v09'}), timeout=25) as r:
+                  assert r.status == 200
+                  raw = r.read(1024*1024 + 1)
+              assert 20 < len(raw) < 1024*1024, (path, len(raw))
+              (out/path).write_bytes(raw)
+              print('Pinned official DFP source fetched:', path, len(raw), flush=True)
+          fork_base = ('https://raw.githubusercontent.com/STMicroelectronics/OpenOCD/'
+                       'c8d973bdad9a6fddb51459eda109b3b95d23b57a/')
+          with urlopen(Request(fork_base+'tcl/target/stm32c5x.cfg',
+                               headers={'User-Agent':'PlasmaResearch-v09'}), timeout=25) as r:
+              assert r.status == 200
+              cfg = r.read(64*1024)
+          assert 1000 < len(cfg) < 64*1024
+          (out/'stm32c5x.cfg').write_bytes(cfg)
+          PY
+      - name: Verify all original Git blobs, 172 PDSC rows, three loader ELF headers and SHA256
+        run: |
+          python data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py \
+            --pdsc /tmp/plasma-c5-dfp-v09/STMicroelectronics.stm32c5xx_dfp.pdsc \
+            --loader-dir /tmp/plasma-c5-dfp-v09/Flash \
+            --fork-cfg /tmp/plasma-c5-dfp-v09/stm32c5x.cfg \
+            --license /tmp/plasma-c5-dfp-v09/LICENSE.md \
+            | tee /tmp/plasma-c5-dfp-v09/source-validation-summary.txt
+      - name: Retain text-only research digest and replay summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-c5-v09-official-source-digest-summary
+          path: /tmp/plasma-c5-dfp-v09/source-validation-summary.txt
+          retention-days: 7
+          if-no-files-found: error
