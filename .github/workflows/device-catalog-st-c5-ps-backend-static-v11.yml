@@ -1,0 +1,114 @@
+name: ST C5 PS source-only backend/Tcl candidate v1.1
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+      - 'data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py'
+      - 'data/device-catalog/research/test_validate_st_c5_ps_backend_static_gate_v11.py'
+      - 'data/device-catalog/research/ST_C5_PS_BACKEND_STATIC_GATE_V11.md'
+      - '.github/workflows/device-catalog-st-c5-ps-backend-static-v11.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+      - 'data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py'
+      - 'data/device-catalog/research/test_validate_st_c5_ps_backend_static_gate_v11.py'
+      - 'data/device-catalog/research/ST_C5_PS_BACKEND_STATIC_GATE_V11.md'
+      - '.github/workflows/device-catalog-st-c5-ps-backend-static-v11.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-ps-source-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify frozen PS runtime block, 172/139/33 and workarea boundaries
+        run: |
+          python data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_st_c5_ps_backend_static_gate_v11.py -v
+
+  replay-original-st-and-host-tcl:
+    needs: frozen-ps-source-boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch ONLY pinned vendor sources into disposable CI staging
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+          root = Path('/tmp/plasma-st-c5-ps-static-v11')
+          (root/'Flash').mkdir(parents=True, exist_ok=False)
+          sources = [
+            ('STMicroelectronics/OpenOCD',
+             'c8d973bdad9a6fddb51459eda109b3b95d23b57a',
+             'tcl/target/stm32c5x.cfg', 'stm32c5x.cfg', 65536),
+            ('STMicroelectronics/OpenOCD',
+             'c8d973bdad9a6fddb51459eda109b3b95d23b57a',
+             'src/flash/nor/stldr_driver.c', 'stldr_driver.c', 100000),
+            ('STMicroelectronics/OpenOCD',
+             'c8d973bdad9a6fddb51459eda109b3b95d23b57a',
+             'src/flash/nor/drivers.c', 'drivers.c', 65536),
+          ]
+          for file in ('STM32C5[34]x.xldr', 'STM32C5[56]x.xldr', 'STM32C5[9A]x.xldr'):
+            sources.append((
+              'STMicroelectronics/stm32c5xx-dfp',
+              'a5f65bc64535cfa723e9d25f58d7ce23d0937aed',
+              'Flash/'+file, 'Flash/'+file, 131072))
+          for repo, commit, source, dest, limit in sources:
+            url = 'https://raw.githubusercontent.com/'+repo+'/'+commit+'/'+quote(source,safe='/')
+            with urlopen(Request(url,headers={'User-Agent':'Plasma-ST-C5-host-tcl-gate-v11'}),timeout=25) as resp:
+              assert resp.status == 200
+              raw = resp.read(limit+1)
+            assert 500 < len(raw) < limit, (source,len(raw))
+            (root/dest).write_bytes(raw)
+            print('Original fixed-commit source staged:', source, len(raw), flush=True)
+          PY
+      - name: Validate exact upstream Git blob bytes, in-memory two-line fix and host-only Tcl
+        run: |
+          python data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py \
+            --fork-cfg /tmp/plasma-st-c5-ps-static-v11/stm32c5x.cfg \
+            --stldr-driver /tmp/plasma-st-c5-ps-static-v11/stldr_driver.c \
+            --driver-registry /tmp/plasma-st-c5-ps-static-v11/drivers.c \
+            --loader-dir /tmp/plasma-st-c5-ps-static-v11/Flash \
+            --host-tcl-output /tmp/plasma-st-c5-ps-static-v11/host-only-semantics.tcl
+          tclsh /tmp/plasma-st-c5-ps-static-v11/host-only-semantics.tcl
+      - name: Verify each original DFP Xldr exposes the ST STLDR driver's mandatory ELF symbols
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          from pathlib import Path
+          from sys import path
+          path.insert(0,'data/device-catalog/research')
+          import validate_st_c5_dfp_loader_crosswalk_v09 as prior
+          root=Path('/tmp/plasma-st-c5-ps-static-v11/Flash')
+          required={'Init','SectorErase','Write','StorageInfo'}
+          for relative in sorted(prior.EXPECTED_LOADER_SHA256):
+            binary=root/Path(relative).name
+            header=subprocess.run(['readelf','-h',str(binary)],check=True,capture_output=True,text=True).stdout
+            symbols=subprocess.run(['readelf','-sW',str(binary)],check=True,capture_output=True,text=True).stdout
+            assert re.search(r'Class:\s+ELF32',header),binary
+            assert re.search(r'Data:\s+2.s complement, little endian',header),binary
+            assert re.search(r'Machine:\s+ARM',header),binary
+            found=set()
+            for line in symbols.splitlines():
+              fields=line.split()
+              if fields and fields[-1] in required:
+                found.add(fields[-1])
+            assert found==required,(binary,'missing STLDR ELF symbol names',sorted(required-found))
+            print('Source-only STLDR ELF symbol check PASS:',binary.name,sorted(found),flush=True)
+          PY
