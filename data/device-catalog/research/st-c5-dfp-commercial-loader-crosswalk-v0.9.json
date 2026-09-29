@@ -23,7 +23,8 @@
         ],
         "dev_id": "0x44F",
         "path": "Flash/STM32C5[34]x.xldr",
-        "git_blob_sha": "ef1d74c6c9cbc7cfe992be476897f621512154a0"
+        "git_blob_sha": "ef1d74c6c9cbc7cfe992be476897f621512154a0",
+        "sha256": "4645574f274f5274de869dbd2a6b35fd79d134f7ec07224c3f17ed2d40c7b8b6"
       },
       {
         "family": [
@@ -32,7 +33,8 @@
         ],
         "dev_id": "0x44E",
         "path": "Flash/STM32C5[56]x.xldr",
-        "git_blob_sha": "c8f1dfbd183477f79db8fc8174d5d08d3b2fbdb7"
+        "git_blob_sha": "c8f1dfbd183477f79db8fc8174d5d08d3b2fbdb7",
+        "sha256": "131784c2e4eb4589200b614e56b83abd21a34906c1fd485ca3d806378d28732d"
       },
       {
         "family": [
@@ -41,7 +43,8 @@
         ],
         "dev_id": "0x45A",
         "path": "Flash/STM32C5[9A]x.xldr",
-        "git_blob_sha": "9b5326edebbed8f7ade21029d6d014aa56d66bba"
+        "git_blob_sha": "9b5326edebbed8f7ade21029d6d014aa56d66bba",
+        "sha256": "b9aacec837613f273b0d88fb3ca41c5c52712752fd26271959dd03a41dab8e53"
       }
     ]
   },
@@ -105,7 +108,7 @@
   },
   "safety_gates": {
     "official_three_xldr_git_blobs_observed": true,
-    "loader_sha256_retained_in_research_report": false,
+    "loader_sha256_retained_in_research_report": true,
     "independent_license_and_binary_distribution_signoff": false,
     "source_only_does_not_verify_loader_elf_compatibility": true,
     "exact_metadata_review_for_33_complete": false,
@@ -117,7 +120,9 @@
     "production_write_authorized": false,
     "frozen_production_st_exact_icpns": 2683,
     "frozen_production_st_families": 23,
-    "true_whole_st_coverage_percent": null
+    "true_whole_st_coverage_percent": null,
+    "raw_official_loader_bytes_replayed_from_pinned_commit": true,
+    "official_pinned_source_replay_workflow_run_id": 36540249563
   },
   "next_gate": "Source-byte SHA256 pin for 3 official DFP Xldr, independent legal approval, reproduce 139/33 PDSC mapping; reconcile 33 base-only identities; fix Tcl array mismatch in an isolated candidate and compile/qualify chosen Plasma OpenOCD before any exact ICPN Production approval."
 }
