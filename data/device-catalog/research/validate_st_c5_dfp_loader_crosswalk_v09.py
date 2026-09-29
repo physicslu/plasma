@@ -181,7 +181,7 @@ def validate(pdsc: Path | None = None, loader_dir: Path | None = None,
                 "0x45A": ("C59", "C5A"),
             }, "loader source or family map drifted")
     fork = report["fork_vs_proposal"]
-    require(fork["pinned_fork_cfg_git_blob_sha"] == EXPECTED_FORK_CFG_BLOB and
+    require(fork["pinned_target_cfg_git_blob_sha"] == EXPECTED_FORK_CFG_BLOB and
             all(fork[key] is True for key in (
                 "pinned_fork_defines_dev_id_loader_as_scalar_set",
                 "pinned_fork_defines_die_max_flash_size_as_scalar_set",
