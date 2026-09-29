@@ -62,8 +62,8 @@ class CrosswalkEvidenceTests(unittest.TestCase):
                                  ["STM32C531CBT6"])
 
     def test_source_git_blob_integrity(self):
-        self.assertEqual("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-                         gate.git_blob(b"test source blob\n"))
+        self.assertEqual("9240f423ccca0ba7c43a6a0ac800be8cd86e3470",
+                         gate.git_blob(gate.prior.CODES.read_bytes()))
 
 
 if __name__ == "__main__":
