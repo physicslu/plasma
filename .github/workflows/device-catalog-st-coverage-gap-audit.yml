@@ -1,0 +1,33 @@
+name: ST portfolio coverage bounded gap audit validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-portfolio-gap-source-2026-09-29.json'
+      - 'data/device-catalog/research/st-portfolio-coverage-gap-v0.2.json'
+      - 'data/device-catalog/research/audit_st_portfolio_coverage_gap.py'
+      - 'data/device-catalog/research/ST_COVERAGE_GAP_REPORT_2026-09-29.md'
+      - '.github/workflows/device-catalog-st-coverage-gap-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-portfolio-gap-source-2026-09-29.json'
+      - 'data/device-catalog/research/st-portfolio-coverage-gap-v0.2.json'
+      - 'data/device-catalog/research/audit_st_portfolio_coverage_gap.py'
+      - 'data/device-catalog/research/ST_COVERAGE_GAP_REPORT_2026-09-29.md'
+      - '.github/workflows/device-catalog-st-coverage-gap-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  replay-bounded-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify integrity-bound ST Production subset and manufacturer Active gap sentinels
+        run: python data/device-catalog/research/audit_st_portfolio_coverage_gap.py

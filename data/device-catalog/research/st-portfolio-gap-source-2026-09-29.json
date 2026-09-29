@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "st-stm32-coverage-gap-bounded-audit-2026-09-29-v02",
+  "captured_date_utc": "2026-09-29",
+  "research_scope": "STMicroelectronics STM32 MCU and wireless MCU commercial exact MPN; ST MPU, STM8, non-MCU IC and development boards excluded",
+  "snapshot_type": "bounded_manufacturer_portfolio_claim_plus_five_official_live_web_reviewed_sentinels_not_complete_exact_vendor_export",
+  "production_baseline": {
+    "manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+    "manufacturer": "STMicroelectronics",
+    "frozen_st_sources": [
+      {
+        "family": "STM32F0",
+        "row_count": 42,
+        "path": "../research/stm32f0-commercial-icpn.csv",
+        "git_blob_sha": "ad9a5b0e643dcbee3118dff9f9863c637d66e3d6",
+        "sha256": "c5e138eced2389cf99948536308142a2488bdaefa619130b9b50b6fc52cd80c9"
+      },
+      {
+        "family": "STM32F1",
+        "row_count": 75,
+        "path": "../research/stm32f1-commercial-icpn.csv",
+        "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+        "sha256": "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+      },
+      {
+        "family": "STM32F2",
+        "row_count": 33,
+        "path": "../research/stm32f2-commercial-icpn.csv",
+        "git_blob_sha": "1bec0770179f3849c6cfbb66aea9ad9d63610f55",
+        "sha256": "69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0"
+      },
+      {
+        "family": "STM32F3",
+        "row_count": 10,
+        "path": "../research/stm32f3-commercial-icpn.csv",
+        "git_blob_sha": "39f0d18c8e54ece6098090b24277bd365462106e",
+        "sha256": "c371b7a1c3b271afb9c8c823a4d12071be57da1aa11d138b59d39911489e1ee8"
+      },
+      {
+        "family": "STM32F4",
+        "row_count": 384,
+        "path": "../research/stm32f4-commercial-icpn.csv",
+        "git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
+        "sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+      },
+      {
+        "family": "STM32F7",
+        "row_count": 19,
+        "path": "../research/stm32f7-commercial-icpn.csv",
+        "git_blob_sha": "d61ebd2c56edf6bb7b1cadc381c23d071fe7967f",
+        "sha256": "c71434cc85068353a1aabdfe24059573c3e8092505fcdb1d6eda7f2374fa64d7"
+      },
+      {
+        "family": "STM32G0",
+        "row_count": 47,
+        "path": "../research/stm32g0-commercial-icpn.csv",
+        "git_blob_sha": "514f3a9b15b7ba31982f7b1ed322b1bac610909a",
+        "sha256": "70cc049b7e4c282af407c65bbf41a8f7128e54285b76275cb5f3071b9d03e012"
+      },
+      {
+        "family": "STM32G4",
+        "row_count": 25,
+        "path": "../research/stm32g4-commercial-icpn.csv",
+        "git_blob_sha": "52958c5313e95f924a628c6a69c9f3b2f4ca5e05",
+        "sha256": "2e20c585687e9bc3148c7835575695a7d06f497c29409818b9b56064df7b07a8"
+      },
+      {
+        "family": "STM32U0",
+        "row_count": 68,
+        "path": "../research/stm32u0-commercial-icpn.csv",
+        "git_blob_sha": "df9f8901e0d455dd2da497c5c0ec347f8052eb1b",
+        "sha256": "6a18ec5c8501e08a3bedd3a7bc21fdb8ece1afb4c92464aadc0d7aecfc944a75"
+      },
+      {
+        "family": "STM32C0",
+        "row_count": 209,
+        "path": "../research/stm32c0-commercial-icpn.csv",
+        "git_blob_sha": "0bf125dd071312cf31c57cfa7ebe3b29ffdda845",
+        "sha256": "d473c7a1b3b72b75314732ffd59bf8a8b0a39eaf8d632ba935e9e1b71509f96b"
+      },
+      {
+        "family": "STM32L0",
+        "row_count": 360,
+        "path": "../research/stm32l0-commercial-icpn.csv",
+        "git_blob_sha": "8484a3ca22ae141621247e1a947b993803710467",
+        "sha256": "2a40e482b0e9084feb930b94fd2cac7029d8ecbdf4b69743f99d1e5a3c2439b7"
+      },
+      {
+        "family": "STM32L4",
+        "row_count": 446,
+        "path": "../research/stm32l4-commercial-icpn.csv",
+        "git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
+        "sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c"
+      },
+      {
+        "family": "STM32L1",
+        "row_count": 144,
+        "path": "../research/stm32l1-commercial-icpn.csv",
+        "git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
+        "sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec"
+      },
+      {
+        "family": "STM32U3",
+        "row_count": 106,
+        "path": "../research/stm32u3-commercial-icpn.csv",
+        "git_blob_sha": "c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
+        "sha256": "171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff"
+      },
+      {
+        "family": "STM32L5",
+        "row_count": 49,
+        "path": "../research/stm32l5-commercial-icpn.csv",
+        "git_blob_sha": "2a29ccb754b5da6332cb40bd992a1261a3b03237",
+        "sha256": "a329e4146cf083f79f629b6df31db0922d0a611b6cae26dba8ec891f0ae9232f"
+      },
+      {
+        "family": "STM32U5",
+        "row_count": 265,
+        "path": "../research/stm32u5-commercial-icpn.csv",
+        "git_blob_sha": "fbdc3269b3e989058a6644355afe53f981814aec",
+        "sha256": "49144dc8bd1855861ca4059880c256d19af31a9abcfcdf2cddae83cf44560fe6"
+      },
+      {
+        "family": "STM32H7RS",
+        "row_count": 36,
+        "path": "../research/stm32h7rs-commercial-icpn.csv",
+        "git_blob_sha": "c8457006dbe45bef5203ed061b47c2f00224d717",
+        "sha256": "e86083329eaceb013aa19ea7fdb85d4b8c55339f7879dc02237c15a549d498a3"
+      },
+      {
+        "family": "STM32H7",
+        "row_count": 191,
+        "path": "../research/stm32h7-classic-commercial-icpn.csv",
+        "git_blob_sha": "fda7d9a4eaa9978d0a67416e8b339fc9aab4e5cc",
+        "sha256": "35b9d2bc13da3a01809ea62b62557f5419b8d6f7139574ca4715a127f1e86465"
+      },
+      {
+        "family": "STM32WBA2X",
+        "row_count": 14,
+        "path": "../research/stm32wba2x-commercial-icpn.csv",
+        "git_blob_sha": "15a0d57b7f94c05f745a1768036fef9f01ec1fd9",
+        "sha256": "8d21112ab6d9c8a865e5ce6ccda221b1fee17cbac750ceb042ea41111379fe8d"
+      },
+      {
+        "family": "STM32WLX",
+        "row_count": 31,
+        "path": "../research/stm32wlx-commercial-icpn.csv",
+        "git_blob_sha": "3b9b7281058ca1248d83880ca96b21d6f02a65a3",
+        "sha256": "f1caf745d5ef728b415e10886c4caf294dd79364c240d3256901b8432648dc0c"
+      },
+      {
+        "family": "STM32WBX",
+        "row_count": 50,
+        "path": "../research/stm32wbx-commercial-icpn.csv",
+        "git_blob_sha": "caff19debecf190fc02c2a8af4b3f301e7ae4d67",
+        "sha256": "0a97caf4afc336a762d9f504b860cafeffdf0ff8a6f603665b564f10b42bd664"
+      },
+      {
+        "family": "STM32WBA5X",
+        "row_count": 40,
+        "path": "../research/stm32wba5x-commercial-icpn.csv",
+        "git_blob_sha": "21cd808371f4d6f05a813e35b06cb1227f96195a",
+        "sha256": "653dca4184eab05c3a0c8e6714e73adacf3d6927310855faf064b7d8d0b322d6"
+      },
+      {
+        "family": "STM32WBA6X",
+        "row_count": 39,
+        "path": "../research/stm32wba6x-commercial-icpn.csv",
+        "git_blob_sha": "0ab09918b2d845c0f21f10c5edb4a150d0c8c4f5",
+        "sha256": "87e5bde7efc3fd3aee7397a80e9f4f972eb5ff42370b8d54cf1a333b3252004d"
+      }
+    ]
+  },
+  "official_portfolio_claim": {
+    "source_url": "https://www.st.com/en/microcontrollers-microprocessors.html",
+    "claim": "STM32 microcontrollers: more than 4,500 commercial part numbers",
+    "comparator_type": "vendor_portfolio_marketing_statement",
+    "threshold_exclusive": 4500,
+    "exact_active_icpn_export_available_in_this_snapshot": false,
+    "same_lifecycle_population_as_production_confirmed": false,
+    "note": "This is a denominator-scale reference, NOT a verified exact active commercial ICPN count."
+  },
+  "missing_family_sentinels": [
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBT6",
+      "official_lifecycle": "Active",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html",
+      "surface": "Quality and Reliability exact-ICPN row",
+      "gate_domain": "new_family_backend_and_metadata_research"
+    },
+    {
+      "family": "STM32C5",
+      "exact_icpn": "STM32C531CBT6",
+      "official_lifecycle": "Active",
+      "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32c5-series.html",
+      "surface": "ST official eStore Active exact part listing",
+      "gate_domain": "new_family_backend_and_metadata_research"
+    },
+    {
+      "family": "STM32N6",
+      "exact_icpn": "STM32N657A0H3Q",
+      "official_lifecycle": "Active",
+      "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=3",
+      "surface": "ST official eStore Active exact part listing",
+      "gate_domain": "programming_profile_exception_external_flash_debug_only_openocd_candidate"
+    },
+    {
+      "family": "STM32WB0",
+      "exact_icpn": "STM32WB05KZV6TR",
+      "official_lifecycle": "Active",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb05kz.html",
+      "surface": "Quality and Reliability exact-ICPN row",
+      "gate_domain": "new_family_backend_and_metadata_research"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV6",
+      "official_lifecycle": "Active",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html",
+      "surface": "Quality and Reliability exact-ICPN row",
+      "gate_domain": "new_family_backend_and_metadata_research"
+    }
+  ],
+  "classification_policy": {
+    "official_sentinel_not_in_production": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+    "known_missing_quantity_interpretation": "At least one specific, official Active exact MPN absent for each of five verified missing families; no extrapolation to entire family.",
+    "uncertain_in_published_families": "UNQUANTIFIED_REQUIRE_FULL_ST_EXACT_MPN_EXPORT",
+    "stm32w108": "HISTORICAL_STRUCTURAL_DEFERRED_NOT_TREATED_AS_CURRENT_ACTIVE_GAP",
+    "manufacturer_status_expiry": "Reference date only; recheck source status on future refresh."
+  }
+}
