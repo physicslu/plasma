@@ -1,0 +1,126 @@
+{
+  "audit_id": "st-stm32-coverage-gap-bounded-audit-2026-09-29-v02",
+  "snapshot_date_utc": "2026-09-29",
+  "scope": "STMicroelectronics STM32 MCU and wireless MCU commercial exact MPN; ST MPU, STM8, non-MCU IC and development boards excluded",
+  "record_state": "RESEARCH_BASELINE_NOT_CATALOG_ADMISSION",
+  "production_baseline": {
+    "manufacturer": "STMicroelectronics",
+    "original_manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+    "integrity_bound_source_count": 23,
+    "unique_exact_icpns": 2683,
+    "family_counts": {
+      "STM32C0": 209,
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47,
+      "STM32G4": 25,
+      "STM32H7": 191,
+      "STM32H7RS": 36,
+      "STM32L0": 360,
+      "STM32L1": 144,
+      "STM32L4": 446,
+      "STM32L5": 49,
+      "STM32U0": 68,
+      "STM32U3": 106,
+      "STM32U5": 265,
+      "STM32WBA2X": 14,
+      "STM32WBA5X": 40,
+      "STM32WBA6X": 39,
+      "STM32WBX": 50,
+      "STM32WLX": 31
+    },
+    "segment_counts": {
+      "mainstream": 408,
+      "high_performance": 663,
+      "ultra_low_power": 1438,
+      "wireless": 174
+    }
+  },
+  "vendor_portfolio_reference": {
+    "official_url": "https://www.st.com/en/microcontrollers-microprocessors.html",
+    "manufacturer_claim": "STM32 microcontrollers: more than 4,500 commercial part numbers",
+    "commercial_part_number_floor_exclusive": 4500,
+    "actual_active_exact_denominator": null,
+    "same_population_comparability_verified": false,
+    "inventory_scale_ratio_percent_using_4500_reference": 59.62,
+    "inventory_scale_ratio_is_coverage_metric": false
+  },
+  "bounded_official_gap_sentinels": {
+    "known_unpublished_family_count": 5,
+    "known_unpublished_active_exact_mpn_minimum": 5,
+    "entries": [
+      {
+        "family": "STM32H5",
+        "exact_icpn": "STM32H503CBT6",
+        "manufacturer_observed_lifecycle": "Active",
+        "production_exact_match_count": 0,
+        "classification": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+        "official_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html",
+        "official_evidence_surface": "Quality and Reliability exact-ICPN row",
+        "remaining_gate": "new_family_backend_and_metadata_research"
+      },
+      {
+        "family": "STM32C5",
+        "exact_icpn": "STM32C531CBT6",
+        "manufacturer_observed_lifecycle": "Active",
+        "production_exact_match_count": 0,
+        "classification": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+        "official_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32c5-series.html",
+        "official_evidence_surface": "ST official eStore Active exact part listing",
+        "remaining_gate": "new_family_backend_and_metadata_research"
+      },
+      {
+        "family": "STM32N6",
+        "exact_icpn": "STM32N657A0H3Q",
+        "manufacturer_observed_lifecycle": "Active",
+        "production_exact_match_count": 0,
+        "classification": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+        "official_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=3",
+        "official_evidence_surface": "ST official eStore Active exact part listing",
+        "remaining_gate": "programming_profile_exception_external_flash_debug_only_openocd_candidate"
+      },
+      {
+        "family": "STM32WB0",
+        "exact_icpn": "STM32WB05KZV6TR",
+        "manufacturer_observed_lifecycle": "Active",
+        "production_exact_match_count": 0,
+        "classification": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+        "official_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb05kz.html",
+        "official_evidence_surface": "Quality and Reliability exact-ICPN row",
+        "remaining_gate": "new_family_backend_and_metadata_research"
+      },
+      {
+        "family": "STM32WL3",
+        "exact_icpn": "STM32WL33CCV6",
+        "manufacturer_observed_lifecycle": "Active",
+        "production_exact_match_count": 0,
+        "classification": "OFFICIAL_ACTIVE_EXACT_MPN_NOT_PUBLISHED",
+        "official_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html",
+        "official_evidence_surface": "Quality and Reliability exact-ICPN row",
+        "remaining_gate": "new_family_backend_and_metadata_research"
+      }
+    ],
+    "is_complete_vendor_delta": false
+  },
+  "actual_active_exact_coverage_percent": null,
+  "actual_missing_active_exact_icpns": null,
+  "in_family_current_commercial_variants_not_yet_compared": true,
+  "exclusions": {
+    "stm32w108": "historical_structural_deferred_not_assumed_current_active",
+    "other_st_product_classes": "MPU, STM8, analog, power, sensor, non-MCU and development boards are outside this audit"
+  },
+  "next_gate": "obtain complete dated official ST exact MPN and same-row lifecycle snapshot; verify authority and digests; compute exact set difference by family; classify OpenOCD/programming profile separately",
+  "claims": {
+    "all_official_ST_exact_icpns_enumerated": false,
+    "all_existing_production_ST_rows_currently_Active_reverified": false,
+    "the_4500_plus_commercial_count_is_an_Active_exact_denominator": false,
+    "the_inventory_scale_ratio_is_an_actual_coverage_percentage": false,
+    "all_missing_ST_series_have_programming_backend_support": false,
+    "production_publication_authorized": false,
+    "physical_programming_qualification_claimed": false
+  }
+}
