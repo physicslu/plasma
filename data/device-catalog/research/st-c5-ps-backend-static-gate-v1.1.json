@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-c5-ps-backend-static-gate-v1.1",
+  "reference_date_utc": "2026-09-29",
+  "research_only": true,
+  "manufacturer_openocd_fork": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "pinned_commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "target_cfg_path": "tcl/target/stm32c5x.cfg",
+    "target_cfg_blob_sha": "03bce02b166b669ca0d7515656bca68ff4db8b84",
+    "stldr_driver_path": "src/flash/nor/stldr_driver.c",
+    "stldr_driver_blob_sha": "99d51e696cd5cfa64948e479102472fb126afafa",
+    "registry_path": "src/flash/nor/drivers.c",
+    "registry_blob_sha": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a",
+    "source_tcl_defect": {
+      "flash_fallback_original": "set die_max_flash_size {",
+      "flash_fallback_candidate": "array set die_max_flash_size {",
+      "loader_table_original": "set dev_id_loader {\n}",
+      "loader_table_candidate": "array set dev_id_loader {\n}",
+      "replacements_must_match_each_exactly_once": true,
+      "loader_table_remains_empty_in_research_fix": true,
+      "candidate_is_not_production_target_cfg": true
+    },
+    "target_default_workarea_bytes": 32768,
+    "fallback_die_flash_bytes": {
+      "0x44E": 524288,
+      "0x44F": 262144,
+      "0x45A": 1048576
+    },
+    "loader_missing_device_id_remains_blocked": true
+  },
+  "dfp": {
+    "repository": "STMicroelectronics/stm32c5xx-dfp",
+    "commit": "a5f65bc64535cfa723e9d25f58d7ce23d0937aed",
+    "pdsc_blob_sha": "859649be212ea43bc524eb977e1279e45da644c8",
+    "loader_family_alg_ram_bytes": {
+      "Flash/STM32C5[34]x.xldr": 65536,
+      "Flash/STM32C5[56]x.xldr": 131072,
+      "Flash/STM32C5[9A]x.xldr": 262144
+    },
+    "ram_size_field_is_pack_declared_algorithm_footprint_not_proven_runtime_requirement": true,
+    "workarea_needs_independent_backend_and_hardware_confirmation": true
+  },
+  "plasma_source": {
+    "reference_main_merge_commit": "ce79556d852eb9e1b0a261d25c6d956d25743cd4",
+    "openocd_executor_path": "software/python/plasma_interfaces/openocd_executor.py",
+    "openocd_executor_blob_sha": "062fefa79926535e8c89dddcd55bee95b65b22c3",
+    "openocd_interface_path": "software/python/plasma_interfaces/openocd.py",
+    "openocd_interface_blob_sha": "3d12cc658b6d71adf8b8dfc14ea07ac4a0c5cab7",
+    "site_router_path": "software/python/plasma_server/execution_router.py",
+    "site_router_blob_sha": "6ce78bb4421448327a844171d97ffe7995ca8fbd",
+    "executor_no_default_process_launcher": true,
+    "interface_direct_erase_program_verify_read_are_blocked": true,
+    "backend_implementation_state": "plan_compiled_not_executable",
+    "hardware_runtime_ready": false,
+    "real_ps_openocd_version_sha256_and_stldr_build_not_observed": true,
+    "real_z2_hil_did_not_run": true
+  },
+  "crosswalk": {
+    "v09_audit": "st-c5-dfp-commercial-loader-crosswalk-v0.9",
+    "v10_audit": "st-c5-dfp-33-commercial-exact-variant-triage-v1.0",
+    "observed_public_estore_exact_active": 172,
+    "exact_dfp_variant_observed": 139,
+    "base_device_only": 33,
+    "all_172_loader_routes_remain_closed": true,
+    "fixed_production_st_icpns": 2683,
+    "fixed_production_st_families": 23
+  },
+  "gates": {
+    "manufacturer_tcl_scalar_array_fix_proposal_only": true,
+    "isolated_tcl_host_fallback_probe_required": true,
+    "three_local_xldr_source_sha256_pinned": true,
+    "official_vendor_binary_license_approved": false,
+    "stldr_compiled_in_plasma_chosen_binary_verified": false,
+    "plasma_target_cfg_deployed_and_loader_map_populated": false,
+    "pinned_loader_ram_compatibility_hil_verified": false,
+    "real_dev_id_flash_geometry_readback_verified": false,
+    "source_only_candidate_executable": false,
+    "production_catalog_update_authorized": false,
+    "production_programming_authorized": false
+  },
+  "next_gate": "Verify a selected PS OpenOCD binary/version/build inventory and stldr availability without enabling runtime, test local-only source-pinned C5 loader target configuration in an isolated environment, obtain legitimate read-only real silicon probe evidence, independent license signoff and review 33 exact commercial metadata gaps. Owner approval separately required before Production ICPN publication."
+}
