@@ -106,11 +106,21 @@ def acquire(page: Any) -> dict[str,Any]:
               "same_row_active_status":bool(re.search(r"\bActive\b",text)),
               "same_row_other_status":bool(re.search(r"\b(Obsolete|No Longer Manufactured|NRND|Not Recommended for New Designs)\b",text,re.I)),
             })
-    if len(matching_rows)!=1:
-        raise EvidenceError(f"Expected exactly one matching commercial product row, found {len(matching_rows)}")
-    row=matching_rows[0]
-    if not row["same_row_active_status"] or row["same_row_other_status"]:
-        raise EvidenceError("Exact part commercial row lacks unambiguous Active status")
+    # A SKU may also occur in the distinct Quality Information table. That
+    # second table is not lifecycle evidence. Require exactly one Active row,
+    # and reject ANY contradictory lifecycle row for the same exact identity.
+    if not matching_rows:
+        raise EvidenceError("No exact SKU row found in official NXP rendered DOM")
+    if any(row["same_row_other_status"] for row in matching_rows):
+        raise EvidenceError("Conflicting non-Active lifecycle status for exact SKU")
+    commercial=[row for row in matching_rows if row["same_row_active_status"]]
+    if len(commercial)!=1:
+        diag=[{"active":r["same_row_active_status"],"other":r["same_row_other_status"],
+               "excerpt":r["visible_row_excerpt"][:160]} for r in matching_rows]
+        raise EvidenceError(f"Expected one unambiguous Active commercial row: {diag}")
+    row=commercial[0]
+    row["matching_exact_sku_rows_seen"]=len(matching_rows)
+    row["non_lifecycle_quality_rows_seen"]=len(matching_rows)-1
     return {
       "acquisition_status":"success",
       "commercial_identity_status":"verified_active_on_official_manufacturer_listing",
