@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-c5-backend-source-boundary-v0.8",
+  "reference_date_utc": "2026-09-29",
+  "observed_research_input": {
+    "c5_official_estore_category_exact_active_candidates": 172,
+    "exact_set_sha256": "32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3",
+    "evidence_ledger": "st-c5-estore-evidence-lock-v0.7.json",
+    "only_bounded_category_evidence": true
+  },
+  "st_openocd_fork": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "branch_reference": "openocd-cubeide-r7",
+    "pinned_commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "license": "GNU GPL v2 (repository statement); preserve source/license if redistributing",
+    "target_config": {
+      "path": "tcl/target/stm32c5x.cfg",
+      "git_blob_sha": "03bce02b166b669ca0d7515656bca68ff4db8b84",
+      "supports_debug_transports_claimed": [
+        "JTAG",
+        "SWD"
+      ],
+      "flash_bank_driver": "stldr",
+      "flash_bank_base": "0x08000000",
+      "default_work_area_bytes": 32768,
+      "default_adapter_speed_khz": 500,
+      "loader_table_declaration": "set dev_id_loader {\\n}",
+      "loader_table_has_pinned_paths": false,
+      "on_missing_device_loader": "Error : No STLDR loader file found for device ID $dev_id",
+      "fallback_die_identifiers_observed": [
+        "0x44E",
+        "0x44F",
+        "0x45A"
+      ],
+      "fallback_list_is_full_identity_mapping": false
+    },
+    "linked_flash_driver": {
+      "path": "src/flash/nor/stldr_driver.c",
+      "git_blob_sha": "99d51e696cd5cfa64948e479102472fb126afafa",
+      "registry_path": "src/flash/nor/drivers.c",
+      "registry_git_blob_sha": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a",
+      "source_presence_is_not_algorithm_or_loader_qualification": true
+    },
+    "official_upstream_submission": {
+      "reference": "https://review.openocd.org/c/openocd/+/9699",
+      "observed_public_submission_date": "2026-07-15",
+      "target_script_submission": "tcl/target/stm32c5x.cfg",
+      "upstream_main_target_file_verified_available": false,
+      "absent_default_path_lookup_is_not_proof_of_other_backend_absence": true
+    }
+  },
+  "alternate_tool_boundary": {
+    "product": "ST STM32CubeProgrammer",
+    "official_st_c5_support_release": "2.22.0",
+    "official_support_source": "https://community.st.com/stm32-mpus-software-development-tools-138/stm32cubeprogrammer-v2-22-released-163108",
+    "official_st_faq_source": "https://www.st.com/content/st_com/en/stm32cubeprogrammer.html",
+    "production_use_approved_by_tool_license": false,
+    "may_be_treated_as_plasma_production_backend": false
+  },
+  "gate_state": {
+    "manufacturer_exact_identity_observed_research_only": true,
+    "source_replay_172_exact_codes": true,
+    "backend_target_script_candidate": true,
+    "complete_per_device_id_loader_mapping_reviewed": false,
+    "actual_plasma_backend_stldr_compiled_verified": false,
+    "per_mpn_metadata_route_qualified": false,
+    "runtime_flash_erase_verify_qualified": false,
+    "security_mutation_authorized": false,
+    "catalog_admission_ready": false,
+    "production_write_authorized": false,
+    "hardware_hil_qualified": false,
+    "frozen_production_st_icpns": 2683,
+    "frozen_production_st_families": 23
+  },
+  "next_gate": "Acquire legally usable versioned ST C5 flash loader profiles and map supported DEV_ID/flash-size to each intended exact MPN; verify selected Plasma backend includes stldr driver, target script and compatible loader; independently qualify identity/metadata/route; request explicit Production approval."
+}
