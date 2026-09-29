@@ -1,0 +1,20 @@
+{
+  "discovery_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "exact_icpn_count": 12,
+  "exact_icpns": [
+    "MKL25Z128VFM4",
+    "MKL25Z128VFT4",
+    "MKL25Z128VLH4",
+    "MKL25Z128VLK4",
+    "MKL25Z32VFM4",
+    "MKL25Z32VFT4",
+    "MKL25Z32VLH4",
+    "MKL25Z32VLK4",
+    "MKL25Z64VFM4",
+    "MKL25Z64VFT4",
+    "MKL25Z64VLH4",
+    "MKL25Z64VLK4"
+  ],
+  "exact_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "excluded_non_active": []
+}
