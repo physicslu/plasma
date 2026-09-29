@@ -101,9 +101,9 @@ jobs:
             binary=root/Path(relative).name
             header=subprocess.run(['readelf','-h',str(binary)],check=True,capture_output=True,text=True).stdout
             symbols=subprocess.run(['readelf','-sW',str(binary)],check=True,capture_output=True,text=True).stdout
-            assert re.search(r'Class:\\s+ELF32',header),binary
-            assert re.search(r'Data:\\s+2.s complement, little endian',header),binary
-            assert re.search(r'Machine:\\s+ARM',header),binary
+            assert re.search(r'Class:\s+ELF32',header),binary
+            assert re.search(r'Data:\s+2.s complement, little endian',header),binary
+            assert re.search(r'Machine:\s+ARM',header),binary
             found=set()
             for line in symbols.splitlines():
               fields=line.split()
