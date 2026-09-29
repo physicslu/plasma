@@ -1,0 +1,102 @@
+name: ST C5 33-gap local SHA256 research preflight v1.0
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-c5-dfp-33-exact-variant-triage-v1.0.csv'
+      - 'data/device-catalog/research/st-c5-dfp-33-exact-variant-triage-v1.0.json'
+      - 'data/device-catalog/research/preflight_st_c5_local_loader_candidate_v10.py'
+      - 'data/device-catalog/research/test_preflight_st_c5_local_loader_candidate_v10.py'
+      - 'data/device-catalog/research/ST_C5_33GAP_LOCAL_LOADER_V10.md'
+      - '.github/workflows/device-catalog-st-c5-33gap-local-loader-v10.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-c5-dfp-33-exact-variant-triage-v1.0.csv'
+      - 'data/device-catalog/research/st-c5-dfp-33-exact-variant-triage-v1.0.json'
+      - 'data/device-catalog/research/preflight_st_c5_local_loader_candidate_v10.py'
+      - 'data/device-catalog/research/test_preflight_st_c5_local_loader_candidate_v10.py'
+      - 'data/device-catalog/research/ST_C5_33GAP_LOCAL_LOADER_V10.md'
+      - '.github/workflows/device-catalog-st-c5-33gap-local-loader-v10.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-research-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay original 23 ST source SHA, 172 / 139 / 33 and 9/11/13 triage
+        run: |
+          python data/device-catalog/research/preflight_st_c5_local_loader_candidate_v10.py
+          python -m unittest discover -s data/device-catalog/research -p test_preflight_st_c5_local_loader_candidate_v10.py -v
+
+  official-local-byte-preflight:
+    needs: offline-research-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay only pinned ST DFP Flash loader byte hashes in temporary CI staging
+        run: |
+          python - <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          research = Path('data/device-catalog/research').resolve()
+          sys.path.insert(0, str(research))
+          import validate_st_c5_dfp_loader_crosswalk_v09 as v09
+          import preflight_st_c5_local_loader_candidate_v10 as gate
+
+          staged = Path('/tmp/plasma-st-c5-v10-local-only')
+          staged.mkdir(parents=True, exist_ok=False)
+          base = ('https://raw.githubusercontent.com/STMicroelectronics/stm32c5xx-dfp/'
+                  'a5f65bc64535cfa723e9d25f58d7ce23d0937aed/')
+          for relative, pinned_sha in sorted(v09.EXPECTED_LOADER_SHA256.items()):
+              url = base + quote(relative, safe='/')
+              with urlopen(Request(url, headers={'User-Agent':'Plasma-ST-C5-source-replay-v1.0'}), timeout=25) as stream:
+                  assert stream.status == 200
+                  raw = stream.read(1024 * 1024 + 1)
+              assert len(raw) < 1024 * 1024
+              assert hashlib.sha256(raw).hexdigest() == pinned_sha, relative
+              (staged / Path(relative).name).write_bytes(raw)
+              print('Official DFP fixed-commit SHA256 PASS:', relative, flush=True)
+
+          v09.validate(loader_dir=staged)
+          candidates = gate.load_and_reconcile()
+          exact = [row for row in candidates.values()
+                   if row['dfp_evidence_state'] == 'EXACT_DFP_VARIANT']
+          by_loader = {}
+          for row in exact:
+              by_loader.setdefault(row['candidate_xldr_path'], row)
+          assert set(by_loader) == set(v09.EXPECTED_LOADERS)
+          for source, row in sorted(by_loader.items()):
+              result = gate.preflight(row['icpn'], row['candidate_dev_id'],
+                                      int(row['exact_variant_flash_bytes']), staged)
+              assert result['decision'] == 'SOURCE_MATCHED_RESEARCH_ONLY', result
+              assert result['executable'] is False
+              assert result['hardware_readback_authenticated'] is False
+              assert result['hardware_runtime_ready'] is False
+              assert result['production_write_authorized'] is False
+              assert result['loader_sha256'] == v09.EXPECTED_LOADER_SHA256[source]
+              print('Local source-only candidate PASS:', row['icpn'], source, flush=True)
+
+          # Even with all three original official binaries, DFP-absent exact retail
+          # variants never qualify by stripping TR or inheriting a Base Device.
+          blocked = candidates['STM32C551CCT6TR']
+          result = gate.preflight(blocked['icpn'], blocked['candidate_dev_id'],
+                                  int(blocked['parent_flash_bytes']), staged)
+          assert result['decision'] == 'BLOCKED_NO_EXACT_DFP_VARIANT', result
+          print('33-part exact DFP admission remains BLOCKED, no hardware used.')
+          PY
