@@ -15,6 +15,16 @@ The ST portfolio's **more than 4,500 commercial part numbers** marketing stateme
 
 **Critical non-equivalence:** the tools may export an MCU configuration name such as `STM32F103C8Tx` rather than the exact commercial ordering identities (e.g. `STM32F103C8T6`, `STM32F103C8T6TR`). The Excel export feature is confirmed; its exact-MPN/lifecycle field completeness is **NOT confirmed**. Never use raw exported row count or the 4,500+ marketing statement as a verified current Active exact-MPN denominator. Do not expand wildcard `x` into guessed package, temperature, security, packing or orderable suffixes.
 
+## Mandatory MX1/MX2 scope correction (v0.4)
+
+**CubeMX1/MX1 does not, by itself, cover all current ST STM32 families.**
+In particular, ST's 2026-05-06 employee clarification says that **MX2-only STM32C5 is deliberately excluded from the older `STM32_open_pin_data` XML**; its supported configuration descriptors are in the separate official `stm32c5xx-dfp` JSON repository. A CubeMX1 Excel export therefore **cannot, on its own, substantiate whole-ST portfolio completeness**, even if all visible filters have been cleared.
+
+The pinned multi-source structural audit confirms 2,240 XML configurations in the MX1 `mcu` tree, of which **232 are STM32MP/MPU and must be excluded**; the remaining **2,008 are STM32 MCU XML patterns**. MX2 C5 separately supplies **46 pinout JSON patterns**. None of these are a full Active exact-ordering-MPN export. Keep MX1 and MX2 version/provenance boundaries explicit; obtain C5's official commercial/lifecycle dataset separately before attempting a whole-ST Active coverage KPI.
+
+See `ST_COVERAGE_GAP_MULTI_SOURCE_2026-09-29.md` and ST's official employee answer:
+<https://community.st.com/stm32cubemx2-mcus-151/please-keep-updating-the-stm32-open-pin-data-repo-with-new-families-as-of-now-stm32c5xx-165392>
+
 ## One-time export procedure
 
 1. Install/update the official STM32CubeMX (or ST-MCU-FINDER-PC) using ST's official distribution and accept the applicable vendor terms.
