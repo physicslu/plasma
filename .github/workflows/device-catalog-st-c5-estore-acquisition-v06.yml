@@ -1,0 +1,54 @@
+name: ST C5 public eStore source acquisition v0.6
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/acquire_st_c5_estore.py'
+      - 'data/device-catalog/research/test_acquire_st_c5_estore.py'
+      - 'data/device-catalog/research/ST_C5_ESTORE_ACQUISITION_V06.md'
+      - '.github/workflows/device-catalog-st-c5-estore-acquisition-v06.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test bounded official C5 parser fail-closed cases
+        run: python -m unittest discover -s data/device-catalog/research -p test_acquire_st_c5_estore.py -v
+
+  live-vendor-evidence-attempt:
+    needs: offline-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Attempt one-time ST category exact Active MPN acquisition
+        run: |
+          set +e
+          python data/device-catalog/research/acquire_st_c5_estore.py \
+            --output /tmp/st-c5-v06 --interval-seconds 1.0
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "CATEGORY OBSERVED (candidate only); independent completeness review required." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ACQUISITION_BLOCKED. No newly captured ICPN may be claimed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+      - name: Retain raw ST page bytes and SHA256 evidence or blocked manifest
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: st-c5-v06-source-evidence-candidate
+          path: /tmp/st-c5-v06/
+          if-no-files-found: warn
+          retention-days: 7
