@@ -1,0 +1,13 @@
+{
+  "exact_representative": "MKL25Z128VLK4",
+  "family": "KL25",
+  "full_exact_discovery_authorized": false,
+  "manufacturer": "NXP",
+  "matching_canonical_pattern": "MKL25Z128xxx4",
+  "probe_id": "nxp-kl25-official-current-commercial-evidence-accessibility-v1",
+  "production_manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+  "scope": "one exact KL25 representative official manufacturer identity and lifecycle accessibility",
+  "selection_git_blob_sha": "61aeaba4601101cc665c2830453bbf2cc416c8c0",
+  "source_lock_git_blob_sha": "4927139f202bee1ee3e813ef57e3cfdfd3333ba6",
+  "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab"
+}
