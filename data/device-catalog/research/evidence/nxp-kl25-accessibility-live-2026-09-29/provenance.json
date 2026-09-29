@@ -1,0 +1,10 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser_version": "153.0.8010.12",
+  "generated_at_utc": "2026-09-29T00:55:57Z",
+  "probe_id": "nxp-kl25-official-current-commercial-evidence-accessibility-v1",
+  "production_prestate_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+  "selection_git_blob_sha": "61aeaba4601101cc665c2830453bbf2cc416c8c0",
+  "source_lock_git_blob_sha": "4927139f202bee1ee3e813ef57e3cfdfd3333ba6",
+  "source_repository": "physicslu/plasma"
+}
