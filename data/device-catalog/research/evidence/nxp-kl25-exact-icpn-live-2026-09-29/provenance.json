@@ -1,0 +1,11 @@
+{
+  "accessibility_gate_git_blob_sha": "0bb8ff2a0a59381243c5dc357be521bce882c881",
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser_version": "153.0.8010.12",
+  "discovery_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "generated_at_utc": "2026-09-29T01:02:02Z",
+  "production_prestate_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+  "selection_git_blob_sha": "61aeaba4601101cc665c2830453bbf2cc416c8c0",
+  "source_repository": "physicslu/plasma",
+  "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab"
+}

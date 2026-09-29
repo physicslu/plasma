@@ -1,0 +1,20 @@
+{
+  "accessibility_gate_git_blob_sha": "0bb8ff2a0a59381243c5dc357be521bce882c881",
+  "candidate_source_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "catalog_admission_authorized": false,
+  "discovery_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "family": "KL25",
+  "manufacturer": "NXP",
+  "manufacturer_reviewed_exact_representative": "MKL25Z128VLK4",
+  "pattern_count": 3,
+  "patterns": [
+    "MKL25Z128xxx4",
+    "MKL25Z32xxx4",
+    "MKL25Z64xxx4"
+  ],
+  "production_manifest_git_blob_sha": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+  "scope": "bounded current official NXP KL2x product listing intersected with three frozen KL25 patterns",
+  "selection_git_blob_sha": "61aeaba4601101cc665c2830453bbf2cc416c8c0",
+  "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+  "target_config": "tcl/target/kl25.cfg"
+}

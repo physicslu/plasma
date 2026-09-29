@@ -1,0 +1,42 @@
+{
+  "active_exact_icpn_count": 12,
+  "active_exact_icpns": [
+    "MKL25Z128VFM4",
+    "MKL25Z128VFT4",
+    "MKL25Z128VLH4",
+    "MKL25Z128VLK4",
+    "MKL25Z32VFM4",
+    "MKL25Z32VFT4",
+    "MKL25Z32VLH4",
+    "MKL25Z32VLK4",
+    "MKL25Z64VFM4",
+    "MKL25Z64VFT4",
+    "MKL25Z64VLH4",
+    "MKL25Z64VLK4"
+  ],
+  "active_exact_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "bounded_exact_discovery_complete": true,
+  "claims": {
+    "catalog_admission_ready": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "runtime_programming_support_claimed": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "target_execution_authorized": false
+  },
+  "discovery_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "excluded_non_active": [],
+  "family": "KL25",
+  "frozen_ordering_pattern_count": 3,
+  "manual_review_count": 0,
+  "manufacturer": "NXP",
+  "next_gate": "nxp-kl25-bounded-exact-icpn-admission-readiness-gate",
+  "pattern_active_counts": {
+    "MKL25Z128xxx4": 4,
+    "MKL25Z32xxx4": 4,
+    "MKL25Z64xxx4": 4
+  },
+  "schema_version": 1,
+  "status": "discovered"
+}

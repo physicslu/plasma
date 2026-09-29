@@ -1,0 +1,171 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_exact_icpn_count": 12,
+  "active_exact_icpns": [
+    "MKL25Z128VFM4",
+    "MKL25Z128VFT4",
+    "MKL25Z128VLH4",
+    "MKL25Z128VLK4",
+    "MKL25Z32VFM4",
+    "MKL25Z32VFT4",
+    "MKL25Z32VLH4",
+    "MKL25Z32VLK4",
+    "MKL25Z64VFM4",
+    "MKL25Z64VFT4",
+    "MKL25Z64VLH4",
+    "MKL25Z64VLK4"
+  ],
+  "active_exact_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "active_row_evidence": [
+    {
+      "active": true,
+      "icpn": "MKL25Z128VFM4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z128xxx4",
+      "row_markup_sha256": "a2ebc5d7659d56fb3e6b9435f51c8a9debd02cb8a7affd4177ca7f7f75367c72",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z128VFM4\nPackage : HVQFN32\n\n\tMKL25Z128VFM4\n(935311163557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te4\tReach SVHC",
+      "visible_row_sha256": "0ecd63490938cad393b075250b83ea209be88c4c6fdabf3ca25778c74658fd2b"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z128VFT4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z128xxx4",
+      "row_markup_sha256": "f2d107a07ad7dac5dcf6481f1c25125c83e7145db3e6edcf78d833fecef6dc32",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z128VFT4\nPackage : HVQFN48\n\n\tMKL25Z128VFT4\n(935324637557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "0f7d1603b8c7de33bf8efe22af84025c7ba7012e8e9d6b57e23d90d0359c3a6f"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z128VLH4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z128xxx4",
+      "row_markup_sha256": "da11e0fa8c78931eb4decc59d739415ea8e8beec427115a905f811f31e327b2e",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z128VLH4\nPackage : LQFP64\n\n\tMKL25Z128VLH4\n(935311016557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "efb4a0adbfaa1add468a5a27ba6a48efd7099e6031c48f1f5b95ecdd1ab7a254"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z128VLK4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z128xxx4",
+      "row_markup_sha256": "f64ffa1c5f90fed7c1be44dd116f9bd1498c7f1bc0ad2f14132c09911abbda2b",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z128VLK4\nPackage : LQFP80\n\n\tMKL25Z128VLK4\n(935323324557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "cd4e5765936dc1ba4c6bdbe13d94e344658fbd6746c602eff0c2dd8be51e3deb"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z32VFM4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z32xxx4",
+      "row_markup_sha256": "15f2893d9a2179346ff6bd68bca5135307c3a248f63e3c4251394c5eb9f00f07",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z32VFM4\nPackage : HVQFN32\n\n\tMKL25Z32VFM4\n(935325763557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te4\tReach SVHC",
+      "visible_row_sha256": "117ea9d8faab1dbb59080f29f90418278d1da4c28b87d4d09cc052da83347f81"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z32VFT4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z32xxx4",
+      "row_markup_sha256": "0e44b9fb6a9ae74b43c495c920aeeaf7fc926822d727a726beabb54ccda7c5ce",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z32VFT4\nPackage : HVQFN48\n\n\tMKL25Z32VFT4\n(935317748557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "d9d8dd51cde110ae5811acc6cb5f4e0f654dcaba316228a42d3d1b742ba0954e"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z32VLH4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z32xxx4",
+      "row_markup_sha256": "1359da5126a3d5ed28e1f736c4f0051acb5b46eef4096b9e648bd19d2a9ba484",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z32VLH4\nPackage : LQFP64\n\n\tMKL25Z32VLH4\n(935320015557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "1d1616f2efebb7e4d318148e1edab0bbf7badf8be84f10175cdc7ceeef7aaf2d"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z32VLK4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z32xxx4",
+      "row_markup_sha256": "4130635b392f8eb9e3d0f4e6af7af5ee8fdeaf3253865f3bf42976ec58c3fcc7",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z32VLK4\nPackage : LQFP80\n\n\tMKL25Z32VLK4\n(935323406557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "0829fd7745ca1401f3cc70b7589137edb9b54ebc98686e92ea219858ca37f131"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z64VFM4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z64xxx4",
+      "row_markup_sha256": "41c2ca98a21d9248170f84e8464e815b4d127bff0d7357bce60031669dbb6fe1",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z64VFM4\nPackage : HVQFN32\n\n\tMKL25Z64VFM4\n(935317756557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te4\tReach SVHC",
+      "visible_row_sha256": "b062c277b87c18c1cb7051b6fcf86779cf6fda5b10bf53e94705b502de310fa3"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z64VFT4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z64xxx4",
+      "row_markup_sha256": "c7cd9ab68a34297144b4c90d2c9af105e5b7849ef4152336e51d440eafbf8c5f",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z64VFT4\nPackage : HVQFN48\n\n\tMKL25Z64VFT4\n(935325764557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "5e628e2a808de93d2ad06b5ac092aea9f05de1939dd8419c3e01178d7c6486d4"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z64VLH4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z64xxx4",
+      "row_markup_sha256": "dbb856b22d9b05144ffdf317eb48088840475e1503b42d89aceb1d1a6d0d7b49",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z64VLH4\nPackage : LQFP64\n\n\tMKL25Z64VLH4\n(935320016557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "53d754b05b64b6c1f5658b8a95af97d65fd49a2fbd5189ce597a58dec01a33c0"
+    },
+    {
+      "active": true,
+      "icpn": "MKL25Z64VLK4",
+      "non_lifecycle_rows_seen": 1,
+      "nonactive": false,
+      "pattern": "MKL25Z64xxx4",
+      "row_markup_sha256": "52f97ce5739f1521cf8c27767d2d59f5e90aecb119a5f7f6929f2401ef6fbbb6",
+      "same_sku_table_row_count": 2,
+      "visible_row_excerpt": "MKL25Z64VLK4\nPackage : LQFP80\n\n\tMKL25Z64VLK4\n(935325719557)\tActive\tYes\tYes\nCertificate Of Analysis (CoA)\tYes\tD\te3\tReach SVHC",
+      "visible_row_sha256": "094869d54cab62671144d5d62c35d50220e4431bc444932a592fe7d8cab86d69"
+    }
+  ],
+  "candidate_exact_sku_count": 12,
+  "discovery_id": "nxp-kl25-bounded-current-commercial-exact-icpn-discovery-v1",
+  "excluded_non_active": [],
+  "final_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+  "http_status": 200,
+  "page_title": "Arm Cortex-M0+|Ultra-Low Power Kinetis KL2x USB MCU | NXP Semiconductors",
+  "pattern_active_counts": {
+    "MKL25Z128xxx4": 4,
+    "MKL25Z32xxx4": 4,
+    "MKL25Z64xxx4": 4
+  },
+  "rendered_dom_sha256": "168fca906e76b463d10d34d70772d28c35082ebba601521ef32d48b08527524b",
+  "retrieved_at_utc": "2026-09-29T01:02:02Z",
+  "scope": "exact NXP KL25 identities visible in current official KL2x Package/Quality table, not extrapolated patterns",
+  "source_url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+  "status": "discovered",
+  "table_row_count": 127,
+  "visible_body_sha256": "c8f638700ce20c9818aa8fbdbb938886ac62fcd1a9f1975ccb5f82a0e0d258b6"
+}
