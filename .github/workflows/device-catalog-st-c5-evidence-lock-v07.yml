@@ -1,0 +1,37 @@
+name: ST C5 raw evidence lock v0.7 validation
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-c5-estore-172-active-exact-mpn-v0.7.txt'
+      - 'data/device-catalog/research/st-c5-estore-evidence-lock-v0.7.json'
+      - 'data/device-catalog/research/validate_st_c5_estore_evidence_lock_v07.py'
+      - 'data/device-catalog/research/test_validate_st_c5_estore_evidence_lock_v07.py'
+      - 'data/device-catalog/research/ST_C5_ESTORE_EVIDENCE_LOCK_V07.md'
+      - '.github/workflows/device-catalog-st-c5-evidence-lock-v07.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/st-c5-estore-172-active-exact-mpn-v0.7.txt'
+      - 'data/device-catalog/research/st-c5-estore-evidence-lock-v0.7.json'
+      - 'data/device-catalog/research/validate_st_c5_estore_evidence_lock_v07.py'
+      - 'data/device-catalog/research/test_validate_st_c5_estore_evidence_lock_v07.py'
+      - 'data/device-catalog/research/ST_C5_ESTORE_EVIDENCE_LOCK_V07.md'
+      - '.github/workflows/device-catalog-st-c5-evidence-lock-v07.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay frozen source-reference exact C5 set and all ST Production SHA checks
+        run: |
+          python data/device-catalog/research/validate_st_c5_estore_evidence_lock_v07.py
+          python -m unittest discover -s data/device-catalog/research -p test_validate_st_c5_estore_evidence_lock_v07.py -v
