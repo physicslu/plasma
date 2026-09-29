@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-c5-dfp-33-commercial-exact-variant-triage-v1.0",
+  "reference_date_utc": "2026-09-29",
+  "source_lock": {
+    "eStore_exact_set_sha256": "32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3",
+    "dfp_repo": "STMicroelectronics/stm32c5xx-dfp",
+    "dfp_commit": "a5f65bc64535cfa723e9d25f58d7ce23d0937aed",
+    "dfp_pdsc_git_blob_sha": "859649be212ea43bc524eb977e1279e45da644c8",
+    "current_dfp_main_verified_same_commit_as_pinned": true
+  },
+  "population": {
+    "eStore_observed_active_exact": 172,
+    "dfp_exact_match": 139,
+    "dfp_exact_missing": 33,
+    "classes": {
+      "NONTR_MPN_ABSENT_FROM_PINNED_DFP_VARIANTS": 13,
+      "TR_WITHOUT_PINNED_DFP_NONTR_EXACT_VARIANT": 11,
+      "TR_WITH_PINNED_DFP_NONTR_EXACT_VARIANT": 9
+    }
+  },
+  "interpretation": {
+    "TR_WITH_PINNED_DFP_NONTR_EXACT_VARIANT": "Retail TR code Active in source, its non-TR counterpart independently present in pinned DFP. No same-silicon or programming-route assumption from packaging suffix.",
+    "TR_WITHOUT_PINNED_DFP_NONTR_EXACT_VARIANT": "Retail TR code Active in source and neither it nor stripped non-TR exact part is in pinned DFP Dvariant list.",
+    "NONTR_MPN_ABSENT_FROM_PINNED_DFP_VARIANTS": "Retail exact non-TR code Active in eStore, absent exact DFP Dvariant; only one DFP Base Device structurally matches."
+  },
+  "evidence_limitations": {
+    "dfp_pack_version": "2.1.0",
+    "dfp_pack_release_date": "2026-05-04",
+    "eStore_live_capture_date": "2026-09-29",
+    "source_snapshots_not_atomic": true,
+    "dfp_variant_list_not_certified_all_orderable_mpns": true,
+    "suffix_semantics_independently_reviewed": false,
+    "retail_same_card_status_exists": true,
+    "c5_whole_portfolio_completeness_unknown": true
+  },
+  "gates": {
+    "per_exact_mpn_missing_metadata_resolved": 0,
+    "production_ST_total": 2683,
+    "production_write_authorized": false,
+    "backend_route_ready": false,
+    "hardware_hil_verified": false
+  },
+  "next_gate": "Obtain official exact MPN datasheet ordering table or exact commercial selector row for all 33 (package/temp/packing/memory), retain source date and hash; no automatic DFP variant substitution. Then verify local-only loader SHA256 and observed DEV_ID+flash geometry for exact DFP-matched cohort in research-only dry-run."
+}
