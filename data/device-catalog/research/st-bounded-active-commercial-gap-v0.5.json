@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-stm32-bounded-official-active-commercial-gap-v0.5",
+  "observation_date_utc": "2026-09-29",
+  "record_state": "RESEARCH_ONLY_MANUALLY_TRANSCRIBED_OFFICIAL_PAGE_ROWS",
+  "raw_official_page_bytes_retained": false,
+  "source_cohort_count": 5,
+  "production_baseline": {
+    "st_exact_icpns": 2683,
+    "st_catalog_families": 23,
+    "st_integrity_bound_sources": 23
+  },
+  "bounded_unpublished_active_exact_mpn_minimum": 20,
+  "per_missing_family_counts": {
+    "STM32C5": 1,
+    "STM32H5": 6,
+    "STM32N6": 3,
+    "STM32WB0": 2,
+    "STM32WL3": 8
+  },
+  "observations": [
+    {
+      "family": "STM32C5",
+      "exact_icpn": "STM32C531CBT6",
+      "marketing_status": "Active",
+      "source_surface": "ST official eStore Active exact part listing",
+      "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32c5-series/stm32c53x-542.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBT6",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBT7",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBT7TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBU6",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBU6TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32H5",
+      "exact_icpn": "STM32H503CBU7",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h503cb.html"
+    },
+    {
+      "family": "STM32N6",
+      "exact_icpn": "STM32N657A0H3Q",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32n657a0.html"
+    },
+    {
+      "family": "STM32N6",
+      "exact_icpn": "STM32N657A0H3QG",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32n657a0.html"
+    },
+    {
+      "family": "STM32N6",
+      "exact_icpn": "STM32N657A0H3QTR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32n657a0.html"
+    },
+    {
+      "family": "STM32WB0",
+      "exact_icpn": "STM32WB05KZV6TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb05kz.html"
+    },
+    {
+      "family": "STM32WB0",
+      "exact_icpn": "STM32WB05KZV7TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wb05kz.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV6",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV6A",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV6ATR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV6TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV7",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV7A",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV7ATR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    },
+    {
+      "family": "STM32WL3",
+      "exact_icpn": "STM32WL33CCV7TR",
+      "marketing_status": "Active",
+      "source_surface": "Quality and Reliability exact-ICPN row",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl33cc.html"
+    }
+  ],
+  "full_st_active_exact_mpn_denominator": null,
+  "actual_active_coverage_percent": null,
+  "actual_full_st_gap_count": null,
+  "is_complete_st_official_portfolio_export": false,
+  "production_write_authorized": false,
+  "backend_programming_authorized": false,
+  "physical_hil_validated": false,
+  "next_gate": "Capture manufacturer raw exact-MPN and same-row lifecycle across all scoped MX1/MX2 families with replayable date, digest, pagination and completeness review."
+}
