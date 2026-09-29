@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-c5-dfp-commercial-loader-crosswalk-v0.9",
+  "reference_date_utc": "2026-09-29",
+  "record_state": "RESEARCH_ONLY_NOT_PRODUCTION_ADMISSION",
+  "official_dfp_source": {
+    "repository": "STMicroelectronics/stm32c5xx-dfp",
+    "pinned_commit": "a5f65bc64535cfa723e9d25f58d7ce23d0937aed",
+    "pack_version": "2.1.0",
+    "pack_release_date": "2026-05-04",
+    "pdsc_path": "STMicroelectronics.stm32c5xx_dfp.pdsc",
+    "pdsc_git_blob_sha": "859649be212ea43bc524eb977e1279e45da644c8",
+    "device_dname_count": 80,
+    "exact_dvariant_count": 157,
+    "license_path": "LICENSE.md",
+    "license_git_blob_sha": "f404bd9d1021334ecfbbb82da1ee4bbe68a82173",
+    "license_marker": "BSD-3-Clause in pinned DFP license; independent packaging and binary-use review required",
+    "loader_files": [
+      {
+        "family": [
+          "C53",
+          "C54"
+        ],
+        "dev_id": "0x44F",
+        "path": "Flash/STM32C5[34]x.xldr",
+        "git_blob_sha": "ef1d74c6c9cbc7cfe992be476897f621512154a0"
+      },
+      {
+        "family": [
+          "C55",
+          "C56"
+        ],
+        "dev_id": "0x44E",
+        "path": "Flash/STM32C5[56]x.xldr",
+        "git_blob_sha": "c8f1dfbd183477f79db8fc8174d5d08d3b2fbdb7"
+      },
+      {
+        "family": [
+          "C59",
+          "C5A"
+        ],
+        "dev_id": "0x45A",
+        "path": "Flash/STM32C5[9A]x.xldr",
+        "git_blob_sha": "9b5326edebbed8f7ade21029d6d014aa56d66bba"
+      }
+    ]
+  },
+  "commercial_cohort": {
+    "exact_set_path": "st-c5-estore-172-active-exact-mpn-v0.7.txt",
+    "exact_set_git_blob_sha": "9240f423ccca0ba7c43a6a0ac800be8cd86e3470",
+    "canonical_exact_set_sha256": "32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3",
+    "crosswalk_path": "st-c5-dfp-commercial-loader-crosswalk-v0.9.csv",
+    "observed_public_estore_active_exact_mpns": 172,
+    "exact_pdsc_variant_matches": 139,
+    "parent_dname_only_missing_exact_dfp_variant": 33,
+    "group_counts": {
+      "C53": {
+        "observed": 51,
+        "exact_dfp_variant": 39,
+        "base_only": 12
+      },
+      "C54": {
+        "observed": 12,
+        "exact_dfp_variant": 9,
+        "base_only": 3
+      },
+      "C55": {
+        "observed": 48,
+        "exact_dfp_variant": 36,
+        "base_only": 12
+      },
+      "C56": {
+        "observed": 12,
+        "exact_dfp_variant": 10,
+        "base_only": 2
+      },
+      "C59": {
+        "observed": 39,
+        "exact_dfp_variant": 35,
+        "base_only": 4
+      },
+      "C5A": {
+        "observed": 10,
+        "exact_dfp_variant": 10,
+        "base_only": 0
+      }
+    },
+    "exact_variant_match_is_not_production_admission": true,
+    "parent_base_match_does_not_evidence_an_exact_variant": true,
+    "dfp_and_estore_snapshot_not_atomic": true
+  },
+  "fork_vs_proposal": {
+    "official_fork": "STMicroelectronics/OpenOCD",
+    "pinned_fork_commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "pinned_target_cfg_git_blob_sha": "03bce02b166b669ca0d7515656bca68ff4db8b84",
+    "pinned_fork_defines_dev_id_loader_as_scalar_set": true,
+    "pinned_fork_defines_die_max_flash_size_as_scalar_set": true,
+    "pinned_fork_uses_array_index_lookup_for_both": true,
+    "tcl_array_mismatch_gate": "BLOCKED",
+    "upstream_proposal": "https://review.openocd.org/c/openocd/+/9699",
+    "upstream_patch_observed_dev_id_loader_array_set": true,
+    "upstream_patch_references_the_three_commit_pinned_dfp_loader_paths": true,
+    "upstream_patch_merge_and_runtime_qualification_unverified": true,
+    "plasma_requires_local_content_locked_loader_no_runtime_network": true
+  },
+  "safety_gates": {
+    "official_three_xldr_git_blobs_observed": true,
+    "loader_sha256_retained_in_research_report": false,
+    "independent_license_and_binary_distribution_signoff": false,
+    "source_only_does_not_verify_loader_elf_compatibility": true,
+    "exact_metadata_review_for_33_complete": false,
+    "compiled_plasma_openocd_stldr_qualified": false,
+    "safe_local_loader_selection_qualified": false,
+    "physical_hil_verified": false,
+    "destructive_security_ops_authorized": false,
+    "catalog_admission_ready": false,
+    "production_write_authorized": false,
+    "frozen_production_st_exact_icpns": 2683,
+    "frozen_production_st_families": 23,
+    "true_whole_st_coverage_percent": null
+  },
+  "next_gate": "Source-byte SHA256 pin for 3 official DFP Xldr, independent legal approval, reproduce 139/33 PDSC mapping; reconcile 33 base-only identities; fix Tcl array mismatch in an isolated candidate and compile/qualify chosen Plasma OpenOCD before any exact ICPN Production approval."
+}
