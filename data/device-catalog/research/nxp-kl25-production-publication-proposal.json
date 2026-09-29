@@ -1,0 +1,44 @@
+{
+  "canonical_csv_git_blob_sha": "53087e9082445e7948f88e688ecd890b0454d788",
+  "canonical_csv_sha256": "73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+  "catalog_admission_policy": "icpn-catalog-admission-separation",
+  "catalog_membership_authorizes_target_execution": false,
+  "cmsis_bridge_authorizes_production_route": false,
+  "debug_attach_support_claimed": false,
+  "exact_icpn_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "excluded_non_active_part_numbers": 0,
+  "family": "KL25",
+  "manufacturer": "NXP",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 12
+  },
+  "marketing_status_observed": {
+    "Active": 12
+  },
+  "metadata_exception_count": 0,
+  "physical_programming_success_required_for_catalog_admission": false,
+  "physical_validation_claimed": false,
+  "ppu_hil_required_for_catalog_admission": false,
+  "production_exact_icpns_after": 2695,
+  "production_exact_icpns_before": 2683,
+  "production_family_count_after": 24,
+  "production_family_count_before": 23,
+  "production_manifest_git_blob_before": "c8012b211a28b0a7811bfe978e7e697bc169c6f3",
+  "programming_algorithm_equivalence_claimed": false,
+  "published_active_base_devices": 3,
+  "published_exact_icpns": 12,
+  "readiness_baseline": "nxp-kl25-admission-readiness.json",
+  "readiness_git_blob_sha": "b76e1e3f55e8fd3a68a4ccdf7bfd16a4ed71dc27",
+  "research_series": "KL25",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 12
+  },
+  "route_bridge_count": 0,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "security_mutation_support_claimed": false,
+  "socket_hil_required_for_catalog_admission": false,
+  "software_executor_admission_implies_catalog_admission": false,
+  "status": "publication_ready_pending_explicit_merge_approval",
+  "transaction": "nxp-kl25-production-catalog-publication"
+}
