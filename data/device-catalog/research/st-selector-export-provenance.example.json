@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "source_kind": "STM32CubeMX_MCU_Selector",
+  "official_source_url": "https://www.st.com/en/development-tools/stm32cubemx.html",
+  "tool_version": "REPLACE_WITH_ACTUAL_INSTALLED_VERSION",
+  "acquired_at_utc": "2026-09-29T00:00:00Z",
+  "raw_export_sha256": "REPLACE_WITH_ACTUAL_SHA256_OF_UNMODIFIED_CSV_OR_XLSX",
+  "filter_disclosure": {
+    "device_scope": "STM32 MCU + Wireless MCU",
+    "marketing_status": "all",
+    "other_filters": "none"
+  },
+  "full_portfolio_completeness_reviewed": false,
+  "notes": "Template only. The export may contain device-name patterns, may omit orderable suffixes and/or lifecycle; no actual coverage can be inferred without verified complete official exact-MPN population."
+}
