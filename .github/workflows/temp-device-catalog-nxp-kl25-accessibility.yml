@@ -1,0 +1,66 @@
+name: TEMP NXP KL25 official commercial evidence acquisition
+
+on:
+  push:
+    branches:
+      - agent/nxp-kl25-official-commercial-evidence-accessibility
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-nxp-kl25-accessibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acquire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install official product browser dependencies
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Acquire NXP exact identity and same-row lifecycle
+        id: acquire
+        continue-on-error: true
+        run: |
+          rm -rf .artifacts/nxp-kl25-accessibility
+          mkdir -p .artifacts/nxp-kl25-accessibility
+          python data/device-catalog/research/nxp_kl25_official_accessibility_probe.py \
+            --output-dir .artifacts/nxp-kl25-accessibility
+
+      - name: Emit evidence files to log
+        if: always()
+        run: |
+          python - <<'PY'
+          import base64,pathlib
+          root=pathlib.Path(".artifacts/nxp-kl25-accessibility")
+          for path in sorted(root.glob("*.json")):
+              print(f"EVIDENCE_FILE_BEGIN {path.name}")
+              print(base64.b64encode(path.read_bytes()).decode("ascii"))
+              print(f"EVIDENCE_FILE_END {path.name}")
+          PY
+
+      - name: Upload retained evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxp-kl25-accessibility-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: .artifacts/nxp-kl25-accessibility/*.json
+
+      - name: Enforce bounded official manufacturer accessibility
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "NXP KL25 live evidence requires manual review" >&2
+            exit 1
+          fi
