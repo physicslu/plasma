@@ -14,6 +14,18 @@ The pinned official [STM32C5xx DFP](https://github.com/STMicroelectronics/stm32c
 | C55, C56 | `0x44E` | `Flash/STM32C5[56]x.xldr` | `c8f1dfbd183477f79db8fc8174d5d08d3b2fbdb7` |
 | C59, C5A | `0x45A` | `Flash/STM32C5[9A]x.xldr` | `9b5326edebbed8f7ade21029d6d014aa56d66bba` |
 
+## Verified source-byte SHA256 (research-only)
+
+The PR's first pinned upstream source replay (GitHub Actions run [36540249563](https://github.com/physicslu/plasma/actions/runs/36540249563)) independently fetched all three official fixed-commit `.xldr` files and verified their original Git blob identity plus ELF32 little-endian signatures. Their SHA256 are now frozen in the v0.9 JSON report and checked on every source replay:
+
+| Official file | SHA256 |
+| --- | --- |
+| `STM32C5[34]x.xldr` | `4645574f274f5274de869dbd2a6b35fd79d134f7ec07224c3f17ed2d40c7b8b6` |
+| `STM32C5[56]x.xldr` | `131784c2e4eb4589200b614e56b83abd21a34906c1fd485ca3d806378d28732d` |
+| `STM32C5[9A]x.xldr` | `b9aacec837613f273b0d88fb3ca41c5c52712752fd26271959dd03a41dab8e53` |
+
+The upstream binaries are **not copied into Plasma** and have **not** been run against a physical chip. Successful ELF/source integrity replay proves neither legal production redistribution nor a compatible compiled runtime programming backend.
+
 The DFP declares `<license>LICENSE.md</license>`; the pinned license file Git blob `f404bd9d1021334ecfbbb82da1ee4bbe68a82173` carries a BSD-3-Clause license. Packaging/redistribution and any third-party component obligations **still require independent review** before shipping binaries with Plasma. No `.xldr` binary is copied into the Production repository in this PR.
 
 ### Exact commercial to DFP variant reconciliation
@@ -62,4 +74,4 @@ python data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py \
 
 The PR's separate official-source replay job fetches these read-only fixed-commit bytes and verifies Git blob IDs and expected ELF32 signatures. No physical Flash erase/write, target debug attachment, loader execution, runtime dependency promotion, production publication or license signoff is claimed.
 
-**Next gate:** retain source SHA256 for the three pinned loader binaries, independently review license/distribution and the 33 exact DFP-absent variants, then qualify a corrected local-only OpenOCD route on Plasma PS and later HIL. ST Production stays **2,683 exact ICPNs / 23 families** pending a separately approved ICPN publication PR.
+**Next gate:** independently review licence/distribution, reconcile the 33 exact DFP-absent variants, then qualify a corrected local-only OpenOCD loader route on Plasma PS and later HIL. ST Production stays **2,683 exact ICPNs / 23 families** pending a separately approved ICPN publication PR.
