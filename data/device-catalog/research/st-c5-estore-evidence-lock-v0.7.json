@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-c5-official-estore-raw-evidence-lock-v0.7",
+  "observation_date_utc": "2026-09-29",
+  "scope": "Public STM32C5 eStore category only; not all STM32, not independent manufacturer-issued as-of release",
+  "acquisition_status": "OBSERVED_C5_CATEGORY_CANDIDATE_REQUIRES_INDEPENDENT_REVIEW",
+  "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32c5-series.html",
+  "vendor_displayed_active_facet": 172,
+  "vendor_displayed_total_pages": 18,
+  "official_source_tool": "public ST eStore, same-product-card exact part number and Active label",
+  "provenance": {
+    "repository": "physicslu/plasma",
+    "pr_number": 677,
+    "executed_pr_head_sha": "b8457dc333b1526ea798ac609bf55be38ed18324",
+    "workflow_run_id": 36537612073,
+    "workflow_job_id": 109305204084,
+    "artifact_id": 11018802900,
+    "artifact_name": "st-c5-v06-source-evidence-candidate",
+    "artifact_zip_sha256": "b0b7349899864cbb5378603de17526532898e249be54d48a989c2c8b6b191861",
+    "artifact_csv_sha256": "1c09edd86c7bfe12b38f6e22fea8626adced3ab964990ac6f61c1a9880abd85c",
+    "github_artifact_retention_days": 7
+  },
+  "page_source_digests": [
+    {
+      "page": 1,
+      "sha256": "73d8f7cfe74aaffb5d3212f91a934a3228815982f70caef10c663436009a1bf7",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 2,
+      "sha256": "032f0d8a89eb929b170bbcf41b9f4a4f1f957370b674a09188ad7c769aa5c2df",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 3,
+      "sha256": "b37e928c0b429d615ebb06426537b1d52812229e63e96a36a8c8ced90b466b87",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 4,
+      "sha256": "155393670c1ac2aa6452722d5c6fa7cdc1a5960e863b99b2e73362eb57b9b8b5",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 5,
+      "sha256": "656716905e83d21f4f56c1ac245ab237858e03526b5e04da5d7caa9067e8688d",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 6,
+      "sha256": "83264dfb066d47417f43497aff082acb072d83c69fc704393e2a7984ef1eb439",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 7,
+      "sha256": "e30fb76d97bd0717fa9976d5c7242bc6a63ddf5423e86540786d90df8491b0e3",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 8,
+      "sha256": "d912d9805f99758bd7e3a148732c252b3078e809041af8cf0e160519d24c2977",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 9,
+      "sha256": "cf95bd6ae6d88460380312fa3d3bdd55db7a3c758ce44426be3b",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 10,
+      "sha256": "83bf26bcce581dadb6ae91ad24fbd8fb81ff27b6a0cdf5852e3eecc42449b30b",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 11,
+      "sha256": "89bd33dbba5a1f83cf537a7367c83222aac0d46b02cdc1c1206338dfb1a5579e",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 12,
+      "sha256": "234d494cb583848461a76e1b56c16a6ca3690206c9c869f4020305fc607b0f57",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 13,
+      "sha256": "259f6bfb636b9c5dab03c4d25dd9bc77fc72d6da7c47686cc408647e23e23132",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 14,
+      "sha256": "624784aa4881d4d894526cdeb39daa793224246709697357b9bb8fca41c5a6bc",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 15,
+      "sha256": "18f811ba44765728876f38928941e85c92b709b4218440e7634e753154f7d538",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 16,
+      "sha256": "aaf4577d6107100702f683547a069295b5ccf05cc05d9386301cd05a87510150",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 17,
+      "sha256": "6586697d6bafc5724bef45fac492a9d69e7f2b249758d4cc09b7eb51cf768844",
+      "exact_active_rows": 10
+    },
+    {
+      "page": 18,
+      "sha256": "c0fa6ada5a3d9cf2155df8fc06f9a5d1a932b7743b598164fc6487152651dc94",
+      "exact_active_rows": 2
+    }
+  ],
+  "observed_active_exact_mpn_count": 172,
+  "observed_exact_set_sha256": "32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3",
+  "reviewed_identity_list_path": "st-c5-estore-172-active-exact-mpn-v0.7.txt",
+  "frozen_production_st": {
+    "icpns": 2683,
+    "families": 23,
+    "stm32c5_exact_mpns": 0
+  },
+  "v05_remaining_observed_non_c5_sentinels": 19,
+  "combined_bounded_official_active_observations_minimum": 191,
+  "mutually_exclusive_mpn_sets_crosschecked_by_family": true,
+  "manufacturer_snapshot_atomicity_verified": false,
+  "product_category_equals_full_manufacturer_c5_commercial_portfolio_verified": false,
+  "raw_html_stored_in_production_repo": false,
+  "whole_st_active_denominator": null,
+  "whole_st_actual_coverage_percent": null,
+  "whole_st_missing_exact_count": null,
+  "production_write_authorized": false,
+  "backend_route_or_hil_qualified": false,
+  "next_gate": "Independently review original 18-page artifact before expiration, license/durable evidence, reconcile official C5 commercial completeness and per-ICPN metadata/target mapping; then separate explicit Production admission approval."
+}
