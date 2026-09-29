@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "authority_id": "nxp-kl25-commercial-metadata-authority-v1",
+  "manufacturer": "NXP",
+  "family": "KL25",
+  "retained_source_lock_path": "data/ic-support/benchmarks/nxp-kl25/source-lock.json",
+  "retained_source_lock_git_blob_sha": "4927139f202bee1ee3e813ef57e3cfdfd3333ba6",
+  "documents": [
+    {
+      "source_id": "nxp_kl25_ds_rev5",
+      "document": "KL25P80M48SF0",
+      "revision": "5",
+      "role": "manufacturer_datasheet_ordering_information",
+      "page_number": 2,
+      "url": "https://www.nxp.com/docs/en/data-sheet/KL25P80M48SF0.pdf",
+      "sha256": "e42271b7f612ac1b0812001e62bef10d217be4a61dbee5bb0a1e5c4076209a3b"
+    },
+    {
+      "source_id": "nxp_kl25_rm_rev3",
+      "document": "KL25P80M48SF0RM",
+      "revision": "3",
+      "role": "manufacturer_orderable_parts_table_2_11",
+      "printed_page": 44,
+      "url": "https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/kinetis/8734/1/KL25P80M48SF0RM.pdf",
+      "sha256": "7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241"
+    }
+  ],
+  "active_commercial_identity_source": {
+    "url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+    "evidence_path": "data/device-catalog/research/evidence/nxp-kl25-exact-icpn-live-2026-09-29/commercial-rows.json",
+    "evidence_git_blob_sha": "61c1be96a3c14e28f05099762f64b9ab5e23c1fb",
+    "acquisition_run_id": 36505881833,
+    "observed_active_exact_count": 12
+  },
+  "metadata_rules": {
+    "memory_codes_kib": {
+      "32": 32,
+      "64": 64,
+      "128": 128
+    },
+    "suffix_to_package_and_pins": {
+      "VFM4": {
+        "manufacturer_product_package": "HVQFN32",
+        "datasheet_package": "QFN",
+        "normalized_package": "HVQFN",
+        "pin_count": "32"
+      },
+      "VFT4": {
+        "manufacturer_product_package": "HVQFN48",
+        "datasheet_package": "QFN",
+        "normalized_package": "HVQFN",
+        "pin_count": "48"
+      },
+      "VLH4": {
+        "manufacturer_product_package": "LQFP64",
+        "datasheet_package": "LQFP",
+        "normalized_package": "LQFP",
+        "pin_count": "64"
+      },
+      "VLK4": {
+        "manufacturer_product_package": "LQFP80",
+        "datasheet_package": "LQFP",
+        "normalized_package": "LQFP",
+        "pin_count": "80"
+      }
+    },
+    "temperature_grade": "-40..105 C",
+    "temperature_authority": "KL25P80M48SF0 Rev 5 page 2 / KL25P80M48SF0RM Rev 3 Table 2-11 printed page 44",
+    "option_suffix": "",
+    "option_suffix_note": "The trailing 4 in KL25 order codes is part of the base ordered identity, not an optional packing suffix.",
+    "coverage": "Exact twelve orderable identities are listed in both retained NXP manufacturer documents and independently observed Active in live product table."
+  },
+  "route": {
+    "target_config": "tcl/target/kl25.cfg",
+    "identifier_kind": "ordering_pattern",
+    "identity_route_policy": "Match entire exact commercial SKU to exactly one of the three frozen canonical patterns; lowercase x is one-position wildcard.",
+    "cmsis_bridge_count": 0
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "production_publication_authorized": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "target_execution_authorized": false,
+    "physical_validation_claimed": false,
+    "security_mutation_authorized": false
+  }
+}
