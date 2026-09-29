@@ -1,0 +1,64 @@
+{
+  "authority": "research_only",
+  "canonical_candidate": "nxp-kl25-commercial-icpn.csv",
+  "canonical_candidate_git_blob_sha": "53087e9082445e7948f88e688ecd890b0454d788",
+  "canonical_candidate_sha256": "73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+  "catalog_admission_ready": true,
+  "claims": {
+    "cmsis_bridge_authorizes_production_route": false,
+    "physical_validation_claimed": false,
+    "production_publication_authorized": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "security_mutation_authorized": false,
+    "software_executor_admission_implies_catalog_admission": false,
+    "target_execution_authorized": false
+  },
+  "excluded_non_active_part_number_count": 0,
+  "excluded_non_active_part_numbers": [],
+  "family": "KL25",
+  "flash_size_counts": {
+    "128 KiB": 4,
+    "32 KiB": 4,
+    "64 KiB": 4
+  },
+  "frozen_exact_icpn_count": 12,
+  "frozen_exact_icpn_set_sha256": "dd2c3cee83552a9875ee84c7bdea2cc6bc9c671f528b4bde02bed02b753755d5",
+  "identity_ready_count": 12,
+  "lifecycle_ready_count": 12,
+  "manual_review_count": 0,
+  "manufacturer": "NXP",
+  "mapping_status_counts": {
+    "deterministic_ordering_pattern": 12
+  },
+  "metadata_authority": "nxp-kl25-metadata-authority.json",
+  "metadata_exception_count": 0,
+  "metadata_ready_count": 12,
+  "next_gate": "nxp-kl25-production-publication-gate",
+  "package_counts": {
+    "HVQFN": 6,
+    "LQFP": 6
+  },
+  "pin_count_counts": {
+    "32": 3,
+    "48": 3,
+    "64": 3,
+    "80": 3
+  },
+  "production_exact_icpn_count": 2683,
+  "production_family_count": 23,
+  "readiness_id": "nxp-kl25-bounded-exact-icpn-admission-readiness-v1",
+  "research_series": "KL25",
+  "route_assignment_kind_counts": {
+    "ordering_pattern": 12
+  },
+  "route_bridge_count": 0,
+  "route_ready_count": 12,
+  "schema_version": 1,
+  "scope": "research_only_catalog_admission_readiness",
+  "target_config": "tcl/target/kl25.cfg",
+  "temperature_grade_counts": {
+    "-40..105 C": 12
+  }
+}
