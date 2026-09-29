@@ -73,7 +73,11 @@ def render()->dict:
     all_sources=manifest.get("sources")
     require(isinstance(all_sources,list),"Production source list missing")
     st_sources=[s for s in all_sources if s.get("manufacturer")=="STMicroelectronics"]
-    require(st_sources==frozen["frozen_st_sources"],
+    projected_st_sources=[
+        {field:s[field] for field in ("family","row_count","path","git_blob_sha","sha256")}
+        for s in st_sources
+    ]
+    require(projected_st_sources==frozen["frozen_st_sources"],
             "ST Production source membership, order, row-count or content digest drifted; refresh audit")
     # Pin the original all-ST snapshot, but permit an independent new manufacturer's
     # publication, e.g. NXP KL25, without turning this historical ST audit stale.
