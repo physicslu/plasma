@@ -1,0 +1,96 @@
+name: ST eStore whole-STM32 Active exact coverage v1.3
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/acquire_st_estore_full_coverage_v13.py'
+      - 'data/device-catalog/research/ST_ESTORE_FULL_COVERAGE_V13.md'
+      - '.github/workflows/device-catalog-st-estore-full-coverage-v13.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acquire-segment:
+    strategy:
+      fail-fast: false
+      matrix:
+        segment: [mainstream, high-performance, ultra-low-power, wireless]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Static source and frozen Production sanity
+        run: |
+          python -m py_compile data/device-catalog/research/acquire_st_estore_full_coverage_v13.py
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'data/device-catalog/research')
+          import acquire_st_estore_full_coverage_v13 as audit
+          names, families = audit.production_set()
+          assert len(names) == 2683 and len(families) == 23
+          print('Frozen Production baseline PASS:', len(names), len(families))
+          PY
+      - name: Acquire complete official ST eStore segment
+        run: |
+          rm -rf "/tmp/st-estore-v13-${{ matrix.segment }}"
+          python data/device-catalog/research/acquire_st_estore_full_coverage_v13.py \
+            --segment '${{ matrix.segment }}' \
+            --output "/tmp/st-estore-v13-${{ matrix.segment }}" \
+            --interval-seconds 0.8
+          cat "/tmp/st-estore-v13-${{ matrix.segment }}/segment-summary.json"
+      - name: Upload raw segment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-estore-v13-${{ matrix.segment }}
+          path: /tmp/st-estore-v13-${{ matrix.segment }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  reconcile:
+    needs: acquire-segment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-mainstream
+          path: /tmp/st-estore-v13/mainstream
+      - uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-high-performance
+          path: /tmp/st-estore-v13/high-performance
+      - uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-ultra-low-power
+          path: /tmp/st-estore-v13/ultra-low-power
+      - uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-wireless
+          path: /tmp/st-estore-v13/wireless
+      - name: Compute exact Active set difference against Production
+        run: |
+          rm -rf /tmp/st-estore-v13-result
+          python data/device-catalog/research/acquire_st_estore_full_coverage_v13.py \
+            --aggregate-root /tmp/st-estore-v13 \
+            --output /tmp/st-estore-v13-result
+          cat /tmp/st-estore-v13-result/coverage-summary.json
+          echo '--- Missing Active exact MPN count ---'
+          wc -l /tmp/st-estore-v13-result/active-missing-from-production.txt
+          echo '--- Production currently not Active count ---'
+          wc -l /tmp/st-estore-v13-result/production-not-current-active.txt
+      - name: Upload reconciled coverage result
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-estore-v13-coverage-result
+          path: /tmp/st-estore-v13-result/
+          if-no-files-found: error
+          retention-days: 30
