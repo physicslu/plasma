@@ -1,0 +1,304 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32g4-ordering-authority-v2.0",
+  "family": "STM32G4",
+  "manufacturer": "STMicroelectronics",
+  "scope": "complete ordering-code authority for the current 273 Active exact STM32G4 identities observed by the locked ST eStore v1.4 audit",
+  "governance": {
+    "identity_lifecycle_authority": "ST eStore Active exact-set lock v1.4 / PR #685",
+    "metadata_authority": "official ST datasheet ordering-information tables; exact documented exception below",
+    "openocd_is_metadata_authority": false,
+    "cmsis_alias_is_metadata_authority": false,
+    "production_write_authorized": false
+  },
+  "records": [
+    {
+      "series": "STM32G431",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g431c6.pdf",
+      "document_id": "DS12589",
+      "revision": 6,
+      "ordering_table": 101,
+      "pin_count": {
+        "K": 32,
+        "C": [
+          48,
+          49
+        ],
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "pin_package_overrides": {
+        "C/T": 48,
+        "C/U": 48,
+        "C/Y": 49
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64,
+        "B": 128
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G441",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g441cb.pdf",
+      "document_id": "DS12960",
+      "revision": 5,
+      "ordering_table": 101,
+      "pin_count": {
+        "K": 32,
+        "C": [
+          48,
+          49
+        ],
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "pin_package_overrides": {
+        "C/T": 48,
+        "C/U": 48,
+        "C/Y": 49
+      },
+      "flash_kib": {
+        "B": 128
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G473",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g473cb.pdf",
+      "document_id": "DS12712",
+      "revision": 5,
+      "ordering_table": 119,
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "M": [
+          80,
+          81
+        ],
+        "V": 100,
+        "P": 121,
+        "Q": 128
+      },
+      "pin_package_overrides": {
+        "M/T": 80,
+        "M/Y": 81
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "H": "TFBGA",
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G474",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf",
+      "document_id": "DS12288",
+      "revision": 6,
+      "ordering_table": 124,
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "M": [
+          80,
+          81
+        ],
+        "V": 100,
+        "P": 121,
+        "Q": 128
+      },
+      "pin_package_overrides": {
+        "M/T": 80,
+        "M/Y": 81
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "H": "TFBGA",
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G483",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g483ce.pdf",
+      "document_id": "DS12997",
+      "revision": 4,
+      "ordering_table": 119,
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "M": [
+          80,
+          81
+        ],
+        "V": 100,
+        "P": 128,
+        "Q": 128
+      },
+      "pin_package_overrides": {
+        "M/T": 80,
+        "M/Y": 81
+      },
+      "flash_kib": {
+        "E": 512
+      },
+      "package": {
+        "I": "UFBGA",
+        "H": "TFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G484",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g484ce.pdf",
+      "document_id": "DS12983",
+      "revision": 5,
+      "ordering_table": 123,
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "M": [
+          80,
+          81
+        ],
+        "V": 100,
+        "P": 121,
+        "Q": 128
+      },
+      "pin_package_overrides": {
+        "M/T": 80,
+        "M/Y": 81
+      },
+      "flash_kib": {
+        "E": 512
+      },
+      "package": {
+        "H": "TFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G491",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf",
+      "document_id": "DS13122",
+      "revision": 4,
+      "ordering_table": 101,
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "pin_package_overrides": {},
+      "flash_kib": {
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "S": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    },
+    {
+      "series": "STM32G4A1",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g4a1ce.pdf",
+      "document_id": "DS13268",
+      "revision": 4,
+      "ordering_table": 103,
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "pin_package_overrides": {},
+      "flash_kib": {
+        "E": 512
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "S": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C"
+      }
+    }
+  ],
+  "exact_exceptions": [
+    {
+      "exact_icpn": "STM32G484PEI6",
+      "reason": "DS12983 Rev 5 ordering table lists pin code P=121 but omits package code I; the same official datasheet Section 6.9 explicitly defines the UFBGA121 package and the eStore Active exact identity supplies the P/E/I/6 combination.",
+      "package_code": "I",
+      "package": "UFBGA",
+      "pin_count": 121,
+      "authority_section": "DS12983 Rev 5 Section 6.9 UFBGA121 package information"
+    }
+  ]
+}
