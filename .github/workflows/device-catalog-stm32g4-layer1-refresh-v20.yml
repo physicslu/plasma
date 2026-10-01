@@ -1,0 +1,50 @@
+name: STM32G4 Layer-1 refresh v2.0
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32g4-active-exact-gap-v2.0.txt'
+      - 'data/device-catalog/research/stm32g4-ordering-authority-v2.0.json'
+      - 'data/device-catalog/research/stm32g4_layer1_refresh_v20.py'
+      - 'data/device-catalog/research/test_stm32g4_layer1_refresh_v20.py'
+      - 'data/device-catalog/research/STM32G4_LAYER1_REFRESH_V20.md'
+      - '.github/workflows/device-catalog-stm32g4-layer1-refresh-v20.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/device-catalog/research/stm32g4-active-exact-gap-v2.0.txt'
+      - 'data/device-catalog/research/stm32g4-ordering-authority-v2.0.json'
+      - 'data/device-catalog/research/stm32g4_layer1_refresh_v20.py'
+      - 'data/device-catalog/research/test_stm32g4_layer1_refresh_v20.py'
+      - 'data/device-catalog/research/STM32G4_LAYER1_REFRESH_V20.md'
+      - '.github/workflows/device-catalog-stm32g4-layer1-refresh-v20.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build deterministic Layer-1 proposal
+        run: |
+          python data/device-catalog/research/stm32g4_layer1_refresh_v20.py \
+            --proposal /tmp/stm32g4-layer1-admission-proposal-v20.csv \
+            --summary /tmp/stm32g4-layer1-admission-proposal-v20.json
+      - name: Run proposal regression tests
+        run: python data/device-catalog/research/test_stm32g4_layer1_refresh_v20.py
+      - name: Upload proposal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32g4-layer1-admission-proposal-v20
+          path: |
+            /tmp/stm32g4-layer1-admission-proposal-v20.csv
+            /tmp/stm32g4-layer1-admission-proposal-v20.json
+          if-no-files-found: error
+          retention-days: 30
