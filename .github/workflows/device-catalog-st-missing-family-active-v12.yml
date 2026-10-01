@@ -5,6 +5,12 @@ on:
     paths:
       - 'data/device-catalog/research/acquire_st_missing_family_active_v12.py'
       - 'data/device-catalog/research/ST_COVERAGE_GAP_MISSING_FAMILIES_V12.md'
+      - 'data/device-catalog/research/st-missing-family-active-evidence-lock-v1.2.json'
+      - 'data/device-catalog/research/st-stm32h5-active-exact-mpn-v1.2.txt'
+      - 'data/device-catalog/research/st-stm32n6-active-exact-mpn-v1.2.txt'
+      - 'data/device-catalog/research/st-stm32wb0-active-exact-mpn-v1.2.txt'
+      - 'data/device-catalog/research/st-stm32wl3-active-exact-mpn-v1.2.txt'
+      - 'data/device-catalog/research/validate_st_missing_family_active_lock_v12.py'
       - '.github/workflows/device-catalog-st-missing-family-active-v12.yml'
   workflow_dispatch:
 
@@ -23,12 +29,16 @@ jobs:
       - name: Static syntax gate
         run: |
           python -m py_compile data/device-catalog/research/acquire_st_missing_family_active_v12.py
+          python -m py_compile data/device-catalog/research/validate_st_missing_family_active_lock_v12.py
+          python data/device-catalog/research/validate_st_missing_family_active_lock_v12.py
       - name: Acquire official ST Active exact commercial rows
         run: |
           rm -rf /tmp/st-missing-family-v12
           python data/device-catalog/research/acquire_st_missing_family_active_v12.py \
             --output /tmp/st-missing-family-v12 \
             --interval-seconds 1.0
+          python data/device-catalog/research/validate_st_missing_family_active_lock_v12.py \
+            --capture-dir /tmp/st-missing-family-v12
           echo '--- CAPTURE SUMMARY ---'
           cat /tmp/st-missing-family-v12/capture-summary.json
           echo '--- EXACT SETS ---'
