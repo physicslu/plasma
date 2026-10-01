@@ -86,7 +86,6 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
   const [selectedAlias, setSelectedAlias] = useState("");
   const [bootstrap, setBootstrap] = useState<ManagerBootstrapStatus | null>(null);
   const [platformCapability, setPlatformCapability] = useState<PlatformCapabilityState>("checking");
-  const [platformError, setPlatformError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,17 +128,14 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
           if (cancelled) return;
           setBootstrap(status);
           setPlatformCapability("supported");
-          setPlatformError(null);
         })
         .catch(reason => {
           if (cancelled) return;
           setBootstrap(null);
           if (isMissingBootstrapCapabilityRoute(reason)) {
             setPlatformCapability("unsupported");
-            setPlatformError(null);
           } else {
             setPlatformCapability("unavailable");
-            setPlatformError(reason instanceof Error ? reason.message : "Platform status unavailable");
           }
         });
     }
