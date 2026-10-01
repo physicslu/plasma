@@ -124,6 +124,21 @@ export default function PpuRuntimeActivation({ entry, hasActiveExecution }: Prop
           ? "Partially Observable"
           : "Runtime Unavailable";
 
+  if (capabilityUnsupported) {
+    return (
+      <OperatorCard className="ppuSiteCard ppuCapabilitySummaryCard" ariaLabel="Site Desired Runtime Activation">
+        <div className="ppuCapabilityCompactRow">
+          <div>
+            <small>CAPABILITY</small>
+            <strong>Runtime Activation</strong>
+          </div>
+          <span className="ppuReconciliationBadge" data-tone="muted">Not Supported</span>
+        </div>
+        <p className="ppuCapabilityBoundaryNote">Runtime Activation is not supported by this PPU profile. This is a capability boundary, not a runtime fault.</p>
+      </OperatorCard>
+    );
+  }
+
   return (
     <OperatorCard className="ppuSiteCard" ariaLabel="Site Desired Runtime Activation">
       <header className="ppuSiteCardHeader">
