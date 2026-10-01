@@ -1,0 +1,32 @@
+{
+  "proposal_id": "stm32g0-layer1-catalog-admission-proposal-v1.8",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "candidate_exact_count": 359,
+  "candidate_exact_set_sha256": "a6240e4a34e3834cba7195be306d449386dcac1b3e66189f6bfac8fdc7557a5d",
+  "candidate_csv_sha256": "5b18c64349dcdf273234b2a656ce3dee62d05d15959872753c6136c23f925ea2",
+  "layer1_catalog_resolution": {
+    "normalized": 359
+  },
+  "layer2_backend_state": {
+    "mapping_candidate": 317,
+    "no_mapping": 42
+  },
+  "current_g0_active_exact": 406,
+  "current_g0_production_exact": 47,
+  "proposed_g0_catalog_exact_after": 406,
+  "g0_active_coverage_after_percent": 100,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_current_active_intersection": 2604,
+  "whole_st_proposed_active_intersection_after": 2963,
+  "whole_st_active_gap_after": 1587,
+  "whole_st_active_coverage_after_percent": 65.1209,
+  "production_exact_total_before": 2683,
+  "production_exact_total_after_if_approved": 3042,
+  "production_write_authorized": false,
+  "backend_mapping_required_for_layer1_admission": false,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "source_pr": 691,
+  "source_workflow_run_id": 36805449432,
+  "source_job_id": 110188651531
+}

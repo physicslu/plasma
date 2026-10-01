@@ -1,0 +1,35 @@
+name: STM32G0 Layer-1 admission proposal v1.8
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_stm32g0_layer1_admission_proposal_v18.py'
+      - 'data/device-catalog/research/test_prepare_stm32g0_layer1_admission_proposal_v18.py'
+      - 'data/device-catalog/research/stm32g0-layer1-admission-proposal-v1.8.json'
+      - 'data/device-catalog/research/validate_stm32g0_layer1_proposal_lock_v18.py'
+      - 'data/device-catalog/research/STM32G0_LAYER1_ADMISSION_PROPOSAL_V18.md'
+      - '.github/workflows/device-catalog-stm32g0-layer1-proposal-v18.yml'
+permissions:
+  contents: read
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python data/device-catalog/research/prepare_stm32g0_layer1_admission_proposal_v18.py \
+            --csv-output /tmp/stm32g0-layer1-candidates-v18.csv \
+            --json-output /tmp/stm32g0-layer1-proposal-v18.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_stm32g0_layer1_admission_proposal_v18.py -v
+          python data/device-catalog/research/validate_stm32g0_layer1_proposal_lock_v18.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32g0-layer1-admission-proposal-v18
+          path: |
+            /tmp/stm32g0-layer1-candidates-v18.csv
+            /tmp/stm32g0-layer1-proposal-v18.json
+          if-no-files-found: error
+          retention-days: 30
