@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32g4-layer1-production-publication-v2.1",
+  "publication_date_utc": "2026-10-01",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32g4-layer1-admission-proposal-v2.0",
+  "approved_proposal_pr": 694,
+  "approved_proposal_workflow_run_id": 36813267658,
+  "approved_proposal_job_id": 110212747264,
+  "approved_proposal_artifact_id": 11140191944,
+  "approved_proposal_artifact_zip_sha256": "f1474a6e89669bfcd82d45cc72bf5f453bd401bd4f543a3dac0c83fe956530bb",
+  "approved_candidate_exact_count": 248,
+  "approved_candidate_exact_set_sha256": "d6b7f8dbec3869b9e71d414773305b2d7bc2d9a57eb7a2987a8114f14b5bd270",
+  "approved_candidate_csv_sha256": "97d1c2725a45decfb4c0c43cb54e68c23e4c6e2b18e0452d7d8f51a47cb51be1",
+  "approved_authority_sha256": "9e8fb79ac60372c3caf4066d15a597ad8953a9043e18a70dcad98a85899c8d7a",
+  "production_prestate": {
+    "exact_total": 3042,
+    "source_count": 23,
+    "stm32g4_exact": 25,
+    "stm32g4_source_git_blob_sha": "52958c5313e95f924a628c6a69c9f3b2f4ca5e05",
+    "stm32g4_source_sha256": "2e20c585687e9bc3148c7835575695a7d06f497c29409818b9b56064df7b07a8"
+  },
+  "production_poststate": {
+    "exact_total": 3290,
+    "source_count": 23,
+    "stm32g4_exact": 273,
+    "stm32g4_source_git_blob_sha": "83a7e6f20256ca10e6fb1c3452bca8c5b9e39f56",
+    "stm32g4_source_sha256": "e1d2b369e02560d52d56a91c230eef2cc65b93394a2cfdb41915d5b5407cb2fd"
+  },
+  "stm32g4_backend_state_after": {
+    "mapped": 272,
+    "no_mapping": 1
+  },
+  "approved_addition_backend_state": {
+    "mapped": 247,
+    "no_mapping": 1
+  },
+  "catalog_backend_state_after": {
+    "mapped": 3247,
+    "no_mapping": 43
+  },
+  "coverage_effect": {
+    "stm32g4_active_exact_denominator": 273,
+    "stm32g4_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 3211,
+    "whole_st_active_gap_after": 1339,
+    "whole_st_active_identity_coverage_after_percent": 70.5714
+  },
+  "metadata_exception": {
+    "exact_icpn": "STM32G484PEI6",
+    "code": "G484_UFBGA121_ORDERING_TABLE_OMISSION"
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
