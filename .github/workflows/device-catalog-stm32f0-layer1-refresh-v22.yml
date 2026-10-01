@@ -1,0 +1,38 @@
+name: STM32F0 Layer-1 Active refresh v2.2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f0-active-exact-gap-v2.2.txt'
+      - 'data/device-catalog/research/stm32f0-ordering-authority-v2.2.json'
+      - 'data/device-catalog/research/stm32f0_layer1_refresh_v22.py'
+      - 'data/device-catalog/research/test_stm32f0_layer1_refresh_v22.py'
+      - 'data/device-catalog/research/STM32F0_LAYER1_REFRESH_V22.md'
+      - '.github/workflows/device-catalog-stm32f0-layer1-refresh-v22.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build deterministic F0 Layer-1 proposal
+        run: |
+          python data/device-catalog/research/stm32f0_layer1_refresh_v22.py \
+            --proposal /tmp/stm32f0-layer1-admission-proposal-v22.csv \
+            --summary /tmp/stm32f0-layer1-admission-proposal-v22.json
+          python data/device-catalog/research/test_stm32f0_layer1_refresh_v22.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f0-layer1-admission-proposal-v22
+          path: |
+            /tmp/stm32f0-layer1-admission-proposal-v22.csv
+            /tmp/stm32f0-layer1-admission-proposal-v22.json
+          if-no-files-found: error
+          retention-days: 30
