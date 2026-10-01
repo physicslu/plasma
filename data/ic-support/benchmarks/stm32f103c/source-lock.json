@@ -43,7 +43,7 @@
     {
       "source_id": "plasma_stm32f1_catalog_main",
       "authority": "plasma_canonical_catalog",
-      "path": "data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv",
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
       "integrity": {
         "algorithm": "git_blob_sha1",
         "digest": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
