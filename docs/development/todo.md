@@ -138,6 +138,29 @@ Architectural invariant:
 
 ## Deferred product capability
 
+### Control Station Product Version / Build Identity Visibility
+
+**Status:** TODO / product traceability follow-up
+
+**Layer:** Control Station / release identity / operator diagnostics
+
+**Reason:** The global header currently shows the canonical Plasma Product Version (for example `v0.2.1`) but does not identify the exact deployed build. Product Version is intentionally stable across ordinary PR merges, so using it alone makes it difficult to distinguish which commit/release is actually running on `plasma-demo`, `z2like-demo`, `plasma.open4th.com`, or an installed Control Station.
+
+Required work:
+
+- keep `release/product.json` as the canonical Product Version source; do not bump Product Version for every merged PR;
+- expose the deployed Build/Release identity separately from Product Version, preferably using the existing `<product_version>-<12-char git sha>` release identity where available;
+- show a compact short Git SHA or equivalent build identifier in the global header without overloading the Product Version label;
+- make the full Product Version, full Git SHA and/or full release identity available through hover/tooltip or an equivalent low-noise detail surface;
+- source build identity from immutable release/build metadata rather than a manually maintained UI constant;
+- keep development/demo builds explicit when no immutable product release artifact exists;
+- add tests proving that Product Version and Build/Release identity remain distinct and that packaged/installed Control Station builds expose the exact build they contain;
+- verify the behavior consistently across Render `plasma-demo`, `z2like-demo`, `plasma.open4th.com`, Windows/macOS/Linux Control Station packages, and future production deployments.
+
+Architectural invariant:
+
+> Product Version expresses the released product line; Build/Release identity expresses the exact deployed revision. A PR merge alone must not imply a Product Version bump.
+
 ### UI Configuration Profiles — Save / Load
 
 **Status:** TODO / future product capability
