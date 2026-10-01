@@ -17,13 +17,6 @@ EXTRACTION_CONTRACT = HERE / "extraction-contract.json"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
-RETAINED_GIT_BLOB_ALIASES = {
-    (
-        "data/device-catalog/research/stm32f1-commercial-icpn.csv",
-        "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
-    ): "data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv",
-}
-
 
 class ValidationError(RuntimeError):
     pass
@@ -98,17 +91,7 @@ def main() -> int:
             path = entry.get("path")
             require(isinstance(path, str) and path == source.get("path"), f"{source_id}: catalog path mismatch")
             actual = git_blob_sha(REPO_ROOT / path)
-            if actual != digest:
-                retained_path = RETAINED_GIT_BLOB_ALIASES.get((path, digest))
-                require(
-                    retained_path is not None,
-                    f"{source_id}: Git blob drift: {actual} != {digest}",
-                )
-                retained = git_blob_sha(REPO_ROOT / retained_path)
-                require(
-                    retained == digest,
-                    f"{source_id}: retained Git blob alias drift: {retained} != {digest}",
-                )
+            require(actual == digest, f"{source_id}: Git blob drift: {actual} != {digest}")
         else:
             raise ValidationError(f"{source_id}: unsupported integrity algorithm {algorithm!r}")
 
