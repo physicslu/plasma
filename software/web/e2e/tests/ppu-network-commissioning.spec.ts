@@ -181,7 +181,8 @@ test("PPU Network commissions Static IPv4 through the Manager-owned transaction 
 
   await expect(page.getByRole("heading", { name: "PPU Network Configuration", exact: true })).toBeVisible();
   const managerTxn = page.locator(".ppuNetworkCompactSummary > div").filter({ hasText: "Manager Txn" });
-  await expect(managerTxn).toContainText("Manager Txn none");
+  await expect(managerTxn.locator("small")).toHaveText("Manager Txn");
+  await expect(managerTxn.locator("strong")).toHaveText("none");
 
   await page.getByRole("button", { name: "Configure Network", exact: true }).click();
   const commissionButton = page.getByRole("button", { name: "Commission Static Network", exact: true });
