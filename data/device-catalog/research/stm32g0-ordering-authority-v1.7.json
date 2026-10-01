@@ -1,0 +1,321 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32g0-ordering-authority-v1.7",
+  "record_state": "RESEARCH_ONLY_NOT_PRODUCTION_ADMISSION",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32G0",
+  "evidence_date_utc": "2026-10-01",
+  "subfamilies": {
+    "STM32G030": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g030c6.pdf",
+      "document": "DS12991",
+      "pin_count": {
+        "J": 8,
+        "F": 20,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "P": "TSSOP",
+        "M": "SO8N"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G031": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g031c4.pdf",
+      "document": "DS12992",
+      "pin_count": {
+        "J": 8,
+        "Y": 18,
+        "F": 20,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "4": 16,
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP",
+        "P": "TSSOP",
+        "M": "SO8N"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G041": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g041c6.pdf",
+      "document": "DS12993",
+      "pin_count": {
+        "J": 8,
+        "Y": 18,
+        "F": 20,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP",
+        "P": "TSSOP",
+        "M": "SO8N"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G050": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g050c6.pdf",
+      "document": "DS13514",
+      "pin_count": {
+        "F": 20,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "P": "TSSOP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G051": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf",
+      "document": "DS13303",
+      "pin_count": {
+        "F": 20,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP",
+        "P": "TSSOP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G061": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g061c6.pdf",
+      "document": "DS13513",
+      "pin_count": {
+        "F": 20,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP",
+        "P": "TSSOP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G070": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g070cb.pdf",
+      "document": "DS12766",
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "B": 128
+      },
+      "package": {
+        "T": "LQFP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G071": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf",
+      "document": "DS12232",
+      "pin_count": {
+        "E": 25,
+        "G": 28,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": true
+    },
+    "STM32G081": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf",
+      "document": "DS12231",
+      "pin_count": {
+        "E": 25,
+        "G": 28,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "B": 128
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": true
+    },
+    "STM32G0B0": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g0b0ce.pdf",
+      "document": "DS13565",
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "E": 512
+      },
+      "package": {
+        "T": "LQFP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "n_product_version_allowed": false
+    },
+    "STM32G0B1": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf",
+      "document": "DS13560",
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "N": 52,
+        "M": 80,
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": true
+    },
+    "STM32G0C1": {
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32g0c1cc.pdf",
+      "document": "DS13564",
+      "pin_count": {
+        "K": 32,
+        "C": 48,
+        "N": 52,
+        "M": 80,
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "I": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40 to 125 C",
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "n_product_version_allowed": true
+    }
+  },
+  "claims": {
+    "layer1_identity_authority": false,
+    "exact_active_identity_replayed_from_estore": true,
+    "production_write_authorized": false,
+    "backend_route_required_for_metadata_decode": false,
+    "physical_validation_claimed": false
+  }
+}
