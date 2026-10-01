@@ -41,7 +41,7 @@ def main():
 
     gaps=[x.strip() for x in GAPS.read_text(encoding="utf-8").splitlines() if x.strip()]
     req(len(gaps)==359 and len(set(gaps))==359,"gap ledger drift")
-    gap_hash=hashlib.sha256(("\\n".join(sorted(gaps))+"\\n").encode()).hexdigest()
+    gap_hash=hashlib.sha256((chr(10).join(sorted(gaps))+chr(10)).encode()).hexdigest()
     req(gap_hash==EXPECTED_GAP_SHA256,"gap set digest drift")
     by_icpn={r["icpn"]:r for r in rows}
     req(set(gaps) <= set(by_icpn),"approved candidate missing from Production G0")
