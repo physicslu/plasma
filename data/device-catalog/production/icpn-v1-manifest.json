@@ -188,6 +188,14 @@
       "row_count": 39,
       "git_blob_sha": "0ab09918b2d845c0f21f10c5edb4a150d0c8c4f5",
       "sha256": "87e5bde7efc3fd3aee7397a80e9f4f972eb5ff42370b8d54cf1a333b3252004d"
+    },
+    {
+      "manufacturer": "NXP",
+      "family": "KL25",
+      "path": "../research/nxp-kl25-commercial-icpn.csv",
+      "row_count": 12,
+      "git_blob_sha": "53087e9082445e7948f88e688ecd890b0454d788",
+      "sha256": "73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95"
     }
   ]
 }
