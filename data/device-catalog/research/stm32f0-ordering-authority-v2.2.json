@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32f0-ordering-authority-v2.2",
+  "family": "STM32F0",
+  "manufacturer": "STMicroelectronics",
+  "scope": "Complete per-series ordering-code authority required by the locked 263-current-Active STM32F0 exact set",
+  "governance": {
+    "identity_lifecycle_authority": "ST eStore Active exact-set lock v1.4 / PR #685",
+    "metadata_authority": "official ST datasheet ordering information",
+    "openocd_is_metadata_authority": false,
+    "production_write_authorized": false
+  },
+  "records": [
+    {
+      "series": "STM32F030",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f030c8.pdf",
+      "document": "DS9773 Rev 5",
+      "pin_count": {
+        "F": 20,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "4": 16,
+        "6": 32,
+        "8": 64,
+        "C": 256
+      },
+      "package": {
+        "P": "TSSOP",
+        "T": "LQFP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F031",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f031k6.pdf",
+      "document": "STDocID025743 Rev 6",
+      "pin_count": {
+        "F": 20,
+        "E": 25,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "4": 16,
+        "6": 32
+      },
+      "package": {
+        "P": "TSSOP",
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F038",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f038c6.pdf",
+      "document": "DocID026079 Rev 5",
+      "pin_count": {
+        "F": 20,
+        "E": 25,
+        "G": 28,
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32
+      },
+      "package": {
+        "P": "TSSOP",
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F042",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f042g6.pdf",
+      "document": "DocID025832 Rev 5",
+      "pin_count": {
+        "F": 20,
+        "G": 28,
+        "K": 32,
+        "T": 36,
+        "C": 48
+      },
+      "flash_kib": {
+        "4": 16,
+        "6": 32
+      },
+      "package": {
+        "P": "TSSOP",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F048",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f048c6.pdf",
+      "document": "DocID026007 Rev 6",
+      "pin_count": {
+        "G": 28,
+        "T": 36,
+        "C": 48
+      },
+      "flash_kib": {
+        "6": 32
+      },
+      "package": {
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F051",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f051r8.pdf",
+      "document": "DocID022265 Rev 7",
+      "pin_count": {
+        "K": 32,
+        "T": 36,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "4": 16,
+        "6": 32,
+        "8": 64
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F058",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f058c8.pdf",
+      "document": "DocID023402 Rev 4",
+      "pin_count": {
+        "T": 36,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "8": 64
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F070",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f070c6.pdf",
+      "document": "DS10697 Rev 4",
+      "pin_count": {
+        "F": 20,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "6": 32,
+        "B": 128
+      },
+      "package": {
+        "P": "TSSOP",
+        "T": "LQFP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F071",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f071vb.pdf",
+      "document": "DS10009 Rev 7",
+      "pin_count": {
+        "C": [
+          48,
+          49
+        ],
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {
+        "C/T": 48,
+        "C/U": 48,
+        "C/Y": 49
+      }
+    },
+    {
+      "series": "STM32F072",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f072rb.pdf",
+      "document": "DS9826 Rev 6",
+      "pin_count": {
+        "C": [
+          48,
+          49
+        ],
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {
+        "C/T": 48,
+        "C/U": 48,
+        "C/Y": 49
+      }
+    },
+    {
+      "series": "STM32F078",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f078cb.pdf",
+      "document": "DS10212 Rev 6",
+      "pin_count": {
+        "C": [
+          48,
+          49
+        ],
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "B": 128
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {
+        "C/T": 48,
+        "C/U": 48,
+        "C/Y": 49
+      }
+    },
+    {
+      "series": "STM32F091",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f091vc.pdf",
+      "document": "DocID026284 Rev 4",
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "pin_package_overrides": {}
+    },
+    {
+      "series": "STM32F098",
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f098cc.pdf",
+      "document": "DS10624 Rev 5",
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "V": 100
+      },
+      "flash_kib": {
+        "C": 256
+      },
+      "package": {
+        "H": "UFBGA",
+        "T": "LQFP",
+        "U": "UFQFPN",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40 to 85 C"
+      },
+      "pin_package_overrides": {}
+    }
+  ],
+  "allowed_option_suffixes": [
+    "",
+    "TR"
+  ],
+  "claims": {
+    "layer1_identity_authority": false,
+    "exact_active_identity_replayed_from_estore": true,
+    "production_write_authorized": false,
+    "backend_route_required_for_metadata_decode": false,
+    "engineering_verified_claimed": false
+  }
+}
