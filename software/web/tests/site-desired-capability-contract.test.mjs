@@ -24,12 +24,17 @@ test("Site Desired reuses the exact Site-settings missing-route classifier", () 
   assert.match(desiredUi, /isMissingSiteSettingsCapabilityRoute\(error\) \? "unsupported" : "supported"/);
 });
 
-test("Site Desired renders unsupported capability as a non-fault state", () => {
+test("Site Desired collapses unsupported configuration capability into one non-fault summary", () => {
   assert.match(desiredUi, /SiteDesiredCapabilityState = "checking" \| "supported" \| "unsupported"/);
+  assert.match(desiredUi, /ppuCapabilitySummaryCard/);
+  assert.match(desiredUi, /Programming Configuration/);
+  assert.match(desiredUi, /Site Desired Configuration/);
+  assert.match(desiredUi, /Runtime Activation/);
   assert.match(desiredUi, /Not Supported/);
-  assert.match(desiredUi, /Not supported by this PPU profile\. This is a capability boundary, not a runtime fault\./);
-  assert.match(desiredUi, /This PPU profile does not expose Site Desired Configuration\./);
+  assert.match(desiredUi, /This is a capability boundary, not a runtime fault\./);
+  assert.match(desiredUi, /Observed Site topology is independent from configuration and Runtime-activation capability/);
   assert.match(desiredUi, /siteDesiredCapability === "supported"/);
   assert.match(desiredUi, /<PpuSiteDesiredConfigurationCore \{\.\.\.props\} \/>/);
+  assert.match(desiredUi, /<PpuRuntimeActivation \{\.\.\.props\} \/>/);
   assert.doesNotMatch(desiredUi, /setError\([^\n]*Not supported by this PPU profile/);
 });
