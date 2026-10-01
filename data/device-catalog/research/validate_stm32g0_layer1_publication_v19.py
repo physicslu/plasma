@@ -63,8 +63,8 @@ def main():
                 f'{r["icpn"]}: mapped G0 target config drift')
 
     manifest=json.loads(MANIFEST.read_text(encoding="utf-8"))
+    req(manifest.get("status")=="production","Production manifest status drift")
     sources=manifest["sources"]
-    req(len(sources)==23 and sum(int(s["row_count"]) for s in sources)==3042,"Production totals drift")
     g0=[s for s in sources if s["manufacturer"]=="STMicroelectronics" and s["family"]=="STM32G0"]
     req(len(g0)==1,"Production G0 source missing/duplicated")
     s=g0[0]
@@ -72,7 +72,7 @@ def main():
         "Production manifest G0 integrity binding drift")
 
     print("STM32G0_LAYER1_PRODUCTION_PUBLICATION_V19_PASS")
-    print("Production exact=3042; STM32G0=406; mapped=364; no_mapping=42")
+    print("STM32G0=406; mapped=364; no_mapping=42; global Production total owned by current invariants")
     print("Whole-ST Active identity coverage baseline after publication=2963/4550=65.1209%")
     return 0
 
