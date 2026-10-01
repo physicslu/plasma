@@ -55,6 +55,7 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [commissioned, setCommissioned] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (!entry.alias) return;
@@ -203,17 +204,27 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
         <div className="ppuSiteCardHeaderActions">
           <span className="ppuSiteFilter">REV {current?.revision ?? "—"}</span>
           <span className="ppuSiteFilter">{network?.activation.supported ? "Activation Ready" : "Desired State Only"}</span>
+          <button className="ppuSiteButton" type="button" onClick={() => setDetailsOpen(open => !open)}>
+            {detailsOpen ? "Hide Details" : "Configure Network"}
+          </button>
         </div>
       </header>
 
-      <div className="ppuSiteSummary">
-        <span>Interface <strong>{current?.interface ?? "eth0"}</strong></span>
-        <span>Desired Mode <strong>{current?.mode?.toUpperCase() ?? "—"}</strong></span>
-        <span>Activation <strong>{network?.activation.state ?? "unknown"}</strong></span>
-        <span>Committed REV <strong>{network?.activation.committed_revision ?? "—"}</strong></span>
-        <span>Manager Txn <strong>{commissioning?.state ?? "none"}</strong></span>
+      <div className="ppuNetworkCompactSummary" aria-label="PPU network summary">
+        <div><small>Interface</small><strong>{current?.interface ?? "eth0"}</strong></div>
+        <div><small>Desired Mode</small><strong>{current?.mode?.toUpperCase() ?? "—"}</strong></div>
+        <div><small>Activation</small><strong>{network?.activation.supported ? network.activation.state : "Not Supported"}</strong></div>
+        <div><small>Revision</small><strong>{current?.revision ?? "—"}</strong></div>
+        <div><small>Manager Txn</small><strong>{commissioning?.state ?? "none"}</strong></div>
       </div>
 
+      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
+      {recoveryRequired && (
+        <p className="ppuRegistryMessage warning" role="alert"><strong>Recovery required:</strong> {commissioning?.error_message ?? "Manager cannot prove a safe automatic continuation."} Do not start another network transaction until the PPU network and Manager registry are reconciled.</p>
+      )}
+
+      {detailsOpen && (
+        <>
       <div className="ppuNetworkGrid">
         <label>
           <span>Mode</span>
@@ -287,13 +298,9 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
           <strong>Commissioning evidence:</strong> candidate Plasma Gateway Endpoint <code>{commissioning.candidate_endpoint}</code>; transaction <code>{commissioning.transaction_id}</code>.
         </p>
       )}
-      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {saved && !loading && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}
       {commissioned && commissioning?.state === "completed" && (
         <p className="ppuRegistryMessage success" role="status">Static IPv4 commissioning completed. Manager verified the same <code>ppu_id</code>, committed the PPU activation, and reconciled the durable Plasma Gateway Endpoint.</p>
-      )}
-      {recoveryRequired && (
-        <p className="ppuRegistryMessage warning" role="alert"><strong>Recovery required:</strong> {commissioning?.error_message ?? "Manager cannot prove a safe automatic continuation."} Do not start another network transaction until the PPU network and Manager registry are reconciled.</p>
       )}
 
       {!lifecycleWritable && (
@@ -334,6 +341,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
           {commissioningBusy ? "Commissioning..." : "Commission Static Network"}
         </button>
       </div>
+        </>
+      )}
     </section>
   );
 }

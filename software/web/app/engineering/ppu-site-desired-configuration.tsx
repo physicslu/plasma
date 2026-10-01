@@ -16,30 +16,32 @@ type Props = {
 
 type SiteDesiredCapabilityState = "checking" | "supported" | "unsupported";
 
-function SiteDesiredCapabilityCard({ state }: { state: Exclude<SiteDesiredCapabilityState, "supported"> }) {
+function SiteConfigurationCapabilitySummary({ state }: { state: Exclude<SiteDesiredCapabilityState, "supported"> }) {
   const unsupported = state === "unsupported";
   return (
-    <section className="ppuSiteCard" aria-label="Programming Site Configuration">
+    <section className="ppuSiteCard ppuCapabilitySummaryCard" aria-label="Programming configuration capabilities">
       <header className="ppuSiteCardHeader">
         <div>
-          <h3>Programming Site Configuration</h3>
-          <p className="ppuSiteHeaderNote">Site is the canonical independently controlled programming position inside a PPU. Topology is discovered from the PPU; this UI does not hard-code an eight-Site assumption.</p>
+          <small>CAPABILITIES</small>
+          <h3>Programming Configuration</h3>
+          <p className="ppuSiteHeaderNote">Observed Site topology is independent from configuration and Runtime-activation capability.</p>
         </div>
-        <span className="ppuReconciliationBadge" data-tone="muted">
-          {unsupported ? "Not Supported" : "Checking"}
-        </span>
       </header>
-
-      <p className="ppuRegistryMessage warning" role="status">
-        <strong>Site Desired Configuration:</strong>{" "}
+      <div className="ppuCapabilitySummaryGrid">
+        <div>
+          <span>Site Desired Configuration</span>
+          <strong>{unsupported ? "Not Supported" : "Checking"}</strong>
+        </div>
+        <div>
+          <span>Runtime Activation</span>
+          <strong>{unsupported ? "Not Supported" : "Checking"}</strong>
+        </div>
+      </div>
+      <p className="ppuCapabilityBoundaryNote">
         {unsupported
-          ? "Not supported by this PPU profile. This is a capability boundary, not a runtime fault."
-          : "Checking whether this PPU profile exposes Site Desired Configuration."}
+          ? "This PPU profile exposes observed Sites but not the Site-settings route. This is a capability boundary, not a runtime fault."
+          : "Checking whether this PPU profile exposes Site Desired Configuration and Runtime Activation."}
       </p>
-
-      {unsupported && (
-        <p className="ppuSiteNote">This PPU profile does not expose Site Desired Configuration.</p>
-      )}
     </section>
   );
 }
@@ -78,10 +80,14 @@ export default function PpuSiteDesiredConfiguration(props: Props) {
 
   return (
     <>
-      {siteDesiredCapability === "supported"
-        ? <PpuSiteDesiredConfigurationCore {...props} />
-        : <SiteDesiredCapabilityCard state={siteDesiredCapability} />}
-      <PpuRuntimeActivation {...props} />
+      {siteDesiredCapability === "supported" ? (
+        <>
+          <PpuSiteDesiredConfigurationCore {...props} />
+          <PpuRuntimeActivation {...props} />
+        </>
+      ) : (
+        <SiteConfigurationCapabilitySummary state={siteDesiredCapability} />
+      )}
     </>
   );
 }

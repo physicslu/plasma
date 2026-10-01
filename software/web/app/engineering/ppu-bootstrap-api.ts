@@ -91,6 +91,27 @@ type ErrorPayload = {
   message?: string;
 };
 
+export class BootstrapApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly detail: string;
+
+  constructor(status: number, code: string | null, message: string) {
+    super(code ? `${code}: ${message}` : message);
+    this.name = "BootstrapApiError";
+    this.status = status;
+    this.code = code;
+    this.detail = message;
+  }
+}
+
+export function isMissingBootstrapCapabilityRoute(error: unknown): boolean {
+  return error instanceof BootstrapApiError
+    && error.status === 404
+    && error.code === null
+    && error.detail === "not found";
+}
+
 type UploadPayload = {
   ok: true;
   upload: {
@@ -126,7 +147,7 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
       ? error.message
       : payload?.message ?? `Bootstrap request failed with HTTP ${response.status}`;
     const code = typeof error === "object" ? error?.code : typeof error === "string" ? error : null;
-    throw new Error(code ? `${code}: ${message}` : message);
+    throw new BootstrapApiError(response.status, code ?? null, message);
   }
   return payload;
 }

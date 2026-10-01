@@ -155,6 +155,9 @@ test("network commissioning is preserved as a Registration/onboarding operation"
   assert.match(registration, /<PpuNetworkConfiguration entry=\{selectedEntry\} hasActiveExecution=\{selectedHasActiveExecution\} \/>/);
   assert.match(registration, /Operational network commissioning remains locked until programming Registration is complete/);
   assert.match(ppuNetwork, /PPU Network Configuration/);
+  assert.match(ppuNetwork, /ppuNetworkCompactSummary/);
+  assert.match(ppuNetwork, /Configure Network/);
+  assert.match(ppuNetwork, /detailsOpen/);
   assert.match(ppuNetwork, /Save Desired Network/);
   assert.match(ppuNetwork, /Commission Static Network/);
   assert.match(managerServer, /PPU must complete Validate & Enable before network commissioning/);
