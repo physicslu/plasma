@@ -197,10 +197,8 @@ class STM32F4Phase40FoundationBatch11PostAdmissionTests(unittest.TestCase):
         self.assertEqual(sources["STM32F4"]["row_count"], len(rows))
         self.assertEqual(sources["STM32F4"]["sha256"], current_sha)
         self.assertEqual(sources["STM32F4"]["git_blob_sha"], current_blob)
-        self.assertEqual(
-            sum(sources[family]["row_count"] for family in ("STM32F1", "STM32F4")),
-            75 + len(rows),
-        )
+        # Cross-family growth is independent; this test owns F4 state only.
+        self.assertGreaterEqual(sources["STM32F1"]["row_count"], 75)
 
     def test_later_growth_preserves_batch11_inventory_consistency(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
