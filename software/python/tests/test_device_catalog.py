@@ -255,6 +255,39 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert len(combined) == 100
 
 
+def test_stm32f0_layer1_refresh_is_catalog_visible_with_deterministic_routes() -> None:
+    catalog = get_default_device_catalog()
+
+    tssop = catalog.search("STM32F030F4P6", limit=1)[0]
+    assert tssop.identifier == "STM32F030F4P6"
+    assert tssop.family == "STM32F0"
+    assert tssop.package == "TSSOP"
+    assert tssop.pin_count == "20"
+    assert tssop.mapping_status == "mapped"
+    assert tssop.target_config == "tcl/target/stm32f0x.cfg"
+
+    wlcsp = catalog.search("STM32F031E6Y6TR", limit=1)[0]
+    assert wlcsp.identifier == "STM32F031E6Y6TR"
+    assert wlcsp.package == "WLCSP"
+    assert wlcsp.pin_count == "25"
+    assert wlcsp.mapping_status == "mapped"
+
+    ufbga = catalog.search("STM32F051R8H6", limit=1)[0]
+    assert ufbga.identifier == "STM32F051R8H6"
+    assert ufbga.package == "UFBGA"
+    assert ufbga.pin_count == "64"
+    assert ufbga.mapping_status == "mapped"
+
+    payload = wlcsp.to_payload()
+    assert payload["catalog"]["scope"] == "production_admitted"
+    assert payload["backend"]["mapping_status"] == "mapped"
+    assert payload["physical_validation"] == {
+        "engineering_status": "no_evidence",
+        "ppu_status": "no_evidence",
+        "socket_status": "no_evidence",
+    }
+
+
 def test_stm32g0_layer1_publication_preserves_independent_backend_state() -> None:
     catalog = get_default_device_catalog()
 

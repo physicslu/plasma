@@ -59,8 +59,10 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/test_stm32f0_phase4_5b_discovery.py"),
             ["sha256sum", "data/device-catalog/research/stm32f0-phase4.5b-discovery-baseline.json"],
             _py("data/device-catalog/research/validate_stm32f0_phase4_5b_retained_evidence.py"),
-            _py("data/device-catalog/research/test_stm32f0_phase4_5c_policy.py"),
-            _py("data/device-catalog/research/test_stm32f0_phase4_5d_admission.py"),
+            # Historical 4.5C/4.5D retain the original 42-row bounded pilot
+            # prestates. Current family CI validates retained discovery evidence
+            # plus the approved v2.3 Production publication post-state.
+            _py("data/device-catalog/research/validate_stm32f0_layer1_publication_v23.py"),
         ],
         "stm32f2": [
             _py("data/device-catalog/research/test_stm32f2_bounded_historical_golden_replay.py"),
