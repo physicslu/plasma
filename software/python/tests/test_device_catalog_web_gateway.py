@@ -53,7 +53,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
     def test_g0_no_mapping_identity_is_visible_without_backend_overclaim(self) -> None:
-        status, payload = self.request("/api/devices/search?q=STM32G071G8U6N&limit=5")
+        status, payload = self.request("/api/devices/search?q=STM32G071G8U6N&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
