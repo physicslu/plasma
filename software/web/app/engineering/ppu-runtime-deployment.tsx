@@ -84,10 +84,12 @@ export default function PpuRuntimeDeployment({
   }, [alias]);
 
   useEffect(() => {
-    setPlatformCapability("checking");
-    setStatus(null);
-    setError(null);
-    const initial = window.setTimeout(() => { void refresh(); }, 0);
+    const initial = window.setTimeout(() => {
+      setPlatformCapability("checking");
+      setStatus(null);
+      setError(null);
+      void refresh();
+    }, 0);
     const timer = window.setInterval(() => { void refresh(true); }, 3000);
     return () => {
       window.clearTimeout(initial);
