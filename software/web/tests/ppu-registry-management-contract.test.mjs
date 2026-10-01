@@ -43,6 +43,18 @@ test("PPU Overview is read-only and summarizes Platform, Registration, Sites, an
   assert.doesNotMatch(overview, /addManagerPpu|setManagerPpuLifecycle|removeManagerPpu|saveManagerPpuSite/);
 });
 
+test("PPU Overview preserves Platform capability semantics", () => {
+  assert.match(overview, /isMissingBootstrapCapabilityRoute/);
+  assert.match(overview, /PlatformCapabilityState = "checking" \| "supported" \| "unsupported" \| "unavailable"/);
+  assert.match(overview, /setPlatformCapability\("unsupported"\)/);
+  assert.match(overview, /setPlatformCapability\("unavailable"\)/);
+  assert.match(overview, /if \(capability === "unsupported"\) return "Not Supported"/);
+  assert.match(overview, /if \(capability === "unsupported"\) return "N\/A"/);
+  assert.match(overview, /Bootstrap route not exposed/);
+  assert.match(overview, /Platform maintenance is not supported by this PPU profile; no active fault is implied/);
+  assert.match(overview, /if \(platformCapability === "unavailable"\) values\.push\("Platform status unavailable"\)/);
+});
+
 test("PPU workspace pages concentrate status before domain workflows without changing ownership", () => {
   assert.match(overview, /ppuOverviewSnapshotGrid/);
   assert.match(overview, /ppuOverviewDomainGrid/);
