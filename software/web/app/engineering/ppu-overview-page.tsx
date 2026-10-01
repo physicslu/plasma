@@ -10,6 +10,7 @@ import {
 } from "./ppu-registry-api";
 import {
   getManagerPpuBootstrap,
+  isMissingBootstrapCapabilityRoute,
   type ManagerBootstrapStatus,
 } from "./ppu-bootstrap-api";
 import {
@@ -23,6 +24,7 @@ const ACTIVE_SITE_STATES = new Set(["queued", "submitting", "running", "stopping
 const FAULT_SITE_STATES = new Set(["error", "fault", "failed"]);
 
 type PpuDestination = "platform" | "registration" | "sites";
+type PlatformCapabilityState = "checking" | "supported" | "unsupported" | "unavailable";
 
 type Props = {
   onNavigate: (destination: PpuDestination) => void;
@@ -40,11 +42,42 @@ function registrationLabel(entry: ManagerRegistryEntry | null): string {
   return "Not Registered";
 }
 
-function platformReleaseLabel(status: ManagerBootstrapStatus | null): string {
+function platformReleaseLabel(status: ManagerBootstrapStatus | null, capability: PlatformCapabilityState): string {
+  if (capability === "unsupported") return "Not Supported";
+  if (capability === "checking") return "Checking";
+  if (capability === "unavailable") return "Unavailable";
   const runtime = status?.bootstrap.runtime;
   if (runtime?.release_id) return runtime.release_id;
   if (status?.bootstrap.bootstrap.state === "bootstrap_ready") return "Bootstrap only";
   return "Unavailable";
+}
+
+function runtimeVersionLabel(status: ManagerBootstrapStatus | null, capability: PlatformCapabilityState): string {
+  if (capability === "unsupported") return "N/A";
+  if (capability === "checking") return "Checking";
+  if (capability === "unavailable") return "Unavailable";
+  return status?.bootstrap.runtime.product_version ?? "Not installed";
+}
+
+function bootstrapVersionLabel(status: ManagerBootstrapStatus | null, capability: PlatformCapabilityState): string {
+  if (capability === "unsupported") return "Not Supported";
+  if (capability === "checking") return "Checking";
+  if (capability === "unavailable") return "Unavailable";
+  return status?.bootstrap.bootstrap.version ?? "Unavailable";
+}
+
+function platformRuntimeDetail(status: ManagerBootstrapStatus | null, capability: PlatformCapabilityState): string {
+  if (capability === "unsupported") return "Platform maintenance not supported";
+  if (capability === "checking") return "Checking Bootstrap capability";
+  if (capability === "unavailable") return "Platform status unavailable";
+  return status?.bootstrap.runtime.state?.replaceAll("_", " ") ?? "Unknown runtime state";
+}
+
+function runtimeVersionDetail(status: ManagerBootstrapStatus | null, capability: PlatformCapabilityState): string {
+  if (capability === "unsupported") return "Bootstrap route not exposed";
+  if (capability === "checking") return "Checking Bootstrap capability";
+  if (capability === "unavailable") return "Bootstrap status unavailable";
+  return status?.bootstrap.bootstrap.version ? `Bootstrap ${status.bootstrap.bootstrap.version}` : "Bootstrap unavailable";
 }
 
 export default function PpuOverviewPage({ onNavigate }: Props) {
@@ -52,6 +85,8 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
   const [fleet, setFleet] = useState<FleetWebPayload | null>(null);
   const [selectedAlias, setSelectedAlias] = useState("");
   const [bootstrap, setBootstrap] = useState<ManagerBootstrapStatus | null>(null);
+  const [platformCapability, setPlatformCapability] = useState<PlatformCapabilityState>("checking");
+  const [platformError, setPlatformError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,8 +125,23 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
     let cancelled = false;
     if (selectedAlias) {
       void getManagerPpuBootstrap(selectedAlias)
-        .then(status => { if (!cancelled) setBootstrap(status); })
-        .catch(() => { if (!cancelled) setBootstrap(null); });
+        .then(status => {
+          if (cancelled) return;
+          setBootstrap(status);
+          setPlatformCapability("supported");
+          setPlatformError(null);
+        })
+        .catch(reason => {
+          if (cancelled) return;
+          setBootstrap(null);
+          if (isMissingBootstrapCapabilityRoute(reason)) {
+            setPlatformCapability("unsupported");
+            setPlatformError(null);
+          } else {
+            setPlatformCapability("unavailable");
+            setPlatformError(reason instanceof Error ? reason.message : "Platform status unavailable");
+          }
+        });
     }
     return () => { cancelled = true; };
   }, [selectedAlias, registry, fleet]);
@@ -125,8 +175,9 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
     if (selectedFleet?.degraded) values.push("Fleet observation degraded");
     if (bootstrap?.bootstrap.runtime.state === "recovery_required") values.push("Runtime recovery required");
     if (bootstrap?.bootstrap.deployment?.state === "recovery_required") values.push("Platform deployment recovery required");
+    if (platformCapability === "unavailable") values.push("Platform status unavailable");
     return values;
-  }, [selectedFleet, bootstrap]);
+  }, [selectedFleet, bootstrap, platformCapability]);
 
   return (
     <section className="ppuSiteConfiguration" aria-label="PPU Overview">
@@ -189,10 +240,10 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
                 <small>Registration</small><strong>{registrationLabel(selectedEntry)}</strong><span>{lifecycle?.label ?? "Unknown"}</span>
               </article>
               <article className="ppuOverviewMetric">
-                <small>Platform Release</small><strong>{platformReleaseLabel(bootstrap)}</strong><span>{bootstrap?.bootstrap.runtime.state?.replaceAll("_", " ") ?? "Unknown runtime state"}</span>
+                <small>Platform Release</small><strong>{platformReleaseLabel(bootstrap, platformCapability)}</strong><span>{platformRuntimeDetail(bootstrap, platformCapability)}</span>
               </article>
               <article className="ppuOverviewMetric">
-                <small>Runtime Version</small><strong>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</strong><span>{bootstrap?.bootstrap.bootstrap.version ? `Bootstrap ${bootstrap.bootstrap.bootstrap.version}` : "Bootstrap unavailable"}</span>
+                <small>Runtime Version</small><strong>{runtimeVersionLabel(bootstrap, platformCapability)}</strong><span>{runtimeVersionDetail(bootstrap, platformCapability)}</span>
               </article>
               <article className="ppuOverviewMetric" data-tone={siteSummary.fault > 0 ? "danger" : siteSummary.busy > 0 ? "info" : "healthy"}>
                 <small>Sites</small><strong>{siteSummary.total} reported</strong><span>{siteSummary.ready} ready · {siteSummary.busy} busy · {siteSummary.fault} fault</span>
@@ -207,9 +258,9 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
                 <button className="ppuSiteButton" type="button" onClick={() => onNavigate("platform")}>Open Platform</button>
               </header>
               <dl>
-                <div><dt>Release</dt><dd>{platformReleaseLabel(bootstrap)}</dd></div>
-                <div><dt>Runtime</dt><dd>{bootstrap?.bootstrap.runtime.product_version ?? "Not installed"}</dd></div>
-                <div><dt>Bootstrap</dt><dd>{bootstrap?.bootstrap.bootstrap.version ?? "Unavailable"}</dd></div>
+                <div><dt>Release</dt><dd>{platformReleaseLabel(bootstrap, platformCapability)}</dd></div>
+                <div><dt>Runtime</dt><dd>{runtimeVersionLabel(bootstrap, platformCapability)}</dd></div>
+                <div><dt>Bootstrap</dt><dd>{bootstrapVersionLabel(bootstrap, platformCapability)}</dd></div>
               </dl>
             </section>
 
@@ -240,7 +291,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
 
           <section className="ppuOverviewAlerts" aria-label="PPU active alerts" data-state={alerts.length ? "active" : "clear"}>
             <strong>{alerts.length ? `${alerts.length} active alert${alerts.length === 1 ? "" : "s"}` : "No active alerts"}</strong>
-            <span>{alerts.length ? alerts.join(" · ") : "No active alert is visible from current Manager and Bootstrap observations."}</span>
+            <span>{alerts.length ? alerts.join(" · ") : platformCapability === "unsupported" ? "Platform maintenance is not supported by this PPU profile; no active fault is implied." : "No active alert is visible from current Manager and Bootstrap observations."}</span>
           </section>
         </>
       ) : (
