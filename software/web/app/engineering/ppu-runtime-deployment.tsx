@@ -8,6 +8,7 @@ import {
   commitManagerPpuBootstrapUpload,
   createManagerPpuBootstrapUpload,
   getManagerPpuBootstrap,
+  isMissingBootstrapCapabilityRoute,
   pairManagerPpuBootstrap,
   parseSha256Sidecar,
   runManagerPpuPlatformPsLoopback,
@@ -43,6 +44,7 @@ export default function PpuRuntimeDeployment({
 }: Props) {
   const alias = entry.alias ?? "";
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
+  const [platformCapability, setPlatformCapability] = useState<"checking" | "supported" | "unsupported">("checking");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"pair" | "deploy" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +64,20 @@ export default function PpuRuntimeDeployment({
     try {
       const next = await getManagerPpuBootstrap(alias);
       setStatus(next);
+      setPlatformCapability("supported");
       setError(null);
       const identity = next.bootstrap.identity;
       if (identity.ppu_id) setPpuId(current => current || identity.ppu_id || alias);
       if (identity.facility_id) setFacilityId(current => current || identity.facility_id || "lab");
     } catch (reason) {
       setStatus(null);
-      if (!quiet) setError(reason instanceof Error ? reason.message : "PPU Bootstrap unavailable");
+      if (isMissingBootstrapCapabilityRoute(reason)) {
+        setPlatformCapability("unsupported");
+        setError(null);
+      } else {
+        setPlatformCapability("supported");
+        if (!quiet) setError(reason instanceof Error ? reason.message : "PPU Bootstrap unavailable");
+      }
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -197,6 +206,22 @@ export default function PpuRuntimeDeployment({
 
   return (
     <section className="ppuSiteCard ppuPlatformCard" aria-label="PPU Platform Release">
+      {platformCapability === "unsupported" ? (
+        <section className="ppuPlatformCapabilityBoundary" aria-label="Platform maintenance capability">
+          <div>
+            <small>CAPABILITY</small>
+            <h3>Platform Maintenance</h3>
+            <p>This PPU profile does not expose the Bootstrap / Platform maintenance route. Programming Registration and observed Site topology remain separate capabilities.</p>
+          </div>
+          <div className="ppuPlatformSummaryActions">
+            <span className="ppuPlatformStatusPill">Not Supported</span>
+            <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
+              {loading ? "Checking..." : "Refresh Status"}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <>
       {error && (
         <div className="ppuPlatformAlert" data-tone="danger" role="alert">
           <strong>Platform status unavailable</strong>
@@ -383,6 +408,8 @@ export default function PpuRuntimeDeployment({
         </div>
         {deployment?.error && <p className="ppuRegistryMessage error">{deployment.error}</p>}
       </section>
+        </>
+      )}
     </section>
   );
 }
