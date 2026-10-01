@@ -47,7 +47,7 @@ test("Platform missing Bootstrap route is classified narrowly as unsupported cap
   assert.match(api, /error instanceof BootstrapApiError/);
   assert.match(api, /error\.status === 404/);
   assert.match(api, /error\.code === null/);
-  assert.match(api, /error\.message === "not found"/);
+  assert.match(api, /error\.detail === "not found"/);
   assert.match(deployment, /isMissingBootstrapCapabilityRoute/);
   assert.match(deployment, /setPlatformCapability\("unsupported"\)/);
   assert.match(deployment, /Platform Maintenance/);
