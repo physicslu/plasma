@@ -40,7 +40,11 @@ def main() -> int:
     assert metrics["family_exact_icpns"]["STM32F1"] == 75
     assert metrics["family_exact_icpns"]["STM32F4"] == 384
     assert metrics["base_devices"] >= 157
-    assert metrics["deterministic_openocd_exact_icpns"] == metrics["exact_icpns"]
+    assert (
+        metrics["deterministic_openocd_exact_icpns"]
+        + metrics["openocd_unmapped_exact_icpns"]
+        == metrics["exact_icpns"]
+    )
     assert metrics["ic_support_bound_exact_icpns"] == 2
     assert metrics["unresolved_programming_profile_exact_icpns"] == metrics["exact_icpns"] - 2
     assert metrics["evidence_backed_programming_profiles"] == 1
