@@ -255,6 +255,35 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert len(combined) == 100
 
 
+def test_stm32g0_layer1_publication_preserves_independent_backend_state() -> None:
+    catalog = get_default_device_catalog()
+
+    mapped = catalog.search("STM32G030C8T6", limit=1)[0]
+    assert mapped.identifier == "STM32G030C8T6"
+    assert mapped.family == "STM32G0"
+    assert mapped.mapping_status == "mapped"
+    assert mapped.mapping_method == "deterministic_ordering_pattern"
+    assert mapped.target_config == "tcl/target/stm32g0x.cfg"
+
+    no_mapping = catalog.search("STM32G071G8U6N", limit=1)[0]
+    assert no_mapping.identifier == "STM32G071G8U6N"
+    assert no_mapping.family == "STM32G0"
+    assert no_mapping.production_admitted is True
+    assert no_mapping.mapping_status == "no_mapping"
+    assert no_mapping.mapping_method == "no_mapping"
+    assert no_mapping.target_config == ""
+
+    payload = no_mapping.to_payload()
+    assert payload["catalog"]["scope"] == "production_admitted"
+    assert payload["backend"]["mapping_status"] == "no_mapping"
+    assert payload["backend"]["target_config"] == ""
+    assert payload["physical_validation"] == {
+        "engineering_status": "no_evidence",
+        "ppu_status": "no_evidence",
+        "socket_status": "no_evidence",
+    }
+
+
 def test_stm32g4_publication_is_catalog_visible_without_physical_qualification() -> None:
     record = get_default_device_catalog().search("stm32g441cby6tr", limit=1)[0]
     assert record.identifier == "STM32G441CBY6TR"
