@@ -123,9 +123,8 @@ def main()->int:
         "published G4 rows do not reconstruct the approved proposal artifact")
 
     manifest=json.loads(MANIFEST.read_text(encoding="utf-8"))
+    req(manifest.get("status")=="production","Production manifest status drift")
     sources=manifest["sources"]
-    req(len(sources)==23 and sum(int(s["row_count"]) for s in sources)==3290,
-        "Production totals drift")
     g4=[s for s in sources if s["manufacturer"]=="STMicroelectronics" and s["family"]=="STM32G4"]
     req(len(g4)==1,"Production G4 source missing/duplicated")
     s=g4[0]
@@ -133,7 +132,7 @@ def main()->int:
         "Production manifest G4 integrity binding drift")
 
     print("STM32G4_LAYER1_PRODUCTION_PUBLICATION_V21_PASS")
-    print("Production exact=3290; STM32G4=273; mapped=272; no_mapping=1")
+    print("STM32G4=273; mapped=272; no_mapping=1; global Production total owned by current invariants")
     print("Whole-ST Active identity coverage baseline after publication=3211/4550=70.5714%")
     return 0
 
