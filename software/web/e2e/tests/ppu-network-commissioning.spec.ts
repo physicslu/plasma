@@ -180,8 +180,10 @@ test("PPU Network commissions Static IPv4 through the Manager-owned transaction 
   await openPpuRegistration(page);
 
   await expect(page.getByRole("heading", { name: "PPU Network Configuration", exact: true })).toBeVisible();
-  const managerTxn = page.locator(".ppuSiteSummary span").filter({ hasText: "Manager Txn" });
+  const managerTxn = page.locator(".ppuNetworkCompactSummary > div").filter({ hasText: "Manager Txn" });
   await expect(managerTxn).toContainText("Manager Txn none");
+
+  await page.getByRole("button", { name: "Configure Network", exact: true }).click();
   const commissionButton = page.getByRole("button", { name: "Commission Static Network", exact: true });
   await expect(commissionButton).toBeEnabled();
   await commissionButton.click();
@@ -230,6 +232,10 @@ test("Static commissioning stays fail-closed when the PPU has no activation help
 
   await openPpuRegistration(page);
 
+  const activation = page.locator(".ppuNetworkCompactSummary > div").filter({ hasText: "Activation" });
+  await expect(activation).toContainText("Not Supported");
+
+  await page.getByRole("button", { name: "Configure Network", exact: true }).click();
   await expect(page.getByText(/Commissioning unavailable:/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Commission Static Network", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Save Desired Network", exact: true })).toBeDisabled();
