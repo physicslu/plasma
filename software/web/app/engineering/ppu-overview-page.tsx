@@ -230,7 +230,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
                 <small>Connectivity</small><strong>{connectivity.label}</strong><span>{selectedEntry.endpoint}</span>
               </article>
               <article className="ppuOverviewMetric" data-tone={health.tone}>
-                <small>Platform Health</small><strong>{health.label}</strong><span>{health.reason}</span>
+                <small>PPU Health</small><strong>{health.label}</strong><span>{health.reason}</span>
               </article>
               <article className="ppuOverviewMetric" data-tone={selectedEntry.lifecycle === "commissioned" ? "healthy" : "warning"}>
                 <small>Registration</small><strong>{registrationLabel(selectedEntry)}</strong><span>{lifecycle?.label ?? "Unknown"}</span>
