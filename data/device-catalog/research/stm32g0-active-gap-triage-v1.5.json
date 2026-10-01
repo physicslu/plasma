@@ -1,0 +1,168 @@
+{
+  "audit_id": "stm32g0-active-gap-layered-triage-v1.5",
+  "authority": {
+    "g0_gap_set_sha256": "a6240e4a34e3834cba7195be306d449386dcac1b3e66189f6bfac8fdc7557a5d",
+    "source_pr": 685,
+    "source_result_artifact_id": 11134202297,
+    "source_workflow_run_id": 36797087427,
+    "whole_st_missing_active_set_sha256": "64dc19927cb257ac3588367c92e0ccf4253995389d06e89556178fed1bc8714d"
+  },
+  "claims": {
+    "backend_support_claimed_for_all_gap_identities": false,
+    "metadata_complete_for_all_gap_identities": false,
+    "physical_validation_claimed": false,
+    "production_write_authorized": false
+  },
+  "historical_scope": {
+    "exact_gap_scope_counts": {
+      "existing_published_base_variant_gap": 2,
+      "new_base_device_gap": 357
+    },
+    "gap_existing_published_base_count": 1,
+    "gap_new_base_device_count": 87,
+    "gap_unique_base_device_count": 88,
+    "published_base_device_count": 12
+  },
+  "largest_gap_bases": [
+    {
+      "base_device": "STM32G0B1KB",
+      "gap_exact_count": 13
+    },
+    {
+      "base_device": "STM32G031K8",
+      "gap_exact_count": 12
+    },
+    {
+      "base_device": "STM32G071CB",
+      "gap_exact_count": 12
+    },
+    {
+      "base_device": "STM32G071KB",
+      "gap_exact_count": 12
+    },
+    {
+      "base_device": "STM32G0B1CC",
+      "gap_exact_count": 12
+    },
+    {
+      "base_device": "STM32G0B1KE",
+      "gap_exact_count": 12
+    },
+    {
+      "base_device": "STM32G031C8",
+      "gap_exact_count": 11
+    },
+    {
+      "base_device": "STM32G0B1KC",
+      "gap_exact_count": 10
+    },
+    {
+      "base_device": "STM32G051C8",
+      "gap_exact_count": 9
+    },
+    {
+      "base_device": "STM32G071RB",
+      "gap_exact_count": 9
+    },
+    {
+      "base_device": "STM32G0B1RB",
+      "gap_exact_count": 9
+    },
+    {
+      "base_device": "STM32G0B1RC",
+      "gap_exact_count": 9
+    },
+    {
+      "base_device": "STM32G0B1RE",
+      "gap_exact_count": 9
+    },
+    {
+      "base_device": "STM32G0B1CE",
+      "gap_exact_count": 8
+    },
+    {
+      "base_device": "STM32G0C1CE",
+      "gap_exact_count": 8
+    },
+    {
+      "base_device": "STM32G031K4",
+      "gap_exact_count": 7
+    },
+    {
+      "base_device": "STM32G051K8",
+      "gap_exact_count": 7
+    },
+    {
+      "base_device": "STM32G071GB",
+      "gap_exact_count": 7
+    },
+    {
+      "base_device": "STM32G0B1VE",
+      "gap_exact_count": 7
+    },
+    {
+      "base_device": "STM32G031G6",
+      "gap_exact_count": 6
+    }
+  ],
+  "layer1_catalog": {
+    "active_exact_gap": 359,
+    "catalog_identity_candidate_count": 359,
+    "identity_is_not_rejected_by_backend_state": true,
+    "official_active_exact_total": 406,
+    "production_coverage_percent": 11.5764,
+    "production_exact_current": 47
+  },
+  "layer2_route_observation": {
+    "route_counts": {
+      "unique": 317,
+      "unmapped": 42
+    },
+    "route_examples": {
+      "unique": [
+        "STM32G030C8T6",
+        "STM32G030C8T6TR",
+        "STM32G030F6P6",
+        "STM32G030F6P6TR",
+        "STM32G030J6M6",
+        "STM32G030J6M6TR",
+        "STM32G030K6T6",
+        "STM32G030K6T6TR",
+        "STM32G030K8T6",
+        "STM32G030K8T6TR",
+        "STM32G031C6T6",
+        "STM32G031C6T7"
+      ],
+      "unmapped": [
+        "STM32G071G8U6N",
+        "STM32G071G8U6NTR",
+        "STM32G071GBU6N",
+        "STM32G071KBT6N",
+        "STM32G071KBU6N",
+        "STM32G0B1CBT6N",
+        "STM32G0B1CBU6N",
+        "STM32G0B1CCU6N",
+        "STM32G0B1CCU6NTR",
+        "STM32G0B1CET6N",
+        "STM32G0B1CEU6N",
+        "STM32G0B1KBT6N"
+      ]
+    },
+    "route_state_gates_layer1_identity": false
+  },
+  "next_gate": "Acquire authoritative metadata for the new Base Device set and promote Layer-1 identities independently of Layer-2 route state; Production write requires explicit owner approval.",
+  "subfamily_gap_counts": {
+    "STM32G030": 10,
+    "STM32G031": 73,
+    "STM32G041": 14,
+    "STM32G050": 7,
+    "STM32G051": 34,
+    "STM32G061": 13,
+    "STM32G070": 4,
+    "STM32G071": 54,
+    "STM32G081": 9,
+    "STM32G0B0": 5,
+    "STM32G0B1": 104,
+    "STM32G0C1": 32
+  }
+}
