@@ -19,7 +19,7 @@ def req(ok,msg):
     if not ok: raise ValueError(msg)
 
 def git_blob(data:bytes)->str:
-    return hashlib.sha1(f"blob {len(data)}\\0".encode()+data).hexdigest()
+    return hashlib.sha1(f"blob {len(data)}".encode("ascii")+bytes([0])+data).hexdigest()
 
 def main():
     audit=json.loads(AUDIT.read_text(encoding="utf-8"))
