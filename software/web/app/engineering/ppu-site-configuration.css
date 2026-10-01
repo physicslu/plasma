@@ -1488,3 +1488,112 @@
     flex-direction: column;
   }
 }
+
+
+/* Capability-aware cleanup: unsupported is a product capability boundary, not a fault surface. */
+.ppuCapabilitySummaryCard {
+  display: grid;
+  gap: 0;
+}
+
+.ppuCapabilitySummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.ppuCapabilitySummaryGrid > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--panel-3) 68%, transparent);
+}
+
+.ppuCapabilitySummaryGrid span,
+.ppuCapabilityCompactRow small,
+.ppuPlatformCapabilityBoundary small {
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.ppuCapabilitySummaryGrid strong {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ppuCapabilityBoundaryNote {
+  margin: 0 16px 14px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuCapabilityCompactRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 8px;
+}
+
+.ppuCapabilityCompactRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.ppuCapabilityCompactRow strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ppuPlatformCapabilityBoundary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 16px;
+}
+
+.ppuPlatformCapabilityBoundary > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ppuPlatformCapabilityBoundary h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.ppuPlatformCapabilityBoundary p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .ppuCapabilitySummaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuCapabilityCompactRow,
+  .ppuPlatformCapabilityBoundary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ppuPlatformCapabilityBoundary .ppuPlatformSummaryActions {
+    justify-content: flex-start;
+  }
+}
