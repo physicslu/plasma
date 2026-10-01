@@ -28,10 +28,22 @@ For every row in this ledger:
 
 A missing or unresolved OpenOCD mapping must **not** turn an official Active exact commercial identity into a non-device.
 
-The CI classifier reports how many of the 359 gaps:
-- are variants of one of the 12 already-published Base Devices;
-- belong to new Base Devices outside the historical discovery scope;
-- are uniquely routable, ambiguous, or unmapped under the current OpenOCD ordering-pattern research surface;
-- fall into each STM32G0 subfamily.
+Final-head CI result:
 
-The next gate after this triage is manufacturer-authoritative metadata acquisition for the new Base Device set, followed by a separately reviewed Catalog publication proposal. Any Production write requires explicit owner approval.
+| Dimension | Result |
+| --- | ---: |
+| Active exact G0 | 406 |
+| Production exact G0 | 47 |
+| Exact gap | **359** |
+| Production Active coverage | **11.5764%** |
+| Gap variants on an already-published Base Device | **2** |
+| Gap identities on new Base Devices | **357** |
+| New Base Devices represented by those gaps | **87** |
+| Current OpenOCD ordering-pattern unique routes | **317** |
+| Current OpenOCD ordering-pattern unmapped | **42** |
+
+The 42 unmapped identities do **not** invalidate their Layer-1 Catalog identity. They remain backend/profile follow-up.
+
+This establishes the root cause: the dominant G0 coverage gap is the historical bounded discovery scope (12 published Base Devices), not a broad lack of OpenOCD ordering-pattern coverage.
+
+The next gate after this triage is manufacturer-authoritative metadata acquisition for the 87 new Base Devices, followed by a separately reviewed Catalog publication proposal. Any Production write requires explicit owner approval.
