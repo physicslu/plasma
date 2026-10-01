@@ -32,6 +32,8 @@ test("PPU is a first-class EMode object with four functional subpages", () => {
 test("PPU Overview is read-only and summarizes Platform, Registration, Sites, and alerts", () => {
   assert.match(overview, /aria-label="PPU Overview"/);
   assert.match(overview, /Platform Maintenance/);
+  assert.match(overview, /PPU Health/);
+  assert.doesNotMatch(overview, /<small>Platform Health<\/small>/);
   assert.match(overview, /Platform Release/);
   assert.match(overview, /Runtime Version/);
   assert.match(overview, /Registration/);
@@ -41,6 +43,18 @@ test("PPU Overview is read-only and summarizes Platform, Registration, Sites, an
   assert.match(overview, /onNavigate\("registration"\)/);
   assert.match(overview, /onNavigate\("sites"\)/);
   assert.doesNotMatch(overview, /addManagerPpu|setManagerPpuLifecycle|removeManagerPpu|saveManagerPpuSite/);
+});
+
+test("PPU Overview preserves Platform capability semantics", () => {
+  assert.match(overview, /isMissingBootstrapCapabilityRoute/);
+  assert.match(overview, /PlatformCapabilityState = "checking" \| "supported" \| "unsupported" \| "unavailable"/);
+  assert.match(overview, /setPlatformCapability\("unsupported"\)/);
+  assert.match(overview, /setPlatformCapability\("unavailable"\)/);
+  assert.match(overview, /if \(capability === "unsupported"\) return "Not Supported"/);
+  assert.match(overview, /if \(capability === "unsupported"\) return "N\/A"/);
+  assert.match(overview, /Bootstrap route not exposed/);
+  assert.match(overview, /Platform maintenance is not supported by this PPU profile; no active fault is implied/);
+  assert.match(overview, /if \(platformCapability === "unavailable"\) values\.push\("Platform status unavailable"\)/);
 });
 
 test("PPU workspace pages concentrate status before domain workflows without changing ownership", () => {
