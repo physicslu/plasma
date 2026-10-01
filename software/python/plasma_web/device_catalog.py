@@ -432,12 +432,26 @@ def _parse_admitted_source(
         base_device = (row.get("base_device") or "").strip()
         target_config = (row.get("openocd_target_config") or "").strip()
         mapping_method = (row.get("mapping_status") or "").strip()
+        existing_identifier = (row.get("existing_identifier") or "").strip()
+        existing_identifier_kind = (row.get("existing_identifier_kind") or "").strip()
         source_reference = (row.get("source_reference") or "").strip()
         source_authority = (row.get("source_authority") or "").strip()
         source_type = (row.get("source_type") or "").strip()
         verification_status = (row.get("verification_status") or "").strip()
-        if not all((manufacturer, icpn, family, series, base_device, target_config, mapping_method)):
+        if not all((manufacturer, icpn, family, series, base_device, mapping_method)):
             raise DeviceCatalogIntegrityError(f"{origin}:{row_number}: admitted ICPN row has empty required identity/mapping field")
+        if mapping_method == "no_mapping":
+            if target_config or existing_identifier or existing_identifier_kind:
+                raise DeviceCatalogIntegrityError(
+                    f"{origin}:{row_number}: no_mapping ICPN must not carry a backend route"
+                )
+            runtime_mapping_status = "no_mapping"
+        else:
+            if not target_config:
+                raise DeviceCatalogIntegrityError(
+                    f"{origin}:{row_number}: mapped ICPN requires openocd_target_config"
+                )
+            runtime_mapping_status = "mapped"
         if expected_manufacturer is not None and manufacturer != expected_manufacturer:
             raise DeviceCatalogIntegrityError(f"{origin}:{row_number}: manufacturer does not match manifest")
         if expected_family is not None and family != expected_family:
@@ -455,7 +469,7 @@ def _parse_admitted_source(
                 cpu_architectures=(),
                 target_config=target_config,
                 openocd_distribution="upstream-openocd",
-                mapping_status="mapped",
+                mapping_status=runtime_mapping_status,
                 validation_status="no_evidence",
                 catalog_origin=origin,
                 package=(row.get("package") or "").strip() or None,
