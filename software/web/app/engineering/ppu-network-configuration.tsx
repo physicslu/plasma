@@ -218,6 +218,10 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
         <div><small>Manager Txn</small><strong>{commissioning?.state ?? "none"}</strong></div>
       </div>
 
+      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
+      {recoveryRequired && (
+        <p className="ppuRegistryMessage warning" role="alert"><strong>Recovery required:</strong> {commissioning?.error_message ?? "Manager cannot prove a safe automatic continuation."} Do not start another network transaction until the PPU network and Manager registry are reconciled.</p>
+      )}
 
       {detailsOpen && (
         <>
@@ -294,13 +298,9 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onR
           <strong>Commissioning evidence:</strong> candidate Plasma Gateway Endpoint <code>{commissioning.candidate_endpoint}</code>; transaction <code>{commissioning.transaction_id}</code>.
         </p>
       )}
-      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {saved && !loading && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}
       {commissioned && commissioning?.state === "completed" && (
         <p className="ppuRegistryMessage success" role="status">Static IPv4 commissioning completed. Manager verified the same <code>ppu_id</code>, committed the PPU activation, and reconciled the durable Plasma Gateway Endpoint.</p>
-      )}
-      {recoveryRequired && (
-        <p className="ppuRegistryMessage warning" role="alert"><strong>Recovery required:</strong> {commissioning?.error_message ?? "Manager cannot prove a safe automatic continuation."} Do not start another network transaction until the PPU network and Manager registry are reconciled.</p>
       )}
 
       {!lifecycleWritable && (
