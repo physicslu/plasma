@@ -116,11 +116,13 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/test_stm32g4_dual_surface_evidence.py"),
             _py("data/device-catalog/research/test_stm32g4_phase4_9b_discovery.py"),
             _py("data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py"),
-            _py("data/device-catalog/research/test_stm32g4_phase4_9c_policy.py"),
-            _py("data/device-catalog/research/stm32g4_phase4_9c_policy.py"),
-            _py("data/device-catalog/research/test_stm32g4_phase4_9d_admission.py"),
-            _py("data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py"),
-            _py("data/device-catalog/research/test_stm32g4_phase4_9e_publication.py"),
+            # Historical 4.9C/D/E files remain immutable evidence, but their
+            # prestate manifests dereference mutable Production CSV paths.
+            # Current family CI therefore validates the retained evidence plus
+            # the current refresh contract instead of regenerating historical
+            # conclusions from later Production growth.
+            _py("data/device-catalog/research/stm32g4_layer1_refresh_v20.py"),
+            _py("data/device-catalog/research/test_stm32g4_layer1_refresh_v20.py"),
         ],
         "stm32u0": [
             _py("data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py"),
