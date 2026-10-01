@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'data/device-catalog/research/stm32g0-commercial-icpn.csv'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/stm32g0-layer1-production-publication-v1.9.json'
       - 'data/device-catalog/research/validate_stm32g0_layer1_publication_v19.py'
       - 'data/device-catalog/research/STM32G0_LAYER1_PRODUCTION_PUBLICATION_V19.md'
