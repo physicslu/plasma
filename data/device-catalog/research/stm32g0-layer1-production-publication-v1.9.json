@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32g0-layer1-production-publication-v1.9",
+  "publication_date_utc": "2026-10-01",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32g0-layer1-catalog-admission-proposal-v1.8",
+  "approved_candidate_exact_count": 359,
+  "approved_candidate_exact_set_sha256": "a6240e4a34e3834cba7195be306d449386dcac1b3e66189f6bfac8fdc7557a5d",
+  "approved_candidate_csv_sha256": "5b18c64349dcdf273234b2a656ce3dee62d05d15959872753c6136c23f925ea2",
+  "production_prestate": {
+    "exact_total": 2683,
+    "source_count": 23,
+    "stm32g0_exact": 47,
+    "stm32g0_source_git_blob_sha": "514f3a9b15b7ba31982f7b1ed322b1bac610909a",
+    "stm32g0_source_sha256": "70cc049b7e4c282af407c65bbf41a8f7128e54285b76275cb5f3071b9d03e012"
+  },
+  "production_poststate": {
+    "exact_total": 3042,
+    "source_count": 23,
+    "stm32g0_exact": 406,
+    "stm32g0_source_git_blob_sha": "48ee24d55581ebda1ac4386f1f73890b2db058a7",
+    "stm32g0_source_sha256": "48f097d7d06c1af4497fba4bc3e4b24b50bab120f4fdb98e4e584583ef90c233"
+  },
+  "stm32g0_backend_state_after": {
+    "mapped": 364,
+    "no_mapping": 42
+  },
+  "approved_addition_backend_state": {
+    "mapped": 317,
+    "no_mapping": 42
+  },
+  "coverage_effect": {
+    "stm32g0_active_exact_denominator": 406,
+    "stm32g0_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 2963,
+    "whole_st_active_gap_after": 1587,
+    "whole_st_active_identity_coverage_after_percent": 65.1209
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
