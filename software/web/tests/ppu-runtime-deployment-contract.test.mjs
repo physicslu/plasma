@@ -41,6 +41,21 @@ test("Platform surface is explicitly independent from programming Registration",
   assert.doesNotMatch(platform, /PPU \/ Site Configuration/);
 });
 
+test("Platform missing Bootstrap route is classified narrowly as unsupported capability", async () => {
+  const [deployment, api] = await Promise.all([source(files.deployment), source(files.api)]);
+  assert.match(api, /export class BootstrapApiError extends Error/);
+  assert.match(api, /error instanceof BootstrapApiError/);
+  assert.match(api, /error\.status === 404/);
+  assert.match(api, /error\.code === null/);
+  assert.match(api, /error\.message === "not found"/);
+  assert.match(deployment, /isMissingBootstrapCapabilityRoute/);
+  assert.match(deployment, /setPlatformCapability\("unsupported"\)/);
+  assert.match(deployment, /Platform Maintenance/);
+  assert.match(deployment, /Not Supported/);
+  assert.match(deployment, /does not expose the Bootstrap \/ Platform maintenance route/);
+  assert.doesNotMatch(deployment, /setError\([^\n]*Not Supported/);
+});
+
 test("Platform Release update is registration-independent while preserving idle, recovery, and artifact-integrity gates", async () => {
   const deployment = await source(files.deployment);
   assert.match(deployment, /runtime\?\.state === "runtime_absent"/);
