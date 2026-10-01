@@ -50,7 +50,7 @@
       "document_date": "2026-08-30",
       "title": "Plasma retained STM32F1 commercial ICPN catalog",
       "authority": "plasma_canonical_catalog",
-      "path": "data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv",
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
       "integrity": {
         "status": "git_blob_pinned",
         "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
