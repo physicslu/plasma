@@ -1,0 +1,44 @@
+name: STM32F1 Layer-1 Production publication v2.5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f1-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv'
+      - 'data/device-catalog/research/stm32f1-layer1-production-publication-v2.5.json'
+      - 'data/device-catalog/research/validate_stm32f1_layer1_publication_v25.py'
+      - 'data/device-catalog/research/STM32F1_LAYER1_PRODUCTION_PUBLICATION_V25.md'
+      - 'data/device-catalog/research/validate_stm32f1_commercial_icpn.py'
+      - 'data/device-catalog/research/test_stm32f1_canonical_admission.py'
+      - 'data/device-catalog/research/test_stm32f1_phase2_9_scaleout.py'
+      - 'data/ic-support/test_coverage_inventory.py'
+      - 'software/python/tests/test_device_catalog.py'
+      - '.github/workflows/device-catalog-validation.yml'
+      - '.github/workflows/device-catalog-stm32f1-layer1-publication-v25.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate approved F1 publication and historical replay boundary
+        run: |
+          python data/device-catalog/research/validate_stm32f1_commercial_icpn.py
+          python data/device-catalog/research/validate_stm32f1_layer1_publication_v25.py
+          python data/device-catalog/research/validate_stm32f1_admission_plan.py \
+            --canonical data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv
+          python data/device-catalog/research/test_stm32f1_canonical_admission.py
+          python data/device-catalog/research/test_stm32f1_phase2_9_scaleout.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+      - name: Install Python development package
+        run: python -m pip install -e './software/python[dev]'
+      - name: Validate runtime Catalog semantics
+        run: python -m pytest -q software/python/tests/test_device_catalog.py
