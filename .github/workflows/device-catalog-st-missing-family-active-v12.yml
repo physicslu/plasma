@@ -28,7 +28,7 @@ jobs:
           rm -rf /tmp/st-missing-family-v12
           python data/device-catalog/research/acquire_st_missing_family_active_v12.py \
             --output /tmp/st-missing-family-v12 \
-            --interval-seconds 0.6
+            --interval-seconds 1.0
           echo '--- CAPTURE SUMMARY ---'
           cat /tmp/st-missing-family-v12/capture-summary.json
           echo '--- EXACT SETS ---'
