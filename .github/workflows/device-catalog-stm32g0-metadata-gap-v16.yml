@@ -1,0 +1,21 @@
+name: STM32G0 metadata policy gap v1.6
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/analyze_stm32g0_metadata_gap_v16.py'
+      - 'data/device-catalog/research/test_analyze_stm32g0_metadata_gap_v16.py'
+      - 'data/device-catalog/research/STM32G0_METADATA_GAP_V16.md'
+      - '.github/workflows/device-catalog-stm32g0-metadata-gap-v16.yml'
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python data/device-catalog/research/analyze_stm32g0_metadata_gap_v16.py
+          python -m unittest discover -s data/device-catalog/research -p test_analyze_stm32g0_metadata_gap_v16.py -v
