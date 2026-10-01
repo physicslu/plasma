@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32f0-layer1-production-publication-v2.3",
+  "publication_date_utc": "2026-10-01",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32f0-layer1-admission-proposal-v2.2",
+  "approved_proposal_pr": 696,
+  "approved_proposal_workflow_run_id": 36829488501,
+  "approved_proposal_job_id": 110262581852,
+  "approved_proposal_artifact_id": 11146682053,
+  "approved_proposal_artifact_zip_sha256": "5d700e54b872c2c033fc9db971b22925d6919799ae0c27f29f2b697e0b3ba6b9",
+  "approved_candidate_exact_count": 221,
+  "approved_candidate_exact_set_sha256": "66023d672322045e9301245a3b6c5fcaa5637bbcc6a83ca98919923468d0fdb0",
+  "approved_candidate_csv_sha256": "8f876a2b4f127ca2c86705a0589901ce08c373b56015d928a58847b03dbe3c06",
+  "approved_authority_sha256": "986d8cea5d8a68377491c9adc2b6e893b3fdd0f3ce333af822fa7f03b4361e09",
+  "production_prestate": {
+    "exact_total": 3290,
+    "source_count": 23,
+    "stm32f0_exact": 42,
+    "stm32f0_source_git_blob_sha": "ad9a5b0e643dcbee3118dff9f9863c637d66e3d6",
+    "stm32f0_source_sha256": "c5e138eced2389cf99948536308142a2488bdaefa619130b9b50b6fc52cd80c9"
+  },
+  "production_poststate": {
+    "exact_total_at_publication": 3511,
+    "source_count": 23,
+    "stm32f0_exact": 263,
+    "stm32f0_source_git_blob_sha": "a55048aa21d54cb958dad277ee34a0f7f491a123",
+    "stm32f0_source_sha256": "03cc4593ee607162702451caf0be583efcf8eacdde0d63c03918e3333c9cd45e"
+  },
+  "stm32f0_backend_state_after": {
+    "mapped": 263,
+    "no_mapping": 0
+  },
+  "approved_addition_backend_state": {
+    "mapped": 221,
+    "no_mapping": 0
+  },
+  "catalog_backend_state_at_publication": {
+    "mapped": 3468,
+    "no_mapping": 43
+  },
+  "coverage_effect": {
+    "stm32f0_active_exact_denominator": 263,
+    "stm32f0_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 3432,
+    "whole_st_active_gap_after": 1118,
+    "whole_st_active_identity_coverage_after_percent": 75.4286
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "all_added_rows_have_deterministic_openocd_route": true,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
