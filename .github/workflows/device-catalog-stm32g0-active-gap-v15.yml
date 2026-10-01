@@ -1,0 +1,36 @@
+name: STM32G0 Active exact gap layered triage v1.5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32g0-active-exact-gap-v1.5.txt'
+      - 'data/device-catalog/research/classify_stm32g0_active_gap_v15.py'
+      - 'data/device-catalog/research/test_classify_stm32g0_active_gap_v15.py'
+      - 'data/device-catalog/research/STM32G0_ACTIVE_GAP_TRIAGE_V15.md'
+      - '.github/workflows/device-catalog-stm32g0-active-gap-v15.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  layered-triage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reconcile Layer-1 G0 identity gaps against current Production and OpenOCD research surface
+        run: |
+          python data/device-catalog/research/classify_stm32g0_active_gap_v15.py \
+            | tee /tmp/stm32g0-active-gap-triage-v15.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_classify_stm32g0_active_gap_v15.py -v
+      - name: Upload triage result
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32g0-active-gap-triage-v15
+          path: /tmp/stm32g0-active-gap-triage-v15.json
+          if-no-files-found: error
+          retention-days: 30
