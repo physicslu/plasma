@@ -195,6 +195,7 @@ def build_inventory() -> dict[str, Any]:
     base_rows: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     family_counts: Counter[str] = Counter()
     openocd_mapped_count = 0
+    openocd_unmapped_count = 0
     inventory_rows: list[dict[str, Any]] = []
 
     for row in rows:
@@ -209,6 +210,12 @@ def build_inventory() -> dict[str, Any]:
         deterministic_openocd = bool(openocd_target) and mapping_status.startswith("deterministic")
         if deterministic_openocd:
             openocd_mapped_count += 1
+        else:
+            require(
+                mapping_status == "no_mapping" and not openocd_target,
+                f"{row['icpn']}: non-deterministic backend state must be explicit no_mapping",
+            )
+            openocd_unmapped_count += 1
 
         binding = bindings.get(row["icpn"])
         if binding:
@@ -270,6 +277,7 @@ def build_inventory() -> dict[str, Any]:
             "family_exact_icpns": dict(sorted(family_counts.items())),
             "base_devices": len(base_devices),
             "deterministic_openocd_exact_icpns": openocd_mapped_count,
+            "openocd_unmapped_exact_icpns": openocd_unmapped_count,
             "ic_support_bound_exact_icpns": len(bindings),
             "unresolved_programming_profile_exact_icpns": len(rows) - len(bindings),
             "evidence_backed_programming_profiles": len(programming_profile_ids),

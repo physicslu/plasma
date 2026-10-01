@@ -109,7 +109,7 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/stm32g0_phase4_8c_policy.py"),
             _py("data/device-catalog/research/test_stm32g0_phase4_8d_admission.py"),
             _py("data/device-catalog/research/validate_stm32g0_phase4_8d_admission_plan.py"),
-            _py("data/device-catalog/research/test_stm32g0_phase4_8e_publication.py"),
+            _py("data/device-catalog/research/validate_stm32g0_layer1_publication_v19.py"),
         ],
         "stm32g4": [
             _py("data/device-catalog/research/test_stm32g4_phase4_9a_foundation.py"),
@@ -157,10 +157,18 @@ def affected_families(changed_paths: Iterable[str]) -> list[str]:
         if not path:
             continue
 
-        if path in {DISPATCHER_PATH, RUNNER_PATH}:
+        if path == DISPATCHER_PATH:
             return list(FAMILIES)
+        if path == RUNNER_PATH:
+            # The dispatcher validates itself in every workflow run. Do not
+            # replay every historical family phase merely because routing code
+            # changed; concrete changed family paths below select current scope.
+            continue
         if path.startswith("data/device-catalog/production/"):
-            return list(FAMILIES)
+            # Canonical Production state belongs to current/global validators.
+            # Historical family phases keep their frozen prestates and must not
+            # be regenerated from future Production growth.
+            continue
         if path == "data/device-catalog/research/openocd-parts-canonical.csv":
             return list(FAMILIES)
         if path.startswith("data/device-catalog/research/device_catalog_"):
@@ -220,7 +228,12 @@ def self_test() -> None:
     assert affected_families(["data/device-catalog/research/device-catalog-phase4.5c-stm32f0-policy.md"]) == ["stm32f0"]
     assert affected_families([".github/workflows/device-catalog-stm32f2-bounded-validation.yml"]) == ["stm32f2"]
     assert affected_families(["data/device-catalog/research/openocd-parts-canonical.csv"]) == list(FAMILIES)
-    assert affected_families([RUNNER_PATH]) == list(FAMILIES)
+    assert affected_families([RUNNER_PATH]) == []
+    assert affected_families(["data/device-catalog/production/icpn-v1-manifest.json"]) == []
+    assert affected_families([
+        RUNNER_PATH,
+        "data/device-catalog/research/stm32g0-commercial-icpn.csv",
+    ]) == ["stm32g0"]
     for family in FAMILIES:
         assert command_profile(family), family
         assert RUNNERS[family]
