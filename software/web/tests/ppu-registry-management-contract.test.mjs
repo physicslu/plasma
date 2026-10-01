@@ -32,6 +32,8 @@ test("PPU is a first-class EMode object with four functional subpages", () => {
 test("PPU Overview is read-only and summarizes Platform, Registration, Sites, and alerts", () => {
   assert.match(overview, /aria-label="PPU Overview"/);
   assert.match(overview, /Platform Maintenance/);
+  assert.match(overview, /PPU Health/);
+  assert.doesNotMatch(overview, /<small>Platform Health<\/small>/);
   assert.match(overview, /Platform Release/);
   assert.match(overview, /Runtime Version/);
   assert.match(overview, /Registration/);
