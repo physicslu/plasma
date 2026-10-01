@@ -84,6 +84,9 @@ export default function PpuRuntimeDeployment({
   }, [alias]);
 
   useEffect(() => {
+    setPlatformCapability("checking");
+    setStatus(null);
+    setError(null);
     const initial = window.setTimeout(() => { void refresh(); }, 0);
     const timer = window.setInterval(() => { void refresh(true); }, 3000);
     return () => {
@@ -206,15 +209,19 @@ export default function PpuRuntimeDeployment({
 
   return (
     <section className="ppuSiteCard ppuPlatformCard" aria-label="PPU Platform Release">
-      {platformCapability === "unsupported" ? (
+      {platformCapability !== "supported" ? (
         <section className="ppuPlatformCapabilityBoundary" aria-label="Platform maintenance capability">
           <div>
             <small>CAPABILITY</small>
             <h3>Platform Maintenance</h3>
-            <p>This PPU profile does not expose the Bootstrap / Platform maintenance route. Programming Registration and observed Site topology remain separate capabilities.</p>
+            <p>
+              {platformCapability === "unsupported"
+                ? "This PPU profile does not expose the Bootstrap / Platform maintenance route. Programming Registration and observed Site topology remain separate capabilities."
+                : "Checking whether the selected PPU exposes the Bootstrap / Platform maintenance route."}
+            </p>
           </div>
           <div className="ppuPlatformSummaryActions">
-            <span className="ppuPlatformStatusPill">Not Supported</span>
+            <span className="ppuPlatformStatusPill">{platformCapability === "unsupported" ? "Not Supported" : "Checking"}</span>
             <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
               {loading ? "Checking..." : "Refresh Status"}
             </button>
