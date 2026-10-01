@@ -11,7 +11,7 @@ from stm32f4_coverage_gap_inventory import build_inventory
 HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
-STM32F1_CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+STM32F1_CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
 PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 LIFECYCLE_ROOT = HERE / "lifecycle-evidence"
 BASELINE = HERE / "stm32f4-phase4.2al-lifecycle-gap-classification-baseline.json"
@@ -34,18 +34,13 @@ def main() -> int:
     assert inventory["production"]["base_device_count"] == production["stm32f4_base_devices"]
     assert hashlib.sha256(CANONICAL.read_bytes()).hexdigest() == production["stm32f4_catalog_sha256"]
     manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
-    assert (
-        sum(
-            source["row_count"]
-            for source in manifest["sources"]
-            if source["family"] in {"STM32F1", "STM32F4"}
-        )
-        == production["st_exact_icpns"]
-    )
+    sources = {source["family"]: source for source in manifest["sources"]}
+    assert sources["STM32F4"]["row_count"] == production["stm32f4_exact_icpns"]
     with STM32F1_CANONICAL.open(encoding="utf-8") as handle:
-        stm32f1_base_devices = {
-            row["base_device"] for row in csv.DictReader(handle)
-        }
+        historical_f1_rows = list(csv.DictReader(handle))
+    assert len(historical_f1_rows) == 75
+    assert len(historical_f1_rows) + sources["STM32F4"]["row_count"] == production["st_exact_icpns"]
+    stm32f1_base_devices = {row["base_device"] for row in historical_f1_rows}
     stm32f4_base_devices = set(inventory["production"]["base_devices"])
     assert stm32f1_base_devices.isdisjoint(stm32f4_base_devices)
     assert len(stm32f1_base_devices | stm32f4_base_devices) == production["st_base_devices"]
