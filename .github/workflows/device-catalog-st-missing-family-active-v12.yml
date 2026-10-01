@@ -1,0 +1,45 @@
+name: ST missing-family Active exact-MPN live acquisition v1.2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/acquire_st_missing_family_active_v12.py'
+      - 'data/device-catalog/research/ST_COVERAGE_GAP_MISSING_FAMILIES_V12.md'
+      - '.github/workflows/device-catalog-st-missing-family-active-v12.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-live-acquisition:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Static syntax gate
+        run: |
+          python -m py_compile data/device-catalog/research/acquire_st_missing_family_active_v12.py
+      - name: Acquire official ST Active exact commercial rows
+        run: |
+          rm -rf /tmp/st-missing-family-v12
+          python data/device-catalog/research/acquire_st_missing_family_active_v12.py \
+            --output /tmp/st-missing-family-v12 \
+            --interval-seconds 0.6
+          echo '--- CAPTURE SUMMARY ---'
+          cat /tmp/st-missing-family-v12/capture-summary.json
+          echo '--- EXACT SETS ---'
+          for f in /tmp/st-missing-family-v12/*/observed-active-exact.csv; do
+            echo "### $f"
+            cat "$f"
+          done
+      - name: Upload manufacturer raw evidence candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-missing-family-active-exact-v12-candidate
+          path: /tmp/st-missing-family-v12/
+          if-no-files-found: error
+          retention-days: 30
