@@ -24,7 +24,7 @@ from stm32f1_canonical_admission import (  # noqa: E402
 )
 
 EVIDENCE = HERE / "evidence" / "stm32f1-phase2.6-browser-2026-08-29"
-CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 BASELINE = HERE / "stm32f1-acquisition-pilot-baseline.json"
 HISTORICAL_PLAN = HERE / "stm32f1-phase2.7-admission-plan.json"
