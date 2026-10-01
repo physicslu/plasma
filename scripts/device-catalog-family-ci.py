@@ -121,8 +121,7 @@ def command_profile(family: str) -> list[list[str]]:
             # Current family CI therefore validates the retained evidence plus
             # the current refresh contract instead of regenerating historical
             # conclusions from later Production growth.
-            _py("data/device-catalog/research/stm32g4_layer1_refresh_v20.py"),
-            _py("data/device-catalog/research/test_stm32g4_layer1_refresh_v20.py"),
+            _py("data/device-catalog/research/validate_stm32g4_layer1_publication_v21.py"),
         ],
         "stm32u0": [
             _py("data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py"),
