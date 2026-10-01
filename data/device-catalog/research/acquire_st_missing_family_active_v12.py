@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -65,17 +66,36 @@ def get(url: str, agent: str) -> tuple[bytes, str]:
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
     })
-    with urlopen(request, timeout=30) as response:
-        final = response.geturl()
-        parts = urlsplit(final)
-        check(response.status == 200 and parts.scheme == "https" and
-              parts.hostname in {"estore.st.com", "www.st.com"},
-              "blocked response or redirect outside official ST domains")
-        check("text/html" in response.headers.get("Content-Type", "").lower(),
-              "manufacturer returned non-HTML")
-        raw = response.read(SIZE_LIMIT + 1)
-    check(5000 <= len(raw) <= SIZE_LIMIT, "blocked, truncated or oversized HTML")
-    return raw, final
+    last_error = None
+    for attempt, backoff in enumerate((0, 2, 5, 10), start=1):
+        if backoff:
+            time.sleep(backoff)
+        try:
+            with urlopen(request, timeout=30) as response:
+                final = response.geturl()
+                parts = urlsplit(final)
+                check(response.status == 200 and parts.scheme == "https" and
+                      parts.hostname in {"estore.st.com", "www.st.com"},
+                      "blocked response or redirect outside official ST domains")
+                check("text/html" in response.headers.get("Content-Type", "").lower(),
+                      "manufacturer returned non-HTML")
+                raw = response.read(SIZE_LIMIT + 1)
+            check(5000 <= len(raw) <= SIZE_LIMIT,
+                  "blocked, truncated or oversized HTML")
+            return raw, final
+        except HTTPError as error:
+            last_error = error
+            if error.code not in {429, 500, 502, 503, 504} or attempt == 4:
+                raise
+            print(f"Transient HTTP {error.code}; bounded retry {attempt}/4: {url}",
+                  file=sys.stderr, flush=True)
+        except URLError as error:
+            last_error = error
+            if attempt == 4:
+                raise
+            print(f"Transient URL error; bounded retry {attempt}/4: {url}",
+                  file=sys.stderr, flush=True)
+    raise RuntimeError(f"unreachable retry exhaustion: {last_error}")
 
 class Cards(HTMLParser):
     def __init__(self):
@@ -353,7 +373,7 @@ def collect(out: Path, interval: float) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--output", type=Path, required=True)
-    ap.add_argument("--interval-seconds", type=float, default=0.6)
+    ap.add_argument("--interval-seconds", type=float, default=1.0)
     args = ap.parse_args()
     result = collect(args.output, args.interval_seconds)
     print(json.dumps({k: v for k, v in result.items() if k != "families"},
