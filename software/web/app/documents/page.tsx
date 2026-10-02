@@ -1303,7 +1303,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
       <DocumentSetupOverview
         title={zh ? "Mock Settings　4 個設定群組" : "Mock Settings · 4 configuration groups"}
         subtitle={zh ? "先決定 Profile 與 Synthetic Image，再設定 determinism 與各 operation timing / error injection。" : "Resolve Profile and Synthetic Image first, then configure determinism and per-operation timing / error injection."}
-        steps={zh ? [
+        steps={(zh ? [
           ["Profile", "Enabled"],
           ["Synthetic Image", "Default Image Size"],
           ["Determinism", "Seed Mode / Fixed Seed"],
@@ -1313,7 +1313,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
           ["Synthetic Image", "Default Image Size"],
           ["Determinism", "Seed Mode / Fixed Seed"],
           ["Operation Profile", "Error Rate / Base Time / Throughput / Jitter"],
-        ]}
+        ]) as Array<[string, string]>}
       />
 
       <DocumentCallout tone="critical" label={zh ? "Mock evidence boundary" : "Mock evidence boundary"}>
