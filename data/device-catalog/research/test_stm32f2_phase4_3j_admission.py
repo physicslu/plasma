@@ -29,8 +29,10 @@ from stm32f2_bounded_policy import DEFAULT_CANONICAL  # noqa: E402
 AUDIT_PATH = HERE / "stm32f2-phase4.3j-admission-audit.json"
 MANIFEST_PATH = HERE.parent / "production" / "icpn-v1-manifest.json"
 PRESTATE_MANIFEST_PATH = HERE / "stm32f2-phase4.3j-production-manifest-prestate.json"
-F1_CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
-F4_CANONICAL = HERE / "stm32f4-phase4.3-historical-production-canonical.csv"
+F1_HISTORICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
+F4_HISTORICAL = HERE / "stm32f4-phase4.3-historical-production-canonical.csv"
+F1_CANONICAL_NAME = "stm32f1-commercial-icpn.csv"
+F4_CANONICAL_NAME = "stm32f4-commercial-icpn.csv"
 EXPECTED_PLAN_SHA256 = "1b8649c284210076d74fa4b418c5f40554f5d74e1b03062054685d70f34faba8"
 EXPECTED_CANONICAL_SHA256 = "69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0"
 EXPECTED_CANONICAL_BLOB = "1bec0770179f3849c6cfbb66aea9ad9d63610f55"
@@ -74,8 +76,8 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
 
         canonical = research / DEFAULT_CANONICAL.name
         self._historical_canonical(canonical)
-        (research / F1_CANONICAL.name).write_bytes(F1_CANONICAL.read_bytes())
-        (research / F4_CANONICAL.name).write_bytes(F4_CANONICAL.read_bytes())
+        (research / F1_CANONICAL_NAME).write_bytes(F1_HISTORICAL.read_bytes())
+        (research / F4_CANONICAL_NAME).write_bytes(F4_HISTORICAL.read_bytes())
         manifest = production / "icpn-v1-manifest.json"
         manifest.write_bytes(PRESTATE_MANIFEST_PATH.read_bytes())
         return canonical, manifest
