@@ -40,6 +40,10 @@ DEFAULT_CATALOG = HERE / "openocd-parts-canonical.csv"
 DEFAULT_CANONICAL = HERE / "stm32f2-commercial-icpn.csv"
 DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 DEFAULT_POLICY_BASELINE = HERE / "stm32f2-phase4.3f-policy-baseline.json"
+HISTORICAL_F1_CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
+HISTORICAL_F4_CANONICAL = HERE / "stm32f4-phase4.3-historical-production-canonical.csv"
+HISTORICAL_F1_SHA256 = "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+HISTORICAL_F4_SHA256 = "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
 PHASE = "4.3F"
 ADAPTER_ID = "stm32f2-phase4.3f"
 EXPECTED_COUNT = 13
@@ -75,11 +79,28 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
         _, rows = read_csv((manifest_path.parent / relative).resolve())
         if len(rows) != declared or any(row.get("family") != family for row in rows):
             raise AdmissionError(f"{family}: Production source drifted")
-        family_counts[family] = family_counts.get(family, 0) + len(rows)
-        base_devices.update((family, row.get("base_device", "")) for row in rows)
-    if family_counts.get("STM32F1") != 75 or family_counts.get("STM32F4") != 384:
-        raise AdmissionError(f"unexpected Production family counts: {family_counts}")
-    if family_counts.get("STM32F2", 0) < 9 or sum(family_counts.values()) < 468 or len(base_devices) < 161:
+
+        if family == "STM32F1":
+            if file_sha256(HISTORICAL_F1_CANONICAL) != HISTORICAL_F1_SHA256:
+                raise AdmissionError("STM32F1 historical Production snapshot digest drifted")
+            _, historical_rows = read_csv(HISTORICAL_F1_CANONICAL)
+        elif family == "STM32F4":
+            if file_sha256(HISTORICAL_F4_CANONICAL) != HISTORICAL_F4_SHA256:
+                raise AdmissionError("STM32F4 historical Production snapshot digest drifted")
+            _, historical_rows = read_csv(HISTORICAL_F4_CANONICAL)
+        elif family == "STM32F2":
+            historical_rows = [
+                row for row in rows if row.get("icpn") in HISTORICAL_CANONICAL_ICPNS
+            ]
+        else:
+            continue
+
+        family_counts[family] = len(historical_rows)
+        base_devices.update((family, row.get("base_device", "")) for row in historical_rows)
+
+    if family_counts != {"STM32F1": 75, "STM32F2": 9, "STM32F4": 384}:
+        raise AdmissionError(f"unexpected historical Production family counts: {family_counts}")
+    if sum(family_counts.values()) != 468 or len(base_devices) != 161:
         raise AdmissionError("Phase 4.3F historical Production boundary is unavailable")
     return {
         "exact_icpn_count": 468,
