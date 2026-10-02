@@ -171,13 +171,13 @@ function PpuSetupExampleRail({ zh }: { zh: boolean }) {
         <div>
           <small>{zh ? "操作畫面示例" : "OPERATION SCREEN EXAMPLES"}</small>
           <h2>{zh ? "操作畫面示例" : "Operation screen examples"}</h2>
-          <p>{zh ? "以下是操作畫面的示意，用來對照左側步驟；不是即時系統狀態。" : "These are illustrative operation screens for following the steps at left; they are not live system state."}</p>
+          <p>{zh ? "以下 1–7 對應左側 7 個大步驟；這些是操作畫面示意，不是即時系統狀態。" : "Examples 1–7 correspond to the seven major steps at left. These are illustrative operation screens, not live system state."}</p>
         </div>
       </header>
 
-      <section className="documentOperationExample">
-        <header><span>1</span><div><strong>{zh ? "新增 PPU 連線" : "Add a PPU connection"}</strong><p>{zh ? "PPU → Registration → + Add PPU Connection" : "PPU → Registration → + Add PPU Connection"}</p></div></header>
-        <div className="documentMockScreen" aria-label={zh ? "新增 PPU 連線示意畫面" : "Illustrative add PPU connection screen"}>
+      <section className="documentOperationExample" data-step="1">
+        <header><span>1</span><div><strong>{zh ? "新增 PPU 連線" : "Add a PPU connection"}</strong><p>PPU → Registration → + Add PPU Connection</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 1：新增 PPU 連線操作畫面示例" : "Step 1 illustrative add PPU connection screen"}>
           <div className="documentMockToolbar"><b>Registration</b><span>+ Add PPU Connection</span></div>
           <div className="documentMockForm">
             <label><span>Console Alias</span><b>line1-ppu-a</b></label>
@@ -187,17 +187,119 @@ function PpuSetupExampleRail({ zh }: { zh: boolean }) {
         </div>
       </section>
 
-      <section className="documentOperationExample">
-        <header><span>2</span><div><strong>{zh ? "查看 PPU 狀態" : "Review PPU state"}</strong><p>{zh ? "新增後確認 Connectivity、Health 與 Registration readiness。" : "After adding it, confirm Connectivity, Health, and Registration readiness."}</p></div></header>
-        <div className="documentMockScreen" aria-label={zh ? "PPU 狀態示意畫面" : "Illustrative PPU status screen"}>
+      <section className="documentOperationExample" data-step="2">
+        <header><span>2</span><div><strong>{zh ? "確認 PPU 狀態" : "Confirm PPU state"}</strong><p>{zh ? "註冊前確認 Connectivity、Health 與 Registration readiness。" : "Before Registration, confirm Connectivity, Health, and Registration readiness."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 2：PPU 狀態操作畫面示例" : "Step 2 illustrative PPU state screen"}>
           <div className="documentMockToolbar"><b>Known PPU Connections</b><span>Refresh</span></div>
           <div className="documentMockStatusRow"><b>line1-ppu-a</b><span data-tone="good">Online</span><span data-tone="good">Healthy</span></div>
           <div className="documentMockSummary">
             <div><small>PPU ID</small><strong>ppu-8f2c9d7e</strong></div>
-            <div><small>Registration</small><strong>Registered</strong></div>
+            <div><small>Registration</small><strong>Not Registered</strong></div>
             <div><small>Execution</small><strong>Ready</strong></div>
             <div><small>Reported Sites</small><strong>8</strong></div>
           </div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample" data-step="3">
+        <header><span>3</span><div><strong>{zh ? "註冊燒錄權限" : "Register programming admission"}</strong><p>{zh ? "Readiness 全部通過後執行 Validate & Register for Programming。" : "After all readiness checks pass, run Validate & Register for Programming."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 3：Programming Registration 操作畫面示例" : "Step 3 illustrative programming registration screen"}>
+          <div className="documentMockToolbar"><b>Registration Readiness</b><span>Ready</span></div>
+          <div className="documentMockSummary">
+            <div><small>Observation</small><strong>Current</strong></div>
+            <div><small>Transport</small><strong>Online</strong></div>
+            <div><small>Execution</small><strong>Ready</strong></div>
+            <div><small>Identity Conflict</small><strong>None</strong></div>
+          </div>
+          <div className="documentMockForm">
+            <div className="documentMockActions"><strong>Validate &amp; Register for Programming</strong></div>
+          </div>
+          <div className="documentMockStatusRow"><b>Programming Registration</b><span data-tone="good">Registered</span><span>Commissioned</span></div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample" data-step="4">
+        <header><span>4</span><div><strong>{zh ? "選擇受管操作 PPU" : "Select the Managed Operations PPU"}</strong><p>{zh ? "將已 Registered 的 PPU 指定為目前 managed workflow 目標。" : "Select a Registered PPU as the current managed-workflow target."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 4：Managed Operations PPU 操作畫面示例" : "Step 4 illustrative Managed Operations PPU screen"}>
+          <div className="documentMockToolbar"><b>Known PPU Connections</b><span>Registered</span></div>
+          <div className="documentMockSummary">
+            <div><small>Console Alias</small><strong>line1-ppu-a</strong></div>
+            <div><small>Facility</small><strong>line-1</strong></div>
+            <div><small>Connectivity</small><strong>Online</strong></div>
+            <div><small>Health</small><strong>Healthy</strong></div>
+          </div>
+          <div className="documentMockForm">
+            <div className="documentMockActions"><strong>Use for Managed Operations</strong></div>
+          </div>
+          <div className="documentMockStatusRow"><b>Managed Operations PPU</b><span data-tone="good">Selected</span><span>line1-ppu-a</span></div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample" data-step="5">
+        <header><span>5</span><div><strong>{zh ? "設定 PPU 網路" : "Configure the PPU network"}</strong><p>{zh ? "查看 Desired Network，必要時進入 Configure Network。" : "Review Desired Network and open Configure Network when a change is required."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 5：PPU Network Configuration 操作畫面示例" : "Step 5 illustrative PPU Network Configuration screen"}>
+          <div className="documentMockToolbar"><b>PPU Network Configuration</b><span>Configure Network</span></div>
+          <div className="documentMockSummary">
+            <div><small>Interface</small><strong>eth0</strong></div>
+            <div><small>Desired Mode</small><strong>DHCP</strong></div>
+            <div><small>Activation</small><strong>Not Supported</strong></div>
+            <div><small>Revision</small><strong>1</strong></div>
+          </div>
+          <div className="documentMockForm">
+            <label><span>Desired Mode</span><b>Static IPv4</b></label>
+            <label><span>IPv4 Address / Prefix</span><b>192.168.10.21 / 24</b></label>
+            <label><span>Default Gateway</span><b>192.168.10.1</b></label>
+            <label><span>DNS Servers</span><b>192.168.10.1</b></label>
+            <div className="documentMockActions"><span>Cancel</span><strong>Save Desired Network</strong></div>
+          </div>
+          <div className="documentMockStatusRow"><b>Activation capability</b><span>Not Supported</span><span>{zh ? "不是 Fault" : "Not a fault"}</span></div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample" data-step="6">
+        <header><span>6</span><div><strong>{zh ? "Platform 維護" : "Maintain the Platform"}</strong><p>{zh ? "使用獨立的 Platform Maintenance 授權更新 Platform Release / Runtime。" : "Use the separate Platform Maintenance authorization to update Platform Release / Runtime."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 6：Platform Maintenance 操作畫面示例" : "Step 6 illustrative Platform Maintenance screen"}>
+          <div className="documentMockToolbar"><b>Platform Maintenance</b><span>Bootstrap Supported</span></div>
+          <div className="documentMockForm">
+            <label><span>Pairing Token</span><b>••••••••••••</b></label>
+            <div className="documentMockActions"><strong>Authorize Platform Maintenance</strong></div>
+            <label><span>Platform Release Package</span><b>plasma-z2-ps-kit-0.2.1-…tar.gz</b></label>
+            <label><span>SHA-256 Sidecar</span><b>SHA256SUMS</b></label>
+            <div className="documentMockActions"><strong>Update PPU Platform Release</strong></div>
+          </div>
+          <div className="documentMockSummary">
+            <div><small>Authorization</small><strong>Authorized</strong></div>
+            <div><small>Runtime</small><strong>Active</strong></div>
+            <div><small>Platform Release</small><strong>0.2.1</strong></div>
+            <div><small>PS Loop</small><strong>Available</strong></div>
+          </div>
+          <div className="documentMockForm">
+            <div className="documentMockActions"><span>Run PS Loop Test</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample" data-step="7">
+        <header><span>7</span><div><strong>{zh ? "Site 設定與 Runtime 就緒" : "Configure Sites and confirm Runtime readiness"}</strong><p>{zh ? "保存 Site Desired Configuration，必要時再 Activate Desired Configuration。" : "Save Site Desired Configuration, then Activate Desired Configuration when required."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "步驟 7：Site Configuration 與 Runtime Activation 操作畫面示例" : "Step 7 illustrative Site Configuration and Runtime Activation screen"}>
+          <div className="documentMockToolbar"><b>Sites</b><span>8 Reported</span></div>
+          <div className="documentMockStatusRow"><b>Site 1</b><span data-tone="good">Ready</span><span>Enabled</span></div>
+          <div className="documentMockForm">
+            <label><span>Desired Enabled</span><b>True</b></label>
+            <label><span>Desired Interface</span><b>fpga</b></label>
+            <label><span>Desired Target</span><b>target-profile-a</b></label>
+            <div className="documentMockActions"><span>Discard Draft</span><strong>Save Desired Configuration</strong></div>
+          </div>
+          <div className="documentMockSummary">
+            <div><small>Draft</small><strong>Saved</strong></div>
+            <div><small>Desired</small><strong>Current</strong></div>
+            <div><small>Runtime</small><strong>Reconciled</strong></div>
+            <div><small>Active Execution</small><strong>None</strong></div>
+          </div>
+          <div className="documentMockForm">
+            <div className="documentMockActions"><strong>Activate Desired Configuration</strong></div>
+          </div>
+          <div className="documentMockStatusRow"><b>Configuration lifecycle</b><span>Draft → Desired</span><span data-tone="good">→ Runtime</span></div>
         </div>
       </section>
     </aside>
