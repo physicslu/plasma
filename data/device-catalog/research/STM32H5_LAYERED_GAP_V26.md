@@ -47,7 +47,7 @@ Observed exact-identity cohort counts:
 | STM32H5E | 22 |
 | STM32H5F | 13 |
 
-This proves deterministic structural identity correspondence only. It does **not** yet prove Production metadata admission readiness.
+The 34 unexercised MX1 patterns are only classified as absent from the current Active exact ledger. This gate does not infer NRND, obsolete, future, or invalid lifecycle state from that absence.\n\nThis proves deterministic structural identity correspondence only. It does **not** yet prove Production metadata admission readiness.
 
 ## Layer 2 — current Plasma backend route
 
