@@ -25,16 +25,50 @@ def require(condition: bool, message: str) -> None:
         raise CoverageError(message)
 
 
-def parse_pin_count(value: str) -> int:
-    """Normalize canonical pin-count text for the numeric IC-support inventory.
+def parse_pin_count(value: str, package: str = "") -> int:
+    """Normalize manufacturer pin-count notation for the numeric IC-support inventory.
 
-    Device Catalog preserves manufacturer package notation as text. Most parts
-    use a plain integer; STM32H7 also has official TFBGA notation such as
-    240+25. The derived IC-support inventory exposes a numeric count, so it
-    sums explicit decimal components and rejects every other notation.
+    Device Catalog intentionally preserves manufacturer ordering-table text.
+    Most rows use a plain integer; some STM32 families use additive BGA notation
+    such as 240+25. STM32H5 also uses slash notation when one ordering pin-code
+    spans more than one physical package population. In that case the exact
+    package is required to resolve the numeric count; unknown combinations fail
+    closed instead of choosing an arbitrary alternative.
     """
     text = value.strip()
+    package_text = package.strip()
     require(bool(text), "pin_count must not be empty")
+
+    if "/" in text:
+        alternatives = text.split("/")
+        require(all(alternatives), f"unsupported pin_count notation: {value!r}")
+        if len(set(alternatives)) == 1:
+            text = alternatives[0]
+        elif text == "64/68":
+            by_package = {"LQFP": "64", "VFQFPN": "68"}
+            require(
+                package_text in by_package,
+                f"cannot resolve pin_count {value!r} for package {package!r}",
+            )
+            text = by_package[package_text]
+        elif text == "176/176+25":
+            if package_text == "LQFP":
+                text = "176"
+            elif package_text.startswith("UFBGA 10x10"):
+                text = "176+25"
+            else:
+                raise CoverageError(
+                    f"cannot resolve pin_count {value!r} for package {package!r}"
+                )
+        elif text == "100/105":
+            require(
+                package_text == "LQFP",
+                f"cannot resolve pin_count {value!r} for package {package!r}",
+            )
+            text = "100"
+        else:
+            raise CoverageError(f"unsupported pin_count notation: {value!r}")
+
     parts = text.split("+")
     require(
         all(part.isdigit() and part for part in parts),
@@ -235,7 +269,7 @@ def build_inventory() -> dict[str, Any]:
                 "icpn": row["icpn"],
                 "base_device": base_device,
                 "package": row["package"],
-                "pin_count": parse_pin_count(row["pin_count"]),
+                "pin_count": parse_pin_count(row["pin_count"], row["package"]),
                 "flash_size": row["flash_size"],
                 "openocd": {
                     "state": "deterministic_target_mapped" if deterministic_openocd else "unresolved",
