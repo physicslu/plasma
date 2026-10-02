@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32f3-ordering-authority-v3.1",
+  "reference_date": "2026-10-02",
+  "scope": "official ST Ordering Information metadata authority for the locked 182 missing current-Active STM32F3 exact MPNs",
+  "common": {
+    "temperature_c": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    },
+    "packing": {
+      "": "standard_or_tray_unspecified",
+      "TR": "tape_and_reel"
+    },
+    "flash_kib": {
+      "4": 16,
+      "6": 32,
+      "8": 64,
+      "B": 128,
+      "C": 256,
+      "D": 384,
+      "E": 512
+    },
+    "pin_package": {
+      "C/T": {
+        "package": "LQFP",
+        "pin_count": 48
+      },
+      "C/Y": {
+        "package": "WLCSP",
+        "pin_count": 49
+      },
+      "K/T": {
+        "package": "LQFP",
+        "pin_count": 32
+      },
+      "K/U": {
+        "package": "UFQFPN",
+        "pin_count": 32
+      },
+      "R/T": {
+        "package": "LQFP",
+        "pin_count": 64
+      },
+      "R/Y": {
+        "package": "WLCSP",
+        "pin_count": 66
+      },
+      "V/T": {
+        "package": "LQFP",
+        "pin_count": 100
+      },
+      "V/H": {
+        "package": "UFBGA",
+        "pin_count": 100
+      },
+      "V/Y": {
+        "package": "WLCSP",
+        "pin_count": 100
+      },
+      "Z/T": {
+        "package": "LQFP",
+        "pin_count": 144
+      }
+    }
+  },
+  "series": {
+    "STM32F301": {
+      "bands": [
+        {
+          "name": "x6_x8",
+          "flash_codes": [
+            "6",
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "C/Y",
+            "K/T",
+            "K/U",
+            "R/T"
+          ],
+          "document": "DS9895",
+          "revision": 8,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f301c6.pdf"
+        }
+      ]
+    },
+    "STM32F302": {
+      "bands": [
+        {
+          "name": "x6_x8",
+          "flash_codes": [
+            "6",
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "C/Y",
+            "K/U",
+            "R/T"
+          ],
+          "document": "DS9896",
+          "revision": 8,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f302c6.pdf"
+        },
+        {
+          "name": "xB_xC",
+          "flash_codes": [
+            "B",
+            "C"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "R/T",
+            "V/T",
+            "V/Y"
+          ],
+          "document": "DS9911",
+          "revision": 9,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f302cb.pdf"
+        },
+        {
+          "name": "xD_xE",
+          "flash_codes": [
+            "D",
+            "E"
+          ],
+          "allowed_pin_package": [
+            "R/T",
+            "V/T",
+            "V/H",
+            "Z/T"
+          ],
+          "document": "DS10592 / DocID026900",
+          "revision": 4,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f302re.pdf"
+        }
+      ]
+    },
+    "STM32F303": {
+      "bands": [
+        {
+          "name": "x6_x8",
+          "flash_codes": [
+            "6",
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "C/Y",
+            "K/T",
+            "R/T"
+          ],
+          "document": "DS9866",
+          "revision": 8,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f303c6.pdf"
+        },
+        {
+          "name": "xB_xC",
+          "flash_codes": [
+            "B",
+            "C"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "R/T",
+            "V/T",
+            "V/Y"
+          ],
+          "document": "DS9118",
+          "revision": 14,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f303cb.pdf"
+        },
+        {
+          "name": "xD_xE",
+          "flash_codes": [
+            "D",
+            "E"
+          ],
+          "allowed_pin_package": [
+            "R/T",
+            "V/T",
+            "V/H",
+            "V/Y",
+            "Z/T"
+          ],
+          "document": "DS10362 / DocID026415",
+          "revision": 5,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f303re.pdf"
+        }
+      ]
+    },
+    "STM32F318": {
+      "bands": [
+        {
+          "name": "x8",
+          "flash_codes": [
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "C/Y",
+            "K/U"
+          ],
+          "document": "DS10315",
+          "revision": 7,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f318c8.pdf"
+        }
+      ]
+    },
+    "STM32F328": {
+      "bands": [
+        {
+          "name": "x8",
+          "flash_codes": [
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T"
+          ],
+          "document": "DS10336 / DocID026351",
+          "revision": 3,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f328c8.pdf"
+        }
+      ]
+    },
+    "STM32F334": {
+      "bands": [
+        {
+          "name": "x4_x6_x8",
+          "flash_codes": [
+            "4",
+            "6",
+            "8"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "C/Y",
+            "K/T",
+            "K/U",
+            "R/T"
+          ],
+          "document": "DS9994",
+          "revision": 9,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f334c4.pdf"
+        }
+      ]
+    },
+    "STM32F358": {
+      "bands": [
+        {
+          "name": "xC",
+          "flash_codes": [
+            "C"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "R/T",
+            "V/T"
+          ],
+          "document": "DocID025540",
+          "revision": 4,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f358vc.pdf"
+        }
+      ]
+    },
+    "STM32F373": {
+      "bands": [
+        {
+          "name": "x8_xB_xC",
+          "flash_codes": [
+            "8",
+            "B",
+            "C"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "R/T",
+            "V/T",
+            "V/H"
+          ],
+          "document": "DS8845 / DocID022691",
+          "revision": 7,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f373vb.pdf"
+        }
+      ]
+    },
+    "STM32F378": {
+      "bands": [
+        {
+          "name": "xC",
+          "flash_codes": [
+            "C"
+          ],
+          "allowed_pin_package": [
+            "C/T",
+            "R/T",
+            "R/Y",
+            "V/T",
+            "V/H"
+          ],
+          "document": "DS10062 / DocID025608",
+          "revision": 4,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f378vc.pdf"
+        }
+      ]
+    },
+    "STM32F398": {
+      "bands": [
+        {
+          "name": "xE",
+          "flash_codes": [
+            "E"
+          ],
+          "allowed_pin_package": [
+            "V/T"
+          ],
+          "document": "DocID027227",
+          "revision": 2,
+          "url": "https://www.st.com/resource/en/datasheet/stm32f398ve.pdf"
+        }
+      ]
+    }
+  },
+  "governance": {
+    "exact_identity_source": "stm32f3-active-exact-gap-v3.0.txt",
+    "cross_series_inference_forbidden": true,
+    "cross_density_band_inference_forbidden": true,
+    "package_pin_resolution_requires_explicit_combination": true,
+    "backend_mapping_required_for_layer1_metadata": false,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
