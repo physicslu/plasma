@@ -1,0 +1,22 @@
+name: STM32H5 metadata replay v2.7
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32h5-ordering-authority-v2.7.json'
+      - 'data/device-catalog/research/analyze_stm32h5_metadata_replay_v27.py'
+      - 'data/device-catalog/research/test_analyze_stm32h5_metadata_replay_v27.py'
+      - 'data/device-catalog/research/STM32H5_METADATA_REPLAY_V27.md'
+      - '.github/workflows/device-catalog-stm32h5-metadata-replay-v27.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python data/device-catalog/research/analyze_stm32h5_metadata_replay_v27.py
+          python -m unittest discover -s data/device-catalog/research -p test_analyze_stm32h5_metadata_replay_v27.py -v

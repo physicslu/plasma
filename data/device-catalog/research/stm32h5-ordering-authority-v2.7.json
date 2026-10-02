@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32h5-ordering-authority-v2.7",
+  "reference_date": "2026-10-02",
+  "scope": "official ST Ordering Information metadata authority for the 190 locked Active STM32H5 exact MPNs",
+  "subfamilies": {
+    "503": {
+      "document": "DS14053",
+      "revision": 4,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h503cb.pdf",
+      "pin_count": {
+        "E": 25,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "B": 128
+      },
+      "package": {
+        "U": "UFQFPN",
+        "Y": "WLCSP",
+        "T": "LQFP"
+      },
+      "temperature_c": {
+        "6": "-40..85",
+        "7": "-40..105; up to 125 at low dissipation"
+      },
+      "q_policy": "forbidden"
+    },
+    "523": {
+      "document": "DS14540",
+      "revision": 3,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h523ce.pdf",
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "H": 39,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "C": 256,
+        "E": 512
+      },
+      "package": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "J": "UFBGA 10x10",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85",
+        "7": "-40..105; up to 125 at low dissipation"
+      },
+      "q_policy": "forbidden"
+    },
+    "533": {
+      "document": "DS14539",
+      "revision": 3,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h533ce.pdf",
+      "pin_count": {
+        "C": 48,
+        "R": 64,
+        "H": 39,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "E": 512
+      },
+      "package": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "J": "UFBGA 10x10",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85",
+        "7": "-40..105; up to 125 at low dissipation"
+      },
+      "q_policy": "forbidden"
+    },
+    "543": {
+      "document": "DS15168",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h543ve.pdf",
+      "pin_count": {
+        "C": 48,
+        "U": 63,
+        "R": 64,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "G": 1024,
+        "E": 512
+      },
+      "package": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "J": "UFBGA 10x10",
+        "Z": "LQFP-EP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40..125",
+        "6": "-40..85",
+        "7": "-40..105"
+      },
+      "q_policy": "forbidden",
+      "constraints": [
+        "temperature 3 requires package code Z (LQFP-EP)"
+      ]
+    },
+    "553": {
+      "document": "DS15167",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h553vg.pdf",
+      "pin_count": {
+        "C": 48,
+        "U": 63,
+        "R": 64,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "G": 1024
+      },
+      "package": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "J": "UFBGA 10x10",
+        "Z": "LQFP-EP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "3": "-40..125",
+        "6": "-40..85",
+        "7": "-40..105"
+      },
+      "q_policy": "forbidden",
+      "constraints": [
+        "temperature 3 requires package code Z (LQFP-EP)"
+      ]
+    },
+    "562": {
+      "document": "DS14258",
+      "revision": 6,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h562rg.pdf",
+      "pin_count": {
+        "R": "64/68",
+        "M": 80,
+        "V": 100,
+        "Z": 144,
+        "A": 169,
+        "I": 176,
+        "L": 225
+      },
+      "flash_kib": {
+        "G": 1024,
+        "I": 2048
+      },
+      "package": {
+        "V": "VFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "K": "UFBGA 10x10",
+        "Y": "WLCSP",
+        "H": "TFBGA 13x13"
+      },
+      "temperature_c": {
+        "3": "-40..125 SMPS",
+        "6": "-40..85 LDO",
+        "7": "-40..105 LDO"
+      },
+      "q_policy": "temperature_3_requires_q_temperature_6_7_forbid_q"
+    },
+    "563": {
+      "document": "DS14258",
+      "revision": 6,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h562rg.pdf",
+      "pin_count": {
+        "R": "64/68",
+        "M": 80,
+        "V": 100,
+        "Z": 144,
+        "A": 169,
+        "I": 176,
+        "L": 225
+      },
+      "flash_kib": {
+        "G": 1024,
+        "I": 2048
+      },
+      "package": {
+        "V": "VFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "K": "UFBGA 10x10",
+        "Y": "WLCSP",
+        "H": "TFBGA 13x13"
+      },
+      "temperature_c": {
+        "3": "-40..125 SMPS",
+        "6": "-40..85 LDO",
+        "7": "-40..105 LDO"
+      },
+      "q_policy": "temperature_3_requires_q_temperature_6_7_forbid_q"
+    },
+    "573": {
+      "document": "DS14121",
+      "revision": 5,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h573ai.pdf",
+      "pin_count": {
+        "R": "64/68",
+        "M": 80,
+        "V": 100,
+        "Z": 144,
+        "A": 169,
+        "I": "176/176+25",
+        "L": 225
+      },
+      "flash_kib": {
+        "I": 2048
+      },
+      "package": {
+        "V": "VFQFPN",
+        "T": "LQFP",
+        "I": "UFBGA 7x7",
+        "K": "UFBGA 10x10",
+        "Y": "WLCSP",
+        "H": "TFBGA 13x13"
+      },
+      "temperature_c": {
+        "3": "-40..125 SMPS",
+        "6": "-40..85 LDO",
+        "7": "-40..105 LDO"
+      },
+      "q_policy": "temperature_3_requires_q_temperature_6_7_forbid_q"
+    },
+    "5E4": {
+      "document": "DS14971",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h5e4ik.pdf",
+      "pin_count": {
+        "A": 169,
+        "I": "176/176+25",
+        "L": 225,
+        "V": "100/105",
+        "Z": "144/144"
+      },
+      "flash_kib": {
+        "J": 4096,
+        "K": 3072
+      },
+      "package": {
+        "I": "UFBGA 7x7 0.50",
+        "H": "TFBGA 13x13",
+        "K": "UFBGA 10x10 0.65",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85 LDO",
+        "7": "-40..105; up to 125 at low dissipation SMPS"
+      },
+      "q_policy": "temperature_7_requires_q_temperature_6_forbids_q"
+    },
+    "5E5": {
+      "document": "DS14971",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h5e4ik.pdf",
+      "pin_count": {
+        "A": 169,
+        "I": "176/176+25",
+        "L": 225,
+        "V": "100/105",
+        "Z": "144/144"
+      },
+      "flash_kib": {
+        "J": 4096,
+        "K": 3072
+      },
+      "package": {
+        "I": "UFBGA 7x7 0.50",
+        "H": "TFBGA 13x13",
+        "K": "UFBGA 10x10 0.65",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85 LDO",
+        "7": "-40..105; up to 125 at low dissipation SMPS"
+      },
+      "q_policy": "temperature_7_requires_q_temperature_6_forbids_q"
+    },
+    "5F4": {
+      "document": "DS14972",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h5f5vj.pdf",
+      "pin_count": {
+        "A": 169,
+        "I": "176/176+25",
+        "L": 225,
+        "V": "100/105",
+        "Z": "144/144"
+      },
+      "flash_kib": {
+        "J": 4096
+      },
+      "package": {
+        "I": "UFBGA 7x7 0.50",
+        "H": "TFBGA 13x13",
+        "J": "UFBGA 10x10 0.80",
+        "K": "UFBGA 10x10 0.65",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85 LDO",
+        "7": "-40..105; up to 125 at low dissipation SMPS"
+      },
+      "q_policy": "temperature_7_requires_q_temperature_6_forbids_q"
+    },
+    "5F5": {
+      "document": "DS14972",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32h5f5vj.pdf",
+      "pin_count": {
+        "A": 169,
+        "I": "176/176+25",
+        "L": 225,
+        "V": "100/105",
+        "Z": "144/144"
+      },
+      "flash_kib": {
+        "J": 4096
+      },
+      "package": {
+        "I": "UFBGA 7x7 0.50",
+        "H": "TFBGA 13x13",
+        "J": "UFBGA 10x10 0.80",
+        "K": "UFBGA 10x10 0.65",
+        "T": "LQFP",
+        "Y": "WLCSP"
+      },
+      "temperature_c": {
+        "6": "-40..85 LDO",
+        "7": "-40..105; up to 125 at low dissipation SMPS"
+      },
+      "q_policy": "temperature_7_requires_q_temperature_6_forbids_q"
+    }
+  },
+  "bounded_exact_exceptions": {
+    "STM32H5E4ZJJ6": {
+      "field": "package",
+      "code": "J",
+      "value": "UFBGA 144 10x10x0.6 P 0.8 mm",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h5e4zj.html",
+      "source_surface": "ST Quality & Reliability exact row",
+      "rationale": "DS14971 Rev 1 Ordering Information omits package code J; exact ST row supplies the package."
+    },
+    "STM32H5E4ZJJ7Q": {
+      "field": "package",
+      "code": "J",
+      "value": "UFBGA 144 10x10x0.6 P 0.8 mm",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h5e4zj.html",
+      "source_surface": "ST Quality & Reliability exact row",
+      "rationale": "DS14971 Rev 1 Ordering Information omits package code J; exact ST row supplies the package."
+    },
+    "STM32H5E4ZKJ6": {
+      "field": "package",
+      "code": "J",
+      "value": "UFBGA 144 10x10x0.6 P 0.8 mm",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32h5e4zk.html",
+      "source_surface": "ST Quality & Reliability exact row",
+      "rationale": "DS14971 Rev 1 Ordering Information omits package code J; exact ST row supplies the package."
+    }
+  },
+  "claims": {
+    "backend_route_inferred": false,
+    "programming_profile_inferred": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "production_write_authorized": false
+  }
+}
