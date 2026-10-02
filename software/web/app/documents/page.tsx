@@ -470,6 +470,46 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
                   ]}
                 />
               </div>
+              <div className="documentSubsection">
+                <h3><span>7.4</span>{zh ? "初次設定路徑" : "First-time setup paths"}</h3>
+                <p>{zh ? "依 PPU 目前是否已安裝 Runtime，初次設定有兩條常見路徑；兩者最後都必須回到相同的 Registration、Site 與 Programming readiness 判定。" : "First-time setup normally follows one of two paths depending on whether Runtime is already installed. Both paths converge on the same Registration, Site, and Programming readiness gates."}</p>
+                <h4>{zh ? "已有 Runtime 的 PPU" : "Runtime-present PPU"}</h4>
+                <div className="documentCompactProcedure">
+                  {(zh ? [
+                    "確認 PPU 網路可達並 Add PPU Connection",
+                    "確認 PPU ID / Connectivity / Health",
+                    "Validate & Register for Programming",
+                    "Use for Managed Operations",
+                    "視需要設定 Network 與 Site Desired Configuration",
+                    "必要時執行 Runtime Activation，最後進入 Programming 驗證",
+                  ] : [
+                    "Confirm PPU network reachability and Add PPU Connection",
+                    "Confirm PPU ID / Connectivity / Health",
+                    "Validate & Register for Programming",
+                    "Use for Managed Operations",
+                    "Configure Network and Site Desired Configuration when needed",
+                    "Run Runtime Activation when needed, then proceed to Programming validation",
+                  ]).map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+                </div>
+                <h4>{zh ? "Bootstrap-only PPU" : "Bootstrap-only PPU"}</h4>
+                <div className="documentCompactProcedure">
+                  {(zh ? [
+                    "完成 Bootstrap factory provisioning 並 Add PPU Connection",
+                    "進入 Platform 並 Authorize Platform Maintenance",
+                    "部署 PPU Platform Release / Runtime，確認 Runtime Active",
+                    "回到 Registration，Validate & Register for Programming",
+                    "設定 Sites，必要時執行 Runtime Activation",
+                    "完成 Programming qualification",
+                  ] : [
+                    "Complete Bootstrap factory provisioning and Add PPU Connection",
+                    "Open Platform and Authorize Platform Maintenance",
+                    "Deploy the PPU Platform Release / Runtime and confirm Runtime Active",
+                    "Return to Registration and Validate & Register for Programming",
+                    "Configure Sites and run Runtime Activation when needed",
+                    "Complete Programming qualification",
+                  ]).map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+                </div>
+              </div>
               <DocumentCallout tone="critical" label={zh ? "Evidence boundary" : "Evidence boundary"}>
                 <p>{zh ? "Mock PPU 的 Online / Healthy / Site Ready 只證明相應 software / Mock workflow；不代表 Z2、FPGA/PL、socket、電氣條件或實體 IC programming 已完成驗證。" : "Online / Healthy / Site Ready on a Mock PPU proves only the corresponding software / Mock workflow. It does not validate Z2, FPGA/PL, sockets, electrical behavior, or physical IC programming."}</p>
               </DocumentCallout>
