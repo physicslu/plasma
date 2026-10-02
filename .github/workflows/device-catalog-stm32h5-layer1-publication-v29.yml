@@ -1,0 +1,18 @@
+name: STM32H5 Layer-1 Production publication v2.9
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32h5-commercial-icpn.csv'
+      - '.github/workflows/device-catalog-stm32h5-layer1-publication-v29.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report canonical integrity
+        run: |
+          wc -l data/device-catalog/research/stm32h5-commercial-icpn.csv
+          sha256sum data/device-catalog/research/stm32h5-commercial-icpn.csv
+          git hash-object data/device-catalog/research/stm32h5-commercial-icpn.csv
