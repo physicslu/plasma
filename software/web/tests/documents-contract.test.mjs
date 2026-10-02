@@ -111,6 +111,24 @@ test("PPU Setup is the first structured document-layout migration", () => {
   assert.match(documents, /documentExampleRail/);
   assert.doesNotMatch(documents, /On this page/);
 
+  for (let step = 1; step <= 7; step += 1) {
+    assert.match(documents, new RegExp(`data-step="${step}"`));
+  }
+
+  for (const action of [
+    "Validate &amp; Register for Programming",
+    "Use for Managed Operations",
+    "Configure Network",
+    "Authorize Platform Maintenance",
+    "Update PPU Platform Release",
+    "Activate Desired Configuration",
+  ]) assert.match(documents, new RegExp(action));
+
+  assert.match(documents, /Registration<\/small><strong>Not Registered/);
+  assert.match(documents, /Activation capability/);
+  assert.match(documents, /Draft → Desired/);
+  assert.match(documents, /not live system state/);
+
   for (const className of [
     "documentArticleGuide",
     "documentSetupOverview",
