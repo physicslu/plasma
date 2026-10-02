@@ -76,12 +76,50 @@ test("EMode PPU setup guide documents the current management boundaries and setu
   assert.match(documents, /run the PS Loop Test when needed/i);
   assert.match(documents, /Draft → Desired → Runtime/);
   assert.match(documents, /Activate Desired Configuration/);
-  assert.match(documents, /Healthy ≠ every capability exists/);
-  assert.match(documents, /Not Supported ≠ Fault/);
-  assert.match(documents, /Registered ≠ Platform Maintenance Authorized/);
+  assert.match(documents, /Healthy (?:≠|does not mean) every capability exists/);
+  assert.match(documents, /Not Supported does not mean the PPU is faulty/);
+  assert.match(documents, /\["Not Supported"[\s\S]*"Not a Fault\."/);
+  assert.match(documents, /\["Registered"[\s\S]*Still does not mean Platform Maintenance is authorized/);
   assert.match(documents, /Bootstrap-only PPU/);
   assert.match(documents, /Mock PPU/);
   assert.match(documents, /physical IC programming/);
+});
+
+test("PPU Setup is the first structured document-layout migration", () => {
+  for (const primitive of [
+    "DocumentSetupOverview",
+    "DocumentSectionHeading",
+    "DocumentDataTable",
+    "DocumentCallout",
+    "PpuSetupExampleRail",
+  ]) assert.match(documents, new RegExp(primitive));
+
+  assert.match(documents, /設定總覽　共 7 個大步驟/);
+  assert.match(documents, /Setup overview · 7 major steps/);
+  for (const step of [
+    "連線 PPU",
+    "確認 PPU 狀態",
+    "註冊燒錄權限",
+    "選擇受管操作",
+    "網路設定",
+    "Platform 維護",
+    "Site 設定與就緒",
+  ]) assert.match(documents, new RegExp(step));
+
+  assert.match(documents, /操作畫面示例/);
+  assert.match(documents, /不是即時系統狀態/);
+  assert.match(documents, /documentExampleRail/);
+  assert.doesNotMatch(documents, /On this page/);
+
+  for (const className of [
+    "documentArticleGuide",
+    "documentSetupOverview",
+    "documentSetupStepGrid",
+    "documentGuideBody",
+    "documentProcedureSection",
+    "documentExampleRail",
+    "documentCompactProcedure",
+  ]) assert.match(documentsCss, new RegExp(`\\.${className}`));
 });
 
 test("Gateway operator reference lists only currently editable settings", () => {

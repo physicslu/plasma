@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import "../engineering/engineering.css";
 import "../engineering/engineering-workspace-refresh.css";
@@ -75,6 +75,132 @@ function DefinitionTable({ rows }: { rows: Array<[string, string]> }) {
         </div>
       ))}
     </div>
+  );
+}
+
+
+type DocumentCalloutTone = "info" | "success" | "warning" | "critical";
+
+function DocumentCallout({
+  tone = "info",
+  label,
+  children,
+}: {
+  tone?: DocumentCalloutTone;
+  label: string;
+  children: ReactNode;
+}) {
+  const symbol = tone === "success" ? "✓" : tone === "warning" || tone === "critical" ? "!" : "i";
+  return (
+    <aside className={`documentCallout ${tone}`}>
+      <span className="documentCalloutIcon" aria-hidden="true">{symbol}</span>
+      <div><strong>{label}</strong><div>{children}</div></div>
+    </aside>
+  );
+}
+
+function DocumentDataTable({
+  headers,
+  rows,
+}: {
+  headers: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="documentDataTableWrap">
+      <table className="documentDataTable">
+        <thead><tr>{headers.map(header => <th key={header}>{header}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={`${rowIndex}-${row.join("-")}`}>
+              {row.map((value, cellIndex) => <td key={`${cellIndex}-${value}`}>{value}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DocumentSectionHeading({
+  number,
+  title,
+  summary,
+}: {
+  number: number;
+  title: string;
+  summary: string;
+}) {
+  return (
+    <header className="documentSectionHeading">
+      <span>{number}</span>
+      <div><h2>{title}</h2><p>{summary}</p></div>
+    </header>
+  );
+}
+
+function DocumentSetupOverview({
+  title,
+  subtitle,
+  steps,
+}: {
+  title: string;
+  subtitle: string;
+  steps: Array<[string, string]>;
+}) {
+  return (
+    <section className="documentSetupOverview" aria-label={title}>
+      <header><span className="documentSetupOverviewIcon" aria-hidden="true">≡</span><div><h2>{title}</h2><p>{subtitle}</p></div></header>
+      <div className="documentSetupStepGrid">
+        {steps.map(([label, description], index) => (
+          <div className="documentSetupStep" key={label}>
+            <span>{index + 1}</span>
+            <div><strong>{label}</strong><small>{description}</small></div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PpuSetupExampleRail({ zh }: { zh: boolean }) {
+  return (
+    <aside className="documentExampleRail" aria-label={zh ? "PPU 操作畫面示例" : "PPU operation screen examples"}>
+      <header className="documentExampleRailHeader">
+        <span className="documentExampleRailIcon" aria-hidden="true">▣</span>
+        <div>
+          <small>{zh ? "操作畫面示例" : "OPERATION SCREEN EXAMPLES"}</small>
+          <h2>{zh ? "操作畫面示例" : "Operation screen examples"}</h2>
+          <p>{zh ? "以下是操作畫面的示意，用來對照左側步驟；不是即時系統狀態。" : "These are illustrative operation screens for following the steps at left; they are not live system state."}</p>
+        </div>
+      </header>
+
+      <section className="documentOperationExample">
+        <header><span>1</span><div><strong>{zh ? "新增 PPU 連線" : "Add a PPU connection"}</strong><p>{zh ? "PPU → Registration → + Add PPU Connection" : "PPU → Registration → + Add PPU Connection"}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "新增 PPU 連線示意畫面" : "Illustrative add PPU connection screen"}>
+          <div className="documentMockToolbar"><b>Registration</b><span>+ Add PPU Connection</span></div>
+          <div className="documentMockForm">
+            <label><span>Console Alias</span><b>line1-ppu-a</b></label>
+            <label><span>Plasma Gateway Endpoint</span><b>http://192.168.10.21:18080</b></label>
+            <div className="documentMockActions"><span>Cancel</span><strong>Add Connection</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="documentOperationExample">
+        <header><span>2</span><div><strong>{zh ? "查看 PPU 狀態" : "Review PPU state"}</strong><p>{zh ? "新增後確認 Connectivity、Health 與 Registration readiness。" : "After adding it, confirm Connectivity, Health, and Registration readiness."}</p></div></header>
+        <div className="documentMockScreen" aria-label={zh ? "PPU 狀態示意畫面" : "Illustrative PPU status screen"}>
+          <div className="documentMockToolbar"><b>Known PPU Connections</b><span>Refresh</span></div>
+          <div className="documentMockStatusRow"><b>line1-ppu-a</b><span data-tone="good">Online</span><span data-tone="good">Healthy</span></div>
+          <div className="documentMockSummary">
+            <div><small>PPU ID</small><strong>ppu-8f2c9d7e</strong></div>
+            <div><small>Registration</small><strong>Registered</strong></div>
+            <div><small>Execution</small><strong>Ready</strong></div>
+            <div><small>Reported Sites</small><strong>8</strong></div>
+          </div>
+        </div>
+      </section>
+    </aside>
   );
 }
 
@@ -168,145 +294,230 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
   }
 
   if (topic === "emode-ppu-setup") {
+    const setupSteps: Array<[string, string]> = zh ? [
+      ["連線 PPU", "建立 PPU Connection"],
+      ["確認 PPU 狀態", "確認身分與健康"],
+      ["註冊燒錄權限", "申請 Managed Programming admission"],
+      ["選擇受管操作", "指定 Managed Operations PPU"],
+      ["網路設定", "設定 Desired Network"],
+      ["Platform 維護", "Bootstrap / Runtime 維護"],
+      ["Site 設定與就緒", "設定 Sites 並確認 Runtime"],
+    ] : [
+      ["Connect PPU", "Create the PPU connection"],
+      ["Confirm PPU state", "Verify identity and health"],
+      ["Register programming", "Admit Managed Programming"],
+      ["Select managed target", "Choose the Managed Operations PPU"],
+      ["Configure network", "Set Desired Network"],
+      ["Maintain Platform", "Maintain Bootstrap / Runtime"],
+      ["Configure Sites & ready", "Configure Sites and confirm Runtime"],
+    ];
+
     return (
-      <article className="documentArticle">
-        <p className="documentEyebrow">EMODE · PPU SETUP</p>
-        <h1>{zh ? "PPU 設定" : "PPU Setup"}</h1>
-        <p className="documentLead">
-          {zh
-            ? "PPU 是 Plasma 實際執行燒錄工作的設備。Control Station 必須先知道 PPU 的 Plasma Gateway Endpoint，確認 PPU 身分與運作狀態，再決定是否允許它進入 Managed Programming。PPU Connection / Registration、Platform Maintenance 與 Site Configuration 是三個彼此獨立的管理領域。"
-            : "A PPU is the appliance that executes Plasma programming work. The Control Station must first know its Plasma Gateway Endpoint, observe its identity and health, and then decide whether to admit it to Managed Programming. PPU Connection / Registration, Platform Maintenance, and Site Configuration are separate management domains."}
-        </p>
-
-        <section>
-          <h2>{zh ? "管理領域" : "Management domains"}</h2>
-          <DefinitionTable rows={[
-            ["PPU Connection / Registration", zh ? "Control Station 是否知道這台 PPU，以及是否允許它執行 Managed Programming。" : "Whether the Control Station knows the PPU and admits it to Managed Programming."],
-            ["Platform Maintenance", zh ? "Bootstrap、Runtime、Platform Release 與維護授權；與 Programming Registration 分離。" : "Bootstrap, Runtime, Platform Release, and maintenance authorization; separate from Programming Registration."],
-            ["Site Configuration", zh ? "PPU 各 Site 的 Desired Configuration、Runtime reconciliation 與 Runtime Activation。" : "Desired Configuration, Runtime reconciliation, and Runtime Activation for the PPU Sites."],
-          ]} />
-          <aside className="documentNotice">
+      <article className="documentArticle documentArticleGuide">
+        <header className="documentGuideHeader">
+          <p className="documentEyebrow">EMODE · PPU SETUP</p>
+          <h1>{zh ? "PPU 設定" : "PPU Setup"}</h1>
+          <p className="documentLead">
             {zh
-              ? "Healthy 不代表所有 capability 都存在；Not Supported 也不代表 PPU 故障。"
-              : "Healthy does not mean every capability exists, and Not Supported does not mean the PPU is faulty."}
-          </aside>
-        </section>
+              ? "PPU Setup 說明如何連線並註冊 PPU，以及設定網路、Platform 與 Sites。先看完整步驟，再依序完成每個設定；每一步的操作畫面示例顯示在右側。"
+              : "PPU Setup explains how to connect and register a PPU, then configure its network, Platform, and Sites. Review the complete flow first, then follow each step; operation-screen examples are shown at right."}
+          </p>
+        </header>
 
-        <section>
-          <h2>{zh ? "1. 加入 PPU Connection" : "1. Add a PPU Connection"}</h2>
-          <p>{zh ? "進入 Engineering Mode → PPU → Registration，按 + Add PPU Connection。" : "Open Engineering Mode → PPU → Registration, then select + Add PPU Connection."}</p>
-          <DefinitionTable rows={[
-            ["Console Alias", zh ? "Control Station 內使用的 PPU 名稱，例如 line1-ppu-a。" : "The PPU name used by this Control Station, for example line1-ppu-a."],
-            ["Plasma Gateway Endpoint", zh ? "PPU Plasma Gateway 的 root URL，例如 http://192.168.10.21:18080。" : "The root URL of the PPU Plasma Gateway, for example http://192.168.10.21:18080."],
-          ]} />
-          <p>{zh ? "按 Add Connection 後，PPU 只會成為 Control Station 已知的 Connection；它通常仍是 Not Registered，尚未取得 Managed Programming admission。" : "After Add Connection, the PPU is only a known Control Station connection. It normally remains Not Registered and is not yet admitted to Managed Programming."}</p>
-          <aside className="documentNotice">
-            {zh
-              ? "Plasma Gateway Endpoint 是 Plasma service URL；Default Gateway 是 Linux 介面的 Layer-3 next-hop router。兩者不是同一個設定。"
-              : "Plasma Gateway Endpoint is a Plasma service URL. Default Gateway is the Linux interface Layer-3 next-hop router. They are different settings."}
-          </aside>
-        </section>
+        <DocumentSetupOverview
+          title={zh ? "設定總覽　共 7 個大步驟" : "Setup overview · 7 major steps"}
+          subtitle={zh ? "先了解完整流程與工作量，再往下依序完成各步驟。" : "Review the whole flow and expected work before following the detailed procedure."}
+          steps={setupSteps}
+        />
 
-        <section>
-          <h2>{zh ? "2. 確認 PPU 狀態" : "2. Confirm PPU State"}</h2>
-          <p>{zh ? "加入 Connection 後，Manager 會取得 Fleet observation。進行 Programming Registration 前，先確認 PPU ID、Facility、Reported Sites、Connectivity、Health 與 Active Execution 符合預期。" : "After adding the connection, Manager obtains Fleet observations. Before Programming Registration, confirm the PPU ID, Facility, Reported Sites, Connectivity, Health, and Active Execution state."}</p>
-          <DefinitionTable rows={[
-            ["Observation current", zh ? "PPU observation 必須是目前有效資料；stale 或 unknown 不足以進行 Registration。" : "The PPU observation must be current; stale or unknown data is not sufficient for Registration."],
-            ["Transport reachable", zh ? "Manager 可以連到 Plasma Gateway。" : "Manager can reach the Plasma Gateway."],
-            ["Execution ready", zh ? "PPU execution service 已進入 ready 狀態。" : "The PPU execution service reports ready."],
-            ["No identity conflict", zh ? "沒有 canonical ppu_id 衝突。" : "No canonical ppu_id conflict is present."],
-            ["Not degraded", zh ? "Fleet observation 沒有 degraded condition。" : "Fleet observation reports no degraded condition."],
-          ]} />
-        </section>
+        <DocumentCallout tone="success" label={zh ? "重點說明 (Key Points)" : "Key points"}>
+          <ul>
+            <li>{zh ? "PPU Connection / Registration、Platform Maintenance 與 Site Configuration 是獨立管理領域。" : "PPU Connection / Registration, Platform Maintenance, and Site Configuration are separate management domains."}</li>
+            <li>{zh ? "Healthy 不代表所有 capability 都存在；Not Supported 也不代表 PPU 故障。" : "Healthy does not mean every capability exists, and Not Supported does not mean the PPU is faulty."}</li>
+            <li>{zh ? "Registration 只控制 Managed Programming admission；Platform Maintenance 有獨立授權邊界。" : "Registration controls Managed Programming admission only; Platform Maintenance has a separate authorization boundary."}</li>
+          </ul>
+        </DocumentCallout>
 
-        <section>
-          <h2>{zh ? "3. Register PPU for Programming" : "3. Register the PPU for Programming"}</h2>
-          <p>{zh ? "當 Registration Readiness 全部通過後，按 Validate & Register for Programming。成功後 lifecycle 會成為 Commissioned，UI 顯示 Registered。" : "When all Registration Readiness checks pass, select Validate & Register for Programming. The lifecycle becomes Commissioned and the UI reports Registered."}</p>
-          <p>{zh ? "Registration 只控制 Managed Programming admission，不會授權 Platform Maintenance。" : "Registration controls Managed Programming admission only; it does not authorize Platform Maintenance."}</p>
-        </section>
+        <div className="documentGuideBody">
+          <div className="documentGuideMain">
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={1} title={zh ? "連線 PPU" : "Connect the PPU"} summary={zh ? "將 PPU 加入 Control Station，建立已知連線。" : "Add the PPU to the Control Station as a known connection."} />
+              <div className="documentSubsection">
+                <h3><span>1.1</span>{zh ? "新增 PPU 連線" : "Add PPU Connection"}</h3>
+                <p>{zh ? "進入 Engineering Mode → PPU → Registration，按 + Add PPU Connection，輸入下列資訊後按 Add Connection。" : "Open Engineering Mode → PPU → Registration, select + Add PPU Connection, enter the following values, then select Add Connection."}</p>
+                <DocumentDataTable
+                  headers={zh ? ["欄位", "說明", "範例"] : ["Field", "Description", "Example"]}
+                  rows={[
+                    ["Console Alias", zh ? "PPU 在此 Control Station 中的顯示名稱。" : "The PPU name used by this Control Station.", "line1-ppu-a"],
+                    ["Plasma Gateway Endpoint", zh ? "PPU 的 Plasma Gateway root URL。" : "The root URL of the PPU Plasma Gateway.", "http://192.168.10.21:18080"],
+                  ]}
+                />
+                <DocumentCallout label={zh ? "注意：僅建立 PPU Connection" : "Note — PPU Connection only"}>
+                  <p>{zh ? "Add Connection 只讓 Control Station 知道這台 PPU；它通常仍為 Not Registered，尚未取得 Managed Programming admission。" : "Add Connection only makes the PPU known to the Control Station. It normally remains Not Registered and is not yet admitted to Managed Programming."}</p>
+                </DocumentCallout>
+                <DocumentCallout tone="warning" label={zh ? "不要混淆 Gateway 名稱" : "Do not confuse Gateway terms"}>
+                  <p>{zh ? "Plasma Gateway Endpoint 是 Plasma service URL；Default Gateway 是 Linux 網路介面的 Layer-3 next-hop router。兩者不是同一個設定。" : "Plasma Gateway Endpoint is a Plasma service URL. Default Gateway is the Linux interface Layer-3 next-hop router. They are different settings."}</p>
+                </DocumentCallout>
+              </div>
+            </section>
 
-        <section>
-          <h2>{zh ? "4. 選擇 Managed Operations PPU" : "4. Select the PPU for Managed Operations"}</h2>
-          <p>{zh ? "對已 Registered 的 PPU 按 Use for Managed Operations，將它設為目前 Managed Programming 使用的 PPU。之後 PMode / EMode 的 managed workflow 會透過 Manager 對該 PPU 執行工作。" : "For a Registered PPU, select Use for Managed Operations to make it the current managed-programming target. Managed PMode / EMode workflows then route through Manager to that PPU."}</p>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={2} title={zh ? "確認 PPU 狀態" : "Confirm PPU state"} summary={zh ? "確認 PPU 身分、連線與執行服務狀態符合 Registration 前提。" : "Verify identity, connectivity, and execution state before Registration."} />
+              <p>{zh ? "新增 Connection 後，Manager 會取得 Fleet observation。確認 PPU ID、Facility、Reported Sites、Connectivity、Health 與 Active Execution 符合預期。" : "After adding the connection, Manager obtains Fleet observations. Confirm the PPU ID, Facility, Reported Sites, Connectivity, Health, and Active Execution state."}</p>
+              <DocumentDataTable
+                headers={zh ? ["檢查項目", "說明", "期望狀態"] : ["Check", "Description", "Expected state"]}
+                rows={[
+                  ["Observation current", zh ? "PPU observation 必須是目前有效資料。" : "The PPU observation must be current.", "Current"],
+                  ["Transport reachable", zh ? "Manager 可以連到 Plasma Gateway。" : "Manager can reach the Plasma Gateway.", "Online"],
+                  ["Execution ready", zh ? "PPU execution service 已 ready。" : "The PPU execution service is ready.", "Ready"],
+                  ["No identity conflict", zh ? "沒有 canonical ppu_id 衝突。" : "No canonical ppu_id conflict is present.", "None"],
+                  ["Not degraded", zh ? "Fleet observation 沒有 degraded condition。" : "Fleet observation reports no degraded condition.", "Healthy"],
+                ]}
+              />
+              <DocumentCallout tone="success" label={zh ? "PPU 準備就緒" : "PPU readiness"}>
+                <p>{zh ? "所有 Registration prerequisites 都通過後，才能進入下一步。Stale 或 Unknown observation 不足以註冊。" : "All Registration prerequisites must pass before continuing. Stale or Unknown observations are not sufficient for Registration."}</p>
+              </DocumentCallout>
+            </section>
 
-        <section>
-          <h2>{zh ? "5. PPU Network Configuration" : "5. PPU Network Configuration"}</h2>
-          <p>{zh ? "完成 Programming Registration 後，可在 Registration 頁面的 PPU Network Configuration 查看 Interface、Desired Mode、Activation、Revision 與 Manager Txn。需要修改時按 Configure Network。" : "After Programming Registration, PPU Network Configuration shows Interface, Desired Mode, Activation, Revision, and Manager Txn. Select Configure Network to edit it."}</p>
-          <DefinitionTable rows={[
-            ["DHCP", zh ? "保存 DHCP Desired State。是否能立即套用取決於 PPU 是否提供 Network Activation capability。" : "Stores DHCP Desired State. Immediate application depends on whether the PPU exposes Network Activation capability."],
-            ["Static IPv4", zh ? "可設定 IPv4 Address、Prefix Length、Default Gateway 與 DNS Servers。" : "Configures IPv4 Address, Prefix Length, Default Gateway, and DNS Servers."],
-            ["Not Supported", zh ? "此 PPU Profile 沒有 Network Activation capability；這是 capability boundary，不是 runtime fault。" : "This PPU profile does not expose Network Activation capability. This is a capability boundary, not a runtime fault."],
-          ]} />
-          <p>{zh ? "Static IPv4 commissioning 由 Manager 擁有交易流程：保存 Desired → PPU 啟用候選位址 → Manager 重新連線候選 Endpoint → 驗證相同 ppu_id → PPU commit → Manager 更新 Plasma Gateway Endpoint。Browser 不直接改寫已註冊的 Endpoint。" : "Static IPv4 commissioning is Manager-owned: save Desired → PPU activates the candidate address → Manager reconnects to the candidate Endpoint → verifies the same ppu_id → PPU commits → Manager updates the Plasma Gateway Endpoint. The Browser does not directly rewrite the registered Endpoint."}</p>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={3} title={zh ? "註冊燒錄權限" : "Register programming admission"} summary={zh ? "將 PPU 納入 Managed Programming。" : "Admit the PPU to Managed Programming."} />
+              <div className="documentSubsection">
+                <h3><span>3.1</span>{zh ? "Validate & Register for Programming" : "Validate & Register for Programming"}</h3>
+                <p>{zh ? "當 Registration Readiness 全部通過後，按 Validate & Register for Programming。成功後 lifecycle 會成為 Commissioned，UI 顯示 Registered。" : "When all Registration Readiness checks pass, select Validate & Register for Programming. The lifecycle becomes Commissioned and the UI reports Registered."}</p>
+              </div>
+              <DocumentCallout tone="warning" label={zh ? "重要：Registration 與 Platform Maintenance 分離" : "Important — Registration is separate from Platform Maintenance"}>
+                <p>{zh ? "Registration 只控制 Managed Programming admission，不會授權 Platform Maintenance。" : "Registration controls Managed Programming admission only; it does not authorize Platform Maintenance."}</p>
+              </DocumentCallout>
+            </section>
 
-        <section>
-          <h2>{zh ? "6. Platform Maintenance" : "6. Platform Maintenance"}</h2>
-          <p>{zh ? "進入 PPU → Platform。這個頁面負責 Bootstrap、Runtime、Platform Release、Platform Maintenance authorization 與 PS Loop Test。Platform lifecycle 與 Programming Registration 分離。" : "Open PPU → Platform. This surface owns Bootstrap, Runtime, Platform Release, Platform Maintenance authorization, and the PS Loop Test. The Platform lifecycle is separate from Programming Registration."}</p>
-          <Flow steps={zh
-            ? ["選擇已知 PPU", "確認 Bootstrap / Platform capability", "輸入 Platform Maintenance Pairing Token", "Authorize Platform Maintenance", "選擇 Platform Release package 與 SHA-256 sidecar", "確認 PPU ID / Facility ID / Display Name", "Update PPU Platform Release", "等待 Runtime Active 並視需要執行 PS Loop Test"]
-            : ["Select a known PPU", "Confirm Bootstrap / Platform capability", "Enter the Platform Maintenance Pairing Token", "Authorize Platform Maintenance", "Select the Platform Release package and SHA-256 sidecar", "Confirm PPU ID / Facility ID / Display Name", "Update PPU Platform Release", "Wait for Runtime Active and run the PS Loop Test when needed"]} />
-          <aside className="documentNotice">
-            {zh
-              ? "若顯示 Platform Maintenance · Not Supported，代表此 PPU Profile 沒有 Bootstrap / Platform Maintenance route。這不是 fault。"
-              : "Platform Maintenance · Not Supported means the PPU profile does not expose the Bootstrap / Platform Maintenance route. It is not a fault."}
-          </aside>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={4} title={zh ? "選擇受管操作 PPU" : "Select the Managed Operations PPU"} summary={zh ? "指定目前 Managed Programming 的目標 PPU。" : "Choose the current target PPU for Managed Programming."} />
+              <p>{zh ? "對已 Registered 的 PPU 按 Use for Managed Operations。之後 PMode / EMode 的 managed workflow 會透過 Manager 對這台 PPU 執行工作。" : "For a Registered PPU, select Use for Managed Operations. Managed PMode / EMode workflows then route through Manager to that PPU."}</p>
+            </section>
 
-        <section>
-          <h2>{zh ? "7. Site Configuration" : "7. Site Configuration"}</h2>
-          <p>{zh ? "進入 PPU → Sites。上方 Ready / Busy / Fault / Enabled Sites / Topology Source / Active Execution 是 Observed Runtime State；是否能修改 Site Desired Configuration 是另一個 capability。" : "Open PPU → Sites. Ready / Busy / Fault / Enabled Sites / Topology Source / Active Execution are Observed Runtime State. Site Desired Configuration write support is a separate capability."}</p>
-          <DefinitionTable rows={[
-            ["Desired Enabled", zh ? "Site 是否應在 Desired Configuration 中啟用。" : "Whether the Site should be enabled in Desired Configuration."],
-            ["Desired Interface", zh ? "Site 使用的 programming interface，例如 mock、openocd 或 fpga；可用值仍由 PPU contract 決定。" : "The programming interface, such as mock, openocd, or fpga; the PPU contract remains authoritative for accepted values."],
-            ["Desired Target", zh ? "Site 的 target configuration identity；不代表該實體 IC 已完成 qualification。" : "The Site target configuration identity; it is not proof that a physical IC is qualified."],
-          ]} />
-          <p>{zh ? "Plasma 明確區分 Draft → Desired → Runtime。Save 只更新 Desired Configuration，不代表 running Plasma Server 已套用。" : "Plasma explicitly separates Draft → Desired → Runtime. Save updates Desired Configuration only; it does not mean the running Plasma Server has applied it."}</p>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={5} title={zh ? "網路設定" : "Configure the PPU network"} summary={zh ? "設定 PPU Desired Network，並由 Manager 管理 Static IPv4 commissioning。" : "Configure Desired Network and let Manager own Static IPv4 commissioning."} />
+              <p>{zh ? "完成 Registration 後，可在 PPU Network Configuration 查看 Interface、Desired Mode、Activation、Revision 與 Manager Txn。需要修改時按 Configure Network。" : "After Registration, PPU Network Configuration shows Interface, Desired Mode, Activation, Revision, and Manager Txn. Select Configure Network to edit it."}</p>
+              <DocumentDataTable
+                headers={zh ? ["模式 / 狀態", "說明", "操作重點"] : ["Mode / State", "Description", "Operator note"]}
+                rows={[
+                  ["DHCP", zh ? "保存 DHCP Desired State。" : "Stores DHCP Desired State.", zh ? "是否立即套用取決於 Network Activation capability。" : "Immediate application depends on Network Activation capability."],
+                  ["Static IPv4", zh ? "設定 IPv4 Address、Prefix Length、Default Gateway 與 DNS Servers。" : "Configures IPv4 Address, Prefix Length, Default Gateway, and DNS Servers.", zh ? "由 Manager 擁有 commissioning transaction。" : "Manager owns the commissioning transaction."],
+                  ["Not Supported", zh ? "此 PPU Profile 沒有 Network Activation capability。" : "The PPU profile does not expose Network Activation capability.", zh ? "Capability boundary，不是 runtime fault。" : "Capability boundary, not a runtime fault."],
+                ]}
+              />
+              <p>{zh ? "Static IPv4 commissioning 流程為：保存 Desired → PPU 啟用候選位址 → Manager 重新連線候選 Endpoint → 驗證相同 ppu_id → PPU commit → Manager 更新 Plasma Gateway Endpoint。Browser 不直接改寫已註冊的 Endpoint。" : "Static IPv4 commissioning is Manager-owned: save Desired → PPU activates the candidate address → Manager reconnects to the candidate Endpoint → verifies the same ppu_id → PPU commits → Manager updates the Plasma Gateway Endpoint. The Browser does not directly rewrite the registered Endpoint."}</p>
+            </section>
 
-        <section>
-          <h2>{zh ? "8. Runtime Activation" : "8. Runtime Activation"}</h2>
-          <p>{zh ? "如果 PPU 支援 Runtime Activation，可按 Activate Desired Configuration。這是 PPU-level 操作：關閉新的 Job admission、restart Plasma Server、重新載入 canonical Site Desired Configuration，再驗證 PPU identity 與 Runtime reconciliation。" : "If the PPU supports Runtime Activation, select Activate Desired Configuration. This is a PPU-level operation: quiesce new Job admission, restart Plasma Server, reload canonical Site Desired Configuration, then verify PPU identity and Runtime reconciliation."}</p>
-          <p>{zh ? "有 active Site execution 時 Activation 會被拒絕。若顯示 Runtime Activation · Not Supported，代表目前 PPU Profile 沒有此 capability，而不是 runtime fault。" : "Activation is rejected while Site execution is active. Runtime Activation · Not Supported means the current PPU profile does not expose this capability; it is not a runtime fault."}</p>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={6} title={zh ? "Platform 維護" : "Maintain the Platform"} summary={zh ? "使用獨立的 Platform Maintenance boundary 維護 Bootstrap 與 Runtime。" : "Use the separate Platform Maintenance boundary for Bootstrap and Runtime maintenance."} />
+              <p>{zh ? "進入 PPU → Platform。此頁負責 Bootstrap、Runtime、Platform Release、Platform Maintenance authorization 與 PS Loop Test；與 Programming Registration lifecycle 分離。" : "Open PPU → Platform. This surface owns Bootstrap, Runtime, Platform Release, Platform Maintenance authorization, and the PS Loop Test; it is separate from the Programming Registration lifecycle."}</p>
+              <div className="documentCompactProcedure">
+                {(zh ? [
+                  "選擇已知 PPU 並確認 Bootstrap / Platform capability",
+                  "輸入 Platform Maintenance Pairing Token 並完成授權",
+                  "選擇 Platform Release package 與 SHA-256 sidecar",
+                  "確認 PPU ID / Facility ID / Display Name",
+                  "按 Update PPU Platform Release",
+                  "等待 Runtime Active，必要時執行 Run PS Loop Test",
+                ] : [
+                  "Select a known PPU and confirm Bootstrap / Platform capability",
+                  "Enter the Platform Maintenance Pairing Token and select Authorize Platform Maintenance",
+                  "Select the Platform Release package and SHA-256 sidecar",
+                  "Confirm PPU ID / Facility ID / Display Name",
+                  "Select Update PPU Platform Release",
+                  "Wait for Runtime Active and run the PS Loop Test when needed",
+                ]).map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+              </div>
+              <DocumentCallout label={zh ? "Platform Maintenance · Not Supported" : "Platform Maintenance · Not Supported"}>
+                <p>{zh ? "代表此 PPU Profile 沒有 Bootstrap / Platform Maintenance route；這是 capability boundary，不是 fault。" : "The PPU profile does not expose the Bootstrap / Platform Maintenance route. This is a capability boundary, not a fault."}</p>
+              </DocumentCallout>
+            </section>
 
-        <section>
-          <h2>{zh ? "9. 常見狀態判讀" : "9. Interpreting Common States"}</h2>
-          <DefinitionTable rows={[
-            ["Healthy", zh ? "目前沒有已知 degraded condition；不代表所有 capability 都存在。" : "No known degraded condition is reported; this does not imply every capability exists."],
-            ["Registered", zh ? "已通過 Managed Programming admission。" : "Managed Programming admission is complete."],
-            ["Not Registered", zh ? "尚未通過 Programming Registration。" : "Programming Registration has not completed."],
-            ["Not Supported", zh ? "此 PPU Profile 沒有該 capability。" : "The PPU profile does not expose that capability."],
-            ["Not Installed", zh ? "相關 capability 存在，但 Runtime 尚未安裝。" : "The relevant capability exists, but Runtime is not installed."],
-            ["Unavailable", zh ? "理論上應可取得狀態，但目前無法取得；需要當成可診斷的異常。" : "The state should be observable but is currently unavailable and should be diagnosed."],
-            ["Busy", zh ? "PPU 或 Site 正在執行工作。" : "The PPU or Site is executing work."],
-            ["Fault", zh ? "已有明確的 runtime / Site fault evidence。" : "Explicit runtime or Site fault evidence exists."],
-          ]} />
-          <aside className="documentNotice">
-            {zh
-              ? "Healthy ≠ 所有 capability 都存在；Not Supported ≠ Fault；Registered ≠ Platform Maintenance Authorized。"
-              : "Healthy ≠ every capability exists; Not Supported ≠ Fault; Registered ≠ Platform Maintenance Authorized."}
-          </aside>
-        </section>
+            <section className="documentProcedureSection">
+              <DocumentSectionHeading number={7} title={zh ? "Site 設定與就緒確認" : "Configure Sites and confirm readiness"} summary={zh ? "設定 Site Desired Configuration，必要時套用 Runtime，再確認可進入 Programming。" : "Configure Site Desired State, apply Runtime when needed, then confirm Programming readiness."} />
+              <div className="documentSubsection">
+                <h3><span>7.1</span>{zh ? "Site Configuration" : "Site Configuration"}</h3>
+                <p>{zh ? "進入 PPU → Sites。Ready / Busy / Fault / Enabled Sites / Topology Source / Active Execution 是 Observed Runtime State；是否能修改 Site Desired Configuration 是另一個 capability。" : "Open PPU → Sites. Ready / Busy / Fault / Enabled Sites / Topology Source / Active Execution are Observed Runtime State. Site Desired Configuration write support is a separate capability."}</p>
+                <DocumentDataTable
+                  headers={zh ? ["設定", "說明", "注意"] : ["Setting", "Description", "Note"]}
+                  rows={[
+                    ["Desired Enabled", zh ? "Site 是否應啟用。" : "Whether the Site should be enabled.", zh ? "保存到 Desired Configuration。" : "Stored in Desired Configuration."],
+                    ["Desired Interface", zh ? "Site programming interface，例如 mock、openocd 或 fpga。" : "Site programming interface, such as mock, openocd, or fpga.", zh ? "Accepted values 由 PPU contract 決定。" : "Accepted values are defined by the PPU contract."],
+                    ["Desired Target", zh ? "Site target configuration identity。" : "Site target configuration identity.", zh ? "不代表實體 IC 已完成 qualification。" : "Does not prove physical IC qualification."],
+                  ]}
+                />
+                <p>{zh ? "Plasma 明確區分 Draft → Desired → Runtime。Save 只更新 Desired Configuration，不代表 running Plasma Server 已套用。" : "Plasma explicitly separates Draft → Desired → Runtime. Save updates Desired Configuration only; it does not mean the running Plasma Server has applied it."}</p>
+              </div>
+              <div className="documentSubsection">
+                <h3><span>7.2</span>{zh ? "Runtime Activation" : "Runtime Activation"}</h3>
+                <p>{zh ? "若 PPU 支援 Runtime Activation，可按 Activate Desired Configuration。這是 PPU-level 操作；有 active Site execution 時會被拒絕。" : "If the PPU supports Runtime Activation, select Activate Desired Configuration. This is a PPU-level operation and is rejected while Site execution is active."}</p>
+                <DocumentCallout label={zh ? "Runtime Activation · Not Supported" : "Runtime Activation · Not Supported"}>
+                  <p>{zh ? "表示目前 PPU Profile 沒有此 capability，而不是 runtime fault。" : "The current PPU profile does not expose this capability; it is not a runtime fault."}</p>
+                </DocumentCallout>
+              </div>
+              <div className="documentSubsection">
+                <h3><span>7.3</span>{zh ? "狀態判讀" : "State interpretation"}</h3>
+                <DocumentDataTable
+                  headers={zh ? ["狀態", "意義", "Operator 判讀"] : ["State", "Meaning", "Operator interpretation"]}
+                  rows={[
+                    ["Healthy", zh ? "沒有已知 degraded condition。" : "No known degraded condition.", zh ? "不代表所有 capability 都存在。" : "Does not imply every capability exists."],
+                    ["Registered", zh ? "Managed Programming admission 完成。" : "Managed Programming admission is complete.", zh ? "仍不等於 Platform Maintenance Authorized。" : "Still does not mean Platform Maintenance is authorized."],
+                    ["Not Supported", zh ? "此 PPU Profile 沒有該 capability。" : "The PPU profile does not expose the capability.", zh ? "不是 Fault。" : "Not a Fault."],
+                    ["Not Installed", zh ? "Capability 存在，但 Runtime 尚未安裝。" : "Capability exists, but Runtime is not installed.", zh ? "需要 Platform deployment。" : "Platform deployment is required."],
+                    ["Unavailable", zh ? "應可取得的狀態目前無法取得。" : "Expected state cannot currently be observed.", zh ? "需要診斷。" : "Diagnose the failure."],
+                    ["Busy / Fault", zh ? "正在執行或已有 fault evidence。" : "Execution is active or fault evidence exists.", zh ? "依狀態停止變更並進行診斷。" : "Avoid unsafe changes and diagnose as appropriate."],
+                  ]}
+                />
+              </div>
+              <div className="documentSubsection">
+                <h3><span>7.4</span>{zh ? "初次設定路徑" : "First-time setup paths"}</h3>
+                <p>{zh ? "依 PPU 目前是否已安裝 Runtime，初次設定有兩條常見路徑；兩者最後都必須回到相同的 Registration、Site 與 Programming readiness 判定。" : "First-time setup normally follows one of two paths depending on whether Runtime is already installed. Both paths converge on the same Registration, Site, and Programming readiness gates."}</p>
+                <h4>{zh ? "已有 Runtime 的 PPU" : "Runtime-present PPU"}</h4>
+                <div className="documentCompactProcedure">
+                  {(zh ? [
+                    "確認 PPU 網路可達並 Add PPU Connection",
+                    "確認 PPU ID / Connectivity / Health",
+                    "Validate & Register for Programming",
+                    "Use for Managed Operations",
+                    "視需要設定 Network 與 Site Desired Configuration",
+                    "必要時執行 Runtime Activation，最後進入 Programming 驗證",
+                  ] : [
+                    "Confirm PPU network reachability and Add PPU Connection",
+                    "Confirm PPU ID / Connectivity / Health",
+                    "Validate & Register for Programming",
+                    "Use for Managed Operations",
+                    "Configure Network and Site Desired Configuration when needed",
+                    "Run Runtime Activation when needed, then proceed to Programming validation",
+                  ]).map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+                </div>
+                <h4>{zh ? "Bootstrap-only PPU" : "Bootstrap-only PPU"}</h4>
+                <div className="documentCompactProcedure">
+                  {(zh ? [
+                    "完成 Bootstrap factory provisioning 並 Add PPU Connection",
+                    "進入 Platform 並 Authorize Platform Maintenance",
+                    "部署 PPU Platform Release / Runtime，確認 Runtime Active",
+                    "回到 Registration，Validate & Register for Programming",
+                    "設定 Sites，必要時執行 Runtime Activation",
+                    "完成 Programming qualification",
+                  ] : [
+                    "Complete Bootstrap factory provisioning and Add PPU Connection",
+                    "Open Platform and Authorize Platform Maintenance",
+                    "Deploy the PPU Platform Release / Runtime and confirm Runtime Active",
+                    "Return to Registration and Validate & Register for Programming",
+                    "Configure Sites and run Runtime Activation when needed",
+                    "Complete Programming qualification",
+                  ]).map((step, index) => <div key={step}><span>{index + 1}</span><p>{step}</p></div>)}
+                </div>
+              </div>
+              <DocumentCallout tone="critical" label={zh ? "Evidence boundary" : "Evidence boundary"}>
+                <p>{zh ? "Mock PPU 的 Online / Healthy / Site Ready 只證明相應 software / Mock workflow；不代表 Z2、FPGA/PL、socket、電氣條件或實體 IC programming 已完成驗證。" : "Online / Healthy / Site Ready on a Mock PPU proves only the corresponding software / Mock workflow. It does not validate Z2, FPGA/PL, sockets, electrical behavior, or physical IC programming."}</p>
+              </DocumentCallout>
+            </section>
+          </div>
 
-        <section>
-          <h2>{zh ? "10. 建議的初次設定流程" : "10. Recommended First-Time Setup"}</h2>
-          <h3>{zh ? "已有 Runtime 的 PPU" : "PPU with Runtime already installed"}</h3>
-          <Flow steps={zh
-            ? ["確認 PPU 網路可達", "Add PPU Connection", "確認 PPU ID / Connectivity / Health", "Validate & Register for Programming", "Use for Managed Operations", "視需要設定 Network", "檢查 Sites topology", "視 capability 設定 Site Desired Configuration", "視需要執行 Runtime Activation", "進入 Programming 驗證"]
-            : ["Confirm PPU network reachability", "Add PPU Connection", "Confirm PPU ID / Connectivity / Health", "Validate & Register for Programming", "Use for Managed Operations", "Configure Network when needed", "Inspect Sites topology", "Configure Site Desired Configuration when supported", "Run Runtime Activation when needed", "Proceed to Programming validation"]} />
-          <h3>{zh ? "Bootstrap-only PPU" : "Bootstrap-only PPU"}</h3>
-          <Flow steps={zh
-            ? ["完成 PPU Bootstrap factory provisioning", "Add PPU Connection", "進入 Platform", "Authorize Platform Maintenance", "部署 PPU Platform Release / Runtime", "確認 Runtime Active", "回到 Registration", "Validate & Register for Programming", "設定 Sites", "進行 Programming qualification"]
-            : ["Complete PPU Bootstrap factory provisioning", "Add PPU Connection", "Open Platform", "Authorize Platform Maintenance", "Deploy the PPU Platform Release / Runtime", "Confirm Runtime Active", "Return to Registration", "Validate & Register for Programming", "Configure Sites", "Run Programming qualification"]} />
-        </section>
-
-        <aside className="documentNotice critical">
-          {zh
-            ? "Mock PPU 的 Online / Healthy / Site Ready 只證明相應的 software / Mock workflow。它不代表 Z2、FPGA/PL、socket、電氣條件或實體 IC programming 已完成驗證。"
-            : "Online / Healthy / Site Ready on a Mock PPU proves only the corresponding software / Mock workflow. It does not validate Z2, FPGA/PL, sockets, electrical behavior, or physical IC programming."}
-        </aside>
+          <PpuSetupExampleRail zh={zh} />
+        </div>
       </article>
     );
   }
