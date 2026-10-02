@@ -3,7 +3,6 @@ name: STM32H5 Layer-1 Production publication v2.9
 on:
   pull_request:
     paths:
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/stm32h5-commercial-icpn.csv'
       - 'data/device-catalog/research/stm32h5-layer1-production-publication-v2.9.json'
       - 'data/device-catalog/research/validate_stm32h5_layer1_publication_v29.py'
