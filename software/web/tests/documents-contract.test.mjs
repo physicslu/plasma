@@ -140,6 +140,30 @@ test("PPU Setup is the first structured document-layout migration", () => {
   ]) assert.match(documentsCss, new RegExp(`\\.${className}`));
 });
 
+test("all operator documents use the approved structured guide layout", () => {
+  assert.equal((documents.match(/documentArticle documentArticleGuide/g) ?? []).length, 10);
+  assert.equal((documents.match(/<DocumentTopicExampleRail topic=\{topic\} zh=\{zh\} \/>/g) ?? []).length, 9);
+  assert.equal((documents.match(/<PpuSetupExampleRail zh=\{zh\} \/>/g) ?? []).length, 1);
+  assert.doesNotMatch(documents, /<article className="documentArticle">/);
+
+  for (const marker of [
+    "PMode core model · 5 primary objects",
+    "Production flow · 9 steps",
+    "Programming Job · 4 configuration groups",
+    "Result interpretation · 3 layers",
+    "EMode · 4 primary capabilities",
+    "Engineering flow · 8 steps",
+    "EMode Programming · 4 components",
+    "Gateway Settings · 2 editable fields",
+    "Mock Settings · 4 configuration groups",
+  ]) assert.match(documents, new RegExp(marker.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\test("Gateway operator reference lists only currently editable settings", () => {")));
+
+  assert.match(documents, /These screens illustrate the documentation at left; they are examples, not live system state/);
+  assert.match(documents, /documentGuideBody/);
+  assert.match(documents, /DocumentSectionHeading/);
+  assert.match(documents, /DocumentDataTable/);
+});
+
 test("Gateway operator reference lists only currently editable settings", () => {
   assert.match(documents, /\["PPU Request Timeout"/);
   assert.match(documents, /\["PPU Retry Count"/);
