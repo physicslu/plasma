@@ -1,0 +1,24 @@
+name: STM32F3 metadata replay v3.1
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f3-ordering-authority-v3.1.json'
+      - 'data/device-catalog/research/analyze_stm32f3_metadata_replay_v31.py'
+      - 'data/device-catalog/research/test_analyze_stm32f3_metadata_replay_v31.py'
+      - 'data/device-catalog/research/STM32F3_METADATA_REPLAY_V31.md'
+      - '.github/workflows/device-catalog-stm32f3-metadata-replay-v31.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate STM32F3 metadata replay
+        run: |
+          python data/device-catalog/research/analyze_stm32f3_metadata_replay_v31.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_analyze_stm32f3_metadata_replay_v31.py -v
