@@ -1,0 +1,33 @@
+name: STM32H5 Layer-1 admission proposal v2.8
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_stm32h5_layer1_admission_proposal_v28.py'
+      - 'data/device-catalog/research/test_prepare_stm32h5_layer1_admission_proposal_v28.py'
+      - 'data/device-catalog/research/STM32H5_LAYER1_ADMISSION_PROPOSAL_V28.md'
+      - '.github/workflows/device-catalog-stm32h5-layer1-proposal-v28.yml'
+permissions:
+  contents: read
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate STM32H5 Layer-1 proposal
+        run: |
+          python data/device-catalog/research/prepare_stm32h5_layer1_admission_proposal_v28.py \
+            --proposal /tmp/stm32h5-layer1-candidates-v28.csv \
+            --summary /tmp/stm32h5-layer1-proposal-v28.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_stm32h5_layer1_admission_proposal_v28.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32h5-layer1-admission-proposal-v28
+          path: |
+            /tmp/stm32h5-layer1-candidates-v28.csv
+            /tmp/stm32h5-layer1-proposal-v28.json
+          if-no-files-found: error
+          retention-days: 30
