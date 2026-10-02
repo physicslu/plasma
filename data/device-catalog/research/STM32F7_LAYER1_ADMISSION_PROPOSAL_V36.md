@@ -33,6 +33,12 @@ No Programming Profile applicability, Engineering Verified status, field evidenc
 
 The override does not authorize a generalized STM32F750 x8 decoder.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `ec93408ecec154bf40a6fcd4d5ddb063e5e36cb023bc19bbed13b306a3b4a931`
+- proposal CSV SHA-256: `bde4bbf82b4a528a18eb6d4d298b06cf8df9bbc7918150bfb9ed510cdbfe3170`
+- metadata authority SHA-256: `9828220050adfa19c7c6c6ff74a863ab2d3583d13258b6d286c3b831975129c6`
+
 ## Review artifact
 
 CI generates the complete 154-row proposal CSV and machine-readable summary. Their exact-set, CSV and authority SHA-256 values are frozen into this PR before merge.
