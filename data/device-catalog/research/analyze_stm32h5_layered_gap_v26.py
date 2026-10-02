@@ -98,6 +98,7 @@ def analyze() -> dict:
             crosswalk[icpn] = matches[0]
 
     matched_patterns = sorted(set(crosswalk.values()))
+    unexercised_patterns = sorted(set(patterns) - set(matched_patterns))
     prefix_counts = dict(sorted(Counter(x[:8] for x in exact).items()))
     tr_count = sum(x.endswith("TR") for x in exact)
     backend_entries = current_h5_backend_entries()
@@ -119,6 +120,8 @@ def analyze() -> dict:
             "mx1_structural_pattern_count": len(patterns),
             "matched_exact_count": len(crosswalk),
             "matched_pattern_count": len(matched_patterns),
+            "current_active_unexercised_pattern_count": len(unexercised_patterns),
+            "current_active_unexercised_patterns": unexercised_patterns,
             "unmatched_exact_count": len(unmatched),
             "ambiguous_exact_count": len(ambiguous),
             "tr_exact_count": tr_count,
