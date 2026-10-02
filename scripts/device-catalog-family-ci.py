@@ -103,6 +103,7 @@ def command_profile(family: str) -> list[list[str]]:
             # evidence and validates the current 173-Active / 154-gap lock
             # instead of replaying historical conclusions from mutable state.
             _py("data/device-catalog/research/validate_stm32f7_active_gap_v34.py"),
+            _py("data/device-catalog/research/analyze_stm32f7_metadata_replay_v35.py"),
         ],
         "stm32g0": [
             _py("data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"),
