@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32f7-ordering-authority-v3.5",
+  "reference_date": "2026-10-02",
+  "scope": "official ST Ordering Information metadata authority for the locked 154 missing current-Active STM32F7 exact MPNs",
+  "common": {
+    "temperature_c": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    },
+    "packing": {
+      "": "standard_or_tray_unspecified",
+      "TR": "tape_and_reel"
+    },
+    "flash_kib": {
+      "8": 64,
+      "C": 256,
+      "E": 512,
+      "G": 1024,
+      "I": 2048
+    },
+    "pin_package": {
+      "R/T": {
+        "package": "LQFP",
+        "pin_count": 64
+      },
+      "V/T": {
+        "package": "LQFP",
+        "pin_count": 100
+      },
+      "V/H": {
+        "package": "TFBGA",
+        "pin_count": 100
+      },
+      "V/Y": {
+        "package": "WLCSP",
+        "pin_count": 100
+      },
+      "Z/T": {
+        "package": "LQFP",
+        "pin_count": 144
+      },
+      "Z/I": {
+        "package": "UFBGA",
+        "pin_count": 144
+      },
+      "Z/Y": {
+        "package": "WLCSP",
+        "pin_count": 143
+      },
+      "I/T": {
+        "package": "LQFP",
+        "pin_count": 176
+      },
+      "I/K": {
+        "package": "UFBGA",
+        "pin_count": 176
+      },
+      "N/H": {
+        "package": "TFBGA",
+        "pin_count": 216
+      },
+      "A/Y": {
+        "package": "WLCSP",
+        "pin_count": 180
+      }
+    }
+  },
+  "series": {
+    "STM32F722": {
+      "flash_codes": [
+        "C",
+        "E"
+      ],
+      "document": "DS11853",
+      "revision": 9,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f722ic.pdf"
+    },
+    "STM32F723": {
+      "flash_codes": [
+        "C",
+        "E"
+      ],
+      "document": "DS11853",
+      "revision": 9,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f722ic.pdf"
+    },
+    "STM32F730": {
+      "flash_codes": [
+        "8"
+      ],
+      "document": "DS12536",
+      "revision": 2,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f730i8.pdf"
+    },
+    "STM32F732": {
+      "flash_codes": [
+        "C",
+        "E"
+      ],
+      "document": "DS11854",
+      "revision": 7,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f732ie.pdf"
+    },
+    "STM32F733": {
+      "flash_codes": [
+        "C",
+        "E"
+      ],
+      "document": "DS11854",
+      "revision": 7,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f732ie.pdf"
+    },
+    "STM32F745": {
+      "flash_codes": [
+        "E",
+        "G"
+      ],
+      "document": "DS10916",
+      "revision": 5,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f746vg.pdf"
+    },
+    "STM32F746": {
+      "flash_codes": [
+        "E",
+        "G"
+      ],
+      "document": "DS10916",
+      "revision": 5,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f746vg.pdf"
+    },
+    "STM32F756": {
+      "flash_codes": [
+        "G"
+      ],
+      "document": "DS10915",
+      "revision": 5,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f756zg.pdf"
+    },
+    "STM32F765": {
+      "flash_codes": [
+        "G",
+        "I"
+      ],
+      "document": "DS11532",
+      "revision": 9,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f765ng.pdf"
+    },
+    "STM32F767": {
+      "flash_codes": [
+        "G",
+        "I"
+      ],
+      "document": "DS11532",
+      "revision": 9,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f765ng.pdf"
+    },
+    "STM32F769": {
+      "flash_codes": [
+        "G",
+        "I"
+      ],
+      "document": "DS11532",
+      "revision": 9,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f765ng.pdf"
+    },
+    "STM32F777": {
+      "flash_codes": [
+        "I"
+      ],
+      "document": "DS11243",
+      "revision": 8,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f777bi.pdf"
+    },
+    "STM32F779": {
+      "flash_codes": [
+        "I"
+      ],
+      "document": "DS11243",
+      "revision": 8,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f777bi.pdf"
+    }
+  },
+  "bounded_exact_overrides": {
+    "STM32F750V8T6": {
+      "base_device": "STM32F750V8",
+      "package": "LQFP",
+      "pin_count": 100,
+      "flash_kib": 64,
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f750v8.html",
+      "reason": "DS12535 Rev 2 ordering table does not encode the commercial x8 Flash code; exact ST product surface confirms the 64-KiB Active identity."
+    },
+    "STM32F750V8T7": {
+      "base_device": "STM32F750V8",
+      "package": "LQFP",
+      "pin_count": 100,
+      "flash_kib": 64,
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f750v8.html",
+      "reason": "DS12535 Rev 2 ordering table does not encode the commercial x8 Flash code; exact ST product surface confirms the 64-KiB Active identity."
+    },
+    "STM32F750Z8T6": {
+      "base_device": "STM32F750Z8",
+      "package": "LQFP",
+      "pin_count": 144,
+      "flash_kib": 64,
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f750z8.html",
+      "reason": "DS12535 Rev 2 ordering table does not encode the commercial x8 Flash code; exact ST product surface confirms the 64-KiB Active identity."
+    }
+  },
+  "governance": {
+    "exact_identity_source": "stm32f7-active-exact-gap-v3.4.txt",
+    "unknown_series_forbidden": true,
+    "unknown_flash_code_forbidden": true,
+    "unknown_pin_package_combination_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_option_suffix_forbidden": true,
+    "exact_override_scope_must_match_identity": true,
+    "backend_mapping_required_for_layer1_metadata": false,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
