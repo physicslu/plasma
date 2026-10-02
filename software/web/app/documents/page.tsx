@@ -163,6 +163,236 @@ function DocumentSetupOverview({
   );
 }
 
+type DocumentExampleSpec = {
+  title: string;
+  caption: string;
+  toolbar: string;
+  toolbarMeta: string;
+  fields?: Array<[string, string]>;
+  summary?: Array<[string, string]>;
+  statusRows?: Array<{ label: string; value: string; detail?: string; good?: boolean }>;
+  primaryAction?: string;
+  secondaryAction?: string;
+};
+
+function DocumentTopicExampleRail({ topic, zh }: { topic: Topic; zh: boolean }) {
+  let examples: DocumentExampleSpec[] = [];
+
+  if (topic === "pmode-overview" || topic === "pmode-flow") {
+    examples = [
+      {
+        title: zh ? "選擇 Production Set" : "Select the Production Set",
+        caption: zh ? "先決定 Facility / PPU / Site 範圍。" : "Define the Facility / PPU / Site scope first.",
+        toolbar: "Production Site Selection",
+        toolbarMeta: "Production Set",
+        summary: [["Facility", "line-1"], ["PPU", "line1-ppu-a"], ["Sites", "8"], ["Selected", "8"]],
+      },
+      {
+        title: zh ? "定義 Programming Job" : "Define the Programming Job",
+        caption: zh ? "Target IC、Image、Operations 與 Batch Policy 集中在同一工作面板。" : "Target IC, Image, Operations, and Batch Policy stay in one work panel.",
+        toolbar: "Programming Job",
+        toolbarMeta: "BATCH READY",
+        fields: [["Target IC", "Selected IC"], ["Programming Image", "firmware.bin"], ["Operations", "ERASE → PROGRAM → VERIFY"], ["Repeat / Retry", "1 / 3"]],
+        primaryAction: "START PROGRAMMING",
+      },
+      {
+        title: zh ? "監看 Batch 與 Sites" : "Monitor Batch and Sites",
+        caption: zh ? "START 後以 Batch Summary 與 Live Site Status 追蹤執行結果。" : "After START, use Batch Summary and Live Site Status to track execution.",
+        toolbar: "BATCH SUMMARY",
+        toolbarMeta: "Current Batch",
+        summary: [["SITES", "8"], ["TOTAL IC", "8"], ["PROCESSED IC", "8"], ["YIELD", "100%"]],
+        statusRows: [{ label: "Live Site Status", value: "PASS", detail: "8 / 8", good: true }],
+      },
+    ];
+  } else if (topic === "pmode-programming") {
+    examples = [
+      {
+        title: zh ? "選擇 Target 與 Image" : "Choose Target and Image",
+        caption: zh ? "Program / Verify 需要有效 Programming Image。" : "Program / Verify require a valid Programming Image.",
+        toolbar: "Programming Job",
+        toolbarMeta: "Target",
+        fields: [["Target IC", "Selected IC"], ["Programming Image", "firmware.bin"]],
+      },
+      {
+        title: zh ? "選擇 Operations" : "Choose Operations",
+        caption: zh ? "Erase / Program / Verify / Read 依本次工作需要組合。" : "Combine Erase / Program / Verify / Read as required for the job.",
+        toolbar: "Operations",
+        toolbarMeta: "E / P / V / R",
+        fields: [["Erase", "Enabled"], ["Program", "Enabled"], ["Verify", "Enabled"], ["Read", "Disabled"]],
+      },
+      {
+        title: zh ? "設定 Batch Policy" : "Set Batch Policy",
+        caption: zh ? "Repeat、Retry 與 Stop Policy 決定本次 Batch 的執行政策。" : "Repeat, Retry, and Stop Policy define Batch execution policy.",
+        toolbar: "Batch Policy",
+        toolbarMeta: "Ready",
+        fields: [["Repeat", "1"], ["Retry", "3"], ["Stop Policy", "Off"]],
+        primaryAction: "START PROGRAMMING",
+      },
+    ];
+  } else if (topic === "pmode-batch") {
+    examples = [
+      {
+        title: "Batch Summary",
+        caption: zh ? "計畫數、已處理數與 Yield 分開呈現。" : "Planned quantity, processed quantity, and Yield are presented separately.",
+        toolbar: "BATCH SUMMARY",
+        toolbarMeta: "Current Batch",
+        summary: [["SITES", "8"], ["TOTAL IC", "16"], ["PROCESSED IC", "14"], ["YIELD", "92.9%"]],
+      },
+      {
+        title: zh ? "Site 狀態" : "Site states",
+        caption: zh ? "IC FAIL 與基礎設施 ERROR 必須分開解讀。" : "IC FAIL and infrastructure ERROR must be interpreted separately.",
+        toolbar: "Live Site Status",
+        toolbarMeta: "8 Sites",
+        statusRows: [
+          { label: "Site 1", value: "PASS", detail: "100%", good: true },
+          { label: "Site 2", value: "FAIL", detail: "Verify" },
+          { label: "Site 3", value: "ERROR", detail: "Gateway" },
+        ],
+      },
+    ];
+  } else if (topic === "emode-overview" || topic === "emode-flow") {
+    examples = [
+      {
+        title: zh ? "指定工程目標" : "Resolve the engineering target",
+        caption: zh ? "先選 Facility / PPU，再解讀 Sites 與 Job 狀態。" : "Select Facility / PPU before interpreting Sites and Job state.",
+        toolbar: "Engineering Target",
+        toolbarMeta: "Selected",
+        summary: [["Facility", "line-1"], ["PPU", "line1-ppu-a"], ["Sites", "8"], ["Provider", "Selected"]],
+      },
+      {
+        title: zh ? "執行 Engineering Programming" : "Run Engineering Programming",
+        caption: zh ? "EMode 與 PMode 共用 Programming Job 核心欄位。" : "EMode shares the core Programming Job fields with PMode.",
+        toolbar: "Programming Job",
+        toolbarMeta: "BATCH READY",
+        fields: [["Target IC", "Selected IC"], ["Programming Image", "firmware.bin"], ["Operations", "PROGRAM → VERIFY"], ["Selected Sites", "1, 2"]],
+        primaryAction: "START PROGRAMMING",
+      },
+      {
+        title: zh ? "查看 Site / Operator Log" : "Review Site / Operator Log",
+        caption: zh ? "Engineering 模式增加 Site 診斷與完整操作紀錄。" : "Engineering mode adds Site diagnostics and full operator evidence.",
+        toolbar: "Engineering Site Status",
+        toolbarMeta: "REST polling",
+        statusRows: [
+          { label: "Site 1", value: "READY", detail: "Selected", good: true },
+          { label: "Site 2", value: "PASS", detail: "Verify", good: true },
+        ],
+        secondaryAction: "Operator Log",
+      },
+    ];
+  } else if (topic === "emode-programming") {
+    examples = [
+      {
+        title: zh ? "選擇 Target 與 Sites" : "Select Target and Sites",
+        caption: zh ? "Engineering targeting 明確綁定 Facility / PPU / Site。" : "Engineering targeting explicitly binds Facility / PPU / Site.",
+        toolbar: "Engineering Programming",
+        toolbarMeta: "Target",
+        summary: [["Facility", "line-1"], ["PPU", "line1-ppu-a"], ["Selected Sites", "2"], ["Site Count", "8"]],
+      },
+      {
+        title: zh ? "共用 Programming Job" : "Shared Programming Job",
+        caption: zh ? "Target IC、Image、E/P/V/R 與 Batch Policy 使用同一套語意。" : "Target IC, Image, E/P/V/R, and Batch Policy use the same semantics.",
+        toolbar: "Programming Job",
+        toolbarMeta: "BATCH READY",
+        fields: [["Target IC", "Selected IC"], ["Programming Image", "firmware.bin"], ["Repeat", "1"], ["Retry", "3"]],
+        primaryAction: "START PROGRAMMING",
+      },
+      {
+        title: zh ? "直接 Site 操作與 Audit" : "Direct Site action and audit",
+        caption: zh ? "工程操作可針對單 Site 執行，並保留 Job / Operator Log。" : "Engineering work can target one Site while retaining Job / Operator Log evidence.",
+        toolbar: "Engineering Site Status",
+        toolbarMeta: "Site 1",
+        statusRows: [{ label: "Site 1", value: "READY", detail: "Direct action", good: true }],
+        secondaryAction: "Operator Log",
+      },
+    ];
+  } else if (topic === "gateway-settings") {
+    examples = [
+      {
+        title: zh ? "設定 Gateway 通訊政策" : "Configure Gateway communication policy",
+        caption: zh ? "目前 UI 直接提供 Request Timeout 與 Retry Count。" : "The current UI directly exposes Request Timeout and Retry Count.",
+        toolbar: "Plasma Gateway Settings",
+        toolbarMeta: "Settings",
+        fields: [["PPU Request Timeout", "10 sec"], ["PPU Retry Count", "3 times"]],
+        primaryAction: "Apply Settings",
+      },
+      {
+        title: zh ? "確認設定 Revision" : "Confirm the settings revision",
+        caption: zh ? "新的設定套用後確認 REV；已開始的 Batch 保留 START 時凍結的 policy。" : "Confirm REV after applying changes; a started Batch keeps the policy frozen at START.",
+        toolbar: "Gateway Policy",
+        toolbarMeta: "Applied",
+        summary: [["Request Timeout", "10 sec"], ["Retry Count", "3"], ["Revision", "REV + 1"], ["Scope", "Next Batch"]],
+      },
+    ];
+  } else if (topic === "mock-settings") {
+    examples = [
+      {
+        title: zh ? "設定 Mock Profile" : "Configure the Mock profile",
+        caption: zh ? "Enabled、Default Image Size 與 Seed Mode 控制 Mock 測試基線。" : "Enabled, Default Image Size, and Seed Mode control the Mock test baseline.",
+        toolbar: "Mock Runtime Settings",
+        toolbarMeta: "Profile",
+        fields: [["Enabled", "ON"], ["Default Image Size", "1024 KiB"], ["Seed Mode", "Fixed"], ["Fixed Seed", "424242"]],
+        primaryAction: "Apply Settings",
+      },
+      {
+        title: zh ? "設定 Operation 注入" : "Configure operation injection",
+        caption: zh ? "各 E/P/V/R operation 可獨立設定 Error Rate 與 timing 參數。" : "Each E/P/V/R operation can independently configure Error Rate and timing parameters.",
+        toolbar: "Operation Profile",
+        toolbarMeta: "E / P / V / R",
+        fields: [["Error Rate", "0.0%"], ["Base Time", "100 ms"], ["Throughput", "1024 KiB/s"], ["Jitter", "0 ms"]],
+        primaryAction: "Apply Settings",
+      },
+    ];
+  }
+
+  return (
+    <aside className="documentExampleRail" aria-label={zh ? "操作畫面示例" : "Operation screen examples"}>
+      <header className="documentExampleRailHeader">
+        <span className="documentExampleRailIcon" aria-hidden="true">▣</span>
+        <div>
+          <small>{zh ? "操作畫面示例" : "OPERATION SCREEN EXAMPLES"}</small>
+          <h2>{zh ? "操作畫面示例" : "Operation screen examples"}</h2>
+          <p>{zh ? "以下畫面用來對照左側說明；屬於文件示意，不是即時系統狀態。" : "These screens illustrate the documentation at left; they are examples, not live system state."}</p>
+        </div>
+      </header>
+      {examples.map((example, index) => (
+        <section className="documentOperationExample" data-doc-example={`${topic}-${index + 1}`} key={`${topic}-${example.title}`}>
+          <header><span>{index + 1}</span><div><strong>{example.title}</strong><p>{example.caption}</p></div></header>
+          <div className="documentMockScreen">
+            <div className="documentMockToolbar"><b>{example.toolbar}</b><span>{example.toolbarMeta}</span></div>
+            {example.statusRows?.map(row => (
+              <div className="documentMockStatusRow" key={`${row.label}-${row.value}`}>
+                <b>{row.label}</b><span data-tone={row.good ? "good" : undefined}>{row.value}</span>{row.detail ? <span>{row.detail}</span> : null}
+              </div>
+            ))}
+            {example.fields ? (
+              <div className="documentMockForm">
+                {example.fields.map(([label, value]) => <label key={label}><span>{label}</span><b>{value}</b></label>)}
+                {(example.secondaryAction || example.primaryAction) ? (
+                  <div className="documentMockActions">
+                    {example.secondaryAction ? <span>{example.secondaryAction}</span> : null}
+                    {example.primaryAction ? <strong>{example.primaryAction}</strong> : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {example.summary ? (
+              <div className="documentMockSummary">
+                {example.summary.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
+              </div>
+            ) : null}
+            {!example.fields && (example.secondaryAction || example.primaryAction) ? (
+              <div className="documentMockForm"><div className="documentMockActions">
+                {example.secondaryAction ? <span>{example.secondaryAction}</span> : null}
+                {example.primaryAction ? <strong>{example.primaryAction}</strong> : null}
+              </div></div>
+            ) : null}
+          </div>
+        </section>
+      ))}
+    </aside>
+  );
+}
+
 function PpuSetupExampleRail({ zh }: { zh: boolean }) {
   return (
     <aside className="documentExampleRail" aria-label={zh ? "PPU 操作畫面示例" : "PPU operation screen examples"}>
