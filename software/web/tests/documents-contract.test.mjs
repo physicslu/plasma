@@ -76,7 +76,7 @@ test("EMode PPU setup guide documents the current management boundaries and setu
   assert.match(documents, /run the PS Loop Test when needed/i);
   assert.match(documents, /Draft → Desired → Runtime/);
   assert.match(documents, /Activate Desired Configuration/);
-  assert.match(documents, /Healthy ≠ every capability exists/);
+  assert.match(documents, /Healthy (?:≠|does not mean) every capability exists/);
   assert.match(documents, /Not Supported ≠ Fault/);
   assert.match(documents, /Registered ≠ Platform Maintenance Authorized/);
   assert.match(documents, /Bootstrap-only PPU/);
