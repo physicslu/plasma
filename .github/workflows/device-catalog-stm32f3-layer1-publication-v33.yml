@@ -1,0 +1,18 @@
+name: STM32F3 Layer-1 Production publication v3.3
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f3-commercial-icpn.csv'
+      - '.github/workflows/device-catalog-stm32f3-layer1-publication-v33.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report STM32F3 canonical integrity
+        run: |
+          wc -l data/device-catalog/research/stm32f3-commercial-icpn.csv
+          sha256sum data/device-catalog/research/stm32f3-commercial-icpn.csv
+          git hash-object data/device-catalog/research/stm32f3-commercial-icpn.csv
