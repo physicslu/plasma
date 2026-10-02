@@ -1,0 +1,21 @@
+name: STM32H5 layered gap v2.6
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/analyze_stm32h5_layered_gap_v26.py'
+      - 'data/device-catalog/research/test_analyze_stm32h5_layered_gap_v26.py'
+      - 'data/device-catalog/research/STM32H5_LAYERED_GAP_V26.md'
+      - '.github/workflows/device-catalog-stm32h5-layered-gap-v26.yml'
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python data/device-catalog/research/analyze_stm32h5_layered_gap_v26.py
+          python -m unittest discover -s data/device-catalog/research -p test_analyze_stm32h5_layered_gap_v26.py -v
