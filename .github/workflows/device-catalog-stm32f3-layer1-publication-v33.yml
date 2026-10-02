@@ -1,18 +1,39 @@
 name: STM32F3 Layer-1 Production publication v3.3
+
 on:
   pull_request:
     paths:
       - 'data/device-catalog/research/stm32f3-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32f3-layer1-production-publication-v3.3.json'
+      - 'data/device-catalog/research/validate_stm32f3_layer1_publication_v33.py'
+      - 'data/device-catalog/research/STM32F3_LAYER1_PRODUCTION_PUBLICATION_V33.md'
+      - 'data/ic-support/test_coverage_inventory.py'
+      - 'scripts/device-catalog-family-ci.py'
+      - 'software/python/tests/test_device_catalog_stm32f3.py'
       - '.github/workflows/device-catalog-stm32f3-layer1-publication-v33.yml'
+
 permissions:
   contents: read
+
 jobs:
-  preflight:
+  publication:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Report STM32F3 canonical integrity
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate approved STM32F3 publication and Production graph
         run: |
-          wc -l data/device-catalog/research/stm32f3-commercial-icpn.csv
-          sha256sum data/device-catalog/research/stm32f3-commercial-icpn.csv
-          git hash-object data/device-catalog/research/stm32f3-commercial-icpn.csv
+          python data/device-catalog/research/validate_stm32f3_layer1_publication_v33.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+      - name: Install Python development package
+        run: python -m pip install -e './software/python[dev]'
+      - name: Validate runtime Catalog Layer-1/Layer-2 separation
+        run: |
+          python -m pytest -q \
+            software/python/tests/test_device_catalog.py \
+            software/python/tests/test_device_catalog_stm32f3.py \
+            software/python/tests/test_device_catalog_web_gateway.py
