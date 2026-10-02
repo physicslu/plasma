@@ -8,6 +8,7 @@ on:
       - 'data/device-catalog/research/stm32h5-layer1-production-publication-v2.9.json'
       - 'data/device-catalog/research/validate_stm32h5_layer1_publication_v29.py'
       - 'data/device-catalog/research/STM32H5_LAYER1_PRODUCTION_PUBLICATION_V29.md'
+      - 'data/ic-support/coverage_inventory.py'
       - 'data/ic-support/test_coverage_inventory.py'
       - 'software/python/tests/test_device_catalog_stm32h5.py'
       - '.github/workflows/device-catalog-stm32h5-layer1-publication-v29.yml'
