@@ -64,6 +64,17 @@ The exact-only H5E package-code exception remains limited to:
 
 No family-wide `J` package inference is introduced.
 
+## IC Support numeric pin-count derivation
+
+The canonical Device Catalog preserves ST's manufacturer notation such as `64/68`, `100/105`, and `176/176+25`. The derived IC Support inventory requires a single numeric physical count, so v2.9 resolves only package-qualified combinations proven by the same ST product surfaces:
+
+- `64/68`: LQFP → 64, VFQFPN → 68;
+- `176/176+25`: LQFP → 176, UFBGA 10x10 → 201 physical balls;
+- `100/105`: current admitted LQFP rows → 100;
+- `144/144`: identical alternatives collapse to 144.
+
+Any unknown slash/package combination fails closed. This derivation does not alter the approved canonical H5 metadata rows.
+
 ## Validation
 
 The v2.9 validator must prove:
