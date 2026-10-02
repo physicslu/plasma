@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32f3-layer1-admission-proposal-v3.2",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 3906,
+  "production_f3_exact_prestate": 10,
+  "current_f3_active_exact": 192,
+  "current_f3_active_intersection_prestate": 10,
+  "proposal_addition_count": 182,
+  "proposal_exact_set_sha256": "1514c8edd3d190a8fd2bc9c27960c47f05ab4536640e008d73e4d5ab2f5a01d7",
+  "proposal_csv_sha256": "de8938da114c261b55aee191a6d0916f4ef8e7d0f1cc16f08d3b870074fe3e47",
+  "authority_id": "stm32f3-ordering-authority-v3.1",
+  "authority_sha256": "5d1f2d565450387b3e4c4074483dea40bfd8c9576e75df88c862da9790c03137",
+  "layer1_catalog_resolution": {
+    "normalized": 182
+  },
+  "backend_scope_evaluated": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 182
+  },
+  "backend_state_semantics": "no route bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "metadata_exception_exact_icpns": [],
+  "series_counts": {
+    "STM32F301": 21,
+    "STM32F302": 50,
+    "STM32F303": 55,
+    "STM32F318": 2,
+    "STM32F328": 1,
+    "STM32F334": 23,
+    "STM32F358": 3,
+    "STM32F373": 21,
+    "STM32F378": 5,
+    "STM32F398": 1
+  },
+  "package_counts": {
+    "LQFP": 145,
+    "UFBGA": 12,
+    "UFQFPN": 16,
+    "WLCSP": 9
+  },
+  "production_f3_exact_after_if_approved": 192,
+  "f3_current_active_identity_coverage_after_if_published": "192/192 = 100%",
+  "production_exact_after_if_approved": 4088,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 3827,
+  "whole_st_active_intersection_after_if_approved": 4009,
+  "whole_st_active_gap_after_if_approved": 541,
+  "whole_st_active_coverage_after_if_approved_percent": 88.1099,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 710,
+  "source_workflow_run_id": 36979774140,
+  "source_artifact_id": 11215256150,
+  "source_artifact_zip_sha256": "518cc5555180655f0b16d0f0d9fe61a019a98ff67063e545b67bd41584e9b5d9"
+}
