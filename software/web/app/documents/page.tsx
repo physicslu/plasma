@@ -422,7 +422,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
                   "等待 Runtime Active，必要時執行 Run PS Loop Test",
                 ] : [
                   "Select a known PPU and confirm Bootstrap / Platform capability",
-                  "Enter the Platform Maintenance Pairing Token and authorize maintenance",
+                  "Enter the Platform Maintenance Pairing Token and select Authorize Platform Maintenance",
                   "Select the Platform Release package and SHA-256 sidecar",
                   "Confirm PPU ID / Facility ID / Display Name",
                   "Select Update PPU Platform Release",
