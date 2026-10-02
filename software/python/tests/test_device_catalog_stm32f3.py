@@ -9,7 +9,8 @@ def test_stm32f3_publication_preserves_legacy_route_and_adds_unbound_layer1_rows
     legacy = catalog.search("STM32F301C6T6", limit=1)[0]
     assert legacy.identifier == "STM32F301C6T6"
     assert legacy.family == "STM32F3"
-    assert legacy.mapping_status == "deterministic_ordering_pattern"
+    assert legacy.mapping_status == "mapped"
+    assert legacy.mapping_method == "deterministic_ordering_pattern"
     assert legacy.target_config == "tcl/target/stm32f3x.cfg"
     assert legacy.production_admitted is True
 
