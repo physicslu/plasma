@@ -85,8 +85,12 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/test_stm32f3_dual_surface_evidence.py"),
             _py("data/device-catalog/research/test_st_browser_acquisition.py"),
             _py("data/device-catalog/research/validate_stm32f3_phase4_4b_retained_evidence.py"),
-            _py("data/device-catalog/research/test_stm32f3_phase4_4c_policy.py"),
-            _py("data/device-catalog/research/test_stm32f3_phase4_4d_admission.py"),
+            # Historical 4.4C/4.4D snapshots dereference Production CSV paths
+            # that have legitimately grown since the original 10-row F3 pilot.
+            # Current family CI keeps the retained discovery evidence and then
+            # validates the current 192-Active / 182-gap refresh lock instead
+            # of regenerating historical conclusions from mutable poststates.
+            _py("data/device-catalog/research/validate_stm32f3_active_gap_v30.py"),
         ],
         "stm32f7": [
             _py("data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"),

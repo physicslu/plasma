@@ -1,0 +1,20 @@
+name: STM32F3 Active exact gap lock v3.0
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-stm32f3-active-exact-mpn-v3.0.txt'
+      - 'data/device-catalog/research/stm32f3-active-exact-gap-v3.0.txt'
+      - 'data/device-catalog/research/validate_stm32f3_active_gap_v30.py'
+      - 'data/device-catalog/research/STM32F3_ACTIVE_EXACT_GAP_V30.md'
+      - '.github/workflows/device-catalog-stm32f3-active-gap-v30.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python data/device-catalog/research/validate_stm32f3_active_gap_v30.py
