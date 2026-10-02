@@ -97,12 +97,12 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/test_stm32f7_dual_surface_evidence.py"),
             _py("data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py"),
             _py("data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py"),
-            _py("data/device-catalog/research/test_stm32f7_phase4_6c_policy.py"),
-            _py("data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py"),
-            _py("data/device-catalog/research/stm32f7_phase4_6c_policy.py"),
-            _py("data/device-catalog/research/test_stm32f7_phase4_6d_admission.py"),
-            _py("data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py"),
-            _py("data/device-catalog/research/test_stm32f7_phase4_6e_publication.py"),
+            # Historical 4.6C/4.6D/4.6E snapshots dereference Production
+            # sources that have legitimately expanded since the original
+            # 19-row F7 pilot. Current family CI preserves retained discovery
+            # evidence and validates the current 173-Active / 154-gap lock
+            # instead of replaying historical conclusions from mutable state.
+            _py("data/device-catalog/research/validate_stm32f7_active_gap_v34.py"),
         ],
         "stm32g0": [
             _py("data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"),

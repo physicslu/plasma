@@ -1,0 +1,19 @@
+name: STM32F7 Active exact gap lock v3.4
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f7-active-exact-gap-v3.4.txt'
+      - 'data/device-catalog/research/validate_stm32f7_active_gap_v34.py'
+      - 'data/device-catalog/research/STM32F7_ACTIVE_EXACT_GAP_V34.md'
+      - '.github/workflows/device-catalog-stm32f7-active-gap-v34.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python data/device-catalog/research/validate_stm32f7_active_gap_v34.py
