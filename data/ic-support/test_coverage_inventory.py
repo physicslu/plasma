@@ -173,8 +173,28 @@ def test_conflicting_bound_programming_profiles_fail_closed() -> None:
         raise AssertionError("conflicting programming profiles must fail closed")
 
 
+
+def test_stm32h5_package_dependent_pin_count_resolution() -> None:
+    module = load_module()
+    assert module.parse_pin_count("64/68", "LQFP") == 64
+    assert module.parse_pin_count("64/68", "VFQFPN") == 68
+    assert module.parse_pin_count("176/176+25", "LQFP") == 176
+    assert module.parse_pin_count("176/176+25", "UFBGA 10x10 0.65") == 201
+    assert module.parse_pin_count("100/105", "LQFP") == 100
+    assert module.parse_pin_count("144/144", "UFBGA 10x10 0.80") == 144
+    assert module.parse_pin_count("240+25", "TFBGA") == 265
+
+    try:
+        module.parse_pin_count("64/68", "UFBGA")
+    except module.CoverageError as exc:
+        assert "cannot resolve pin_count" in str(exc)
+    else:
+        raise AssertionError("unknown package-dependent pin count must fail closed")
+
+
 def main() -> int:
     test_current_production_metrics()
+    test_stm32h5_package_dependent_pin_count_resolution()
     test_exact_icpn_to_base_device_to_profile_projection()
     test_base_device_grouping_is_not_exact_icpn_counting()
     test_conflicting_base_device_flash_or_openocd_mapping_fails_closed()
