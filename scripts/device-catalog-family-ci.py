@@ -90,7 +90,7 @@ def command_profile(family: str) -> list[list[str]]:
             # Current family CI keeps the retained discovery evidence and then
             # validates the current 192-Active / 182-gap refresh lock instead
             # of regenerating historical conclusions from mutable poststates.
-            _py("data/device-catalog/research/validate_stm32f3_active_gap_v30.py"),
+            _py("data/device-catalog/research/validate_stm32f3_layer1_publication_v33.py"),
         ],
         "stm32f7": [
             _py("data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"),
