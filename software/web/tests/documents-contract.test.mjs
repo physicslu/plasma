@@ -84,6 +84,43 @@ test("EMode PPU setup guide documents the current management boundaries and setu
   assert.match(documents, /physical IC programming/);
 });
 
+test("PPU Setup is the first structured document-layout migration", () => {
+  for (const primitive of [
+    "DocumentSetupOverview",
+    "DocumentSectionHeading",
+    "DocumentDataTable",
+    "DocumentCallout",
+    "PpuSetupExampleRail",
+  ]) assert.match(documents, new RegExp(primitive));
+
+  assert.match(documents, /設定總覽　共 7 個大步驟/);
+  assert.match(documents, /Setup overview · 7 major steps/);
+  for (const step of [
+    "連線 PPU",
+    "確認 PPU 狀態",
+    "註冊燒錄權限",
+    "選擇受管操作",
+    "網路設定",
+    "Platform 維護",
+    "Site 設定與就緒",
+  ]) assert.match(documents, new RegExp(step));
+
+  assert.match(documents, /操作畫面示例/);
+  assert.match(documents, /不是即時系統狀態/);
+  assert.match(documents, /documentExampleRail/);
+  assert.doesNotMatch(documents, /On this page/);
+
+  for (const className of [
+    "documentArticleGuide",
+    "documentSetupOverview",
+    "documentSetupStepGrid",
+    "documentGuideBody",
+    "documentProcedureSection",
+    "documentExampleRail",
+    "documentCompactProcedure",
+  ]) assert.match(documentsCss, new RegExp(`\\.${className}`));
+});
+
 test("Gateway operator reference lists only currently editable settings", () => {
   assert.match(documents, /\["PPU Request Timeout"/);
   assert.match(documents, /\["PPU Retry Count"/);
