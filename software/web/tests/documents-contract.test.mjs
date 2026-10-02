@@ -77,8 +77,9 @@ test("EMode PPU setup guide documents the current management boundaries and setu
   assert.match(documents, /Draft → Desired → Runtime/);
   assert.match(documents, /Activate Desired Configuration/);
   assert.match(documents, /Healthy (?:≠|does not mean) every capability exists/);
-  assert.match(documents, /Not Supported (?:≠ Fault|.*not (?:a )?Fault|.*not (?:a )?fault)/);
-  assert.match(documents, /Registered (?:≠ Platform Maintenance Authorized|.*does not mean Platform Maintenance is authorized)/);
+  assert.match(documents, /Not Supported does not mean the PPU is faulty/);
+  assert.match(documents, /\["Not Supported"[\s\S]*"Not a Fault\."/);
+  assert.match(documents, /\["Registered"[\s\S]*Still does not mean Platform Maintenance is authorized/);
   assert.match(documents, /Bootstrap-only PPU/);
   assert.match(documents, /Mock PPU/);
   assert.match(documents, /physical IC programming/);
