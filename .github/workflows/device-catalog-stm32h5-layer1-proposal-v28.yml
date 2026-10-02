@@ -4,6 +4,8 @@ on:
     paths:
       - 'data/device-catalog/research/prepare_stm32h5_layer1_admission_proposal_v28.py'
       - 'data/device-catalog/research/test_prepare_stm32h5_layer1_admission_proposal_v28.py'
+      - 'data/device-catalog/research/stm32h5-layer1-admission-proposal-v2.8.json'
+      - 'data/device-catalog/research/validate_stm32h5_layer1_proposal_lock_v28.py'
       - 'data/device-catalog/research/STM32H5_LAYER1_ADMISSION_PROPOSAL_V28.md'
       - '.github/workflows/device-catalog-stm32h5-layer1-proposal-v28.yml'
 permissions:
@@ -23,6 +25,7 @@ jobs:
             --summary /tmp/stm32h5-layer1-proposal-v28.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_stm32h5_layer1_admission_proposal_v28.py -v
+          python data/device-catalog/research/validate_stm32h5_layer1_proposal_lock_v28.py
       - uses: actions/upload-artifact@v4
         with:
           name: stm32h5-layer1-admission-proposal-v28
