@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32h5-layer1-admission-proposal-v2.8",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 3716,
+  "production_h5_exact_prestate": 0,
+  "current_h5_active_exact": 190,
+  "current_h5_active_intersection_prestate": 0,
+  "proposal_addition_count": 190,
+  "proposal_exact_set_sha256": "33b3d084b635a39f71e9d724aae3456bfb65c1e7e904b0b6547a849bd9dbee9b",
+  "proposal_csv_sha256": "07e1c05a60e0eb19d00b61fa9a092e754752aeb9475a4fe7f3403eab7a0749cd",
+  "authority_id": "stm32h5-ordering-authority-v2.7",
+  "authority_sha256": "2cd9372151db5997adaf44aaf5e029a0f8c566a3fa09daa0095fbeea258454a6",
+  "layer1_catalog_resolution": {
+    "normalized": 190
+  },
+  "backend_state_counts": {
+    "mapping_candidate": 0,
+    "no_mapping": 190
+  },
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "metadata_exception_exact_icpns": [
+    "STM32H5E4ZJJ6",
+    "STM32H5E4ZJJ7Q",
+    "STM32H5E4ZKJ6"
+  ],
+  "series_counts": {
+    "STM32H503": 14,
+    "STM32H523": 39,
+    "STM32H533": 14,
+    "STM32H543": 4,
+    "STM32H553": 2,
+    "STM32H562": 22,
+    "STM32H563": 37,
+    "STM32H573": 23,
+    "STM32H5E4": 13,
+    "STM32H5E5": 9,
+    "STM32H5F4": 9,
+    "STM32H5F5": 4
+  },
+  "production_h5_exact_after_if_approved": 190,
+  "h5_current_active_identity_coverage_after_if_published": "190/190 = 100%",
+  "production_exact_after_if_approved": 3906,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 3637,
+  "whole_st_active_intersection_after_if_approved": 3827,
+  "whole_st_active_gap_after_if_approved": 723,
+  "whole_st_active_coverage_after_if_approved_percent": 84.1099,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 705,
+  "source_workflow_run_id": 36975288162,
+  "source_artifact_id": 11213442198,
+  "source_artifact_zip_sha256": "be1d4301721014c7a04e9133e3eb70d38030038a0d2c6fb52791d2da9393cbab"
+}
