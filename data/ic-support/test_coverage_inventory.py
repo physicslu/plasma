@@ -52,7 +52,7 @@ def test_current_production_metrics() -> None:
     assert metrics["families"] == len(expected_family_counts)
     assert metrics["family_exact_icpns"] == expected_family_counts
     assert metrics["base_devices"] == len(expected_base_devices)
-    assert metrics["deterministic_openocd_exact_icpns"] == 3468
+    assert metrics["deterministic_openocd_exact_icpns"] == 3673
     assert metrics["openocd_unmapped_exact_icpns"] == 43
     assert (
         metrics["deterministic_openocd_exact_icpns"]
@@ -96,6 +96,21 @@ def test_exact_icpn_to_base_device_to_profile_projection() -> None:
         "runtime_resolver": "not_implemented",
         "runtime_ready": False,
     }
+
+    f103_new = find_exact(inventory, "STM32F103R8T6")
+    assert f103_new["base_device"] == "STM32F103R8"
+    assert f103_new["openocd"]["target_config"] == "tcl/target/stm32f1x.cfg"
+    assert f103_new["programming_profile"] == {
+        "state": "unresolved",
+        "profile_id": None,
+        "status": None,
+    }
+    assert f103_new["native_ppu"]["runtime_ready"] is False
+
+    f100_new = find_exact(inventory, "STM32F100C4T6B")
+    assert f100_new["base_device"] == "STM32F100C4"
+    assert f100_new["programming_profile"]["state"] == "unresolved"
+    assert f100_new["openocd"]["target_config"] == "tcl/target/stm32f1x.cfg"
 
 
 def test_base_device_grouping_is_not_exact_icpn_counting() -> None:

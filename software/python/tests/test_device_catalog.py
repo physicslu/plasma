@@ -255,6 +255,40 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert len(combined) == 100
 
 
+def test_stm32f1_layer1_refresh_is_catalog_visible_with_cmsis_base_routes() -> None:
+    catalog = get_default_device_catalog()
+
+    low = catalog.search("STM32F100C4T6B", limit=1)[0]
+    assert low.identifier == "STM32F100C4T6B"
+    assert low.family == "STM32F1"
+    assert low.package == "LQFP"
+    assert low.pin_count == "48"
+    assert low.mapping_status == "mapped"
+    assert low.mapping_method == "deterministic_pattern"
+    assert low.target_config == "tcl/target/stm32f1x.cfg"
+
+    exception = catalog.search("STM32F101RBH6", limit=1)[0]
+    assert exception.identifier == "STM32F101RBH6"
+    assert exception.package == "TFBGA"
+    assert exception.pin_count == "64"
+    assert exception.mapping_status == "mapped"
+
+    high = catalog.search("STM32F103RDY6TR", limit=1)[0]
+    assert high.identifier == "STM32F103RDY6TR"
+    assert high.package == "WLCSP64"
+    assert high.pin_count == "64"
+    assert high.mapping_status == "mapped"
+    assert high.target_config == "tcl/target/stm32f1x.cfg"
+
+    payload = high.to_payload()
+    assert payload["catalog"]["scope"] == "production_admitted"
+    assert payload["physical_validation"] == {
+        "engineering_status": "no_evidence",
+        "ppu_status": "no_evidence",
+        "socket_status": "no_evidence",
+    }
+
+
 def test_stm32f0_layer1_refresh_is_catalog_visible_with_deterministic_routes() -> None:
     catalog = get_default_device_catalog()
 

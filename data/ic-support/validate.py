@@ -30,6 +30,13 @@ PROFILE_DIR_KIND = {
 }
 FLASH_SIZE_BYTES = {"64 KiB": 64 * 1024, "128 KiB": 128 * 1024}
 
+RETAINED_GIT_BLOB_ALIASES = {
+    (
+        "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+        "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+    ): "data/device-catalog/research/stm32f1-phase2.9-post-admission-canonical.csv",
+}
+
 
 class ValidationError(RuntimeError):
     pass
@@ -81,7 +88,17 @@ def source_ids() -> set[str]:
                 f"{sid}: 40-character git_blob_sha is required",
             )
             actual_sha = git_blob_sha(REPO_ROOT / evidence_path)
-            require(actual_sha == expected_sha, f"{sid}: pinned Git blob drift: expected {expected_sha}, got {actual_sha}")
+            if actual_sha != expected_sha:
+                retained_path = RETAINED_GIT_BLOB_ALIASES.get((evidence_path, expected_sha))
+                require(
+                    retained_path is not None,
+                    f"{sid}: pinned Git blob drift: expected {expected_sha}, got {actual_sha}",
+                )
+                retained_sha = git_blob_sha(REPO_ROOT / retained_path)
+                require(
+                    retained_sha == expected_sha,
+                    f"{sid}: retained Git blob alias drift: expected {expected_sha}, got {retained_sha}",
+                )
     require(len(ids) == len(set(ids)), "source_id values must be unique")
     return set(ids)
 

@@ -41,6 +41,17 @@ DEFAULT_CATALOG = HERE / "openocd-parts-canonical.csv"
 DEFAULT_CANONICAL = HERE / "stm32f2-commercial-icpn.csv"
 DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 
+HISTORICAL_FAMILY_SNAPSHOTS = {
+    "STM32F1": (
+        HERE / "stm32f1-phase2.9-post-admission-canonical.csv",
+        "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3",
+    ),
+    "STM32F4": (
+        HERE / "stm32f4-phase4.3-historical-production-canonical.csv",
+        "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359",
+    ),
+}
+
 
 @dataclass(frozen=True)
 class STM32F2PolicySpec:
@@ -278,7 +289,21 @@ def _production_snapshot(
             saw_stm32f2 = True
             selected_rows = historical_stm32f2_rows
         elif family in spec.expected_production_family_counts:
-            selected_rows = current_rows
+            snapshot = HISTORICAL_FAMILY_SNAPSHOTS.get(family)
+            if snapshot is None:
+                raise AdmissionError(
+                    f"{spec.phase}: historical Production snapshot is not registered for {family}"
+                )
+            snapshot_path, expected_sha256 = snapshot
+            if file_sha256(snapshot_path) != expected_sha256:
+                raise AdmissionError(
+                    f"{spec.phase}: {family} historical Production snapshot digest drifted"
+                )
+            _, selected_rows = read_csv(snapshot_path)
+            if any(row.get("family") != family for row in selected_rows):
+                raise AdmissionError(
+                    f"{spec.phase}: {family} historical Production snapshot contains a foreign family"
+                )
         else:
             # A family admitted after this historical policy phase is outside
             # the reconstructed boundary and must not mutate historical replay.

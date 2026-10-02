@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32f1-layer1-production-publication-v2.5",
+  "publication_date_utc": "2026-10-01",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32f1-layer1-admission-proposal-v2.4",
+  "approved_proposal_pr": 698,
+  "approved_proposal_workflow_run_id": 36835253814,
+  "approved_proposal_artifact_id": 11148727273,
+  "approved_proposal_artifact_zip_sha256": "702f78925958023234c43283890f5b5a4a889b80ac05d8fbf3191ea83e623fe5",
+  "approved_candidate_exact_count": 205,
+  "approved_candidate_exact_set_sha256": "a4f4fc7db33bf5be34f6f114e266474625cd63cb8ba9719f103535c7036b26e4",
+  "approved_candidate_csv_sha256": "33410a8f941d7d88ffb90f81d9859e04d10e0e3f40bfd6a57a05d1603f4f4287",
+  "approved_authority_sha256": "5b075a65dec2590bea8df1b93a47448efb4c88f1072b8a277c6659a482a0e376",
+  "production_prestate": {
+    "exact_total": 3511,
+    "source_count": 23,
+    "stm32f1_exact": 75,
+    "stm32f1_current_active_intersection": 70,
+    "stm32f1_source_git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+    "stm32f1_source_sha256": "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+  },
+  "production_poststate": {
+    "exact_total_at_publication": 3716,
+    "source_count": 23,
+    "stm32f1_exact": 280,
+    "stm32f1_current_active_exact": 275,
+    "stm32f1_historical_not_current_active": 5,
+    "stm32f1_source_git_blob_sha": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3",
+    "stm32f1_source_sha256": "a2b9463d58d434ff4792f1830b4e6d0fbe75ea3d084568801402aa799c91b0c4"
+  },
+  "stm32f1_backend_state_after": {
+    "mapped": 280,
+    "no_mapping": 0,
+    "mapping_kind": "cmsis_device_name"
+  },
+  "approved_addition_backend_state": {
+    "mapped": 205,
+    "no_mapping": 0
+  },
+  "catalog_backend_state_at_publication": {
+    "mapped": 3673,
+    "no_mapping": 43
+  },
+  "programming_profile_boundary": {
+    "binding_set_id": "stm32f103c-pilot-v0",
+    "exact_bound_icpns": [
+      "STM32F103C8T6",
+      "STM32F103CBT6"
+    ],
+    "bound_exact_count": 2,
+    "scope_expanded": false
+  },
+  "coverage_effect": {
+    "stm32f1_active_exact_denominator": 275,
+    "stm32f1_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 3637,
+    "whole_st_active_gap_after": 913,
+    "whole_st_active_identity_coverage_after_percent": 79.9341
+  },
+  "metadata_exception": {
+    "exact_icpn": "STM32F101RBH6",
+    "code": "F101_RBH6_TFBGA64_ORDERING_TABLE_OMISSION"
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "all_added_rows_have_deterministic_openocd_route": true,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}

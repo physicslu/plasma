@@ -40,9 +40,13 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_CATALOG = HERE / "openocd-parts-canonical.csv"
 DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 DEFAULT_POLICY_BASELINE = HERE / "stm32f2-phase4.3c-policy-baseline.json"
+HISTORICAL_F1_CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
+HISTORICAL_F4_CANONICAL = HERE / "stm32f4-phase4.3-historical-production-canonical.csv"
 PHASE = "4.3C"
 ADAPTER_ID = "stm32f2-phase4.3c"
 HISTORICAL_PRODUCTION_FAMILY_COUNTS = {"STM32F1": 75, "STM32F4": 384}
+HISTORICAL_F1_SHA256 = "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+HISTORICAL_F4_SHA256 = "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
 
 
 def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
@@ -74,8 +78,22 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
         if any(row.get("family") != family for row in rows):
             raise AdmissionError(f"{family}: canonical source contains a foreign family")
         if family in HISTORICAL_PRODUCTION_FAMILY_COUNTS:
-            family_counts[family] = family_counts.get(family, 0) + len(rows)
-            base_devices.update((family, row.get("base_device", "")) for row in rows)
+            if family == "STM32F1":
+                historical_path = HISTORICAL_F1_CANONICAL
+                expected_sha = HISTORICAL_F1_SHA256
+            else:
+                historical_path = HISTORICAL_F4_CANONICAL
+                expected_sha = HISTORICAL_F4_SHA256
+            if file_sha256(historical_path) != expected_sha:
+                raise AdmissionError(f"{family}: historical Production snapshot digest drifted")
+            _, historical_rows = read_csv(historical_path)
+            if (
+                len(historical_rows) != HISTORICAL_PRODUCTION_FAMILY_COUNTS[family]
+                or any(row.get("family") != family for row in historical_rows)
+            ):
+                raise AdmissionError(f"{family}: historical Production snapshot drifted")
+            family_counts[family] = len(historical_rows)
+            base_devices.update((family, row.get("base_device", "")) for row in historical_rows)
 
     exact_count = sum(family_counts.values())
     if family_counts != HISTORICAL_PRODUCTION_FAMILY_COUNTS:

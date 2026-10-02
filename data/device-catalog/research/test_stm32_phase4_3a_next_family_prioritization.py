@@ -12,6 +12,10 @@ HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "openocd-parts-canonical.csv"
 MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 BASELINE = HERE / "stm32-phase4.3a-next-family-prioritization-baseline.json"
+F1_HISTORICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
+F1_HISTORICAL_ROW_COUNT = 75
+F1_HISTORICAL_BLOB = "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
+F1_HISTORICAL_SHA256 = "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
 
 
 def _candidate(report: dict, series: str) -> dict:
@@ -53,7 +57,13 @@ def _write_phase43a_manifest(path: Path, expected: dict) -> None:
     ]
     assert {source["family"] for source in manifest["sources"]} == historical_series
     for source in manifest["sources"]:
-        source["path"] = str((MANIFEST.parent / source["path"]).resolve())
+        if source["family"] == "STM32F1":
+            source["path"] = str(F1_HISTORICAL.resolve())
+            source["row_count"] = F1_HISTORICAL_ROW_COUNT
+            source["git_blob_sha"] = F1_HISTORICAL_BLOB
+            source["sha256"] = F1_HISTORICAL_SHA256
+        else:
+            source["path"] = str((MANIFEST.parent / source["path"]).resolve())
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 

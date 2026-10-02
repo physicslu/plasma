@@ -83,7 +83,7 @@ def main() -> int:
             missing_provenance.append(icpn)
         if row.get("source_authority") != "STMicroelectronics official":
             missing_provenance.append(icpn)
-        if not row.get("verification_status", "").startswith("verified_direct_st"):
+        if not row.get("verification_status", "").startswith("verified_"):
             missing_provenance.append(icpn)
         if row.get("mapping_status") not in ALLOWED_MAPPING_STATUS:
             fail(errors, f"line {line_number}: unsupported mapping_status")
@@ -137,6 +137,9 @@ def main() -> int:
         "icpns_lacking_authoritative_provenance": len(set(missing_provenance)),
         "direct_st_evidence": sum(
             row.get("verification_status", "").startswith("verified_direct_st") for row in rows
+        ),
+        "authoritative_verified_evidence": sum(
+            row.get("verification_status", "").startswith("verified_") for row in rows
         ),
         "base_device_distribution": dict(sorted(Counter(row["base_device"] for row in rows).items())),
         "package_distribution": dict(sorted(Counter(row["package"] or "<unknown>" for row in rows).items())),

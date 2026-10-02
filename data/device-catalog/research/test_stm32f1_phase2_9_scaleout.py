@@ -29,7 +29,7 @@ from stm32f1_scaleout_admission import (  # noqa: E402
 MANIFEST = HERE / "stm32f1-phase2.9-scaleout-manifest.json"
 BASELINE = HERE / "stm32f1-phase2.9-scaleout-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
-CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+CANONICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
 PHASE29_PLAN = HERE / "stm32f1-phase2.9-admission-plan.json"
 PHASE29_EVIDENCE = HERE / "evidence" / "stm32f1-phase2.9-scaleout-batch1-live-2026-08-29"
 HISTORICAL_BASELINE = HERE / "stm32f1-acquisition-pilot-baseline.json"
