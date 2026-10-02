@@ -73,7 +73,7 @@ test("EMode PPU setup guide documents the current management boundaries and setu
   assert.match(documents, /Static IPv4 commissioning is Manager-owned/);
   assert.match(documents, /Authorize Platform Maintenance/);
   assert.match(documents, /Update PPU Platform Release/);
-  assert.match(documents, /Run the PS Loop Test when needed/);
+  assert.match(documents, /run the PS Loop Test when needed/i);
   assert.match(documents, /Draft → Desired → Runtime/);
   assert.match(documents, /Activate Desired Configuration/);
   assert.match(documents, /Healthy ≠ every capability exists/);
