@@ -48,6 +48,7 @@ test("Documents v1 covers PMode, EMode, Gateway and Mock operator reference", ()
     "pmode-programming",
     "pmode-batch",
     "emode-overview",
+    "emode-ppu-setup",
     "emode-flow",
     "emode-programming",
     "gateway-settings",
@@ -57,6 +58,30 @@ test("Documents v1 covers PMode, EMode, Gateway and Mock operator reference", ()
   assert.match(documents, /IC FAIL ≠ Infrastructure ERROR/);
   assert.match(documents, /Mock PASS ≠/);
   assert.match(documents, /0\.1%/);
+});
+
+test("EMode PPU setup guide documents the current management boundaries and setup flow", () => {
+  assert.match(documents, /PPU Setup/);
+  assert.match(documents, /PPU Connection \/ Registration/);
+  assert.match(documents, /Platform Maintenance/);
+  assert.match(documents, /Site Configuration/);
+  assert.match(documents, /Validate & Register for Programming/);
+  assert.match(documents, /Use for Managed Operations/);
+  assert.match(documents, /Plasma Gateway Endpoint/);
+  assert.match(documents, /Default Gateway/);
+  assert.match(documents, /Configure Network/);
+  assert.match(documents, /Static IPv4 commissioning is Manager-owned/);
+  assert.match(documents, /Authorize Platform Maintenance/);
+  assert.match(documents, /Update PPU Platform Release/);
+  assert.match(documents, /Run the PS Loop Test when needed/);
+  assert.match(documents, /Draft → Desired → Runtime/);
+  assert.match(documents, /Activate Desired Configuration/);
+  assert.match(documents, /Healthy ≠ every capability exists/);
+  assert.match(documents, /Not Supported ≠ Fault/);
+  assert.match(documents, /Registered ≠ Platform Maintenance Authorized/);
+  assert.match(documents, /Bootstrap-only PPU/);
+  assert.match(documents, /Mock PPU/);
+  assert.match(documents, /physical IC programming/);
 });
 
 test("Gateway operator reference lists only currently editable settings", () => {
