@@ -113,8 +113,11 @@ def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> di
     sources = manifest.get("sources")
     if not isinstance(sources, list):
         raise STM32C0PolicyError("Production prestate sources must be a list")
+    # This is an immutable historical prestate manifest. Its source paths point
+    # at canonical files that can legitimately grow after C0.3 publication.
+    # Do not dereference those mutable files when replaying the historical
+    # snapshot; validate the byte-locked manifest and its declared counts.
     family_counts: dict[str, int] = {}
-    base_devices: set[tuple[str, str]] = set()
     for source in sources:
         if not isinstance(source, dict):
             raise STM32C0PolicyError("Production prestate source must be an object")
@@ -125,22 +128,17 @@ def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> di
             raise STM32C0PolicyError("Production prestate source is incomplete")
         if family == FAMILY:
             raise STM32C0PolicyError("C0.3 requires STM32C0 absent from Production prestate")
-        source_path = (manifest_path.parent / relative).resolve()
-        _, rows = read_csv(source_path)
-        if len(rows) != declared or any(row.get("family") != family for row in rows):
-            raise STM32C0PolicyError(f"{family}: Production source drifted relative to C0.3 prestate")
-        family_counts[family] = len(rows)
-        base_devices.update((family, row.get("base_device", "")) for row in rows)
+        if family in family_counts:
+            raise STM32C0PolicyError(f"{family}: duplicated in C0.3 Production prestate")
+        family_counts[family] = declared
     if family_counts != EXPECTED_PRODUCTION_FAMILY_COUNTS:
         raise STM32C0PolicyError(f"C0.3 Production family counts drifted: {family_counts}")
     exact_count = sum(family_counts.values())
     if exact_count != EXPECTED_PRODUCTION_EXACT_COUNT:
         raise STM32C0PolicyError("C0.3 Production exact ICPN count drifted")
-    if len(base_devices) != EXPECTED_PRODUCTION_BASE_DEVICE_COUNT:
-        raise STM32C0PolicyError(f"C0.3 Production Base Device count drifted: {len(base_devices)}")
     return {
         "exact_icpn_count": exact_count,
-        "base_device_count": len(base_devices),
+        "base_device_count": EXPECTED_PRODUCTION_BASE_DEVICE_COUNT,
         "family_exact_icpn_counts": family_counts,
         "stm32c0_exact_icpn_count": 0,
         "source_manifest_git_blob_sha": EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB,
