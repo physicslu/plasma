@@ -142,6 +142,7 @@ type DocumentExampleSpec = {
   toolbar: string;
   toolbarMeta: string;
   fields?: Array<[string, string]>;
+  operationChecks?: Array<{ code: string; label: string; checked: boolean }>;
   summary?: Array<[string, string]>;
   statusRows?: Array<{ label: string; value: string; detail?: string; good?: boolean }>;
   primaryAction?: string;
@@ -189,9 +190,14 @@ function DocumentTopicExampleRail({ topic, zh }: { topic: Topic; zh: boolean }) 
       {
         title: zh ? "選擇 Operations" : "Choose Operations",
         caption: zh ? "Erase / Program / Verify / Read 依本次工作需要組合。" : "Combine Erase / Program / Verify / Read as required for the job.",
-        toolbar: "Operations",
+        toolbar: "3. Operations",
         toolbarMeta: "E / P / V / R",
-        fields: [["Erase", "Enabled"], ["Program", "Enabled"], ["Verify", "Enabled"], ["Read", "Disabled"]],
+        operationChecks: [
+          { code: "E", label: zh ? "擦除" : "Erase", checked: true },
+          { code: "P", label: zh ? "燒錄" : "Program", checked: true },
+          { code: "V", label: zh ? "驗證" : "Verify", checked: true },
+          { code: "R", label: zh ? "讀取" : "Read", checked: false },
+        ],
       },
       {
         title: zh ? "設定 Batch Policy" : "Set Batch Policy",
@@ -337,6 +343,17 @@ function DocumentTopicExampleRail({ topic, zh }: { topic: Topic; zh: boolean }) 
                 <b>{row.label}</b><span data-tone={row.good ? "good" : undefined}>{row.value}</span>{row.detail ? <span>{row.detail}</span> : null}
               </div>
             ))}
+            {example.operationChecks ? (
+              <div className="documentMockOperationChecks" role="group" aria-label={zh ? "Operations checkbox 示例" : "Illustrative Operations checkboxes"}>
+                {example.operationChecks.map(operation => (
+                  <label key={operation.code}>
+                    <input type="checkbox" checked={operation.checked} readOnly tabIndex={-1} />
+                    <b>{operation.code}</b>
+                    <span>{operation.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
             {example.fields ? (
               <div className="documentMockForm">
                 {example.fields.map(([label, value]) => <label key={label}><span>{label}</span><b>{value}</b></label>)}
