@@ -20,6 +20,12 @@ The two bounded exceptions remain only:
 
 No generalized WL31 `C=48` ordering rule is introduced.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `4d7a67a26dbe6fe65ed492f0143116ae1898e183c9f57001f724a12af654b60d`
+- proposal CSV SHA-256: `843d081c6905a2fc01b0c7efcad7bd6d88a126cfbcf545686a6eb4b8ce568686`
+- metadata authority SHA-256: `0e3f67d00af87d74052cfdb06ee38d94d324d263d0ddf0aa9b51fdcf38b11d75`
+
 ## Projected state only if later explicitly approved
 
 - STM32WL3 Active identity coverage: **0/47 → 47/47 = 100%**
