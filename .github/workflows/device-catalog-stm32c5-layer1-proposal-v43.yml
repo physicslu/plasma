@@ -1,0 +1,40 @@
+name: STM32C5 Layer-1 admission proposal v4.3
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_stm32c5_layer1_admission_proposal_v43.py'
+      - 'data/device-catalog/research/test_prepare_stm32c5_layer1_admission_proposal_v43.py'
+      - 'data/device-catalog/research/STM32C5_LAYER1_ADMISSION_PROPOSAL_V43.md'
+      - 'data/device-catalog/research/stm32c5-layer1-admission-proposal-v4.3.json'
+      - 'data/device-catalog/research/validate_stm32c5_layer1_proposal_lock_v43.py'
+      - '.github/workflows/device-catalog-stm32c5-layer1-proposal-v43.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate STM32C5 proposal
+        run: |
+          python data/device-catalog/research/prepare_stm32c5_layer1_admission_proposal_v43.py \
+            --proposal /tmp/stm32c5-v43.csv \
+            --summary /tmp/stm32c5-v43.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_stm32c5_layer1_admission_proposal_v43.py -v
+          python data/device-catalog/research/validate_stm32c5_layer1_proposal_lock_v43.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32c5-layer1-admission-proposal-v43
+          path: |
+            /tmp/stm32c5-v43.csv
+            /tmp/stm32c5-v43.json
+          if-no-files-found: error
+          retention-days: 30
