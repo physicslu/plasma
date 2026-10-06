@@ -1,0 +1,28 @@
+name: STM32WL3 metadata replay v4.5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32wl3-ordering-authority-v4.5.json'
+      - 'data/device-catalog/research/analyze_stm32wl3_metadata_replay_v45.py'
+      - 'data/device-catalog/research/test_analyze_stm32wl3_metadata_replay_v45.py'
+      - 'data/device-catalog/research/STM32WL3_METADATA_REPLAY_V45.md'
+      - '.github/workflows/device-catalog-stm32wl3-metadata-replay-v45.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay STM32WL3 Layer-1 metadata authority
+        run: |
+          python data/device-catalog/research/analyze_stm32wl3_metadata_replay_v45.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_analyze_stm32wl3_metadata_replay_v45.py -v
