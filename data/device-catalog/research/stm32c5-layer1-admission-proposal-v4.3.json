@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32c5-layer1-admission-proposal-v4.3",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4314,
+  "production_source_count_prestate": 24,
+  "production_c5_exact_prestate": 0,
+  "current_c5_active_exact": 172,
+  "current_c5_active_intersection_prestate": 0,
+  "proposal_addition_count": 172,
+  "proposal_exact_set_sha256": "32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3",
+  "proposal_csv_sha256": "4cfb9cc166c395e6b2f402c8c1e8b30a452467b9de4e1c2e90996617b54d0ded",
+  "authority_id": "stm32c5-ordering-authority-v4.2",
+  "authority_sha256": "59cc5b9b36c95de56a34dba68300e66bf31aa6fe155a11ada11d4feb5cf1e7e9",
+  "layer1_catalog_resolution": {
+    "normalized": 172
+  },
+  "metadata_direct_ordering_information_exact_count": 170,
+  "metadata_bounded_exception_exact_count": 2,
+  "metadata_exception_exact_icpns": [
+    "STM32C551CCT7",
+    "STM32C551CCT7TR"
+  ],
+  "dfp_exact_variant_observed_count": 139,
+  "dfp_parent_only_count": 33,
+  "backend_scope_evaluated": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 172
+  },
+  "backend_state_semantics": "no route bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "series_counts": {
+    "STM32C531": 29,
+    "STM32C532": 22,
+    "STM32C542": 12,
+    "STM32C551": 29,
+    "STM32C552": 19,
+    "STM32C562": 12,
+    "STM32C591": 20,
+    "STM32C593": 19,
+    "STM32C5A3": 10
+  },
+  "package_counts": {
+    "LQFP": 106,
+    "UFQFPN": 66
+  },
+  "production_c5_exact_after_if_approved": 172,
+  "production_source_count_after_if_approved": 25,
+  "c5_current_active_identity_coverage_after_if_published": "172/172 = 100%",
+  "production_exact_after_if_approved": 4486,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4235,
+  "whole_st_active_intersection_after_if_approved": 4407,
+  "whole_st_active_gap_after_if_approved": 143,
+  "whole_st_active_coverage_after_if_approved_percent": 96.8571,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 726,
+  "source_workflow_run_id": 37423885129,
+  "source_artifact_id": 11394182599,
+  "source_artifact_zip_sha256": "7099190da75462276a28887d4ce45e79a1cac1b0f4521faddbeb1b1be106e772",
+  "metadata_replay_pr": 724,
+  "metadata_replay_merge_commit": "d31a5b336ee12b3a22f2128ac40ea9f8bf3f2340"
+}
