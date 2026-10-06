@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32c0-active-gap-ordering-authority-v5.4",
+  "base_authority": "stm32c0-phase-c0.3-ordering-authority.json",
+  "base_authority_sha256": "691733479e7f89ac9f9fe1dbd7cd95a7db6be8b27e7d75a77ae38b853d3899b0",
+  "scope": "metadata replay only for the locked 17 current-Active STM32C0 delta identities",
+  "authority_extensions": {
+    "STM32C011": {
+      "document_id": "DS13866",
+      "revision": 5,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c011f4.pdf",
+      "pin_package": {
+        "D/Y": "12"
+      },
+      "package_note": "WLCSP12"
+    },
+    "STM32C051": {
+      "document_id": "DS14721",
+      "revision": 2,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c051c6.pdf",
+      "pin_package": {
+        "D/Y": "15"
+      },
+      "package_note": "WLCSP15"
+    }
+  },
+  "lifecycle_delta": {
+    "STM32C091KBT3": {
+      "old_retained_state": "Preview",
+      "locked_2026_10_01_estore_state": "Active",
+      "metadata_semantics_changed": false
+    }
+  },
+  "governance": {
+    "decode_only_locked_gap_set": true,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
