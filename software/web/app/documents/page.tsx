@@ -1278,12 +1278,12 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
         subtitle={zh ? "先決定 Profile 與 Synthetic Image，再設定 determinism 與各 operation timing / error injection。" : "Resolve Profile and Synthetic Image first, then configure determinism and per-operation timing / error injection."}
         steps={(zh ? [
           ["Profile", "Enabled"],
-          ["Synthetic Image", "Default Image Size"],
+          ["Image Size", "Default Image Size"],
           ["Determinism", "Seed Mode / Fixed Seed"],
           ["Operation Profile", "Error Rate / Base Time / Throughput / Jitter"],
         ] : [
           ["Profile", "Enabled"],
-          ["Synthetic Image", "Default Image Size"],
+          ["Image Size", "Default Image Size"],
           ["Determinism", "Seed Mode / Fixed Seed"],
           ["Operation Profile", "Error Rate / Base Time / Throughput / Jitter"],
         ]) as Array<[string, string]>}
