@@ -29,9 +29,7 @@ jobs:
             --summary /tmp/stm32wb0-v52.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_stm32wb0_layer1_admission_proposal_v52.py -v
-          if [ -f data/device-catalog/research/validate_stm32wb0_layer1_proposal_lock_v52.py ]; then
-            python data/device-catalog/research/validate_stm32wb0_layer1_proposal_lock_v52.py
-          fi
+          python data/device-catalog/research/validate_stm32wb0_layer1_proposal_lock_v52.py
       - uses: actions/upload-artifact@v4
         with:
           name: stm32wb0-layer1-admission-proposal-v52
