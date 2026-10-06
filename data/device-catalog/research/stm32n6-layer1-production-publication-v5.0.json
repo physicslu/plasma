@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32n6-layer1-production-publication-v5.0",
+  "publication_date_utc": "2026-10-06",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32n6-layer1-admission-proposal-v4.9",
+  "approved_proposal_pr": 733,
+  "approved_proposal_head_sha": "fd981d8df97ad93cd712caeff3681c0810db1612",
+  "approved_proposal_merge_commit": "b0231e2a520897b962036ebee7a67d5ed689e7c2",
+  "approved_proposal_source_workflow_run_id": 37434384862,
+  "approved_proposal_source_artifact_id": 11397719001,
+  "approved_proposal_source_artifact_zip_sha256": "2a122b622d25822e57d391700d1d36ae140533253ee65be135da77fd4757d9f6",
+  "approved_candidate_exact_count": 32,
+  "approved_candidate_exact_set_sha256": "f3ae0640f7e28c14b40b7b2ff83570e0bd95c7d0bd3bd98baac6edbcfc78bd50",
+  "approved_candidate_csv_sha256": "af1badb6c8ae555b0364421c1e88b7117d07a8e0bc362e6bce71f3df02c8a81e",
+  "approved_authority_id": "stm32n6-ordering-authority-v4.8",
+  "approved_authority_sha256": "a1abca6e300936583198e73053d1894496fb1764a2fb7874a489f9e5cc3dbe2f",
+  "production_prestate": {
+    "exact_total": 4533,
+    "source_count": 26,
+    "stm32n6_exact": 0
+  },
+  "production_poststate": {
+    "exact_total": 4565,
+    "source_count": 27,
+    "stm32n6_exact": 32,
+    "stm32n6_source_git_blob_sha": "937aeb4468fa7babd0c7b84d0bee72468d445002",
+    "stm32n6_source_sha256": "ef43825a35e7cc2b4548c9fe050ade05f8149253b4c7da055a89e057965dbfc7"
+  },
+  "stm32n6_backend_state_after": {
+    "mapped": 0,
+    "no_mapping": 32
+  },
+  "approved_addition_backend_state": {
+    "mapped": 0,
+    "no_mapping": 32,
+    "semantics": "no route or backend type bound; backend capability not evaluated in catalog-only scope"
+  },
+  "catalog_backend_state_after": {
+    "mapped": 3673,
+    "no_mapping": 892
+  },
+  "external_memory_programming_profile_boundary": true,
+  "programming_profile_binding_claimed": false,
+  "metadata_direct_ordering_information_exact_count": 32,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "coverage_effect": {
+    "stm32n6_active_exact_denominator": 32,
+    "stm32n6_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 4486,
+    "whole_st_active_gap_after": 64,
+    "whole_st_active_identity_coverage_after_percent": 98.5934
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_scope_evaluated_for_32_additions": false,
+    "backend_type_claimed_for_no_mapping_rows": false,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
