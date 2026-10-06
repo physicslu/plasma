@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32wb0-layer1-admission-proposal-v5.2",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4565,
+  "production_source_count_prestate": 27,
+  "production_wb0_exact_prestate": 0,
+  "current_wb0_active_exact": 24,
+  "current_wb0_active_intersection_prestate": 0,
+  "proposal_addition_count": 24,
+  "proposal_exact_set_sha256": "5f6adbd574ca751487c256a806764b1046cd5150cba757f73fd9d3269d167447",
+  "proposal_csv_sha256": "7bec5269ba9a67f4e4a26f7bff61d1116ad713bb97400f9deebcb329749e74f0",
+  "authority_id": "stm32wb0-ordering-authority-v5.1",
+  "authority_sha256": "c8975280bb2d930f64b3e40e385ae4d009f38e3c555578c186e86eada97adaaf",
+  "layer1_catalog_resolution": {
+    "normalized": 24
+  },
+  "metadata_direct_ordering_information_exact_count": 24,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "network_coprocessor_exact_count": 4,
+  "network_coprocessor_semantic_preserved": true,
+  "package_dependent_physical_pin_count_preserved": true,
+  "backend_scope_evaluated": false,
+  "backend_type_claimed": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 24
+  },
+  "backend_state_semantics": "no route or backend type bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "series_counts": {
+    "STM32WB05N": 4,
+    "STM32WB05Z": 4,
+    "STM32WB06C": 6,
+    "STM32WB07C": 6,
+    "STM32WB09E": 4
+  },
+  "package_counts": {
+    "VFQFPN": 14,
+    "WLCSP": 10
+  },
+  "production_wb0_exact_after_if_approved": 24,
+  "production_source_count_after_if_approved": 28,
+  "wb0_current_active_identity_coverage_after_if_published": "24/24 = 100%",
+  "production_exact_after_if_approved": 4589,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4486,
+  "whole_st_active_intersection_after_if_approved": 4510,
+  "whole_st_active_gap_after_if_approved": 40,
+  "whole_st_active_coverage_after_if_approved_percent": 99.1209,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 736,
+  "source_workflow_run_id": 37437294647,
+  "source_artifact_id": 11398828505,
+  "source_artifact_zip_sha256": "9b09987703f2866d1364467ec1ca46360ca63c5979b08be233963ccd31a93e54",
+  "metadata_replay_pr": 735,
+  "metadata_replay_merge_commit": "6c6ff298f275b514ed396328b74d9f3a28fa72ed"
+}
