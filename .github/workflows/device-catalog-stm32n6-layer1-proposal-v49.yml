@@ -29,9 +29,7 @@ jobs:
             --summary /tmp/stm32n6-v49.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_stm32n6_layer1_admission_proposal_v49.py -v
-          if [ -f data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py ]; then
-            python data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py
-          fi
+          python data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py
       - uses: actions/upload-artifact@v4
         with:
           name: stm32n6-layer1-admission-proposal-v49
