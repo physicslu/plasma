@@ -88,9 +88,27 @@ def _evidence_builder(**kwargs: object) -> dict[str, object]:
 def _assert_next_batch_planning() -> None:
     phase = "4.3Z"
     acquisition_date = "2026-09-08"
+
+    historical_file = tempfile.NamedTemporaryFile(
+        prefix="stm32f2-phase43j-", suffix=".csv", delete=False
+    )
+    historical_file.close()
+    historical_path = Path(historical_file.name)
+    with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        fields = reader.fieldnames
+        rows = [row for row in reader if row["mapping_status"] != "no_mapping"]
+    assert fields is not None
+    assert len(rows) == 33
+    with historical_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
     plan = build_next_batch_plan(
         phase=phase,
         acquisition_date=acquisition_date,
+        canonical_path=historical_path,
     )
     assert plan["family"] == "STM32F2"
     assert plan["phase"] == phase
@@ -129,7 +147,11 @@ def _assert_next_batch_planning() -> None:
     )
 
     try:
-        build_next_batch_plan(phase="4.3H", acquisition_date=acquisition_date)
+        build_next_batch_plan(
+            phase="4.3H",
+            acquisition_date=acquisition_date,
+            canonical_path=historical_path,
+        )
     except BoundedPlanningError:
         pass
     else:
@@ -144,6 +166,7 @@ def _assert_next_batch_planning() -> None:
             phase=phase,
             acquisition_date=acquisition_date,
             registry_path=registry_path,
+            canonical_path=historical_path,
         )
         plan_path = root / "next-batch-plan.json"
         plan_path.write_text(
@@ -153,6 +176,7 @@ def _assert_next_batch_planning() -> None:
         report = materialize_next_batch_plan(
             plan_path=plan_path,
             registry_path=registry_path,
+            canonical_path=historical_path,
             root=root,
         )
         assert report["status"] == "materialized"
@@ -167,6 +191,7 @@ def _assert_next_batch_planning() -> None:
             materialize_next_batch_plan(
                 plan_path=plan_path,
                 registry_path=registry_path,
+                canonical_path=historical_path,
                 root=root,
             )
         except BoundedPlanningError:
@@ -182,6 +207,7 @@ def _assert_next_batch_planning() -> None:
             phase=phase,
             acquisition_date=acquisition_date,
             registry_path=registry_path,
+            canonical_path=historical_path,
         )
         mutated = copy.deepcopy(clean_plan)
         mutated["manifest"]["targets"][0]["base_device"] = "STM32F205ZZ"
@@ -191,6 +217,7 @@ def _assert_next_batch_planning() -> None:
             materialize_next_batch_plan(
                 plan_path=plan_path,
                 registry_path=registry_path,
+                canonical_path=historical_path,
                 root=root,
             )
         except BoundedPlanningError:
@@ -203,7 +230,7 @@ def _assert_next_batch_planning() -> None:
         registry_path = root / DEFAULT_REGISTRY.name
         canonical_path = root / DEFAULT_CANONICAL.name
         shutil.copyfile(DEFAULT_REGISTRY, registry_path)
-        shutil.copyfile(DEFAULT_CANONICAL, canonical_path)
+        shutil.copyfile(historical_path, canonical_path)
 
         stale_plan = build_next_batch_plan(
             phase=phase,
@@ -236,6 +263,8 @@ def _assert_next_batch_planning() -> None:
             pass
         else:
             raise AssertionError("stale Production-bound plan must fail closed")
+
+    historical_path.unlink(missing_ok=True)
 
 
 def main() -> int:

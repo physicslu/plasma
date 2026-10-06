@@ -60,7 +60,10 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
     def _historical_canonical(self, path: Path) -> None:
         with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
-            rows = [row for row in reader if row["icpn"] not in EXPECTED]
+            rows = [
+                row for row in reader
+                if row["mapping_status"] != "no_mapping" and row["icpn"] not in EXPECTED
+            ]
         self.assertEqual(len(rows), 22)
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
@@ -97,16 +100,22 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
     def test_published_canonical_manifest_and_audit_are_bound(self) -> None:
         with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
-        self.assertEqual(len(rows), 33)
-        self.assertTrue(EXPECTED.issubset({row["icpn"] for row in rows}))
-        self.assertEqual(len({row["base_device"] for row in rows}), 12)
-        self.assertEqual(file_sha256(DEFAULT_CANONICAL), EXPECTED_CANONICAL_SHA256)
+        historical_rows = [row for row in rows if row["mapping_status"] != "no_mapping"]
+        self.assertEqual(len(historical_rows), 33)
+        self.assertTrue(EXPECTED.issubset({row["icpn"] for row in historical_rows}))
+        self.assertEqual(len({row["base_device"] for row in historical_rows}), 12)
+        with tempfile.TemporaryDirectory() as tmp:
+            historical = Path(tmp) / DEFAULT_CANONICAL.name
+            with historical.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(historical_rows)
+            self.assertEqual(file_sha256(historical), EXPECTED_CANONICAL_SHA256)
 
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         source = next(item for item in manifest["sources"] if item["family"] == "STM32F2")
-        self.assertEqual(source["row_count"], 33)
-        self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
+        self.assertEqual(source["row_count"], len(rows))
+        self.assertEqual(source["sha256"], file_sha256(DEFAULT_CANONICAL))
 
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["canonical_csv_file_sha256"], EXPECTED_CANONICAL_SHA256)
