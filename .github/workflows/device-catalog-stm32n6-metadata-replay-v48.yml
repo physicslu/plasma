@@ -1,0 +1,28 @@
+name: STM32N6 metadata replay v4.8
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32n6-ordering-authority-v4.8.json'
+      - 'data/device-catalog/research/analyze_stm32n6_metadata_replay_v48.py'
+      - 'data/device-catalog/research/test_analyze_stm32n6_metadata_replay_v48.py'
+      - 'data/device-catalog/research/STM32N6_METADATA_REPLAY_V48.md'
+      - '.github/workflows/device-catalog-stm32n6-metadata-replay-v48.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay STM32N6 Layer-1 metadata authority
+        run: |
+          python data/device-catalog/research/analyze_stm32n6_metadata_replay_v48.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_analyze_stm32n6_metadata_replay_v48.py -v
