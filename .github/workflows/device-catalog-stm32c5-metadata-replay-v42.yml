@@ -1,0 +1,28 @@
+name: STM32C5 metadata replay v4.2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32c5-ordering-authority-v4.2.json'
+      - 'data/device-catalog/research/analyze_stm32c5_metadata_replay_v42.py'
+      - 'data/device-catalog/research/test_analyze_stm32c5_metadata_replay_v42.py'
+      - 'data/device-catalog/research/STM32C5_METADATA_REPLAY_V42.md'
+      - '.github/workflows/device-catalog-stm32c5-metadata-replay-v42.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay STM32C5 Layer-1 metadata authority
+        run: |
+          python data/device-catalog/research/analyze_stm32c5_metadata_replay_v42.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_analyze_stm32c5_metadata_replay_v42.py -v
