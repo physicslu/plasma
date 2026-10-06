@@ -206,17 +206,19 @@ def main() -> int:
         and source["sha256"] == EXPECTED_WL3_SHA256
         and source["git_blob_sha"] == EXPECTED_WL3_BLOB,
         "Production manifest WL3 integrity binding drift")
-    req(len(sources) == 26, "Production source count drift")
-    req(sum(int(s["row_count"]) for s in sources) == 4533,
-        "Production exact total drift")
+    current_total = sum(int(s["row_count"]) for s in sources)
+    req(len(sources) >= 26, "Production source count regressed below WL3 publication poststate")
+    req(current_total >= 4533, "Production exact total regressed below WL3 publication poststate")
 
     backend = Counter()
     for source in sources:
         path = (MANIFEST.parent / source["path"]).resolve()
         for row in read_rows(path):
             backend["no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"] += 1
-    req(backend == Counter({"mapped": 3673, "no_mapping": 860}),
-        f"Production backend partition drift: {dict(backend)}")
+    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 860,
+        f"Production backend partition regressed below WL3 publication poststate: {dict(backend)}")
+    req(backend["mapped"] + backend["no_mapping"] == current_total,
+        "current Production backend partition does not equal current exact total")
 
     req(audit["production_prestate"] == {
         "exact_total": 4486, "source_count": 25, "stm32wl3_exact": 0
@@ -237,8 +239,8 @@ def main() -> int:
         "coverage effect audit drift")
 
     print("STM32WL3_LAYER1_PRODUCTION_PUBLICATION_V47_PASS")
-    print("STM32WL3=47; mapped=0; no_mapping=47; Production=4533; sources=26")
-    print("Production backend partition=3673 mapped / 860 no_mapping")
+    print(f"STM32WL3=47; mapped=0; no_mapping=47; current_Production={current_total}; current_sources={len(sources)}")
+    print(f"Current Production backend partition={backend['mapped']} mapped / {backend['no_mapping']} no_mapping")
     print("Whole-ST Active identity coverage=4454/4550=97.8901%")
     return 0
 
