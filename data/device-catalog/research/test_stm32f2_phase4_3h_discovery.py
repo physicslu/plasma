@@ -176,6 +176,7 @@ def _assert_next_batch_planning() -> None:
         report = materialize_next_batch_plan(
             plan_path=plan_path,
             registry_path=registry_path,
+            canonical_path=historical_path,
             root=root,
         )
         assert report["status"] == "materialized"
@@ -190,6 +191,7 @@ def _assert_next_batch_planning() -> None:
             materialize_next_batch_plan(
                 plan_path=plan_path,
                 registry_path=registry_path,
+                canonical_path=historical_path,
                 root=root,
             )
         except BoundedPlanningError:
@@ -215,6 +217,7 @@ def _assert_next_batch_planning() -> None:
             materialize_next_batch_plan(
                 plan_path=plan_path,
                 registry_path=registry_path,
+                canonical_path=historical_path,
                 root=root,
             )
         except BoundedPlanningError:
