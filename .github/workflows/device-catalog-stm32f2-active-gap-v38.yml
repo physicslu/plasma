@@ -1,0 +1,44 @@
+name: STM32F2 Active exact gap lock v3.8
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/derive_stm32f2_active_gap_v38.py'
+      - 'data/device-catalog/research/st-stm32f2-active-exact-mpn-v3.8.txt'
+      - 'data/device-catalog/research/stm32f2-active-exact-gap-v3.8.txt'
+      - 'data/device-catalog/research/validate_stm32f2_active_gap_v38.py'
+      - 'data/device-catalog/research/STM32F2_ACTIVE_EXACT_GAP_V38.md'
+      - '.github/workflows/device-catalog-stm32f2-active-gap-v38.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen ST eStore v1.3 coverage result
+        uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-coverage-result
+          path: /tmp/st-estore-v13-result
+          repository: physicslu/plasma
+          run-id: 36797087427
+          github-token: ${{ github.token }}
+      - name: Reconstruct and compare STM32F2 frozen exact sets
+        run: |
+          python data/device-catalog/research/derive_stm32f2_active_gap_v38.py \
+            --coverage-root /tmp/st-estore-v13-result \
+            --output-active /tmp/stm32f2-active-exact-v38.txt \
+            --output-gap /tmp/stm32f2-active-gap-v38.txt
+          cmp /tmp/stm32f2-active-exact-v38.txt \
+            data/device-catalog/research/st-stm32f2-active-exact-mpn-v3.8.txt
+          cmp /tmp/stm32f2-active-gap-v38.txt \
+            data/device-catalog/research/stm32f2-active-exact-gap-v3.8.txt
+      - name: Validate current STM32F2 gap lock
+        run: python data/device-catalog/research/validate_stm32f2_active_gap_v38.py
