@@ -22,6 +22,12 @@ The two bounded exceptions remain only:
 
 No generalized C55 temperature-code `7` rule is introduced.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `32d81e2491f1c8973a778cf62828a0c76662f4fb1813bc611d8b8959607b36a3`
+- proposal CSV SHA-256: `4cfb9cc166c395e6b2f402c8c1e8b30a452467b9de4e1c2e90996617b54d0ded`
+- metadata authority SHA-256: `59cc5b9b36c95de56a34dba68300e66bf31aa6fe155a11ada11d4feb5cf1e7e9`
+
 ## Projected state only if later explicitly approved
 
 - STM32C5 Active identity coverage: **0/172 → 172/172 = 100%**
