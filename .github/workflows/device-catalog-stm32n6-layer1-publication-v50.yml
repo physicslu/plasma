@@ -1,0 +1,40 @@
+name: STM32N6 Layer-1 Production publication v5.0
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32n6-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32n6-layer1-production-publication-v5.0.json'
+      - 'data/device-catalog/research/validate_stm32n6_layer1_publication_v50.py'
+      - 'data/device-catalog/research/STM32N6_LAYER1_PRODUCTION_PUBLICATION_V50.md'
+      - 'data/device-catalog/research/validate_stm32wl3_layer1_publication_v47.py'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'software/python/tests/test_device_catalog_stm32n6.py'
+      - '.github/workflows/device-catalog-stm32n6-layer1-publication-v50.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate approved STM32N6 publication and Production graph
+        run: |
+          python data/device-catalog/research/validate_stm32n6_layer1_publication_v50.py
+          python data/device-catalog/research/validate_stm32wl3_layer1_publication_v47.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+      - name: Install Python development package
+        run: python -m pip install -e './software/python[dev]'
+      - name: Validate runtime Catalog Layer-1/Layer-2 separation
+        run: |
+          python -m pytest -q \
+            software/python/tests/test_device_catalog.py \
+            software/python/tests/test_device_catalog_stm32n6.py \
+            software/python/tests/test_device_catalog_web_gateway.py
