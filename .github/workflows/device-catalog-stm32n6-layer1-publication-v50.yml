@@ -8,7 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32n6_layer1_publication_v50.py'
       - 'data/device-catalog/research/STM32N6_LAYER1_PRODUCTION_PUBLICATION_V50.md'
       - 'data/device-catalog/research/validate_stm32wl3_layer1_publication_v47.py'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'software/python/tests/test_device_catalog_stm32n6.py'
       - '.github/workflows/device-catalog-stm32n6-layer1-publication-v50.yml'
 
