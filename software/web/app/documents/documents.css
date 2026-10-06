@@ -625,6 +625,40 @@
   white-space: nowrap;
 }
 
+.documentMockOperationChecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: center;
+  padding: 12px 10px;
+}
+
+.documentMockOperationChecks label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text);
+  font-size: 9.5px;
+  cursor: default;
+}
+
+.documentMockOperationChecks input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--cyan);
+  pointer-events: none;
+}
+
+.documentMockOperationChecks b {
+  font: 800 9.5px var(--font-mono);
+}
+
+.documentMockOperationChecks span {
+  color: var(--text);
+  font-size: 9.5px;
+}
+
 .documentMockActions {
   display: flex;
   justify-content: flex-end;
