@@ -29,9 +29,7 @@ jobs:
             --summary /tmp/stm32c5-v43.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_stm32c5_layer1_admission_proposal_v43.py -v
-          if [ -f data/device-catalog/research/validate_stm32c5_layer1_proposal_lock_v43.py ]; then
-            python data/device-catalog/research/validate_stm32c5_layer1_proposal_lock_v43.py
-          fi
+          python data/device-catalog/research/validate_stm32c5_layer1_proposal_lock_v43.py
       - uses: actions/upload-artifact@v4
         with:
           name: stm32c5-layer1-admission-proposal-v43
