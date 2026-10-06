@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32wb0-ordering-authority-v5.1",
+  "reference_date": "2026-10-06",
+  "scope": "Official ST Ordering Information metadata authority for the locked 24 current-Active STM32WB0 exact MPNs",
+  "exact_identity_source": "st-stm32wb0-active-exact-mpn-v1.2.txt",
+  "documents": {
+    "STM32WB05N": {
+      "document": "DS14620",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb05kn.pdf",
+      "semantic": "network_coprocessor"
+    },
+    "STM32WB05Z": {
+      "document": "DS14591",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb05kz.pdf",
+      "semantic": "192_kib_flash_mcu"
+    },
+    "STM32WB06C_STM32WB07C": {
+      "document": "DS14676",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb06cc.pdf",
+      "semantic": "256_kib_flash_mcu"
+    },
+    "STM32WB09E": {
+      "document": "DS14210",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb09ke.pdf",
+      "semantic": "512_kib_flash_mcu"
+    }
+  },
+  "temperature_c": {
+    "6": "-40 to 85 C",
+    "7": "-40 to 105 C"
+  },
+  "product_codes": {
+    "STM32WB05N": {
+      "subfamily": "05",
+      "product_code": "N",
+      "flash_size": "N/A (network coprocessor)",
+      "network_coprocessor": true
+    },
+    "STM32WB05Z": {
+      "subfamily": "05",
+      "product_code": "Z",
+      "flash_size": "192 KiB",
+      "network_coprocessor": false
+    },
+    "STM32WB06C": {
+      "subfamily": "06",
+      "product_code": "C",
+      "flash_size": "256 KiB",
+      "network_coprocessor": false
+    },
+    "STM32WB07C": {
+      "subfamily": "07",
+      "product_code": "C",
+      "flash_size": "256 KiB",
+      "network_coprocessor": false
+    },
+    "STM32WB09E": {
+      "subfamily": "09",
+      "product_code": "E",
+      "flash_size": "512 KiB",
+      "network_coprocessor": false
+    }
+  },
+  "package_resolution": {
+    "K:V": {"package": "VFQFPN", "pin_count": 32},
+    "T:F": {"package": "WLCSP", "pin_count": 36},
+    "C:V": {"package": "VFQFPN", "pin_count": 48},
+    "C:F": {"package": "WLCSP", "pin_count": 49}
+  },
+  "packing": {
+    "TR": "tape_and_reel"
+  },
+  "governance": {
+    "decode_only_locked_exact_identity_set": true,
+    "unknown_product_code_forbidden": true,
+    "unknown_pin_package_pair_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_packing_suffix_forbidden": true,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
