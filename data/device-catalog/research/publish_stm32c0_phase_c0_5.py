@@ -67,11 +67,43 @@ def _write_empty_canonical(path: Path) -> None:
         csv.DictWriter(handle, fieldnames=list(CANONICAL_FIELDS), lineterminator="\n").writeheader()
 
 
-def _production_snapshot(manifest_path: Path) -> tuple[int, set[tuple[str, str]], dict[str, int]]:
+def _production_snapshot(manifest_path: Path) -> tuple[int, int, dict[str, int]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    sources = manifest.get("sources", [])
+    if not isinstance(sources, list):
+        raise RuntimeError("Production manifest sources must be a list")
+
+    # PRESTATE_MANIFEST is an immutable historical transaction input. Its
+    # relative source paths point at canonical files that legitimately grow
+    # later, so dereferencing today's files would corrupt historical replay.
+    if manifest_path.resolve() == PRESTATE_MANIFEST.resolve():
+        if file_sha256(PRESTATE_MANIFEST) != EXPECTED_PRESTATE_MANIFEST_SHA256:
+            raise RuntimeError("C0.3 Production prestate digest drifted")
+        if _git_blob_sha(PRESTATE_MANIFEST.read_bytes()) != EXPECTED_PRESTATE_MANIFEST_BLOB:
+            raise RuntimeError("C0.3 Production prestate Git blob drifted")
+        family_counts: dict[str, int] = {}
+        for source in sources:
+            if not isinstance(source, dict):
+                raise RuntimeError("historical Production source must be an object")
+            family = source.get("family")
+            declared = source.get("row_count")
+            if not isinstance(family, str) or not family or not isinstance(declared, int):
+                raise RuntimeError("historical Production source identity/count is incomplete")
+            if family == "STM32C0":
+                raise RuntimeError("STM32C0 unexpectedly exists in C0.3 historical prestate")
+            if family in family_counts:
+                raise RuntimeError(f"{family}: duplicated in C0.3 historical prestate")
+            family_counts[family] = declared
+        exact = sum(family_counts.values())
+        if (exact, EXPECTED_PRESTATE[1], len(family_counts)) != EXPECTED_PRESTATE:
+            raise RuntimeError("C0.3 historical Production aggregate prestate drifted")
+        return exact, EXPECTED_PRESTATE[1], family_counts
+
+    # Current Production remains strict: every referenced canonical source must
+    # match the manifest row count and integrity digests.
     family_counts: dict[str, int] = {}
     bases: set[tuple[str, str]] = set()
-    for source in manifest.get("sources", []):
+    for source in sources:
         family = source["family"]
         path = (manifest_path.parent / source["path"]).resolve()
         data = path.read_bytes()
@@ -87,8 +119,7 @@ def _production_snapshot(manifest_path: Path) -> tuple[int, set[tuple[str, str]]
             raise RuntimeError(f"{family}: source contains foreign-family row")
         family_counts[family] = len(rows)
         bases.update((family, row["base_device"]) for row in rows)
-    return sum(family_counts.values()), bases, family_counts
-
+    return sum(family_counts.values()), len(bases), family_counts
 
 def _historical_plan() -> dict[str, Any]:
     if file_sha256(PLAN_PATH) != EXPECTED_PLAN_SHA256:
@@ -160,8 +191,8 @@ def _build_post_manifest(canonical_bytes: bytes) -> tuple[bytes, dict[str, Any]]
 
 
 def build_proposal() -> dict[str, Any]:
-    before_exact, before_bases, before_families = _production_snapshot(PRESTATE_MANIFEST)
-    if (before_exact, len(before_bases), len(before_families)) != EXPECTED_PRESTATE:
+    before_exact, before_base_count, before_families = _production_snapshot(PRESTATE_MANIFEST)
+    if (before_exact, before_base_count, len(before_families)) != EXPECTED_PRESTATE:
         raise RuntimeError("Production aggregate prestate drifted")
     if "STM32C0" in before_families:
         raise RuntimeError("STM32C0 unexpectedly exists in Production prestate")
@@ -170,7 +201,7 @@ def build_proposal() -> dict[str, Any]:
     canonical_bytes, rows = _render_canonical(plan)
     manifest_bytes, _ = _build_post_manifest(canonical_bytes)
     added_bases = {("STM32C0", row["base_device"]) for row in rows}
-    poststate = (before_exact + len(rows), len(before_bases | added_bases), len(before_families) + 1)
+    poststate = (before_exact + len(rows), before_base_count + len(added_bases), len(before_families) + 1)
     if poststate != EXPECTED_POSTSTATE:
         raise RuntimeError(f"proposed Production poststate drifted: {poststate}")
     unresolved = sorted(EXPECTED_CAPABILITY_UNRESOLVED)
@@ -200,7 +231,7 @@ def build_proposal() -> dict[str, Any]:
         "capability_unresolved_is_identity_rejection": False,
         "production_exact_icpns_before": before_exact,
         "production_exact_icpns_after_proposed": poststate[0],
-        "production_base_devices_before": len(before_bases),
+        "production_base_devices_before": before_base_count,
         "production_base_devices_after_proposed": poststate[1],
         "production_family_count_before": len(before_families),
         "production_family_count_after_proposed": poststate[2],
@@ -289,8 +320,8 @@ def verify_current_publication() -> dict[str, Any]:
     if file_sha256(AUDIT_PATH) != EXPECTED_AUDIT_SHA256 or audit != _build_audit(proposal):
         raise RuntimeError("C0.5 publication audit drifted")
 
-    exact, bases, families = _production_snapshot(PRODUCTION_MANIFEST)
-    if exact < EXPECTED_POSTSTATE[0] or len(bases) < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
+    exact, base_count, families = _production_snapshot(PRODUCTION_MANIFEST)
+    if exact < EXPECTED_POSTSTATE[0] or base_count < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
         raise RuntimeError("current Production state regressed below C0.5 publication poststate")
     if families.get("STM32C0") != EXPECTED_PUBLISHED_ROWS:
         raise RuntimeError("published STM32C0 Production row count drifted")
@@ -301,7 +332,7 @@ def verify_current_publication() -> dict[str, Any]:
         "published_base_devices": EXPECTED_PUBLISHED_BASES,
         "capability_unresolved": EXPECTED_UNRESOLVED,
         "production_exact_icpns": exact,
-        "production_base_devices": len(bases),
+        "production_base_devices": base_count,
         "production_family_count": len(families),
         "canonical_sha256": EXPECTED_CANONICAL_SHA256,
         "production_manifest_sha256": file_sha256(PRODUCTION_MANIFEST),
