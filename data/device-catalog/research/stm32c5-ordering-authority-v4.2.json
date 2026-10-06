@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32c5-ordering-authority-v4.2",
+  "reference_date": "2026-10-06",
+  "scope": "Official ST Ordering Information metadata authority for the locked 172 current-Active STM32C5 exact MPNs",
+  "exact_identity_source": "st-c5-estore-172-active-exact-mpn-v0.7.txt",
+  "common": {
+    "packing": {
+      "": "standard_or_tray_unspecified",
+      "TR": "tape_and_reel"
+    },
+    "temperature_c": {
+      "3": "-40 to 125 C",
+      "6": "-40 to 85 C"
+    }
+  },
+  "series": {
+    "STM32C531": {
+      "document": "DS15125",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c531cc.pdf",
+      "pin_codes": {
+        "F": 20,
+        "E": 24,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "P": "TSSOP"
+      }
+    },
+    "STM32C532": {
+      "document": "DS15125",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c531cc.pdf",
+      "pin_codes": {
+        "F": 20,
+        "E": 24,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "B": 128,
+        "C": 256
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "P": "TSSOP"
+      }
+    },
+    "STM32C542": {
+      "document": "DS15135",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c542rc.pdf",
+      "pin_codes": {
+        "F": 20,
+        "E": 24,
+        "K": 32,
+        "C": 48,
+        "R": 64
+      },
+      "flash_kib": {
+        "C": 256
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP",
+        "P": "TSSOP"
+      }
+    },
+    "STM32C551": {
+      "document": "DS14928",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c551rc.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "flash_kib": {
+        "C": 256,
+        "E": 512
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    },
+    "STM32C552": {
+      "document": "DS14928",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c551rc.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "flash_kib": {
+        "C": 256,
+        "E": 512
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    },
+    "STM32C562": {
+      "document": "DS14927",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c562re.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100
+      },
+      "flash_kib": {
+        "E": 512
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    },
+    "STM32C591": {
+      "document": "DS15136",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c591re.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "E": 512,
+        "G": 1024
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    },
+    "STM32C593": {
+      "document": "DS15136",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c591re.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "E": 512,
+        "G": 1024
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    },
+    "STM32C5A3": {
+      "document": "DS15137",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32c5a3cg.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48,
+        "R": 64,
+        "M": 80,
+        "V": 100,
+        "Z": 144
+      },
+      "flash_kib": {
+        "G": 1024
+      },
+      "package_codes": {
+        "U": "UFQFPN",
+        "T": "LQFP"
+      }
+    }
+  },
+  "bounded_exact_exceptions": {
+    "STM32C551CCT7": {
+      "field": "temperature_grade",
+      "value": "-40 to 105 C",
+      "basis": "official_st_estore_exact_active_row",
+      "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors-page41.html"
+    },
+    "STM32C551CCT7TR": {
+      "field": "temperature_grade",
+      "value": "-40 to 105 C",
+      "basis": "official_st_estore_exact_active_row",
+      "source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors-page41.html"
+    }
+  },
+  "governance": {
+    "decode_only_locked_exact_identity_set": true,
+    "unknown_series_forbidden": true,
+    "unknown_pin_code_forbidden": true,
+    "unknown_flash_code_forbidden": true,
+    "unknown_package_code_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_option_suffix_forbidden": true,
+    "exception_scope_exact_mpn_only": true,
+    "dfp_exact_variant_match_required_for_layer1_metadata": false,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
