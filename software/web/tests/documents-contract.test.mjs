@@ -166,6 +166,19 @@ test("all operator documents use the approved structured guide layout", () => {
   assert.match(documents, /DocumentDataTable/);
 });
 
+test("Programming Job operation example mirrors the real checkbox control shape", () => {
+  assert.match(documents, /operationChecks\?:/);
+  assert.match(documents, /toolbar: "3\. Operations"/);
+  for (const operation of [
+    '{ code: "E", label: zh ? "擦除" : "Erase", checked: true }',
+    '{ code: "P", label: zh ? "燒錄" : "Program", checked: true }',
+    '{ code: "V", label: zh ? "驗證" : "Verify", checked: true }',
+    '{ code: "R", label: zh ? "讀取" : "Read", checked: false }',
+  ]) assert.ok(documents.includes(operation));
+  assert.match(documents, /type="checkbox"/);
+  assert.match(documentsCss, /\.documentMockOperationChecks/);
+});
+
 test("Gateway operator reference lists only currently editable settings", () => {
   assert.match(documents, /\["PPU Request Timeout"/);
   assert.match(documents, /\["PPU Retry Count"/);
