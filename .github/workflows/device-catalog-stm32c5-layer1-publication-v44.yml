@@ -8,7 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32c5_layer1_publication_v44.py'
       - 'data/device-catalog/research/STM32C5_LAYER1_PRODUCTION_PUBLICATION_V44.md'
       - 'data/device-catalog/research/validate_stm32f2_layer1_publication_v41.py'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/ic-support/test_coverage_inventory.py'
       - 'software/python/tests/test_device_catalog_stm32c5.py'
       - '.github/workflows/device-catalog-stm32c5-layer1-publication-v44.yml'
