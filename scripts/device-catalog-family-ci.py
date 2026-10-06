@@ -70,6 +70,7 @@ def command_profile(family: str) -> list[list[str]]:
             # Current family CI validates the locked whole-family Active/gap refresh
             # instead of regenerating historical conclusions from later Production state.
             _py("data/device-catalog/research/validate_stm32f2_active_gap_v38.py"),
+            _py("data/device-catalog/research/analyze_stm32f2_metadata_replay_v39.py"),
         ],
         "stm32f3": [
             _py("data/device-catalog/research/test_stm32f3_phase4_4a_foundation.py"),

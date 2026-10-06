@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32f2-ordering-authority-v3.9",
+  "reference_date": "2026-10-06",
+  "scope": "official ST Ordering Information metadata authority for the locked 72 missing current-Active STM32F2 exact MPNs",
+  "common": {
+    "temperature_c": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    },
+    "packing": {
+      "": "standard_or_tray_unspecified",
+      "TR": "tape_and_reel"
+    },
+    "flash_kib": {
+      "B": 128,
+      "C": 256,
+      "E": 512,
+      "F": 768,
+      "G": 1024
+    },
+    "pin_package": {
+      "R/T": {
+        "package": "LQFP",
+        "pin_count": 64
+      },
+      "R/Y": {
+        "package": "WLCSP",
+        "pin_count": 66
+      },
+      "V/T": {
+        "package": "LQFP",
+        "pin_count": 100
+      },
+      "Z/T": {
+        "package": "LQFP",
+        "pin_count": 144
+      },
+      "I/H": {
+        "package": "UFBGA",
+        "pin_count": 176
+      },
+      "I/T": {
+        "package": "LQFP",
+        "pin_count": 176
+      }
+    }
+  },
+  "series": {
+    "STM32F205": {
+      "flash_codes": [
+        "B",
+        "C",
+        "E",
+        "F",
+        "G"
+      ],
+      "document": "DS6329",
+      "revision": 18,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f205rc.pdf"
+    },
+    "STM32F207": {
+      "flash_codes": [
+        "B",
+        "C",
+        "E",
+        "F",
+        "G"
+      ],
+      "document": "DS6329",
+      "revision": 18,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f205rc.pdf"
+    },
+    "STM32F215": {
+      "flash_codes": [
+        "E",
+        "G"
+      ],
+      "document": "DS6697",
+      "revision": 13,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f217ve.pdf"
+    },
+    "STM32F217": {
+      "flash_codes": [
+        "E",
+        "G"
+      ],
+      "document": "DS6697",
+      "revision": 13,
+      "url": "https://www.st.com/resource/en/datasheet/stm32f217ve.pdf"
+    }
+  },
+  "governance": {
+    "exact_identity_source": "stm32f2-active-exact-gap-v3.8.txt",
+    "unknown_series_forbidden": true,
+    "unknown_flash_code_forbidden": true,
+    "unknown_pin_package_combination_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_option_suffix_forbidden": true,
+    "backend_mapping_required_for_layer1_metadata": false,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
