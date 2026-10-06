@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32c0-layer1-admission-proposal-v5.5",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4589,
+  "production_source_count_prestate": 28,
+  "production_c0_exact_prestate": 209,
+  "current_c0_active_exact": 226,
+  "current_c0_active_intersection_prestate": 209,
+  "proposal_addition_count": 17,
+  "proposal_exact_set_sha256": "03b7202842b52aaa6362386864d60c62f64d9cefea74d2d039691ea170b79097",
+  "proposal_csv_sha256": "ae20c35416e7144613f0aa5041676e382fe8e077836794ea31a466ec78d72e80",
+  "base_authority_sha256": "691733479e7f89ac9f9fe1dbd7cd95a7db6be8b27e7d75a77ae38b853d3899b0",
+  "delta_authority_id": "stm32c0-active-gap-ordering-authority-v5.4",
+  "delta_authority_sha256": "b2a48e10b40db576b46b8ecec926d033dffccb777028d3e27b752f03dcf79ac4",
+  "layer1_catalog_resolution": {
+    "normalized": 17
+  },
+  "metadata_direct_ordering_information_exact_count": 17,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "lifecycle_delta_exact_icpns": [
+    "STM32C091KBT3"
+  ],
+  "new_package_semantics": {
+    "STM32C011_D_Y": "WLCSP12",
+    "STM32C051_D_Y": "WLCSP15"
+  },
+  "backend_scope_evaluated": false,
+  "backend_type_claimed": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 17
+  },
+  "backend_state_semantics": "no route or backend type bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "series_counts": {
+    "STM32C011": 1,
+    "STM32C051": 7,
+    "STM32C071": 3,
+    "STM32C091": 3,
+    "STM32C092": 3
+  },
+  "package_counts": {
+    "LQFP": 1,
+    "UFBGA": 4,
+    "UFQFPN": 6,
+    "WLCSP": 6
+  },
+  "production_c0_exact_after_if_approved": 226,
+  "production_source_count_after_if_approved": 28,
+  "c0_current_active_identity_coverage_after_if_published": "226/226 = 100%",
+  "production_exact_after_if_approved": 4606,
+  "catalog_backend_partition_after_if_approved": {
+    "mapped": 3673,
+    "no_mapping": 933
+  },
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4510,
+  "whole_st_active_intersection_after_if_approved": 4527,
+  "whole_st_active_gap_after_if_approved": 23,
+  "whole_st_active_coverage_after_if_approved_percent": 99.4945,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 739,
+  "source_workflow_run_id": 37472025031,
+  "source_artifact_id": 11417885710,
+  "source_artifact_zip_sha256": "8e877965282eb3b46f4fe131de3591ea11616d7232884b701f131ba6d8a7968a",
+  "metadata_replay_pr": 738,
+  "metadata_replay_merge_commit": "5727124d98e2f26afd72d197fe35767b719e6514"
+}
