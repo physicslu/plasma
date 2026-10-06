@@ -158,7 +158,9 @@ test("all operator documents use the approved structured guide layout", () => {
     "Settings overview · 4 configuration groups",
   ]) assert.ok(documents.includes(marker), `missing structured-doc marker: ${marker}`);
 
-  assert.match(documents, /These screens illustrate the documentation at left; they are examples, not live system state/);\n  assert.doesNotMatch(documents, /firmware(?:\\b|_)/i);\n  assert.match(documents, /programming_asset\\.bin/);
+  assert.match(documents, /These screens illustrate the documentation at left; they are examples, not live system state/);
+  assert.doesNotMatch(documents, /firmware(?:\b|_)/i);
+  assert.match(documents, /programming_asset\.bin/);
   assert.match(documents, /documentGuideBody/);
   assert.match(documents, /DocumentSectionHeading/);
   assert.match(documents, /DocumentDataTable/);
