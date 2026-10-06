@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32f2-layer1-admission-proposal-v4.0",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4242,
+  "production_f2_exact_prestate": 33,
+  "current_f2_active_exact": 105,
+  "current_f2_active_intersection_prestate": 33,
+  "proposal_addition_count": 72,
+  "proposal_exact_set_sha256": "1ba037ac5bba68ab4907742e97be0d9d56fd15f5e32b89899a67359c6703f584",
+  "proposal_csv_sha256": "8bd6dce8d0e6f1d976a7708ac7afef785d214797567c12ef6a56bbc63d31e2a3",
+  "authority_id": "stm32f2-ordering-authority-v3.9",
+  "authority_sha256": "b4dbee7bc5c22d9b4d472637af9d32fdb54c22fb5e554a3e817db4ec716b4abd",
+  "layer1_catalog_resolution": {
+    "normalized": 72
+  },
+  "backend_scope_evaluated": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 72
+  },
+  "backend_state_semantics": "no route bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "metadata_exception_exact_icpns": [],
+  "direct_ordering_information_exact_count": 72,
+  "series_counts": {
+    "STM32F205": 35,
+    "STM32F207": 25,
+    "STM32F215": 7,
+    "STM32F217": 5
+  },
+  "package_counts": {
+    "LQFP": 68,
+    "UFBGA": 3,
+    "WLCSP": 1
+  },
+  "production_f2_exact_after_if_approved": 105,
+  "f2_current_active_identity_coverage_after_if_published": "105/105 = 100%",
+  "production_exact_after_if_approved": 4314,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4163,
+  "whole_st_active_intersection_after_if_approved": 4235,
+  "whole_st_active_gap_after_if_approved": 315,
+  "whole_st_active_coverage_after_if_approved_percent": 93.0769,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 722,
+  "source_workflow_run_id": 37417196622,
+  "source_artifact_id": 11391337666,
+  "source_artifact_zip_sha256": "29ae4fb67491b292b545b61e371ad5461313eff6edff6459b16653901693f380"
+}
