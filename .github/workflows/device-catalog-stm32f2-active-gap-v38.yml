@@ -1,0 +1,42 @@
+name: STM32F2 Active exact gap derivation v3.8
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/derive_stm32f2_active_gap_v38.py'
+      - '.github/workflows/device-catalog-stm32f2-active-gap-v38.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  derive:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen ST eStore v1.3 coverage result
+        uses: actions/download-artifact@v4
+        with:
+          name: st-estore-v13-coverage-result
+          path: /tmp/st-estore-v13-result
+          repository: physicslu/plasma
+          run-id: 36797087427
+          github-token: ${{ github.token }}
+      - name: Derive STM32F2 exact Active and gap sets
+        run: |
+          python data/device-catalog/research/derive_stm32f2_active_gap_v38.py \
+            --coverage-root /tmp/st-estore-v13-result \
+            --output-active /tmp/stm32f2-active-exact-v38.txt \
+            --output-gap /tmp/stm32f2-active-gap-v38.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f2-active-gap-v38
+          path: |
+            /tmp/stm32f2-active-exact-v38.txt
+            /tmp/stm32f2-active-gap-v38.txt
+          if-no-files-found: error
+          retention-days: 30
