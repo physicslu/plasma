@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32wb0-layer1-production-publication-v5.3",
+  "publication_date_utc": "2026-10-06",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32wb0-layer1-admission-proposal-v5.2",
+  "approved_proposal_pr": 736,
+  "approved_proposal_head_sha": "2a23104bb12a62f467914b0ba2619d4594f55fde",
+  "approved_proposal_merge_commit": "09adf0cf3fce2ec0baaa9ed197a803e941678b7b",
+  "approved_proposal_source_workflow_run_id": 37437294647,
+  "approved_proposal_source_artifact_id": 11398828505,
+  "approved_proposal_source_artifact_zip_sha256": "9b09987703f2866d1364467ec1ca46360ca63c5979b08be233963ccd31a93e54",
+  "approved_candidate_exact_count": 24,
+  "approved_candidate_exact_set_sha256": "5f6adbd574ca751487c256a806764b1046cd5150cba757f73fd9d3269d167447",
+  "approved_candidate_csv_sha256": "7bec5269ba9a67f4e4a26f7bff61d1116ad713bb97400f9deebcb329749e74f0",
+  "approved_authority_id": "stm32wb0-ordering-authority-v5.1",
+  "approved_authority_sha256": "c8975280bb2d930f64b3e40e385ae4d009f38e3c555578c186e86eada97adaaf",
+  "production_prestate": {
+    "exact_total": 4565,
+    "source_count": 27,
+    "stm32wb0_exact": 0
+  },
+  "production_poststate": {
+    "exact_total": 4589,
+    "source_count": 28,
+    "stm32wb0_exact": 24,
+    "stm32wb0_source_git_blob_sha": "b4754420d0a6342f63c3edb368c96fc7f9bf864b",
+    "stm32wb0_source_sha256": "f9c827037f1471c438fbe91f4959913594d182fe41b601266138614cc34e9f43"
+  },
+  "stm32wb0_backend_state_after": {
+    "mapped": 0,
+    "no_mapping": 24
+  },
+  "approved_addition_backend_state": {
+    "mapped": 0,
+    "no_mapping": 24,
+    "semantics": "no route or backend type bound; backend capability not evaluated in catalog-only scope"
+  },
+  "catalog_backend_state_after": {
+    "mapped": 3673,
+    "no_mapping": 916
+  },
+  "network_coprocessor_exact_count": 4,
+  "network_coprocessor_semantic_preserved": true,
+  "package_dependent_physical_pin_count_preserved": true,
+  "programming_profile_binding_claimed": false,
+  "metadata_direct_ordering_information_exact_count": 24,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "coverage_effect": {
+    "stm32wb0_active_exact_denominator": 24,
+    "stm32wb0_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 4510,
+    "whole_st_active_gap_after": 40,
+    "whole_st_active_identity_coverage_after_percent": 99.1209
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_scope_evaluated_for_24_additions": false,
+    "backend_type_claimed_for_no_mapping_rows": false,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
