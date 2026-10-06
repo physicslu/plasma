@@ -24,6 +24,15 @@ For STM32WB06/07 `CCF`, the ordering pin code is `C = 48`, but the physical pack
 
 These semantics are metadata facts only and do not imply a programming backend.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `5f6adbd574ca751487c256a806764b1046cd5150cba757f73fd9d3269d167447`
+- proposal CSV SHA-256: `7bec5269ba9a67f4e4a26f7bff61d1116ad713bb97400f9deebcb329749e74f0`
+- metadata authority SHA-256: `c8975280bb2d930f64b3e40e385ae4d009f38e3c555578c186e86eada97adaaf`
+- source workflow run: `37437294647`
+- source artifact: `11398828505`
+- artifact ZIP SHA-256: `9b09987703f2866d1364467ec1ca46360ca63c5979b08be233963ccd31a93e54`
+
 ## Projected state only if later explicitly approved
 
 - STM32WB0 Active identity coverage: **0/24 → 24/24 = 100%**
