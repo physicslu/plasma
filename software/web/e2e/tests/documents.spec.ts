@@ -20,8 +20,9 @@ test("Documents exposes PMode and EMode static operator guides through the share
 
   await nav.getByRole("button", { name: "Gateway Settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Gateway (設定說明|Settings)/ })).toBeVisible();
-  await expect(page.getByText("PPU Request Timeout", { exact: true })).toBeVisible();
-  await expect(page.getByText("PPU Retry Count", { exact: true })).toBeVisible();
+  const gatewayReference = page.locator(".documentDataTable");
+  await expect(gatewayReference.getByRole("cell", { name: "PPU Request Timeout", exact: true })).toBeVisible();
+  await expect(gatewayReference.getByRole("cell", { name: "PPU Retry Count", exact: true })).toBeVisible();
   await expect(page.getByText("PPU Response Budget", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Browser Watchdog", { exact: true })).toHaveCount(0);
 
