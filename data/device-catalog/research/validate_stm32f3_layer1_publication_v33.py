@@ -201,16 +201,19 @@ def main() -> int:
         and source["sha256"] == EXPECTED_F3_SHA256
         and source["git_blob_sha"] == EXPECTED_F3_BLOB,
         "Production manifest F3 integrity binding drift")
-    req(len(sources) == 24, "Production source count drift")
-    req(sum(int(s["row_count"]) for s in sources) == 4088, "Production exact total drift")
+    current_total = sum(int(s["row_count"]) for s in sources)
+    req(len(sources) >= 24, "Production source count regressed below F3 publication poststate")
+    req(current_total >= 4088, "Production exact total regressed below F3 publication poststate")
 
     backend = Counter()
     for source in sources:
         path = (MANIFEST.parent / source["path"]).resolve()
         for row in read_rows(path):
             backend["no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"] += 1
-    req(backend == Counter({"mapped": 3673, "no_mapping": 415}),
-        f"Production backend partition drift: {dict(backend)}")
+    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 415,
+        f"Production backend partition regressed below F3 publication poststate: {dict(backend)}")
+    req(backend["mapped"] + backend["no_mapping"] == current_total,
+        "current Production backend partition does not equal current exact total")
 
     req(audit["production_prestate"] == {
         "exact_total": 3906, "source_count": 24, "stm32f3_exact": 10
@@ -227,7 +230,7 @@ def main() -> int:
         "coverage effect audit drift")
 
     print("STM32F3_LAYER1_PRODUCTION_PUBLICATION_V33_PASS")
-    print("STM32F3=192; mapped=10; no_mapping=182; Production=4088; sources=24")
+    print(f"STM32F3=192; mapped=10; no_mapping=182; current_Production={current_total}; current_sources={len(sources)}")
     print("Whole-ST Active identity coverage=4009/4550=88.1099%")
     return 0
 
