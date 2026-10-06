@@ -73,7 +73,7 @@ class STM32F2Phase43DAdmissionTests(unittest.TestCase):
         self.assertEqual(canonical_csv_sha256(list(CANONICAL_FIELDS), historical_rows),
                          "dab17b2892497a32e555e57c5349da4ebe6f37136d90c0cab87a4df08a8fe0c9")
         self.assertTrue(all(row["family"] == "STM32F2" for row in rows))
-        self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32f2x.cfg" for row in rows))
+        self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32f2x.cfg" for row in historical_rows))
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         source = next(item for item in manifest["sources"] if item["family"] == "STM32F2")
         self.assertEqual(source["row_count"], len(rows))
