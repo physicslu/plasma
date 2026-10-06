@@ -220,6 +220,14 @@
       "row_count": 32,
       "git_blob_sha": "937aeb4468fa7babd0c7b84d0bee72468d445002",
       "sha256": "ef43825a35e7cc2b4548c9fe050ade05f8149253b4c7da055a89e057965dbfc7"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32WB0",
+      "path": "../research/stm32wb0-commercial-icpn.csv",
+      "row_count": 24,
+      "git_blob_sha": "b4754420d0a6342f63c3edb368c96fc7f9bf864b",
+      "sha256": "f9c827037f1471c438fbe91f4959913594d182fe41b601266138614cc34e9f43"
     }
   ]
 }
