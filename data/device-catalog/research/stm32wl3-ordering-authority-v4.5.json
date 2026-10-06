@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32wl3-ordering-authority-v4.5",
+  "reference_date": "2026-10-06",
+  "scope": "Official ST Ordering Information metadata authority for the locked 47 current-Active STM32WL3 exact MPNs",
+  "exact_identity_source": "st-stm32wl3-active-exact-mpn-v1.2.txt",
+  "common": {
+    "package_codes": {
+      "V": "VFQFPN"
+    },
+    "temperature_c": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    },
+    "packing": {
+      "": "standard_or_tray_unspecified",
+      "TR": "tape_and_reel"
+    }
+  },
+  "series": {
+    "STM32WL30": {
+      "document": "DS14855",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32wl30kb.pdf",
+      "pin_codes": {
+        "K": 32
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "frequency_band_options": [
+        ""
+      ]
+    },
+    "STM32WL31": {
+      "document": "DS14836",
+      "revision": 1,
+      "url": "https://www.st.com/resource/en/datasheet/stm32wl31c8.pdf",
+      "pin_codes": {
+        "K": 32
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "frequency_band_options": [
+        "",
+        "A"
+      ]
+    },
+    "STM32WL33": {
+      "document": "DS14221",
+      "revision": 6,
+      "url": "https://www.st.com/resource/en/datasheet/stm32wl33cc.pdf",
+      "pin_codes": {
+        "K": 32,
+        "C": 48
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128,
+        "C": 256
+      },
+      "frequency_band_options": [
+        "",
+        "A",
+        "X"
+      ]
+    },
+    "STM32WL3R": {
+      "document": "DS15018",
+      "revision": 2,
+      "url": "https://www.st.com/resource/en/datasheet/stm32wl3rkb.pdf",
+      "pin_codes": {
+        "K": 32
+      },
+      "flash_kib": {
+        "8": 64,
+        "B": 128
+      },
+      "frequency_band_options": [
+        "",
+        "X"
+      ]
+    }
+  },
+  "bounded_exact_exceptions": {
+    "STM32WL31C8V6": {
+      "field": "pin_count",
+      "value": 48,
+      "basis": "same_datasheet_vfqfpn48_package_plus_official_st_exact_product_qr",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl31c8.html"
+    },
+    "STM32WL31CBV6": {
+      "field": "pin_count",
+      "value": 48,
+      "basis": "same_datasheet_vfqfpn48_package_plus_official_st_exact_product_qr",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32wl31cb.html"
+    }
+  },
+  "governance": {
+    "decode_only_locked_exact_identity_set": true,
+    "unknown_series_forbidden": true,
+    "unknown_pin_code_forbidden": true,
+    "unknown_flash_code_forbidden": true,
+    "unknown_package_code_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_frequency_option_forbidden": true,
+    "unknown_packing_suffix_forbidden": true,
+    "exception_scope_exact_mpn_only": true,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
