@@ -32,6 +32,15 @@ The known external-memory / special programming-profile question remains a separ
 
 Catalog identity metadata and programming capability are independent dimensions.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `f3ae0640f7e28c14b40b7b2ff83570e0bd95c7d0bd3bd98baac6edbcfc78bd50`
+- proposal CSV SHA-256: `af1badb6c8ae555b0364421c1e88b7117d07a8e0bc362e6bce71f3df02c8a81e`
+- metadata authority SHA-256: `a1abca6e300936583198e73053d1894496fb1764a2fb7874a489f9e5cc3dbe2f`
+- source workflow run: `37434384862`
+- source artifact: `11397719001`
+- artifact ZIP SHA-256: `2a122b622d25822e57d391700d1d36ae140533253ee65be135da77fd4757d9f6`
+
 ## Projected state only if later explicitly approved
 
 - STM32N6 Active identity coverage: **0/32 → 32/32 = 100%**
