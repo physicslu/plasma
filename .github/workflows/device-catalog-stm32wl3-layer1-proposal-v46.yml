@@ -29,9 +29,7 @@ jobs:
             --summary /tmp/stm32wl3-v46.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_stm32wl3_layer1_admission_proposal_v46.py -v
-          if [ -f data/device-catalog/research/validate_stm32wl3_layer1_proposal_lock_v46.py ]; then
-            python data/device-catalog/research/validate_stm32wl3_layer1_proposal_lock_v46.py
-          fi
+          python data/device-catalog/research/validate_stm32wl3_layer1_proposal_lock_v46.py
       - uses: actions/upload-artifact@v4
         with:
           name: stm32wl3-layer1-admission-proposal-v46
