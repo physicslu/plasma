@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32n6-ordering-authority-v4.8",
+  "reference_date": "2026-10-06",
+  "scope": "Official ST DS14791 Rev 11 Ordering Information metadata authority for the locked 32 current-Active STM32N6 exact MPNs",
+  "exact_identity_source": "st-stm32n6-active-exact-mpn-v1.2.txt",
+  "datasheet": {
+    "document": "DS14791",
+    "revision": 11,
+    "url": "https://www.st.com/resource/en/datasheet/stm32n657a0.pdf"
+  },
+  "common": {
+    "pin_codes": {
+      "Z": 142,
+      "A": 169,
+      "I": 178,
+      "B": 198,
+      "L": 223,
+      "X": 264
+    },
+    "flash_kib": {
+      "0": "0-1 KiB"
+    },
+    "package_codes": {
+      "H": "VFBGA"
+    },
+    "temperature_c": {
+      "3": "-40 to 125 C"
+    },
+    "dedicated_pinout": {
+      "Q": "internal_smps_step_down_converter",
+      "QG": "internal_smps_step_down_converter_plus_gp_configuration"
+    },
+    "packing": {
+      "": "standard_or_unspecified",
+      "TR": "tape_and_ring"
+    }
+  },
+  "series": {
+    "STM32N645": {
+      "die_code": "4",
+      "crypto": false,
+      "line_code": "5",
+      "neural_art": false
+    },
+    "STM32N647": {
+      "die_code": "4",
+      "crypto": false,
+      "line_code": "7",
+      "neural_art": true
+    },
+    "STM32N655": {
+      "die_code": "5",
+      "crypto": true,
+      "line_code": "5",
+      "neural_art": false
+    },
+    "STM32N657": {
+      "die_code": "5",
+      "crypto": true,
+      "line_code": "7",
+      "neural_art": true
+    }
+  },
+  "governance": {
+    "decode_only_locked_exact_identity_set": true,
+    "unknown_series_forbidden": true,
+    "unknown_pin_code_forbidden": true,
+    "unknown_flash_code_forbidden": true,
+    "unknown_package_code_forbidden": true,
+    "unknown_temperature_code_forbidden": true,
+    "unknown_dedicated_pinout_forbidden": true,
+    "unknown_packing_suffix_forbidden": true,
+    "backend_scope_evaluated": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
