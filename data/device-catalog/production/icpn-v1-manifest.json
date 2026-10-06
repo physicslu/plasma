@@ -167,6 +167,14 @@
     },
     {
       "manufacturer": "STMicroelectronics",
+      "family": "STM32WL3",
+      "path": "../research/stm32wl3-commercial-icpn.csv",
+      "row_count": 47,
+      "git_blob_sha": "0a774823e5236e011a105cde355942821e9ebe48",
+      "sha256": "5278dfabde948987619881393c7c8db897499ec1647659076da120224b65f671"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
       "family": "STM32WLX",
       "path": "../research/stm32wlx-commercial-icpn.csv",
       "row_count": 31,
