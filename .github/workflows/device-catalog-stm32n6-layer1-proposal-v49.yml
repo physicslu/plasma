@@ -1,0 +1,42 @@
+name: STM32N6 Layer-1 admission proposal v4.9
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_stm32n6_layer1_admission_proposal_v49.py'
+      - 'data/device-catalog/research/test_prepare_stm32n6_layer1_admission_proposal_v49.py'
+      - 'data/device-catalog/research/STM32N6_LAYER1_ADMISSION_PROPOSAL_V49.md'
+      - 'data/device-catalog/research/stm32n6-layer1-admission-proposal-v4.9.json'
+      - 'data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py'
+      - '.github/workflows/device-catalog-stm32n6-layer1-proposal-v49.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate STM32N6 proposal
+        run: |
+          python data/device-catalog/research/prepare_stm32n6_layer1_admission_proposal_v49.py \
+            --proposal /tmp/stm32n6-v49.csv \
+            --summary /tmp/stm32n6-v49.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_stm32n6_layer1_admission_proposal_v49.py -v
+          if [ -f data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py ]; then
+            python data/device-catalog/research/validate_stm32n6_layer1_proposal_lock_v49.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32n6-layer1-admission-proposal-v49
+          path: |
+            /tmp/stm32n6-v49.csv
+            /tmp/stm32n6-v49.json
+          if-no-files-found: error
+          retention-days: 30
