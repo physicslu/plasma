@@ -12,16 +12,16 @@ ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 
 MANIFEST = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
-N6 = HERE / "stm32n6-commercial-icpn.csv"
-EXACT = HERE / "st-stm32n6-active-exact-mpn-v1.2.txt"
-PROPOSAL_LOCK = HERE / "stm32n6-layer1-admission-proposal-v4.9.json"
-AUDIT = HERE / "stm32n6-layer1-production-publication-v5.0.json"
+WB0 = HERE / "stm32wb0-commercial-icpn.csv"
+EXACT = HERE / "st-stm32wb0-active-exact-mpn-v1.2.txt"
+PROPOSAL_LOCK = HERE / "stm32wb0-layer1-admission-proposal-v5.2.json"
+AUDIT = HERE / "stm32wb0-layer1-production-publication-v5.3.json"
 
-EXPECTED_N6_SHA256 = "ef43825a35e7cc2b4548c9fe050ade05f8149253b4c7da055a89e057965dbfc7"
-EXPECTED_N6_BLOB = "937aeb4468fa7babd0c7b84d0bee72468d445002"
-EXPECTED_EXACT_SHA256 = "f3ae0640f7e28c14b40b7b2ff83570e0bd95c7d0bd3bd98baac6edbcfc78bd50"
-EXPECTED_PROPOSAL_SHA256 = "af1badb6c8ae555b0364421c1e88b7117d07a8e0bc362e6bce71f3df02c8a81e"
-EXPECTED_AUTHORITY_SHA256 = "a1abca6e300936583198e73053d1894496fb1764a2fb7874a489f9e5cc3dbe2f"
+EXPECTED_WB0_SHA256 = "f9c827037f1471c438fbe91f4959913594d182fe41b601266138614cc34e9f43"
+EXPECTED_WB0_BLOB = "b4754420d0a6342f63c3edb368c96fc7f9bf864b"
+EXPECTED_EXACT_SHA256 = "5f6adbd574ca751487c256a806764b1046cd5150cba757f73fd9d3269d167447"
+EXPECTED_PROPOSAL_SHA256 = "7bec5269ba9a67f4e4a26f7bff61d1116ad713bb97400f9deebcb329749e74f0"
+EXPECTED_AUTHORITY_SHA256 = "c8975280bb2d930f64b3e40e385ae4d009f38e3c555578c186e86eada97adaaf"
 
 PROPOSAL_FIELDS = (
     "manufacturer","icpn","family","series","base_device","marketing_status",
@@ -73,16 +73,14 @@ def reconstruct_proposal(rows: list[dict[str, str]]) -> bytes:
             "option_suffix": row["option_suffix"],
             "backend_type": "",
             "backend_mapping_state": "no_mapping",
-            "backend_route_observation":
-                "backend_not_evaluated_catalog_only_external_memory_profile_unresolved",
+            "backend_route_observation": "backend_not_evaluated_catalog_only",
             "existing_identifier": "",
             "existing_identifier_kind": "",
             "openocd_target_config": "",
             "metadata_source_reference": row["source_reference"],
             "source_authority": row["source_authority"],
             "verification_status": row["verification_status"],
-            "programming_profile_state":
-                "unresolved_external_memory_programming_profile_boundary",
+            "programming_profile_state": "unresolved",
             "metadata_exception": "",
         })
 
@@ -93,69 +91,51 @@ def reconstruct_proposal(rows: list[dict[str, str]]) -> bytes:
     return buf.getvalue().encode()
 
 def main() -> int:
-    rows = read_rows(N6)
+    rows = read_rows(WB0)
     exact = exact_lines()
     proposal = json.loads(PROPOSAL_LOCK.read_text(encoding="utf-8"))
     audit = json.loads(AUDIT.read_text(encoding="utf-8"))
 
-    req(len(rows) == 32 and len({r["icpn"] for r in rows}) == 32,
-        "N6 Production count/unique drift")
+    req(len(rows) == 24 and len({r["icpn"] for r in rows}) == 24,
+        "WB0 Production count/unique drift")
     req(sorted(r["icpn"] for r in rows) == exact,
-        "N6 Production identities differ from locked Active set")
+        "WB0 Production identities differ from locked Active set")
     req(digest_lines(exact) == EXPECTED_EXACT_SHA256,
-        "N6 exact identity digest drift")
+        "WB0 exact identity digest drift")
 
-    data = N6.read_bytes()
-    req(hashlib.sha256(data).hexdigest() == EXPECTED_N6_SHA256,
-        "N6 canonical SHA256 drift")
-    req(git_blob(data) == EXPECTED_N6_BLOB,
-        "N6 canonical Git blob drift")
+    data = WB0.read_bytes()
+    req(hashlib.sha256(data).hexdigest() == EXPECTED_WB0_SHA256,
+        "WB0 canonical SHA256 drift")
+    req(git_blob(data) == EXPECTED_WB0_BLOB,
+        "WB0 canonical Git blob drift")
 
     req(all(r["mapping_status"] == "no_mapping" for r in rows),
-        "N6 Production contains mapped row without backend qualification")
+        "WB0 Production contains mapped row without backend qualification")
     req(all(
         not r["cmsis_device_name"]
         and not r["existing_identifier"]
         and not r["existing_identifier_kind"]
         and not r["openocd_target_config"]
         for r in rows
-    ), "N6 no_mapping row carries backend route data")
+    ), "WB0 no_mapping row carries backend route data")
 
-    for row in rows:
-        req(
-            row["manufacturer"] == "STMicroelectronics"
-            and row["family"] == "STM32N6",
-            f'{row["icpn"]}: identity scope drift',
-        )
-        req(row["package"] == "VFBGA",
-            f'{row["icpn"]}: package drift')
-        req(row["flash_size"] == "0-1 KiB",
-            f'{row["icpn"]}: N6 flash metadata drift')
-        req(row["temperature_grade"] == "-40 to 125 C",
-            f'{row["icpn"]}: temperature grade drift')
-        req(
-            row["source_type"]
-            == "official_st_ordering_information_plus_current_active_exact_identity",
-            f'{row["icpn"]}: source type drift',
-        )
-        req(row["source_reference"]
-            == "https://www.st.com/resource/en/datasheet/stm32n657a0.pdf",
-            f'{row["icpn"]}: source reference drift')
-        req(row["source_authority"] == "STMicroelectronics official",
-            f'{row["icpn"]}: source authority drift')
-        req(
-            row["verification_status"]
-            == "verified_st_ordering_information_codes_plus_current_active_exact_identity",
-            f'{row["icpn"]}: verification status drift',
-        )
+    network = [r for r in rows if r["series"] == "STM32WB05N"]
+    req(len(network) == 4, "WB0 network-coprocessor partition drift")
+    req(all(r["flash_size"] == "N/A (network coprocessor)" for r in network),
+        "WB05xN network-coprocessor semantic drift")
+
+    wlcsp49 = [r for r in rows if r["icpn"].startswith(("STM32WB06CCF", "STM32WB07CCF"))]
+    req(len(wlcsp49) == 4, "WB06/07 WLCSP49 cohort drift")
+    req(all(r["package"] == "WLCSP" and r["pin_count"] == "49" for r in wlcsp49),
+        "WB06/07 WLCSP49 physical pin-count drift")
 
     req(hashlib.sha256(reconstruct_proposal(rows)).hexdigest()
         == EXPECTED_PROPOSAL_SHA256,
-        "published N6 rows do not reconstruct approved proposal CSV")
+        "published WB0 rows do not reconstruct approved proposal CSV")
 
-    req(proposal["proposal_id"] == "stm32n6-layer1-admission-proposal-v4.9",
+    req(proposal["proposal_id"] == "stm32wb0-layer1-admission-proposal-v5.2",
         "approved proposal id drift")
-    req(proposal["proposal_addition_count"] == 32,
+    req(proposal["proposal_addition_count"] == 24,
         "approved proposal count drift")
     req(proposal["proposal_exact_set_sha256"] == EXPECTED_EXACT_SHA256,
         "approved exact-set lock drift")
@@ -168,22 +148,22 @@ def main() -> int:
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     sources = manifest["sources"]
-    n6s = [
+    wb0s = [
         s for s in sources
         if s["manufacturer"] == "STMicroelectronics"
-        and s["family"] == "STM32N6"
+        and s["family"] == "STM32WB0"
     ]
-    req(len(n6s) == 1, "Production N6 source missing/duplicated")
-    source = n6s[0]
+    req(len(wb0s) == 1, "Production WB0 source missing/duplicated")
+    source = wb0s[0]
     req(
-        source["row_count"] == 32
-        and source["sha256"] == EXPECTED_N6_SHA256
-        and source["git_blob_sha"] == EXPECTED_N6_BLOB,
-        "Production manifest N6 integrity binding drift",
+        source["row_count"] == 24
+        and source["sha256"] == EXPECTED_WB0_SHA256
+        and source["git_blob_sha"] == EXPECTED_WB0_BLOB,
+        "Production manifest WB0 integrity binding drift",
     )
-    current_total = sum(int(s["row_count"]) for s in sources)
-    req(len(sources) >= 27, "Production source count regressed below N6 publication poststate")
-    req(current_total >= 4565, "Production exact total regressed below N6 publication poststate")
+    req(len(sources) == 28, "Production source count drift")
+    req(sum(int(s["row_count"]) for s in sources) == 4589,
+        "Production exact total drift")
 
     backend = Counter()
     for source in sources:
@@ -192,48 +172,48 @@ def main() -> int:
             backend[
                 "no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"
             ] += 1
-    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 892,
-        f"Production backend partition regressed below N6 publication poststate: {dict(backend)}")
-    req(backend["mapped"] + backend["no_mapping"] == current_total,
-        "current Production backend partition does not equal current exact total")
+    req(backend == Counter({"mapped": 3673, "no_mapping": 916}),
+        f"Production backend partition drift: {dict(backend)}")
 
     req(audit["owner_approval_received"] is True,
         "owner approval audit missing")
-    req(audit["approved_proposal_pr"] == 733,
+    req(audit["approved_proposal_pr"] == 736,
         "approved proposal PR drift")
     req(audit["approved_proposal_merge_commit"]
-        == "b0231e2a520897b962036ebee7a67d5ed689e7c2",
+        == "09adf0cf3fce2ec0baaa9ed197a803e941678b7b",
         "approved proposal merge commit drift")
     req(audit["production_prestate"] == {
-        "exact_total": 4533, "source_count": 26, "stm32n6_exact": 0
+        "exact_total": 4565, "source_count": 27, "stm32wb0_exact": 0
     }, "publication prestate audit drift")
     req(
-        audit["production_poststate"]["exact_total"] == 4565
-        and audit["production_poststate"]["source_count"] == 27
-        and audit["production_poststate"]["stm32n6_exact"] == 32,
+        audit["production_poststate"]["exact_total"] == 4589
+        and audit["production_poststate"]["source_count"] == 28
+        and audit["production_poststate"]["stm32wb0_exact"] == 24,
         "publication poststate audit drift",
     )
-    req(audit["stm32n6_backend_state_after"] == {"mapped": 0, "no_mapping": 32},
-        "N6 backend poststate audit drift")
-    req(audit["catalog_backend_state_after"] == {"mapped": 3673, "no_mapping": 892},
+    req(audit["stm32wb0_backend_state_after"] == {"mapped": 0, "no_mapping": 24},
+        "WB0 backend poststate audit drift")
+    req(audit["catalog_backend_state_after"] == {"mapped": 3673, "no_mapping": 916},
         "catalog backend poststate audit drift")
-    req(audit["external_memory_programming_profile_boundary"] is True,
-        "N6 external-memory boundary audit drift")
+    req(audit["network_coprocessor_semantic_preserved"] is True,
+        "WB0 network-coprocessor semantic audit drift")
+    req(audit["package_dependent_physical_pin_count_preserved"] is True,
+        "WB0 physical pin-count audit drift")
     req(audit["programming_profile_binding_claimed"] is False,
-        "N6 Programming Profile overclaim")
+        "WB0 Programming Profile overclaim")
     req(
-        audit["coverage_effect"]["whole_st_active_intersection_after"] == 4486
-        and audit["coverage_effect"]["whole_st_active_gap_after"] == 64
+        audit["coverage_effect"]["whole_st_active_intersection_after"] == 4510
+        and audit["coverage_effect"]["whole_st_active_gap_after"] == 40
         and audit["coverage_effect"][
             "whole_st_active_identity_coverage_after_percent"
-        ] == 98.5934,
+        ] == 99.1209,
         "coverage effect audit drift",
     )
 
-    print("STM32N6_LAYER1_PRODUCTION_PUBLICATION_V50_PASS")
-    print(f"STM32N6=32; mapped=0; no_mapping=32; current_Production={current_total}; current_sources={len(sources)}")
-    print(f"Current Production backend partition={backend['mapped']} mapped / {backend['no_mapping']} no_mapping")
-    print("Whole-ST Active identity coverage=4486/4550=98.5934%")
+    print("STM32WB0_LAYER1_PRODUCTION_PUBLICATION_V53_PASS")
+    print("STM32WB0=24; mapped=0; no_mapping=24; Production=4589; sources=28")
+    print("Production backend partition=3673 mapped / 916 no_mapping")
+    print("Whole-ST Active identity coverage=4510/4550=99.1209%")
     return 0
 
 if __name__ == "__main__":
