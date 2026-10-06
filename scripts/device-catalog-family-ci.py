@@ -66,18 +66,10 @@ def command_profile(family: str) -> list[list[str]]:
         ],
         "stm32f2": [
             _py("data/device-catalog/research/test_stm32f2_bounded_historical_golden_replay.py"),
-            _py("data/device-catalog/research/stm32f2_phase4_3i_policy.py"),
-            _py("data/device-catalog/research/test_stm32f2_bounded_policy_admission.py"),
-            _py("data/device-catalog/research/test_stm32f2_phase4_3j_admission.py"),
-            _py("data/device-catalog/research/test_stm32f2_bounded_shadow_compare.py"),
-            _py(
-                "data/device-catalog/research/stm32f2_bounded_shadow.py",
-                "compare",
-                "--phase",
-                "4.3H",
-                "--live-summary",
-                "data/device-catalog/research/evidence/stm32f2-phase4.3h-official-st-discovery-live-2026-09-07/pilot-summary.json",
-            ),
+            # Historical Phase 4.3 policy/admission snapshots remain immutable evidence.
+            # Current family CI validates the locked whole-family Active/gap refresh
+            # instead of regenerating historical conclusions from later Production state.
+            _py("data/device-catalog/research/validate_stm32f2_active_gap_v38.py"),
         ],
         "stm32f3": [
             _py("data/device-catalog/research/test_stm32f3_phase4_4a_foundation.py"),
