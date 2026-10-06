@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32n6-layer1-admission-proposal-v4.9",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4533,
+  "production_source_count_prestate": 26,
+  "production_n6_exact_prestate": 0,
+  "current_n6_active_exact": 32,
+  "current_n6_active_intersection_prestate": 0,
+  "proposal_addition_count": 32,
+  "proposal_exact_set_sha256": "f3ae0640f7e28c14b40b7b2ff83570e0bd95c7d0bd3bd98baac6edbcfc78bd50",
+  "proposal_csv_sha256": "af1badb6c8ae555b0364421c1e88b7117d07a8e0bc362e6bce71f3df02c8a81e",
+  "authority_id": "stm32n6-ordering-authority-v4.8",
+  "authority_sha256": "a1abca6e300936583198e73053d1894496fb1764a2fb7874a489f9e5cc3dbe2f",
+  "layer1_catalog_resolution": {
+    "normalized": 32
+  },
+  "metadata_direct_ordering_information_exact_count": 32,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "backend_scope_evaluated": false,
+  "backend_type_claimed": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 32
+  },
+  "backend_state_semantics": "no route or backend type bound; backend capability not evaluated in catalog-only scope",
+  "backend_mapping_required_for_layer1_admission": false,
+  "external_memory_programming_profile_boundary": true,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "series_counts": {
+    "STM32N645": 7,
+    "STM32N647": 7,
+    "STM32N655": 7,
+    "STM32N657": 11
+  },
+  "package_counts": {
+    "VFBGA": 32
+  },
+  "production_n6_exact_after_if_approved": 32,
+  "production_source_count_after_if_approved": 27,
+  "n6_current_active_identity_coverage_after_if_published": "32/32 = 100%",
+  "production_exact_after_if_approved": 4565,
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4454,
+  "whole_st_active_intersection_after_if_approved": 4486,
+  "whole_st_active_gap_after_if_approved": 64,
+  "whole_st_active_coverage_after_if_approved_percent": 98.5934,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 733,
+  "source_workflow_run_id": 37434384862,
+  "source_artifact_id": 11397719001,
+  "source_artifact_zip_sha256": "2a122b622d25822e57d391700d1d36ae140533253ee65be135da77fd4757d9f6",
+  "metadata_replay_pr": 732,
+  "metadata_replay_merge_commit": "86098df51d458d83ec118c07a88591025bf7235c"
+}
