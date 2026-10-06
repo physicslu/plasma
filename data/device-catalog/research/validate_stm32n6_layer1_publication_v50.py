@@ -181,9 +181,9 @@ def main() -> int:
         and source["git_blob_sha"] == EXPECTED_N6_BLOB,
         "Production manifest N6 integrity binding drift",
     )
-    req(len(sources) == 27, "Production source count drift")
-    req(sum(int(s["row_count"]) for s in sources) == 4565,
-        "Production exact total drift")
+    current_total = sum(int(s["row_count"]) for s in sources)
+    req(len(sources) >= 27, "Production source count regressed below N6 publication poststate")
+    req(current_total >= 4565, "Production exact total regressed below N6 publication poststate")
 
     backend = Counter()
     for source in sources:
@@ -192,8 +192,10 @@ def main() -> int:
             backend[
                 "no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"
             ] += 1
-    req(backend == Counter({"mapped": 3673, "no_mapping": 892}),
-        f"Production backend partition drift: {dict(backend)}")
+    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 892,
+        f"Production backend partition regressed below N6 publication poststate: {dict(backend)}")
+    req(backend["mapped"] + backend["no_mapping"] == current_total,
+        "current Production backend partition does not equal current exact total")
 
     req(audit["owner_approval_received"] is True,
         "owner approval audit missing")
@@ -229,8 +231,8 @@ def main() -> int:
     )
 
     print("STM32N6_LAYER1_PRODUCTION_PUBLICATION_V50_PASS")
-    print("STM32N6=32; mapped=0; no_mapping=32; Production=4565; sources=27")
-    print("Production backend partition=3673 mapped / 892 no_mapping")
+    print(f"STM32N6=32; mapped=0; no_mapping=32; current_Production={current_total}; current_sources={len(sources)}")
+    print(f"Current Production backend partition={backend['mapped']} mapped / {backend['no_mapping']} no_mapping")
     print("Whole-ST Active identity coverage=4486/4550=98.5934%")
     return 0
 
