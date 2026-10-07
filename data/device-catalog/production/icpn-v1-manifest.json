@@ -153,9 +153,9 @@
       "manufacturer": "STMicroelectronics",
       "family": "STM32H7",
       "path": "../research/stm32h7-classic-commercial-icpn.csv",
-      "row_count": 191,
-      "git_blob_sha": "fda7d9a4eaa9978d0a67416e8b339fc9aab4e5cc",
-      "sha256": "35b9d2bc13da3a01809ea62b62557f5419b8d6f7139574ca4715a127f1e86465"
+      "row_count": 205,
+      "git_blob_sha": "a0ca2521a196e4e7f3d87560b05e830611e85b32",
+      "sha256": "ae0fbffecb9f978f6195ded06fcecfc5a048b71ef8c307548a3298b35889af07"
     },
     {
       "manufacturer": "STMicroelectronics",
