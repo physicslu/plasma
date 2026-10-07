@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 EVIDENCE_ROOT = HERE / "evidence"
+FINAL_TAIL_AUTHORITY = HERE / "st-final-active-tail-gap-metadata-authority-v6.0.json"
 EXPECTED_EVIDENCE_FILES = {
     "control-summary.json",
     "pilot-summary.json",
@@ -152,12 +153,61 @@ def validate() -> dict[str, object]:
         errors.append("duplicate ICPN rows")
 
     evidence_usage: dict[str, int] = {evidence_id: 0 for evidence_id in packages}
+
+    tail_payload = read_json(FINAL_TAIL_AUTHORITY)
+    tail_records = {
+        item["icpn"]: item
+        for item in tail_payload.get("records", [])
+        if isinstance(item, dict) and item.get("family") == FAMILY
+    }
+    expected_tail_ids = {
+        "STM32F405OGY6VTR",
+        "STM32F405OGY6WTR",
+        "STM32F437VIT6WTR",
+    }
+    if set(tail_records) != expected_tail_ids:
+        errors.append("final STM32F4 tail authority exact set drifted")
+
+    observed_tail_ids: set[str] = set()
     for row in rows:
         icpn = row.get("icpn", "")
         if row.get("manufacturer") != MANUFACTURER:
             errors.append(f"{icpn}: manufacturer mismatch")
         if row.get("family") != FAMILY:
             errors.append(f"{icpn}: family mismatch")
+        tail = tail_records.get(icpn)
+        if tail is not None:
+            observed_tail_ids.add(icpn)
+            expected_meta = {
+                "series": tail["series"],
+                "base_device": tail["base_device"],
+                "package": tail["package"],
+                "pin_count": str(tail["pin_count"]),
+                "flash_size": tail["flash_size"],
+                "temperature_grade": tail["temperature_grade"],
+                "option_suffix": tail["option_suffix"],
+            }
+            for key, expected in expected_meta.items():
+                if row.get(key) != expected:
+                    errors.append(f"{icpn}: final-tail {key} mismatch")
+            if row.get("cmsis_device_name") != "":
+                errors.append(f"{icpn}: final-tail CMSIS name must remain unclaimed")
+            if row.get("existing_identifier") != "" or row.get("existing_identifier_kind") != "":
+                errors.append(f"{icpn}: final-tail backend identifier must remain unbound")
+            if row.get("mapping_status") != "no_mapping":
+                errors.append(f"{icpn}: final-tail mapping status must remain no_mapping")
+            if row.get("openocd_target_config") != "":
+                errors.append(f"{icpn}: final-tail target config must remain unbound")
+            if row.get("source_type") != "official_st_exact_product_authority_plus_locked_active_lifecycle":
+                errors.append(f"{icpn}: final-tail source type mismatch")
+            if row.get("source_reference") != tail["metadata_source_url"]:
+                errors.append(f"{icpn}: final-tail source reference mismatch")
+            if row.get("source_authority") != "STMicroelectronics official":
+                errors.append(f"{icpn}: final-tail source authority mismatch")
+            if row.get("verification_status") != "verified_official_exact_product_identity_metadata_plus_locked_active_lifecycle":
+                errors.append(f"{icpn}: final-tail verification status mismatch")
+            continue
+
         if row.get("existing_identifier_kind") != "ordering_pattern":
             errors.append(f"{icpn}: identifier kind mismatch")
         if row.get("mapping_status") != "deterministic_ordering_pattern":
@@ -193,8 +243,15 @@ def validate() -> dict[str, object]:
         elif mapping.get("target_configs") != [TARGET_CONFIG]:
             errors.append(f"{icpn}: current target config differs from canonical")
 
+    if observed_tail_ids != expected_tail_ids:
+        errors.append(
+            "final STM32F4 tail identities missing from canonical: "
+            + ",".join(sorted(expected_tail_ids - observed_tail_ids))
+        )
+
     return {
         "rows": len(rows),
+        "final_tail_no_mapping_rows": len(observed_tail_ids),
         "unique_icpns": len(set(values)),
         "retained_evidence_packages": len(packages),
         "retained_candidate_bindings": len(retained_rows),
