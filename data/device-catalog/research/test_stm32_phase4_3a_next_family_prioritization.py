@@ -16,6 +16,10 @@ F1_HISTORICAL = HERE / "stm32f1-phase2.9-post-admission-canonical.csv"
 F1_HISTORICAL_ROW_COUNT = 75
 F1_HISTORICAL_BLOB = "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
 F1_HISTORICAL_SHA256 = "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+F4_CURRENT = HERE / "stm32f4-commercial-icpn.csv"
+F4_HISTORICAL_ROW_COUNT = 384
+F4_HISTORICAL_BLOB = "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863"
+F4_HISTORICAL_SHA256 = "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
 
 
 def _candidate(report: dict, series: str) -> dict:
@@ -62,6 +66,35 @@ def _write_phase43a_manifest(path: Path, expected: dict) -> None:
             source["row_count"] = F1_HISTORICAL_ROW_COUNT
             source["git_blob_sha"] = F1_HISTORICAL_BLOB
             source["sha256"] = F1_HISTORICAL_SHA256
+        elif source["family"] == "STM32F4":
+            historical_f4 = path.parent / "stm32f4-phase43a-historical.csv"
+            with F4_CURRENT.open(newline="", encoding="utf-8") as handle:
+                reader = csv.DictReader(handle)
+                fieldnames = list(reader.fieldnames or [])
+                rows = [
+                    row for row in reader
+                    if not (
+                        row["mapping_status"] == "no_mapping"
+                        and row["source_type"]
+                        == "official_st_exact_product_authority_plus_locked_active_lifecycle"
+                    )
+                ]
+            assert len(rows) == F4_HISTORICAL_ROW_COUNT
+            with historical_f4.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
+            import hashlib
+            raw = historical_f4.read_bytes()
+            blob = hashlib.sha1(
+                b"blob " + str(len(raw)).encode() + b"\0" + raw
+            ).hexdigest()
+            assert blob == F4_HISTORICAL_BLOB
+            assert hashlib.sha256(raw).hexdigest() == F4_HISTORICAL_SHA256
+            source["path"] = str(historical_f4.resolve())
+            source["row_count"] = F4_HISTORICAL_ROW_COUNT
+            source["git_blob_sha"] = F4_HISTORICAL_BLOB
+            source["sha256"] = F4_HISTORICAL_SHA256
         else:
             source["path"] = str((MANIFEST.parent / source["path"]).resolve())
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
