@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 from collections import Counter
 from pathlib import Path
 
 from stm32f4_coverage_gap_inventory import build_inventory
+from stm32f4_historical_replay import without_final_layer1_tail
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[2]
@@ -62,11 +64,21 @@ def retained_lifecycle_inventory() -> tuple[set[str], set[str], Counter[str]]:
 
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+    rows = without_final_layer1_tail(current_rows)
     exact_icpns = {row["icpn"] for row in rows}
+    assert len(current_rows) == 387
     assert len(rows) == len(exact_icpns) == 384
     assert len({row["base_device"] for row in rows}) == 139
-    assert hashlib.sha256(CATALOG.read_bytes()).hexdigest() == EXPECTED_CATALOG_SHA256
+    historical_stream = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        historical_stream, fieldnames=list(rows[0].keys()), lineterminator="\n"
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    assert hashlib.sha256(
+        historical_stream.getvalue().encode("utf-8")
+    ).hexdigest() == EXPECTED_CATALOG_SHA256
 
     lifecycle_bases, lifecycle_icpns, lifecycle_statuses = retained_lifecycle_inventory()
     assert lifecycle_bases == POLICY_BLOCKED
@@ -77,11 +89,11 @@ def main() -> int:
     manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
     sources = {(source["manufacturer"], source["family"]): source for source in manifest["sources"]}
     assert sources[("STMicroelectronics", "STM32F1")]["row_count"] >= 75
-    assert sources[("STMicroelectronics", "STM32F4")]["row_count"] == 384
-    assert sources[("STMicroelectronics", "STM32F4")]["sha256"] == EXPECTED_CATALOG_SHA256
+    assert sources[("STMicroelectronics", "STM32F4")]["row_count"] == 387
+    assert sources[("STMicroelectronics", "STM32F4")]["sha256"] == hashlib.sha256(CATALOG.read_bytes()).hexdigest()
 
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
-    assert inventory["production"]["exact_icpn_rows"] == 384
+    assert inventory["production"]["exact_icpn_rows"] == 387
     assert inventory["production"]["base_device_count"] == 139
     assert inventory["gap"]["base_device_count"] == 10
     assert inventory["gap"]["policy_ready_count"] == 0
