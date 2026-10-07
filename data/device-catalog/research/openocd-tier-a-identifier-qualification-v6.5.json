@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "qualification_id": "openocd-tier-a-identifier-qualification-v6.5",
+  "record_state": "RESEARCH_ONLY_NOT_PRODUCTION_MAPPING",
+  "input_tier_a_exact_count": 389,
+  "identifier_qualified_exact_count": 320,
+  "identifier_blocked_exact_count": 69,
+  "identifier_ambiguous_exact_count": 0,
+  "qualified_exact_set_sha256": "32ca466183a44288c903c923b20df36ad25de0824397a98625550e53e245f69e",
+  "blocked_exact_set_sha256": "d1b2d9bebc71ba10160c422b4e4c76367ea21f9419618c40ccffc7e543b5c4c6",
+  "qualified_csv_sha256": "b74136d7a9ede1671ac0174425e84904dc1f355ad9307b9ee0a1ddaa052e5d6e",
+  "blocked_csv_sha256": "ac28754afab3e17f4cd71e4b55f41d79577ff67cc62a1632c9b672648ece6b17",
+  "qualified_family_counts": {
+    "STM32C0": 1,
+    "STM32F2": 72,
+    "STM32F3": 168,
+    "STM32F7": 62,
+    "STM32H7": 14,
+    "STM32L1": 1,
+    "STM32L4": 1,
+    "STM32U3": 1
+  },
+  "blocked_family_counts": {
+    "STM32C0": 16,
+    "STM32F3": 4,
+    "STM32F4": 3,
+    "STM32G0": 42,
+    "STM32G4": 1,
+    "STM32L1": 1,
+    "STM32L4": 2
+  },
+  "resolved_identifier_kind_counts": {
+    "cmsis_device_name": 13,
+    "ordering_pattern": 307
+  },
+  "route_inventory_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+  "route_inventory_semantics": "upstream OpenOCD mapping candidates with validation_status=not_verified",
+  "current_active_openocd_route_exact_count": 3594,
+  "projected_route_exact_count_if_qualified_set_later_promoted": 3914,
+  "scoped_active_denominator": 4550,
+  "projected_route_coverage_percent_if_qualified_set_later_promoted": 86.022,
+  "projected_remaining_gap_if_qualified_set_later_promoted": 636,
+  "claims": {
+    "production_write_authorized": false,
+    "backend_mapping_promoted": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  },
+  "source_pr": 752,
+  "source_workflow_run_id": 37590248210,
+  "source_workflow_head_sha": "422f766560e59cda2dcc96e5fd61f113e0646c05",
+  "source_artifact_id": 11467978681,
+  "source_artifact_sha256": "818d603070d314ce136a5642d5a304e3734fd40f6bf9d6d4474ef29840d2fcb8",
+  "upstream_route_candidate_pr": 751,
+  "upstream_route_candidate_merge_commit": "4d767b8401ad1979ef45d4554d5d09af72c2399a"
+}
