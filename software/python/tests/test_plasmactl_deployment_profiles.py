@@ -265,6 +265,11 @@ def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
     source = Z2_PS.read_text(encoding="utf-8")
     assert "--python-artifact" in source
     assert "$product_root/python" in source
+    assert "--openocd-artifact" in source
+    assert "PLASMA_Z2_OPENOCD_RUNTIME_TOOL" in source
+    assert "$product_root/programming-engines/openocd" in source
+    assert "hardware_runtime_ready=false" in source
+    assert "starts_openocd_service" in source
     assert "/usr/bin/python3" not in source
     assert "PS-only" in source
     assert "PL/FPGA/Site/power/real-IC readiness is separate" in source
