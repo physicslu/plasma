@@ -139,6 +139,7 @@ P3 packaging separately verifies the wrapper/core bootstrap pair instead of assu
 ├── current -> releases/<release-id>/
 └── install/
     ├── python-runtime.json
+    ├── openocd-runtime.json
     └── last-install.json
 
 /etc/plasma/ppu.yaml
@@ -244,6 +245,8 @@ After extracting the kit:
 sudo bash scripts/plasmactl install z2-ps \
   --python-artifact artifacts/plasma-python-<version>-linux-armv7l.tar.gz \
   --python-sidecar artifacts/plasma-python-<version>-linux-armv7l.tar.gz.sha256 \
+  --openocd-artifact artifacts/plasma-openocd-<runtime-id>-linux-armv7l.tar.gz \
+  --openocd-sidecar artifacts/plasma-openocd-<runtime-id>-linux-armv7l.tar.gz.sha256 \
   --release-artifact artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz \
   --release-sidecar artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256 \
   --gateway-host <Z2-IP> \
@@ -251,7 +254,7 @@ sudo bash scripts/plasmactl install z2-ps \
   --facility-id lab
 ```
 
-A later release uses `deploy z2-ps`. If no new Python artifact/path is supplied, the profile reuses `/opt/plasma/install/python-runtime.json` rather than guessing among interpreters.
+A later release uses `deploy z2-ps`. If no new Python artifact/path is supplied, the profile reuses `/opt/plasma/install/python-runtime.json` rather than guessing among interpreters. If no replacement OpenOCD artifact is supplied, it likewise requires and reuses `/opt/plasma/install/openocd-runtime.json`. Installing the Programming Engine does not start an OpenOCD service and does not change `hardware_runtime_ready=false`.
 
 ## Local Z2 verification
 
