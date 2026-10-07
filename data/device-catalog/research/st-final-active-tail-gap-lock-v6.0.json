@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "lock_id": "st-final-active-tail-gap-lock-v6.0",
+  "captured_utc": "2026-10-01T00:48:24+00:00",
+  "source_workflow_run_id": 36797087427,
+  "source_artifact_id": 11134202297,
+  "whole_st_active_exact_denominator": 4550,
+  "production_exact_prestate": 4620,
+  "production_source_count_prestate": 28,
+  "whole_st_active_intersection_prestate": 4541,
+  "whole_st_active_gap_prestate": 9,
+  "tail_gap_exact_count": 9,
+  "tail_gap_exact_set_sha256": "891831ec21f6f65e5332667bf30440f321039740709d697312afd38a821ac801",
+  "family_gap_counts": {
+    "STM32F4": 3,
+    "STM32L4": 3,
+    "STM32L1": 2,
+    "STM32U3": 1
+  },
+  "production_family_prestates": {
+    "STM32F4": 384,
+    "STM32L4": 446,
+    "STM32L1": 144,
+    "STM32U3": 106
+  },
+  "identity_semantics": "2026-10-01 locked eStore Active exact set minus current Production exact set after STM32H7 v5.9",
+  "production_write_authorized": false
+}

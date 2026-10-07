@@ -41,9 +41,9 @@
       "manufacturer": "STMicroelectronics",
       "family": "STM32F4",
       "path": "../research/stm32f4-commercial-icpn.csv",
-      "row_count": 384,
-      "git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
-      "sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+      "row_count": 387,
+      "git_blob_sha": "8983052017cca2c98caaaf899359c2fead33f40d",
+      "sha256": "6a2fa67f58f4edc7bcf1c79a7077ca5e954c74ad2e223f0effdb600dc948d1cd"
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -105,25 +105,25 @@
       "manufacturer": "STMicroelectronics",
       "family": "STM32L4",
       "path": "../research/stm32l4-commercial-icpn.csv",
-      "row_count": 446,
-      "git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
-      "sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c"
+      "row_count": 449,
+      "git_blob_sha": "a39514712d8e27be344bd5837813d1c9d19c34c6",
+      "sha256": "64e5f493581c5a2a06d86490c704dcb79f744369f1ddb8349f20a956b145f70f"
     },
     {
       "manufacturer": "STMicroelectronics",
       "family": "STM32L1",
       "path": "../research/stm32l1-commercial-icpn.csv",
-      "row_count": 144,
-      "git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
-      "sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec"
+      "row_count": 146,
+      "git_blob_sha": "a8120b7064832f4db81850e3e4764a13ef531754",
+      "sha256": "ae0b13da9282d64b17d182af14ae9d151a55a512879b34cd20c810ea926699da"
     },
     {
       "manufacturer": "STMicroelectronics",
       "family": "STM32U3",
       "path": "../research/stm32u3-commercial-icpn.csv",
-      "row_count": 106,
-      "git_blob_sha": "c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
-      "sha256": "171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff"
+      "row_count": 107,
+      "git_blob_sha": "5913ed0ff3817b41dd81f12edead60e9dead32ee",
+      "sha256": "49a6a72460d8f025ab5fb7bfe30a2eb372e4255143b6d3345c083f3fab831f4e"
     },
     {
       "manufacturer": "STMicroelectronics",

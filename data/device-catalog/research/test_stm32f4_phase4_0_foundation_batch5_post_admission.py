@@ -157,10 +157,19 @@ class STM32F4Phase40FoundationBatch5PostAdmissionTests(unittest.TestCase):
             self.assertEqual(second["added"], [])
             self.assertEqual(hashlib.sha256(canonical.read_bytes()).hexdigest(), EXPECTED_CANONICAL_SHA256)
 
-    def test_nrnd_is_not_admitted_and_control_stays_present(self) -> None:
+    def test_historical_nrnd_observation_and_current_state(self) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             rows = {row["icpn"]: row for row in csv.DictReader(handle)}
-        self.assertNotIn(NRND_ONLY, rows)
+        self.assertIn(NRND_ONLY, rows)
+        current = rows[NRND_ONLY]
+        self.assertEqual(current["mapping_status"], "no_mapping")
+        self.assertEqual(current["existing_identifier"], "")
+        self.assertEqual(current["existing_identifier_kind"], "")
+        self.assertEqual(current["openocd_target_config"], "")
+        self.assertEqual(
+            current["source_type"],
+            "official_st_exact_product_authority_plus_locked_active_lifecycle",
+        )
         self.assertTrue(CONTROL_ICPNS <= set(rows))
         self.assertEqual(rows["STM32F437VGT6"]["base_device"], "STM32F437VG")
 

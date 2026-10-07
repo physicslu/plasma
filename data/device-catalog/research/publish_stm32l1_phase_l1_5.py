@@ -361,13 +361,24 @@ def verify_current_publication() -> dict[str, Any]:
         if not path.exists():
             raise RuntimeError(f"{path.name}: published artifact missing")
 
-    canonical_bytes = CANONICAL_PATH.read_bytes()
+    current_canonical_bytes = CANONICAL_PATH.read_bytes()
     proposal_bytes = PROPOSAL_PATH.read_bytes()
     audit_bytes = AUDIT_PATH.read_bytes()
     baseline_bytes = BASELINE_PATH.read_bytes()
     proposal = _read_json(PROPOSAL_PATH)
     audit = _read_json(AUDIT_PATH)
     baseline = _read_json(BASELINE_PATH)
+
+    historical_ids = set(proposal.get("added_exact_icpns", []))
+    current_lines = current_canonical_bytes.decode("utf-8").splitlines()
+    header = current_lines[0]
+    historical_lines = [
+        line for line in current_lines[1:]
+        if line.split(",", 2)[1] in historical_ids
+    ]
+    historical_canonical_bytes = (
+        header + "\n" + "\n".join(historical_lines) + "\n"
+    ).encode("utf-8")
 
     if proposal.get("phase") != PHASE or proposal.get("family") != FAMILY or proposal.get("status") != "publication_proposal_clean":
         raise RuntimeError("L1.5 publication proposal identity/status drifted")
@@ -393,22 +404,23 @@ def verify_current_publication() -> dict[str, Any]:
     if not _all_false(baseline.get("claims")):
         raise RuntimeError("L1.5 baseline overclaim escaped")
 
-    if baseline.get("canonical_csv_sha256") != hashlib.sha256(canonical_bytes).hexdigest() or baseline.get("canonical_csv_git_blob_sha") != _git_blob_sha(canonical_bytes):
-        raise RuntimeError("L1.5 canonical artifact digest drifted")
+    if baseline.get("canonical_csv_sha256") != hashlib.sha256(historical_canonical_bytes).hexdigest() or baseline.get("canonical_csv_git_blob_sha") != _git_blob_sha(historical_canonical_bytes):
+        raise RuntimeError("L1.5 historical canonical subset digest drifted")
     if baseline.get("publication_proposal_sha256") != hashlib.sha256(proposal_bytes).hexdigest() or baseline.get("publication_proposal_git_blob_sha") != _git_blob_sha(proposal_bytes):
         raise RuntimeError("L1.5 proposal artifact digest drifted")
     if baseline.get("publication_audit_sha256") != hashlib.sha256(audit_bytes).hexdigest() or baseline.get("publication_audit_git_blob_sha") != _git_blob_sha(audit_bytes):
         raise RuntimeError("L1.5 audit artifact digest drifted")
 
     with CANONICAL_PATH.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+    rows = [row for row in current_rows if row.get("icpn") in historical_ids]
     identities = {row.get("icpn", "") for row in rows}
     if len(rows) != EXPECTED_PUBLISHED_ROWS or len(identities) != EXPECTED_PUBLISHED_ROWS:
-        raise RuntimeError("L1.5 canonical row cardinality drifted")
+        raise RuntimeError("L1.5 historical canonical row cardinality drifted")
     if len({row.get("base_device", "") for row in rows}) != EXPECTED_PUBLISHED_BASES:
-        raise RuntimeError("L1.5 canonical Base Device cardinality drifted")
+        raise RuntimeError("L1.5 historical canonical Base Device cardinality drifted")
     if _set_sha(identities) != EXPECTED_EXACT_SET_SHA256:
-        raise RuntimeError("L1.5 canonical exact set drifted")
+        raise RuntimeError("L1.5 historical canonical exact set drifted")
     if any(
         row.get("family") != FAMILY
         or row.get("existing_identifier_kind") != "ordering_pattern"
@@ -417,7 +429,7 @@ def verify_current_publication() -> dict[str, Any]:
         or row.get("verification_status") != CANONICAL_VERIFICATION_STATUS
         for row in rows
     ):
-        raise RuntimeError("L1.5 canonical semantics drifted")
+        raise RuntimeError("L1.5 historical canonical semantics drifted")
 
     if set(proposal.get("added_exact_icpns", [])) != identities or proposal.get("added_exact_icpn_set_sha256") != EXPECTED_EXACT_SET_SHA256:
         raise RuntimeError("L1.5 proposal exact-set drifted")
@@ -449,9 +461,9 @@ def verify_current_publication() -> dict[str, Any]:
         "manufacturer": "STMicroelectronics",
         "family": FAMILY,
         "path": "../research/stm32l1-commercial-icpn.csv",
-        "row_count": EXPECTED_PUBLISHED_ROWS,
-        "git_blob_sha": _git_blob_sha(canonical_bytes),
-        "sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+        "row_count": len(current_rows),
+        "git_blob_sha": _git_blob_sha(current_canonical_bytes),
+        "sha256": hashlib.sha256(current_canonical_bytes).hexdigest(),
     }
     if l1_sources[0] != expected_source:
         raise RuntimeError("current STM32L1 Production source drifted")
@@ -459,8 +471,8 @@ def verify_current_publication() -> dict[str, Any]:
     exact, bases, families = _production_snapshot(PRODUCTION_MANIFEST)
     if exact < EXPECTED_POSTSTATE[0] or len(bases) < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
         raise RuntimeError("current Production state regressed below L1.5 poststate")
-    if families.get(FAMILY) != EXPECTED_PUBLISHED_ROWS:
-        raise RuntimeError("published STM32L1 Production row count drifted")
+    if families.get(FAMILY, 0) < EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError("current STM32L1 Production regressed below L1.5 row count")
     if (exact, len(bases), len(families)) == EXPECTED_POSTSTATE:
         current_manifest = PRODUCTION_MANIFEST.read_bytes()
         if baseline.get("production_manifest_sha256_after") != hashlib.sha256(current_manifest).hexdigest():

@@ -55,7 +55,17 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
         self.assertGreaterEqual(len(rows), 211)
         by_icpn = {row["icpn"]: row for row in rows}
         self.assertTrue(EXPECTED <= set(by_icpn))
-        self.assertTrue(EXCLUDED_NRND.isdisjoint(by_icpn))
+        self.assertTrue(EXCLUDED_NRND <= set(by_icpn))
+        for icpn in EXCLUDED_NRND:
+            current = by_icpn[icpn]
+            self.assertEqual(current["mapping_status"], "no_mapping")
+            self.assertEqual(current["existing_identifier"], "")
+            self.assertEqual(current["existing_identifier_kind"], "")
+            self.assertEqual(current["openocd_target_config"], "")
+            self.assertEqual(
+                current["source_type"],
+                "official_st_exact_product_authority_plus_locked_active_lifecycle",
+            )
         oe = by_icpn["STM32F405OEY6TR"]
         self.assertEqual(
             (oe["package"], oe["pin_count"], oe["flash_size"]),

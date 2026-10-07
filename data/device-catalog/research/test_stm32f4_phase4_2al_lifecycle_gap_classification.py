@@ -4,9 +4,11 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 
 from stm32f4_coverage_gap_inventory import build_inventory
+from stm32f4_historical_replay import without_final_layer1_tail
 
 HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "openocd-parts-canonical.csv"
@@ -22,9 +24,24 @@ def main() -> int:
     assert expected["schema_version"] == 1
     assert expected["production_write_authorized"] is False
     assert expected["policy_change_authorized"] is False
+    with CANONICAL.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = list(reader.fieldnames or [])
+        current_rows = list(reader)
+    historical_rows = without_final_layer1_tail(current_rows)
+    assert len(current_rows) == 387
+    assert len(historical_rows) == 384
+
+    historical_tmp = tempfile.TemporaryDirectory()
+    historical_canonical = Path(historical_tmp.name) / "stm32f4-commercial-icpn.csv"
+    with historical_canonical.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(historical_rows)
+
     inventory = build_inventory(
         catalog_path=CATALOG,
-        canonical_path=CANONICAL,
+        canonical_path=historical_canonical,
         lifecycle_evidence_root=LIFECYCLE_ROOT,
     )
 
@@ -32,14 +49,15 @@ def main() -> int:
     production = expected["production_invariants"]
     assert inventory["production"]["exact_icpn_rows"] == production["stm32f4_exact_icpns"]
     assert inventory["production"]["base_device_count"] == production["stm32f4_base_devices"]
-    assert hashlib.sha256(CANONICAL.read_bytes()).hexdigest() == production["stm32f4_catalog_sha256"]
+    assert hashlib.sha256(historical_canonical.read_bytes()).hexdigest() == production["stm32f4_catalog_sha256"]
     manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
     sources = {source["family"]: source for source in manifest["sources"]}
-    assert sources["STM32F4"]["row_count"] == production["stm32f4_exact_icpns"]
+    assert sources["STM32F4"]["row_count"] == 387
+    assert sources["STM32F4"]["row_count"] >= production["stm32f4_exact_icpns"]
     with STM32F1_CANONICAL.open(encoding="utf-8") as handle:
         historical_f1_rows = list(csv.DictReader(handle))
     assert len(historical_f1_rows) == 75
-    assert len(historical_f1_rows) + sources["STM32F4"]["row_count"] == production["st_exact_icpns"]
+    assert len(historical_f1_rows) + inventory["production"]["exact_icpn_rows"] == production["st_exact_icpns"]
     stm32f1_base_devices = {row["base_device"] for row in historical_f1_rows}
     stm32f4_base_devices = set(inventory["production"]["base_devices"])
     assert stm32f1_base_devices.isdisjoint(stm32f4_base_devices)
@@ -93,10 +111,11 @@ def main() -> int:
     assert actionable["policy_ready"] == []
     assert actionable["policy_blocked"] == []
 
-    raw_inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
+    raw_inventory = build_inventory(catalog_path=CATALOG, canonical_path=historical_canonical)
     assert "lifecycle_closure" not in raw_inventory
     assert "actionable_gap" not in raw_inventory
     assert raw_inventory["gap"] == raw_gap
+    historical_tmp.cleanup()
     print("Phase 4.2AL lifecycle-aware actionable-gap classification PASS")
     return 0
 

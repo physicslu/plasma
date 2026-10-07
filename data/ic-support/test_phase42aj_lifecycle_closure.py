@@ -32,7 +32,7 @@ def main() -> int:
     assert metrics["exact_icpns"] >= 459
     assert metrics["families"] >= 2
     assert metrics["family_exact_icpns"]["STM32F1"] >= 75
-    assert metrics["family_exact_icpns"]["STM32F4"] == 384
+    assert metrics["family_exact_icpns"]["STM32F4"] == 387
     assert metrics["base_devices"] >= 157
     assert (
         metrics["deterministic_openocd_exact_icpns"]

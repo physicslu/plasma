@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "authority_id": "st-final-active-tail-gap-metadata-authority-v6.0",
+  "verified_utc": "2026-10-07T04:30:00Z",
+  "bindings": {
+    "stm32l4_ordering_authority_git_blob_sha": "745dd3d36f41aa533b9e0e89ff8c4c91aee197da",
+    "stm32l1_ordering_authority_git_blob_sha": "158beebe538385a8cd892ff551221bf5f3a1d734",
+    "stm32u3_metadata_authority_git_blob_sha": "79687cd6ecdcca74a2d60e139c20aa0a3def3206",
+    "stm32f4_f405o_historical_baseline_git_blob_sha": "e792fffd8df3098cdbcab4c0e7f6c26622c9bbb3",
+    "stm32f4_f437vi_historical_baseline_git_blob_sha": "1489415342fd6c58a859cd6124655ffd5411feb3"
+  },
+  "lifecycle_policy": {
+    "scoped_denominator_authority": "locked 2026-10-01 ST eStore Active exact set",
+    "f4_current_authority_conflict": {
+      "affected_exact_icpns": [
+        "STM32F405OGY6VTR",
+        "STM32F405OGY6WTR",
+        "STM32F437VIT6WTR"
+      ],
+      "current_estore_status": "Active",
+      "current_st_product_page_status": "NRND",
+      "admission_treatment": "retain locked/current eStore Active lifecycle for this denominator; preserve st.com NRND discrepancy as an explicit finding"
+    }
+  },
+  "records": [
+    {
+      "icpn": "STM32F405OGY6VTR",
+      "family": "STM32F4",
+      "series": "STM32F405",
+      "base_device": "STM32F405OG",
+      "package": "WLCSP",
+      "pin_count": "90",
+      "flash_size": "1024 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "VTR",
+      "metadata_authority_mode": "official_exact_product",
+      "option_semantics": "opaque_manufacturer_suffix_preserved_literal",
+      "metadata_source_url": "https://estore.st.com/en/stm32f405ogy6vtr-cpn.html",
+      "lifecycle_source_url": "https://estore.st.com/en/stm32f405ogy6vtr-cpn.html"
+    },
+    {
+      "icpn": "STM32F405OGY6WTR",
+      "family": "STM32F4",
+      "series": "STM32F405",
+      "base_device": "STM32F405OG",
+      "package": "WLCSP",
+      "pin_count": "90",
+      "flash_size": "1024 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "WTR",
+      "metadata_authority_mode": "official_exact_product",
+      "option_semantics": "opaque_manufacturer_suffix_preserved_literal",
+      "metadata_source_url": "https://estore.st.com/en/stm32f405ogy6wtr-cpn.html",
+      "lifecycle_source_url": "https://estore.st.com/en/stm32f405ogy6wtr-cpn.html"
+    },
+    {
+      "icpn": "STM32F437VIT6WTR",
+      "family": "STM32F4",
+      "series": "STM32F437",
+      "base_device": "STM32F437VI",
+      "package": "LQFP",
+      "pin_count": "100",
+      "flash_size": "2048 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "WTR",
+      "metadata_authority_mode": "official_exact_product",
+      "option_semantics": "opaque_manufacturer_suffix_preserved_literal",
+      "metadata_source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32f4-series/stm32f427-437/stm32f437vi.html",
+      "lifecycle_source_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32f4-series/stm32f427-437/stm32f437vi.html"
+    },
+    {
+      "icpn": "STM32L151VDT7X",
+      "family": "STM32L1",
+      "series": "STM32L151",
+      "base_device": "STM32L151VD",
+      "package": "LQFP",
+      "pin_count": "100",
+      "flash_size": "384 KiB",
+      "temperature_grade": "-40..105 C",
+      "option_suffix": "X",
+      "metadata_authority_mode": "official_exact_product",
+      "option_semantics": "opaque_manufacturer_suffix_preserved_literal",
+      "metadata_source_url": "https://www.st.com/content/st_com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l1-series/stm32l151-152/stm32l151vd-x.html",
+      "lifecycle_source_url": "https://www.st.com/content/st_com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l1-series/stm32l151-152/stm32l151vd-x.html"
+    },
+    {
+      "icpn": "STM32L151VDY6XTR",
+      "family": "STM32L1",
+      "series": "STM32L151",
+      "base_device": "STM32L151VD",
+      "package": "WLCSP104",
+      "pin_count": "104",
+      "flash_size": "384 KiB",
+      "temperature_grade": "-40..85 C",
+      "option_suffix": "XTR",
+      "metadata_authority_mode": "official_exact_product",
+      "option_semantics": "opaque_manufacturer_suffix_preserved_literal",
+      "metadata_source_url": "https://www.st.com/content/st_com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l1-series/stm32l151-152/stm32l151vd-x.html",
+      "lifecycle_source_url": "https://www.st.com/content/st_com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l1-series/stm32l151-152/stm32l151vd-x.html"
+    },
+    {
+      "icpn": "STM32L412RBT3",
+      "family": "STM32L4",
+      "series": "STM32L412",
+      "base_device": "STM32L412RB",
+      "package": "LQFP",
+      "pin_count": "64",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40..125 C",
+      "option_suffix": "",
+      "metadata_authority_mode": "existing_ordering_grammar",
+      "option_semantics": "existing_l4_power_smps_grammar",
+      "metadata_source_url": "https://www.st.com/resource/en/datasheet/stm32l412c8.pdf",
+      "lifecycle_source_url": "locked_2026_10_01_estore_active_set"
+    },
+    {
+      "icpn": "STM32L496WGY6PST",
+      "family": "STM32L4",
+      "series": "STM32L496",
+      "base_device": "STM32L496WG",
+      "package": "WLCSP",
+      "pin_count": "115",
+      "flash_size": "1 MiB",
+      "temperature_grade": "-40..85 C",
+      "option_suffix": "PST",
+      "metadata_authority_mode": "existing_ordering_grammar",
+      "option_semantics": "external_smps_plus_pfas_free_plus_special_packing",
+      "metadata_source_url": "https://www.st.com/resource/en/datasheet/stm32l496ae.pdf",
+      "lifecycle_source_url": "locked_2026_10_01_estore_active_set"
+    },
+    {
+      "icpn": "STM32L496WGY6PTR",
+      "family": "STM32L4",
+      "series": "STM32L496",
+      "base_device": "STM32L496WG",
+      "package": "WLCSP",
+      "pin_count": "115",
+      "flash_size": "1 MiB",
+      "temperature_grade": "-40..85 C",
+      "option_suffix": "PTR",
+      "metadata_authority_mode": "existing_ordering_grammar",
+      "option_semantics": "external_smps_plus_tape_and_reel",
+      "metadata_source_url": "https://www.st.com/resource/en/datasheet/stm32l496ae.pdf",
+      "lifecycle_source_url": "locked_2026_10_01_estore_active_set"
+    },
+    {
+      "icpn": "STM32U375CET6TR",
+      "family": "STM32U3",
+      "series": "STM32U375",
+      "base_device": "STM32U375CE",
+      "package": "LQFP",
+      "pin_count": "48",
+      "flash_size": "512 KiB",
+      "temperature_grade": "-40..85 C",
+      "option_suffix": "TR",
+      "metadata_authority_mode": "existing_ordering_grammar",
+      "option_semantics": "tape_and_reel",
+      "metadata_source_url": "https://www.st.com/resource/en/datasheet/stm32u375vg.pdf",
+      "lifecycle_source_url": "locked_2026_10_01_estore_active_set"
+    }
+  ],
+  "governance": {
+    "decode_only_locked_tail_gap": true,
+    "opaque_option_suffixes_are_not_semantically_inferred": true,
+    "backend_scope_evaluated": false,
+    "existing_family_backend_mapping_inherited": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}

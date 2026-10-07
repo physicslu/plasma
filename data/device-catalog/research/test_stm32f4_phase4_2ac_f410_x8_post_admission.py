@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from stm32f4_historical_replay import without_final_layer1_tail
+
 HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "stm32f4-commercial-icpn.csv"
 PLAN = HERE / "stm32f4-phase4.2ac-f410-x8-admission-plan.json"
@@ -24,9 +26,11 @@ EXPECTED = {
 
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+    rows = without_final_layer1_tail(current_rows)
+    assert len(current_rows) == 387
     assert len(rows) == 384
-    assert len(rows) == len({row["icpn"] for row in rows})
+    assert len(current_rows) == len({row["icpn"] for row in current_rows})
     assert len({row["base_device"] for row in rows}) == 139
 
     by_icpn = {row["icpn"]: row for row in rows}

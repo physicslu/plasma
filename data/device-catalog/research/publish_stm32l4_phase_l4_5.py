@@ -69,6 +69,27 @@ def _production_snapshot(manifest_path: Path) -> tuple[int, set[tuple[str, str]]
     manifest = _read_json(manifest_path)
     family_counts: dict[str, int] = {}
     bases: set[tuple[str, str]] = set()
+
+    # PRESTATE_MANIFEST is an immutable historical transaction snapshot.
+    # Its relative source paths point at canonical files that legitimately grow
+    # later, so replay must use the frozen manifest declarations rather than
+    # dereferencing today's files.
+    if manifest_path.resolve() == PRESTATE_MANIFEST.resolve():
+        for source in manifest.get("sources", []):
+            if not isinstance(source, dict):
+                raise RuntimeError("historical Production source must be object")
+            family = source.get("family")
+            declared = source.get("row_count")
+            if not isinstance(family, str) or not isinstance(declared, int):
+                raise RuntimeError("historical Production source identity/count invalid")
+            if family in family_counts:
+                raise RuntimeError(f"{family}: duplicate historical Production source")
+            family_counts[family] = declared
+        exact = sum(family_counts.values())
+        if exact != EXPECTED_PRESTATE[0] or len(family_counts) != EXPECTED_PRESTATE[2]:
+            raise RuntimeError("L4.5 historical Production prestate aggregate drifted")
+        bases = {("__historical_prestate__", str(i)) for i in range(EXPECTED_PRESTATE[1])}
+        return exact, bases, family_counts
     for source in manifest.get("sources", []):
         if not isinstance(source, dict):
             raise RuntimeError("Production manifest source must be object")
@@ -358,8 +379,9 @@ def _expected_publication_bytes() -> tuple[bytes, bytes, bytes, bytes, bytes]:
 
 def verify_current_publication() -> dict[str, Any]:
     canonical_bytes, proposal_bytes, audit_bytes, baseline_bytes, historical_manifest_bytes = _expected_publication_bytes()
+
+    # Proposal/audit/baseline remain immutable historical artifacts.
     expected_files = {
-        CANONICAL_PATH: canonical_bytes,
         PROPOSAL_PATH: proposal_bytes,
         AUDIT_PATH: audit_bytes,
         BASELINE_PATH: baseline_bytes,
@@ -367,6 +389,26 @@ def verify_current_publication() -> dict[str, Any]:
     for path, expected in expected_files.items():
         if not path.exists() or path.read_bytes() != expected:
             raise RuntimeError(f"{path.name}: published bytes drifted")
+
+    # The original 446 canonical rows remain byte-identical as a subset of the
+    # current file; later Layer-1 rows are allowed to coexist.
+    proposal = json.loads(proposal_bytes.decode("utf-8"))
+    historical_ids = set(proposal["added_exact_icpns"])
+    current_raw = CANONICAL_PATH.read_bytes()
+    current_text = current_raw.decode("utf-8")
+    lines = current_text.splitlines()
+    header = lines[0]
+    historical_lines = [
+        line for line in lines[1:]
+        if line.split(",", 2)[1] in historical_ids
+    ]
+    historical_current = (header + "\n" + "\n".join(historical_lines) + "\n").encode("utf-8")
+    if historical_current != canonical_bytes:
+        raise RuntimeError("historical L4.5 canonical subset drifted")
+    with CANONICAL_PATH.open(newline="", encoding="utf-8") as handle:
+        current_rows = list(csv.DictReader(handle))
+    if len(current_rows) < EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError("current STM32L4 canonical regressed below L4.5 row count")
 
     current = _read_json(PRODUCTION_MANIFEST)
     sources = current.get("sources")
@@ -379,18 +421,18 @@ def verify_current_publication() -> dict[str, Any]:
         "manufacturer": "STMicroelectronics",
         "family": FAMILY,
         "path": "../research/stm32l4-commercial-icpn.csv",
-        "row_count": EXPECTED_PUBLISHED_ROWS,
-        "git_blob_sha": _git_blob_sha(canonical_bytes),
-        "sha256": hashlib.sha256(canonical_bytes).hexdigest(),
+        "row_count": len(current_rows),
+        "git_blob_sha": _git_blob_sha(current_raw),
+        "sha256": hashlib.sha256(current_raw).hexdigest(),
     }
     if l4_sources[0] != expected_source:
-        raise RuntimeError("current STM32L4 Production source drifted")
+        raise RuntimeError("current STM32L4 Production source binding drifted")
 
     exact, bases, families = _production_snapshot(PRODUCTION_MANIFEST)
     if exact < EXPECTED_POSTSTATE[0] or len(bases) < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
         raise RuntimeError("current Production state regressed below L4.5 poststate")
-    if families.get(FAMILY) != EXPECTED_PUBLISHED_ROWS:
-        raise RuntimeError("published STM32L4 Production row count drifted")
+    if families.get(FAMILY, 0) < EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError("current STM32L4 Production regressed below L4.5 row count")
     if (exact, len(bases), len(families)) == EXPECTED_POSTSTATE and PRODUCTION_MANIFEST.read_bytes() != historical_manifest_bytes:
         raise RuntimeError("L4.5 exact poststate manifest bytes drifted")
     return {
