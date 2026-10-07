@@ -1,0 +1,44 @@
+name: OpenOCD Tier A identifier qualification v6.5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/qualify_openocd_tier_a_identifiers_v65.py'
+      - 'data/device-catalog/research/test_qualify_openocd_tier_a_identifiers_v65.py'
+      - 'data/device-catalog/research/OPENOCD_TIER_A_IDENTIFIER_QUALIFICATION_V65.md'
+      - 'data/device-catalog/research/openocd-tier-a-identifier-qualification-v6.5.json'
+      - 'data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py'
+      - '.github/workflows/device-catalog-openocd-tier-a-identifier-v65.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Qualify Tier A identifiers
+        run: |
+          python data/device-catalog/research/qualify_openocd_tier_a_identifiers_v65.py \
+            --qualified /tmp/openocd-tier-a-v65-qualified.csv \
+            --blocked /tmp/openocd-tier-a-v65-blocked.csv \
+            --summary /tmp/openocd-tier-a-v65-summary.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_qualify_openocd_tier_a_identifiers_v65.py -v
+          if [ -f data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py ]; then
+            python data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-tier-a-identifier-qualification-v65
+          path: |
+            /tmp/openocd-tier-a-v65-qualified.csv
+            /tmp/openocd-tier-a-v65-blocked.csv
+            /tmp/openocd-tier-a-v65-summary.json
+          if-no-files-found: error
+          retention-days: 30
