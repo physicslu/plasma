@@ -15,6 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "openocd-runtime.py"
 METADATA = REPO_ROOT / "release" / "openocd.json"
 BUILD_SCRIPT = REPO_ROOT / "scripts" / "build-openocd-runtime.sh"
+Z2_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "z2-ps-release.yml"
+QEMU_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "z2like-demo-qemu.yml"
 SPEC = importlib.util.spec_from_file_location("plasma_openocd_runtime", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -198,3 +200,24 @@ def test_build_recipe_uses_pinned_commit_and_minimal_control_plane_adapters() ->
     assert "adapter driver dummy" in source
     assert "ldd" in source
     assert "not found" in source
+
+
+def test_z2_release_builds_both_openocd_architectures_and_packages_armv7() -> None:
+    source = Z2_WORKFLOW.read_text(encoding="utf-8")
+    assert "openocd-runtime:" in source
+    assert "- x86_64" in source
+    assert "- armv7l" in source
+    assert "bash scripts/build-openocd-runtime.sh" in source
+    assert "Install and execute on fresh matching Ubuntu 22.04 userspace" in source
+    assert "plasma-openocd-*-linux-armv7l-" in source
+    assert 'python "$root/scripts/openocd-runtime.py" verify' in source
+    assert "hardware_runtime_ready" in source
+
+
+def test_qemu_workflow_installs_same_armv7_artifact_without_claiming_hardware() -> None:
+    source = QEMU_WORKFLOW.read_text(encoding="utf-8")
+    assert "Install and smoke packaged OpenOCD inside QEMU ARMv7 target" in source
+    assert "python3 /tmp/openocd-runtime.py install" in source
+    assert 'assert p["architecture"] == "armv7l"' in source
+    assert 'assert p["hardware_runtime_ready"] is False' in source
+    assert '"adapter driver dummy"' in source
