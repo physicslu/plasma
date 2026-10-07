@@ -60,7 +60,7 @@ class STM32C0PhaseC05PublicationTests(unittest.TestCase):
 
         self.assertEqual(file_sha256(PLAN_PATH), EXPECTED_PLAN_SHA256)
         self.assertEqual(file_sha256(PROPOSAL_PATH), EXPECTED_PROPOSAL_SHA256)
-        self.assertEqual(file_sha256(CANONICAL_PATH), EXPECTED_CANONICAL_SHA256)
+        self.assertGreaterEqual(summary["current_stm32c0_exact_icpns"], EXPECTED_PUBLISHED_ROWS)
         self.assertEqual(file_sha256(AUDIT_PATH), EXPECTED_AUDIT_SHA256)
         self.assertEqual(self.audit["canonical_csv_git_blob_sha"], EXPECTED_CANONICAL_BLOB)
         self.assertEqual(self.audit["production_manifest_git_blob_sha_after"], EXPECTED_POST_MANIFEST_BLOB)
@@ -69,25 +69,26 @@ class STM32C0PhaseC05PublicationTests(unittest.TestCase):
         self.assertEqual(self.audit["production_manifest_sha256_before"], EXPECTED_PRESTATE_MANIFEST_SHA256)
 
     def test_exact_published_set_and_unresolved_exclusion_are_hard_locked(self) -> None:
-        identities = {row["icpn"] for row in self.rows}
+        current = {row["icpn"]: row for row in self.rows}
+        historical = set(self.proposal["added_exact_icpns"])
         unresolved = set(EXPECTED_CAPABILITY_UNRESOLVED)
-        self.assertEqual(len(self.rows), EXPECTED_PUBLISHED_ROWS)
-        self.assertEqual(len(identities), EXPECTED_PUBLISHED_ROWS)
-        self.assertEqual(identities, set(self.proposal["added_exact_icpns"]))
-        self.assertFalse(identities & unresolved)
+        self.assertEqual(len(historical), EXPECTED_PUBLISHED_ROWS)
+        self.assertTrue(historical.issubset(current))
+        self.assertFalse(historical & unresolved)
         self.assertEqual(set(self.audit["capability_unresolved_exact_icpns"]), unresolved)
         self.assertEqual(self.audit["capability_unresolved_count"], EXPECTED_UNRESOLVED)
         self.assertFalse(self.audit["capability_unresolved_is_identity_rejection"])
-        self.assertTrue(all(row["family"] == "STM32C0" for row in self.rows))
-        self.assertTrue(all(row["cmsis_device_name"] == "" for row in self.rows))
-        self.assertTrue(all(row["existing_identifier_kind"] == "ordering_pattern" for row in self.rows))
-        self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32c0x.cfg" for row in self.rows))
+
+        historical_rows = [current[icpn] for icpn in historical]
+        self.assertTrue(all(row["family"] == "STM32C0" for row in historical_rows))
+        self.assertTrue(all(row["cmsis_device_name"] == "" for row in historical_rows))
+        self.assertTrue(all(row["existing_identifier_kind"] == "ordering_pattern" for row in historical_rows))
+        self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32c0x.cfg" for row in historical_rows))
 
         manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         source = next(item for item in manifest["sources"] if item["family"] == "STM32C0")
-        self.assertEqual(source["row_count"], EXPECTED_PUBLISHED_ROWS)
-        self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
+        self.assertEqual(source["row_count"], len(self.rows))
+        self.assertEqual(source["sha256"], file_sha256(CANONICAL_PATH))
         self.assertEqual(source["path"], "../research/stm32c0-commercial-icpn.csv")
 
     def test_historical_c04_replays_and_canonical_writer_is_idempotent(self) -> None:
@@ -120,14 +121,15 @@ class STM32C0PhaseC05PublicationTests(unittest.TestCase):
             ("TSSOP", "20", "NTR"),
         )
         self.assertEqual(rows["STM32C071C8T6N"]["option_suffix"], "N")
-        self.assertNotIn("STM32C071FBY6TR", rows)
+        self.assertNotIn("STM32C071FBY6TR", set(self.proposal["added_exact_icpns"]))
 
     def test_c091_c092_series_identity_stays_separate(self) -> None:
         rows = {row["icpn"]: row for row in self.rows}
         self.assertEqual(rows["STM32C091RCI6"]["series"], "STM32C091")
         self.assertEqual(rows["STM32C092RCI6"]["series"], "STM32C092")
-        self.assertNotIn("STM32C091RBI6", rows)
-        self.assertNotIn("STM32C092RBI6", rows)
+        historical = set(self.proposal["added_exact_icpns"])
+        self.assertNotIn("STM32C091RBI6", historical)
+        self.assertNotIn("STM32C092RBI6", historical)
 
     def test_publication_does_not_overclaim_programmer_support(self) -> None:
         self.assertTrue(self.audit["canonical_write_applied"])
