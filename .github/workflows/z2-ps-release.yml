@@ -12,6 +12,8 @@ on:
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
+      - "scripts/openocd-runtime.py"
+      - "scripts/build-openocd-runtime.sh"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
@@ -32,6 +34,7 @@ on:
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
+      - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
   pull_request:
@@ -42,6 +45,8 @@ on:
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
+      - "scripts/openocd-runtime.py"
+      - "scripts/build-openocd-runtime.sh"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
@@ -62,6 +67,7 @@ on:
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
+      - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
 
@@ -179,10 +185,105 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  openocd-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture:
+          - x86_64
+          - armv7l
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up QEMU for ARMv7 build and runtime smoke
+        if: matrix.architecture == 'armv7l'
+        uses: docker/setup-qemu-action@v4
+        with:
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm
+
+      - name: Validate OpenOCD packaging tools
+        run: |
+          python -m py_compile scripts/openocd-runtime.py
+          bash -n scripts/build-openocd-runtime.sh
+          python -m pip install pytest
+          python -m pytest -q software/python/tests/test_openocd_runtime_artifact.py
+
+      - name: Build pinned OpenOCD runtime
+        id: build
+        shell: bash
+        env:
+          ARCH: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/openocd-$ARCH"
+          bash scripts/build-openocd-runtime.sh "$out" "$ARCH"
+          runtime_id="$(python -c 'import json; print(json.load(open("release/openocd.json"))["runtime_id"])')"
+          artifact="$out/plasma-openocd-$runtime_id-linux-$ARCH.tar.gz"
+          test -f "$artifact"
+          test -f "$artifact.sha256"
+          python scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256"
+          echo "runtime_id=$runtime_id" >> "$GITHUB_OUTPUT"
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Install and execute on fresh matching Ubuntu 22.04 userspace
+        shell: bash
+        env:
+          ARCH: ${{ matrix.architecture }}
+          ARTIFACT: ${{ steps.build.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$(dirname "$ARTIFACT")"
+          artifact_name="$(basename "$ARTIFACT")"
+          if [[ "$ARCH" == "armv7l" ]]; then
+            platform_name="linux/arm/v7"
+            image="arm32v7/ubuntu:22.04"
+          else
+            platform_name="linux/amd64"
+            image="ubuntu:22.04"
+          fi
+          docker run --rm \
+            --platform "$platform_name" \
+            --volume "$PWD:/repo:ro" \
+            --volume "$artifact_dir:/artifacts:ro" \
+            --env ARTIFACT_NAME="$artifact_name" \
+            "$image" \
+            bash -euxo pipefail -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends python3
+              artifact="/artifacts/$ARTIFACT_NAME"
+              python3 /repo/scripts/openocd-runtime.py install \
+                "$artifact" --sidecar "$artifact.sha256"
+              binary="$(python3 -c '"'"'import json; print(json.load(open("/opt/plasma/install/openocd-runtime.json"))["binary"])'"'"')"
+              scripts_root="$(python3 -c '"'"'import json; print(json.load(open("/opt/plasma/install/openocd-runtime.json"))["scripts_root"])'"'"')"
+              "$binary" --version
+              ldd "$binary" | tee /tmp/openocd-ldd.txt
+              ! grep -q "not found" /tmp/openocd-ldd.txt
+              "$binary" -s "$scripts_root" -c "adapter driver dummy" -c "shutdown"
+              python3 -c '"'"'import json; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["hardware_runtime_ready"] is False'"'"'
+            '
+
+      - name: Upload qualified OpenOCD runtime candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-openocd-${{ steps.build.outputs.runtime_id }}-linux-${{ matrix.architecture }}-${{ github.sha }}
+          path: |
+            ${{ steps.build.outputs.artifact }}
+            ${{ steps.build.outputs.artifact }}.sha256
+          if-no-files-found: error
+          retention-days: 14
+
   z2-ps-kit:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: z2-python-runtime
+    needs: [z2-python-runtime, openocd-runtime]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -203,6 +304,7 @@ jobs:
           software/python/tests/test_ppu_z2_installer.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
           software/python/tests/test_z2_python_runtime_artifact.py
+          software/python/tests/test_openocd_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py
           software/python/tests/test_plasmactl_deployment_profiles.py
 
@@ -211,6 +313,13 @@ jobs:
         with:
           name: plasma-z2-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l-${{ github.sha }}
           path: ${{ runner.temp }}/z2-python-artifact
+
+      - name: Download qualified ARMv7 OpenOCD runtime candidate
+        uses: actions/download-artifact@v4
+        with:
+          pattern: plasma-openocd-*-linux-armv7l-${{ github.sha }}
+          path: ${{ runner.temp }}/openocd-artifact
+          merge-multiple: true
 
       - name: Build canonical PPU release
         id: release
@@ -253,12 +362,14 @@ jobs:
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
+          cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
+          cp "$RUNNER_TEMP/openocd-artifact/"* "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
-            "$root/scripts/z2-python-runtime.py"
+            "$root/scripts/z2-python-runtime.py" "$root/scripts/openocd-runtime.py"
           test -f "$root/scripts/ppu-z2-installer-core.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
@@ -266,6 +377,11 @@ jobs:
           python "$root/scripts/ppu-z2-installer.py" verify \
             --release-artifact "$root/artifacts/$(basename "$PPU_ARCHIVE")" \
             --sidecar "$root/artifacts/$(basename "$PPU_ARCHIVE").sha256"
+          shopt -s nullglob
+          openocd_archives=("$root/artifacts"/plasma-openocd-*-linux-armv7l.tar.gz)
+          test "${#openocd_archives[@]}" -eq 1
+          python "$root/scripts/openocd-runtime.py" verify "${openocd_archives[0]}" \
+            --sidecar "${openocd_archives[0]}.sha256"
           bash "$root/scripts/plasmactl" help >/dev/null
           (
             cd "$root"
