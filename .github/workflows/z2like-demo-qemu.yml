@@ -250,14 +250,7 @@ jobs:
           docker cp "$OPENOCD_ARTIFACT.sha256" plasma-z2like-demo-qemu:/tmp/openocd-runtime.tar.gz.sha256
           docker exec plasma-z2like-demo-qemu python3 /tmp/openocd-runtime.py install \
             /tmp/openocd-runtime.tar.gz --sidecar /tmp/openocd-runtime.tar.gz.sha256
-          docker exec plasma-z2like-demo-qemu python3 -c '
-import json,subprocess
-p=json.load(open("/opt/plasma/install/openocd-runtime.json"))
-assert p["architecture"] == "armv7l"
-assert p["hardware_runtime_ready"] is False
-subprocess.run([p["binary"], "--version"], check=True)
-subprocess.run([p["binary"], "-s", p["scripts_root"], "-c", "adapter driver dummy", "-c", "shutdown"], check=True)
-'
+          docker exec plasma-z2like-demo-qemu python3 -c 'import json,subprocess; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["architecture"] == "armv7l"; assert p["hardware_runtime_ready"] is False; subprocess.run([p["binary"], "--version"], check=True); subprocess.run([p["binary"], "-s", p["scripts_root"], "-c", "adapter driver dummy", "-c", "shutdown"], check=True)'
 
       - name: Drive Manager to Bootstrap to QEMU deployment E2E
         env:
