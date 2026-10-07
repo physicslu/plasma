@@ -5,6 +5,8 @@ on:
       - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
       - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/stm32c0-layer1-production-publication-v5.6.json'
+      - 'data/device-catalog/research/validate_stm32c0_layer1_publication_v56.py'
+      - 'data/device-catalog/research/STM32C0_LAYER1_PRODUCTION_PUBLICATION_V56.md'
       - '.github/workflows/device-catalog-stm32c0-production-v56.yml'
 permissions:
   contents: read
@@ -31,3 +33,5 @@ jobs:
           print('C0_SHA256',hashlib.sha256(raw).hexdigest())
           print('C0_NO_MAPPING_DELTA',len(got))
           PY
+          python data/device-catalog/research/validate_stm32c0_layer1_publication_v56.py
+          python data/device-catalog/research/publish_stm32c0_phase_c0_5.py --verify
