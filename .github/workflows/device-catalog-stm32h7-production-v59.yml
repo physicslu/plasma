@@ -45,3 +45,8 @@ jobs:
           print('H7_SHA256',hashlib.sha256(raw).hexdigest())
           print('H7_NO_MAPPING_DELTA',len(got))
           PY
+          python data/device-catalog/research/validate_stm32h7_layer1_publication_v59.py
+          python data/device-catalog/research/validate_stm32h7_classic_admission_readiness.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+          PYTHONPATH=software/python python -m plasma_web.device_catalog --json
