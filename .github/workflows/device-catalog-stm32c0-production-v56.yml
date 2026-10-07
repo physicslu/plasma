@@ -34,3 +34,4 @@ jobs:
           PY
           python data/device-catalog/research/validate_stm32c0_layer1_publication_v56.py
           python data/device-catalog/research/publish_stm32c0_phase_c0_5.py --verify
+          python scripts/ci/device-catalog-production-invariants.py
