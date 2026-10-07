@@ -42,3 +42,7 @@ The older 191-row H7 catalog contains OpenOCD routes. Those routes are historica
 No Production file is changed by this proposal.
 
 No backend route, Programming Profile support, Engineering Verified state, field evidence, or PS/HIL qualification is claimed.
+
+## Merge gate
+
+Merge requires the frozen proposal lock and the repository-wide current Device Catalog validation to pass. A pending or missing current-validation job is not treated as approval.
