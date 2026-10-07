@@ -179,19 +179,24 @@ def validate_static(
 
     sources = production.get("sources")
     req(isinstance(sources, list), "Production sources missing")
-    req(sum(int(source.get("row_count", 0)) for source in sources) == EXPECTED_PRODUCTION_COUNT, "Production Catalog changed")
-    req(all(source.get("family") != FAMILY for source in sources), "STM32H7 leaked into Production")
+    current_total = sum(int(source.get("row_count", 0)) for source in sources)
+    req(current_total >= EXPECTED_PRODUCTION_COUNT, "Production regressed below H7 readiness prestate")
+    h7_sources = [source for source in sources if source.get("family") == FAMILY]
+    req(len(h7_sources) <= 1, "duplicate STM32H7 Production source")
+    if h7_sources:
+        req(int(h7_sources[0].get("row_count", 0)) >= EXPECTED_EXACT_COUNT,
+            "current STM32H7 Production regressed below readiness exact set")
 
 
 def expect_reject(name: str, mutate) -> None:
     baseline = load(BASELINE)
     authority = load(AUTHORITY)
     production = load(PRODUCTION)
-    actual_csv = CSV_PATH.read_text(encoding="utf-8")
-    rows = parse_csv(actual_csv)
+    historical_csv = csv_text(build_rows())
+    rows = parse_csv(historical_csv)
     mutate(baseline, rows, authority, production)
     try:
-        validate_static(baseline, rows, actual_csv, authority, production)
+        validate_static(baseline, rows, historical_csv, authority, production)
     except SystemExit:
         return
     raise SystemExit(f"negative control accepted: {name}")
@@ -201,14 +206,14 @@ def main() -> None:
     baseline = load(BASELINE)
     authority = load(AUTHORITY)
     production = load(PRODUCTION)
-    actual_csv = CSV_PATH.read_text(encoding="utf-8")
-    rows = parse_csv(actual_csv)
 
     replay = build_readiness()
     req(baseline == replay, "readiness baseline differs from deterministic replay")
-    expected_csv = csv_text(build_rows())
-    req(actual_csv == expected_csv, "canonical candidate CSV differs from deterministic replay")
-    validate_static(baseline, rows, actual_csv, authority, production)
+    historical_csv = csv_text(build_rows())
+    rows = parse_csv(historical_csv)
+    req(hashlib.sha256(historical_csv.encode("utf-8")).hexdigest() == EXPECTED_CSV_SHA256,
+        "historical readiness candidate digest drifted")
+    validate_static(baseline, rows, historical_csv, authority, production)
 
     controls = [
         ("Production authorization", lambda b,r,a,p: b["claims"].__setitem__("production_write_authorized", True)),
@@ -226,7 +231,7 @@ def main() -> None:
         ("functional bridge loss", lambda b,r,a,p: b.__setitem__("route_functional_option_bridge_count", 0)),
         ("skip publication gate", lambda b,r,a,p: b.__setitem__("next_gate", "stm32h7-classic-target-execution-gate")),
         ("exact digest mutation", lambda b,r,a,p: b.__setitem__("frozen_exact_icpn_set_sha256", "0" * 64)),
-        ("Production mutation", lambda b,r,a,p: p["sources"][0].__setitem__("row_count", int(p["sources"][0]["row_count"]) + 1)),
+        ("Production regression", lambda b,r,a,p: p.__setitem__("sources", [])),
     ]
     for name, mutate in controls:
         expect_reject(name, mutate)
@@ -235,7 +240,7 @@ def main() -> None:
         "PASS: STM32H7-classic admission readiness: "
         f"{EXPECTED_EXACT_COUNT}/{EXPECTED_EXACT_COUNT} ready, "
         "178 ordering + 13 CMSIS routes, 1 metadata exception, "
-        "1 functional-option bridge, Production unchanged at 2318, "
+        "1 functional-option bridge, historical Production prestate preserved, "
         f"{len(controls)} negative controls"
     )
 

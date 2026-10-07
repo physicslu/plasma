@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "publication_id": "stm32h7-layer1-production-publication-v5.9",
+  "publication_date_utc": "2026-10-07",
+  "owner_approval_received": true,
+  "approved_proposal_id": "stm32h7-layer1-admission-proposal-v5.8",
+  "approved_proposal_pr": 744,
+  "approved_proposal_merge_commit": "c8bf47224393f3413ef51a0810496c94352ccca2",
+  "approved_proposal_source_workflow_run_id": 37552012782,
+  "approved_proposal_source_artifact_id": 11452379640,
+  "approved_proposal_source_artifact_sha256": "888e9a696701e2d3b59b54c2cce0d5daa2f8070ad6805096f937aba27f42681d",
+  "approved_candidate_exact_count": 14,
+  "approved_candidate_exact_set_sha256": "22587c53a237fe3d2d4a208641e6109dd4d1b67bab1e39c9da86c4233b76b834",
+  "approved_candidate_csv_sha256": "3dcd7d6997cfca45eade9f85dc75fa5596b0ab4da48f2cfd8992555addd366d9",
+  "production_prestate": {
+    "exact_total": 4606,
+    "source_count": 28,
+    "stm32h7_exact": 191
+  },
+  "production_poststate": {
+    "exact_total": 4620,
+    "source_count": 28,
+    "stm32h7_exact": 205,
+    "stm32h7_source_git_blob_sha": "a0ca2521a196e4e7f3d87560b05e830611e85b32",
+    "stm32h7_source_sha256": "ae0fbffecb9f978f6195ded06fcecfc5a048b71ef8c307548a3298b35889af07"
+  },
+  "historical_stm32h7_subset": {
+    "exact_count": 191,
+    "git_blob_sha": "fda7d9a4eaa9978d0a67416e8b339fc9aab4e5cc",
+    "sha256": "35b9d2bc13da3a01809ea62b62557f5419b8d6f7139574ca4715a127f1e86465"
+  },
+  "stm32h7_backend_state_after": {
+    "mapped": 191,
+    "no_mapping": 14
+  },
+  "catalog_backend_state_after": {
+    "mapped": 3673,
+    "no_mapping": 947
+  },
+  "programming_profile_binding_claimed": false,
+  "coverage_effect": {
+    "stm32h7_active_exact_denominator": 205,
+    "stm32h7_active_identity_coverage_after_percent": 100,
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 4541,
+    "whole_st_active_gap_after": 9,
+    "whole_st_active_identity_coverage_after_percent": 99.8022
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_scope_evaluated_for_14_additions": false,
+    "historical_h7_mapping_inherited_by_14_additions": false,
+    "backend_type_claimed_for_no_mapping_rows": false,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}

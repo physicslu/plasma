@@ -161,9 +161,9 @@ def main() -> int:
         and source["git_blob_sha"] == EXPECTED_WB0_BLOB,
         "Production manifest WB0 integrity binding drift",
     )
-    req(len(sources) == 28, "Production source count drift")
-    req(sum(int(s["row_count"]) for s in sources) == 4589,
-        "Production exact total drift")
+    current_total = sum(int(s["row_count"]) for s in sources)
+    req(len(sources) >= 28, "Production source count regressed below WB0 publication poststate")
+    req(current_total >= 4589, "Production exact total regressed below WB0 publication poststate")
 
     backend = Counter()
     for source in sources:
@@ -172,8 +172,10 @@ def main() -> int:
             backend[
                 "no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"
             ] += 1
-    req(backend == Counter({"mapped": 3673, "no_mapping": 916}),
-        f"Production backend partition drift: {dict(backend)}")
+    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 916,
+        f"Production backend partition regressed below WB0 publication poststate: {dict(backend)}")
+    req(backend["mapped"] + backend["no_mapping"] == current_total,
+        "current Production backend partition does not equal current exact total")
 
     req(audit["owner_approval_received"] is True,
         "owner approval audit missing")

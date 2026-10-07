@@ -31,12 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Replay deterministic STM32H7 publication
-        working-directory: data/device-catalog/research
-        run: python publish_stm32h7_classic_catalog.py --output-dir "$RUNNER_TEMP/stm32h7-publication" --json
-      - name: Validate checked-in STM32H7 publication
-        working-directory: data/device-catalog/research
-        run: python validate_stm32h7_classic_production_publication.py
+      - name: Validate historical 191-row subset and current STM32H7 v5.9 publication
+        run: python data/device-catalog/research/validate_stm32h7_layer1_publication_v59.py
       - name: Validate Production manifest invariants
         run: python scripts/ci/device-catalog-production-invariants.py
       - name: Load Production catalog through runtime implementation

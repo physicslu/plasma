@@ -1,0 +1,52 @@
+name: STM32H7 Production publication v5.9
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32h7-classic-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32h7-layer1-production-publication-v5.9.json'
+      - 'data/device-catalog/research/validate_stm32h7_layer1_publication_v59.py'
+      - 'data/device-catalog/research/STM32H7_LAYER1_PRODUCTION_PUBLICATION_V59.md'
+      - 'data/device-catalog/research/publish_stm32h7_classic_catalog.py'
+      - 'data/device-catalog/research/validate_stm32h7_classic_production_publication.py'
+      - '.github/workflows/device-catalog-stm32h7-production-v59.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate STM32H7 v5.9 candidate
+        run: |
+          python - <<'PY'
+          import csv, hashlib
+          from pathlib import Path
+          p=Path('data/device-catalog/research/stm32h7-classic-commercial-icpn.csv')
+          raw=p.read_bytes()
+          rows=list(csv.DictReader(p.open()))
+          gap=set(Path('data/device-catalog/research/st-stm32h7-active-gap-v5.7.txt').read_text().split())
+          by={r['icpn']:r for r in rows}
+          got=[by[x] for x in sorted(gap)]
+          assert len(rows)==205
+          assert len(by)==205
+          assert len(got)==14
+          assert all(
+              r['mapping_status']=='no_mapping'
+              and not r['existing_identifier']
+              and not r['existing_identifier_kind']
+              and not r['openocd_target_config']
+              for r in got
+          )
+          print('H7_ROWS',len(rows))
+          print('H7_SHA256',hashlib.sha256(raw).hexdigest())
+          print('H7_NO_MAPPING_DELTA',len(got))
+          PY
+          python data/device-catalog/research/validate_stm32h7_layer1_publication_v59.py
+          python data/device-catalog/research/validate_stm32h7_classic_admission_readiness.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+          PYTHONPATH=software/python python -m plasma_web.device_catalog --json
