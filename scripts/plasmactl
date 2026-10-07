@@ -111,8 +111,10 @@ Profile-aware commands:
   sudo plasmactl status z2like-demo  Show Render/SWPC/QEMU ownership and runtime state
 
   sudo plasmactl install z2-ps --release-artifact PATH --gateway-host IPv4 \
-    [--python-artifact PATH | --plasma-python PATH] [--ppu-id ID] [--facility-id ID]
-  sudo plasmactl deploy z2-ps --release-artifact PATH --gateway-host IPv4 [same identity/runtime options]
+    [--python-artifact PATH | --plasma-python PATH] --openocd-artifact PATH \
+    [--ppu-id ID] [--facility-id ID]
+  sudo plasmactl deploy z2-ps --release-artifact PATH --gateway-host IPv4 \
+    [--openocd-artifact PATH] [same identity/runtime options]
   plasmactl verify z2-ps             Real Z2 ARMv7 PS runtime + local PS diagnostic loopback only
   plasmactl status z2-ps             Installed release, Plasma Python and system-service state
 
