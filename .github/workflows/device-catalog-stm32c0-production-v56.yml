@@ -1,0 +1,33 @@
+name: STM32C0 production publication v5.6
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'data/device-catalog/research/stm32c0-layer1-production-publication-v5.6.json'
+      - '.github/workflows/device-catalog-stm32c0-production-v56.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate C0 publication candidate
+        run: |
+          python - <<'PY'
+          import csv,hashlib
+          from pathlib import Path
+          p=Path('data/device-catalog/research/stm32c0-commercial-icpn.csv')
+          raw=p.read_bytes()
+          rows=list(csv.DictReader(p.open()))
+          assert len(rows)==226
+          assert len({r['icpn'] for r in rows})==226
+          gap=set(Path('data/device-catalog/research/st-stm32c0-active-gap-v5.4.txt').read_text().split())
+          got=[r for r in rows if r['icpn'] in gap]
+          assert len(got)==17
+          assert all(r['mapping_status']=='no_mapping' and not r['openocd_target_config'] and not r['existing_identifier'] for r in got)
+          print('C0_ROWS',len(rows))
+          print('C0_SHA256',hashlib.sha256(raw).hexdigest())
+          print('C0_NO_MAPPING_DELTA',len(got))
+          PY
