@@ -132,6 +132,53 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
         (product_root / "install" / "openocd-runtime.json").read_text(encoding="utf-8")
     )
     assert retained["artifact_sha256"] == evidence["artifact_sha256"]
+    assert retained["starts_openocd_service"] is False
+    assert retained["qualification_boundary"]["hardware_runtime_ready"] is False
+
+
+def test_reinstall_rejects_tampered_existing_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = _fake_prefix(tmp_path)
+    monkeypatch.setattr(MODULE.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        MODULE,
+        "_probe_openocd",
+        lambda _path: ("0.12.0", "Open On-Chip Debugger 0.12.0"),
+    )
+    monkeypatch.setattr(MODULE, "_ldd_dependencies", lambda _path: ["libc.so.6"])
+    monkeypatch.setattr(MODULE, "_require_install_target", lambda architecture: architecture)
+
+    built = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "out",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+    artifact = Path(str(built["artifact"]))
+    sidecar = Path(str(built["sidecar"]))
+    product_root = tmp_path / "product"
+    MODULE.install_artifact(artifact, sidecar=sidecar, product_root=product_root)
+
+    installed_target = (
+        product_root
+        / "programming-engines"
+        / "openocd"
+        / RUNTIME_ID
+        / "share"
+        / "openocd"
+        / "scripts"
+        / "target"
+        / "stm32f1x.cfg"
+    )
+    installed_target.write_text("# tampered\n", encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.OpenOCDRuntimeArtifactError,
+        match="existing OpenOCD runtime content does not match",
+    ):
+        MODULE.install_artifact(artifact, sidecar=sidecar, product_root=product_root)
 
 
 def test_detached_hash_detects_artifact_tampering(
