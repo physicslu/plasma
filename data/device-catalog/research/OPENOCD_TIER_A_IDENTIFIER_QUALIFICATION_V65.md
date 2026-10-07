@@ -43,6 +43,16 @@ Qualified identifier kinds:
 
 These rows stay fail-closed. In particular, opaque F4 `V/W` suffixes are not collapsed into an existing identifier.
 
+## Frozen qualification provenance
+
+- qualified exact-set SHA-256: `32ca466183a44288c903c923b20df36ad25de0824397a98625550e53e245f69e`
+- blocked exact-set SHA-256: `d1b2d9bebc71ba10160c422b4e4c76367ea21f9419618c40ccffc7e543b5c4c6`
+- qualified CSV SHA-256: `b74136d7a9ede1671ac0174425e84904dc1f355ad9307b9ee0a1ddaa052e5d6e`
+- blocked CSV SHA-256: `ac28754afab3e17f4cd71e4b55f41d79577ff67cc62a1632c9b672648ece6b17`
+- source workflow run: `37590248210`
+- artifact ID: `11467978681`
+- artifact SHA-256: `818d603070d314ce136a5642d5a304e3734fd40f6bf9d6d4474ef29840d2fcb8`
+
 ## Coverage implication
 
 Current OpenOCD Active route coverage:
