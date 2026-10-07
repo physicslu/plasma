@@ -295,27 +295,44 @@ def _build_audit(proposal: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_current_publication() -> dict[str, Any]:
+    """Verify the historical C0.5 publication remains intact inside current Production.
+
+    C0.5 froze the original 209-row publication transaction. Later catalog-only
+    additions are allowed, so this verifier checks the frozen 209 rows as an
+    immutable subset while validating the current manifest against the complete
+    current canonical file.
+    """
     proposal = json.loads(PROPOSAL_PATH.read_text(encoding="utf-8"))
     if file_sha256(PROPOSAL_PATH) != EXPECTED_PROPOSAL_SHA256 or proposal != build_proposal():
         raise RuntimeError("frozen C0.5 publication proposal drifted")
-    if file_sha256(CANONICAL_PATH) != EXPECTED_CANONICAL_SHA256:
-        raise RuntimeError("published STM32C0 canonical CSV drifted")
-    if _git_blob_sha(CANONICAL_PATH.read_bytes()) != EXPECTED_CANONICAL_BLOB:
-        raise RuntimeError("published STM32C0 canonical Git blob drifted")
+
+    plan = _historical_plan()
+    _, historical_rows = _render_canonical(plan)
+    historical_by_icpn = {row["icpn"]: row for row in historical_rows}
+
+    with CANONICAL_PATH.open(newline="", encoding="utf-8") as handle:
+        current_rows = list(csv.DictReader(handle))
+    current_by_icpn = {row["icpn"]: row for row in current_rows}
+    if len(current_rows) != len(current_by_icpn):
+        raise RuntimeError("current STM32C0 canonical contains duplicate exact identities")
+    for icpn, expected in historical_by_icpn.items():
+        if current_by_icpn.get(icpn) != expected:
+            raise RuntimeError(f"C0.5 historical published row drifted or disappeared: {icpn}")
+
     manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
     c0_sources = [source for source in manifest.get("sources", []) if source.get("family") == "STM32C0"]
     if len(c0_sources) != 1:
         raise RuntimeError("current Production manifest must contain exactly one STM32C0 source")
-    expected_source = {
-        "manufacturer": "STMicroelectronics",
-        "family": "STM32C0",
-        "path": "../research/stm32c0-commercial-icpn.csv",
-        "row_count": EXPECTED_PUBLISHED_ROWS,
-        "git_blob_sha": EXPECTED_CANONICAL_BLOB,
-        "sha256": EXPECTED_CANONICAL_SHA256,
-    }
-    if c0_sources[0] != expected_source:
-        raise RuntimeError("current STM32C0 Production source drifted")
+    source = c0_sources[0]
+    if (
+        source.get("manufacturer") != "STMicroelectronics"
+        or source.get("path") != "../research/stm32c0-commercial-icpn.csv"
+        or source.get("row_count") != len(current_rows)
+        or source.get("sha256") != file_sha256(CANONICAL_PATH)
+        or source.get("git_blob_sha") != _git_blob_sha(CANONICAL_PATH.read_bytes())
+    ):
+        raise RuntimeError("current STM32C0 Production source binding drifted")
+
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
     if file_sha256(AUDIT_PATH) != EXPECTED_AUDIT_SHA256 or audit != _build_audit(proposal):
         raise RuntimeError("C0.5 publication audit drifted")
@@ -323,21 +340,21 @@ def verify_current_publication() -> dict[str, Any]:
     exact, base_count, families = _production_snapshot(PRODUCTION_MANIFEST)
     if exact < EXPECTED_POSTSTATE[0] or base_count < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
         raise RuntimeError("current Production state regressed below C0.5 publication poststate")
-    if families.get("STM32C0") != EXPECTED_PUBLISHED_ROWS:
-        raise RuntimeError("published STM32C0 Production row count drifted")
+    if families.get("STM32C0", 0) < EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError("current STM32C0 Production regressed below C0.5 publication row count")
     return {
         "status": "valid",
         "phase": "C0.5",
         "published_exact_icpns": EXPECTED_PUBLISHED_ROWS,
         "published_base_devices": EXPECTED_PUBLISHED_BASES,
         "capability_unresolved": EXPECTED_UNRESOLVED,
+        "current_stm32c0_exact_icpns": len(current_rows),
         "production_exact_icpns": exact,
         "production_base_devices": base_count,
         "production_family_count": len(families),
-        "canonical_sha256": EXPECTED_CANONICAL_SHA256,
+        "canonical_sha256": file_sha256(CANONICAL_PATH),
         "production_manifest_sha256": file_sha256(PRODUCTION_MANIFEST),
     }
-
 
 def publish() -> dict[str, Any]:
     proposal = build_proposal()
