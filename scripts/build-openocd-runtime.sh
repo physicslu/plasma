@@ -57,7 +57,7 @@ docker run --rm \
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y --no-install-recommends \
-      build-essential ca-certificates git autoconf automake libtool pkg-config python3
+      build-essential ca-certificates git autoconf automake libtool pkg-config python3 tcl
 
     prefix="/opt/plasma/programming-engines/openocd/${OPENOCD_RUNTIME_ID}"
     mkdir -p /tmp/openocd-src
