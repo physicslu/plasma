@@ -9,6 +9,7 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - "render.yaml"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
@@ -34,6 +35,7 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - "render.yaml"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
@@ -92,6 +94,7 @@ jobs:
             scripts/openocd-runtime.py
           bash -n scripts/build-openocd-runtime.sh
           bash -n scripts/plasmactl
+          bash -n scripts/plasmactl-z2-ps
           bash -n scripts/plasmactl-z2like-demo
           bash -n scripts/plasmactl-z2like-demo-managed-ingress
           bash -n scripts/render-control-station-start.sh
