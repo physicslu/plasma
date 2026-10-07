@@ -1,0 +1,37 @@
+name: OpenOCD Tier A route candidates v6.4
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_openocd_tier_a_route_candidates_v64.py'
+      - 'data/device-catalog/research/test_prepare_openocd_tier_a_route_candidates_v64.py'
+      - 'data/device-catalog/research/OPENOCD_TIER_A_ROUTE_CANDIDATES_V64.md'
+      - '.github/workflows/device-catalog-openocd-tier-a-v64.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate Tier A route candidates
+        run: |
+          python data/device-catalog/research/prepare_openocd_tier_a_route_candidates_v64.py \
+            --proposal /tmp/openocd-tier-a-v64.csv \
+            --summary /tmp/openocd-tier-a-v64.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_openocd_tier_a_route_candidates_v64.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-tier-a-route-candidates-v64
+          path: |
+            /tmp/openocd-tier-a-v64.csv
+            /tmp/openocd-tier-a-v64.json
+          if-no-files-found: error
+          retention-days: 30
