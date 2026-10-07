@@ -30,9 +30,7 @@ jobs:
             --patched-dir /tmp/openocd-tier-a-v66-patched
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_openocd_tier_a_backend_promotion_v66.py -v
-          if [ -f data/device-catalog/research/validate_openocd_tier_a_promotion_lock_v66.py ]; then
-            python data/device-catalog/research/validate_openocd_tier_a_promotion_lock_v66.py
-          fi
+          python data/device-catalog/research/validate_openocd_tier_a_promotion_lock_v66.py
       - uses: actions/upload-artifact@v4
         with:
           name: openocd-tier-a-backend-promotion-proposal-v66
