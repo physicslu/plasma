@@ -179,9 +179,9 @@ install_or_reuse_python() {
 }
 
 install_or_reuse_openocd() {
-  if [[ -n "$openocd_artifact" ]]; then
+  if [[ -n "${openocd_artifact:-}" ]]; then
     local -a args=(install "$openocd_artifact" --product-root "$product_root")
-    [[ -n "$openocd_sidecar" ]] && args+=(--sidecar "$openocd_sidecar")
+    [[ -n "${openocd_sidecar:-}" ]] && args+=(--sidecar "$openocd_sidecar")
     say "installing verified Plasma-owned ARMv7 OpenOCD runtime"
     python3 "$openocd_runtime_tool" "${args[@]}"
   fi
