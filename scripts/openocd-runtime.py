@@ -400,6 +400,22 @@ def _verify_hashes(root: Path) -> None:
             raise OpenOCDRuntimeArtifactError(f"internal SHA-256 mismatch: {name}")
 
 
+def _verify_installed_payload(source_root: Path, target: Path) -> None:
+    expected = {
+        path.relative_to(source_root).as_posix(): _sha256(path)
+        for path in _iter_regular_files(source_root)
+    }
+    actual = {
+        path.relative_to(target).as_posix(): _sha256(path)
+        for path in _iter_regular_files(target)
+        if path.name != "plasma-runtime.json"
+    }
+    if actual != expected:
+        raise OpenOCDRuntimeArtifactError(
+            "existing OpenOCD runtime content does not match the verified artifact"
+        )
+
+
 def _safe_relative(value: object, *, field: str) -> PurePosixPath:
     if not isinstance(value, str) or not value:
         raise OpenOCDRuntimeArtifactError(f"runtime manifest is missing {field}")
@@ -529,6 +545,7 @@ def install_artifact(
                     raise OpenOCDRuntimeArtifactError(
                         f"existing OpenOCD runtime identity mismatch for {field}"
                     )
+            _verify_installed_payload(source_root, target)
         else:
             staging = engines_root / f".{runtime_id}.tmp-{os.getpid()}"
             if staging.exists():
@@ -572,6 +589,8 @@ def install_artifact(
             "version_banner": version_banner,
             "shared_library_dependencies": dependencies,
             "hardware_runtime_ready": False,
+            "starts_openocd_service": False,
+            "qualification_boundary": dict(manifest["qualification_boundary"]),
         }
         evidence_path = install_root / "openocd-runtime.json"
         temporary_evidence = evidence_path.with_name(f".{evidence_path.name}.tmp-{os.getpid()}")
