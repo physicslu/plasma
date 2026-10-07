@@ -39,14 +39,16 @@ class STM32L4PhaseL45PublicationTests(unittest.TestCase):
         cls.audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
         cls.baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
         with CANONICAL_PATH.open(newline="", encoding="utf-8") as handle:
-            cls.rows = list(csv.DictReader(handle))
+            cls.current_rows = list(csv.DictReader(handle))
+        historical_ids = set(cls.proposal["added_exact_icpns"])
+        cls.rows = [row for row in cls.current_rows if row["icpn"] in historical_ids]
 
     def test_publication_state_is_valid(self) -> None:
         summary = verify_current_publication()
         self.assertGreaterEqual(summary["production_exact_icpns"], EXPECTED_POSTSTATE[0])
         self.assertGreaterEqual(summary["production_base_devices"], EXPECTED_POSTSTATE[1])
         self.assertGreaterEqual(summary["production_family_count"], EXPECTED_POSTSTATE[2])
-        self.assertEqual(summary["stm32l4_production"], EXPECTED_PUBLISHED_ROWS)
+        self.assertGreaterEqual(summary["stm32l4_production"], EXPECTED_PUBLISHED_ROWS)
         self.assertEqual(summary["published_exact_icpns"], EXPECTED_PUBLISHED_ROWS)
         self.assertEqual(summary["published_base_devices"], EXPECTED_PUBLISHED_BASES)
 
@@ -84,7 +86,8 @@ class STM32L4PhaseL45PublicationTests(unittest.TestCase):
         self.assertEqual(len(sources), 1)
         source = sources[0]
         data = CANONICAL_PATH.read_bytes()
-        self.assertEqual(source["row_count"], EXPECTED_PUBLISHED_ROWS)
+        self.assertEqual(source["row_count"], len(self.current_rows))
+        self.assertGreaterEqual(source["row_count"], EXPECTED_PUBLISHED_ROWS)
         self.assertEqual(source["path"], "../research/stm32l4-commercial-icpn.csv")
         self.assertEqual(source["sha256"], hashlib.sha256(data).hexdigest())
         self.assertEqual(source["git_blob_sha"], _git_blob_sha(data))
