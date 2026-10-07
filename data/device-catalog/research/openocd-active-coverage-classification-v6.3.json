@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "audit_id": "openocd-active-coverage-classification-v6.3",
+  "captured_utc": "2026-10-07T07:15:00Z",
+  "scoped_active_denominator": 4550,
+  "production_exact_total": 4629,
+  "production_mapped_total": 3673,
+  "production_no_mapping_total": 956,
+  "production_not_current_active_exact_count": 79,
+  "production_not_current_active_sha256": "aa9b3b53e251f90f6026f496e6e571f380377a4eb2d2ee82539e1753eeab661b",
+  "active_openocd_route_exact_count": 3594,
+  "active_openocd_route_coverage_percent": 78.9890,
+  "active_no_mapping_exact_count": 956,
+  "active_no_mapping_percent": 21.0110,
+  "classification": {
+    "tier_a_same_series_existing_route": {
+      "count": 389,
+      "meaning": "same STM32 series already has mapped sibling rows with one consistent OpenOCD target config",
+      "family_counts": {
+        "STM32F2": 72,
+        "STM32F3": 172,
+        "STM32F4": 3,
+        "STM32F7": 62,
+        "STM32G0": 42,
+        "STM32G4": 1,
+        "STM32C0": 17,
+        "STM32L4": 3,
+        "STM32L1": 2,
+        "STM32U3": 1,
+        "STM32H7": 14
+      }
+    },
+    "tier_b_family_route_flash_capable_no_series_sibling": {
+      "count": 102,
+      "meaning": "no mapped sibling in the exact series, but current upstream OpenOCD has a family-level target config with a flash bank",
+      "family_counts": {
+        "STM32F3": 10,
+        "STM32F7": 92
+      }
+    },
+    "tier_c_upstream_debug_target_without_flash_bank": {
+      "count": 32,
+      "meaning": "upstream target exists, but target config has no flash bank and is not counted as programming coverage",
+      "family_counts": {
+        "STM32N6": 32
+      }
+    },
+    "tier_d_no_direct_upstream_target_config": {
+      "count": 433,
+      "meaning": "no direct family target config found in current upstream OpenOCD target inventory",
+      "family_counts": {
+        "STM32C5": 172,
+        "STM32H5": 190,
+        "STM32WL3": 47,
+        "STM32WB0": 24
+      }
+    }
+  },
+  "projection_if_tier_a_qualified": {
+    "active_openocd_route_exact_count": 3983,
+    "coverage_percent": 87.5385,
+    "remaining_gap": 567
+  },
+  "projection_if_tier_a_and_b_qualified": {
+    "active_openocd_route_exact_count": 4085,
+    "coverage_percent": 89.7802,
+    "remaining_gap": 465
+  },
+  "upstream_openocd_binding": {
+    "repository": "openocd-org/openocd",
+    "master_commit": "8da0578d7bce3e134821ccf10911182788debc32",
+    "stm32f3x_cfg_git_blob_sha": "e616c20f89655a654d1ed44905c3f3a492d74c8d",
+    "stm32f7x_cfg_git_blob_sha": "345995c37f7b294911f93ca7b0df86495358579a",
+    "stm32n6x_cfg_git_blob_sha": "668182fbf9a0a91e50851dbe998a85ae94a72d0b",
+    "stm32f3x_has_flash_bank": true,
+    "stm32f7x_has_flash_bank": true,
+    "stm32n6x_has_flash_bank": false,
+    "direct_target_configs_not_found": [
+      "stm32c5x.cfg",
+      "stm32h5x.cfg",
+      "stm32wl3x.cfg",
+      "stm32wb0x.cfg"
+    ]
+  },
+  "claims": {
+    "route_candidate_is_programming_verified": false,
+    "route_candidate_is_engineering_verified": false,
+    "route_candidate_is_hil_verified": false,
+    "production_mapping_write_authorized": false
+  }
+}
