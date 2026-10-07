@@ -130,7 +130,7 @@ def _openocd_artifact(repo: Path, output_dir: Path) -> Path:
     return artifact
 
 
-def build(output_dir: Path) -> dict[str, str]:
+def build(output_dir: Path) -> dict[str, object]:
     repo = _repo_root()
     sha = _require_clean_source(repo)
     identity = f"{_product_version(repo)}-{sha[:12]}"
@@ -250,7 +250,7 @@ def build(output_dir: Path) -> dict[str, str]:
         "sidecar": str(sidecar),
         "python_artifact_execution": "not_executed_in_qemu-simulation",
         "openocd_artifact": openocd_artifact.name,
-        "openocd_hardware_runtime_ready": "false",
+        "openocd_hardware_runtime_ready": False,
     }
 
 
