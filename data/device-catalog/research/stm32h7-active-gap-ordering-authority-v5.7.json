@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "authority_id": "stm32h7-active-gap-ordering-authority-v5.7",
+  "base_authority": "stm32h7-classic-metadata-authority.json",
+  "base_authority_git_blob_sha": "4e01d06fee1318c35390ad7707f884b3203d3d3f",
+  "scope": "metadata replay only for the locked 14 current-Active STM32H7-classic delta identities",
+  "official_ordering_information_extensions": {
+    "STM32H730": {
+      "document_id": "DS13315",
+      "revision": "Rev 5",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h730zb.pdf",
+      "pin_count": {
+        "A": "169",
+        "I": "176"
+      },
+      "functional_options": ["Q"]
+    },
+    "STM32H7A3": {
+      "document_id": "DS13195",
+      "revision": "Rev 8",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h7a3qi.pdf",
+      "pin_count": {
+        "Q": "132",
+        "A": "169",
+        "L": "225"
+      },
+      "functional_options": ["Q"]
+    },
+    "STM32H7B0": {
+      "document_id": "DS13196",
+      "revision": "Rev 7",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h7b0zb.pdf",
+      "pin_count": {
+        "A": "169"
+      },
+      "functional_options": ["Q"]
+    },
+    "STM32H7B3": {
+      "document_id": "DS13139",
+      "revision": "Rev 8",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h7b3ii.pdf",
+      "pin_count": {
+        "Q": "132",
+        "A": "169",
+        "L": "225"
+      },
+      "functional_options": ["Q"]
+    }
+  },
+  "governance": {
+    "decode_only_locked_gap_set": true,
+    "metadata_exception_authorized": false,
+    "backend_scope_evaluated": false,
+    "existing_family_backend_mapping_inherited": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified": false,
+    "field_evidence": false,
+    "ps_hil_qualification": false,
+    "production_write_authorized": false
+  }
+}
