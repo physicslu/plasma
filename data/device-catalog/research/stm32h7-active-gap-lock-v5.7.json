@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "lock_id": "stm32h7-active-gap-lock-v5.7",
+  "captured_utc": "2026-10-01T00:48:24+00:00",
+  "source_workflow_run_id": 36797087427,
+  "source_artifact_id": 11134202297,
+  "source_artifact_zip_sha256": "663d733cd6112bcffa4f7cf3d436b8a6e98ea91039e17dfb8493d8c4dbaf7d1d",
+  "whole_st_active_exact_denominator": 4550,
+  "stm32h7_active_exact_count": 205,
+  "stm32h7_production_exact_prestate": 191,
+  "stm32h7_active_gap_count": 14,
+  "stm32h7_active_gap_exact_set_sha256": "22587c53a237fe3d2d4a208641e6109dd4d1b67bab1e39c9da86c4233b76b834",
+  "production_exact_prestate": 4606,
+  "production_source_count_prestate": 28,
+  "whole_st_active_intersection_prestate": 4527,
+  "whole_st_active_gap_prestate": 23,
+  "identity_semantics": "2026-10-01 locked eStore Active exact set minus current STM32H7 Production exact set",
+  "production_write_authorized": false
+}
