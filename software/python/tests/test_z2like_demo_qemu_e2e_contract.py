@@ -15,6 +15,11 @@ def test_workflow_runs_armv7_qemu_and_manager_bootstrap_e2e():
     assert "python scripts/z2like-demo-qemu-e2e.py" in source
     assert "test -z \"$(docker port plasma-z2like-demo-qemu)\"" in source
     assert "simulation-only Z2 kit fixture" in source
+    assert "Install and smoke packaged OpenOCD inside QEMU ARMv7 target" in source
+    assert "scripts/openocd-runtime.py" in source
+    assert "scripts/build-openocd-runtime.sh" in source
+    assert 'assert p["hardware_runtime_ready"] is False' in source
+    assert '"adapter driver dummy"' in source
 
 
 def test_e2e_never_mutates_bootstrap_directly():
@@ -41,3 +46,5 @@ def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     assert "swpc-z2like" in source
     assert "engineering surrogate only" in source
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source
+    assert "hardware_runtime_ready" in source
+    assert "Tcl RPC worker/control-plane lifecycle" in source
