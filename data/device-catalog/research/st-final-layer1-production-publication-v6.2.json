@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "publication_id": "st-final-layer1-production-publication-v6.2",
+  "publication_date_utc": "2026-10-07",
+  "owner_approval_received": true,
+  "approved_proposal_id": "st-final-layer1-admission-proposal-v6.1",
+  "approved_proposal_pr": 747,
+  "approved_proposal_merge_commit": "739535a05ca9b2b3df86af0429eb3ef0dd6de680",
+  "approved_proposal_source_workflow_run_id": 37572250038,
+  "approved_proposal_source_artifact_id": 11461201671,
+  "approved_proposal_source_artifact_sha256": "30a82373e31dd9da5ad93de1deaf52da56b56b6b8ca1f0f4206c7c427a0f951c",
+  "approved_candidate_exact_count": 9,
+  "approved_candidate_exact_set_sha256": "891831ec21f6f65e5332667bf30440f321039740709d697312afd38a821ac801",
+  "approved_candidate_csv_sha256": "682ec66ddff6eb880f4ff84e4c971177b2d8150021998fc78469e9b35911b223",
+  "production_prestate": {
+    "exact_total": 4620,
+    "source_count": 28
+  },
+  "production_poststate": {
+    "exact_total": 4629,
+    "source_count": 28
+  },
+  "family_transactions": {
+    "STM32F4": {
+      "before": 384,
+      "after": 387,
+      "delta": 3,
+      "historical_git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
+      "historical_sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359",
+      "current_git_blob_sha": "8983052017cca2c98caaaf899359c2fead33f40d",
+      "current_sha256": "6a2fa67f58f4edc7bcf1c79a7077ca5e954c74ad2e223f0effdb600dc948d1cd"
+    },
+    "STM32L4": {
+      "before": 446,
+      "after": 449,
+      "delta": 3,
+      "historical_git_blob_sha": "6cbb7ee5f5189c7d510623940a8945a2bde38399",
+      "historical_sha256": "f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c",
+      "current_git_blob_sha": "a39514712d8e27be344bd5837813d1c9d19c34c6",
+      "current_sha256": "64e5f493581c5a2a06d86490c704dcb79f744369f1ddb8349f20a956b145f70f"
+    },
+    "STM32L1": {
+      "before": 144,
+      "after": 146,
+      "delta": 2,
+      "historical_git_blob_sha": "8c4ff4b3331f6fe21f04c117fa952802ed587f71",
+      "historical_sha256": "72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec",
+      "current_git_blob_sha": "a8120b7064832f4db81850e3e4764a13ef531754",
+      "current_sha256": "ae0b13da9282d64b17d182af14ae9d151a55a512879b34cd20c810ea926699da"
+    },
+    "STM32U3": {
+      "before": 106,
+      "after": 107,
+      "delta": 1,
+      "historical_git_blob_sha": "c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
+      "historical_sha256": "171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff",
+      "current_git_blob_sha": "5913ed0ff3817b41dd81f12edead60e9dead32ee",
+      "current_sha256": "49a6a72460d8f025ab5fb7bfe30a2eb372e4255143b6d3345c083f3fab831f4e"
+    }
+  },
+  "catalog_backend_state_after": {
+    "mapped": 3673,
+    "no_mapping": 956
+  },
+  "coverage_effect": {
+    "whole_st_active_exact_denominator": 4550,
+    "whole_st_active_intersection_after": 4550,
+    "whole_st_active_gap_after": 0,
+    "whole_st_active_identity_coverage_after_percent": 100
+  },
+  "lifecycle_findings": {
+    "f4_estore_active_vs_product_page_nrnd_exact_count": 3,
+    "opaque_suffix_literal_exact_count": 5
+  },
+  "claims": {
+    "layer1_catalog_publication_authorized": true,
+    "backend_scope_evaluated_for_9_additions": false,
+    "existing_family_backend_mapping_inherited_by_9_additions": false,
+    "backend_type_claimed_for_no_mapping_rows": false,
+    "backend_route_claimed_for_no_mapping_rows": false,
+    "programming_profile_scope_expanded": false,
+    "engineering_verified_claimed": false,
+    "field_evidence_claimed": false,
+    "ps_hil_qualification_claimed": false
+  }
+}
