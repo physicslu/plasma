@@ -1,0 +1,42 @@
+name: ST final 9 Layer-1 admission proposal v6.1
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_st_final_layer1_admission_proposal_v61.py'
+      - 'data/device-catalog/research/test_prepare_st_final_layer1_admission_proposal_v61.py'
+      - 'data/device-catalog/research/ST_FINAL_LAYER1_ADMISSION_PROPOSAL_V61.md'
+      - 'data/device-catalog/research/st-final-layer1-admission-proposal-v6.1.json'
+      - 'data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py'
+      - '.github/workflows/device-catalog-st-final-layer1-proposal-v61.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate final 9 proposal
+        run: |
+          python data/device-catalog/research/prepare_st_final_layer1_admission_proposal_v61.py \
+            --proposal /tmp/st-final-v61.csv \
+            --summary /tmp/st-final-v61.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_st_final_layer1_admission_proposal_v61.py -v
+          if [ -f data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py ]; then
+            python data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: st-final-layer1-admission-proposal-v61
+          path: |
+            /tmp/st-final-v61.csv
+            /tmp/st-final-v61.json
+          if-no-files-found: error
+          retention-days: 30
