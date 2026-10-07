@@ -19,6 +19,15 @@ Merged v6.0 establishes metadata authority for the final nine exact identities i
 
 The five `V/W/X` exact-product identities retain opaque manufacturer suffixes literally. No option semantics are invented.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `891831ec21f6f65e5332667bf30440f321039740709d697312afd38a821ac801`
+- proposal CSV SHA-256: `682ec66ddff6eb880f4ff84e4c971177b2d8150021998fc78469e9b35911b223`
+- source workflow run: `37572250038`
+- source artifact: `11461201671`
+- artifact SHA-256: `30a82373e31dd9da5ad93de1deaf52da56b56b6b8ca1f0f4206c7c427a0f951c`
+- metadata authority Git blob: `9f260f83c9f81147f1c768c846abcc39c9fd2bc8`
+
 ## Projected state only if later explicitly approved
 
 | Metric | Current | Projected |
