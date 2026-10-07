@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from stm32f4_historical_replay import without_final_layer1_tail
+
 from stm32f4_coverage_gap_inventory import build_inventory
 
 HERE = Path(__file__).resolve().parent
@@ -48,9 +50,11 @@ B_T_BLOCKED = {
 
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+    rows = without_final_layer1_tail(current_rows)
+    assert len(current_rows) == 387
     assert len(rows) == 384
-    assert len(rows) == len({row["icpn"] for row in rows})
+    assert len(current_rows) == len({row["icpn"] for row in current_rows})
     assert len({row["base_device"] for row in rows}) == 139
 
     by_icpn = {row["icpn"]: row for row in rows}
@@ -95,7 +99,7 @@ def main() -> int:
     assert audit["retained_evidence_id"] == EVIDENCE_ID
 
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
-    assert inventory["production"]["exact_icpn_rows"] == 384
+    assert inventory["production"]["exact_icpn_rows"] == 387
     assert inventory["production"]["base_device_count"] == 139
     assert inventory["gap"]["base_device_count"] == 10
     assert inventory["gap"]["policy_ready_count"] == 0

@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 from pathlib import Path
+
+from stm32f4_historical_replay import without_final_layer1_tail
 
 from stm32f4_coverage_gap_inventory import build_inventory
 
@@ -37,9 +40,11 @@ B_T_BLOCKED = {
 
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+    rows = without_final_layer1_tail(current_rows)
+    assert len(current_rows) == 387
     assert len(rows) == 384
-    assert len(rows) == len({row["icpn"] for row in rows})
+    assert len(current_rows) == len({row["icpn"] for row in current_rows})
     assert len({row["base_device"] for row in rows}) == 139
 
     by_icpn = {row["icpn"]: row for row in rows}
@@ -60,7 +65,15 @@ def main() -> int:
         assert row["verification_status"] == "verified_direct_st_retained_browser_exact_icpn"
         assert EVIDENCE_ID in row["source_reference"]
 
-    assert hashlib.sha256(CATALOG.read_bytes()).hexdigest() == PUBLISHED_CATALOG_SHA256
+    historical_stream = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        historical_stream, fieldnames=list(rows[0].keys()), lineterminator="\n"
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    assert hashlib.sha256(
+        historical_stream.getvalue().encode("utf-8")
+    ).hexdigest() == PUBLISHED_CATALOG_SHA256
     assert hashlib.sha256(PLAN.read_bytes()).hexdigest() == PLAN_SHA256
     plan = json.loads(PLAN.read_text(encoding="utf-8"))
     assert plan["candidate_count"] == 11
@@ -90,7 +103,7 @@ def main() -> int:
     assert audit["retained_evidence_id"] == EVIDENCE_ID
 
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
-    assert inventory["production"]["exact_icpn_rows"] == 384
+    assert inventory["production"]["exact_icpn_rows"] == 387
     assert inventory["production"]["base_device_count"] == 139
     assert {expected[0] for expected in EXPECTED.values()} <= set(
         inventory["production"]["base_devices"]

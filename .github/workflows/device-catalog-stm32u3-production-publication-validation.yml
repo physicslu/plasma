@@ -31,9 +31,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Replay deterministic STM32U3 publication
+      - name: Replay deterministic historical STM32U3 canonical
         working-directory: data/device-catalog/research
-        run: python publish_stm32u3_catalog.py --output-dir "$RUNNER_TEMP/stm32u3-publication" --json
+        run: |
+          python - <<'PY'
+          from publish_stm32u3_catalog import EXPECTED_ROWS, _publication_rows, _render_csv
+          rows, _ = _publication_rows()
+          assert len(rows) == EXPECTED_ROWS
+          data = _render_csv(rows)
+          assert data.startswith(b"manufacturer,icpn,family,")
+          print("STM32U3 historical deterministic replay: PASS")
+          PY
       - name: Validate checked-in STM32U3 publication
         working-directory: data/device-catalog/research
         run: python validate_stm32u3_production_publication.py

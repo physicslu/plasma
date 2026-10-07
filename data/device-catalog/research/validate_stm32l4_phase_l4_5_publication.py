@@ -75,8 +75,20 @@ def main() -> int:
     if set((baseline.get("claims") or {}).values()) != {False}:
         raise RuntimeError("L4.5 publication escaped fail-closed support claims")
 
-    if _git_blob_sha(CANONICAL_PATH.read_bytes()) != EXPECTED_CANONICAL_GIT_BLOB or _sha256(CANONICAL_PATH) != EXPECTED_CANONICAL_SHA256:
-        raise RuntimeError("L4.5 canonical CSV bytes drifted")
+    # The historical 446-row canonical artifact is immutable as a subset of
+    # today's file; later catalog-only rows are permitted.
+    proposal = json.loads(PROPOSAL_PATH.read_text(encoding="utf-8"))
+    historical_ids = set(proposal["added_exact_icpns"])
+    current_raw = CANONICAL_PATH.read_bytes()
+    lines = current_raw.decode("utf-8").splitlines()
+    header = lines[0]
+    historical_lines = [
+        line for line in lines[1:]
+        if line.split(",", 2)[1] in historical_ids
+    ]
+    historical_raw = (header + "\n" + "\n".join(historical_lines) + "\n").encode("utf-8")
+    if _git_blob_sha(historical_raw) != EXPECTED_CANONICAL_GIT_BLOB or hashlib.sha256(historical_raw).hexdigest() != EXPECTED_CANONICAL_SHA256:
+        raise RuntimeError("L4.5 historical canonical subset bytes drifted")
     if _git_blob_sha(PROPOSAL_PATH.read_bytes()) != EXPECTED_PROPOSAL_GIT_BLOB or _sha256(PROPOSAL_PATH) != EXPECTED_PROPOSAL_SHA256:
         raise RuntimeError("L4.5 publication proposal bytes drifted")
     if _git_blob_sha(AUDIT_PATH.read_bytes()) != EXPECTED_AUDIT_GIT_BLOB or _sha256(AUDIT_PATH) != EXPECTED_AUDIT_SHA256:
@@ -88,11 +100,15 @@ def main() -> int:
         "phase": "L4.5",
         "published_exact_icpns": 446,
         "published_base_devices": 138,
-        "stm32l4_production": 446,
     }
     for key, value in expected_family.items():
         if summary.get(key) != value:
             raise RuntimeError(f"L4.5 family publication summary drifted: {key}={summary.get(key)!r}")
+    if summary.get("stm32l4_production", 0) < EXPECTED_PUBLISHED_ROWS:
+        raise RuntimeError(
+            f"L4.5 current STM32L4 Production regressed: {summary.get('stm32l4_production')!r}"
+        )
+
     for key, minimum in (
         ("production_exact_icpns", EXPECTED_POSTSTATE[0]),
         ("production_base_devices", EXPECTED_POSTSTATE[1]),

@@ -1,0 +1,60 @@
+name: ST final 9 Production publication v6.2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f4-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32l4-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32l1-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32u3-commercial-icpn.csv'
+      - 'data/device-catalog/research/st-final-layer1-production-publication-v6.2.json'
+      - 'data/device-catalog/research/validate_st_final_layer1_publication_v62.py'
+      - 'data/device-catalog/research/ST_FINAL_LAYER1_PRODUCTION_PUBLICATION_V62.md'
+      - '.github/workflows/device-catalog-st-final-production-v62.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate final 9 canonical candidates
+        run: |
+          python - <<'PY'
+          import csv, hashlib
+          from pathlib import Path
+          specs = {
+              "STM32F4": ("data/device-catalog/research/stm32f4-commercial-icpn.csv", 387),
+              "STM32L4": ("data/device-catalog/research/stm32l4-commercial-icpn.csv", 449),
+              "STM32L1": ("data/device-catalog/research/stm32l1-commercial-icpn.csv", 146),
+              "STM32U3": ("data/device-catalog/research/stm32u3-commercial-icpn.csv", 107),
+          }
+          gap = set(Path("data/device-catalog/research/st-final-active-tail-gap-v6.0.txt").read_text().split())
+          seen = {}
+          for family, (path_s, expected) in specs.items():
+              p = Path(path_s)
+              raw = p.read_bytes()
+              rows = list(csv.DictReader(p.open()))
+              assert len(rows) == expected
+              assert len({r["icpn"] for r in rows}) == expected
+              delta = [r for r in rows if r["icpn"] in gap]
+              seen[family] = len(delta)
+              assert all(
+                  r["mapping_status"] == "no_mapping"
+                  and not r["existing_identifier"]
+                  and not r["existing_identifier_kind"]
+                  and not r["openocd_target_config"]
+                  for r in delta
+              )
+              print(f"{family}_ROWS", len(rows))
+              print(f"{family}_SHA256", hashlib.sha256(raw).hexdigest())
+              print(f"{family}_DELTA", len(delta))
+          assert seen == {"STM32F4": 3, "STM32L4": 3, "STM32L1": 2, "STM32U3": 1}
+          PY
+          python data/device-catalog/research/validate_st_final_layer1_publication_v62.py
+          python scripts/ci/device-catalog-production-invariants.py
+          python data/ic-support/test_coverage_inventory.py
+          PYTHONPATH=software/python python -m plasma_web.device_catalog --json

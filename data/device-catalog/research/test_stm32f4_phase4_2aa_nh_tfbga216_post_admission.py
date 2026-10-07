@@ -26,9 +26,22 @@ EXPECTED = {
 
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        current_rows = list(csv.DictReader(handle))
+
+    # The historical Phase 4.2 closure ended at 384 rows. v6.2 later added
+    # exactly three F4 Layer-1 identities with no backend mapping. Preserve the
+    # 384-row historical boundary while allowing those later rows to coexist.
+    final_tail = [
+        row for row in current_rows
+        if row["mapping_status"] == "no_mapping"
+        and row["source_type"]
+        == "official_st_exact_product_authority_plus_locked_active_lifecycle"
+    ]
+    assert len(final_tail) == 3
+    rows = [row for row in current_rows if row not in final_tail]
+    assert len(current_rows) == 387
     assert len(rows) == 384
-    assert len(rows) == len({row["icpn"] for row in rows})
+    assert len(current_rows) == len({row["icpn"] for row in current_rows})
     assert len({row["base_device"] for row in rows}) == 139
 
     by_icpn = {row["icpn"]: row for row in rows}
