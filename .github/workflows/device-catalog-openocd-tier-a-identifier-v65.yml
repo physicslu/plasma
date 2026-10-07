@@ -30,9 +30,7 @@ jobs:
             --summary /tmp/openocd-tier-a-v65-summary.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_qualify_openocd_tier_a_identifiers_v65.py -v
-          if [ -f data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py ]; then
-            python data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py
-          fi
+          python data/device-catalog/research/validate_openocd_tier_a_identifier_lock_v65.py
       - uses: actions/upload-artifact@v4
         with:
           name: openocd-tier-a-identifier-qualification-v65
