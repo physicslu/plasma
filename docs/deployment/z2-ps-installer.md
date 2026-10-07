@@ -9,6 +9,7 @@ The Z2 PS deployment path turns a clean PYNQ-Z2 image into a Plasma PPU PS node 
 ```text
 GitHub Actions
   -> build qualified ARMv7 Plasma Python candidate
+  -> build pinned OpenOCD 0.12.0 runtime candidates (x86_64 + ARMv7)
   -> build canonical ppu/linux/armv7l release
   -> assemble source-tree-independent Z2 PS kit
   -> Actions artifact
@@ -53,6 +54,22 @@ The Plasma Python artifact has a separate runtime identity and lives only below:
 /opt/plasma/python/<version>/
 ```
 
+OpenOCD is also packaged as an independent, versioned Programming Engine runtime:
+
+```text
+/opt/plasma/programming-engines/openocd/<openocd-runtime-id>/
+```
+
+The current pinned runtime is OpenOCD 0.12.0 at upstream commit
+`9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c`. Its artifact carries the OpenOCD
+binary, the matching `share/openocd/scripts` tree, internal/detached SHA-256
+evidence, ELF architecture identity and shared-library dependency evidence.
+
+This packaging milestone does **not** start an OpenOCD service and does not enable
+the production programming route. The runtime manifest and install evidence keep
+`hardware_runtime_ready=false`. Tcl RPC lifecycle, Site workers, SWD/JTAG,
+target power/reset and real-IC qualification remain later gates.
+
 PYNQ continues to own System Python. Bootstrap tooling remains Python-3.10-compatible; Plasma Server, Gateway and helper use the isolated Plasma interpreter and never replace `/usr/bin/python3` or the PYNQ venv.
 
 ## GitHub-built Z2 PS kit
@@ -79,10 +96,13 @@ plasma-z2-ps-kit-<release-id>/
 │   ├── plasmactl-z2-ps
 │   ├── ppu-z2-installer.py
 │   ├── ppu-z2-installer-core.py
-│   └── z2-python-runtime.py
+│   ├── z2-python-runtime.py
+│   └── openocd-runtime.py
 ├── artifacts/
 │   ├── plasma-python-<version>-linux-armv7l.tar.gz
 │   ├── plasma-python-<version>-linux-armv7l.tar.gz.sha256
+│   ├── plasma-openocd-<runtime-id>-linux-armv7l.tar.gz
+│   ├── plasma-openocd-<runtime-id>-linux-armv7l.tar.gz.sha256
 │   ├── plasma-ppu-<release-id>-linux-armv7l.tar.gz
 │   └── plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256
 └── docs/
@@ -114,6 +134,7 @@ P3 packaging separately verifies the wrapper/core bootstrap pair instead of assu
 ```text
 /opt/plasma/
 ├── python/<python-version>/
+├── programming-engines/openocd/<openocd-runtime-id>/
 ├── releases/<release-id>/
 ├── current -> releases/<release-id>/
 └── install/
@@ -239,7 +260,7 @@ bash scripts/plasmactl verify z2-ps
 bash scripts/plasmactl status z2-ps
 ```
 
-The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. It does **not** issue the controlled restart transaction merely to make verification pass.
+The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. OpenOCD packaging is qualified separately: CI builds both x86_64 and ARMv7 artifacts, executes the ARMv7 runtime under QEMU, checks the bundled script tree and shared-library closure, and runs a software-only dummy-adapter smoke. That evidence is Programming Engine packaging/runtime evidence only. It does **not** issue the controlled restart transaction merely to make verification pass.
 
 A real P3 activation acceptance should additionally prove on the exact deployed identity:
 
@@ -286,6 +307,8 @@ PS <-> PL
 FPGA execution/loading
 PMOD/Site electrical behavior
 target power
+OpenOCD Tcl RPC / worker lifecycle
+SWD/JTAG through a physical adapter or PL
 real IC programming
 8-Site hardware concurrency
 publisher signing/authenticity
