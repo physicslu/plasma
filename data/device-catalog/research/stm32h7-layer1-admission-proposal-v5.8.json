@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "proposal_id": "stm32h7-layer1-admission-proposal-v5.8",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "production_exact_prestate": 4606,
+  "production_source_count_prestate": 28,
+  "production_h7_exact_prestate": 191,
+  "current_h7_active_exact": 205,
+  "current_h7_active_intersection_prestate": 191,
+  "proposal_addition_count": 14,
+  "proposal_exact_set_sha256": "22587c53a237fe3d2d4a208641e6109dd4d1b67bab1e39c9da86c4233b76b834",
+  "proposal_csv_sha256": "3dcd7d6997cfca45eade9f85dc75fa5596b0ab4da48f2cfd8992555addd366d9",
+  "metadata_direct_ordering_information_exact_count": 14,
+  "metadata_bounded_exception_exact_count": 0,
+  "metadata_exception_exact_icpns": [],
+  "authority_extensions": {
+    "STM32H730": [
+      "A=169",
+      "I=176",
+      "Q=with SMPS"
+    ],
+    "STM32H7A3": [
+      "Q=132",
+      "A=169",
+      "L=225"
+    ],
+    "STM32H7B0": [
+      "A=169"
+    ],
+    "STM32H7B3": [
+      "Q=132",
+      "A=169",
+      "L=225"
+    ]
+  },
+  "backend_scope_evaluated": false,
+  "existing_family_backend_mapping_inherited": false,
+  "backend_type_claimed": false,
+  "backend_state_for_new_rows": {
+    "no_mapping": 14
+  },
+  "backend_state_semantics": "no route or backend type bound; historical STM32H7 mappings are not inherited by the delta",
+  "backend_mapping_required_for_layer1_admission": false,
+  "programming_profile_binding_claimed": false,
+  "programming_profile_scope_expanded": false,
+  "series_counts": {
+    "STM32H730": 4,
+    "STM32H743": 1,
+    "STM32H7A3": 5,
+    "STM32H7B0": 1,
+    "STM32H7B3": 3
+  },
+  "package_counts": {
+    "LQFP": 2,
+    "TFBGA": 3,
+    "UFBGA": 7,
+    "WLCSP": 2
+  },
+  "production_h7_exact_after_if_approved": 205,
+  "production_source_count_after_if_approved": 28,
+  "h7_current_active_identity_coverage_after_if_published": "205/205 = 100%",
+  "production_exact_after_if_approved": 4620,
+  "catalog_backend_partition_after_if_approved": {
+    "mapped": 3673,
+    "no_mapping": 947
+  },
+  "whole_st_active_exact_denominator": 4550,
+  "whole_st_active_intersection_prestate": 4527,
+  "whole_st_active_intersection_after_if_approved": 4541,
+  "whole_st_active_gap_after_if_approved": 9,
+  "whole_st_active_coverage_after_if_approved_percent": 99.8022,
+  "engineering_verified_claimed": false,
+  "field_evidence_claimed": false,
+  "ps_hil_claimed": false,
+  "source_pr": 744,
+  "source_workflow_run_id": 37552012782,
+  "source_artifact_id": 11452379640,
+  "source_artifact_sha256": "888e9a696701e2d3b59b54c2cce0d5daa2f8070ad6805096f937aba27f42681d",
+  "metadata_replay_pr": 742,
+  "metadata_replay_merge_commit": "33ba7751eb183af2e37899e2778ebb4326a78951",
+  "delta_authority_git_blob_sha": "ccaee688584623147a118700155a9404f9940e07",
+  "base_authority_git_blob_sha": "4e01d06fee1318c35390ad7707f884b3203d3d3f"
+}
