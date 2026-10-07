@@ -17,6 +17,15 @@ Merged v5.7 locks the **14 current-Active STM32H7-classic delta identities** and
 
 The older 191-row H7 catalog contains OpenOCD routes. Those routes are historical evidence for those exact rows only and are deliberately **not generalized** to the 14 new identities.
 
+## Frozen proposal locks
+
+- exact-set SHA-256: `22587c53a237fe3d2d4a208641e6109dd4d1b67bab1e39c9da86c4233b76b834`
+- proposal CSV SHA-256: `3dcd7d6997cfca45eade9f85dc75fa5596b0ab4da48f2cfd8992555addd366d9`
+- source workflow run: `37552012782`
+- source artifact: `11452379640`
+- artifact SHA-256: `888e9a696701e2d3b59b54c2cce0d5daa2f8070ad6805096f937aba27f42681d`
+- delta authority Git blob: `ccaee688584623147a118700155a9404f9940e07`
+
 ## Projected state only if later explicitly approved
 
 - STM32H7 Active identity coverage: **191/205 → 205/205 = 100%**
