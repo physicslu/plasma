@@ -29,9 +29,7 @@ jobs:
             --summary /tmp/st-final-v61.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_prepare_st_final_layer1_admission_proposal_v61.py -v
-          if [ -f data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py ]; then
-            python data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py
-          fi
+          python data/device-catalog/research/validate_st_final_layer1_proposal_lock_v61.py
       - uses: actions/upload-artifact@v4
         with:
           name: st-final-layer1-admission-proposal-v61
