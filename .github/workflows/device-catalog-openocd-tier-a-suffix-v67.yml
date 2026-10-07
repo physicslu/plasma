@@ -1,0 +1,37 @@
+name: OpenOCD Tier A suffix normalization probe v6.7
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/probe_openocd_tier_a_suffix_normalization_v67.py'
+      - 'data/device-catalog/research/test_probe_openocd_tier_a_suffix_normalization_v67.py'
+      - 'data/device-catalog/research/OPENOCD_TIER_A_SUFFIX_NORMALIZATION_V67.md'
+      - '.github/workflows/device-catalog-openocd-tier-a-suffix-v67.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe Catalog suffix normalization
+        run: |
+          python data/device-catalog/research/probe_openocd_tier_a_suffix_normalization_v67.py \
+            --probe /tmp/openocd-tier-a-suffix-v67.csv \
+            --summary /tmp/openocd-tier-a-suffix-v67.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_probe_openocd_tier_a_suffix_normalization_v67.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-tier-a-suffix-normalization-v67
+          path: |
+            /tmp/openocd-tier-a-suffix-v67.csv
+            /tmp/openocd-tier-a-suffix-v67.json
+          if-no-files-found: error
+          retention-days: 30
