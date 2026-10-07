@@ -4,12 +4,14 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 script_dir="$(cd "$(dirname "$script_path")" && pwd)"
 python_runtime_tool="${PLASMA_Z2_PYTHON_RUNTIME_TOOL:-$script_dir/z2-python-runtime.py}"
+openocd_runtime_tool="${PLASMA_Z2_OPENOCD_RUNTIME_TOOL:-$script_dir/openocd-runtime.py}"
 ppu_installer="${PLASMA_Z2_PPU_INSTALLER:-$script_dir/ppu-z2-installer.py}"
 deployment_tool="${PLASMA_Z2_BOOTSTRAP_DEPLOYMENT:-$script_dir/ppu-bootstrap-deployment.py}"
 product_root="${PLASMA_Z2_PRODUCT_ROOT:-/opt/plasma}"
 install_root="$product_root/install"
 install_evidence="$install_root/last-install.json"
 python_evidence="$install_root/python-runtime.json"
+openocd_evidence="$install_root/openocd-runtime.json"
 config_root="/etc/plasma"
 ppu_config="$config_root/ppu.yaml"
 server_unit="/etc/systemd/system/plasma-server.service"
@@ -82,13 +84,16 @@ Install/deploy options:
   --python-artifact PATH    Optional prebuilt Plasma ARMv7 Python runtime artifact
   --python-sidecar PATH     Detached Python runtime SHA-256 sidecar
   --plasma-python PATH      Existing qualified Plasma Python under /opt/plasma/python
+  --openocd-artifact PATH   Qualified plasma-openocd-*-linux-armv7l.tar.gz
+  --openocd-sidecar PATH    Detached OpenOCD runtime SHA-256 sidecar
   --gateway-host IPv4       Explicit non-loopback Z2 IPv4 address
   --ppu-id ID               PPU identity (default z2-dev-01)
   --facility-id ID          Facility identity (default lab)
   --display-name NAME       Human display name (default Plasma Z2 PS)
 
-A first install requires either --python-artifact or --plasma-python. Deploy reuses
-/opt/plasma/install/python-runtime.json when neither is supplied.
+A first install requires either --python-artifact or --plasma-python and a qualified
+--openocd-artifact. Deploy reuses /opt/plasma/install/python-runtime.json and
+/opt/plasma/install/openocd-runtime.json when replacement runtime artifacts are omitted.
 
 Activation always passes through the durable Bootstrap deployment coordinator so
 CLI and Console deployment share the same transaction journal and restart policy.
@@ -106,6 +111,8 @@ parse_activation_args() {
   python_artifact=""
   python_sidecar=""
   plasma_python=""
+  openocd_artifact=""
+  openocd_sidecar=""
   gateway_host=""
   ppu_id="z2-dev-01"
   facility_id="lab"
@@ -118,6 +125,8 @@ parse_activation_args() {
       --python-artifact) (($# >= 2)) || die "--python-artifact requires a value"; python_artifact="$2"; shift 2 ;;
       --python-sidecar) (($# >= 2)) || die "--python-sidecar requires a value"; python_sidecar="$2"; shift 2 ;;
       --plasma-python) (($# >= 2)) || die "--plasma-python requires a value"; plasma_python="$2"; shift 2 ;;
+      --openocd-artifact) (($# >= 2)) || die "--openocd-artifact requires a value"; openocd_artifact="$2"; shift 2 ;;
+      --openocd-sidecar) (($# >= 2)) || die "--openocd-sidecar requires a value"; openocd_sidecar="$2"; shift 2 ;;
       --gateway-host) (($# >= 2)) || die "--gateway-host requires a value"; gateway_host="$2"; shift 2 ;;
       --ppu-id) (($# >= 2)) || die "--ppu-id requires a value"; ppu_id="$2"; shift 2 ;;
       --facility-id) (($# >= 2)) || die "--facility-id requires a value"; facility_id="$2"; shift 2 ;;
@@ -140,6 +149,15 @@ parse_activation_args() {
       require_file "$python_sidecar" "Plasma Python runtime sidecar"
     fi
   fi
+  if [[ -n "$openocd_artifact" ]]; then
+    require_file "$openocd_runtime_tool" "OpenOCD runtime tool"
+    require_file "$openocd_artifact" "OpenOCD runtime artifact"
+    if [[ -n "$openocd_sidecar" ]]; then
+      require_file "$openocd_sidecar" "OpenOCD runtime sidecar"
+    fi
+  elif [[ ! -f "$openocd_evidence" ]]; then
+    die "no qualified OpenOCD runtime evidence; provide --openocd-artifact"
+  fi
   require_file "$ppu_installer" "Z2 PPU installer"
   require_file "$deployment_tool" "Bootstrap deployment coordinator"
 }
@@ -160,10 +178,35 @@ install_or_reuse_python() {
   [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
 }
 
+install_or_reuse_openocd() {
+  if [[ -n "${openocd_artifact:-}" ]]; then
+    local -a args=(install "$openocd_artifact" --product-root "$product_root")
+    [[ -n "${openocd_sidecar:-}" ]] && args+=(--sidecar "$openocd_sidecar")
+    say "installing verified Plasma-owned ARMv7 OpenOCD runtime"
+    python3 "$openocd_runtime_tool" "${args[@]}"
+  fi
+  require_file "$openocd_evidence" "OpenOCD runtime evidence"
+  [[ "$(json_field "$openocd_evidence" hardware_runtime_ready 2>/dev/null || true)" == "false" ]] || \
+    die "OpenOCD runtime evidence must keep hardware_runtime_ready=false"
+  [[ "$(json_field "$openocd_evidence" starts_openocd_service 2>/dev/null || true)" == "false" ]] || \
+    die "OpenOCD runtime packaging must not start an OpenOCD service"
+  local binary scripts_root
+  binary="$(json_field "$openocd_evidence" binary)" || die "OpenOCD evidence is missing binary path"
+  scripts_root="$(json_field "$openocd_evidence" scripts_root)" || die "OpenOCD evidence is missing scripts root"
+  [[ "$binary" == "$product_root"/programming-engines/openocd/*/bin/openocd ]] || \
+    die "OpenOCD binary must remain below $product_root/programming-engines/openocd: $binary"
+  [[ "$scripts_root" == "$product_root"/programming-engines/openocd/*/share/openocd/scripts ]] || \
+    die "OpenOCD scripts must remain below the versioned Programming Engine root: $scripts_root"
+  [[ -x "$binary" ]] || die "OpenOCD binary is not executable: $binary"
+  [[ -d "$scripts_root/target" && -d "$scripts_root/interface" ]] || \
+    die "OpenOCD target/interface scripts are incomplete: $scripts_root"
+}
+
 activate_release() {
   require_root
   require_command python3
   install_or_reuse_python
+  install_or_reuse_openocd
   local -a args=(
     --installer "$ppu_installer"
     --product-root "$product_root"
@@ -333,6 +376,7 @@ if machine not in {"armv7", "armv7l"}:
     raise SystemExit(f"runtime host is not ARMv7: {machine}")
 PY
 
+  install_or_reuse_openocd
   verify_site_desired_operational_contract
 
   local base readiness loopback test_id loopback_request
@@ -383,11 +427,13 @@ PY
 
 show_status() {
   require_file "$install_evidence" "Z2 PS install evidence"
-  local release_id git_sha gateway_host python_path server_state web_state activation_state
+  local release_id git_sha gateway_host python_path openocd_runtime_id openocd_version server_state web_state activation_state
   release_id="$(json_field "$install_evidence" release_id)"
   git_sha="$(json_field "$install_evidence" git_sha)"
   gateway_host="$(json_field "$install_evidence" gateway_host)"
   python_path="$(json_field "$install_evidence" plasma_python.path)"
+  openocd_runtime_id="$(json_field "$openocd_evidence" runtime_id 2>/dev/null || printf 'not-installed')"
+  openocd_version="$(json_field "$openocd_evidence" openocd_version 2>/dev/null || printf 'unknown')"
   server_state="$(systemctl is-active plasma-server.service 2>/dev/null || true)"
   web_state="$(systemctl is-active plasma-web.service 2>/dev/null || true)"
   activation_state="$(systemctl is-active plasma-runtime-activation.service 2>/dev/null || true)"
@@ -395,6 +441,7 @@ show_status() {
   printf 'Release:       %s\n' "$release_id"
   printf 'Git SHA:       %s\n' "$git_sha"
   printf 'Plasma Python: %s\n' "$python_path"
+  printf 'OpenOCD:       %s (%s; packaged only, hardware disabled)\n' "$openocd_version" "$openocd_runtime_id"
   printf 'Gateway:       http://%s:18080\n' "$gateway_host"
   printf 'Server svc:    %s\n' "${server_state:-unknown}"
   printf 'Gateway svc:   %s\n' "${web_state:-unknown}"
