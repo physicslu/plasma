@@ -9,6 +9,7 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - "render.yaml"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
@@ -17,10 +18,14 @@ on:
       - "scripts/ppu-z2-installer*.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
+      - "scripts/openocd-runtime.py"
+      - "scripts/build-openocd-runtime.sh"
+      - "release/openocd.json"
       - "software/python/plasma_manager/**"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
+      - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
       - "software/python/tests/test_render_deployment.py"
       - "docs/deployment/z2like-demo-qemu.md"
@@ -30,6 +35,7 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - "render.yaml"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
       - "scripts/plasmactl-z2like-demo*"
       - "scripts/render-control-station-start.sh"
       - "scripts/z2like-demo-qemu*.py"
@@ -38,10 +44,14 @@ on:
       - "scripts/ppu-z2-installer*.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
+      - "scripts/openocd-runtime.py"
+      - "scripts/build-openocd-runtime.sh"
+      - "release/openocd.json"
       - "software/python/plasma_manager/**"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
+      - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
       - "software/python/tests/test_render_deployment.py"
       - "docs/deployment/z2like-demo-qemu.md"
@@ -80,8 +90,11 @@ jobs:
             scripts/z2like-demo-qemu-loopback-matrix.py \
             scripts/z2like-demo-qemu-build-kit.py \
             scripts/z2like-demo-qemu-deploy.py \
-            scripts/z2like-demo-nginx-ephemeral.py
+            scripts/z2like-demo-nginx-ephemeral.py \
+            scripts/openocd-runtime.py
+          bash -n scripts/build-openocd-runtime.sh
           bash -n scripts/plasmactl
+          bash -n scripts/plasmactl-z2-ps
           bash -n scripts/plasmactl-z2like-demo
           bash -n scripts/plasmactl-z2like-demo-managed-ingress
           bash -n scripts/render-control-station-start.sh
@@ -91,6 +104,7 @@ jobs:
           python -m pytest -q \
             software/python/tests/test_z2like_demo_qemu_contract.py \
             software/python/tests/test_z2like_demo_qemu_control_plane_contract.py \
+            software/python/tests/test_openocd_runtime_artifact.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
 
@@ -107,7 +121,7 @@ jobs:
 
   qemu-bootstrap-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -176,6 +190,14 @@ jobs:
             --release-artifact "$ppu" \
             --sidecar "$ppu.sha256"
 
+          openocd_out="$RUNNER_TEMP/openocd-armv7l"
+          bash scripts/build-openocd-runtime.sh "$openocd_out" armv7l
+          shopt -s nullglob
+          openocd_archives=("$openocd_out"/plasma-openocd-*-linux-armv7l.tar.gz)
+          test "${#openocd_archives[@]}" -eq 1
+          openocd="${openocd_archives[0]}"
+          python scripts/openocd-runtime.py verify "$openocd" --sidecar "$openocd.sha256"
+
           root="$RUNNER_TEMP/plasma-z2-ps-kit-$identity"
           mkdir -p "$root/scripts" "$root/artifacts" "$root/docs" "$RUNNER_TEMP/python-fixture"
           cp scripts/plasmactl "$root/scripts/plasmactl"
@@ -184,8 +206,10 @@ jobs:
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
+          cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
           cp scripts/z2like-demo-qemu-installer.py "$root/scripts/z2like-demo-qemu-installer.py"
           cp "$ppu" "$ppu.sha256" "$root/artifacts/"
+          cp "$openocd" "$openocd.sha256" "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
 
           # This acceptance exercises the ARMv7 packaged PPU Runtime and the exact
@@ -203,7 +227,8 @@ jobs:
 
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
-            "$root/scripts/z2-python-runtime.py" "$root/scripts/z2like-demo-qemu-installer.py"
+            "$root/scripts/z2-python-runtime.py" "$root/scripts/openocd-runtime.py" \
+            "$root/scripts/z2like-demo-qemu-installer.py"
           (
             cd "$root"
             find scripts artifacts docs -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
@@ -215,6 +240,21 @@ jobs:
             sha256sum "$(basename "$kit")" > "$(basename "$kit").sha256"
           )
           echo "kit=$kit" >> "$GITHUB_OUTPUT"
+          echo "openocd=$openocd" >> "$GITHUB_OUTPUT"
+
+      - name: Install and smoke packaged OpenOCD inside QEMU ARMv7 target
+        env:
+          OPENOCD_ARTIFACT: ${{ steps.kit.outputs.openocd }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_name="$(basename "$OPENOCD_ARTIFACT")"
+          docker cp scripts/openocd-runtime.py plasma-z2like-demo-qemu:/tmp/openocd-runtime.py
+          docker cp "$OPENOCD_ARTIFACT" "plasma-z2like-demo-qemu:/tmp/$artifact_name"
+          docker cp "$OPENOCD_ARTIFACT.sha256" "plasma-z2like-demo-qemu:/tmp/$artifact_name.sha256"
+          docker exec plasma-z2like-demo-qemu python3 /tmp/openocd-runtime.py install \
+            "/tmp/$artifact_name" --sidecar "/tmp/$artifact_name.sha256"
+          docker exec plasma-z2like-demo-qemu python3 -c 'import json,subprocess; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["architecture"] == "armv7l"; assert p["hardware_runtime_ready"] is False; subprocess.run([p["binary"], "--version"], check=True); subprocess.run([p["binary"], "-s", p["scripts_root"], "-c", "adapter driver dummy", "-c", "shutdown"], check=True)'
 
       - name: Drive Manager to Bootstrap to QEMU deployment E2E
         env:
