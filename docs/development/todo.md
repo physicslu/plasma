@@ -6,6 +6,107 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+### OpenOCD Control-Plane Qualification
+
+**Status:** TODO / next SW/PPU milestone
+
+**Layer:** SW/PPU / Programming Backend / PPU runtime
+
+**Reason:** Plasma already has a software-only compiled-plan executor, fake OpenOCD subprocess coverage, Site safety sequencing, Control Station routing, packaged ARMv7 PPU runtime and SWPC/QEMU acceptance. The next product step is to qualify the real OpenOCD process-control path from Console to PS without prematurely claiming SWD, PL, target-power or real-IC readiness.
+
+The milestone is intentionally scoped to:
+
+```text
+Console
+  -> BFF / Manager
+  -> PPU Gateway
+  -> Plasma PS Runtime
+  -> OpenOCD Worker
+  -> Tcl RPC
+  -> real OpenOCD process
+```
+
+It must keep:
+
+```text
+hardware_runtime_ready = false
+```
+
+until a later physical Z2 + adapter + target qualification explicitly promotes the hardware path.
+
+Required work packages:
+
+1. **OpenOCD Runtime Packaging**
+   - pin the qualified OpenOCD version and build inputs;
+   - produce immutable x86_64 CI and Linux ARMv7 artifacts;
+   - install under a Plasma-owned versioned programming-engine path rather than relying on distro `apt openocd`;
+   - retain the OpenOCD script tree with the binary;
+   - verify artifact SHA-256, executable architecture and runtime/shared-library dependencies.
+
+2. **OpenOCD Tcl RPC / Worker**
+   - implement a production `OpenOCDRpcClient` using the Tcl machine interface and `0x1A` framing;
+   - implement `OpenOCDWorker` process lifecycle, readiness, timeout, cancellation, kill/restart and cleanup;
+   - bind Tcl RPC to loopback only and disable normal GDB/Telnet services for offline programming runtime use;
+   - allocate per-Site local RPC endpoints dynamically rather than hard-coding one global port;
+   - reuse the existing canonical plan validation, artifact staging and command-rendering contracts rather than creating a second programming-plan implementation.
+
+3. **CI Real-OpenOCD Qualification**
+   - run the real OpenOCD binary with a software-only/dummy adapter where supported;
+   - validate RPC connection, command/response framing, invalid commands, timeout, disconnect, crash/restart, cancellation and port-collision behavior;
+   - run eight isolated workers and prove one worker failure does not block recovery/control of the other Sites;
+   - retain fake-process tests for narrow deterministic failure injection, but do not treat them as the final OpenOCD process qualification.
+
+4. **Console -> PS OpenOCD Loop Test**
+   - add an Engineering/Platform diagnostic that follows the real production routing owner from Console through Manager/Gateway to the PPU Runtime;
+   - start or inspect the real OpenOCD worker on the PS and issue only safe control-plane Tcl commands;
+   - report OpenOCD version, process state, Tcl RPC state, architecture, Site identity, latency and PASS/FAIL;
+   - return an explicit evidence boundary such as `execution_capability=openocd-control-plane-only` and `hardware_runtime_ready=false`;
+   - do not touch SWD/JTAG, DUT POWER/RESET, target detection or flash in this loop test.
+
+5. **SWPC QEMU ARMv7 End-to-End Qualification**
+   - include the ARMv7 OpenOCD artifact in the canonical z2like-demo PPU package;
+   - execute the real ARMv7 OpenOCD binary inside the SWPC QEMU PPU;
+   - drive the OpenOCD Loop Test from the real Console/Manager/Gateway route;
+   - validate packaging, permissions, script lookup, Tcl RPC, process recovery and eight-Site failure isolation;
+   - add an explicit CI/CD gate for this ARMv7 control-plane path.
+
+Exit criteria:
+
+```text
+Console -> PS -> real OpenOCD -> Tcl RPC
+```
+
+must pass in both CI and SWPC ARMv7 QEMU with deterministic failure/recovery coverage and without enabling the production hardware route.
+
+Out of scope for this milestone:
+
+- custom `plasma_adapter.c`;
+- FPGA SWD/JTAG transport;
+- physical DUT power/reset sequencing;
+- target detection;
+- flash erase/program/verify on real silicon;
+- `hardware_runtime_ready=true`;
+- real-IC or physical eight-Site qualification.
+
+Only after this milestone passes should the next hardware phase proceed to:
+
+```text
+Physical Z2
+  -> OpenOCD
+  -> Plasma adapter
+  -> FPGA SWD/JTAG engine
+  -> target IC
+```
+
+Related architecture:
+
+- [Device Support / Hardware Execution / OpenOCD Architecture](../architecture/device-support-hardware-openocd.md)
+- [IC Support OpenOCD Compiled-Plan Executor](../architecture/ic-support-openocd-plan-executor.md)
+
+Architectural invariant:
+
+> Qualify the OpenOCD control plane before adding the hardware transport. CI/QEMU evidence may prove process/routing/runtime behavior, but it must never be reported as SWD, PL, electrical or real-IC evidence.
+
 ### Security Rollout and Identity Integration
 
 **Status:** TODO / follow-up after PRs #167-#169
