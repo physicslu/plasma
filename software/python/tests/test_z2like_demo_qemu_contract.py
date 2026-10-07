@@ -159,6 +159,10 @@ def test_local_kit_builder_keeps_simulation_python_boundary_explicit():
     assert "ppu-z2-installer.py" in source
     assert "simulation-only Python artifact fixture; never production-qualified" in source
     assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
+    assert '"openocd_hardware_runtime_ready": False' in source
+    assert "openocd-runtime.py" in source
+    assert "build-openocd-runtime.sh" in source
+    assert "linux-armv7l.tar.gz" in source
     assert "stdout=subprocess.PIPE" in source
     assert "file=sys.stderr" in source
 
