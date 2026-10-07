@@ -248,12 +248,19 @@ jobs:
             platform_name="linux/amd64"
             image="ubuntu:22.04"
           fi
-          docker run --rm             --platform "$platform_name"             --volume "$PWD:/repo:ro"             --volume "$artifact_dir:/artifacts:ro"             --env ARTIFACT_NAME="$artifact_name"             "$image"             bash -euxo pipefail -c '
+          docker run --rm \
+            --platform "$platform_name" \
+            --volume "$PWD:/repo:ro" \
+            --volume "$artifact_dir:/artifacts:ro" \
+            --env ARTIFACT_NAME="$artifact_name" \
+            "$image" \
+            bash -euxo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
               apt-get install -y --no-install-recommends python3
               artifact="/artifacts/$ARTIFACT_NAME"
-              python3 /repo/scripts/openocd-runtime.py install                 "$artifact" --sidecar "$artifact.sha256"
+              python3 /repo/scripts/openocd-runtime.py install \
+                "$artifact" --sidecar "$artifact.sha256"
               binary="$(python3 -c '"'"'import json; print(json.load(open("/opt/plasma/install/openocd-runtime.json"))["binary"])'"'"')"
               scripts_root="$(python3 -c '"'"'import json; print(json.load(open("/opt/plasma/install/openocd-runtime.json"))["scripts_root"])'"'"')"
               "$binary" --version
