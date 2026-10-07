@@ -39,6 +39,16 @@ Affected families:
 | Active OpenOCD route coverage | 78.9890% | **86.0220%** |
 | Active route gap | 956 | **636** |
 
+## Frozen proposal provenance
+
+- promotion exact-set SHA-256: `32ca466183a44288c903c923b20df36ad25de0824397a98625550e53e245f69e`
+- promotion delta CSV SHA-256: `b6671cdd17d9e6755920bd2d69a827891b70b02b697178640de009066a796d81`
+- source workflow run: `37590758341`
+- artifact ID: `11469080022`
+- artifact SHA-256: `e66a9882e972e6c8458fcaa18e1070ab87485a7398af248ec1f0f4e7dcf9faa9`
+
+The frozen lock also binds the exact proposed Git blob and SHA-256 for all eight affected family CSVs.
+
 ## Critical boundary
 
 These OpenOCD route rows are still upstream `mapping_candidate` records with `validation_status=not_verified`.
