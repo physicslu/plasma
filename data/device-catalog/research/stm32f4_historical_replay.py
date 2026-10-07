@@ -19,6 +19,22 @@ def _phase_rank(label: str) -> int:
     return rank
 
 
+def is_final_layer1_tail(row: Mapping[str, str]) -> bool:
+    """Return whether a row belongs to the post-Phase-4.2 final Layer-1 tail."""
+
+    return (
+        row.get("mapping_status") == "no_mapping"
+        and row.get("source_type")
+        == "official_st_exact_product_authority_plus_locked_active_lifecycle"
+    )
+
+
+def without_final_layer1_tail(rows):
+    """Return the immutable pre-v6.2 STM32F4 historical view."""
+
+    return [row for row in rows if not is_final_layer1_tail(row)]
+
+
 def admitted_after_phase42(row: Mapping[str, str], cutoff: str) -> bool:
     """Return whether a canonical row was admitted after the Phase 4.2 cutoff."""
 
@@ -28,11 +44,7 @@ def admitted_after_phase42(row: Mapping[str, str], cutoff: str) -> bool:
     # transactions. They intentionally have no retained Phase 4.2 evidence
     # binding and no backend route, so historical replays must treat them as
     # post-Phase-4.2 additions rather than folding them into old prestates.
-    if (
-        row.get("mapping_status") == "no_mapping"
-        and row.get("source_type")
-        == "official_st_exact_product_authority_plus_locked_active_lifecycle"
-    ):
+    if is_final_layer1_tail(row):
         return True
 
     match = PHASE42_EVIDENCE.search(row.get("source_reference", ""))
