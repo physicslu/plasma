@@ -1,0 +1,42 @@
+name: STM32H7 Layer-1 admission proposal v5.8
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/prepare_stm32h7_layer1_admission_proposal_v58.py'
+      - 'data/device-catalog/research/test_prepare_stm32h7_layer1_admission_proposal_v58.py'
+      - 'data/device-catalog/research/STM32H7_LAYER1_ADMISSION_PROPOSAL_V58.md'
+      - 'data/device-catalog/research/stm32h7-layer1-admission-proposal-v5.8.json'
+      - 'data/device-catalog/research/validate_stm32h7_layer1_proposal_lock_v58.py'
+      - '.github/workflows/device-catalog-stm32h7-layer1-proposal-v58.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate STM32H7 delta proposal
+        run: |
+          python data/device-catalog/research/prepare_stm32h7_layer1_admission_proposal_v58.py \
+            --proposal /tmp/stm32h7-v58.csv \
+            --summary /tmp/stm32h7-v58.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_stm32h7_layer1_admission_proposal_v58.py -v
+          if [ -f data/device-catalog/research/validate_stm32h7_layer1_proposal_lock_v58.py ]; then
+            python data/device-catalog/research/validate_stm32h7_layer1_proposal_lock_v58.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32h7-layer1-admission-proposal-v58
+          path: |
+            /tmp/stm32h7-v58.csv
+            /tmp/stm32h7-v58.json
+          if-no-files-found: error
+          retention-days: 30
