@@ -30,7 +30,7 @@ SCHEMA_VERSION = 1
 SUPPORTED_ARCHITECTURES = {"x86_64": 62, "armv7l": 40}
 MAX_ARCHIVE_FILES = 50000
 MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
-VERSION_PATTERN = re.compile(r"Open On-Chip Debugger\\s+([0-9]+\\.[0-9]+\\.[0-9]+)")
+VERSION_PATTERN = re.compile(r"Open On-Chip Debugger\s+([0-9]+\.[0-9]+\.[0-9]+)")
 
 
 class OpenOCDRuntimeArtifactError(RuntimeError):
@@ -120,7 +120,7 @@ def _elf_architecture(path: Path) -> str:
             header = stream.read(20)
     except OSError as exc:
         raise OpenOCDRuntimeArtifactError(f"cannot read OpenOCD ELF header: {exc}") from exc
-    if len(header) < 20 or header[:4] != b"\\x7fELF":
+    if len(header) < 20 or header[:4] != b"\x7fELF":
         raise OpenOCDRuntimeArtifactError("OpenOCD executable is not an ELF binary")
     endian = header[5]
     if endian == 1:
@@ -158,12 +158,12 @@ def _write_internal_hashes(root: Path) -> None:
         if path == sums:
             continue
         lines.append(f"{_sha256(path)}  {path.relative_to(root).as_posix()}")
-    sums.write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+    sums.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _write_sidecar(artifact: Path) -> Path:
     sidecar = Path(str(artifact) + ".sha256")
-    sidecar.write_text(f"{_sha256(artifact)}  {artifact.name}\\n", encoding="utf-8")
+    sidecar.write_text(f"{_sha256(artifact)}  {artifact.name}\n", encoding="utf-8")
     return sidecar
 
 
@@ -176,7 +176,7 @@ def _validate_source_commit(value: str) -> str:
 
 def _validate_version(value: str) -> str:
     version = value.strip()
-    if re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", version) is None:
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
         raise OpenOCDRuntimeArtifactError(f"invalid OpenOCD version: {value!r}")
     return version
 
@@ -256,7 +256,7 @@ def build_artifact(
             },
         }
         (root / "runtime.json").write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         _write_internal_hashes(root)
         with tarfile.open(artifact, "w:gz", format=tarfile.PAX_FORMAT) as archive:
@@ -535,7 +535,7 @@ def install_artifact(
                 shutil.rmtree(staging)
             shutil.copytree(source_root, staging, symlinks=False)
             (staging / "plasma-runtime.json").write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\\n",
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
             os.replace(staging, target)
@@ -576,7 +576,7 @@ def install_artifact(
         evidence_path = install_root / "openocd-runtime.json"
         temporary_evidence = evidence_path.with_name(f".{evidence_path.name}.tmp-{os.getpid()}")
         temporary_evidence.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         os.replace(temporary_evidence, evidence_path)
