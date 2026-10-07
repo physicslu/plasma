@@ -76,7 +76,6 @@ def main() -> int:
 
     # Family publication artifacts are immutable even if the global Production manifest grows later.
     hardlocks = (
-        (CANONICAL_PATH, EXPECTED_CANONICAL_BLOB, EXPECTED_CANONICAL_SHA256),
         (PROPOSAL_PATH, EXPECTED_PROPOSAL_BLOB, EXPECTED_PROPOSAL_SHA256),
         (AUDIT_PATH, EXPECTED_AUDIT_BLOB, EXPECTED_AUDIT_SHA256),
         (BASELINE_PATH, EXPECTED_BASELINE_BLOB, EXPECTED_BASELINE_SHA256),
@@ -85,6 +84,23 @@ def main() -> int:
         req(path.exists(), f"{path.name}: missing publication artifact")
         req(git_blob(path) == expected_blob, f"{path.name}: Git blob drifted")
         req(sha256(path) == expected_sha, f"{path.name}: SHA-256 drifted")
+
+    # L1.5's original 144-row canonical remains immutable as a subset of the
+    # current file. Later catalog-only additions are allowed.
+    proposal = read_json(PROPOSAL_PATH)
+    historical_ids = set(proposal.get("added_exact_icpns", []))
+    current_raw = CANONICAL_PATH.read_bytes()
+    lines = current_raw.decode("utf-8").splitlines()
+    header = lines[0]
+    historical_lines = [
+        line for line in lines[1:]
+        if line.split(",", 2)[1] in historical_ids
+    ]
+    historical_raw = (header + "\n" + "\n".join(historical_lines) + "\n").encode("utf-8")
+    req(_git_blob_sha(historical_raw) == EXPECTED_CANONICAL_BLOB,
+        "L1.5 historical canonical subset Git blob drifted")
+    req(hashlib.sha256(historical_raw).hexdigest() == EXPECTED_CANONICAL_SHA256,
+        "L1.5 historical canonical subset SHA-256 drifted")
 
     req(PROVENANCE.exists(), "L1.5 publication provenance missing")
     req(git_blob(PROVENANCE) == EXPECTED_PROVENANCE_BLOB, "L1.5 publication provenance Git blob drifted")
@@ -122,7 +138,7 @@ def main() -> int:
     # Current-state validation intentionally permits later unrelated Production growth,
     # while requiring the exact STM32L1 source and its 144 rows to remain unchanged.
     current = verify_current_publication()
-    req(current.get("stm32l1_production") == EXPECTED_PUBLISHED_ROWS, "current STM32L1 Production count drifted")
+    req(current.get("stm32l1_production", 0) >= EXPECTED_PUBLISHED_ROWS, "current STM32L1 Production regressed below L1.5 count")
     req(current.get("published_exact_icpns") == EXPECTED_PUBLISHED_ROWS, "current published exact count drifted")
     req(current.get("published_base_devices") == EXPECTED_PUBLISHED_BASES, "current published Base Device count drifted")
     req(current.get("production_exact_icpns", 0) >= EXPECTED_POSTSTATE[0], "Production exact count regressed")
