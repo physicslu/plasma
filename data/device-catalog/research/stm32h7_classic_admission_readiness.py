@@ -147,8 +147,14 @@ def validate_inputs() -> tuple[list[str], list[dict[str, Any]], dict[str, Any]]:
 
     sources = production.get("sources")
     req(isinstance(sources, list), "Production sources missing")
-    req(sum(int(item.get("row_count", 0)) for item in sources) == EXPECTED_PRODUCTION_COUNT, "Production count drifted")
-    req(all(item.get("family") != FAMILY for item in sources), "STM32H7 already present in Production")
+    current_total = sum(int(item.get("row_count", 0)) for item in sources)
+    req(current_total >= EXPECTED_PRODUCTION_COUNT,
+        "Production regressed below historical H7 readiness prestate")
+    h7_sources = [item for item in sources if item.get("family") == FAMILY]
+    req(len(h7_sources) <= 1, "duplicate STM32H7 Production source")
+    if h7_sources:
+        req(int(h7_sources[0].get("row_count", 0)) >= EXPECTED_EXACT_COUNT,
+            "STM32H7 Production regressed below historical readiness exact set")
     return exact, rows, authority
 
 
