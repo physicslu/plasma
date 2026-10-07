@@ -1,0 +1,25 @@
+name: OpenOCD Active coverage classification v6.3
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-production-not-current-active-v6.3.txt'
+      - 'data/device-catalog/research/openocd-active-coverage-classification-v6.3.json'
+      - 'data/device-catalog/research/validate_openocd_active_coverage_v63.py'
+      - 'data/device-catalog/research/OPENOCD_ACTIVE_COVERAGE_CLASSIFICATION_V63.md'
+      - '.github/workflows/device-catalog-openocd-active-coverage-v63.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate OpenOCD Active coverage classification
+        run: python data/device-catalog/research/validate_openocd_active_coverage_v63.py
