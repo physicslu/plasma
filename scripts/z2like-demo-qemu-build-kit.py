@@ -93,12 +93,51 @@ def _copy(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
+def _openocd_artifact(repo: Path, output_dir: Path) -> Path:
+    external = os.environ.get("PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR")
+    artifact_dir = Path(external).expanduser().resolve() if external else output_dir / "openocd-armv7l"
+    if external is None:
+        if artifact_dir.exists():
+            shutil.rmtree(artifact_dir)
+        _run(
+            ["bash", "scripts/build-openocd-runtime.sh", str(artifact_dir), "armv7l"],
+            cwd=repo,
+        )
+    candidates = sorted(
+        path
+        for path in artifact_dir.glob("plasma-openocd-*-linux-armv7l.tar.gz")
+        if path.is_file()
+    )
+    if len(candidates) != 1:
+        raise BuildError(
+            f"expected exactly one ARMv7 OpenOCD runtime artifact in {artifact_dir}, found {candidates}"
+        )
+    artifact = candidates[0]
+    sidecar = Path(f"{artifact}.sha256")
+    if not sidecar.is_file():
+        raise BuildError(f"OpenOCD runtime sidecar is missing: {sidecar}")
+    _run(
+        [
+            "python3",
+            "scripts/openocd-runtime.py",
+            "verify",
+            str(artifact),
+            "--sidecar",
+            str(sidecar),
+        ],
+        cwd=repo,
+    )
+    return artifact
+
+
 def build(output_dir: Path) -> dict[str, str]:
     repo = _repo_root()
     sha = _require_clean_source(repo)
     identity = f"{_product_version(repo)}-{sha[:12]}"
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    openocd_artifact = _openocd_artifact(repo, output_dir)
+    openocd_sidecar = Path(f"{openocd_artifact}.sha256")
 
     runtime = output_dir / "plasma-ppu-runtime"
     release = output_dir / "plasma-ppu-release"
@@ -155,11 +194,14 @@ def build(output_dir: Path) -> dict[str, str]:
         "ppu-z2-installer.py",
         "ppu-z2-installer-core.py",
         "z2-python-runtime.py",
+        "openocd-runtime.py",
         "z2like-demo-qemu-installer.py",
     ):
         _copy(repo / "scripts" / name, scripts_dir / name)
     _copy(ppu, artifacts_dir / ppu.name)
     _copy(ppu_sidecar, artifacts_dir / ppu_sidecar.name)
+    _copy(openocd_artifact, artifacts_dir / openocd_artifact.name)
+    _copy(openocd_sidecar, artifacts_dir / openocd_sidecar.name)
     _copy(repo / "docs/deployment/z2-ps-installer.md", docs_dir / "README.md")
 
     fixture_root = output_dir / "python-fixture"
@@ -181,6 +223,7 @@ def build(output_dir: Path) -> dict[str, str]:
         "ppu-bootstrap-deployment.py",
         "ppu-z2-installer.py",
         "z2-python-runtime.py",
+        "openocd-runtime.py",
         "z2like-demo-qemu-installer.py",
     ):
         (scripts_dir / name).chmod(0o755)
@@ -206,6 +249,8 @@ def build(output_dir: Path) -> dict[str, str]:
         "kit": str(kit),
         "sidecar": str(sidecar),
         "python_artifact_execution": "not_executed_in_qemu-simulation",
+        "openocd_artifact": openocd_artifact.name,
+        "openocd_hardware_runtime_ready": "false",
     }
 
 
