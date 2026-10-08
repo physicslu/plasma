@@ -50,6 +50,15 @@ def _fake_prefix(tmp_path: Path) -> Path:
     return prefix
 
 
+def test_openocd_builder_avoids_documentation_only_git2cl_submodule() -> None:
+    source = BUILD_SCRIPT.read_text(encoding="utf-8")
+    assert "git submodule update --init --recursive" not in source
+    assert "git submodule update --init --depth 1" in source
+    assert "jimtcl" in source
+    assert "src/jtag/drivers/libjaylink" in source
+    assert "tools/git2cl" not in source
+
+
 def test_release_metadata_pins_upstream_openocd_identity() -> None:
     payload = json.loads(METADATA.read_text(encoding="utf-8"))
     assert payload == {
