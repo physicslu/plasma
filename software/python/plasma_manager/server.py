@@ -78,6 +78,7 @@ _MANAGED_POST_PATTERNS = tuple(
         r"^/api/settings/sites/[1-9][0-9]*$",
         r"^/api/mock/runtime$",
         r"^/api/engineering/diagnostics/loopback$",
+        r"^/api/engineering/diagnostics/openocd-control-plane$",
         r"^/api/engineering/session$",
         r"^/api/jobs$",
         rf"^/api/jobs/{_SEGMENT}/cancel$",
@@ -890,7 +891,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             return
 
         manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
-        if target_path == "/api/engineering/diagnostics/loopback" and status == HTTPStatus.OK:
+        if target_path in {"/api/engineering/diagnostics/loopback", "/api/engineering/diagnostics/openocd-control-plane"} and status == HTTPStatus.OK:
             try:
                 payload = json.loads(response_body)
             except (UnicodeDecodeError, json.JSONDecodeError):
