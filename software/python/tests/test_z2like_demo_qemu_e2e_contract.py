@@ -15,10 +15,12 @@ def test_workflow_runs_armv7_qemu_and_manager_bootstrap_e2e():
     assert "python scripts/z2like-demo-qemu-e2e.py" in source
     assert "test -z \"$(docker port plasma-z2like-demo-qemu)\"" in source
     assert "simulation-only Z2 kit fixture" in source
-    assert "Install and smoke packaged OpenOCD inside QEMU ARMv7 target" in source
-    assert "scripts/openocd-runtime.py" in source
+    assert "Verify kit-deployed OpenOCD inside QEMU ARMv7 target" in source
+    assert "Install and smoke packaged OpenOCD inside QEMU ARMv7 target" not in source
+    assert "docker cp scripts/openocd-runtime.py plasma-z2like-demo-qemu:/tmp/openocd-runtime.py" not in source
     assert "scripts/build-openocd-runtime.sh" in source
     assert 'assert p["hardware_runtime_ready"] is False' in source
+    assert 'assert p["starts_openocd_service"] is False' in source
     assert '"adapter driver dummy"' in source
     assert "Build standalone Control Station Console/BFF" in source
     assert "software/web/dist/standalone/server.js" in source
@@ -56,6 +58,8 @@ def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source
     assert "hardware_runtime_ready" in source
     assert "Console/BFF -> Manager -> Gateway -> Worker -> Tcl RPC" in source
+    assert "OpenOCD is part of the canonical kit deployment contract" in source
+    assert "must not preinstall or copy an OpenOCD runtime" in source
     assert "live SWPC operator-run control-plane qualification" in source
 
 

@@ -267,21 +267,6 @@ jobs:
             sha256sum "$(basename "$kit")" > "$(basename "$kit").sha256"
           )
           echo "kit=$kit" >> "$GITHUB_OUTPUT"
-          echo "openocd=$openocd" >> "$GITHUB_OUTPUT"
-
-      - name: Install and smoke packaged OpenOCD inside QEMU ARMv7 target
-        env:
-          OPENOCD_ARTIFACT: ${{ steps.kit.outputs.openocd }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          artifact_name="$(basename "$OPENOCD_ARTIFACT")"
-          docker cp scripts/openocd-runtime.py plasma-z2like-demo-qemu:/tmp/openocd-runtime.py
-          docker cp "$OPENOCD_ARTIFACT" "plasma-z2like-demo-qemu:/tmp/$artifact_name"
-          docker cp "$OPENOCD_ARTIFACT.sha256" "plasma-z2like-demo-qemu:/tmp/$artifact_name.sha256"
-          docker exec plasma-z2like-demo-qemu python3 /tmp/openocd-runtime.py install \
-            "/tmp/$artifact_name" --sidecar "/tmp/$artifact_name.sha256"
-          docker exec plasma-z2like-demo-qemu python3 -c 'import json,subprocess; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["architecture"] == "armv7l"; assert p["hardware_runtime_ready"] is False; subprocess.run([p["binary"], "--version"], check=True); subprocess.run([p["binary"], "-s", p["scripts_root"], "-c", "adapter driver dummy", "-c", "shutdown"], check=True)'
 
       - name: Drive Manager to Bootstrap to QEMU deployment E2E
         env:
@@ -291,6 +276,12 @@ jobs:
             --kit "$KIT" \
             --sidecar "$KIT.sha256" \
             --console-server software/web/dist/standalone/server.js
+
+      - name: Verify kit-deployed OpenOCD inside QEMU ARMv7 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec plasma-z2like-demo-qemu python3 -c 'import json,subprocess; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["result"] == "PASS"; assert p["architecture"] == "armv7l"; assert p["hardware_runtime_ready"] is False; assert p["starts_openocd_service"] is False; subprocess.run([p["binary"], "--version"], check=True); subprocess.run([p["binary"], "-s", p["scripts_root"], "-c", "adapter driver dummy", "-c", "shutdown"], check=True)'
 
       - name: Qualify eight isolated OpenOCD workers inside deployed ARMv7 PPU
         shell: bash

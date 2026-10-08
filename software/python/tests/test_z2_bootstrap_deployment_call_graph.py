@@ -126,6 +126,10 @@ def test_bootstrap_kit_requires_current_durable_coordinator_and_installer_core()
     source = BOOTSTRAP_KIT.read_text(encoding="utf-8")
     assert 'scripts / "ppu-bootstrap-deployment.py"' in source
     assert 'scripts / "ppu-z2-installer-core.py"' in source
+    assert 'scripts / "openocd-runtime.py"' in source
+    assert '"plasma-openocd-*-linux-armv7l.tar.gz"' in source
+    assert '"--openocd-artifact"' in source
+    assert '"--openocd-sidecar"' in source
     assert "missing required deployment tooling" in source
 
 
