@@ -1,0 +1,28 @@
+name: OpenOCD G0 prefix semantics probe v6.10
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/probe_openocd_g0_prefix_semantics_v610.py'
+      - 'data/device-catalog/research/test_probe_openocd_g0_prefix_semantics_v610.py'
+      - 'data/device-catalog/research/OPENOCD_G0_PREFIX_SEMANTICS_PROBE_V610.md'
+      - '.github/workflows/device-catalog-openocd-g0-prefix-v610.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          python data/device-catalog/research/probe_openocd_g0_prefix_semantics_v610.py --output /tmp/v610.csv --summary /tmp/v610.json
+          python -m unittest discover -s data/device-catalog/research -p test_probe_openocd_g0_prefix_semantics_v610.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-g0-prefix-v610
+          path: |
+            /tmp/v610.csv
+            /tmp/v610.json
+          retention-days: 30
