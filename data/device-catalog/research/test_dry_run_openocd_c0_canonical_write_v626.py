@@ -25,6 +25,18 @@ class TestOpenOCDC0CanonicalWriteDryRunV626(unittest.TestCase):
             "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
         )
 
+    def test_frozen_postimage(self):
+        self.assertEqual(
+            self.summary["canonical_postimage"]["git_blob_sha"],
+            "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+        )
+        self.assertEqual(
+            self.summary["canonical_postimage"]["sha256"],
+            "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+        )
+        self.assertEqual(self.summary["canonical_postimage"]["byte_count"],1583487)
+        self.assertEqual(self.summary["postimage_lock_state"],"FROZEN")
+
     def test_source_delta_is_v625_exact(self):
         self.assertEqual(
             self.summary["source_delta"]["sha256"],
