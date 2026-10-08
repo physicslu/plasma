@@ -1,0 +1,37 @@
+name: OpenOCD C0 one-char generalization probe v6.11
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/probe_openocd_c0_one_char_generalization_v611.py'
+      - 'data/device-catalog/research/test_probe_openocd_c0_one_char_generalization_v611.py'
+      - 'data/device-catalog/research/OPENOCD_C0_ONE_CHAR_GENERALIZATION_V611.md'
+      - '.github/workflows/device-catalog-openocd-c0-onechar-v611.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe STM32C0 one-character route semantics
+        run: |
+          python data/device-catalog/research/probe_openocd_c0_one_char_generalization_v611.py \
+            --output /tmp/openocd-c0-onechar-v611.csv \
+            --summary /tmp/openocd-c0-onechar-v611.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_probe_openocd_c0_one_char_generalization_v611.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-c0-onechar-v611
+          path: |
+            /tmp/openocd-c0-onechar-v611.csv
+            /tmp/openocd-c0-onechar-v611.json
+          if-no-files-found: error
+          retention-days: 30
