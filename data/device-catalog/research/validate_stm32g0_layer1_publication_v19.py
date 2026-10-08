@@ -4,6 +4,8 @@ import csv, hashlib, json
 from collections import Counter
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 MANIFEST=ROOT/"data/device-catalog/production/icpn-v1-manifest.json"
@@ -11,8 +13,8 @@ G0=HERE/"stm32g0-commercial-icpn.csv"
 GAPS=HERE/"stm32g0-active-exact-gap-v1.5.txt"
 AUDIT=HERE/"stm32g0-layer1-production-publication-v1.9.json"
 
-EXPECTED_G0_SHA256="48f097d7d06c1af4497fba4bc3e4b24b50bab120f4fdb98e4e584583ef90c233"
-EXPECTED_G0_BLOB="48ee24d55581ebda1ac4386f1f73890b2db058a7"
+EXPECTED_G0_SHA256="f858b5befc228e9ed9d288606c2f19d42303d5cff19b603dd5af165f010ba855"
+EXPECTED_G0_BLOB="4b1758ee6ca91a814ad128585a871843d4d0afd4"
 EXPECTED_GAP_SHA256="a6240e4a34e3834cba7195be306d449386dcac1b3e66189f6bfac8fdc7557a5d"
 
 def req(ok,msg):
@@ -37,6 +39,7 @@ def main():
     req(git_blob(data)==EXPECTED_G0_BLOB,"G0 git blob drift")
     with G0.open(newline="",encoding="utf-8") as f:
         rows=list(csv.DictReader(f))
+    publication_rows=rewind_v616_backend(rows,"STM32G0")
     req(len(rows)==406 and len({r["icpn"] for r in rows})==406,"G0 poststate count/unique drift")
 
     gaps=[x.strip() for x in GAPS.read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -44,12 +47,13 @@ def main():
     gap_hash=hashlib.sha256((chr(10).join(sorted(gaps))+chr(10)).encode()).hexdigest()
     req(gap_hash==EXPECTED_GAP_SHA256,"gap set digest drift")
     by_icpn={r["icpn"]:r for r in rows}
+    publication_by_icpn={r["icpn"]:r for r in publication_rows}
     req(set(gaps) <= set(by_icpn),"approved candidate missing from Production G0")
 
-    added=[by_icpn[x] for x in gaps]
+    added=[publication_by_icpn[x] for x in gaps]
     added_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in added)
     req(added_state==Counter({"mapped":317,"no_mapping":42}),f"approved backend partition drift: {dict(added_state)}")
-    all_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in rows)
+    all_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in publication_rows)
     req(all_state==Counter({"mapped":364,"no_mapping":42}),f"G0 backend poststate drift: {dict(all_state)}")
 
     for r in rows:

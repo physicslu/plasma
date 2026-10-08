@@ -74,8 +74,7 @@ def _write_phase43a_manifest(path: Path, expected: dict) -> None:
                 rows = [
                     row for row in reader
                     if not (
-                        row["mapping_status"] == "no_mapping"
-                        and row["source_type"]
+                        row["source_type"]
                         == "official_st_exact_product_authority_plus_locked_active_lifecycle"
                     )
                 ]

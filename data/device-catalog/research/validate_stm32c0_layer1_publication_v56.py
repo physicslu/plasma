@@ -6,6 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 CSV = HERE / "stm32c0-commercial-icpn.csv"
@@ -14,8 +16,8 @@ PROPOSAL = HERE / "stm32c0-layer1-admission-proposal-v5.5.json"
 PUBLICATION = HERE / "stm32c0-layer1-production-publication-v5.6.json"
 MANIFEST = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
 
-EXPECTED_CSV_SHA256 = "ee05c901a6783afc65c1c0725c9cfeb27d934173805ec5a4d92bd09b18747a90"
-EXPECTED_CSV_BLOB = "89108ae968cbc6c351f6b8854b888b465c51aae1"
+EXPECTED_CSV_SHA256 = "8ab34090f2cb8fa033e8e50190a61ac3688f1cfc27aa2f7b1dd9c7c6b6474e8c"
+EXPECTED_CSV_BLOB = "c015e131082a3f9fe32ca226a9b2ada71a5c350d"
 EXPECTED_GAP_SHA256 = "03b7202842b52aaa6362386864d60c62f64d9cefea74d2d039691ea170b79097"
 
 def git_blob(raw: bytes) -> str:
@@ -32,8 +34,9 @@ def main() -> int:
 
     with CSV.open(newline="", encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
+    publication_rows = rewind_v616_backend(rows, "STM32C0")
     require(len(rows) == 226, "C0 v5.6 row count drift")
-    by = {r["icpn"]: r for r in rows}
+    by = {r["icpn"]: r for r in publication_rows}
     require(len(by) == 226, "C0 v5.6 duplicate exact identity")
 
     gap = [x.strip() for x in GAP.read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -59,8 +62,8 @@ def main() -> int:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     sources = manifest["sources"]
     require(len(sources) == 28, "C0 v5.6 Production source-count drift")
-    require(sum(int(s["row_count"]) for s in sources) == 4606,
-            "C0 v5.6 Production exact-total drift")
+    require(sum(int(s["row_count"]) for s in sources) >= 4606,
+            "C0 v5.6 Production exact-total regressed below publication poststate")
     c0 = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"
           and s.get("family") == "STM32C0"]
     require(len(c0) == 1, "C0 v5.6 manifest source missing/duplicated")

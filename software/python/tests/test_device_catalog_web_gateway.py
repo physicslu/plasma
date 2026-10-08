@@ -53,11 +53,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
     def test_g0_no_mapping_identity_is_visible_without_backend_overclaim(self) -> None:
-        status, payload = self.request("/api/devices/search?q=STM32G071G8U6N&limit=1")
+        status, payload = self.request("/api/devices/search?q=STM32G0B1RBI3N&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
-        self.assertEqual(result["icpn"], "STM32G071G8U6N")
+        self.assertEqual(result["icpn"], "STM32G0B1RBI3N")
         self.assertEqual(result["family"], "STM32G0")
         self.assertEqual(result["catalog"]["scope"], "production_admitted")
         self.assertEqual(result["backend"]["mapping_status"], "no_mapping")

@@ -9,6 +9,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from openocd_backend_evolution_v616 import (
+    BackendEvolutionError,
+    validate_family_current_bindings,
+)
+
 from device_catalog_evidence_framework import (
     EvidenceFrameworkError,
     read_json,
@@ -167,6 +172,16 @@ def validate() -> dict[str, object]:
     }
     if set(tail_records) != expected_tail_ids:
         errors.append("final STM32F4 tail authority exact set drifted")
+    try:
+        promoted_tail_ids = validate_family_current_bindings(rows, FAMILY)
+    except BackendEvolutionError as exc:
+        promoted_tail_ids = set()
+        errors.append(f"v6.16 STM32F4 backend binding drift: {exc}")
+    if promoted_tail_ids != expected_tail_ids:
+        errors.append(
+            "v6.16 STM32F4 promoted set differs from final-tail authority: "
+            + ",".join(sorted(promoted_tail_ids ^ expected_tail_ids))
+        )
 
     observed_tail_ids: set[str] = set()
     for row in rows:
@@ -190,14 +205,6 @@ def validate() -> dict[str, object]:
             for key, expected in expected_meta.items():
                 if row.get(key) != expected:
                     errors.append(f"{icpn}: final-tail {key} mismatch")
-            if row.get("cmsis_device_name") != "":
-                errors.append(f"{icpn}: final-tail CMSIS name must remain unclaimed")
-            if row.get("existing_identifier") != "" or row.get("existing_identifier_kind") != "":
-                errors.append(f"{icpn}: final-tail backend identifier must remain unbound")
-            if row.get("mapping_status") != "no_mapping":
-                errors.append(f"{icpn}: final-tail mapping status must remain no_mapping")
-            if row.get("openocd_target_config") != "":
-                errors.append(f"{icpn}: final-tail target config must remain unbound")
             if row.get("source_type") != "official_st_exact_product_authority_plus_locked_active_lifecycle":
                 errors.append(f"{icpn}: final-tail source type mismatch")
             if row.get("source_reference") != tail["metadata_source_url"]:
@@ -251,7 +258,7 @@ def validate() -> dict[str, object]:
 
     return {
         "rows": len(rows),
-        "final_tail_no_mapping_rows": len(observed_tail_ids),
+        "final_tail_backend_evolved_rows": len(observed_tail_ids),
         "unique_icpns": len(set(values)),
         "retained_evidence_packages": len(packages),
         "retained_candidate_bindings": len(retained_rows),

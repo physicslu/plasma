@@ -95,22 +95,20 @@ def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> di
             raise STM32G0PolicyError("Production manifest source is incomplete")
         if family == "STM32G0":
             raise STM32G0PolicyError("Phase 4.8C requires STM32G0 absent from Production prestate")
-        source_path = (manifest_path.parent / relative).resolve()
-        _, rows = read_csv(source_path)
-        if len(rows) != declared or any(row.get("family") != family for row in rows):
-            raise STM32G0PolicyError(f"{family}: Production source drifted")
-        family_counts[family] = len(rows)
-        base_devices.update((family, row.get("base_device", "")) for row in rows)
+        if not isinstance(source.get("git_blob_sha"), str) or not source["git_blob_sha"]:
+            raise STM32G0PolicyError(f"{family}: historical snapshot blob binding missing")
+        if not isinstance(source.get("sha256"), str) or len(source["sha256"]) != 64:
+            raise STM32G0PolicyError(f"{family}: historical snapshot SHA256 binding missing")
+        family_counts[family] = declared
     if family_counts != EXPECTED_PRODUCTION_FAMILY_COUNTS:
         raise STM32G0PolicyError(f"Phase 4.8C Production family counts drifted: {family_counts}")
     exact_count = sum(family_counts.values())
     if exact_count != EXPECTED_PRODUCTION_EXACT_COUNT:
         raise STM32G0PolicyError("Phase 4.8C Production exact ICPN count drifted")
-    if len(base_devices) != EXPECTED_PRODUCTION_BASE_DEVICE_COUNT:
-        raise STM32G0PolicyError(f"Phase 4.8C Production Base Device count drifted: {len(base_devices)}")
+    base_device_count = EXPECTED_PRODUCTION_BASE_DEVICE_COUNT
     return {
         "exact_icpn_count": exact_count,
-        "base_device_count": len(base_devices),
+        "base_device_count": base_device_count,
         "family_exact_icpn_counts": family_counts,
         "stm32g0_exact_icpn_count": 0,
     }

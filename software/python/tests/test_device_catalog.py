@@ -332,8 +332,8 @@ def test_stm32g0_layer1_publication_preserves_independent_backend_state() -> Non
     assert mapped.mapping_method == "deterministic_ordering_pattern"
     assert mapped.target_config == "tcl/target/stm32g0x.cfg"
 
-    no_mapping = catalog.search("STM32G071G8U6N", limit=1)[0]
-    assert no_mapping.identifier == "STM32G071G8U6N"
+    no_mapping = catalog.search("STM32G0B1RBI3N", limit=1)[0]
+    assert no_mapping.identifier == "STM32G0B1RBI3N"
     assert no_mapping.family == "STM32G0"
     assert no_mapping.production_admitted is True
     assert no_mapping.mapping_status == "no_mapping"

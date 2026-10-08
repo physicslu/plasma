@@ -20,15 +20,15 @@ def test_stm32f7_publication_preserves_legacy_route_and_adds_unbound_layer1_rows
     assert added.package == "UFBGA"
     assert added.pin_count == "144"
     assert added.flash_size == "256 KiB"
-    assert added.mapping_status == "no_mapping"
-    assert added.mapping_method == "no_mapping"
-    assert added.target_config == ""
+    assert added.mapping_status == "mapped"
+    assert added.mapping_method == "deterministic_ordering_pattern"
+    assert added.target_config == "tcl/target/stm32f7x.cfg"
     assert added.production_admitted is True
 
     payload = added.to_payload()
     assert payload["catalog"]["scope"] == "production_admitted"
-    assert payload["backend"]["mapping_status"] == "no_mapping"
-    assert payload["backend"]["target_config"] == ""
+    assert payload["backend"]["mapping_status"] == "mapped"
+    assert payload["backend"]["target_config"] == "tcl/target/stm32f7x.cfg"
     assert payload["physical_validation"] == {
         "engineering_status": "no_evidence",
         "ppu_status": "no_evidence",
@@ -57,4 +57,6 @@ def test_stm32f7_package_specific_metadata_and_f750_override() -> None:
     assert override.pin_count == "100"
     assert override.flash_size == "64 KiB"
     assert override.temperature_grade == "-40 to 105 C"
-    assert override.mapping_status == "no_mapping"
+    assert override.mapping_status == "mapped"
+    assert override.mapping_method == "deterministic_ordering_pattern"
+    assert override.target_config == "tcl/target/stm32f7x.cfg"

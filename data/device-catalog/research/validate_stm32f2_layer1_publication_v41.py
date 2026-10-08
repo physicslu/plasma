@@ -8,6 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 
@@ -19,8 +21,8 @@ AUTHORITY = HERE / "stm32f2-ordering-authority-v3.9.json"
 PROPOSAL_LOCK = HERE / "stm32f2-layer1-admission-proposal-v4.0.json"
 AUDIT = HERE / "stm32f2-layer1-production-publication-v4.1.json"
 
-EXPECTED_F2_SHA256 = "c2e07ea181b88cfeca2772e7d0c4b00d1a0529805e5e82f3d9af8a7a981de5b6"
-EXPECTED_F2_BLOB = "15072e5a816f1749cd476aa85c6d27b94ae4aa74"
+EXPECTED_F2_SHA256 = "74c7eb15e360c5c5e1c1b174156b9fe5eb0137e406d9ff909d3b30399d640de9"
+EXPECTED_F2_BLOB = "528072232c498d1599c89c84b487f27718423e08"
 EXPECTED_ACTIVE_SHA256 = "60bf4cfcc07c5ec13bb11b290ea5e71da95f56f0fc4b1cdc2a05beaabe17986a"
 EXPECTED_GAP_SHA256 = "1ba037ac5bba68ab4907742e97be0d9d56fd15f5e32b89899a67359c6703f584"
 EXPECTED_PROPOSAL_SHA256 = "8bd6dce8d0e6f1d976a7708ac7afef785d214797567c12ef6a56bbc63d31e2a3"
@@ -122,11 +124,12 @@ def main() -> int:
     req(hashlib.sha256(data).hexdigest()==EXPECTED_F2_SHA256,"F2 Production SHA256 drift")
     req(git_blob(data)==EXPECTED_F2_BLOB,"F2 Production git blob drift")
     rows=read_rows(F2)
+    publication_rows=rewind_v616_backend(rows,"STM32F2")
     req(len(rows)==105 and len({r["icpn"] for r in rows})==105,"F2 Production count/unique drift")
     req(sorted(r["icpn"] for r in rows)==active,"F2 Production identities differ from locked Active set")
 
-    mapped=[r for r in rows if r["mapping_status"]!="no_mapping"]
-    unmapped=[r for r in rows if r["mapping_status"]=="no_mapping"]
+    mapped=[r for r in publication_rows if r["mapping_status"]!="no_mapping"]
+    unmapped=[r for r in publication_rows if r["mapping_status"]=="no_mapping"]
     req(sorted(r["icpn"] for r in mapped)==legacy,"legacy mapped F2 set drift")
     req(sorted(r["icpn"] for r in unmapped)==gap,"new F2 no_mapping set differs from approved additions")
 
@@ -163,7 +166,7 @@ def main() -> int:
         path=(MANIFEST.parent/source["path"]).resolve()
         for row in read_rows(path):
             backend["no_mapping" if row["mapping_status"]=="no_mapping" else "mapped"]+=1
-    req(backend["mapped"]>=3673 and backend["no_mapping"]>=641,
+    req(backend["mapped"]>=3673 and backend["no_mapping"]<=641,
         f"Production backend partition regressed below F2 publication poststate: {dict(backend)}")
     req(backend["mapped"]+backend["no_mapping"]==current_total,
         "current Production backend partition does not equal current exact total")
@@ -181,7 +184,7 @@ def main() -> int:
 
     print("STM32F2_LAYER1_PRODUCTION_PUBLICATION_V41_PASS")
     print(f"STM32F2=105; mapped=33; no_mapping=72; current_Production={current_total}; current_sources={len(sources)}")
-    print("Production backend partition=3673 mapped / 641 no_mapping")
+    print(f"Current Production backend partition={backend['mapped']} mapped / {backend['no_mapping']} no_mapping")
     print("Whole-ST Active identity coverage=4235/4550=93.0769%")
     return 0
 

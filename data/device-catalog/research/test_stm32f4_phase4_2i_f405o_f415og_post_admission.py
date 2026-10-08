@@ -18,6 +18,7 @@ from device_catalog_pipeline_framework import pipeline_plan_is_clean
 from stm32f4_admission import build_admission_plan
 from stm32f4_coverage_gap_inventory import build_inventory
 from stm32f4_historical_replay import admitted_after_phase42
+from openocd_backend_evolution_v616 import rewind_v616_backend
 from validate_stm32f4_retained_evidence import validate_retained_evidence
 
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
@@ -52,16 +53,19 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
 
     def test_production_contains_only_active_bounded_admission(self) -> None:
         rows = self._rows()
+        historical_rows = rewind_v616_backend(rows, "STM32F4")
         self.assertGreaterEqual(len(rows), 211)
         by_icpn = {row["icpn"]: row for row in rows}
+        historical_by = {row["icpn"]: row for row in historical_rows}
         self.assertTrue(EXPECTED <= set(by_icpn))
         self.assertTrue(EXCLUDED_NRND <= set(by_icpn))
         for icpn in EXCLUDED_NRND:
             current = by_icpn[icpn]
-            self.assertEqual(current["mapping_status"], "no_mapping")
-            self.assertEqual(current["existing_identifier"], "")
-            self.assertEqual(current["existing_identifier_kind"], "")
-            self.assertEqual(current["openocd_target_config"], "")
+            historical = historical_by[icpn]
+            self.assertEqual(historical["mapping_status"], "no_mapping")
+            self.assertEqual(historical["existing_identifier"], "")
+            self.assertEqual(historical["existing_identifier_kind"], "")
+            self.assertEqual(historical["openocd_target_config"], "")
             self.assertEqual(
                 current["source_type"],
                 "official_st_exact_product_authority_plus_locked_active_lifecycle",

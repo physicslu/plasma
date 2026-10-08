@@ -7,6 +7,8 @@ import io
 import json
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
 MANIFEST=ROOT/"data/device-catalog/production/icpn-v1-manifest.json"
@@ -19,32 +21,32 @@ FAMILIES={
         "path":HERE/"stm32f4-commercial-icpn.csv","before":384,"after":387,
         "old_blob":"2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
         "old_sha":"3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359",
-        "new_blob":"8983052017cca2c98caaaf899359c2fead33f40d",
-        "new_sha":"6a2fa67f58f4edc7bcf1c79a7077ca5e954c74ad2e223f0effdb600dc948d1cd",
+        "new_blob":"7f2003c27ec2f6d411bb0ca9c36931d5c5a2c71c",
+        "new_sha":"5bead55152fcaaa7f8d06ec330b9aa9e9c43a2b71c78fb3d1ecfccb3afc69cfb",
         "delta":3,
     },
     "STM32L4":{
         "path":HERE/"stm32l4-commercial-icpn.csv","before":446,"after":449,
         "old_blob":"6cbb7ee5f5189c7d510623940a8945a2bde38399",
         "old_sha":"f9ab12f70221a7a6fd934e977d2bed2fed7bdca8fdee9208aaf0a5082533793c",
-        "new_blob":"a39514712d8e27be344bd5837813d1c9d19c34c6",
-        "new_sha":"64e5f493581c5a2a06d86490c704dcb79f744369f1ddb8349f20a956b145f70f",
+        "new_blob":"081aeaa80ed558785ba062255cd322fdfa505ff4",
+        "new_sha":"d6275027b8dae3d53a78963c1d03643ffea25fb2190515e7c5fbc6f7f4d11f89",
         "delta":3,
     },
     "STM32L1":{
         "path":HERE/"stm32l1-commercial-icpn.csv","before":144,"after":146,
         "old_blob":"8c4ff4b3331f6fe21f04c117fa952802ed587f71",
         "old_sha":"72fcaf7e50537749f101e80cab7a403f3b3878006fe4019b99b99dadd2f409ec",
-        "new_blob":"a8120b7064832f4db81850e3e4764a13ef531754",
-        "new_sha":"ae0b13da9282d64b17d182af14ae9d151a55a512879b34cd20c810ea926699da",
+        "new_blob":"3addf804d35382cadca3e54060c05c0d3084116c",
+        "new_sha":"f11dc8486348e3625d5129ee61cb29679b6597ee8ef0a28bc45bd817f0957434",
         "delta":2,
     },
     "STM32U3":{
         "path":HERE/"stm32u3-commercial-icpn.csv","before":106,"after":107,
         "old_blob":"c35e5e4e10c6c514ee82b099cc7ca3d1b7cf79af",
         "old_sha":"171cc7344ee65da9fd89052f2e7a0f0cd6e9ccbc8da02d20f8e33bbc1c1eeaff",
-        "new_blob":"5913ed0ff3817b41dd81f12edead60e9dead32ee",
-        "new_sha":"49a6a72460d8f025ab5fb7bfe30a2eb372e4255143b6d3345c083f3fab831f4e",
+        "new_blob":"950d70579c5bfa61b94bb917386ca36c230bca61",
+        "new_sha":"806b444886f5ac8fd774009be0c53bd9245420478ee6cd6d5b029b7949f92956",
         "delta":1,
     },
 }
@@ -83,7 +85,8 @@ def main()->int:
         req(hashlib.sha256(raw).hexdigest()==spec["new_sha"],f"{family}: current SHA drift")
         req(blob(raw)==spec["new_blob"],f"{family}: current blob drift")
 
-        delta=[r for r in rows if r["icpn"] in gap_set]
+        publication_rows=rewind_v616_backend(rows,family)
+        delta=[r for r in publication_rows if r["icpn"] in gap_set]
         req(len(delta)==spec["delta"],f"{family}: delta cardinality drift")
         all_delta.extend(delta)
         req(all(
@@ -94,10 +97,17 @@ def main()->int:
             for r in delta
         ),f"{family}: v6.2 delta inherited backend mapping")
 
-        # Remove only v6.2 rows and require the historical family file to be byte-identical.
-        header=raw.decode("utf-8").splitlines()[0]
+        # Rewind only the exact authorized v6.16 backend fields, then remove the
+        # v6.2 rows. Identity/metadata history remains byte-identical.
+        fieldnames=list(publication_rows[0])
+        buf=io.StringIO(newline="")
+        writer=csv.DictWriter(buf,fieldnames=fieldnames,lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(publication_rows)
+        publication_text=buf.getvalue()
+        header=publication_text.splitlines()[0]
         historical_lines=[
-            line for line in raw.decode("utf-8").splitlines()[1:]
+            line for line in publication_text.splitlines()[1:]
             if line.split(",",2)[1] not in gap_set
         ]
         historical=(header+"\n"+"\n".join(historical_lines)+"\n").encode()
@@ -151,7 +161,7 @@ def main()->int:
         req(pub["claims"][key] is False,f"v6.2 overclaim: {key}")
 
     print("ST_FINAL_LAYER1_PRODUCTION_PUBLICATION_V62_PASS")
-    print("Production=4629; sources=28; backend=3673 mapped / 956 no_mapping")
+    print("Publication snapshot=4629 identities / 28 sources; v6.16 backend evolution validated separately")
     print("Scoped ST Active identity coverage=4550/4550=100%")
     return 0
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from device_catalog_bounded_discovery import BoundedDiscoveryError, load_batch_spec
 from device_catalog_bounded_planning import BoundedPlanningError
+from openocd_backend_evolution_v616 import rewind_v616_backend
 from st_product_page_acquisition import AcquisitionError
 from stm32f2_bounded_discovery import (
     DEFAULT_REGISTRY,
@@ -97,8 +98,10 @@ def _assert_next_batch_planning() -> None:
     with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         fields = reader.fieldnames
-        rows = [row for row in reader if row["mapping_status"] != "no_mapping"]
+        current_rows = list(reader)
     assert fields is not None
+    historical_rows = rewind_v616_backend(current_rows, "STM32F2")
+    rows = [row for row in historical_rows if row["mapping_status"] != "no_mapping"]
     assert len(rows) == 33
     with historical_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")

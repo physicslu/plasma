@@ -172,8 +172,8 @@ def main() -> int:
             backend[
                 "no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"
             ] += 1
-    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 916,
-        f"Production backend partition regressed below WB0 publication poststate: {dict(backend)}")
+    req(backend["mapped"] >= 3673,
+        f"Production mapped coverage regressed below WB0 publication poststate: {dict(backend)}")
     req(backend["mapped"] + backend["no_mapping"] == current_total,
         "current Production backend partition does not equal current exact total")
 
