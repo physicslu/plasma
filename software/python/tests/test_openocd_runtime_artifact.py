@@ -185,6 +185,8 @@ def test_build_is_reproducible_for_identical_payload_bytes_despite_mtime_drift(
     assert all(member.mtime == 0 for member in members)
     assert all(member.uid == 0 and member.gid == 0 for member in members)
     assert all(member.uname == "" and member.gname == "" for member in members)
+    archive_root = next(member for member in members if member.name.rstrip("/") == "plasma-openocd")
+    assert archive_root.mode == 0o755
 
 
 def test_payload_identity_includes_directory_modes(
@@ -218,6 +220,17 @@ def test_payload_identity_includes_directory_modes(
 
     assert first["payload_sha256"] != second["payload_sha256"]
     assert first["artifact_sha256"] != second["artifact_sha256"]
+
+    prefix.chmod(0o750)
+    third = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-c",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+    assert second["payload_sha256"] != third["payload_sha256"]
+    assert second["artifact_sha256"] != third["artifact_sha256"]
 
 
 def test_reinstall_rejects_tampered_existing_runtime(
