@@ -1,0 +1,82 @@
+name: Materialize v6.16 backend binding ledger
+
+on:
+  push:
+    branches:
+      - agent/openocd-production-write-v616
+    paths:
+      - '.github/workflows/materialize-openocd-v616-binding-ledger.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ARTIFACT_ID: 11525595043
+      EXPECTED_DELTA_SHA256: a015a0747354a41459e0d49c5bb5f4ddfb8bca04f9b509a8558b570253c13ed5
+      EXPECTED_LEDGER_SHA256: 3b5bc6078aba3d18d9f96969a6147df2304e2390c7c93ff4f78409e584ce8501
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/openocd-production-write-v616
+          fetch-depth: 0
+
+      - name: Download frozen v6.14 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip > /tmp/v614.zip
+          mkdir -p /tmp/v614
+          unzip -q /tmp/v614.zip -d /tmp/v614
+          test -f /tmp/v614/openocd-v614-delta.csv
+          echo "${EXPECTED_DELTA_SHA256}  /tmp/v614/openocd-v614-delta.csv" | sha256sum -c -
+
+      - name: Build immutable readable binding ledger
+        run: |
+          python - <<'PY'
+          import csv, hashlib
+          from pathlib import Path
+          src=Path('/tmp/v614/openocd-v614-delta.csv')
+          dst=Path('data/device-catalog/research/openocd-production-backend-bindings-v6.16.csv')
+          fields=[
+              'icpn','family','authority','existing_identifier_kind',
+              'existing_identifier','cmsis_device_name',
+              'openocd_target_config','mapping_status',
+          ]
+          with src.open(newline='',encoding='utf-8') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==364
+          assert len({r['icpn'] for r in rows})==364
+          rows.sort(key=lambda r:r['icpn'])
+          with dst.open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=fields,lineterminator='\n')
+              w.writeheader()
+              for r in rows:
+                  w.writerow({
+                      'icpn':r['icpn'],
+                      'family':r['family'],
+                      'authority':r['authority'],
+                      'existing_identifier_kind':r['after_existing_identifier_kind'],
+                      'existing_identifier':r['after_existing_identifier'],
+                      'cmsis_device_name':r['after_cmsis_device_name'],
+                      'openocd_target_config':r['after_openocd_target_config'],
+                      'mapping_status':r['after_mapping_status'],
+                  })
+          actual=hashlib.sha256(dst.read_bytes()).hexdigest()
+          assert actual == '3b5bc6078aba3d18d9f96969a6147df2304e2390c7c93ff4f78409e584ce8501', actual
+          print('V616_BINDING_LEDGER_PASS',actual)
+          PY
+
+      - name: Commit ledger and remove one-shot workflow
+        run: |
+          rm .github/workflows/materialize-openocd-v616-binding-ledger.yml
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add -A
+          git diff --cached --name-only
+          git commit -m "Device catalog: freeze v6.16 backend binding ledger"
+          git push origin HEAD:agent/openocd-production-write-v616
