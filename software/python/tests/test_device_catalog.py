@@ -322,7 +322,7 @@ def test_stm32f0_layer1_refresh_is_catalog_visible_with_deterministic_routes() -
     }
 
 
-def test_stm32g0_layer1_publication_preserves_independent_backend_state() -> None:
+def test_stm32g0_bounded_backend_enrichment_preserves_catalog_and_physical_boundaries() -> None:
     catalog = get_default_device_catalog()
 
     mapped = catalog.search("STM32G030C8T6", limit=1)[0]
@@ -332,18 +332,18 @@ def test_stm32g0_layer1_publication_preserves_independent_backend_state() -> Non
     assert mapped.mapping_method == "deterministic_ordering_pattern"
     assert mapped.target_config == "tcl/target/stm32g0x.cfg"
 
-    no_mapping = catalog.search("STM32G0B1RBI3N", limit=1)[0]
-    assert no_mapping.identifier == "STM32G0B1RBI3N"
-    assert no_mapping.family == "STM32G0"
-    assert no_mapping.production_admitted is True
-    assert no_mapping.mapping_status == "no_mapping"
-    assert no_mapping.mapping_method == "no_mapping"
-    assert no_mapping.target_config == ""
+    bounded = catalog.search("STM32G0B1RBI3N", limit=1)[0]
+    assert bounded.identifier == "STM32G0B1RBI3N"
+    assert bounded.family == "STM32G0"
+    assert bounded.production_admitted is True
+    assert bounded.mapping_status == "mapped"
+    assert bounded.mapping_method == "deterministic_ordering_pattern"
+    assert bounded.target_config == "tcl/target/stm32g0x.cfg"
 
-    payload = no_mapping.to_payload()
+    payload = bounded.to_payload()
     assert payload["catalog"]["scope"] == "production_admitted"
-    assert payload["backend"]["mapping_status"] == "no_mapping"
-    assert payload["backend"]["target_config"] == ""
+    assert payload["backend"]["mapping_status"] == "mapped"
+    assert payload["backend"]["target_config"] == "tcl/target/stm32g0x.cfg"
     assert payload["physical_validation"] == {
         "engineering_status": "no_evidence",
         "ppu_status": "no_evidence",
