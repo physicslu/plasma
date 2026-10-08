@@ -83,11 +83,7 @@ async def _run(product_root: Path, site_count: int) -> dict[str, Any]:
 
         failed_index = 4
         failed = workers[failed_index]
-        process = failed._process
-        if process is None:
-            raise AcceptanceError("selected failure-injection worker has no process")
-        process.kill()
-        await process.wait()
+        await failed.kill()
 
         surviving = await asyncio.gather(
             *(worker.command("version") for index, worker in enumerate(workers) if index != failed_index)
