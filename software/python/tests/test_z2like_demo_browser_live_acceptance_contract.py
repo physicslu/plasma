@@ -16,7 +16,8 @@ def test_live_gate_is_post_merge_swpc_only() -> None:
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in workflow
     assert "persist-credentials: false" in workflow
-    assert "cancel-in-progress: false" in workflow
+    assert "group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}" in workflow
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
     assert "--expected-commit \"$GITHUB_SHA\"" in workflow
 
 
