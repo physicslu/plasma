@@ -59,12 +59,15 @@ def test_exact_kit_owns_simulation_installer_adapter() -> None:
     assert '"kit_local_simulation_installer": str(installer)' in consumer
 
 
-def test_browser_live_reconciles_control_plane_before_preflight_and_build() -> None:
+def test_browser_live_reconciles_control_plane_and_maintenance_manager_before_preflight() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     reconcile = workflow.index("Reconcile exact-commit QEMU control plane")
+    maintenance = workflow.index("Reconcile exact-commit SWPC-local maintenance Manager")
     preflight = workflow.index("Preflight canonical SWPC/QEMU target")
     build = workflow.index("Build canonical ARMv7 Z2 PS kit")
-    assert reconcile < preflight < build
+    assert reconcile < maintenance < preflight < build
     assert 'scripts/z2like-demo-qemu-control-plane.py \\\n            --expected-commit "$GITHUB_SHA"' in workflow
+    assert "scripts/z2like-demo-qemu.py" in workflow
+    assert "configure-control-station" in workflow
     assert 'runs-on: [self-hosted, linux, x64, plasma-integration]' in workflow
     assert "persist-credentials: false" in workflow
