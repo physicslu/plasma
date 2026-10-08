@@ -119,6 +119,30 @@ Production requirement：
 - Tcl RPC 是 request/response command boundary；command 尚未完成時 caller 仍會等待，因此 timeout、cancel、worker restart 必須由 Python supervisor 管理。
 - 若需要 command log，可使用 OpenOCD Tcl 的回傳值或 `capture` 等既有機制；不得以 stdout text scraping 作 canonical machine contract。
 
+### 6.1 OpenOCD Runtime Artifact Identity
+
+OpenOCD runtime 必須區分兩種不同 identity：
+
+```text
+runtime_id
+= OpenOCD version + pinned source commit
+= source/build intent identity
+
+payload_sha256
+= staged file path + mode + content tree digest
+= compiled/runtime payload identity
+
+artifact_sha256
+= exact distributed .tar.gz bytes
+= deployment / promotion identity
+```
+
+三者不可混為一談。相同 `runtime_id` 不代表兩次獨立編譯必定產生相同 binary；compiler、system library 或 build dependency 若改變，`payload_sha256` 與 artifact SHA 合理地應該改變。Production deployment 不應在 target 或 deployment 階段重新編譯來「重現」artifact，而應 **build once，連同 detached SHA-256 一起 promotion，並由 kit/install path 驗證 exact bytes**。
+
+Packaging 本身必須消除與 payload 無關的 nondeterminism。Canonical OpenOCD artifact 因此正規化 tar/gzip 的 timestamp、uid/gid、user/group name 等 archive metadata；對完全相同的 staged payload bytes，重複 package 必須產生相同 artifact SHA。這只保證 packaging reproducibility，不宣稱未 pin 的 toolchain/dependency 會產生相同 compiled payload。
+
+Installer 的 fail-closed 原則不變：若相同 logical `runtime_id` 的既有安裝內容與新驗證 artifact 不一致，不得 silent overwrite。Exact artifact lineage 以 sidecar 與安裝 evidence 的 `artifact_sha256` 為準。
+
 ## 7. OpenOCD Production 架構
 
 Production 應明確分成 Programming Plane 與 independent Hardware / Recovery Plane：

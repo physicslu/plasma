@@ -67,7 +67,9 @@ docker run --rm \
     git fetch --depth 1 origin "$OPENOCD_SOURCE_COMMIT"
     git checkout --detach FETCH_HEAD
     test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"
-    git submodule update --init --recursive --depth 1
+    git submodule update --init --depth 1 \
+      jimtcl \
+      src/jtag/drivers/libjaylink
 
     ./bootstrap
     ./configure \
