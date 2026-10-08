@@ -117,6 +117,7 @@ jobs:
           python -m pytest -q \
             software/python/tests/test_z2like_demo_qemu_contract.py \
             software/python/tests/test_z2like_demo_qemu_control_plane_contract.py \
+            software/python/tests/test_z2like_demo_qemu_e2e_contract.py \
             software/python/tests/test_openocd_runtime_artifact.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
@@ -153,6 +154,9 @@ jobs:
         run: |
           npm ci
           npm run build:product
+
+      - name: Run OpenOCD Console contract
+        run: node --test software/web/tests/openocd-control-plane-contract.test.mjs
 
       - name: Set up QEMU ARM emulation
         uses: docker/setup-qemu-action@v4
