@@ -179,6 +179,9 @@ SWPC/QEMU ARMv7 z2like-demo software path
 + pinned ARMv7 OpenOCD runtime artifact install/execution
 + OpenOCD version/script/shared-library checks
 + software-only OpenOCD dummy-adapter smoke
++ standalone Control Station Console/BFF -> Manager -> PPU Gateway -> ARMv7 PS -> real OpenOCD Worker -> Tcl RPC
++ fixed safe OpenOCD `version` probe with no Browser-supplied Tcl command surface
++ eight isolated OpenOCD workers with one-Site kill/restart failure isolation
 + Gateway/Server readiness
 + software activation rollback/recovery semantics
 ```
@@ -195,7 +198,7 @@ It does not prove:
 - real systemd/DAC/socket ownership on Z2;
 - real Z2 reboot persistence;
 - Ethernet behavior of the physical board;
-- OpenOCD Tcl RPC / worker lifecycle;
+- live SWPC-host operator qualification unless the SWPC acceptance is run on that host;
 - SWD/JTAG through PL or a physical debug adapter;
 - PS-to-PL or FPGA execution;
 - Site electrical I/O or target power;
@@ -205,10 +208,12 @@ It does not prove:
 OpenOCD evidence in this simulation remains explicitly software-only:
 
 ```text
-ARMv7 OpenOCD binary/package/install/dummy-adapter smoke = QUALIFIED in QEMU
-Tcl RPC worker/control-plane lifecycle                    = NOT YET QUALIFIED
-SWD/JTAG / PL / target / real IC                         = NOT QUALIFIED
-hardware_runtime_ready                                   = false
+ARMv7 OpenOCD binary/package/install/dummy-adapter smoke = QUALIFIED in CI QEMU
+Console/BFF -> Manager -> Gateway -> Worker -> Tcl RPC     = QUALIFIED in CI QEMU
+8-Site worker isolation + one-Site kill/restart            = QUALIFIED in CI QEMU
+live SWPC operator-run control-plane qualification         = PENDING
+SWD/JTAG / PL / target / real IC                          = NOT QUALIFIED
+hardware_runtime_ready                                    = false
 ```
 
 The qualification statement remains:
