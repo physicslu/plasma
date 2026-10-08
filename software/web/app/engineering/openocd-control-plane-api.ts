@@ -15,10 +15,8 @@ export type OpenOcdControlPlaneResponse = {
   runtime_id: string;
   process_state: "stopped";
   probe_process_state: "running";
-  process_id: number | null;
   tcl_rpc_state: "pass";
   rpc_scope: "loopback";
-  rpc_port: number | null;
   architecture: string;
   host_architecture: string;
   worker_generation: number;
