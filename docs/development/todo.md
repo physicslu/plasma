@@ -150,28 +150,34 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ### Dual Manager Lifecycle Ownership / State Drift
 
-**Status:** TODO / architecture ownership cleanup identified during live SWPC QEMU qualification
+**Status:** IN PROGRESS / implementation closure candidate; post-merge SWPC live evidence pending
 
 **Layer:** Control Plane / Manager / PPU Registration / Platform Maintenance
 
-**Reason:** The public `z2like-demo` Manager and the SWPC-local maintenance Manager (`127.0.0.1:18380`) can independently persist lifecycle state for the same PPU alias. Live SWPC/QEMU qualification exposed real state drift: the public Manager had `z2like-qemu` disabled while the local maintenance Manager still held it as `commissioned`, so Runtime maintenance remained blocked by the local lifecycle gate. Both Managers ultimately refer to the same QEMU PPU, but their Registration state is not shared.
+**Reason:** Live SWPC/QEMU qualification exposed a real ownership defect: the public `z2like-demo` Manager and the SWPC-local maintenance Manager (`127.0.0.1:18380`) could independently persist `commissioned` / `disabled` state for the same PPU alias. That allowed contradictory Programming Registration state to affect Platform maintenance and forced manual synchronization between two Manager registries.
 
-Required work:
+Implementation closure direction:
 
-- define one authoritative owner for each semantic state rather than allowing two Managers to independently own the same `commissioned` / `disabled` lifecycle;
-- keep Programming Registration as a programming-admission concern owned by the production control plane;
-- model Platform Maintenance Authorization as a separate bounded maintenance capability/credential rather than duplicating or overloading Programming Registration lifecycle;
-- decide whether the SWPC-local maintenance Manager should become stateless for Registration, consume an authoritative lifecycle view, or be removed once an equivalent production-safe maintenance path exists;
-- define migration and reconciliation semantics for existing installations that already contain independent Manager registry files;
-- make contradictory public/local state observable and fail with an explicit ownership/reconciliation error rather than requiring operators to discover the drift indirectly through a maintenance failure;
-- extend SWPC/QEMU acceptance to prove Runtime maintenance does not require manual lifecycle mutation in two independent Manager registries;
-- update `plasmactl z2like-demo` and operator documentation so the one-command deployment contract does not hide dual-control-plane lifecycle coupling.
+- Programming Registration remains a programming-admission concern owned by the public production control plane;
+- the SWPC-local maintenance Manager is reduced to a fixed, **read-only config connection registry** for the canonical QEMU alias/endpoint;
+- the local Manager writes `registry_state_path: null`, so installer/environment fallback cannot silently re-enable a mutable registry;
+- existing legacy `manager-registry.json` files are intentionally not deleted, but are ignored and no longer authoritative;
+- the Runtime deployer no longer reads, mutates, preserves, or compares local `pending` / `commissioned` / `disabled` lifecycle state;
+- Platform Maintenance Authorization remains separately bounded by device pairing, active-execution exclusion, Runtime state, recovery state and current trusted-idle observation;
+- regression contracts reject restoration of a mutable local Registration registry or lifecycle-based maintenance admission.
+
+Remaining closure evidence:
+
+- merge the implementation only after normal repository/QEMU CI passes;
+- execute the main-only SWPC/Render/QEMU live acceptance on the merged commit;
+- prove `plasmactl update z2like-demo` completes without any manual mutation or synchronization of a second Programming Registration lifecycle;
+- retain explicit evidence that the local maintenance registry is `storage=config` and `mutable=false`.
 
 Architectural invariant:
 
 > One semantic lifecycle state must have one authoritative owner. Programming Registration and Platform Maintenance Authorization are separate concerns and must not be conflated or independently duplicated across Managers.
 
-Closure evidence must demonstrate that one PPU cannot remain logically `commissioned` in one Manager and `disabled` in another in a way that changes maintenance admission, and that the canonical SWPC/QEMU deployment path no longer requires manual dual-Manager lifecycle synchronization.
+This item may be marked complete only after the post-merge live evidence proves the canonical SWPC/QEMU maintenance path no longer depends on a second mutable Programming Registration authority.
 
 ### Mock Runtime Core Convergence
 
