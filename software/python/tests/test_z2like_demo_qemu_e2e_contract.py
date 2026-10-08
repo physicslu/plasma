@@ -58,6 +58,8 @@ def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source
     assert "hardware_runtime_ready" in source
     assert "Console/BFF -> Manager -> Gateway -> Worker -> Tcl RPC" in source
+    assert "OpenOCD is part of the canonical kit deployment contract" in source
+    assert "must not preinstall or copy an OpenOCD runtime" in source
     assert "live SWPC operator-run control-plane qualification" in source
 
 
