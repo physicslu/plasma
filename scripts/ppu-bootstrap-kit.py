@@ -41,6 +41,8 @@ class VerifiedKit:
     ppu_sidecar: Path
     python_artifact: Path
     python_sidecar: Path
+    openocd_artifact: Path
+    openocd_sidecar: Path
     plasmactl: Path
 
 
@@ -198,12 +200,16 @@ def verify_kit(artifact: Path, *, sidecar: Path, extract_to: Path) -> VerifiedKi
         scripts / "ppu-z2-installer.py",
         scripts / "ppu-z2-installer-core.py",
         scripts / "z2-python-runtime.py",
+        scripts / "openocd-runtime.py",
     ]
     if not all(path.is_file() for path in required_scripts):
         raise BootstrapKitError("Z2 PS kit is missing required deployment tooling")
     ppu_artifact, ppu_sidecar = _single_pair(artifacts, "plasma-ppu-*-linux-armv7l.tar.gz", "PPU")
     python_artifact, python_sidecar = _single_pair(
         artifacts, "plasma-python-*-linux-armv7l.tar.gz", "Plasma Python"
+    )
+    openocd_artifact, openocd_sidecar = _single_pair(
+        artifacts, "plasma-openocd-*-linux-armv7l.tar.gz", "OpenOCD"
     )
     return VerifiedKit(
         root=root,
@@ -213,6 +219,8 @@ def verify_kit(artifact: Path, *, sidecar: Path, extract_to: Path) -> VerifiedKi
         ppu_sidecar=ppu_sidecar,
         python_artifact=python_artifact,
         python_sidecar=python_sidecar,
+        openocd_artifact=openocd_artifact,
+        openocd_sidecar=openocd_sidecar,
         plasmactl=plasmactl,
     )
 
@@ -246,6 +254,10 @@ def install_verified_kit(
         facility_id,
         "--display-name",
         display_name,
+        "--openocd-artifact",
+        str(kit.openocd_artifact),
+        "--openocd-sidecar",
+        str(kit.openocd_sidecar),
     ]
     if command == "install":
         argv.extend(
