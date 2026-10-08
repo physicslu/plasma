@@ -29,7 +29,7 @@ test("OpenOCD diagnostic uses the same managed workspace API base and BFF route"
   assert.match(managedRoute, /relayManagerPpuRequest/);
   assert.match(managedBff, /PLASMA_MANAGER_API_URL/);
   assert.match(managedBff, /PLASMA_MANAGER_PPU_ALIAS/);
-  assert.match(managedBff, /\\/api\\/ppus\\/\\$\\{encodeURIComponent\\(ppuAlias\\)\\}\\/gateway\\$\\{targetPath\\}/);
+  assert.ok(managedBff.includes("/api/ppus/${encodeURIComponent(ppuAlias)}/gateway${targetPath}"));
 });
 
 test("browser requires explicit software-only evidence and Manager proof", () => {
