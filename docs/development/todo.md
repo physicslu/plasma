@@ -8,7 +8,7 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ### OpenOCD Control-Plane Qualification
 
-**Status:** PARTIAL — CI/QEMU control-plane qualification implemented; live SWPC ARMv7 QEMU operator qualification remains pending
+**Status:** PARTIAL — CI/QEMU control-plane qualification implemented; main-only SWPC ARMv7 QEMU live gate implemented, post-merge PASS evidence still required
 
 **Layer:** SW/PPU / Programming Backend / PPU runtime
 
@@ -79,6 +79,8 @@ Console -> PS -> real OpenOCD -> Tcl RPC
 ```
 
 must pass in both CI and SWPC ARMv7 QEMU with deterministic failure/recovery coverage and without enabling the production hardware route.
+
+The SWPC half of this exit criterion is satisfied only by an uploaded main-only live acceptance artifact that proves all eight public managed Site diagnostics plus the direct eight-worker ARMv7 isolation/fault-restart evidence on the persistent SWPC QEMU target. Repository CI success alone is insufficient.
 
 Out of scope for this milestone:
 
