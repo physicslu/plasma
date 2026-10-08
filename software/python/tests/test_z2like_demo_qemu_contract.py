@@ -62,14 +62,17 @@ def test_public_control_station_is_render_and_swpc_manager_console_are_internal_
     assert "QEMU ARMv7 simulated Z2 172.30.77.2:18080" in profile
 
 
-def test_internal_maintenance_manager_uses_private_gateway_and_bootstrap_composition():
+def test_internal_maintenance_manager_uses_read_only_connection_registry():
     source = HOST.read_text(encoding="utf-8")
     assert 'endpoint = f"http://{ppu_ip}:{GATEWAY_PORT}"' in source
-    assert "registry_state_path" in source
+    assert '"  registry_state_path: null\\n"' in source
+    assert '"ppus:\\n"' in source
+    assert 'f"  - alias: {json.dumps(alias)}\\n"' in source
+    assert 'f"    endpoint: {json.dumps(endpoint)}\\n"' in source
     assert "plasma_manager.bootstrap_server --config" in source
-    assert '"ppus: []\\n"' in source
-    assert 'method="POST"' in source
-    assert 'body={"alias": alias, "endpoint": endpoint}' in source
+    assert "payload.get(\"mutable\") is not False" in source
+    assert 'payload.get("storage") != "config"' in source
+    assert "body={\"alias\": alias, \"endpoint\": endpoint}" not in source
 
 
 def test_managed_ingress_targets_qemu_not_x86_surrogate():
@@ -110,9 +113,13 @@ def test_one_command_profile_has_explicit_fast_forward_and_full_verification():
     assert "/api/manager/ppu/api/health/ready" in source
 
 
-def test_persistent_runtime_deployer_preserves_registration_and_platform_gates():
+def test_persistent_runtime_deployer_has_no_local_programming_registration_authority():
     source = RUNTIME_DEPLOYER.read_text(encoding="utf-8")
-    assert 'lifecycle_before not in {"pending", "commissioned", "disabled"}' in source
+    assert "_maintenance_connection(" in source
+    assert 'payload.get("mutable") is not False' in source
+    assert 'payload.get("storage") != "config"' in source
+    assert "lifecycle_before" not in source
+    assert "lifecycle_after" not in source
     assert '_set_lifecycle(manager, args.alias, "disabled"' not in source
     assert '_set_lifecycle(manager, args.alias, "commissioned"' not in source
     assert 'runtime_state_before not in {"runtime_absent", "runtime_active"}' in source
@@ -120,8 +127,8 @@ def test_persistent_runtime_deployer_preserves_registration_and_platform_gates()
     assert "_wait_for_trusted_idle(" in source
     assert 'pairing.get("device_match") is False' in source
     assert "do not retain or print" not in source or 'token = ""' in source
-    assert "lifecycle_after != lifecycle_before" in source
-    assert '"lifecycle_after": lifecycle_after' in source
+    assert '"maintenance_registry_storage": "config-read-only"' in source
+    assert '"programming_registration_owner": "public-production-control-plane"' in source
     assert '"runtime_state_after": "runtime_active"' in source
 
 
