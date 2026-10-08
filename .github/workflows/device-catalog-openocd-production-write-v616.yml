@@ -175,6 +175,6 @@ jobs:
           git add -A
           echo "Changed files:"
           git diff --cached --name-only
-          test "$(git diff --cached --name-only | wc -l)" -eq 12
+          test "$(git diff --cached --name-only | wc -l)" -eq 13
           git commit -m "Device catalog: apply OpenOCD Production backend mappings v6.16"
           git push origin HEAD:agent/openocd-production-write-v616
