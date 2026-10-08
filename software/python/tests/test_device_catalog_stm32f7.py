@@ -20,9 +20,9 @@ def test_stm32f7_publication_preserves_legacy_route_and_adds_unbound_layer1_rows
     assert added.package == "UFBGA"
     assert added.pin_count == "144"
     assert added.flash_size == "256 KiB"
-    assert added.mapping_status == "no_mapping"
-    assert added.mapping_method == "no_mapping"
-    assert added.target_config == ""
+    assert added.mapping_status == "mapped"
+    assert added.mapping_method == "deterministic_ordering_pattern"
+    assert added.target_config == "tcl/target/stm32f7x.cfg"
     assert added.production_admitted is True
 
     payload = added.to_payload()
