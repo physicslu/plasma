@@ -372,6 +372,7 @@ def _assert_openocd_control_plane(
     *,
     operation: str,
     site_id: int,
+    alias: str,
 ) -> dict[str, Any]:
     required = {
         "ok": True,
@@ -409,7 +410,7 @@ def _assert_openocd_control_plane(
     if (
         not isinstance(manager, dict)
         or manager.get("relay") != "pass-through"
-        or manager.get("context") != "programming"
+        or manager.get("ppu_alias") != alias
     ):
         raise AcceptanceError(f"{operation} omitted managed-path relay proof: {payload!r}")
     return {
@@ -427,7 +428,11 @@ def _assert_openocd_control_plane(
     }
 
 
-def _managed_openocd_acceptance(session: BrowserSession) -> list[dict[str, Any]]:
+def _managed_openocd_acceptance(
+    session: BrowserSession,
+    *,
+    alias: str,
+) -> list[dict[str, Any]]:
     endpoint = "/api/manager/ppu/api/engineering/diagnostics/openocd-control-plane"
     results: list[dict[str, Any]] = []
     for site_id in range(1, EXPECTED_SITE_COUNT + 1):
@@ -443,6 +448,7 @@ def _managed_openocd_acceptance(session: BrowserSession) -> list[dict[str, Any]]
                 payload,
                 operation=f"managed OpenOCD Control Plane Site {site_id}",
                 site_id=site_id,
+                alias=alias,
             )
         )
     return results
@@ -829,7 +835,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         lifecycle_disabled = False
         fleet_after, _ = _wait_current_idle(session, args.alias, timeout_s=120.0)
         programming_after = _programming_regression(session)
-        managed_openocd_sites = _managed_openocd_acceptance(session)
+        managed_openocd_sites = _managed_openocd_acceptance(
+            session,
+            alias=args.alias,
+        )
         openocd_isolation = _eight_site_openocd_isolation(args.container)
 
         return {
