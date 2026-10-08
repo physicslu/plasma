@@ -55,7 +55,8 @@ def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     assert "engineering surrogate only" in source
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source
     assert "hardware_runtime_ready" in source
-    assert "Tcl RPC worker/control-plane lifecycle" in source
+    assert "Console/BFF -> Manager -> Gateway -> Worker -> Tcl RPC" in source
+    assert "live SWPC operator-run control-plane qualification" in source
 
 
 def test_armv7_openocd_acceptance_proves_eight_site_failure_isolation():
