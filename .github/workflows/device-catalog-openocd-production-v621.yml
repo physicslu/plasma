@@ -6,7 +6,6 @@ on:
       - 'data/device-catalog/research/stm32f3-commercial-icpn.csv'
       - 'data/device-catalog/research/stm32g0-commercial-icpn.csv'
       - 'data/device-catalog/research/stm32l1-commercial-icpn.csv'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/openocd-production-backend-mapping-v6.21.json'
       - 'data/device-catalog/research/validate_openocd_production_write_v621.py'
       - '.github/workflows/device-catalog-openocd-production-v621.yml'
