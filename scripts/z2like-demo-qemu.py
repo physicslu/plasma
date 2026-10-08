@@ -507,6 +507,8 @@ def _verify(alias: str, ppu_ip: str) -> dict[str, Any]:
     status, registry = _request_json(f"{manager}/api/registry")
     if status != 200:
         raise DemoError(f"Manager registry read failed: HTTP {status}")
+    if registry.get("mutable") is not False or registry.get("storage") != "config":
+        raise DemoError("z2like-demo maintenance Manager registry is not read-only config")
     expected_endpoint = f"http://{ppu_ip}:{GATEWAY_PORT}"
     matches = [
         item
@@ -538,6 +540,8 @@ def _verify(alias: str, ppu_ip: str) -> dict[str, Any]:
         "runtime_state": runtime_state,
         "maintenance_console_origin": f"http://127.0.0.1:{CONSOLE_PORT}",
         "maintenance_manager_origin": manager,
+        "maintenance_registry_storage": "config-read-only",
+        "programming_registration_owner": "public-production-control-plane",
         "public_control_station": "Render",
         "host_ports_published_by_qemu": False,
         "engineering_surrogate": "swpc-z2like remains separate",
