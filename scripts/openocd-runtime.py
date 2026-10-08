@@ -11,6 +11,7 @@ explicitly promotes that boundary.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -167,6 +168,32 @@ def _write_sidecar(artifact: Path) -> Path:
     return sidecar
 
 
+def _normalized_tarinfo(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    """Remove host/time ownership metadata without changing payload permissions."""
+
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.pax_headers = {}
+    return info
+
+
+def _write_reproducible_archive(root: Path, artifact: Path) -> None:
+    """Create stable tar+gzip bytes for an identical staged payload tree."""
+
+    with artifact.open("wb") as raw:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0, compresslevel=9) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                archive.add(
+                    root,
+                    arcname=ROOT_NAME,
+                    recursive=True,
+                    filter=_normalized_tarinfo,
+                )
+
+
 def _validate_source_commit(value: str) -> str:
     commit = value.strip().lower()
     if len(commit) != 40 or any(ch not in "0123456789abcdef" for ch in commit):
@@ -259,9 +286,9 @@ def build_artifact(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         _write_internal_hashes(root)
-        with tarfile.open(artifact, "w:gz", format=tarfile.PAX_FORMAT) as archive:
-            archive.add(root, arcname=ROOT_NAME, recursive=True)
+        _write_reproducible_archive(root, artifact)
     _write_sidecar(artifact)
+    artifact_sha256 = _sha256(artifact)
     return {
         "result": "PASS",
         "artifact": str(artifact),
@@ -270,6 +297,8 @@ def build_artifact(
         "openocd_version": version,
         "architecture": architecture,
         "source_commit": source_commit,
+        "artifact_sha256": artifact_sha256,
+        "packaging_policy": "normalized-tar-gzip-v1",
         "hardware_runtime_ready": False,
     }
 
