@@ -43,8 +43,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: z2like-demo-browser-runtime-live-acceptance
-  cancel-in-progress: false
+  group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   contract:
