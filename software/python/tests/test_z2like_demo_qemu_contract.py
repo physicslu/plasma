@@ -17,6 +17,8 @@ NGINX_EPHEMERAL = ROOT / "scripts" / "z2like-demo-nginx-ephemeral.py"
 QEMU_WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-qemu.yml"
 PROFILE = ROOT / "scripts" / "plasmactl-z2like-demo"
 INSTALLER = ROOT / "scripts" / "z2like-demo-qemu-installer.py"
+DEPLOYMENT_DOC = ROOT / "docs" / "deployment" / "z2like-demo-qemu.md"
+TODO_DOC = ROOT / "docs" / "development" / "todo.md"
 
 
 def _load(path: Path, name: str):
@@ -73,6 +75,19 @@ def test_internal_maintenance_manager_uses_read_only_connection_registry():
     assert "payload.get(\"mutable\") is not False" in source
     assert 'payload.get("storage") != "config"' in source
     assert "body={\"alias\": alias, \"endpoint\": endpoint}" not in source
+
+
+def test_maintenance_registry_ownership_is_documented_as_single_owner():
+    deployment = DEPLOYMENT_DOC.read_text(encoding="utf-8")
+    todo = TODO_DOC.read_text(encoding="utf-8")
+    assert "read-only config connection registry" in deployment
+    assert "registry_state_path: null" in deployment
+    assert "public production control plane remains the sole owner of Programming Registration" in deployment
+    assert "manager-registry.json" in deployment
+    assert "ignored and is not an authority" in deployment
+    assert "implementation closure candidate; post-merge SWPC live evidence pending" in todo
+    assert "storage=config" in todo
+    assert "mutable=false" in todo
 
 
 def test_managed_ingress_targets_qemu_not_x86_surrogate():
