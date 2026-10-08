@@ -11,6 +11,7 @@ explicitly promotes that boundary.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -161,10 +162,79 @@ def _write_internal_hashes(root: Path) -> None:
     sums.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _payload_sha256(root: Path) -> str:
+    """Hash staged paths, types, modes, sizes, and regular-file bytes."""
+
+    if root.is_symlink() or not root.is_dir():
+        raise OpenOCDRuntimeArtifactError(f"OpenOCD payload root is not a directory: {root}")
+    digest = hashlib.sha256()
+    root_mode = root.stat().st_mode & 0o777
+    digest.update(b"d")
+    digest.update(struct.pack(">I", 0))
+    digest.update(struct.pack(">I", root_mode))
+    digest.update(struct.pack(">Q", 0))
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise OpenOCDRuntimeArtifactError(
+                f"OpenOCD runtime staging contains a symlink after dereference: {path}"
+            )
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        stat = path.stat()
+        mode = stat.st_mode & 0o777
+        if path.is_dir():
+            kind = b"d"
+            size = 0
+        elif path.is_file():
+            kind = b"f"
+            size = stat.st_size
+        else:
+            raise OpenOCDRuntimeArtifactError(
+                f"OpenOCD runtime staging contains an unsupported file type: {path}"
+            )
+        digest.update(kind)
+        digest.update(struct.pack(">I", len(relative)))
+        digest.update(relative)
+        digest.update(struct.pack(">I", mode))
+        digest.update(struct.pack(">Q", size))
+        if path.is_file():
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _write_sidecar(artifact: Path) -> Path:
     sidecar = Path(str(artifact) + ".sha256")
     sidecar.write_text(f"{_sha256(artifact)}  {artifact.name}\n", encoding="utf-8")
     return sidecar
+
+
+def _normalized_tarinfo(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    """Remove host/time ownership metadata without changing payload permissions."""
+
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.pax_headers = {}
+    if info.name.rstrip("/") == ROOT_NAME:
+        info.mode = 0o755
+    return info
+
+
+def _write_reproducible_archive(root: Path, artifact: Path) -> None:
+    """Create stable tar+gzip bytes for an identical staged payload tree."""
+
+    with artifact.open("wb") as raw:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0, compresslevel=9) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                archive.add(
+                    root,
+                    arcname=ROOT_NAME,
+                    recursive=True,
+                    filter=_normalized_tarinfo,
+                )
 
 
 def _validate_source_commit(value: str) -> str:
@@ -232,6 +302,7 @@ def build_artifact(
         payload = root / "payload"
         root.mkdir(parents=True)
         shutil.copytree(prefix, payload, symlinks=False)
+        payload_sha256 = _payload_sha256(payload)
         manifest = {
             "schema_version": SCHEMA_VERSION,
             "role": "plasma-openocd-runtime",
@@ -240,6 +311,7 @@ def build_artifact(
             "openocd_version": version,
             "source_commit": source_commit,
             "runtime_id": runtime_id,
+            "payload_sha256": payload_sha256,
             "binary": "payload/bin/openocd",
             "scripts_root": "payload/share/openocd/scripts",
             "install_root": f"/opt/plasma/programming-engines/openocd/{runtime_id}",
@@ -259,9 +331,9 @@ def build_artifact(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         _write_internal_hashes(root)
-        with tarfile.open(artifact, "w:gz", format=tarfile.PAX_FORMAT) as archive:
-            archive.add(root, arcname=ROOT_NAME, recursive=True)
+        _write_reproducible_archive(root, artifact)
     _write_sidecar(artifact)
+    artifact_sha256 = _sha256(artifact)
     return {
         "result": "PASS",
         "artifact": str(artifact),
@@ -270,6 +342,9 @@ def build_artifact(
         "openocd_version": version,
         "architecture": architecture,
         "source_commit": source_commit,
+        "payload_sha256": payload_sha256,
+        "artifact_sha256": artifact_sha256,
+        "packaging_policy": "normalized-tar-gzip-v1",
         "hardware_runtime_ready": False,
     }
 
@@ -455,6 +530,17 @@ def verify_artifact(
     expected_install_root = f"/opt/plasma/programming-engines/openocd/{runtime_id}"
     if manifest.get("install_root") != expected_install_root:
         raise OpenOCDRuntimeArtifactError("OpenOCD install_root is not canonical")
+    payload_sha256 = manifest.get("payload_sha256")
+    if payload_sha256 is not None:
+        if (
+            not isinstance(payload_sha256, str)
+            or len(payload_sha256) != 64
+            or any(ch not in "0123456789abcdef" for ch in payload_sha256)
+        ):
+            raise OpenOCDRuntimeArtifactError("OpenOCD payload_sha256 is invalid")
+        actual_payload_sha256 = _payload_sha256(root / "payload")
+        if actual_payload_sha256 != payload_sha256:
+            raise OpenOCDRuntimeArtifactError("OpenOCD payload identity mismatch")
     binary_rel = _safe_relative(manifest.get("binary"), field="binary")
     scripts_rel = _safe_relative(manifest.get("scripts_root"), field="scripts_root")
     binary = root / Path(*binary_rel.parts)
@@ -581,6 +667,7 @@ def install_artifact(
             "runtime_id": runtime_id,
             "openocd_version": manifest["openocd_version"],
             "source_commit": manifest["source_commit"],
+            "payload_sha256": manifest.get("payload_sha256"),
             "architecture": architecture,
             "binary": str(binary),
             "scripts_root": str(scripts),
@@ -650,6 +737,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "openocd_version": manifest["openocd_version"],
                     "architecture": manifest["architecture"],
                     "source_commit": manifest["source_commit"],
+                    "payload_sha256": manifest.get("payload_sha256"),
                     "hardware_runtime_ready": False,
                 }
         else:

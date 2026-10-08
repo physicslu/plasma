@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import struct
 import sys
 import tarfile
@@ -49,6 +50,15 @@ def _fake_prefix(tmp_path: Path) -> Path:
     return prefix
 
 
+def test_openocd_builder_avoids_documentation_only_git2cl_submodule() -> None:
+    source = BUILD_SCRIPT.read_text(encoding="utf-8")
+    assert "git submodule update --init --recursive" not in source
+    assert "git submodule update --init --depth 1" in source
+    assert "jimtcl" in source
+    assert "src/jtag/drivers/libjaylink" in source
+    assert "tools/git2cl" not in source
+
+
 def test_release_metadata_pins_upstream_openocd_identity() -> None:
     payload = json.loads(METADATA.read_text(encoding="utf-8"))
     assert payload == {
@@ -92,6 +102,8 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
     assert artifact.is_file()
     assert sidecar.is_file()
     assert built["runtime_id"] == RUNTIME_ID
+    assert len(built["payload_sha256"]) == 64
+    assert len(built["artifact_sha256"]) == 64
     assert built["hardware_runtime_ready"] is False
 
     verified = MODULE.verify_artifact(
@@ -101,6 +113,7 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
     )
     manifest = verified["manifest"]
     assert manifest["runtime_id"] == RUNTIME_ID
+    assert manifest["payload_sha256"] == built["payload_sha256"]
     assert manifest["architecture"] == "x86_64"
     assert manifest["qualification_boundary"] == {
         "hardware_runtime_ready": False,
@@ -132,8 +145,101 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
         (product_root / "install" / "openocd-runtime.json").read_text(encoding="utf-8")
     )
     assert retained["artifact_sha256"] == evidence["artifact_sha256"]
+    assert retained["payload_sha256"] == built["payload_sha256"]
     assert retained["starts_openocd_service"] is False
     assert retained["qualification_boundary"]["hardware_runtime_ready"] is False
+
+
+def test_build_is_reproducible_for_identical_payload_bytes_despite_mtime_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = _fake_prefix(tmp_path)
+    monkeypatch.setattr(MODULE.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        MODULE,
+        "_probe_openocd",
+        lambda _path: ("0.12.0", "Open On-Chip Debugger 0.12.0"),
+    )
+    monkeypatch.setattr(MODULE, "_ldd_dependencies", lambda _path: ["libc.so.6"])
+
+    binary = prefix / "bin" / "openocd"
+    os.utime(binary, (1_600_000_000, 1_600_000_000))
+    first = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "out-a",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    os.utime(binary, (1_700_000_000, 1_700_000_000))
+    second = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "out-b",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    first_artifact = Path(str(first["artifact"]))
+    second_artifact = Path(str(second["artifact"]))
+    assert first["payload_sha256"] == second["payload_sha256"]
+    assert first["artifact_sha256"] == second["artifact_sha256"]
+    assert first_artifact.read_bytes() == second_artifact.read_bytes()
+    assert first["packaging_policy"] == "normalized-tar-gzip-v1"
+
+    with tarfile.open(first_artifact, "r:gz") as archive:
+        members = archive.getmembers()
+    assert members
+    assert all(member.mtime == 0 for member in members)
+    assert all(member.uid == 0 and member.gid == 0 for member in members)
+    assert all(member.uname == "" and member.gname == "" for member in members)
+    archive_root = next(member for member in members if member.name.rstrip("/") == "plasma-openocd")
+    assert archive_root.mode == 0o755
+
+
+def test_payload_identity_includes_directory_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = _fake_prefix(tmp_path)
+    monkeypatch.setattr(MODULE.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        MODULE,
+        "_probe_openocd",
+        lambda _path: ("0.12.0", "Open On-Chip Debugger 0.12.0"),
+    )
+    monkeypatch.setattr(MODULE, "_ldd_dependencies", lambda _path: ["libc.so.6"])
+
+    first = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-a",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+    target_dir = prefix / "share" / "openocd" / "scripts" / "target"
+    target_dir.chmod(0o750)
+    second = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-b",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    assert first["payload_sha256"] != second["payload_sha256"]
+    assert first["artifact_sha256"] != second["artifact_sha256"]
+
+    prefix.chmod(0o750)
+    third = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-c",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+    assert second["payload_sha256"] != third["payload_sha256"]
+    assert second["artifact_sha256"] != third["artifact_sha256"]
 
 
 def test_reinstall_rejects_tampered_existing_runtime(
