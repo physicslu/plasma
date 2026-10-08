@@ -1,0 +1,37 @@
+name: OpenOCD route inventory authority review v6.24
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/review_openocd_route_inventory_authority_v624.py'
+      - 'data/device-catalog/research/test_review_openocd_route_inventory_authority_v624.py'
+      - 'data/device-catalog/research/OPENOCD_ROUTE_INVENTORY_AUTHORITY_REVIEW_V624.md'
+      - '.github/workflows/device-catalog-openocd-route-authority-v624.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Review authoritative route-inventory evidence
+        run: |
+          python data/device-catalog/research/review_openocd_route_inventory_authority_v624.py \
+            --review /tmp/openocd-route-authority-v624.csv \
+            --summary /tmp/openocd-route-authority-v624.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_review_openocd_route_inventory_authority_v624.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-route-inventory-authority-review-v624
+          path: |
+            /tmp/openocd-route-authority-v624.csv
+            /tmp/openocd-route-authority-v624.json
+          if-no-files-found: error
+          retention-days: 30
