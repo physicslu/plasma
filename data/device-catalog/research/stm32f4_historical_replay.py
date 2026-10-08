@@ -22,9 +22,11 @@ def _phase_rank(label: str) -> int:
 def is_final_layer1_tail(row: Mapping[str, str]) -> bool:
     """Return whether a row belongs to the post-Phase-4.2 final Layer-1 tail."""
 
+    # Historical admission membership is an identity/provenance fact.  Do not
+    # couple it to mutable backend routing state: v6.16 may legitimately enrich
+    # these exact identities after their Layer-1 admission.
     return (
-        row.get("mapping_status") == "no_mapping"
-        and row.get("source_type")
+        row.get("source_type")
         == "official_st_exact_product_authority_plus_locked_active_lifecycle"
     )
 
@@ -42,8 +44,9 @@ def admitted_after_phase42(row: Mapping[str, str], cutoff: str) -> bool:
 
     # Final v6.2 Layer-1-only identities were admitted long after all Phase 4.2
     # transactions. They intentionally have no retained Phase 4.2 evidence
-    # binding and no backend route, so historical replays must treat them as
-    # post-Phase-4.2 additions rather than folding them into old prestates.
+    # binding. Their backend route may evolve later, but historical replays must
+    # still treat them as post-Phase-4.2 additions rather than folding them into
+    # old prestates.
     if is_final_layer1_tail(row):
         return True
 
