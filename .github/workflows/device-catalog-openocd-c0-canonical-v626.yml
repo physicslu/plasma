@@ -1,0 +1,40 @@
+name: OpenOCD C0 canonical write dry-run v6.26
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-c0-canonical-route-write-dry-run-v6.26.json'
+      - 'data/device-catalog/research/dry_run_openocd_c0_canonical_write_v626.py'
+      - 'data/device-catalog/research/test_dry_run_openocd_c0_canonical_write_v626.py'
+      - 'data/device-catalog/research/OPENOCD_C0_CANONICAL_WRITE_DRY_RUN_V626.md'
+      - '.github/workflows/device-catalog-openocd-c0-canonical-v626.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Calculate byte-exact canonical postimage
+        run: |
+          python data/device-catalog/research/dry_run_openocd_c0_canonical_write_v626.py \
+            --delta-csv /tmp/openocd-c0-bounded-route-inventory-v6.25.csv \
+            --postimage /tmp/openocd-parts-canonical-v6.26-postimage.csv \
+            --summary /tmp/openocd-c0-canonical-write-v626.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_dry_run_openocd_c0_canonical_write_v626.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-c0-canonical-write-dry-run-v626
+          path: |
+            /tmp/openocd-c0-bounded-route-inventory-v6.25.csv
+            /tmp/openocd-parts-canonical-v6.26-postimage.csv
+            /tmp/openocd-c0-canonical-write-v626.json
+          if-no-files-found: error
+          retention-days: 30
