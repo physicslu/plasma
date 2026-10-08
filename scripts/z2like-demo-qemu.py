@@ -327,14 +327,14 @@ def _require_control_station_runtime(paths: Mapping[str, Path]) -> tuple[Path, P
     return python, web_server, node
 
 
-def _write_manager_config(paths: Mapping[str, Path], ppu_ip: str) -> Path:
+def _write_manager_config(paths: Mapping[str, Path], alias: str, ppu_ip: str) -> Path:
     config_root = paths["scenario_config"]
     state_root = paths["scenario_state"]
     config_root.mkdir(parents=True, exist_ok=True)
     state_root.mkdir(parents=True, exist_ok=True)
     manager_config = config_root / "manager.yaml"
     observation_db = state_root / "manager-observations.sqlite3"
-    registry_state = state_root / "manager-registry.json"
+    endpoint = f"http://{ppu_ip}:{GATEWAY_PORT}"
     text = (
         "manager:\n"
         '  host: "127.0.0.1"\n'
@@ -342,8 +342,10 @@ def _write_manager_config(paths: Mapping[str, Path], ppu_ip: str) -> Path:
         "  request_timeout_s: 10.0\n"
         "  poll_interval_s: 1.0\n"
         f"  observation_db_path: {json.dumps(str(observation_db))}\n"
-        f"  registry_state_path: {json.dumps(str(registry_state))}\n"
-        "ppus: []\n"
+        "  registry_state_path: null\n"
+        "ppus:\n"
+        f"  - alias: {json.dumps(alias)}\n"
+        f"    endpoint: {json.dumps(endpoint)}\n"
     )
     manager_config.write_text(text, encoding="utf-8")
     manager_config.chmod(0o600)
@@ -428,28 +430,31 @@ def _systemctl_user(*args: str, check: bool = True) -> subprocess.CompletedProce
     return _run(["systemctl", "--user", *args], capture=True, check=check, timeout=30)
 
 
-def _ensure_registry(alias: str, ppu_ip: str) -> None:
+def _verify_maintenance_registry(alias: str, ppu_ip: str) -> None:
     manager = f"http://127.0.0.1:{MANAGER_PORT}"
     status, payload = _request_json(f"{manager}/api/registry")
     if status != 200:
         raise DemoError(f"Manager registry read failed: HTTP {status} {payload!r}")
+    if payload.get("mutable") is not False or payload.get("storage") != "config":
+        raise DemoError(
+            "z2like-demo maintenance Manager must use a read-only config registry; "
+            "a mutable registry would recreate duplicate Programming Registration ownership"
+        )
     ppus = payload.get("ppus")
     if not isinstance(ppus, list):
         raise DemoError("Manager registry response omitted ppus list")
-    matches = [entry for entry in ppus if isinstance(entry, dict) and entry.get("alias") == alias]
     endpoint = f"http://{ppu_ip}:{GATEWAY_PORT}"
-    if not matches:
-        status, created = _request_json(
-            f"{manager}/api/registry",
-            method="POST",
-            body={"alias": alias, "endpoint": endpoint},
-        )
-        if status != 201:
-            raise DemoError(f"cannot register QEMU PPU: HTTP {status} {created!r}")
-        return
-    if len(matches) != 1 or matches[0].get("endpoint") != endpoint:
+    matches = [
+        entry
+        for entry in ppus
+        if isinstance(entry, dict)
+        and entry.get("alias") == alias
+        and entry.get("endpoint") == endpoint
+    ]
+    if len(matches) != 1 or len(ppus) != 1:
         raise DemoError(
-            "persisted z2like-demo registry alias does not match the canonical QEMU endpoint; refusing implicit mutation"
+            "z2like-demo maintenance Manager config registry is not bound exclusively "
+            "to the canonical QEMU endpoint"
         )
 
 
@@ -458,7 +463,7 @@ def _configure_control_station(alias: str, ppu_ip: str) -> None:
     _require_command("systemctl")
     paths = _xdg_paths()
     python, web_server, node = _require_control_station_runtime(paths)
-    manager_config = _write_manager_config(paths, ppu_ip)
+    manager_config = _write_manager_config(paths, alias, ppu_ip)
     manager_unit, console_unit = _write_user_units(
         paths,
         python=python,
@@ -474,7 +479,7 @@ def _configure_control_station(alias: str, ppu_ip: str) -> None:
         f"http://127.0.0.1:{MANAGER_PORT}/api/health/live",
         lambda payload: payload.get("ok") is True,
     )
-    _ensure_registry(alias, ppu_ip)
+    _verify_maintenance_registry(alias, ppu_ip)
     _systemctl_user("restart", "plasma-z2like-demo-console.service")
     _wait_http(f"http://127.0.0.1:{CONSOLE_PORT}/")
     for unit in (manager_unit, console_unit):
