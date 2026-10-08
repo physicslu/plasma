@@ -1,0 +1,67 @@
+.openocdControlPlaneForm {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.openocdControlPlaneForm .operatorButton {
+  min-height: 40px;
+}
+
+.openocdControlPlaneError {
+  margin: 14px 0 0;
+  color: var(--operator-danger, #b42318);
+}
+
+.openocdControlPlaneEmpty {
+  margin: 0;
+  opacity: 0.72;
+}
+
+.openocdControlPlaneHeadline {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+}
+
+.openocdControlPlaneHeadline[data-pass="true"] strong {
+  font-size: 1.1rem;
+}
+
+.openocdControlPlaneGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.openocdControlPlaneGrid article {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--operator-border, rgba(127, 127, 127, 0.25));
+  border-radius: 8px;
+}
+
+.openocdControlPlaneGrid article small {
+  opacity: 0.68;
+}
+
+.openocdControlPlaneGrid article strong {
+  overflow-wrap: anywhere;
+}
+
+.openocdControlPlaneGrid article[data-warning="true"] strong {
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .openocdControlPlaneForm {
+    grid-template-columns: 1fr;
+  }
+}

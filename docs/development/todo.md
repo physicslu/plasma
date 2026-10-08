@@ -8,7 +8,7 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ### OpenOCD Control-Plane Qualification
 
-**Status:** TODO / next SW/PPU milestone
+**Status:** PARTIAL — CI/QEMU control-plane qualification implemented; live SWPC ARMv7 QEMU operator qualification remains pending
 
 **Layer:** SW/PPU / Programming Backend / PPU runtime
 
@@ -35,6 +35,8 @@ hardware_runtime_ready = false
 until a later physical Z2 + adapter + target qualification explicitly promotes the hardware path.
 
 Required work packages:
+
+Merged/CI-qualified foundation: work packages 1–3. The current control-plane transaction adds work packages 4–5 as required CI/QEMU gates while preserving the live-SWPC distinction.
 
 1. **OpenOCD Runtime Packaging**
    - pin the qualified OpenOCD version and build inputs;

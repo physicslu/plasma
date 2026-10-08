@@ -126,6 +126,24 @@ class FakeRuntimeClient:
             "payload_base64": body["payload_base64"],
         }
 
+    def openocd_control_plane(self, body: dict, *, timeout_s: float):
+        self.__class__.calls.append({"endpoint": self.endpoint, "body": dict(body), "timeout_s": timeout_s})
+        return 200, {
+            "ok": True,
+            "result": "PASS",
+            "site_id": body["site_id"],
+            "openocd_version": "0.12.0",
+            "runtime_id": "0.12.0-9ea7f3d647c8",
+            "process_state": "stopped",
+            "tcl_rpc_state": "pass",
+            "rpc_scope": "loopback",
+            "architecture": "armv7l",
+            "worker_generation": 1,
+            "latency_ms": 2.0,
+            "execution_capability": "openocd-control-plane-only",
+            "hardware_runtime_ready": False,
+        }
+
 
 class ManagerBootstrapRestTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -274,6 +292,43 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["code"], "unsupported_endpoint")
+        self.assertEqual(FakeRuntimeClient.calls, [])
+
+    def test_platform_openocd_control_plane_requires_platform_pairing(self) -> None:
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/openocd-control-plane",
+            {"site_id": 1, "timeout_ms": 5000},
+        )
+        self.assertEqual(status, 409)
+        self.assertEqual(payload["error"]["code"], "bootstrap_pairing_required")
+        self.assertEqual(FakeRuntimeClient.calls, [])
+
+    def test_pending_ppu_can_run_platform_openocd_control_plane(self) -> None:
+        self.coordinator.paired = True
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/openocd-control-plane",
+            {"site_id": 1, "timeout_ms": 5000},
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"], "PASS")
+        self.assertEqual(payload["manager"]["context"], "platform")
+        self.assertEqual(payload["manager"]["relay"], "platform-maintenance")
+        self.assertEqual(payload["execution_capability"], "openocd-control-plane-only")
+        self.assertIs(payload["hardware_runtime_ready"], False)
+        self.assertEqual(FakeRuntimeClient.calls[-1]["body"], {"site_id": 1, "timeout_ms": 5000})
+
+    def test_platform_openocd_control_plane_rejects_extra_tcl_surface(self) -> None:
+        self.coordinator.paired = True
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/openocd-control-plane",
+            {"site_id": 1, "timeout_ms": 5000, "command": "shutdown"},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["code"], "invalid_request")
         self.assertEqual(FakeRuntimeClient.calls, [])
 
     def test_runtime_absent_first_install_does_not_require_programming_registration_or_fleet_idle(self) -> None:

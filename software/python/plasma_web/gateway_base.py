@@ -19,6 +19,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
 
 from .diagnostics import execute_ps_loopback
+from .openocd_control_plane import execute_openocd_control_plane
 from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvider
 
 
@@ -539,6 +540,42 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                         self._execution_unavailable()
                         return
                     raise
+                self._json(HTTPStatus.OK, _with_rest_version(payload))
+                return
+
+            if parsed.path == "/api/engineering/diagnostics/openocd-control-plane":
+                try:
+                    payload = _run(
+                        execute_openocd_control_plane(
+                            self._body(),
+                            self._local_snapshot(),
+                        )
+                    )
+                except PlasmaError as exc:
+                    status_by_code = {
+                        ErrorCode.INVALID_ARGUMENT: HTTPStatus.BAD_REQUEST,
+                        ErrorCode.SITE_INVALID: HTTPStatus.BAD_REQUEST,
+                        ErrorCode.OPERATION_TIMEOUT: HTTPStatus.GATEWAY_TIMEOUT,
+                        ErrorCode.CONNECTION_TIMEOUT: HTTPStatus.GATEWAY_TIMEOUT,
+                        ErrorCode.CONNECTION_FAILED: HTTPStatus.SERVICE_UNAVAILABLE,
+                        ErrorCode.INTERFACE_NOT_CONFIGURED: HTTPStatus.SERVICE_UNAVAILABLE,
+                        ErrorCode.INTERFACE_FAILURE: HTTPStatus.SERVICE_UNAVAILABLE,
+                    }
+                    self._json(
+                        status_by_code.get(exc.code, HTTPStatus.BAD_REQUEST),
+                        {
+                            "ok": False,
+                            "error": {
+                                "error_code": exc.code.value,
+                                "message": exc.message,
+                                "recoverable": exc.recoverable,
+                                "context": dict(exc.context),
+                            },
+                            "execution_capability": "openocd-control-plane-only",
+                            "hardware_runtime_ready": False,
+                        },
+                    )
+                    return
                 self._json(HTTPStatus.OK, _with_rest_version(payload))
                 return
 
