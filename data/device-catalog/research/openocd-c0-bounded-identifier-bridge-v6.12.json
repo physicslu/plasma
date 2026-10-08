@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "policy_id": "openocd-c0-bounded-identifier-bridge-v6.12",
+  "record_state": "RESEARCH_POLICY_PROPOSAL_NOT_PRODUCTION",
+  "scope": {
+    "family": "STM32C0",
+    "exact_icpn_count": 11,
+    "exact_icpns": [
+      "STM32C051K8U3",
+      "STM32C051K8U3TR",
+      "STM32C051K8U6",
+      "STM32C051K8U6TR",
+      "STM32C051K8U7",
+      "STM32C051K8U7TR",
+      "STM32C071FBY6TR",
+      "STM32C071R8I6N",
+      "STM32C071RBI6N",
+      "STM32C091RBI6",
+      "STM32C092RBI6"
+    ]
+  },
+  "bridges": {
+    "STM32C051K8U3": "STM32C051K8Tx",
+    "STM32C051K8U3TR": "STM32C051K8Tx",
+    "STM32C051K8U6": "STM32C051K8Tx",
+    "STM32C051K8U6TR": "STM32C051K8Tx",
+    "STM32C051K8U7": "STM32C051K8Tx",
+    "STM32C051K8U7TR": "STM32C051K8Tx",
+    "STM32C071FBY6TR": "STM32C071FBPx",
+    "STM32C071R8I6N": "STM32C071R8Tx",
+    "STM32C071RBI6N": "STM32C071RBTx",
+    "STM32C091RBI6": "STM32C091RBTx",
+    "STM32C092RBI6": "STM32C092RBTx"
+  },
+  "openocd_target_config": "tcl/target/stm32c0x.cfg",
+  "identifier_kind": "ordering_pattern",
+  "evidence": {
+    "source_probe": "openocd-c0-one-char-generalization-v6.11",
+    "source_pr": 762,
+    "source_merge_commit": "cf801451a12b6920333e938b9c23a98b0fda111d",
+    "source_workflow_run_id": 37714727255,
+    "source_artifact_id": 11523178771,
+    "source_artifact_sha256": "8389df3af9520787bc8dd1c063dbad2143e03f9a7d95c6901c9090513a2ff26c",
+    "source_probe_csv_sha256": "577e9fc755855bf84db5486d02035e739927f52c5e3046925fce134663cd450e",
+    "route_inventory_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810"
+  },
+  "governance": {
+    "generic_one_char_generalization_authorized": false,
+    "exact_set_bridge_only": true,
+    "production_mapping_write_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  },
+  "coverage_projection_if_later_promoted": {
+    "current_active_openocd_route_exact_count": 3594,
+    "already_identifier_qualified_or_suffix_normalizable": 353,
+    "bounded_c0_bridge_candidates": 11,
+    "potential_active_openocd_route_exact_count": 3958,
+    "scoped_active_denominator": 4550,
+    "potential_coverage_percent": 86.9890,
+    "remaining_gap": 592
+  }
+}
