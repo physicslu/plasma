@@ -1,0 +1,39 @@
+name: OpenOCD consolidated backend promotion v6.14
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/propose_openocd_consolidated_backend_promotion_v614.py'
+      - 'data/device-catalog/research/test_propose_openocd_consolidated_backend_promotion_v614.py'
+      - 'data/device-catalog/research/OPENOCD_CONSOLIDATED_BACKEND_PROMOTION_V614.md'
+      - '.github/workflows/device-catalog-openocd-consolidated-v614.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and validate consolidated backend proposal
+        run: |
+          python data/device-catalog/research/propose_openocd_consolidated_backend_promotion_v614.py \
+            --delta /tmp/openocd-v614-delta.csv \
+            --summary /tmp/openocd-v614-summary.json \
+            --patched-dir /tmp/openocd-v614-patched
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_propose_openocd_consolidated_backend_promotion_v614.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-consolidated-backend-promotion-v614
+          path: |
+            /tmp/openocd-v614-delta.csv
+            /tmp/openocd-v614-summary.json
+            /tmp/openocd-v614-patched/
+          if-no-files-found: error
+          retention-days: 30
