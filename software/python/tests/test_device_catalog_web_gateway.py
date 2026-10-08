@@ -52,7 +52,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["physical_validation"]["ppu_status"], "no_evidence")
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
-    def test_g0_no_mapping_identity_is_visible_without_backend_overclaim(self) -> None:
+    def test_g0_bounded_backend_mapping_is_visible_without_physical_overclaim(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G0B1RBI3N&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
@@ -60,8 +60,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["icpn"], "STM32G0B1RBI3N")
         self.assertEqual(result["family"], "STM32G0")
         self.assertEqual(result["catalog"]["scope"], "production_admitted")
-        self.assertEqual(result["backend"]["mapping_status"], "no_mapping")
-        self.assertEqual(result["backend"]["target_config"], "")
+        self.assertEqual(result["backend"]["mapping_status"], "mapped")
+        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32g0x.cfg")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
 
     def test_search_is_case_insensitive(self) -> None:
