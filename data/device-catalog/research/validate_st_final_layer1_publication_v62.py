@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v621 import rewind_v621_backend
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
@@ -82,10 +83,17 @@ def main()->int:
         rows,raw=rows_and_raw(spec["path"])
         req(len(rows)==spec["after"],f"{family}: current row-count drift")
         req(len({r["icpn"] for r in rows})==spec["after"],f"{family}: duplicate identity")
-        req(hashlib.sha256(raw).hexdigest()==spec["new_sha"],f"{family}: current SHA drift")
-        req(blob(raw)==spec["new_blob"],f"{family}: current blob drift")
+        v616_current_rows=rewind_v621_backend(rows,family)
+        current_buf=io.StringIO(newline="")
+        current_writer=csv.DictWriter(current_buf,fieldnames=list(v616_current_rows[0]),lineterminator="\n")
+        current_writer.writeheader(); current_writer.writerows(v616_current_rows)
+        v616_current_raw=current_buf.getvalue().encode()
+        req(hashlib.sha256(v616_current_raw).hexdigest()==spec["new_sha"],
+            f"{family}: post-v6.16 historical snapshot SHA drift")
+        req(blob(v616_current_raw)==spec["new_blob"],
+            f"{family}: post-v6.16 historical snapshot blob drift")
 
-        publication_rows=rewind_v616_backend(rows,family)
+        publication_rows=rewind_v616_backend(v616_current_rows,family)
         delta=[r for r in publication_rows if r["icpn"] in gap_set]
         req(len(delta)==spec["delta"],f"{family}: delta cardinality drift")
         all_delta.extend(delta)
@@ -118,8 +126,10 @@ def main()->int:
         src=[s for s in sources if s.get("manufacturer")=="STMicroelectronics" and s.get("family")==family]
         req(len(src)==1,f"{family}: manifest source missing/duplicated")
         req(src[0]["row_count"]==spec["after"],f"{family}: manifest row-count drift")
-        req(src[0]["sha256"]==spec["new_sha"],f"{family}: manifest SHA binding drift")
-        req(src[0]["git_blob_sha"]==spec["new_blob"],f"{family}: manifest blob binding drift")
+        req(src[0]["sha256"]==hashlib.sha256(raw).hexdigest(),
+            f"{family}: manifest current SHA binding drift")
+        req(src[0]["git_blob_sha"]==blob(raw),
+            f"{family}: manifest current blob binding drift")
 
     req(len(all_delta)==9 and {r["icpn"] for r in all_delta}==gap_set,
         "v6.2 delta exact set drift")

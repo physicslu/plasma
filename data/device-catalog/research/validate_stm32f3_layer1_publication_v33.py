@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v621 import rewind_v621_backend
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -148,10 +149,18 @@ def main() -> int:
     req(digest_lines(gap) == EXPECTED_GAP_SHA256, "F3 gap exact-set digest drift")
 
     data = F3.read_bytes()
-    req(hashlib.sha256(data).hexdigest() == EXPECTED_F3_SHA256, "F3 Production SHA256 drift")
-    req(git_blob(data) == EXPECTED_F3_BLOB, "F3 Production git blob drift")
     rows = read_rows(F3)
-    publication_rows = rewind_v616_backend(rows, "STM32F3")
+    v616_current_rows = rewind_v621_backend(rows, "STM32F3")
+    buf = io.StringIO(newline="")
+    writer = csv.DictWriter(buf, fieldnames=list(v616_current_rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(v616_current_rows)
+    v616_current_data = buf.getvalue().encode()
+    req(hashlib.sha256(v616_current_data).hexdigest() == EXPECTED_F3_SHA256,
+        "F3 post-v6.16 historical snapshot SHA256 drift")
+    req(git_blob(v616_current_data) == EXPECTED_F3_BLOB,
+        "F3 post-v6.16 historical snapshot git blob drift")
+    publication_rows = rewind_v616_backend(v616_current_rows, "STM32F3")
     req(len(rows) == 192 and len({r["icpn"] for r in rows}) == 192,
         "F3 Production count/unique drift")
     req(sorted(r["icpn"] for r in rows) == active,
@@ -201,9 +210,9 @@ def main() -> int:
     req(len(f3_sources) == 1, "Production F3 source missing/duplicated")
     source = f3_sources[0]
     req(source["row_count"] == 192
-        and source["sha256"] == EXPECTED_F3_SHA256
-        and source["git_blob_sha"] == EXPECTED_F3_BLOB,
-        "Production manifest F3 integrity binding drift")
+        and source["sha256"] == hashlib.sha256(data).hexdigest()
+        and source["git_blob_sha"] == git_blob(data),
+        "Production manifest F3 current integrity binding drift")
     current_total = sum(int(s["row_count"]) for s in sources)
     req(len(sources) >= 24, "Production source count regressed below F3 publication poststate")
     req(current_total >= 4088, "Production exact total regressed below F3 publication poststate")

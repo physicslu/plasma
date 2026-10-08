@@ -1,0 +1,26 @@
+name: OpenOCD Production write v6.21
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32f3-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32g0-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32l1-commercial-icpn.csv'
+      - 'data/device-catalog/research/openocd-production-backend-mapping-v6.21.json'
+      - 'data/device-catalog/research/validate_openocd_production_write_v621.py'
+      - '.github/workflows/device-catalog-openocd-production-v621.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-write:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate frozen Production postimage
+        run: python data/device-catalog/research/validate_openocd_production_write_v621.py
