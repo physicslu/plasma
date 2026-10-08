@@ -34,16 +34,10 @@ jobs:
           assert len(rows)==205
           assert len(by)==205
           assert len(got)==14
-          assert all(
-              r['mapping_status']=='no_mapping'
-              and not r['existing_identifier']
-              and not r['existing_identifier_kind']
-              and not r['openocd_target_config']
-              for r in got
-          )
+          # Backend evolution is validated by the publication validator.
           print('H7_ROWS',len(rows))
           print('H7_SHA256',hashlib.sha256(raw).hexdigest())
-          print('H7_NO_MAPPING_DELTA',len(got))
+          print('H7_LAYER1_DELTA',len(got))
           PY
           python data/device-catalog/research/validate_stm32h7_layer1_publication_v59.py
           python data/device-catalog/research/validate_stm32h7_classic_admission_readiness.py
