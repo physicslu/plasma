@@ -20,6 +20,10 @@ def test_workflow_runs_armv7_qemu_and_manager_bootstrap_e2e():
     assert "scripts/build-openocd-runtime.sh" in source
     assert 'assert p["hardware_runtime_ready"] is False' in source
     assert '"adapter driver dummy"' in source
+    assert "Build standalone Control Station Console/BFF" in source
+    assert "software/web/dist/standalone/server.js" in source
+    assert "Qualify eight isolated OpenOCD workers inside deployed ARMv7 PPU" in source
+    assert "scripts/openocd-control-plane-armv7-acceptance.py" in source
 
 
 def test_e2e_never_mutates_bootstrap_directly():
@@ -31,6 +35,10 @@ def test_e2e_never_mutates_bootstrap_directly():
     assert "runtime_absent" in source
     assert "runtime_active" in source
     assert "lifecycle\") != \"pending\"" in source
+    assert "/openocd-control-plane" in source
+    assert "/api/manager/ppu/api/engineering/diagnostics/openocd-control-plane" in source
+    assert "openocd-control-plane-only" in source
+    assert '"hardware_runtime_ready": False' in source
 
 
 def test_public_boundary_is_render_managed_ingress_and_qemu_private():
@@ -48,3 +56,13 @@ def test_public_boundary_is_render_managed_ingress_and_qemu_private():
     assert "Real PYNQ-Z2 deployment/reboot/rollback HIL: NOT QUALIFIED" in source
     assert "hardware_runtime_ready" in source
     assert "Tcl RPC worker/control-plane lifecycle" in source
+
+
+def test_armv7_openocd_acceptance_proves_eight_site_failure_isolation():
+    acceptance = (ROOT / "scripts/openocd-control-plane-armv7-acceptance.py").read_text(encoding="utf-8")
+    assert "site_count != 8" in acceptance
+    assert "await failed.kill()" in acceptance
+    assert "surviving_sites_after_failure" in acceptance
+    assert '"execution_capability": "openocd-control-plane-only"' in acceptance
+    assert '"hardware_runtime_ready": False' in acceptance
+    assert "SWD/JTAG" in acceptance
