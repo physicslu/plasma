@@ -232,6 +232,23 @@ jobs:
           echo "runtime_id=$runtime_id" >> "$GITHUB_OUTPUT"
           echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
 
+      - name: Qualify real OpenOCD Tcl RPC worker
+        if: matrix.architecture == 'x86_64'
+        shell: bash
+        env:
+          ARTIFACT: ${{ steps.build.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          python -m pip install -e "./software/python[dev]"
+          extract="$RUNNER_TEMP/openocd-rpc-real"
+          rm -rf "$extract"
+          mkdir -p "$extract"
+          tar -xzf "$ARTIFACT" -C "$extract"
+          export PLASMA_TEST_OPENOCD="$extract/plasma-openocd/payload/bin/openocd"
+          export PLASMA_TEST_OPENOCD_SCRIPTS="$extract/plasma-openocd/payload/share/openocd/scripts"
+          test -x "$PLASMA_TEST_OPENOCD"
+          test -d "$PLASMA_TEST_OPENOCD_SCRIPTS"
+          python -m pytest -q software/python/tests/test_openocd_rpc_worker_real.py
       - name: Install and execute on fresh matching Ubuntu 22.04 userspace
         shell: bash
         env:
