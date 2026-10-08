@@ -1,0 +1,24 @@
+name: OpenOCD C0 bounded identifier bridge v6.12
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-c0-bounded-identifier-bridge-v6.12.json'
+      - 'data/device-catalog/research/validate_openocd_c0_bounded_bridge_v612.py'
+      - 'data/device-catalog/research/OPENOCD_C0_BOUNDED_IDENTIFIER_BRIDGE_V612.md'
+      - '.github/workflows/device-catalog-openocd-c0-bridge-v612.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate bounded C0 identifier bridge
+        run: python data/device-catalog/research/validate_openocd_c0_bounded_bridge_v612.py
