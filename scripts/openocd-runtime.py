@@ -163,20 +163,36 @@ def _write_internal_hashes(root: Path) -> None:
 
 
 def _payload_sha256(root: Path) -> str:
-    """Hash the staged payload tree independent of archive metadata."""
+    """Hash staged paths, types, modes, sizes, and regular-file bytes."""
 
     digest = hashlib.sha256()
-    for path in _iter_regular_files(root):
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise OpenOCDRuntimeArtifactError(
+                f"OpenOCD runtime staging contains a symlink after dereference: {path}"
+            )
         relative = path.relative_to(root).as_posix().encode("utf-8")
         stat = path.stat()
         mode = stat.st_mode & 0o777
+        if path.is_dir():
+            kind = b"d"
+            size = 0
+        elif path.is_file():
+            kind = b"f"
+            size = stat.st_size
+        else:
+            raise OpenOCDRuntimeArtifactError(
+                f"OpenOCD runtime staging contains an unsupported file type: {path}"
+            )
+        digest.update(kind)
         digest.update(struct.pack(">I", len(relative)))
         digest.update(relative)
         digest.update(struct.pack(">I", mode))
-        digest.update(struct.pack(">Q", stat.st_size))
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
+        digest.update(struct.pack(">Q", size))
+        if path.is_file():
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
     return digest.hexdigest()
 
 
