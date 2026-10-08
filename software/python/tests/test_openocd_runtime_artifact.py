@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import struct
 import sys
 import tarfile
@@ -134,6 +135,51 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
     assert retained["artifact_sha256"] == evidence["artifact_sha256"]
     assert retained["starts_openocd_service"] is False
     assert retained["qualification_boundary"]["hardware_runtime_ready"] is False
+
+
+def test_build_is_reproducible_for_identical_payload_bytes_despite_mtime_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = _fake_prefix(tmp_path)
+    monkeypatch.setattr(MODULE.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        MODULE,
+        "_probe_openocd",
+        lambda _path: ("0.12.0", "Open On-Chip Debugger 0.12.0"),
+    )
+    monkeypatch.setattr(MODULE, "_ldd_dependencies", lambda _path: ["libc.so.6"])
+
+    binary = prefix / "bin" / "openocd"
+    os.utime(binary, (1_600_000_000, 1_600_000_000))
+    first = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "out-a",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    os.utime(binary, (1_700_000_000, 1_700_000_000))
+    second = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "out-b",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    first_artifact = Path(str(first["artifact"]))
+    second_artifact = Path(str(second["artifact"]))
+    assert first["artifact_sha256"] == second["artifact_sha256"]
+    assert first_artifact.read_bytes() == second_artifact.read_bytes()
+    assert first["packaging_policy"] == "normalized-tar-gzip-v1"
+
+    with tarfile.open(first_artifact, "r:gz") as archive:
+        members = archive.getmembers()
+    assert members
+    assert all(member.mtime == 0 for member in members)
+    assert all(member.uid == 0 and member.gid == 0 for member in members)
+    assert all(member.uname == "" and member.gname == "" for member in members)
 
 
 def test_reinstall_rejects_tampered_existing_runtime(
