@@ -19,9 +19,15 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/openocd-runtime.py"
+      - "scripts/openocd-control-plane-armv7-acceptance.py"
       - "scripts/build-openocd-runtime.sh"
       - "release/openocd.json"
       - "software/python/plasma_manager/**"
+      - "software/python/plasma_interfaces/**"
+      - "software/python/plasma_web/**"
+      - "software/web/app/engineering/openocd-control-plane-*"
+      - "software/web/app/api/manager/**"
+      - "software/web/tests/openocd-control-plane-contract.test.mjs"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
@@ -45,9 +51,15 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/openocd-runtime.py"
+      - "scripts/openocd-control-plane-armv7-acceptance.py"
       - "scripts/build-openocd-runtime.sh"
       - "release/openocd.json"
       - "software/python/plasma_manager/**"
+      - "software/python/plasma_interfaces/**"
+      - "software/python/plasma_web/**"
+      - "software/web/app/engineering/openocd-control-plane-*"
+      - "software/web/app/api/manager/**"
+      - "software/web/tests/openocd-control-plane-contract.test.mjs"
       - "software/python/tests/test_z2like_demo_qemu_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_e2e_contract.py"
@@ -91,7 +103,8 @@ jobs:
             scripts/z2like-demo-qemu-build-kit.py \
             scripts/z2like-demo-qemu-deploy.py \
             scripts/z2like-demo-nginx-ephemeral.py \
-            scripts/openocd-runtime.py
+            scripts/openocd-runtime.py \
+            scripts/openocd-control-plane-armv7-acceptance.py
           bash -n scripts/build-openocd-runtime.sh
           bash -n scripts/plasmactl
           bash -n scripts/plasmactl-z2-ps
@@ -104,6 +117,7 @@ jobs:
           python -m pytest -q \
             software/python/tests/test_z2like_demo_qemu_contract.py \
             software/python/tests/test_z2like_demo_qemu_control_plane_contract.py \
+            software/python/tests/test_z2like_demo_qemu_e2e_contract.py \
             software/python/tests/test_openocd_runtime_artifact.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
@@ -130,6 +144,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build standalone Control Station Console/BFF
+        working-directory: software/web
+        run: |
+          npm ci
+          npm run build:product
+
+      - name: Run OpenOCD Console contract
+        run: node --test software/web/tests/openocd-control-plane-contract.test.mjs
 
       - name: Set up QEMU ARM emulation
         uses: docker/setup-qemu-action@v4
@@ -262,7 +289,17 @@ jobs:
         run: |
           python scripts/z2like-demo-qemu-e2e.py \
             --kit "$KIT" \
-            --sidecar "$KIT.sha256"
+            --sidecar "$KIT.sha256" \
+            --console-server software/web/dist/standalone/server.js
+
+      - name: Qualify eight isolated OpenOCD workers inside deployed ARMv7 PPU
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker cp scripts/openocd-control-plane-armv7-acceptance.py \
+            plasma-z2like-demo-qemu:/tmp/openocd-control-plane-armv7-acceptance.py
+          docker exec plasma-z2like-demo-qemu \
+            python3 /tmp/openocd-control-plane-armv7-acceptance.py --site-count 8
 
       - name: Prove Platform and Managed PS loopback lifecycle matrix
         run: python scripts/z2like-demo-qemu-loopback-matrix.py
