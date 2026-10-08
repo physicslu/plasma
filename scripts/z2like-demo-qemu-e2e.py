@@ -127,6 +127,41 @@ def _assert_ps_loopback(payload: Mapping[str, Any], *, operation: str) -> None:
         raise AcceptanceError(f"{operation} did not echo the expected payload: {payload!r}")
 
 
+def _openocd_body(site_id: int = 1) -> dict[str, Any]:
+    return {"site_id": site_id, "timeout_ms": 5000}
+
+
+def _assert_openocd_control_plane(payload: Mapping[str, Any], *, operation: str, site_id: int = 1) -> None:
+    required = {
+        "ok": True,
+        "result": "PASS",
+        "site_id": site_id,
+        "process_state": "stopped",
+        "probe_process_state": "running",
+        "tcl_rpc_state": "pass",
+        "rpc_scope": "loopback",
+        "execution_capability": "openocd-control-plane-only",
+        "hardware_runtime_ready": False,
+    }
+    for field, expected in required.items():
+        if payload.get(field) != expected:
+            raise AcceptanceError(
+                f"{operation} returned invalid {field}: expected {expected!r}, got {payload.get(field)!r}"
+            )
+    if not isinstance(payload.get("openocd_version"), str) or not payload["openocd_version"]:
+        raise AcceptanceError(f"{operation} omitted OpenOCD version")
+    if not isinstance(payload.get("runtime_id"), str) or not payload["runtime_id"]:
+        raise AcceptanceError(f"{operation} omitted OpenOCD runtime identity")
+    if payload.get("architecture") not in {"armv7", "armv7l"}:
+        raise AcceptanceError(f"{operation} did not execute the ARMv7 OpenOCD runtime: {payload!r}")
+    generation = payload.get("worker_generation")
+    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+        raise AcceptanceError(f"{operation} returned invalid worker generation: {payload!r}")
+    latency = payload.get("latency_ms")
+    if isinstance(latency, bool) or not isinstance(latency, (int, float)) or latency < 0:
+        raise AcceptanceError(f"{operation} returned invalid latency evidence: {payload!r}")
+
+
 def _commission_when_ready(manager: str, alias: str, *, timeout_s: float = 30.0) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_s
     last: dict[str, Any] | None = None
@@ -193,6 +228,54 @@ def _start_manager(config: Path) -> subprocess.Popen[str]:
     )
 
 
+def _start_console_bff(
+    server: Path,
+    *,
+    manager: str,
+    alias: str,
+    port: int,
+) -> subprocess.Popen[str]:
+    server = server.resolve()
+    if not server.is_file():
+        raise AcceptanceError(f"Control Station standalone server is missing: {server}")
+    env = {
+        **os.environ,
+        "HOST": "127.0.0.1",
+        "PORT": str(port),
+        "PLASMA_FLEET_UI_ENABLED": "1",
+        "PLASMA_CONTROL_STATION_MODE": "managed",
+        "PLASMA_MANAGER_API_URL": manager,
+        "PLASMA_MANAGER_PPU_ALIAS": alias,
+    }
+    return subprocess.Popen(
+        ["node", str(server)],
+        cwd=server.parent,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+    )
+
+
+def _wait_console(origin: str, process: subprocess.Popen[str], *, timeout_s: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    last = "no response"
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            output = process.stdout.read() if process.stdout is not None else ""
+            raise AcceptanceError(f"Control Station BFF exited before readiness: {output[-1000:]}")
+        try:
+            with opener.open(f"{origin}/", timeout=2.0) as response:
+                if 200 <= int(response.status) < 400:
+                    return
+                last = f"HTTP {response.status}"
+        except (OSError, urllib.error.URLError) as exc:
+            last = str(exc)
+        time.sleep(0.2)
+    raise AcceptanceError(f"Control Station BFF did not become ready: {last}")
+
+
 def _stop(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
@@ -219,12 +302,21 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
         config = _write_manager_config(root, args.manager_port)
         manager_process = _start_manager(config)
         manager = f"http://127.0.0.1:{args.manager_port}"
+        console_process: subprocess.Popen[str] | None = None
+        console = f"http://127.0.0.1:{args.console_port}"
         try:
             _wait_json(
                 f"{manager}/api/health/live",
                 lambda payload: payload.get("ok") is True,
                 timeout_s=30.0,
             )
+            console_process = _start_console_bff(
+                args.console_server,
+                manager=manager,
+                alias=args.alias,
+                port=args.console_port,
+            )
+            _wait_console(console, console_process)
             endpoint = f"http://{args.ppu_ip}:18080"
             status, payload = _json_request(
                 f"{manager}/api/registry",
@@ -349,6 +441,43 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
             if not isinstance(manager_proof, dict) or manager_proof.get("context") != "platform":
                 raise AcceptanceError(f"Platform PS Loop Test omitted platform admission proof: {platform_loopback!r}")
 
+            status, platform_openocd = _json_request(
+                f"{bootstrap_url}/openocd-control-plane",
+                method="POST",
+                body=_openocd_body(),
+                timeout_s=15.0,
+            )
+            _expect(status, 200, platform_openocd, "pending Platform OpenOCD Control Plane Test")
+            _assert_openocd_control_plane(
+                platform_openocd,
+                operation="pending Platform OpenOCD Control Plane Test",
+            )
+            openocd_platform_proof = platform_openocd.get("manager")
+            if (
+                not isinstance(openocd_platform_proof, dict)
+                or openocd_platform_proof.get("context") != "platform"
+                or openocd_platform_proof.get("relay") != "platform-maintenance"
+            ):
+                raise AcceptanceError(
+                    f"Platform OpenOCD Test omitted Platform admission proof: {platform_openocd!r}"
+                )
+
+            managed_openocd_bff = (
+                f"{console}/api/manager/ppu/api/engineering/diagnostics/openocd-control-plane"
+            )
+            status, managed_openocd_blocked = _json_request(
+                managed_openocd_bff,
+                method="POST",
+                body=_openocd_body(),
+                timeout_s=15.0,
+            )
+            _expect(status, 409, managed_openocd_blocked, "pending BFF OpenOCD Control Plane block")
+            openocd_error = managed_openocd_blocked.get("error")
+            if not isinstance(openocd_error, dict) or openocd_error.get("code") != "ppu_not_enabled":
+                raise AcceptanceError(
+                    f"pending BFF OpenOCD Control Plane Test did not fail closed: {managed_openocd_blocked!r}"
+                )
+
             managed_url = f"{manager}/api/ppus/{args.alias}/gateway/api/engineering/diagnostics/loopback"
             status, managed_blocked = _json_request(
                 managed_url,
@@ -375,6 +504,27 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
             managed_proof = managed_loopback.get("manager")
             if not isinstance(managed_proof, dict) or managed_proof.get("relay") != "pass-through":
                 raise AcceptanceError(f"Managed PS Loop Test omitted Manager relay proof: {managed_loopback!r}")
+
+            status, managed_openocd = _json_request(
+                managed_openocd_bff,
+                method="POST",
+                body=_openocd_body(),
+                timeout_s=15.0,
+            )
+            _expect(status, 200, managed_openocd, "commissioned BFF OpenOCD Control Plane Test")
+            _assert_openocd_control_plane(
+                managed_openocd,
+                operation="commissioned BFF OpenOCD Control Plane Test",
+            )
+            openocd_managed_proof = managed_openocd.get("manager")
+            if (
+                not isinstance(openocd_managed_proof, dict)
+                or openocd_managed_proof.get("relay") != "pass-through"
+                or openocd_managed_proof.get("ppu_alias") != args.alias
+            ):
+                raise AcceptanceError(
+                    f"BFF OpenOCD Test omitted Managed relay proof: {managed_openocd!r}"
+                )
 
             status, platform_commissioned = _json_request(
                 f"{bootstrap_url}/ps-loopback",
@@ -406,10 +556,15 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
                 "runtime_state": "runtime_active",
                 "gateway_readiness": "PASS",
                 "platform_ps_loopback_pending": "PASS",
+                "platform_openocd_control_plane_pending": "PASS",
                 "managed_ps_loopback_pending": "BLOCKED",
+                "managed_openocd_control_plane_pending": "BLOCKED",
                 "registration_state": "commissioned",
                 "managed_ps_loopback_commissioned": "PASS",
+                "managed_openocd_control_plane_commissioned_via_console_bff": "PASS",
                 "platform_ps_loopback_commissioned": "PASS",
+                "openocd_execution_capability": "openocd-control-plane-only",
+                "hardware_runtime_ready": False,
                 "not_claimed": [
                     "SWPC host deployment",
                     "public Cloudflare hostname routing",
@@ -422,6 +577,8 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
                 ],
             }
         finally:
+            if console_process is not None:
+                _stop(console_process)
             _stop(manager_process)
 
 
@@ -435,6 +592,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--facility-id", default="ci")
     parser.add_argument("--container", default="plasma-z2like-demo-qemu")
     parser.add_argument("--manager-port", type=int, default=18380)
+    parser.add_argument("--console-port", type=int, default=18390)
+    parser.add_argument(
+        "--console-server",
+        type=Path,
+        default=Path("software/web/dist/standalone/server.js"),
+    )
     return parser
 
 

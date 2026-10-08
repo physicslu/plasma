@@ -72,6 +72,30 @@ class FakeManagedPPUGatewayHandler(BaseHTTPRequestHandler):
                 "payload_base64": request["payload_base64"],
             }
             status = HTTPStatus.OK
+        elif self.path == "/api/engineering/diagnostics/openocd-control-plane":
+            request = json.loads(body)
+            payload = {
+                "ok": True,
+                "result": "PASS",
+                "site_id": request["site_id"],
+                "openocd_version": "0.12.0",
+                "openocd_version_banner": "Open On-Chip Debugger 0.12.0",
+                "runtime_id": "0.12.0-9ea7f3d647c8",
+                "process_state": "stopped",
+                "probe_process_state": "running",
+                "process_id": 4321,
+                "tcl_rpc_state": "pass",
+                "rpc_scope": "loopback",
+                "rpc_port": 45678,
+                "architecture": "armv7l",
+                "host_architecture": "armv7l",
+                "worker_generation": 1,
+                "latency_ms": 2.5,
+                "execution_capability": "openocd-control-plane-only",
+                "hardware_runtime_ready": False,
+                "not_claimed": ["SWD/JTAG", "FPGA PL", "real IC"],
+            }
+            status = HTTPStatus.OK
         else:
             payload = {"ok": True, "path": self.path, "size": len(body)}
             status = HTTPStatus.CREATED if "programming-assets" in self.path else HTTPStatus.OK
@@ -269,6 +293,23 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual(payload["manager"]["relay"], "pass-through")
         self.assertEqual(payload["manager"]["ppu_alias"], "ppu-a")
         self.assertEqual(payload["loopback"]["source"], "ps")
+
+    def test_openocd_control_plane_uses_same_managed_relay_and_adds_manager_proof(self):
+        body = json.dumps({"site_id": 1, "timeout_ms": 5000}).encode("utf-8")
+        status, _, data = self.relay(
+            "POST",
+            "/api/engineering/diagnostics/openocd-control-plane",
+            body=body,
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 200)
+        payload = json.loads(data)
+        self.assertEqual(payload["manager"]["relay"], "pass-through")
+        self.assertEqual(payload["manager"]["ppu_alias"], "ppu-a")
+        self.assertEqual(payload["result"], "PASS")
+        self.assertEqual(payload["site_id"], 1)
+        self.assertEqual(payload["execution_capability"], "openocd-control-plane-only")
+        self.assertIs(payload["hardware_runtime_ready"], False)
 
     def test_non_allowlisted_route_is_rejected_before_ppu_contact(self):
         before = len(FakeManagedPPUGatewayHandler.requests)

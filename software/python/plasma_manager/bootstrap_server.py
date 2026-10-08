@@ -283,6 +283,92 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             }
         self._json(status, payload)
 
+    def _platform_openocd_control_plane(self, alias: str, body: dict[str, Any]) -> None:
+        try:
+            platform = self._bootstrap().status(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return
+        pairing = platform.get("pairing")
+        if not isinstance(pairing, dict) or pairing.get("paired") is not True or pairing.get("device_match") is not True:
+            self._bootstrap_error(
+                BootstrapCredentialError(
+                    "Platform maintenance pairing is required before OpenOCD Control Plane Test"
+                )
+            )
+            return
+        if set(body) != {"site_id", "timeout_ms"}:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "invalid_request",
+                        "message": "OpenOCD Control Plane Test requires only site_id and timeout_ms",
+                    },
+                },
+            )
+            return
+        site_id = body.get("site_id")
+        timeout_ms = body.get("timeout_ms")
+        if isinstance(site_id, bool) or not isinstance(site_id, int) or site_id < 1:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_request", "message": "site_id must be a positive integer"}},
+            )
+            return
+        if (
+            isinstance(timeout_ms, bool)
+            or not isinstance(timeout_ms, int)
+            or timeout_ms < 100
+            or timeout_ms > 30_000
+        ):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "invalid_request",
+                        "message": "timeout_ms must be between 100 and 30000",
+                    },
+                },
+            )
+            return
+        entry = self._resolve_ppu_alias(alias)
+        if entry is None:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": {"code": "ppu_not_found", "message": "configured PPU alias was not found"}},
+            )
+            return
+        relay_timeout_s = min(max(timeout_ms / 1000.0 + 2.0, self._config().request_timeout_s), 35.0)
+        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        started = time.monotonic()
+        try:
+            status, payload = client.openocd_control_plane(body, timeout_s=relay_timeout_s)
+        except PPUTransportError:
+            self._json(
+                HTTPStatus.GATEWAY_TIMEOUT,
+                {"ok": False, "error": {"code": "ppu_transport_error", "message": "PPU OpenOCD diagnostic transport failed"}},
+            )
+            return
+        except PPUHTTPError:
+            self._json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": {"code": "ppu_protocol_error", "message": "PPU OpenOCD diagnostic response was invalid"}},
+            )
+            return
+        manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
+        if status == HTTPStatus.OK and payload.get("ok") is True:
+            payload = dict(payload)
+            payload["manager"] = {
+                "relay": "platform-maintenance",
+                "context": "platform",
+                "ppu_alias": alias,
+                "manager_rtt_ms": manager_rtt_ms,
+            }
+        self._json(status, payload)
+
     def _bootstrap_post(self, alias: str, action: str) -> None:
         coordinator = self._bootstrap()
         try:
@@ -294,6 +380,9 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 return
             if action == "ps-loopback":
                 self._platform_ps_loopback(alias, body)
+                return
+            if action == "openocd-control-plane":
+                self._platform_openocd_control_plane(alias, body)
                 return
             if action == "deployments":
                 gate = self._operation_gate()

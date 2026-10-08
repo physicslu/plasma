@@ -422,6 +422,10 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             self._principal()  # Authenticate before the local PPU identity lookup.
             self._authorize(Permission.STATUS_READ, self._local_resource())
             return False
+        if path == "/api/engineering/diagnostics/openocd-control-plane":
+            self._principal()  # Authenticate before the local PPU identity lookup.
+            self._authorize(Permission.STATUS_READ, self._local_resource())
+            return False
         if path == "/api/settings/gateway":
             return self._admit_command(Permission.GATEWAY_SETTINGS_WRITE)
         if path == "/api/settings/ppu-network":

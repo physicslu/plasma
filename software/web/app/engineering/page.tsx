@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
 import GatewaySettingsPanel from "./gateway-settings";
 import LoopbackTest from "./loopback-test";
+import OpenOcdControlPlaneTest from "./openocd-control-plane-test";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
 import PpuOverviewPage from "./ppu-overview-page";
 import PpuRegistrationPage from "./ppu-registration-page";
@@ -41,7 +42,7 @@ const settingsSubgroupLabels = {
 } as const;
 
 type PpuSection = "overview" | "platform" | "registration" | "sites";
-type DiagnosticsSection = "loopback";
+type DiagnosticsSection = "loopback" | "openocd";
 type SettingsSection = "gateway" | "mock";
 
 function subscribeHydration(): () => void {
@@ -209,8 +210,18 @@ export default function EngineeringPage() {
                               aria-pressed={diagnosticsSurfaceActive && diagnosticsSection === "loopback"}
                               onClick={() => selectDiagnosticsSection("loopback")}
                             >
-                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
                               <span className="engineeringNavLabel">{locale === "zh-TW" ? "Loopback 測試" : "Loopback Test"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!hydrated}
+                              className={diagnosticsSurfaceActive && diagnosticsSection === "openocd" ? "active" : ""}
+                              aria-pressed={diagnosticsSurfaceActive && diagnosticsSection === "openocd"}
+                              onClick={() => selectDiagnosticsSection("openocd")}
+                            >
+                              <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                              <span className="engineeringNavLabel">OpenOCD Control Plane</span>
                             </button>
                           </div>
                         )}
@@ -303,6 +314,8 @@ export default function EngineeringPage() {
               <PpuSitesPage />
             ) : active === "ppu-sites" ? (
               <PpuOverviewPage onNavigate={selectPpuSection} />
+            ) : active === "diagnostics" && diagnosticsSection === "openocd" ? (
+              <OpenOcdControlPlaneTest />
             ) : active === "diagnostics" && diagnosticsSection === "loopback" ? (
               <LoopbackTest />
             ) : active === "settings" && settingsSection === "mock" ? (

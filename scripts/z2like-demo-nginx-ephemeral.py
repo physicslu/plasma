@@ -333,6 +333,22 @@ def run_gate() -> dict[str, Any]:
 
                     expect_status(base, "/api/settings/sites", 200)
                     expect_record("gateway", "GET", "/api/settings/sites")
+                    expect_status(
+                        base,
+                        "/api/engineering/diagnostics/openocd-control-plane",
+                        200,
+                        method="POST",
+                    )
+                    expect_record(
+                        "gateway",
+                        "POST",
+                        "/api/engineering/diagnostics/openocd-control-plane",
+                    )
+                    expect_status(
+                        base,
+                        "/api/engineering/diagnostics/openocd-control-plane",
+                        403,
+                    )
                     expect_status(base, "/api/settings/gateway", 403, method="POST")
                     expect_status(base, "/api/jobs", 403)
                     expect_status(base, "/api/jobs", 201, method="POST")
@@ -388,6 +404,7 @@ def run_gate() -> dict[str, Any]:
         "gate": "z2like-demo-ephemeral-nginx-integration",
         "nginx_syntax": "PASS",
         "gateway_positive_route": "PASS",
+        "openocd_control_plane_route": "PASS",
         "bootstrap_prefix_projection": "PASS",
         "bootstrap_chunk_rewrite": "PASS",
         "method_allowlist": "PASS",

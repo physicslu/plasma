@@ -35,6 +35,7 @@ def test_ingress_exposes_programming_and_site_runtime_routes_with_read_only_sett
         "location = /api/settings/sites/activation {",
         "location = /api/mock/runtime {",
         "location = /api/engineering/session {",
+        "location = /api/engineering/diagnostics/openocd-control-plane {",
         "location = /api/jobs {",
         "location = /api/batches {",
         "api/programming-assets/check$",

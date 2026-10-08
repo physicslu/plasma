@@ -266,6 +266,21 @@ class PPUHttpClient:
             headers=headers,
         )
 
+    def openocd_control_plane(
+        self,
+        body: dict[str, Any],
+        *,
+        timeout_s: float,
+    ) -> tuple[int, dict[str, Any]]:
+        """Relay the fixed safe OpenOCD control-plane diagnostic to one PPU."""
+        return self._request_json(
+            "POST",
+            "/api/engineering/diagnostics/openocd-control-plane",
+            accepted_statuses=frozenset({200, 400, 404, 409, 422, 500, 502, 503, 504}),
+            body=body,
+            timeout_s=timeout_s,
+        )
+
     def ps_loopback(
         self,
         body: dict[str, Any],

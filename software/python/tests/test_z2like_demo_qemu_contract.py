@@ -80,6 +80,7 @@ def test_managed_ingress_targets_qemu_not_x86_surrogate():
     assert "Cloudflare Access service token remains REQUIRED" in source
     assert "POST /api/settings/ppu-network" in source
     assert "POST /api/settings/gateway" in source
+    assert "location = /api/engineering/diagnostics/openocd-control-plane {" in source
     assert "location / { return 404; }" in source
 
 
