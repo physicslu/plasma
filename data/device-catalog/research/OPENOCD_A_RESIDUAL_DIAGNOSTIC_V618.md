@@ -26,3 +26,29 @@ v6.18 must fail if the 25-row family/series partition drifts, a direct current-p
 No probe result authorizes a family-wide policy change. Any future bridge must be independently bounded to an exact set and must retain separate owner approval before Production write.
 
 No Programming Profile, erase/program/verify, Engineering Verified, or HIL claim is made.
+
+
+## Diagnostic result
+
+The 25-row residual partitions into two structural classes:
+
+- route inventory present, policy-shape gap: **18**
+- base variant absent from canonical route inventory: **7**
+
+Probe result:
+
+- unique under one-character diagnostic: **17**
+  - STM32G0: 12
+  - STM32F3: 4
+  - STM32L1: 1
+- ambiguous under one-character diagnostic: **1**
+  - STM32G4: 1
+- no identifier probe match: **7**
+  - STM32C0: 5
+  - STM32L4: 2
+
+The one-character result is diagnostic only. It is weaker than an admitted route binding and does not justify a family-wide normalization rule.
+
+The 17 unique rows are the next exact-set evidence-review opportunity. If all 17 later pass an independent bounded-bridge qualification and Production transaction, Active route coverage would move from **3,958 / 4,550 = 86.9890%** to **3,975 / 4,550 = 87.3626%**, leaving **575** Active route gaps.
+
+The seven missing-base-variant rows require canonical route-inventory expansion rather than identifier-policy relaxation. The ambiguous STM32G4 row also requires stronger route evidence before any bridge can be proposed.
