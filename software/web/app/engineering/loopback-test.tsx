@@ -653,8 +653,6 @@ export default function LoopbackTest() {
             <button type="button" disabled={running} onClick={reset}>↻ {text.reset}</button>
           </div>
         </div>
-        <p className="loopbackBackendBoundary">{text.psReady}</p>
-        {endpoint !== "ps" && <p className="loopbackBackendBoundary">{text.laterEndpoint}</p>}
         {running && <p className="loopbackExecutionState"><strong>{text.running}</strong> · {results.length} case(s) completed</p>}
         {runError && <p className="loopbackExecutionState loopbackCaseError">{runError}</p>}
         </DiagnosticsTestCard>
