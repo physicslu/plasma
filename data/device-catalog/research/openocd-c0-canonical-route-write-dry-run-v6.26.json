@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-c0-canonical-route-inventory-dry-run-v6.26",
+  "record_state": "DRY_RUN_FROZEN_NOT_WRITE_AUTHORIZED",
+  "input": {
+    "v625_policy": "openocd-c0-bounded-route-inventory-v6.25.json",
+    "v625_proposal_exact_set_sha256": "c4bbc25d50dfbb77101d8247a00e4730f8ac22e4ee05729245412808ece1a716",
+    "v625_proposal_pattern_set_sha256": "20b733440ceb21fbc52f54d9572e41d91caabf048c05a4b5cfe2036d32ad3d64",
+    "v625_proposal_binding_sha256": "61e9b7d79c8a846b645a69947203271cf39cd21b66d0a1484da4e1412bf2a430",
+    "v625_proposal_csv_sha256": "5d6f2b022a0efab409f57dece8cfcb06dace9cbf93c4a533beef9b4ecbf84b24"
+  },
+  "canonical_preimage": {
+    "path": "data/device-catalog/research/openocd-parts-canonical.csv",
+    "git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "row_count": 7657,
+    "sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "byte_count": 1582603
+  },
+  "source_delta": {
+    "materialized_path": "data/device-catalog/research/openocd-c0-bounded-route-inventory-v6.25.csv",
+    "row_count": 4,
+    "sha256": "5d6f2b022a0efab409f57dece8cfcb06dace9cbf93c4a533beef9b4ecbf84b24",
+    "required_with_actual_write": true
+  },
+  "canonical_postimage": {
+    "row_count": 7661,
+    "git_blob_sha": "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+    "sha256": "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+    "byte_count": 1583487,
+    "lock_state": "FROZEN"
+  },
+  "governance": {
+    "canonical_write_authorized": false,
+    "source_delta_materialization_authorized": false,
+    "production_mapping_write_authorized": false,
+    "exact_set_only": true,
+    "unrelated_catalog_edits_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  },
+  "discovery_evidence": {
+    "workflow_run_id": 37798993383,
+    "artifact_id": 11559877742,
+    "artifact_zip_sha256": "58c2f0ef6714588c0abbce5fdf8efb04f3f52ac94c19924dd3862ee8bb70c204"
+  }
+}
