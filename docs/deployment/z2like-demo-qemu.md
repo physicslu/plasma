@@ -138,13 +138,14 @@ SWPC local operator
 
 Platform maintenance remains fail-closed and independent from programming Registration:
 
-- the existing programming Registration lifecycle (`pending`, `commissioned`, or `disabled`) is preserved;
+- the SWPC-local maintenance Manager uses a **read-only config connection registry** with `registry_state_path: null`; it does not own or mutate Programming Registration lifecycle;
+- the public production control plane remains the sole owner of Programming Registration admission;
+- a legacy SWPC-local `manager-registry.json` may remain on disk after upgrade, but it is ignored and is not an authority once the config-only maintenance registry is active;
 - device-bound Bootstrap pairing is required for authenticated mutation;
 - active Site execution blocks Platform mutation;
 - a `runtime_absent` target may receive first Runtime deployment without a Runtime-idle observation;
 - an existing `runtime_active` target requires a newer current trusted idle Manager observation after target restart;
-- recovery/unknown Runtime state is rejected;
-- commissioning and disabling are handled only by the separate Registration workflow.
+- recovery/unknown Runtime state is rejected.
 
 The device-local pairing token is read only from the local QEMU container when pairing is required and is never printed by the one-command deployment path.
 
