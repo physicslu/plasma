@@ -187,6 +187,39 @@ def test_build_is_reproducible_for_identical_payload_bytes_despite_mtime_drift(
     assert all(member.uname == "" and member.gname == "" for member in members)
 
 
+def test_payload_identity_includes_directory_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prefix = _fake_prefix(tmp_path)
+    monkeypatch.setattr(MODULE.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        MODULE,
+        "_probe_openocd",
+        lambda _path: ("0.12.0", "Open On-Chip Debugger 0.12.0"),
+    )
+    monkeypatch.setattr(MODULE, "_ldd_dependencies", lambda _path: ["libc.so.6"])
+
+    first = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-a",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+    target_dir = prefix / "share" / "openocd" / "scripts" / "target"
+    target_dir.chmod(0o750)
+    second = MODULE.build_artifact(
+        prefix=prefix,
+        output_dir=tmp_path / "mode-b",
+        version="0.12.0",
+        source_commit=SOURCE_COMMIT,
+        architecture="x86_64",
+    )
+
+    assert first["payload_sha256"] != second["payload_sha256"]
+    assert first["artifact_sha256"] != second["artifact_sha256"]
+
+
 def test_reinstall_rejects_tampered_existing_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
