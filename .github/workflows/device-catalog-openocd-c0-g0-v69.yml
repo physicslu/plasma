@@ -1,0 +1,28 @@
+name: OpenOCD C0 G0 residual analysis v6.9
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/analyze_openocd_c0_g0_residual_v69.py'
+      - 'data/device-catalog/research/test_analyze_openocd_c0_g0_residual_v69.py'
+      - 'data/device-catalog/research/OPENOCD_C0_G0_RESIDUAL_ANALYSIS_V69.md'
+      - '.github/workflows/device-catalog-openocd-c0-g0-v69.yml'
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: |
+          python data/device-catalog/research/analyze_openocd_c0_g0_residual_v69.py --output /tmp/v69.csv --summary /tmp/v69.json
+          python -m unittest discover -s data/device-catalog/research -p test_analyze_openocd_c0_g0_residual_v69.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-c0-g0-residual-v69
+          path: |
+            /tmp/v69.csv
+            /tmp/v69.json
+          retention-days: 30
