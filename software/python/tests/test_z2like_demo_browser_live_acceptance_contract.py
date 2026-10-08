@@ -63,7 +63,8 @@ def test_negative_lifecycle_authorization_probes_are_state_preserving() -> None:
 def test_live_gate_qualifies_openocd_managed_path_and_eight_site_isolation() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert "_managed_openocd_acceptance(session)" in source
+    assert "_managed_openocd_acceptance(" in source
+    assert "alias=args.alias" in source
     assert '"/api/manager/ppu/api/engineering/diagnostics/openocd-control-plane"' in source
     assert "for site_id in range(1, EXPECTED_SITE_COUNT + 1)" in source
     assert 'architecture not in {"armv7", "armv7l"}' in source
