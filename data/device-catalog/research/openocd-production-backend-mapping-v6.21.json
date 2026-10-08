@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-production-backend-mapping-v6.21",
+  "record_state": "PRODUCTION_WRITE_APPLIED_ON_BRANCH_NOT_MERGED",
+  "source_transaction": "openocd-production-bounded-bridge-v6.20",
+  "source_transaction_merge_commit": "a17acef5ce90eea32c18f766be961a72cb4baa16",
+  "source_dry_run": {
+    "workflow_run_id": 37746234599,
+    "artifact_id": 11536215571,
+    "artifact_sha256": "b6066849ba1f4c13f3b4e53e8c54d27e65bf2afedfb304b5c2b46e5f6a70f957"
+  },
+  "promotion_exact_count": 17,
+  "promotion_exact_set_sha256": "20b3910840a802a8855ad9022aa6bc67a35e8b169bd71726189eb803ded8636f",
+  "promotion_binding_sha256": "c986e9dbd6e365b3ed6a7054f62e01ae2cd0e18e15cb3841321d43d20fc94892",
+  "affected_family_counts": {
+    "STM32F3": 4,
+    "STM32G0": 12,
+    "STM32L1": 1
+  },
+  "frozen_postimages": {
+    "STM32F3": {
+      "sha256": "0c48633a81ff6eb8785d5e730ee06f6f596a30f2264b4fea374d8df62b3f1573",
+      "git_blob_sha": "42e3cab58f7863e1cf44502cb15c5d85086e2a0e"
+    },
+    "STM32G0": {
+      "sha256": "8d6a556364835a00aa479434ebd10977721fb61b2d45485e4e662620a33fcdef",
+      "git_blob_sha": "504623e5f7dd459336cc805d00af5636901dc19e"
+    },
+    "STM32L1": {
+      "sha256": "8271258806e3ef240c33818c975f0a3928c27312999b4c1c737f7fc3e2a1e99c",
+      "git_blob_sha": "ace1ca1d0be56b24e1ab7fc9a388c7da518eeead"
+    },
+    "MANIFEST": {
+      "sha256": "6bd23d2bf0b31fe0302e23add861abcf92f8500755c0649ee8adc335608c3d70",
+      "git_blob_sha": "f3c65c166e49b107d0bd25050062f8084aeeda30"
+    }
+  },
+  "poststate": {
+    "production_exact_total": 4629,
+    "production_source_count": 28,
+    "mapped": 4054,
+    "no_mapping": 575,
+    "active_openocd_route": 3975,
+    "active_openocd_route_denominator": 4550,
+    "active_openocd_route_coverage_percent": 87.3626
+  },
+  "governance": {
+    "merge_requires_explicit_owner_approval": true,
+    "backend_fields_only": true,
+    "identity_fields_immutable": true,
+    "manifest_integrity_updates_only": true,
+    "generic_one_char_generalization_authorized": false,
+    "exact_set_bridge_only": true,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  }
+}
