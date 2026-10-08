@@ -18,9 +18,11 @@ ROOT = HERE.parents[2]
 MANIFEST = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
 ST_TREE = HERE / "sources/st-open-pin-mcu-tree-7d1f1514.tsv"
 L4_AUTHORITY = HERE / "stm32l4-phase-l4.3-ordering-authority.json"
+STRUCTURAL = HERE / "st-multisource-structural-coverage-v0.4.json"
 
 EXPECTED_ST_TREE_GIT_BLOB_SHA = "2812b968d2d7b194f5fbfa6af8757398ab4e0cd6"
 EXPECTED_L4_AUTHORITY_GIT_BLOB_SHA = "745dd3d36f41aa533b9e0e89ff8c4c91aee197da"
+EXPECTED_STRUCTURAL_GIT_BLOB_SHA = "6beb7b564d59ef0b4e39ae915c7438867d3b4d8c"
 EXPECTED_ST_TREE_COMMIT = "7d1f1514ed5583ec5007ad91236b4e1d377295b1"
 EXPECTED_ST_TREE_SHA = "d8715ae7453883f62377e87b529f94012323f062"
 
@@ -89,6 +91,22 @@ def read_production_index() -> dict[str,dict[str,str]]:
 
 
 def read_tree() -> dict[str,str]:
+    structural_raw = STRUCTURAL.read_bytes()
+    req(git_blob_sha(structural_raw) == EXPECTED_STRUCTURAL_GIT_BLOB_SHA,
+        "ST multisource structural record blob drift")
+    structural = json.loads(structural_raw)
+    mx1 = structural["mx1_subset"]
+    req(mx1["repository"] == "STMicroelectronics/STM32_open_pin_data",
+        "ST Open Pin repository authority drift")
+    req(mx1["commit"] == EXPECTED_ST_TREE_COMMIT, "ST Open Pin commit drift")
+    req(mx1["mcu_tree_sha"] == EXPECTED_ST_TREE_SHA, "ST Open Pin MCU tree SHA drift")
+    req(mx1["source_path"] == "sources/st-open-pin-mcu-tree-7d1f1514.tsv",
+        "ST Open Pin source-lock path drift")
+    req(mx1["exact_orderable_mpn_source"] is False,
+        "structural pattern source incorrectly promoted to exact commercial authority")
+    req(mx1["manufacturer_marketing_lifecycle_authority"] is False,
+        "structural pattern source incorrectly promoted to lifecycle authority")
+
     raw = ST_TREE.read_bytes()
     req(git_blob_sha(raw) == EXPECTED_ST_TREE_GIT_BLOB_SHA, "ST Open Pin source-lock blob drift")
     lines = raw.decode("utf-8").splitlines()
@@ -261,6 +279,7 @@ def build() -> tuple[list[dict[str,str]], str, dict[str,Any]]:
             "st_open_pin_repository_commit": EXPECTED_ST_TREE_COMMIT,
             "st_open_pin_mcu_tree_sha": EXPECTED_ST_TREE_SHA,
             "stm32l4_ordering_authority_git_blob_sha": EXPECTED_L4_AUTHORITY_GIT_BLOB_SHA,
+            "st_multisource_structural_record_git_blob_sha": EXPECTED_STRUCTURAL_GIT_BLOB_SHA,
         },
         "coverage_projection_c0_only_if_later_separately_promoted": {
             "current_active_openocd_route_exact_count": 3975,
