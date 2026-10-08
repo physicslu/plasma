@@ -363,6 +363,145 @@ def _set_lifecycle(
     raise AcceptanceError(f"cannot set lifecycle to {lifecycle!r}: {last}")
 
 
+def _openocd_body(site_id: int) -> dict[str, Any]:
+    return {"site_id": site_id, "timeout_ms": 5000}
+
+
+def _assert_openocd_control_plane(
+    payload: Mapping[str, Any],
+    *,
+    operation: str,
+    site_id: int,
+) -> dict[str, Any]:
+    required = {
+        "ok": True,
+        "result": "PASS",
+        "site_id": site_id,
+        "process_state": "stopped",
+        "probe_process_state": "running",
+        "tcl_rpc_state": "pass",
+        "rpc_scope": "loopback",
+        "execution_capability": "openocd-control-plane-only",
+        "hardware_runtime_ready": False,
+    }
+    for field, expected in required.items():
+        if payload.get(field) != expected:
+            raise AcceptanceError(
+                f"{operation} returned invalid {field}: "
+                f"expected {expected!r}, got {payload.get(field)!r}"
+            )
+    version = payload.get("openocd_version")
+    runtime_id = payload.get("runtime_id")
+    architecture = payload.get("architecture")
+    generation = payload.get("worker_generation")
+    latency = payload.get("latency_ms")
+    if not isinstance(version, str) or not version:
+        raise AcceptanceError(f"{operation} omitted OpenOCD version")
+    if not isinstance(runtime_id, str) or not runtime_id:
+        raise AcceptanceError(f"{operation} omitted OpenOCD runtime identity")
+    if architecture not in {"armv7", "armv7l"}:
+        raise AcceptanceError(f"{operation} did not execute ARMv7 OpenOCD: {payload!r}")
+    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+        raise AcceptanceError(f"{operation} returned invalid worker generation: {payload!r}")
+    if isinstance(latency, bool) or not isinstance(latency, (int, float)) or latency < 0:
+        raise AcceptanceError(f"{operation} returned invalid latency evidence: {payload!r}")
+    manager = payload.get("manager")
+    if (
+        not isinstance(manager, dict)
+        or manager.get("relay") != "pass-through"
+        or manager.get("context") != "programming"
+    ):
+        raise AcceptanceError(f"{operation} omitted managed-path relay proof: {payload!r}")
+    return {
+        "site_id": site_id,
+        "openocd_version": version,
+        "runtime_id": runtime_id,
+        "architecture": architecture,
+        "worker_generation": generation,
+        "latency_ms": latency,
+        "tcl_rpc_state": "pass",
+        "rpc_scope": "loopback",
+        "manager_relay": "pass-through",
+        "execution_capability": "openocd-control-plane-only",
+        "hardware_runtime_ready": False,
+    }
+
+
+def _managed_openocd_acceptance(session: BrowserSession) -> list[dict[str, Any]]:
+    endpoint = "/api/manager/ppu/api/engineering/diagnostics/openocd-control-plane"
+    results: list[dict[str, Any]] = []
+    for site_id in range(1, EXPECTED_SITE_COUNT + 1):
+        status, payload, _ = session.request(
+            endpoint,
+            method="POST",
+            body=_openocd_body(site_id),
+            timeout_s=20.0,
+        )
+        _expect(status, 200, payload, f"managed OpenOCD Control Plane Site {site_id}")
+        results.append(
+            _assert_openocd_control_plane(
+                payload,
+                operation=f"managed OpenOCD Control Plane Site {site_id}",
+                site_id=site_id,
+            )
+        )
+    return results
+
+
+def _eight_site_openocd_isolation(container: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [
+            "docker",
+            "exec",
+            container,
+            "python3",
+            "/sim/openocd-control-plane-armv7-acceptance.py",
+            "--site-count",
+            str(EXPECTED_SITE_COUNT),
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=120,
+    )
+    if completed.returncode != 0:
+        tail = (completed.stderr or completed.stdout)[-4000:]
+        raise AcceptanceError(
+            f"live ARMv7 OpenOCD 8-Site isolation acceptance failed: {tail}"
+        )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise AcceptanceError(
+            "live ARMv7 OpenOCD 8-Site isolation acceptance returned invalid JSON"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise AcceptanceError("live ARMv7 OpenOCD isolation evidence is not an object")
+    required = {
+        "result": "PASS",
+        "evidence_level": "qemu-armv7-openocd-worker-isolation",
+        "architecture": "armv7l",
+        "site_count": EXPECTED_SITE_COUNT,
+        "isolated_rpc_ports": EXPECTED_SITE_COUNT,
+        "failure_injected_site_id": 5,
+        "surviving_sites_after_failure": 7,
+        "failed_site_restart": "PASS",
+        "execution_capability": "openocd-control-plane-only",
+        "hardware_runtime_ready": False,
+    }
+    for field, expected in required.items():
+        if payload.get(field) != expected:
+            raise AcceptanceError(
+                f"live ARMv7 OpenOCD isolation returned invalid {field}: "
+                f"expected {expected!r}, got {payload.get(field)!r}"
+            )
+    return {
+        field: payload[field]
+        for field in required
+    }
+
+
 def _programming_regression(session: BrowserSession) -> dict[str, Any]:
     status, payload, _ = session.request("/api/manager/ppu/api/engineering/targets")
     _expect(status, 200, payload, "8-Site Programming catalog regression")
@@ -690,6 +829,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         lifecycle_disabled = False
         fleet_after, _ = _wait_current_idle(session, args.alias, timeout_s=120.0)
         programming_after = _programming_regression(session)
+        managed_openocd_sites = _managed_openocd_acceptance(session)
+        openocd_isolation = _eight_site_openocd_isolation(args.container)
 
         return {
             "result": "PASS",
@@ -723,6 +864,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "provider": programming_after.get("provider"),
                 "ppu_count": programming_after.get("ppu_count"),
                 "site_count": programming_after.get("site_count"),
+            },
+            "openocd_control_plane_live": {
+                "result": "PASS",
+                "evidence_level": "live-swpc-render-qemu-openocd-control-plane",
+                "managed_console_bff_sites": managed_openocd_sites,
+                "eight_site_worker_isolation": openocd_isolation,
+                "execution_capability": "openocd-control-plane-only",
+                "hardware_runtime_ready": False,
             },
             "fleet_observed_at_before": fleet_before.get("observed_at"),
             "fleet_observed_at_after": fleet_after.get("observed_at"),
