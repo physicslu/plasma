@@ -1,0 +1,37 @@
+name: OpenOCD current gap rebaseline v6.17
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/rebaseline_openocd_current_gap_v617.py'
+      - 'data/device-catalog/research/test_rebaseline_openocd_current_gap_v617.py'
+      - 'data/device-catalog/research/OPENOCD_CURRENT_GAP_REBASELINE_V617.md'
+      - '.github/workflows/device-catalog-openocd-gap-v617.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reclassify current Production OpenOCD gap
+        run: |
+          python data/device-catalog/research/rebaseline_openocd_current_gap_v617.py \
+            --classified /tmp/openocd-gap-v617.csv \
+            --summary /tmp/openocd-gap-v617.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_rebaseline_openocd_current_gap_v617.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-current-gap-rebaseline-v617
+          path: |
+            /tmp/openocd-gap-v617.csv
+            /tmp/openocd-gap-v617.json
+          if-no-files-found: error
+          retention-days: 30
