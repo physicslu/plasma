@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "policy_id": "openocd-c0-bounded-route-inventory-expansion-v6.25",
+  "record_state": "RESEARCH_POLICY_PROPOSAL_NOT_CANONICAL",
+  "scope": {
+    "family": "STM32C0",
+    "exact_icpn_count": 5,
+    "authoritative_pattern_count": 4,
+    "exact_icpns": [
+      "STM32C011D6Y6TR",
+      "STM32C051D8Y6TR",
+      "STM32C091ECY6TR",
+      "STM32C092ECY3TR",
+      "STM32C092ECY6TR"
+    ],
+    "authoritative_patterns": [
+      "STM32C011D6Yx",
+      "STM32C051D8Yx",
+      "STM32C091ECYx",
+      "STM32C092ECYx"
+    ]
+  },
+  "bindings": {
+    "STM32C011D6Y6TR": "STM32C011D6Yx",
+    "STM32C051D8Y6TR": "STM32C051D8Yx",
+    "STM32C091ECY6TR": "STM32C091ECYx",
+    "STM32C092ECY3TR": "STM32C092ECYx",
+    "STM32C092ECY6TR": "STM32C092ECYx"
+  },
+  "patterns": {
+    "STM32C011D6Yx": {
+      "subfamily": "STM32C011",
+      "authority_object": "STM32C011D6Yx.xml",
+      "authority_object_blob_sha": "933c9286fcfb890193e1e9253ced6265c94c0b83"
+    },
+    "STM32C051D8Yx": {
+      "subfamily": "STM32C051",
+      "authority_object": "STM32C051D8Yx.xml",
+      "authority_object_blob_sha": "6eb11c42ce3d3fac6693a36b01743cd6ae4bdd09"
+    },
+    "STM32C091ECYx": {
+      "subfamily": "STM32C091",
+      "authority_object": "STM32C091ECYx.xml",
+      "authority_object_blob_sha": "7edcb4f2e5557ae2fc4643f4556139af00459eb9"
+    },
+    "STM32C092ECYx": {
+      "subfamily": "STM32C092",
+      "authority_object": "STM32C092ECYx.xml",
+      "authority_object_blob_sha": "0fb4ebd15c93d52f30a14700680d7616ec5b5a4b"
+    }
+  },
+  "route": {
+    "identifier_kind": "ordering_pattern",
+    "target_config": "tcl/target/stm32c0x.cfg",
+    "openocd_distribution": "upstream-openocd",
+    "mapping_status": "mapping_candidate",
+    "validation_status": "not_verified"
+  },
+  "evidence": {
+    "source_review": "openocd-route-inventory-authority-review-v6.24",
+    "source_pr": 780,
+    "source_merge_commit": "2ef142976422469b581c5e0ec063fcd6454596c8",
+    "source_review_exact_set_sha256": "441ca09b9189a708328ea6dee0bc89175d16974811eaa724f557077b9c6a2b83",
+    "source_review_csv_sha256": "b0612bf105ad9892c66f21f909a4933e15d30071ca7e35a4f97871a16e4cbe5e",
+    "source_artifact_id": 11549843497,
+    "source_artifact_sha256": "78a6097f75a47a956062f5e75abad9d585a80da1fdeb6f6db6ebac09eaffd6ef",
+    "st_open_pin_repository_commit": "7d1f1514ed5583ec5007ad91236b4e1d377295b1",
+    "st_open_pin_mcu_tree_sha": "d8715ae7453883f62377e87b529f94012323f062",
+    "canonical_inventory_preimage_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810"
+  },
+  "governance": {
+    "exact_set_only": true,
+    "generic_c0_pattern_expansion_authorized": false,
+    "canonical_inventory_write_authorized": false,
+    "production_mapping_write_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  }
+}
