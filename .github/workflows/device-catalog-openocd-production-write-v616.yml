@@ -1,0 +1,180 @@
+name: Apply OpenOCD Production write v6.16
+
+on:
+  push:
+    branches:
+      - agent/openocd-production-write-v616
+    paths:
+      - '.github/workflows/device-catalog-openocd-production-write-v616.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-frozen-transaction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/openocd-production-write-v616
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Rebuild frozen v6.15 transaction
+        run: |
+          python data/device-catalog/research/prepare_openocd_production_transaction_v615.py \
+            --manifest-out /tmp/openocd-v615-transaction.json \
+            --package-dir /tmp/openocd-v615-package
+
+      - name: Apply exact frozen postimages and update manifest
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import csv
+          import hashlib
+          import json
+          import shutil
+          from pathlib import Path
+
+          root = Path.cwd()
+          txn = json.loads(Path('/tmp/openocd-v615-transaction.json').read_text())
+          manifest_path = root / 'data/device-catalog/production/icpn-v1-manifest.json'
+          manifest = json.loads(manifest_path.read_text())
+
+          assert txn['promotion_exact_count'] == 364
+          assert txn['promotion_exact_set_sha256'] == '86844a6f58112ea721f15668f371579aa283dcfc174ccf1eabc275f042ebbfcc'
+          assert txn['promotion_binding_sha256'] == '3e2eafbc959a3d045911487809487642e0f90a5853522155c8413dd0a5a3662e'
+          assert txn['promotion_delta_csv_sha256'] == 'a015a0747354a41459e0d49c5bb5f4ddfb8bca04f9b509a8558b570253c13ed5'
+
+          allowed = {
+              'cmsis_device_name',
+              'existing_identifier',
+              'existing_identifier_kind',
+              'mapping_status',
+              'openocd_target_config',
+          }
+
+          def sha256(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          def blobsha(data: bytes) -> str:
+              return hashlib.sha1(
+                  f'blob {len(data)}\0'.encode('ascii') + data,
+                  usedforsecurity=False,
+              ).hexdigest()
+
+          source_by_family = {s['family']: s for s in manifest['sources']}
+          changed_rows = 0
+
+          for family, evidence in sorted(txn['affected_files'].items()):
+              target = root / evidence['production_path']
+              before_artifact = Path('/tmp/openocd-v615-package/before') / f'{family}.csv'
+              after_artifact = Path('/tmp/openocd-v615-package/after') / f'{family}.csv'
+
+              current = target.read_bytes()
+              before = before_artifact.read_bytes()
+              after = after_artifact.read_bytes()
+
+              assert current == before, f'{family}: current Production bytes drifted from frozen preimage'
+              assert sha256(current) == evidence['pre_sha256']
+              assert blobsha(current) == evidence['pre_git_blob_sha']
+              assert sha256(after) == evidence['post_sha256']
+              assert blobsha(after) == evidence['post_git_blob_sha']
+
+              with before_artifact.open(newline='', encoding='utf-8') as fb, after_artifact.open(newline='', encoding='utf-8') as fa:
+                  rb = list(csv.DictReader(fb))
+                  ra = list(csv.DictReader(fa))
+              assert len(rb) == len(ra) == evidence['expected_row_count']
+              assert [r['icpn'] for r in rb] == [r['icpn'] for r in ra]
+
+              for old, new in zip(rb, ra):
+                  diffs = {k for k in old if old[k] != new[k]}
+                  assert diffs <= allowed, f"{old['icpn']}: non-backend field changed: {sorted(diffs - allowed)}"
+                  if diffs:
+                      changed_rows += 1
+                      assert old['mapping_status'] == 'no_mapping'
+                      assert new['mapping_status'] != 'no_mapping'
+
+              target.write_bytes(after)
+              source = source_by_family[family]
+              source['git_blob_sha'] = evidence['post_git_blob_sha']
+              source['sha256'] = evidence['post_sha256']
+
+          assert changed_rows == 364, f'expected 364 changed rows, got {changed_rows}'
+
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          mapped = 0
+          no_mapping = 0
+          exact_total = 0
+          for source in manifest['sources']:
+              path = (manifest_path.parent / source['path']).resolve()
+              data = path.read_bytes()
+              assert sha256(data) == source['sha256'], f"{source['family']}: manifest SHA256 mismatch"
+              assert blobsha(data) == source['git_blob_sha'], f"{source['family']}: manifest blob mismatch"
+              with path.open(newline='', encoding='utf-8') as f:
+                  rows = list(csv.DictReader(f))
+              assert len(rows) == int(source['row_count'])
+              exact_total += len(rows)
+              for row in rows:
+                  if row['mapping_status'] == 'no_mapping':
+                      no_mapping += 1
+                  else:
+                      mapped += 1
+
+          assert len(manifest['sources']) == 28
+          assert exact_total == 4629
+          assert mapped == 4037
+          assert no_mapping == 592
+          print('OPENOCD_PRODUCTION_WRITE_V616_APPLY_PASS')
+          print(f'mapped={mapped} no_mapping={no_mapping} exact_total={exact_total}')
+          PY
+
+      - name: Record transaction evidence
+        run: |
+          cat > data/device-catalog/research/openocd-production-backend-mapping-v6.16.json <<'JSON'
+          {
+            "schema_version": 1,
+            "transaction_id": "openocd-production-backend-mapping-v6.16",
+            "record_state": "PRODUCTION_WRITE_TRANSACTION_BRANCH",
+            "source_transaction": "openocd-production-backend-mapping-v6.15",
+            "owner_write_approval_received": true,
+            "main_merge_requires_separate_approval": true,
+            "promotion_exact_count": 364,
+            "promotion_exact_set_sha256": "86844a6f58112ea721f15668f371579aa283dcfc174ccf1eabc275f042ebbfcc",
+            "promotion_binding_sha256": "3e2eafbc959a3d045911487809487642e0f90a5853522155c8413dd0a5a3662e",
+            "promotion_delta_csv_sha256": "a015a0747354a41459e0d49c5bb5f4ddfb8bca04f9b509a8558b570253c13ed5",
+            "affected_family_count": 10,
+            "poststate": {
+              "production_exact_total": 4629,
+              "production_source_count": 28,
+              "mapped": 4037,
+              "no_mapping": 592,
+              "active_openocd_route": 3958,
+              "active_openocd_route_denominator": 4550,
+              "active_openocd_route_coverage_percent": 86.989
+            },
+            "claims": {
+              "programming_profile_binding_claimed": false,
+              "programming_verified_claimed": false,
+              "engineering_verified_claimed": false,
+              "hil_verified_claimed": false
+            }
+          }
+          JSON
+
+      - name: Remove one-shot applicator and commit transaction branch
+        run: |
+          rm .github/workflows/device-catalog-openocd-production-write-v616.yml
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add -A
+          echo "Changed files:"
+          git diff --cached --name-only
+          test "$(git diff --cached --name-only | wc -l)" -eq 12
+          git commit -m "Device catalog: apply OpenOCD Production backend mappings v6.16"
+          git push origin HEAD:agent/openocd-production-write-v616
