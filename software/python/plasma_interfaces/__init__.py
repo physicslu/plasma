@@ -4,6 +4,8 @@ from .base import BaseInterface
 from .fpga import FPGAInterface
 from .mock import MockActivityTracker, MockInterface
 from .openocd import OpenOCDInterface
+from .openocd_rpc import OpenOCDRpcClient
+from .openocd_worker import OpenOCDWorker, OpenOCDWorkerStatus
 
 __all__ = [
     "BaseInterface",
@@ -11,4 +13,7 @@ __all__ = [
     "MockActivityTracker",
     "MockInterface",
     "OpenOCDInterface",
+    "OpenOCDRpcClient",
+    "OpenOCDWorker",
+    "OpenOCDWorkerStatus",
 ]
