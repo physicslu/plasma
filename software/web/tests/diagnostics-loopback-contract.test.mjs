@@ -11,6 +11,7 @@ const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/ro
 const vite = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
 const shell = await readFile(new URL("../app/engineering/diagnostics-test-page.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/engineering/loopback-test.css", import.meta.url), "utf8");
+const evidenceCss = await readFile(new URL("../app/engineering/diagnostics-evidence.css", import.meta.url), "utf8");
 const resultCss = await readFile(new URL("../app/engineering/loopback-test-results.css", import.meta.url), "utf8");
 
 test("Diagnostics exposes Loopback Test as an EMode tree child", () => {
@@ -92,7 +93,9 @@ test("PS loopback uses the same workspace API base and shared Manager BFF relay 
   assert.match(loopback, /Control Console \(Browser\) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS/);
 });
 
-test("Phase 0 still executes only the PS production real path", () => {
+test("Phase 0 still executes only the PS production real path and defaults to the executable endpoint", () => {
+  assert.match(loopback, /useState<LoopbackEndpoint>\("ps"\)/);
+  assert.match(loopback, /setEndpoint\("ps"\)/);
   assert.match(loopback, /endpoint !== "ps"/);
   assert.match(loopback, /executePsLoopbackCase/);
   assert.match(loopback, /does not use MockInterface/);
@@ -103,12 +106,30 @@ test("Phase 0 still executes only the PS production real path", () => {
   assert.match(loopback, /firstMismatch\(payload, returned\)/);
 });
 
-test("results render observed CRC, Manager RTT, PPU RTT and endpoint verification", () => {
+test("Loopback uses shared Diagnostics evidence hierarchy and keeps the detailed case table", () => {
+  assert.match(loopback, /import "\.\/diagnostics-evidence\.css"/);
+  assert.match(loopback, /diagnosticsEvidenceHeadline/);
+  assert.match(loopback, /diagnosticsEvidenceSectionGrid/);
+  assert.match(loopback, /diagnosticsEvidenceBoundary/);
+  assert.match(loopback, /QUALIFICATION BOUNDARY/);
+  assert.match(loopback, /managerRttMs: response\.manager\.manager_rtt_ms/);
+  assert.match(loopback, /ppuRttMs: response\.loopback\.ppu_rtt_ms/);
   assert.match(loopback, /TX CRC32/);
   assert.match(loopback, /RX CRC32/);
   assert.match(loopback, /Manager RTT/);
   assert.match(loopback, /PPU RTT/);
   assert.match(loopback, /loopbackResultBadge/);
+  assert.match(evidenceCss, /\.diagnosticsEvidenceHeadline/);
+  assert.match(evidenceCss, /\.diagnosticsEvidenceSectionGrid/);
+  assert.match(evidenceCss, /\.diagnosticsEvidenceBoundary/);
+  assert.doesNotMatch(css, /\.diagnosticsEvidenceHeadline|\.diagnosticsEvidenceBoundary/);
   assert.match(resultCss, /\.loopbackResultBadge\.pass/);
   assert.match(resultCss, /\.loopbackResultBadge\.fail/);
+});
+
+test("Loopback presents data, payload and execution settings as one three-column diagnostics workspace", () => {
+  assert.match(css, /\.loopbackConfigGrid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(loopback, /title=\{text\.dataTitle\}/);
+  assert.match(loopback, /title=\{text\.payloadTitle\}/);
+  assert.match(loopback, /title=\{text\.executionTitle\}/);
 });
