@@ -1,0 +1,37 @@
+name: OpenOCD A residual deep diagnostic v6.23
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/diagnose_openocd_a_residual_v623.py'
+      - 'data/device-catalog/research/test_diagnose_openocd_a_residual_v623.py'
+      - 'data/device-catalog/research/OPENOCD_A_RESIDUAL_DEEP_DIAGNOSTIC_V623.md'
+      - '.github/workflows/device-catalog-openocd-a-residual-v623.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Diagnose remaining A residual exact set
+        run: |
+          python data/device-catalog/research/diagnose_openocd_a_residual_v623.py \
+            --diagnostic /tmp/openocd-a-residual-v623.csv \
+            --summary /tmp/openocd-a-residual-v623.json
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_diagnose_openocd_a_residual_v623.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-a-residual-deep-diagnostic-v623
+          path: |
+            /tmp/openocd-a-residual-v623.csv
+            /tmp/openocd-a-residual-v623.json
+          if-no-files-found: error
+          retention-days: 30
