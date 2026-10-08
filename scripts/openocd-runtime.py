@@ -165,7 +165,14 @@ def _write_internal_hashes(root: Path) -> None:
 def _payload_sha256(root: Path) -> str:
     """Hash staged paths, types, modes, sizes, and regular-file bytes."""
 
+    if root.is_symlink() or not root.is_dir():
+        raise OpenOCDRuntimeArtifactError(f"OpenOCD payload root is not a directory: {root}")
     digest = hashlib.sha256()
+    root_mode = root.stat().st_mode & 0o777
+    digest.update(b"d")
+    digest.update(struct.pack(">I", 0))
+    digest.update(struct.pack(">I", root_mode))
+    digest.update(struct.pack(">Q", 0))
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise OpenOCDRuntimeArtifactError(
@@ -211,6 +218,8 @@ def _normalized_tarinfo(info: tarfile.TarInfo) -> tarfile.TarInfo:
     info.uname = ""
     info.gname = ""
     info.pax_headers = {}
+    if info.name.rstrip("/") == ROOT_NAME:
+        info.mode = 0o755
     return info
 
 
