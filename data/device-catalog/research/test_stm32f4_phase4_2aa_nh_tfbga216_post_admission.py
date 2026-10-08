@@ -33,8 +33,7 @@ def main() -> int:
     # 384-row historical boundary while allowing those later rows to coexist.
     final_tail = [
         row for row in current_rows
-        if row["mapping_status"] == "no_mapping"
-        and row["source_type"]
+        if row["source_type"]
         == "official_st_exact_product_authority_plus_locked_active_lifecycle"
     ]
     assert len(final_tail) == 3
