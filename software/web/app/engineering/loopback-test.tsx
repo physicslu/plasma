@@ -15,6 +15,7 @@ import {
   DiagnosticsTestPage,
 } from "./diagnostics-test-page";
 import "./diagnostics-test-page.css";
+import "./diagnostics-evidence.css";
 import "./loopback-test.css";
 import "./loopback-test-results.css";
 
@@ -28,6 +29,11 @@ type LoopbackResultRow = {
   txCrc32: string;
   rxCrc32: string;
   rttMs: number | null;
+  managerRttMs: number | null;
+  ppuRttMs: number | null;
+  managerRelayValid: boolean | null;
+  psSourceValid: boolean | null;
+  payloadMatch: boolean | null;
   status: LoopbackResultStatus;
   details: string;
 };
@@ -68,12 +74,12 @@ const copy = {
     currentSelection: "目前選擇",
     loopbackAt: "Loopback at",
     effectivePath: "Effective Path",
-    dataTitle: "Test Data Configuration",
+    dataTitle: "測試資料設定",
     pattern: "Pattern",
     seed: "Seed (Hex)",
     seedHint: "僅 PRBS pattern 使用；固定 seed 讓測試可以完全重現。",
     transformPrefix: "Response contract 由所選 endpoint 決定；只有真正抵達該 endpoint 才能 PASS。",
-    payloadTitle: "Payload Length Configuration",
+    payloadTitle: "Payload 長度設定",
     mode: "Mode",
     single: "Single Length",
     boundary: "Boundary Test",
@@ -86,7 +92,7 @@ const copy = {
     bytes: "bytes",
     boundaryHint: "系統執行 N-1、N、N+1。",
     actualLengths: "Actual test lengths",
-    executionTitle: "Test Execution Settings",
+    executionTitle: "測試執行設定",
     repeat: "Repeat Count",
     repeatHint: "每個 test length 的執行次數",
     timeout: "Timeout",
@@ -98,7 +104,29 @@ const copy = {
     psReady: "PS production real-path 已透過 Manager Phase 0 pass-through 啟用：Control Console (Browser) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS → Plasma Server → PPU REST Gateway → Plasma Manager → Web BFF → Control Console。此路徑不使用 MockInterface，也不會 fallback 到 Mock。",
     laterEndpoint: "PL / IC real-path 尚未實作；選擇這些 endpoint 時 Start Test 會保持停用，不會產生假的 PASS / FAIL。",
     running: "Production real-path test 執行中",
-    resultsTitle: "Test Results",
+    resultStatus: "LOOPBACK RESULT",
+    resultPassText: "PS real-path 驗證完成，所有測試案例通過。",
+    resultFailText: "PS real-path 測試存在未通過案例，請查看詳細結果。",
+    dataIntegrity: "DATA INTEGRITY",
+    dataIntegrityDesc: "資料完整性與 payload 比對結果。",
+    completedCases: "通過案例",
+    crcMatch: "CRC Match",
+    payloadMatch: "Payload Match",
+    performance: "PERFORMANCE",
+    performanceDesc: "本次測試的平均延遲。",
+    browserRtt: "Browser RTT",
+    managerRtt: "Manager RTT",
+    ppuRtt: "PPU RTT",
+    pathEvidence: "PATH EVIDENCE",
+    pathEvidenceDesc: "各路徑證據是否符合契約。",
+    managerRelay: "Manager relay",
+    psSource: "PS source",
+    payloadEcho: "Payload echo",
+    qualificationTitle: "QUALIFICATION BOUNDARY",
+    qualificationDesc: "目前僅 PS 的 real-path 可執行；PL / IC 尚未實作，不會產生 synthetic PASS / FAIL。",
+    ready: "READY",
+    notEnabled: "NOT ENABLED",
+    resultsTitle: "詳細測試案例",
     noResults: "尚未執行 production real-path test。",
     resultLength: "Length (bytes)",
     resultPattern: "Pattern",
@@ -150,7 +178,29 @@ const copy = {
     psReady: "The PS production real path now uses the Manager Phase 0 pass-through: Control Console (Browser) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS → Plasma Server → PPU REST Gateway → Plasma Manager → Web BFF → Control Console. This path does not use MockInterface and never falls back to Mock.",
     laterEndpoint: "PL / IC real-path execution is not implemented yet. Start Test stays disabled for those endpoints and no synthetic PASS / FAIL is produced.",
     running: "Production real-path test is running",
-    resultsTitle: "Test Results",
+    resultStatus: "LOOPBACK RESULT",
+    resultPassText: "PS real-path verification completed; all test cases passed.",
+    resultFailText: "One or more PS real-path cases did not pass. Review the detailed results.",
+    dataIntegrity: "DATA INTEGRITY",
+    dataIntegrityDesc: "Data integrity and payload comparison evidence.",
+    completedCases: "Passing cases",
+    crcMatch: "CRC Match",
+    payloadMatch: "Payload Match",
+    performance: "PERFORMANCE",
+    performanceDesc: "Average latency observed by this run.",
+    browserRtt: "Browser RTT",
+    managerRtt: "Manager RTT",
+    ppuRtt: "PPU RTT",
+    pathEvidence: "PATH EVIDENCE",
+    pathEvidenceDesc: "Contract evidence observed across the managed path.",
+    managerRelay: "Manager relay",
+    psSource: "PS source",
+    payloadEcho: "Payload echo",
+    qualificationTitle: "QUALIFICATION BOUNDARY",
+    qualificationDesc: "Only the PS real path is executable today. PL / IC are not implemented and never produce synthetic PASS / FAIL.",
+    ready: "READY",
+    notEnabled: "NOT ENABLED",
+    resultsTitle: "Detailed Test Cases",
     noResults: "No production real-path test has been executed yet.",
     resultLength: "Length (bytes)",
     resultPattern: "Pattern",
@@ -249,11 +299,21 @@ function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
 }
 
+function average(values: Array<number | null>): number | null {
+  const observed = values.filter((value): value is number => value !== null);
+  if (observed.length === 0) return null;
+  return observed.reduce((sum, value) => sum + value, 0) / observed.length;
+}
+
+function formatAverageMs(value: number | null): string {
+  return value === null ? "—" : `${value.toFixed(3)} ms`;
+}
+
 export default function LoopbackTest() {
   const { locale } = useI18n();
   const { apiBase } = useWorkspaceSession();
   const text = copy[locale];
-  const [endpoint, setEndpoint] = useState<LoopbackEndpoint>("pl");
+  const [endpoint, setEndpoint] = useState<LoopbackEndpoint>("ps");
   const [pattern, setPattern] = useState<LoopbackPattern>("prbs");
   const [seed, setSeed] = useState("0x12345678");
   const [lengthMode, setLengthMode] = useState<LengthMode>("boundary");
@@ -303,7 +363,7 @@ export default function LoopbackTest() {
 
   function reset() {
     if (running) return;
-    setEndpoint("pl");
+    setEndpoint("ps");
     setPattern("prbs");
     setSeed("0x12345678");
     setLengthMode("boundary");
@@ -377,6 +437,11 @@ export default function LoopbackTest() {
               txCrc32,
               rxCrc32,
               rttMs,
+              managerRttMs: response.manager.manager_rtt_ms,
+              ppuRttMs: response.loopback.ppu_rtt_ms,
+              managerRelayValid: response.manager.relay === "pass-through",
+              psSourceValid: response.loopback.source === "ps",
+              payloadMatch: mismatch === null,
               status: pass ? "PASS" : "FAIL",
               details: pass
                 ? `Manager RTT ${response.manager.manager_rtt_ms.toFixed(3)} ms · PPU RTT ${response.loopback.ppu_rtt_ms.toFixed(3)} ms · sequence ${sequence}`
@@ -395,6 +460,11 @@ export default function LoopbackTest() {
               txCrc32,
               rxCrc32: "—",
               rttMs,
+              managerRttMs: null,
+              ppuRttMs: null,
+              managerRelayValid: null,
+              psSourceValid: null,
+              payloadMatch: null,
               status: timeoutFailure ? "TIMEOUT" : "ERROR",
               details: error instanceof Error ? error.message : String(error),
             });
@@ -408,6 +478,24 @@ export default function LoopbackTest() {
       setRunning(false);
     }
   }
+
+  const overallStatus: LoopbackResultStatus | null = results.length === 0
+    ? null
+    : results.every(row => row.status === "PASS")
+      ? "PASS"
+      : results.some(row => row.status === "ERROR")
+        ? "ERROR"
+        : results.some(row => row.status === "TIMEOUT")
+          ? "TIMEOUT"
+          : "FAIL";
+  const passingCases = results.filter(row => row.status === "PASS").length;
+  const crcMatch = results.length > 0 && results.every(row => row.rxCrc32 !== "—" && row.txCrc32 === row.rxCrc32);
+  const payloadMatch = results.length > 0 && results.every(row => row.payloadMatch === true);
+  const managerRelayPass = results.length > 0 && results.every(row => row.managerRelayValid === true);
+  const psSourcePass = results.length > 0 && results.every(row => row.psSourceValid === true);
+  const browserRttAverage = average(results.map(row => row.rttMs));
+  const managerRttAverage = average(results.map(row => row.managerRttMs));
+  const ppuRttAverage = average(results.map(row => row.ppuRttMs));
 
   return (
     <DiagnosticsTestPage
@@ -534,9 +622,8 @@ export default function LoopbackTest() {
             <span>{actualLengths.map(value => `${value} ${text.bytes}`).join(", ")}{rangeHasMore ? " …" : ""}</span>
           </DiagnosticsTestNotice>
         </DiagnosticsTestCard>
-      </div>
 
-      <DiagnosticsTestCard title={text.executionTitle}>
+        <DiagnosticsTestCard title={text.executionTitle}>
         <div className="loopbackExecutionGrid">
           <label className="diagnosticsField diagnosticsNumberField">
             <span>{text.repeat}</span>
@@ -566,11 +653,104 @@ export default function LoopbackTest() {
             <button type="button" disabled={running} onClick={reset}>↻ {text.reset}</button>
           </div>
         </div>
-        <p className="loopbackBackendBoundary">{text.psReady}</p>
-        {endpoint !== "ps" && <p className="loopbackBackendBoundary">{text.laterEndpoint}</p>}
         {running && <p className="loopbackExecutionState"><strong>{text.running}</strong> · {results.length} case(s) completed</p>}
         {runError && <p className="loopbackExecutionState loopbackCaseError">{runError}</p>}
-      </DiagnosticsTestCard>
+        </DiagnosticsTestCard>
+      </div>
+
+      {overallStatus && (
+        <div className="diagnosticsEvidence loopbackResultEvidence">
+          <div className="diagnosticsEvidenceHeadline" data-result={overallStatus}>
+            <div>
+              <small>{text.resultStatus}</small>
+              <strong>PS Real-Path Loopback</strong>
+              <span>{overallStatus === "PASS" ? text.resultPassText : text.resultFailText}</span>
+            </div>
+            <span className="diagnosticsEvidenceBadge" data-result={overallStatus}>{overallStatus}</span>
+          </div>
+
+          <div className="diagnosticsEvidenceSectionGrid">
+            <section className="diagnosticsEvidenceSection" data-tone="identity">
+              <header>
+                <small>{text.dataIntegrity}</small>
+                <h4>{locale === "zh-TW" ? "資料完整性" : "Data Integrity"}</h4>
+                <p>{text.dataIntegrityDesc}</p>
+              </header>
+              <dl>
+                <div><dt>{text.completedCases}</dt><dd>{passingCases} / {results.length}</dd></div>
+                <div>
+                  <dt>{text.crcMatch}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={crcMatch ? "success" : "danger"}>{crcMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.payloadMatch}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={payloadMatch ? "success" : "danger"}>{payloadMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="diagnosticsEvidenceSection" data-tone="performance">
+              <header>
+                <small>{text.performance}</small>
+                <h4>{locale === "zh-TW" ? "效能指標" : "Performance"}</h4>
+                <p>{text.performanceDesc}</p>
+              </header>
+              <dl>
+                <div><dt>{text.browserRtt}</dt><dd>{formatAverageMs(browserRttAverage)}</dd></div>
+                <div><dt>{text.managerRtt}</dt><dd>{formatAverageMs(managerRttAverage)}</dd></div>
+                <div><dt>{text.ppuRtt}</dt><dd>{formatAverageMs(ppuRttAverage)}</dd></div>
+              </dl>
+            </section>
+
+            <section className="diagnosticsEvidenceSection" data-tone="execution">
+              <header>
+                <small>{text.pathEvidence}</small>
+                <h4>{locale === "zh-TW" ? "路徑證據" : "Path Evidence"}</h4>
+                <p>{text.pathEvidenceDesc}</p>
+              </header>
+              <dl>
+                <div>
+                  <dt>{text.managerRelay}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={managerRelayPass ? "success" : "danger"}>{managerRelayPass ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.psSource}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={psSourcePass ? "success" : "danger"}>{psSourcePass ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.payloadEcho}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={payloadMatch ? "success" : "danger"}>{payloadMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </div>
+      )}
+
+      <section className="diagnosticsEvidenceBoundary loopbackQualificationBoundary">
+        <header>
+          <small>{text.qualificationTitle}</small>
+          <h4>{locale === "zh-TW" ? "能力與測試範圍" : "Capability & Test Boundary"}</h4>
+          <p>{text.qualificationDesc}</p>
+        </header>
+        <div className="diagnosticsEvidenceBoundaryGrid">
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>PS</span>
+            <strong className="diagnosticsStatusBadge" data-tone="success">{text.ready}</strong>
+            <small>{locale === "zh-TW" ? "Production real-path 可執行。" : "Production real path is executable."}</small>
+          </div>
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>PL</span>
+            <strong className="diagnosticsStatusBadge" data-tone="neutral">{text.notEnabled}</strong>
+            <small>{locale === "zh-TW" ? "Real-path 尚未實作。" : "Real-path execution is not implemented."}</small>
+          </div>
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>IC</span>
+            <strong className="diagnosticsStatusBadge" data-tone="neutral">{text.notEnabled}</strong>
+            <small>{locale === "zh-TW" ? "Real-path 尚未實作。" : "Real-path execution is not implemented."}</small>
+          </div>
+        </div>
+      </section>
 
       <DiagnosticsTestCard title={text.resultsTitle} className="loopbackResultsCard">
         <div className="loopbackResultsWrap">

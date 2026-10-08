@@ -6,6 +6,7 @@ import { useWorkspaceSession } from "../workspace-session";
 import { DiagnosticsTestCard, DiagnosticsTestNotice, DiagnosticsTestPage } from "./diagnostics-test-page";
 import { executeOpenOcdControlPlane, type OpenOcdControlPlaneResponse } from "./openocd-control-plane-api";
 import "./diagnostics-test-page.css";
+import "./diagnostics-evidence.css";
 import "./openocd-control-plane-test.css";
 
 export default function OpenOcdControlPlaneTest() {
@@ -99,18 +100,18 @@ export default function OpenOcdControlPlaneTest() {
         {!result ? (
           <p className="openocdControlPlaneEmpty">{zh ? "尚未執行測試。" : "No test has been executed."}</p>
         ) : (
-          <div className="openocdControlPlaneEvidence">
-            <div className="openocdControlPlaneHeadline" data-pass={result.result === "PASS"}>
+          <div className="diagnosticsEvidence">
+            <div className="diagnosticsEvidenceHeadline" data-result={result.result}>
               <div>
                 <small>{zh ? "控制面狀態" : "Control-plane status"}</small>
                 <strong>OpenOCD Control Plane</strong>
                 <span>{zh ? "控制面驗證通過，worker 流程正常。" : "Control-plane validation passed and the worker lifecycle completed normally."}</span>
               </div>
-              <span className="openocdControlPlanePassBadge">{result.result}</span>
+              <span className="diagnosticsEvidenceBadge" data-result={result.result}>{result.result}</span>
             </div>
 
-            <div className="openocdControlPlaneSectionGrid">
-              <section className="openocdControlPlaneSection" data-tone="identity">
+            <div className="diagnosticsEvidenceSectionGrid">
+              <section className="diagnosticsEvidenceSection" data-tone="identity">
                 <header>
                   <small>{zh ? "ENVIRONMENT" : "ENVIRONMENT"}</small>
                   <h4>{zh ? "基本資訊" : "Runtime Identity"}</h4>
@@ -119,12 +120,12 @@ export default function OpenOcdControlPlaneTest() {
                 <dl>
                   <div><dt>Site ID</dt><dd>{result.site_id}</dd></div>
                   <div><dt>{zh ? "OpenOCD 版本" : "OpenOCD Version"}</dt><dd>{result.openocd_version}</dd></div>
-                  <div><dt>Runtime ID</dt><dd className="openocdControlPlaneMono">{result.runtime_id}</dd></div>
+                  <div><dt>Runtime ID</dt><dd className="diagnosticsEvidenceMono">{result.runtime_id}</dd></div>
                   <div><dt>{zh ? "架構 (Architecture)" : "Architecture"}</dt><dd>{result.architecture}</dd></div>
                 </dl>
               </section>
 
-              <section className="openocdControlPlaneSection" data-tone="execution">
+              <section className="diagnosticsEvidenceSection" data-tone="execution">
                 <header>
                   <small>{zh ? "CONTROL PATH" : "CONTROL PATH"}</small>
                   <h4>{zh ? "執行狀態" : "Execution / RPC"}</h4>
@@ -133,17 +134,17 @@ export default function OpenOcdControlPlaneTest() {
                 <dl>
                   <div>
                     <dt>{zh ? "Worker 生命週期" : "Worker Lifecycle"}</dt>
-                    <dd><span className="openocdControlPlaneStatus" data-tone="success">{zh ? "啟動 → 正常停止" : "Started → Stopped normally"}</span></dd>
+                    <dd><span className="diagnosticsStatusBadge" data-tone="success">{zh ? "啟動 → 正常停止" : "Started → Stopped normally"}</span></dd>
                   </div>
                   <div>
                     <dt>Tcl RPC</dt>
-                    <dd><span className="openocdControlPlaneStatus" data-tone="success">{result.tcl_rpc_state.toUpperCase()}</span></dd>
+                    <dd><span className="diagnosticsStatusBadge" data-tone="success">{result.tcl_rpc_state.toUpperCase()}</span></dd>
                   </div>
                   <div><dt>RPC Scope</dt><dd>{result.rpc_scope}</dd></div>
                 </dl>
               </section>
 
-              <section className="openocdControlPlaneSection" data-tone="performance">
+              <section className="diagnosticsEvidenceSection" data-tone="performance">
                 <header>
                   <small>{zh ? "PERFORMANCE" : "PERFORMANCE"}</small>
                   <h4>{zh ? "效能指標" : "Performance"}</h4>
@@ -157,7 +158,7 @@ export default function OpenOcdControlPlaneTest() {
               </section>
             </div>
 
-            <section className="openocdControlPlaneBoundary">
+            <section className="diagnosticsEvidenceBoundary">
               <header>
                 <small>{zh ? "QUALIFICATION BOUNDARY" : "QUALIFICATION BOUNDARY"}</small>
                 <h4>{zh ? "能力與測試範圍" : "Capability & Test Boundary"}</h4>
@@ -165,20 +166,20 @@ export default function OpenOcdControlPlaneTest() {
                   ? "這些限制是本測試刻意保留的安全邊界，不代表測試失敗。"
                   : "These limits are intentional safety boundaries for this diagnostic, not failed checks."}</p>
               </header>
-              <div className="openocdControlPlaneBoundaryGrid">
-                <div className="openocdControlPlaneBoundaryItem">
+              <div className="diagnosticsEvidenceBoundaryGrid">
+                <div className="diagnosticsEvidenceBoundaryItem">
                   <span>Execution Capability</span>
-                  <strong className="openocdControlPlaneCapability">{result.execution_capability}</strong>
+                  <strong className="diagnosticsEvidenceCapability">{result.execution_capability}</strong>
                   <small>{zh ? "僅驗證 OpenOCD 控制面與 Tcl RPC。" : "OpenOCD control plane and Tcl RPC only."}</small>
                 </div>
-                <div className="openocdControlPlaneBoundaryItem">
+                <div className="diagnosticsEvidenceBoundaryItem">
                   <span>Hardware Runtime Ready</span>
-                  <strong className="openocdControlPlaneBoundaryState">NOT ENABLED</strong>
+                  <strong className="diagnosticsStatusBadge" data-tone="neutral">NOT ENABLED</strong>
                   <small>{zh ? "本測試預期為 false；尚未啟用實體硬體執行。" : "Expected false for this test; physical hardware execution remains disabled."}</small>
                 </div>
-                <div className="openocdControlPlaneBoundaryItem openocdControlPlaneNotClaimed">
+                <div className="diagnosticsEvidenceBoundaryItem" data-span="full">
                   <span>{zh ? "不包含的功能（本測試不涉及）" : "Not claimed by this test"}</span>
-                  <div className="openocdControlPlaneBoundaryTags">
+                  <div className="diagnosticsEvidenceTags">
                     {result.not_claimed.map(item => <span key={item}>{item}</span>)}
                   </div>
                 </div>

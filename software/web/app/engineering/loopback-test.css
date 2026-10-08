@@ -102,8 +102,12 @@ button.loopbackNode:hover {
 
 .loopbackConfigGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.loopbackConfigGrid .diagnosticsTestCard {
+  min-width: 0;
 }
 
 .diagnosticsFieldStack {
@@ -188,21 +192,15 @@ button.loopbackNode:hover {
 
 .loopbackExecutionGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) minmax(190px, .8fr);
-  gap: 14px;
-  align-items: start;
+  gap: 10px;
+  align-content: start;
 }
 
 .loopbackExecutionActions {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-}
-
-.loopbackBackendBoundary {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1.45;
+  margin-top: 2px;
 }
 
 .loopbackResultsCard .diagnosticsTestCardBody {
@@ -254,9 +252,8 @@ button.loopbackNode:hover {
   font-size: 10px;
 }
 
-@media (max-width: 960px) {
-  .loopbackConfigGrid,
-  .loopbackExecutionGrid {
+@media (max-width: 1100px) {
+  .loopbackConfigGrid {
     grid-template-columns: 1fr;
   }
 
@@ -276,7 +273,8 @@ button.loopbackNode:hover {
     display: none;
   }
 
-  .loopbackLengthModes {
+  .loopbackLengthModes,
+  .loopbackExecutionActions {
     grid-template-columns: 1fr;
   }
 }

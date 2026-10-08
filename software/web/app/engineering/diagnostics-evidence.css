@@ -1,0 +1,347 @@
+/* Shared Diagnostics evidence/result presentation.
+ *
+ * Domain pages own their controls and path-specific layouts. This file owns
+ * reusable result summaries, evidence sections, status badges and qualification
+ * boundaries so Diagnostics pages do not grow separate visual systems.
+ */
+
+.diagnosticsEvidence {
+  display: grid;
+  gap: 16px;
+}
+
+.diagnosticsEvidenceHeadline {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--operator-success, #067647) 55%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--operator-success, #067647) 6%, var(--panel));
+}
+
+.diagnosticsEvidenceHeadline[data-result="FAIL"],
+.diagnosticsEvidenceHeadline[data-result="ERROR"],
+.diagnosticsEvidenceHeadline[data-result="TIMEOUT"] {
+  border-color: color-mix(in srgb, var(--operator-danger, #b42318) 55%, var(--line));
+  background: color-mix(in srgb, var(--operator-danger, #b42318) 6%, var(--panel));
+}
+
+.diagnosticsEvidenceHeadline > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.diagnosticsEvidenceHeadline small {
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.diagnosticsEvidenceHeadline strong {
+  color: var(--text);
+  font-size: 18px;
+  letter-spacing: -.01em;
+}
+
+.diagnosticsEvidenceHeadline > div > span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.diagnosticsEvidenceBadge {
+  flex: 0 0 auto;
+  min-width: 92px;
+  padding: 9px 18px;
+  border-radius: 7px;
+  background: var(--operator-success, #067647);
+  color: #fff;
+  font: 800 17px var(--font-mono);
+  text-align: center;
+  letter-spacing: .03em;
+}
+
+.diagnosticsEvidenceBadge[data-result="FAIL"],
+.diagnosticsEvidenceBadge[data-result="ERROR"],
+.diagnosticsEvidenceBadge[data-result="TIMEOUT"] {
+  background: var(--operator-danger, #b42318);
+}
+
+.diagnosticsEvidenceSectionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.diagnosticsEvidenceSection {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--operator-border, rgba(127, 127, 127, 0.25));
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.diagnosticsEvidenceSection[data-tone="identity"] {
+  border-color: color-mix(in srgb, var(--cyan) 28%, var(--line));
+}
+
+.diagnosticsEvidenceSection[data-tone="execution"] {
+  border-color: color-mix(in srgb, var(--operator-success, #067647) 30%, var(--line));
+}
+
+.diagnosticsEvidenceSection[data-tone="performance"] {
+  border-color: color-mix(in srgb, #7c3aed 24%, var(--line));
+}
+
+.diagnosticsEvidenceSection > header {
+  padding: 14px 15px 10px;
+  background: color-mix(in srgb, var(--panel-2) 68%, transparent);
+}
+
+.diagnosticsEvidenceSection[data-tone="identity"] > header {
+  background: color-mix(in srgb, var(--cyan) 6%, var(--panel));
+}
+
+.diagnosticsEvidenceSection[data-tone="execution"] > header {
+  background: color-mix(in srgb, var(--operator-success, #067647) 6%, var(--panel));
+}
+
+.diagnosticsEvidenceSection[data-tone="performance"] > header {
+  background: color-mix(in srgb, #7c3aed 5%, var(--panel));
+}
+
+.diagnosticsEvidenceSection header small,
+.diagnosticsEvidenceBoundary header small {
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+  letter-spacing: .12em;
+}
+
+.diagnosticsEvidenceSection header h4,
+.diagnosticsEvidenceBoundary header h4 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.diagnosticsEvidenceSection header p,
+.diagnosticsEvidenceBoundary header p {
+  margin: 5px 0 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.diagnosticsEvidenceSection dl {
+  margin: 0;
+  padding: 6px 14px 12px;
+}
+
+.diagnosticsEvidenceSection dl > div {
+  display: grid;
+  grid-template-columns: minmax(118px, .9fr) minmax(0, 1.15fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.diagnosticsEvidenceSection dl > div:last-child {
+  border-bottom: 0;
+}
+
+.diagnosticsEvidenceSection dt {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diagnosticsEvidenceSection dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.diagnosticsEvidenceMono {
+  font-family: var(--font-mono);
+  font-size: 12px !important;
+}
+
+.diagnosticsStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.diagnosticsStatusBadge[data-tone="success"] {
+  background: color-mix(in srgb, var(--operator-success, #067647) 12%, var(--panel));
+  color: var(--operator-success, #067647);
+}
+
+.diagnosticsStatusBadge[data-tone="neutral"] {
+  background: color-mix(in srgb, var(--muted) 12%, var(--panel));
+  color: var(--text-soft);
+}
+
+.diagnosticsStatusBadge[data-tone="danger"] {
+  background: color-mix(in srgb, var(--operator-danger, #b42318) 12%, var(--panel));
+  color: var(--operator-danger, #b42318);
+}
+
+.diagnosticsEvidenceBoundary {
+  display: grid;
+  border: 1px solid color-mix(in srgb, #b7791f 36%, var(--line));
+  border-radius: 9px;
+  overflow: hidden;
+  background: color-mix(in srgb, #b7791f 3%, var(--panel));
+}
+
+.diagnosticsEvidenceBoundary > header {
+  padding: 14px 16px 10px;
+  background: color-mix(in srgb, #b7791f 6%, var(--panel));
+}
+
+.diagnosticsEvidenceBoundaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 12px 14px 14px;
+}
+
+.diagnosticsEvidenceBoundaryItem {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 4px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.diagnosticsEvidenceBoundaryItem:first-child {
+  padding-left: 2px;
+}
+
+.diagnosticsEvidenceBoundaryItem:last-child {
+  padding-right: 2px;
+  border-right: 0;
+}
+
+.diagnosticsEvidenceBoundaryItem > span {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.diagnosticsEvidenceBoundaryItem > small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.diagnosticsEvidenceCapability {
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cyan) 10%, var(--panel));
+  color: var(--cyan);
+  font: 750 11px var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.diagnosticsEvidenceTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diagnosticsEvidenceTags span {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 10%, var(--panel));
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+@media (max-width: 1180px) {
+  .diagnosticsEvidenceSectionGrid,
+  .diagnosticsEvidenceBoundaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .diagnosticsEvidenceSection[data-tone="performance"],
+  .diagnosticsEvidenceBoundaryItem[data-span="full"] {
+    grid-column: 1 / -1;
+  }
+
+  .diagnosticsEvidenceBoundaryItem[data-span="full"] {
+    padding: 14px 2px 0;
+    margin-top: 10px;
+    border-top: 1px solid var(--line);
+    border-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .diagnosticsEvidenceSectionGrid,
+  .diagnosticsEvidenceBoundaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnosticsEvidenceHeadline {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .diagnosticsEvidenceBadge {
+    width: fit-content;
+  }
+
+  .diagnosticsEvidenceSection[data-tone="performance"],
+  .diagnosticsEvidenceBoundaryItem[data-span="full"] {
+    grid-column: auto;
+  }
+
+  .diagnosticsEvidenceBoundaryItem,
+  .diagnosticsEvidenceBoundaryItem:first-child,
+  .diagnosticsEvidenceBoundaryItem:last-child {
+    padding: 12px 2px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .diagnosticsEvidenceBoundaryItem:last-child {
+    border-bottom: 0;
+  }
+
+  .diagnosticsEvidenceBoundaryItem[data-span="full"] {
+    margin-top: 0;
+    border-top: 0;
+  }
+
+  .diagnosticsEvidenceSection dl > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    align-items: start;
+    padding: 8px 0;
+  }
+}
