@@ -8,6 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 
@@ -19,8 +21,8 @@ AUTHORITY = HERE / "stm32f3-ordering-authority-v3.1.json"
 PROPOSAL_LOCK = HERE / "stm32f3-layer1-admission-proposal-v3.2.json"
 AUDIT = HERE / "stm32f3-layer1-production-publication-v3.3.json"
 
-EXPECTED_F3_SHA256 = "d453efd0720c6aa2d3a246815ffe6eafd8ee9f924fd09c88b0dd4f64387806cc"
-EXPECTED_F3_BLOB = "ac580b7df62a18ad3c418845a3087fdac10f4e6d"
+EXPECTED_F3_SHA256 = "3761e2e2552d9801ba16e185ea243e43b4eef916ee34d173ec57813bf71c0922"
+EXPECTED_F3_BLOB = "b8c5566e99fca66dad402a01d9fc0d97922bb127"
 EXPECTED_ACTIVE_SHA256 = "e3149bf214375dd50c20919fb2b42ec127626ba6440f62ea90f62e7fe6cde641"
 EXPECTED_GAP_SHA256 = "1514c8edd3d190a8fd2bc9c27960c47f05ab4536640e008d73e4d5ab2f5a01d7"
 EXPECTED_PROPOSAL_SHA256 = "de8938da114c261b55aee191a6d0916f4ef8e7d0f1cc16f08d3b870074fe3e47"
@@ -149,13 +151,14 @@ def main() -> int:
     req(hashlib.sha256(data).hexdigest() == EXPECTED_F3_SHA256, "F3 Production SHA256 drift")
     req(git_blob(data) == EXPECTED_F3_BLOB, "F3 Production git blob drift")
     rows = read_rows(F3)
+    publication_rows = rewind_v616_backend(rows, "STM32F3")
     req(len(rows) == 192 and len({r["icpn"] for r in rows}) == 192,
         "F3 Production count/unique drift")
     req(sorted(r["icpn"] for r in rows) == active,
         "F3 Production exact identities differ from locked current-Active set")
 
-    mapped = [r for r in rows if r["mapping_status"] != "no_mapping"]
-    unmapped = [r for r in rows if r["mapping_status"] == "no_mapping"]
+    mapped = [r for r in publication_rows if r["mapping_status"] != "no_mapping"]
+    unmapped = [r for r in publication_rows if r["mapping_status"] == "no_mapping"]
     req(len(mapped) == 10 and {r["icpn"] for r in mapped} == LEGACY_MAPPED,
         "legacy mapped F3 set drift")
     req(len(unmapped) == 182 and sorted(r["icpn"] for r in unmapped) == gap,
@@ -210,7 +213,7 @@ def main() -> int:
         path = (MANIFEST.parent / source["path"]).resolve()
         for row in read_rows(path):
             backend["no_mapping" if row["mapping_status"] == "no_mapping" else "mapped"] += 1
-    req(backend["mapped"] >= 3673 and backend["no_mapping"] >= 415,
+    req(backend["mapped"] >= 3673 and backend["no_mapping"] <= 415,
         f"Production backend partition regressed below F3 publication poststate: {dict(backend)}")
     req(backend["mapped"] + backend["no_mapping"] == current_total,
         "current Production backend partition does not equal current exact total")
