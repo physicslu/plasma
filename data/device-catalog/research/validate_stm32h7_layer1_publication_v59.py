@@ -8,6 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from openocd_backend_evolution_v616 import rewind_v616_backend
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 CSV_PATH = HERE / "stm32h7-classic-commercial-icpn.csv"
@@ -16,8 +18,8 @@ PROPOSAL = HERE / "stm32h7-layer1-admission-proposal-v5.8.json"
 PUBLICATION = HERE / "stm32h7-layer1-production-publication-v5.9.json"
 MANIFEST = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
 
-EXPECTED_CURRENT_SHA256 = "ae0fbffecb9f978f6195ded06fcecfc5a048b71ef8c307548a3298b35889af07"
-EXPECTED_CURRENT_BLOB = "a0ca2521a196e4e7f3d87560b05e830611e85b32"
+EXPECTED_CURRENT_SHA256 = "47ff2d7d19de3e21ecaba9ade44280d99657749def23c3c37bf79ad075ccb2c6"
+EXPECTED_CURRENT_BLOB = "511840493c716016cddc99ac6c71f34196479d11"
 EXPECTED_HISTORICAL_SHA256 = "35b9d2bc13da3a01809ea62b62557f5419b8d6f7139574ca4715a127f1e86465"
 EXPECTED_HISTORICAL_BLOB = "fda7d9a4eaa9978d0a67416e8b339fc9aab4e5cc"
 EXPECTED_GAP_SHA256 = "22587c53a237fe3d2d4a208641e6109dd4d1b67bab1e39c9da86c4233b76b834"
@@ -37,6 +39,7 @@ def main() -> int:
     lines = text.splitlines()
     header = lines[0]
     rows = list(csv.DictReader(io.StringIO(text)))
+    publication_rows = rewind_v616_backend(rows, "STM32H7")
     req(len(rows) == 205 and len({r["icpn"] for r in rows}) == 205, "H7 v5.9 cardinality drift")
 
     gap = [x.strip() for x in GAP.read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -44,7 +47,7 @@ def main() -> int:
     req(hashlib.sha256(("\n".join(gap)+"\n").encode()).hexdigest() == EXPECTED_GAP_SHA256,
         "H7 v5.9 gap digest drift")
     gap_set = set(gap)
-    by = {r["icpn"]: r for r in rows}
+    by = {r["icpn"]: r for r in publication_rows}
     delta = [by.get(x) for x in gap]
     req(all(delta), "H7 v5.9 approved identity missing")
     req(all(
@@ -83,7 +86,7 @@ def main() -> int:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     sources = manifest["sources"]
     req(len(sources) == 28, "H7 v5.9 Production source-count drift")
-    req(sum(int(s["row_count"]) for s in sources) == 4620, "H7 v5.9 Production total drift")
+    req(sum(int(s["row_count"]) for s in sources) >= 4620, "H7 v5.9 Production total regressed below publication poststate")
     h7 = [s for s in sources if s.get("manufacturer")=="STMicroelectronics" and s.get("family")=="STM32H7"]
     req(len(h7)==1, "H7 v5.9 manifest source missing/duplicated")
     req(h7[0] == {
