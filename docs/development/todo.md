@@ -148,6 +148,31 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ## Deferred architecture evolution
 
+### Dual Manager Lifecycle Ownership / State Drift
+
+**Status:** TODO / architecture ownership cleanup identified during live SWPC QEMU qualification
+
+**Layer:** Control Plane / Manager / PPU Registration / Platform Maintenance
+
+**Reason:** The public `z2like-demo` Manager and the SWPC-local maintenance Manager (`127.0.0.1:18380`) can independently persist lifecycle state for the same PPU alias. Live SWPC/QEMU qualification exposed real state drift: the public Manager had `z2like-qemu` disabled while the local maintenance Manager still held it as `commissioned`, so Runtime maintenance remained blocked by the local lifecycle gate. Both Managers ultimately refer to the same QEMU PPU, but their Registration state is not shared.
+
+Required work:
+
+- define one authoritative owner for each semantic state rather than allowing two Managers to independently own the same `commissioned` / `disabled` lifecycle;
+- keep Programming Registration as a programming-admission concern owned by the production control plane;
+- model Platform Maintenance Authorization as a separate bounded maintenance capability/credential rather than duplicating or overloading Programming Registration lifecycle;
+- decide whether the SWPC-local maintenance Manager should become stateless for Registration, consume an authoritative lifecycle view, or be removed once an equivalent production-safe maintenance path exists;
+- define migration and reconciliation semantics for existing installations that already contain independent Manager registry files;
+- make contradictory public/local state observable and fail with an explicit ownership/reconciliation error rather than requiring operators to discover the drift indirectly through a maintenance failure;
+- extend SWPC/QEMU acceptance to prove Runtime maintenance does not require manual lifecycle mutation in two independent Manager registries;
+- update `plasmactl z2like-demo` and operator documentation so the one-command deployment contract does not hide dual-control-plane lifecycle coupling.
+
+Architectural invariant:
+
+> One semantic lifecycle state must have one authoritative owner. Programming Registration and Platform Maintenance Authorization are separate concerns and must not be conflated or independently duplicated across Managers.
+
+Closure evidence must demonstrate that one PPU cannot remain logically `commissioned` in one Manager and `disabled` in another in a way that changes maintenance admission, and that the canonical SWPC/QEMU deployment path no longer requires manual dual-Manager lifecycle synchronization.
+
 ### Mock Runtime Core Convergence
 
 **Status:** TODO / medium-term architecture cleanup; no immediate runtime merge required
