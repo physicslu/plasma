@@ -155,15 +155,11 @@ async def execute_openocd_control_plane(
 
     started_at = time.monotonic()
     generation = 0
-    pid: int | None = None
-    rpc_port: int | None = None
     version = ""
     stopped = False
     try:
         status = await worker.start()
         generation = status.generation
-        pid = status.pid
-        rpc_port = status.rpc_port
         version = (await worker.command("version", timeout_s=timeout_s)).strip()
         if not version:
             raise PlasmaError(
@@ -193,10 +189,8 @@ async def execute_openocd_control_plane(
         "runtime_id": runtime["runtime_id"],
         "process_state": "stopped",
         "probe_process_state": "running",
-        "process_id": pid,
         "tcl_rpc_state": "pass",
         "rpc_scope": "loopback",
-        "rpc_port": rpc_port,
         "architecture": runtime["architecture"],
         "host_architecture": platform.machine().lower(),
         "worker_generation": generation,
