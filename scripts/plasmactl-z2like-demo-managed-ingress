@@ -130,6 +130,10 @@ server {
         limit_except POST { deny all; }
         proxy_pass $qemu_gateway_root;
     }
+    location = /api/engineering/diagnostics/openocd-control-plane {
+        limit_except POST { deny all; }
+        proxy_pass $qemu_gateway_root;
+    }
     location = /api/engineering/session {
         limit_except POST { deny all; }
         proxy_pass $qemu_gateway_root;
