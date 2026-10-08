@@ -128,12 +128,16 @@ runtime_id
 = OpenOCD version + pinned source commit
 = source/build intent identity
 
+payload_sha256
+= staged file path + mode + content tree digest
+= compiled/runtime payload identity
+
 artifact_sha256
 = exact distributed .tar.gz bytes
 = deployment / promotion identity
 ```
 
-兩者不可混為一談。相同 `runtime_id` 不代表兩次獨立編譯必定產生相同 binary；compiler、system library 或 build dependency 若改變，artifact SHA 合理地應該改變。Production deployment 不應在 target 或 deployment 階段重新編譯來「重現」artifact，而應 **build once，連同 detached SHA-256 一起 promotion，並由 kit/install path 驗證 exact bytes**。
+三者不可混為一談。相同 `runtime_id` 不代表兩次獨立編譯必定產生相同 binary；compiler、system library 或 build dependency 若改變，`payload_sha256` 與 artifact SHA 合理地應該改變。Production deployment 不應在 target 或 deployment 階段重新編譯來「重現」artifact，而應 **build once，連同 detached SHA-256 一起 promotion，並由 kit/install path 驗證 exact bytes**。
 
 Packaging 本身必須消除與 payload 無關的 nondeterminism。Canonical OpenOCD artifact 因此正規化 tar/gzip 的 timestamp、uid/gid、user/group name 等 archive metadata；對完全相同的 staged payload bytes，重複 package 必須產生相同 artifact SHA。這只保證 packaging reproducibility，不宣稱未 pin 的 toolchain/dependency 會產生相同 compiled payload。
 
