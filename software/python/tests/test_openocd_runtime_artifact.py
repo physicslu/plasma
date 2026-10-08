@@ -93,6 +93,8 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
     assert artifact.is_file()
     assert sidecar.is_file()
     assert built["runtime_id"] == RUNTIME_ID
+    assert len(built["payload_sha256"]) == 64
+    assert len(built["artifact_sha256"]) == 64
     assert built["hardware_runtime_ready"] is False
 
     verified = MODULE.verify_artifact(
@@ -102,6 +104,7 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
     )
     manifest = verified["manifest"]
     assert manifest["runtime_id"] == RUNTIME_ID
+    assert manifest["payload_sha256"] == built["payload_sha256"]
     assert manifest["architecture"] == "x86_64"
     assert manifest["qualification_boundary"] == {
         "hardware_runtime_ready": False,
@@ -133,6 +136,7 @@ def test_build_verify_install_round_trip_keeps_hardware_gate_closed(
         (product_root / "install" / "openocd-runtime.json").read_text(encoding="utf-8")
     )
     assert retained["artifact_sha256"] == evidence["artifact_sha256"]
+    assert retained["payload_sha256"] == built["payload_sha256"]
     assert retained["starts_openocd_service"] is False
     assert retained["qualification_boundary"]["hardware_runtime_ready"] is False
 
@@ -170,6 +174,7 @@ def test_build_is_reproducible_for_identical_payload_bytes_despite_mtime_drift(
 
     first_artifact = Path(str(first["artifact"]))
     second_artifact = Path(str(second["artifact"]))
+    assert first["payload_sha256"] == second["payload_sha256"]
     assert first["artifact_sha256"] == second["artifact_sha256"]
     assert first_artifact.read_bytes() == second_artifact.read_bytes()
     assert first["packaging_policy"] == "normalized-tar-gzip-v1"
