@@ -94,6 +94,15 @@ jobs:
           python3 scripts/z2like-demo-qemu-control-plane.py \
             --expected-commit "$GITHUB_SHA"
 
+      - name: Reconcile exact-commit SWPC-local maintenance Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/z2like-demo-qemu.py \
+            --ppu-ip 172.30.77.2 \
+            --alias z2like-qemu \
+            configure-control-station
+
       - name: Preflight canonical SWPC/QEMU target
         shell: bash
         run: |
