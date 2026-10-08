@@ -305,6 +305,10 @@ function average(values: Array<number | null>): number | null {
   return observed.reduce((sum, value) => sum + value, 0) / observed.length;
 }
 
+function formatAverageMs(value: number | null): string {
+  return value === null ? "—" : `${value.toFixed(3)} ms`;
+}
+
 export default function LoopbackTest() {
   const { locale } = useI18n();
   const { apiBase } = useWorkspaceSession();
@@ -618,9 +622,8 @@ export default function LoopbackTest() {
             <span>{actualLengths.map(value => `${value} ${text.bytes}`).join(", ")}{rangeHasMore ? " …" : ""}</span>
           </DiagnosticsTestNotice>
         </DiagnosticsTestCard>
-      </div>
 
-      <DiagnosticsTestCard title={text.executionTitle}>
+        <DiagnosticsTestCard title={text.executionTitle}>
         <div className="loopbackExecutionGrid">
           <label className="diagnosticsField diagnosticsNumberField">
             <span>{text.repeat}</span>
@@ -654,7 +657,102 @@ export default function LoopbackTest() {
         {endpoint !== "ps" && <p className="loopbackBackendBoundary">{text.laterEndpoint}</p>}
         {running && <p className="loopbackExecutionState"><strong>{text.running}</strong> · {results.length} case(s) completed</p>}
         {runError && <p className="loopbackExecutionState loopbackCaseError">{runError}</p>}
-      </DiagnosticsTestCard>
+        </DiagnosticsTestCard>
+      </div>
+
+      {overallStatus && (
+        <div className="diagnosticsEvidence loopbackResultEvidence">
+          <div className="diagnosticsEvidenceHeadline" data-result={overallStatus}>
+            <div>
+              <small>{text.resultStatus}</small>
+              <strong>PS Real-Path Loopback</strong>
+              <span>{overallStatus === "PASS" ? text.resultPassText : text.resultFailText}</span>
+            </div>
+            <span className="diagnosticsEvidenceBadge" data-result={overallStatus}>{overallStatus}</span>
+          </div>
+
+          <div className="diagnosticsEvidenceSectionGrid">
+            <section className="diagnosticsEvidenceSection" data-tone="identity">
+              <header>
+                <small>{text.dataIntegrity}</small>
+                <h4>{locale === "zh-TW" ? "資料完整性" : "Data Integrity"}</h4>
+                <p>{text.dataIntegrityDesc}</p>
+              </header>
+              <dl>
+                <div><dt>{text.completedCases}</dt><dd>{passingCases} / {results.length}</dd></div>
+                <div>
+                  <dt>{text.crcMatch}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={crcMatch ? "success" : "danger"}>{crcMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.payloadMatch}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={payloadMatch ? "success" : "danger"}>{payloadMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="diagnosticsEvidenceSection" data-tone="performance">
+              <header>
+                <small>{text.performance}</small>
+                <h4>{locale === "zh-TW" ? "效能指標" : "Performance"}</h4>
+                <p>{text.performanceDesc}</p>
+              </header>
+              <dl>
+                <div><dt>{text.browserRtt}</dt><dd>{formatAverageMs(browserRttAverage)}</dd></div>
+                <div><dt>{text.managerRtt}</dt><dd>{formatAverageMs(managerRttAverage)}</dd></div>
+                <div><dt>{text.ppuRtt}</dt><dd>{formatAverageMs(ppuRttAverage)}</dd></div>
+              </dl>
+            </section>
+
+            <section className="diagnosticsEvidenceSection" data-tone="execution">
+              <header>
+                <small>{text.pathEvidence}</small>
+                <h4>{locale === "zh-TW" ? "路徑證據" : "Path Evidence"}</h4>
+                <p>{text.pathEvidenceDesc}</p>
+              </header>
+              <dl>
+                <div>
+                  <dt>{text.managerRelay}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={managerRelayPass ? "success" : "danger"}>{managerRelayPass ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.psSource}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={psSourcePass ? "success" : "danger"}>{psSourcePass ? "PASS" : "FAIL"}</span></dd>
+                </div>
+                <div>
+                  <dt>{text.payloadEcho}</dt>
+                  <dd><span className="diagnosticsStatusBadge" data-tone={payloadMatch ? "success" : "danger"}>{payloadMatch ? "PASS" : "FAIL"}</span></dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </div>
+      )}
+
+      <section className="diagnosticsEvidenceBoundary loopbackQualificationBoundary">
+        <header>
+          <small>{text.qualificationTitle}</small>
+          <h4>{locale === "zh-TW" ? "能力與測試範圍" : "Capability & Test Boundary"}</h4>
+          <p>{text.qualificationDesc}</p>
+        </header>
+        <div className="diagnosticsEvidenceBoundaryGrid">
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>PS</span>
+            <strong className="diagnosticsStatusBadge" data-tone="success">{text.ready}</strong>
+            <small>{locale === "zh-TW" ? "Production real-path 可執行。" : "Production real path is executable."}</small>
+          </div>
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>PL</span>
+            <strong className="diagnosticsStatusBadge" data-tone="neutral">{text.notEnabled}</strong>
+            <small>{locale === "zh-TW" ? "Real-path 尚未實作。" : "Real-path execution is not implemented."}</small>
+          </div>
+          <div className="diagnosticsEvidenceBoundaryItem">
+            <span>IC</span>
+            <strong className="diagnosticsStatusBadge" data-tone="neutral">{text.notEnabled}</strong>
+            <small>{locale === "zh-TW" ? "Real-path 尚未實作。" : "Real-path execution is not implemented."}</small>
+          </div>
+        </div>
+      </section>
 
       <DiagnosticsTestCard title={text.resultsTitle} className="loopbackResultsCard">
         <div className="loopbackResultsWrap">
