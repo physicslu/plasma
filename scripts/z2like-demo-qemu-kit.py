@@ -96,6 +96,62 @@ def _validated_deployment_release_id(payload: object) -> str:
     return transaction_release
 
 
+def _install_openocd_from_verified_kit(verified, *, product_root: Path) -> tuple[str, dict[str, object]]:
+    """Install the verified kit OpenOCD artifact through kit-local tooling.
+
+    The QEMU simulation bypasses plasmactl z2-ps only for the product Python
+    boundary and simulation installer adapter. It must not bypass a Programming
+    Engine bundled in the canonical kit; otherwise CI can pass only because of
+    out-of-band target preparation.
+    """
+
+    openocd_sha = _verify_detached(
+        verified.openocd_artifact,
+        verified.openocd_sidecar,
+        "OpenOCD artifact",
+    )
+    tool = verified.root / "scripts" / "openocd-runtime.py"
+    if not tool.is_file():
+        raise QEMUSimulationKitError(f"QEMU simulation kit is missing OpenOCD installer: {tool}")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "install",
+            str(verified.openocd_artifact),
+            "--sidecar",
+            str(verified.openocd_sidecar),
+            "--product-root",
+            str(product_root),
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=900,
+    )
+    if completed.returncode != 0:
+        tail = completed.stdout[-8000:] if completed.stdout else ""
+        raise QEMUSimulationKitError(
+            f"kit-local OpenOCD installation failed with exit {completed.returncode}: {tail}"
+        )
+    evidence_path = product_root / "install" / "openocd-runtime.json"
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise QEMUSimulationKitError(
+            f"kit-local OpenOCD installation did not produce trustworthy evidence: {exc}"
+        ) from exc
+    if (
+        not isinstance(evidence, dict)
+        or evidence.get("result") != "PASS"
+        or evidence.get("hardware_runtime_ready") is not False
+        or evidence.get("starts_openocd_service") is not False
+    ):
+        raise QEMUSimulationKitError("kit-local OpenOCD installation evidence violates the safety boundary")
+    return openocd_sha, evidence
+
+
 def deploy(
     kit_artifact: Path,
     *,
@@ -119,6 +175,10 @@ def deploy(
             verified.python_artifact,
             verified.python_sidecar,
             "Plasma Python artifact",
+        )
+        openocd_sha, openocd_evidence = _install_openocd_from_verified_kit(
+            verified,
+            product_root=product_root,
         )
         kit_scripts = verified.root / "scripts"
         coordinator = kit_scripts / "ppu-bootstrap-deployment.py"
@@ -195,6 +255,9 @@ def deploy(
             "ppu_artifact_sha256": ppu_sha,
             "python_artifact_sha256": python_sha,
             "python_artifact_execution": "not_executed_in_qemu-simulation",
+            "openocd_artifact_sha256": openocd_sha,
+            "openocd_runtime_id": openocd_evidence.get("runtime_id"),
+            "openocd_hardware_runtime_ready": openocd_evidence.get("hardware_runtime_ready"),
             "kit_local_deployment_coordinator": str(coordinator),
             "kit_local_installer_core": str(installer_core),
             "kit_local_simulation_installer": str(installer),
@@ -245,6 +308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 _verify_detached(verified.ppu_artifact, verified.ppu_sidecar, "PPU artifact")
                 _verify_detached(verified.python_artifact, verified.python_sidecar, "Plasma Python artifact")
+                _verify_detached(verified.openocd_artifact, verified.openocd_sidecar, "OpenOCD artifact")
                 print(
                     json.dumps(
                         {

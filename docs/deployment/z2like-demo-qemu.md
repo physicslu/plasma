@@ -131,6 +131,7 @@ SWPC local operator
   -> device pairing if required
   -> authenticated 1 MiB chunk upload
   -> canonical Z2 PS kit verification
+  -> kit-local OpenOCD artifact verification/install
   -> kit-local durable deployment coordinator
   -> QEMU userspace activation adapter
   -> packaged ARMv7 Plasma Server/Gateway
@@ -147,6 +148,8 @@ Platform maintenance remains fail-closed and independent from programming Regist
 - commissioning and disabling are handled only by the separate Registration workflow.
 
 The device-local pairing token is read only from the local QEMU container when pairing is required and is never printed by the one-command deployment path.
+
+OpenOCD is part of the canonical kit deployment contract. CI and live deployment must not preinstall or copy an OpenOCD runtime into the target as an out-of-band prerequisite; qualification smoke runs only after kit deployment and reads the installed `/opt/plasma/install/openocd-runtime.json` evidence.
 
 ## Managed-ingress security boundary
 
