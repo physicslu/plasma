@@ -52,8 +52,8 @@ def test_current_production_metrics() -> None:
     assert metrics["families"] == len(expected_family_counts)
     assert metrics["family_exact_icpns"] == expected_family_counts
     assert metrics["base_devices"] == len(expected_base_devices)
-    assert metrics["deterministic_openocd_exact_icpns"] == 3673
-    assert metrics["openocd_unmapped_exact_icpns"] == 956
+    assert metrics["deterministic_openocd_exact_icpns"] == 4037
+    assert metrics["openocd_unmapped_exact_icpns"] == 592
     assert (
         metrics["deterministic_openocd_exact_icpns"]
         + metrics["openocd_unmapped_exact_icpns"]
