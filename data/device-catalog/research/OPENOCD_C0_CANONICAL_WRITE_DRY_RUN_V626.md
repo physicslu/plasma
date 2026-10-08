@@ -15,6 +15,10 @@ Exact delta:
 - four STM32C0 ordering-pattern rows from v6.25
 - exact v6.25 delta SHA256: `5d6f2b022a0efab409f57dece8cfcb06dace9cbf93c4a533beef9b4ecbf84b24`
 - projected rows: **7,661**
+- preimage SHA256: `43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3`
+- frozen postimage Git blob SHA: `81e44f6a6df902f3b206d06bfac38e37ec74630b`
+- frozen postimage SHA256: `39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751`
+- byte count: **1,582,603 → 1,583,487**
 
 The dry-run renderer must prove that the preimage can be reproduced byte-for-byte before it is allowed to calculate a postimage. It then proves that the postimage adds exactly four keys, removes zero rows, mutates zero existing rows, and creates zero duplicates.
 
