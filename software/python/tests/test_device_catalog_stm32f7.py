@@ -27,8 +27,8 @@ def test_stm32f7_publication_preserves_legacy_route_and_adds_unbound_layer1_rows
 
     payload = added.to_payload()
     assert payload["catalog"]["scope"] == "production_admitted"
-    assert payload["backend"]["mapping_status"] == "no_mapping"
-    assert payload["backend"]["target_config"] == ""
+    assert payload["backend"]["mapping_status"] == "mapped"
+    assert payload["backend"]["target_config"] == "tcl/target/stm32f7x.cfg"
     assert payload["physical_validation"] == {
         "engineering_status": "no_evidence",
         "ppu_status": "no_evidence",
