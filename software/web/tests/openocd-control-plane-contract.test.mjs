@@ -40,23 +40,29 @@ test("browser requires explicit software-only evidence and Manager proof", () =>
   assert.ok(api.includes('success.rpc_scope !== "loopback"'));
   assert.ok(api.includes('success.manager?.relay !== "pass-through"'));
   assert.ok(panel.includes("Hardware Runtime Ready"));
-  assert.ok(panel.includes(">NO</strong>"));
+  assert.ok(panel.includes("NOT ENABLED"));
+  assert.ok(panel.includes("result.not_claimed.map"));
 });
 
-test("panel presents process, RPC, architecture, latency and capability evidence", () => {
+test("panel groups evidence into runtime, execution, performance and qualification boundary", () => {
   for (const label of [
     "OpenOCD Control Plane",
-    "OpenOCD",
-    "Process",
+    "Runtime ID",
+    "Worker Lifecycle",
     "Tcl RPC",
     "RPC Scope",
     "Architecture",
     "Worker Generation",
     "PPU Latency",
     "Manager RTT",
-    "Capability",
+    "Execution Capability",
+    "QUALIFICATION BOUNDARY",
   ]) {
     assert.ok(panel.includes(label), `missing evidence label: ${label}`);
   }
-  assert.ok(css.includes(".openocdControlPlaneGrid"));
+  assert.ok(panel.includes("Started → Stopped normally"));
+  assert.ok(panel.includes("啟動 → 正常停止"));
+  assert.ok(css.includes(".openocdControlPlaneSectionGrid"));
+  assert.ok(css.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"));
+  assert.ok(css.includes(".openocdControlPlaneBoundary"));
 });
