@@ -6,6 +6,7 @@ const engineering = await readFile(new URL("../app/engineering/page.tsx", import
 const panel = await readFile(new URL("../app/engineering/openocd-control-plane-test.tsx", import.meta.url), "utf8");
 const api = await readFile(new URL("../app/engineering/openocd-control-plane-api.ts", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/engineering/openocd-control-plane-test.css", import.meta.url), "utf8");
+const evidenceCss = await readFile(new URL("../app/engineering/diagnostics-evidence.css", import.meta.url), "utf8");
 const managedBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
 const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 
@@ -62,7 +63,9 @@ test("panel groups evidence into runtime, execution, performance and qualificati
   }
   assert.ok(panel.includes("Started → Stopped normally"));
   assert.ok(panel.includes("啟動 → 正常停止"));
-  assert.ok(css.includes(".openocdControlPlaneSectionGrid"));
-  assert.ok(css.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"));
-  assert.ok(css.includes(".openocdControlPlaneBoundary"));
+  assert.ok(panel.includes('import "./diagnostics-evidence.css"'));
+  assert.ok(evidenceCss.includes(".diagnosticsEvidenceSectionGrid"));
+  assert.ok(evidenceCss.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"));
+  assert.ok(evidenceCss.includes(".diagnosticsEvidenceBoundary"));
+  assert.doesNotMatch(css, /diagnosticsEvidenceSection|diagnosticsEvidenceBoundary/);
 });
