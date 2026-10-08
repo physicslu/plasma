@@ -6,6 +6,8 @@ on:
       - 'data/device-catalog/research/review_openocd_bounded_evidence_v619.py'
       - 'data/device-catalog/research/test_review_openocd_bounded_evidence_v619.py'
       - 'data/device-catalog/research/OPENOCD_BOUNDED_EVIDENCE_REVIEW_V619.md'
+      - 'data/device-catalog/research/openocd-bounded-identifier-bridge-v6.19.json'
+      - 'data/device-catalog/research/validate_openocd_bounded_bridge_v619.py'
       - '.github/workflows/device-catalog-openocd-bounded-evidence-v619.yml'
 
 permissions:
@@ -27,6 +29,7 @@ jobs:
             --summary /tmp/openocd-bounded-evidence-v619.json
           python -m unittest discover -s data/device-catalog/research \
             -p test_review_openocd_bounded_evidence_v619.py -v
+          python data/device-catalog/research/validate_openocd_bounded_bridge_v619.py
       - uses: actions/upload-artifact@v4
         with:
           name: openocd-bounded-evidence-review-v619
