@@ -205,6 +205,45 @@ def _wait_public_deployment(
     )
 
 
+def _maintenance_registry_evidence(
+    origin: str,
+    *,
+    alias: str,
+    expected_endpoint: str,
+) -> dict[str, Any]:
+    session = BrowserSession(origin)
+    status, payload, _ = session.request("/api/registry")
+    _expect(status, 200, payload, "local maintenance Manager registry read")
+    if payload.get("storage") != "config" or payload.get("mutable") is not False:
+        raise AcceptanceError(
+            "local maintenance Manager still owns a mutable Programming Registration registry"
+        )
+    ppus = payload.get("ppus")
+    if not isinstance(ppus, list):
+        raise AcceptanceError("local maintenance Manager registry omitted ppus")
+    canonical_endpoint = expected_endpoint.rstrip("/")
+    matches = [
+        item
+        for item in ppus
+        if isinstance(item, dict)
+        and item.get("alias") == alias
+        and str(item.get("endpoint") or "").rstrip("/") == canonical_endpoint
+    ]
+    if len(ppus) != 1 or len(matches) != 1:
+        raise AcceptanceError(
+            "local maintenance Manager registry is not bound exclusively "
+            "to the canonical QEMU endpoint"
+        )
+    return {
+        "origin": origin.rstrip("/"),
+        "storage": "config",
+        "mutable": False,
+        "ppu_alias": alias,
+        "ppu_endpoint": canonical_endpoint,
+        "programming_registration_owner": "public-production-control-plane",
+    }
+
+
 def _registry_entry(session: BrowserSession, alias: str) -> dict[str, Any]:
     status, payload, _ = session.request("/api/manager/registry")
     _expect(status, 200, payload, "public Manager registry read")
@@ -489,6 +528,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     _local_ingress_acceptance(args.local_managed_origin)
+    maintenance_registry = _maintenance_registry_evidence(
+        args.maintenance_manager_origin,
+        alias=args.alias,
+        expected_endpoint=args.maintenance_ppu_endpoint,
+    )
     entry = _registry_entry(session, args.alias)
     if entry.get("endpoint") != args.expected_ppu_endpoint.rstrip("/"):
         raise AcceptanceError(
@@ -685,6 +729,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "unknown_bootstrap_route": "BLOCKED",
             "wrong_bootstrap_method": "BLOCKED",
             "local_managed_ingress_allowlist": "PASS",
+            "maintenance_registry": maintenance_registry,
             "kit_sha256": kit_sha,
             "not_live_qualified_by_this_gate": [
                 "active-Site-Job disable rejection",
@@ -731,6 +776,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--alias", default="z2like-qemu")
     parser.add_argument("--container", default="plasma-z2like-demo-qemu")
     parser.add_argument("--local-managed-origin", default="http://127.0.0.1:18082")
+    parser.add_argument("--maintenance-manager-origin", default="http://127.0.0.1:18380")
+    parser.add_argument("--maintenance-ppu-endpoint", default="http://172.30.77.2:18080")
     parser.add_argument("--render-timeout", type=float, default=600.0)
     parser.add_argument("--report", type=Path)
     return parser
