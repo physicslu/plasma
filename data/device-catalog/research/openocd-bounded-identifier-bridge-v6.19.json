@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "policy_id": "openocd-bounded-identifier-bridge-v6.19",
+  "record_state": "RESEARCH_POLICY_PROPOSAL_NOT_PRODUCTION",
+  "scope": {
+    "exact_icpn_count": 17,
+    "family_counts": {
+      "STM32F3": 4,
+      "STM32G0": 12,
+      "STM32L1": 1
+    },
+    "exact_icpns": [
+      "STM32F301K6T6",
+      "STM32F301K6T6TR",
+      "STM32F301K6T7",
+      "STM32F303C8Y6TR",
+      "STM32G0B1RBI3N",
+      "STM32G0B1RBI3NTR",
+      "STM32G0B1RBI6N",
+      "STM32G0B1RCI6N",
+      "STM32G0B1RCI6NTR",
+      "STM32G0B1REI6N",
+      "STM32G0B1REI6NTR",
+      "STM32G0B1REI7N",
+      "STM32G0C1RCI6N",
+      "STM32G0C1RCI6NTR",
+      "STM32G0C1REI6N",
+      "STM32G0C1REI6NTR",
+      "STM32L151VDY6XTR"
+    ]
+  },
+  "bridges": {
+    "STM32F301K6T6": {
+      "existing_identifier": "STM32F301K6Ux",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32f3x.cfg"
+    },
+    "STM32F301K6T6TR": {
+      "existing_identifier": "STM32F301K6Ux",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32f3x.cfg"
+    },
+    "STM32F301K6T7": {
+      "existing_identifier": "STM32F301K6Ux",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32f3x.cfg"
+    },
+    "STM32F303C8Y6TR": {
+      "existing_identifier": "STM32F303C8Tx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32f3x.cfg"
+    },
+    "STM32G0B1RBI3N": {
+      "existing_identifier": "STM32G0B1RBTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1RBI3NTR": {
+      "existing_identifier": "STM32G0B1RBTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1RBI6N": {
+      "existing_identifier": "STM32G0B1RBTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1RCI6N": {
+      "existing_identifier": "STM32G0B1RCTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1RCI6NTR": {
+      "existing_identifier": "STM32G0B1RCTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1REI6N": {
+      "existing_identifier": "STM32G0B1RETx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1REI6NTR": {
+      "existing_identifier": "STM32G0B1RETx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0B1REI7N": {
+      "existing_identifier": "STM32G0B1RETx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0C1RCI6N": {
+      "existing_identifier": "STM32G0C1RCTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0C1RCI6NTR": {
+      "existing_identifier": "STM32G0C1RCTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0C1REI6N": {
+      "existing_identifier": "STM32G0C1RETx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32G0C1REI6NTR": {
+      "existing_identifier": "STM32G0C1RETx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32g0x.cfg"
+    },
+    "STM32L151VDY6XTR": {
+      "existing_identifier": "STM32L151VDTx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32l1.cfg"
+    }
+  },
+  "evidence": {
+    "source_review": "openocd-bounded-evidence-review-v6.19",
+    "source_pr": 774,
+    "source_workflow_run_id": 37745016666,
+    "source_artifact_id": 11535565952,
+    "source_artifact_sha256": "c6a30f2aec19a028360153336917e804557e65d9e2b2aee27267b0ec4639b43a",
+    "source_review_exact_set_sha256": "20b3910840a802a8855ad9022aa6bc67a35e8b169bd71726189eb803ded8636f",
+    "source_review_csv_sha256": "e3a74067f6e1ec8ec784116dc71c5d33d8fec5ff06974291185a904adf0f5c3a",
+    "source_bridge_binding_sha256": "c986e9dbd6e365b3ed6a7054f62e01ae2cd0e18e15cb3841321d43d20fc94892",
+    "route_inventory_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810"
+  },
+  "governance": {
+    "generic_one_char_generalization_authorized": false,
+    "exact_set_bridge_only": true,
+    "production_mapping_write_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  },
+  "coverage_projection_if_later_promoted": {
+    "current_active_openocd_route_exact_count": 3958,
+    "bounded_bridge_candidates": 17,
+    "potential_active_openocd_route_exact_count": 3975,
+    "scoped_active_denominator": 4550,
+    "potential_coverage_percent": 87.3626,
+    "remaining_gap": 575
+  }
+}
