@@ -17,6 +17,7 @@ if str(HERE) not in sys.path:
 from device_catalog_admission_framework import write_canonical_dataset  # noqa: E402
 from device_catalog_pipeline_framework import pipeline_plan_is_clean  # noqa: E402
 from stm32f4_admission import build_admission_plan  # noqa: E402
+from openocd_backend_evolution_v616 import rewind_v616_backend  # noqa: E402
 from validate_stm32f4_retained_evidence import validate_retained_evidence  # noqa: E402
 
 EVIDENCE = HERE / "evidence" / "stm32f4-phase4.0-foundation-batch5-live-2026-08-31"
@@ -162,10 +163,14 @@ class STM32F4Phase40FoundationBatch5PostAdmissionTests(unittest.TestCase):
             rows = {row["icpn"]: row for row in csv.DictReader(handle)}
         self.assertIn(NRND_ONLY, rows)
         current = rows[NRND_ONLY]
-        self.assertEqual(current["mapping_status"], "no_mapping")
-        self.assertEqual(current["existing_identifier"], "")
-        self.assertEqual(current["existing_identifier_kind"], "")
-        self.assertEqual(current["openocd_target_config"], "")
+        historical = {
+            row["icpn"]: row
+            for row in rewind_v616_backend(rows.values(), "STM32F4")
+        }[NRND_ONLY]
+        self.assertEqual(historical["mapping_status"], "no_mapping")
+        self.assertEqual(historical["existing_identifier"], "")
+        self.assertEqual(historical["existing_identifier_kind"], "")
+        self.assertEqual(historical["openocd_target_config"], "")
         self.assertEqual(
             current["source_type"],
             "official_st_exact_product_authority_plus_locked_active_lifecycle",
