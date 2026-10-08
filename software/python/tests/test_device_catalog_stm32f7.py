@@ -57,4 +57,6 @@ def test_stm32f7_package_specific_metadata_and_f750_override() -> None:
     assert override.pin_count == "100"
     assert override.flash_size == "64 KiB"
     assert override.temperature_grade == "-40 to 105 C"
-    assert override.mapping_status == "no_mapping"
+    assert override.mapping_status == "mapped"
+    assert override.mapping_method == "deterministic_ordering_pattern"
+    assert override.target_config == "tcl/target/stm32f7x.cfg"
