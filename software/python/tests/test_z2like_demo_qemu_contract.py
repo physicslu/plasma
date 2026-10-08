@@ -150,6 +150,10 @@ def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core()
     assert 'coordinator = kit_scripts / "ppu-bootstrap-deployment.py"' in source
     assert 'installer_core = kit_scripts / "ppu-z2-installer-core.py"' in source
     assert 'CORE_OVERRIDE: str(installer_core)' in source
+    assert "_install_openocd_from_verified_kit" in source
+    assert 'verified.root / "scripts" / "openocd-runtime.py"' in source
+    assert '"openocd_artifact_sha256": openocd_sha' in source
+    assert '"openocd_hardware_runtime_ready": openocd_evidence.get("hardware_runtime_ready")' in source
     assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
 
 
