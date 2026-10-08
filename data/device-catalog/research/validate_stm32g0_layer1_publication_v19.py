@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import csv, hashlib, json
+import csv, hashlib, io, json
 from collections import Counter
 from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v621 import rewind_v621_backend
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -35,11 +36,18 @@ def main():
     req(audit["claims"]["ps_hil_qualification_claimed"] is False,"HIL overclaim")
 
     data=G0.read_bytes()
-    req(hashlib.sha256(data).hexdigest()==EXPECTED_G0_SHA256,"G0 SHA256 drift")
-    req(git_blob(data)==EXPECTED_G0_BLOB,"G0 git blob drift")
     with G0.open(newline="",encoding="utf-8") as f:
         rows=list(csv.DictReader(f))
-    publication_rows=rewind_v616_backend(rows,"STM32G0")
+    v616_current_rows=rewind_v621_backend(rows,"STM32G0")
+    buf=io.StringIO(newline="")
+    writer=csv.DictWriter(buf,fieldnames=list(v616_current_rows[0]),lineterminator="\n")
+    writer.writeheader(); writer.writerows(v616_current_rows)
+    v616_current_data=buf.getvalue().encode()
+    req(hashlib.sha256(v616_current_data).hexdigest()==EXPECTED_G0_SHA256,
+        "G0 post-v6.16 historical snapshot SHA256 drift")
+    req(git_blob(v616_current_data)==EXPECTED_G0_BLOB,
+        "G0 post-v6.16 historical snapshot git blob drift")
+    publication_rows=rewind_v616_backend(v616_current_rows,"STM32G0")
     req(len(rows)==406 and len({r["icpn"] for r in rows})==406,"G0 poststate count/unique drift")
 
     gaps=[x.strip() for x in GAPS.read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -72,8 +80,10 @@ def main():
     g0=[s for s in sources if s["manufacturer"]=="STMicroelectronics" and s["family"]=="STM32G0"]
     req(len(g0)==1,"Production G0 source missing/duplicated")
     s=g0[0]
-    req(s["row_count"]==406 and s["sha256"]==EXPECTED_G0_SHA256 and s["git_blob_sha"]==EXPECTED_G0_BLOB,
-        "Production manifest G0 integrity binding drift")
+    req(s["row_count"]==406
+        and s["sha256"]==hashlib.sha256(data).hexdigest()
+        and s["git_blob_sha"]==git_blob(data),
+        "Production manifest G0 current integrity binding drift")
 
     print("STM32G0_LAYER1_PRODUCTION_PUBLICATION_V19_PASS")
     print("STM32G0=406; mapped=364; no_mapping=42; global Production total owned by current invariants")
