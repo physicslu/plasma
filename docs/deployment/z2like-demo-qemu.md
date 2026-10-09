@@ -215,10 +215,12 @@ OpenOCD evidence in this simulation remains explicitly software-only:
 ARMv7 OpenOCD binary/package/install/dummy-adapter smoke = QUALIFIED in CI QEMU
 Console/BFF -> Manager -> Gateway -> Worker -> Tcl RPC     = QUALIFIED in CI QEMU
 8-Site worker isolation + one-Site kill/restart            = QUALIFIED in CI QEMU
-live SWPC operator-run control-plane qualification         = PENDING
+live SWPC operator-run control-plane qualification         = PENDING until main-only Browser Runtime live artifact PASS
 SWD/JTAG / PL / target / real IC                          = NOT QUALIFIED
 hardware_runtime_ready                                    = false
 ```
+
+The main-only Browser Runtime live gate is the closure gate for the OpenOCD control-plane milestone. After canonical kit deployment and return to `commissioned`, it drives the public Console/BFF managed OpenOCD diagnostic across Sites 1–8 and then executes the exact-commit ARMv7 QEMU 8-worker isolation acceptance, including Site 5 kill, seven surviving workers and Site 5 restart. A PASS remains software/control-plane evidence only and must retain `hardware_runtime_ready=false`.
 
 The qualification statement remains:
 
