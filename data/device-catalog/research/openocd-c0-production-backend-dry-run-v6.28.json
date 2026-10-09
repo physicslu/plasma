@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "transaction_id": "openocd-c0-production-backend-dry-run-v6.28",
-  "record_state": "DRY_RUN_DISCOVERY_NOT_WRITE_AUTHORIZED",
+  "record_state": "DRY_RUN_FROZEN_NOT_WRITE_AUTHORIZED",
   "scope": {
     "family": "STM32C0",
     "exact_icpn_count": 5,
@@ -79,13 +79,13 @@
     "active_openocd_route_coverage_percent": 87.4725
   },
   "frozen_postimages": {
-    "lock_state": "DISCOVERY_PENDING",
-    "c0_git_blob_sha": null,
-    "c0_sha256": null,
-    "c0_byte_count": null,
-    "manifest_git_blob_sha": null,
-    "manifest_sha256": null,
-    "manifest_byte_count": null
+    "lock_state": "FROZEN",
+    "c0_git_blob_sha": "ea59d063349da59c433315d571a558ea166f7dd0",
+    "c0_sha256": "0a54584b8873df1199268f1edb9069e9ed70a23ed08fa71cda2aeba559087b6e",
+    "c0_byte_count": 85097,
+    "manifest_git_blob_sha": "e5f13e0cb00273219e4d2496a616013868ed804a",
+    "manifest_sha256": "0a435204ac17db6f117d4adc80e7f62492025d60531305e70a3184be7a7d8308",
+    "manifest_byte_count": 9021
   },
   "governance": {
     "production_write_authorized": false,
@@ -100,5 +100,10 @@
     "programming_verified_claimed": false,
     "engineering_verified_claimed": false,
     "hil_verified_claimed": false
+  },
+  "discovery_evidence": {
+    "workflow_run_id": 37923235487,
+    "artifact_id": 11612772835,
+    "artifact_zip_sha256": "fa4123d7935fd2c88edfa88c63b0a1c88e7cfd59f9c1fd324642fd6064a58bc1"
   }
 }
