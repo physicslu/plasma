@@ -1,0 +1,41 @@
+name: OpenOCD Tier-A tail closure v6.30
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32l4-commercial-icpn.csv'
+      - 'data/device-catalog/research/openocd-tier-a-tail-write-v6.30.json'
+      - 'data/device-catalog/research/openocd_backend_evolution_v630.py'
+      - 'data/device-catalog/research/prepare_openocd_tier_a_tail_v630.py'
+      - 'data/device-catalog/research/test_prepare_openocd_tier_a_tail_v630.py'
+      - 'data/device-catalog/research/validate_st_final_layer1_publication_v62.py'
+      - 'data/device-catalog/research/OPENOCD_TIER_A_TAIL_V630.md'
+      - '.github/workflows/device-catalog-openocd-tier-a-tail-v630.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate L4 exact resolver and G4 fail-closed boundary
+        run: |
+          python data/device-catalog/research/prepare_openocd_tier_a_tail_v630.py \
+            --summary /tmp/openocd-tier-a-tail-v630.json \
+            --package-dir /tmp/openocd-tier-a-tail-v630
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_openocd_tier_a_tail_v630.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-tier-a-tail-v630
+          path: |
+            /tmp/openocd-tier-a-tail-v630.json
+            /tmp/openocd-tier-a-tail-v630/
+          if-no-files-found: error
+          retention-days: 30
