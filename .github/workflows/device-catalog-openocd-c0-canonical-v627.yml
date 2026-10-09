@@ -3,7 +3,7 @@ name: OpenOCD C0 canonical write v6.27
 on:
   pull_request:
     paths:
-      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/openocd-parts-canonical-v627.csv'
       - 'data/device-catalog/research/openocd-c0-bounded-route-inventory-v6.25.csv'
       - 'data/device-catalog/research/openocd-c0-canonical-route-write-v6.27.json'
       - 'data/device-catalog/research/validate_openocd_c0_canonical_write_v627.py'
