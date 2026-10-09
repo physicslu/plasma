@@ -1,0 +1,38 @@
+name: OpenOCD C0 Production transaction v6.28 dry-run
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-c0-production-backend-dry-run-v6.28.json'
+      - 'data/device-catalog/research/prepare_openocd_c0_production_transaction_v628.py'
+      - 'data/device-catalog/research/test_prepare_openocd_c0_production_transaction_v628.py'
+      - 'data/device-catalog/research/OPENOCD_C0_PRODUCTION_TRANSACTION_V628.md'
+      - '.github/workflows/device-catalog-openocd-c0-production-v628.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare bounded C0 Production transaction
+        run: |
+          python data/device-catalog/research/prepare_openocd_c0_production_transaction_v628.py \
+            --transaction-out /tmp/openocd-c0-production-v628.json \
+            --package-dir /tmp/openocd-c0-production-v628
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_openocd_c0_production_transaction_v628.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-c0-production-transaction-v628
+          path: |
+            /tmp/openocd-c0-production-v628.json
+            /tmp/openocd-c0-production-v628/
+          if-no-files-found: error
+          retention-days: 30
