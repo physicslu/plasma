@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "transaction_id": "openocd-c0-production-backend-write-v6.29",
-  "record_state": "WRITE_READY_AWAITING_OWNER_APPROVAL",
+  "record_state": "PRODUCTION_WRITE_APPLIED_ON_BRANCH_NOT_MERGED",
   "source_dry_run": {
     "transaction_id": "openocd-c0-production-backend-dry-run-v6.28",
     "merge_commit": "5667e3820f2f379d4972e9a28f693f04712c01a9",
@@ -43,13 +43,14 @@
     "active_openocd_route_coverage_percent": 87.4725
   },
   "approval": {
-    "owner_approval_received": false,
-    "production_write_authorized": false,
-    "merge_after_green_ci_authorized": false
+    "owner_approval_received": true,
+    "production_write_authorized": true,
+    "merge_after_green_ci_authorized": true,
+    "authorization_scope": "exact_v6.28_frozen_postimages_plus_deterministic_v6.29_receipt_tests_compatibility"
   },
   "write_state": {
-    "production_write_applied": false,
-    "applied_commit": null
+    "production_write_applied": true,
+    "applied_commit": "37d61baf8e6d978116836ebdf40940a15ee42cb6"
   },
   "claims": {
     "programming_profile_binding_claimed": false,
