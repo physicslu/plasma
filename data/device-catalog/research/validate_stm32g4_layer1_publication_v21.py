@@ -6,7 +6,9 @@ import hashlib
 import io
 import json
 from collections import Counter
-from pathlib import Path\n\nfrom openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
+from pathlib import Path
+
+from openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -138,7 +140,8 @@ def main()->int:
     req(s["row_count"]==273 and s["sha256"]==hashlib.sha256(data).hexdigest() and s["git_blob_sha"]==git_blob(data),
         "Production manifest G4 current integrity binding drift")
 
-    print("STM32G4_LAYER1_PRODUCTION_PUBLICATION_V21_PASS")\n    print("G4_BACKEND_EVOLUTION_V631_STATE",v631_state)
+    print("STM32G4_LAYER1_PRODUCTION_PUBLICATION_V21_PASS")
+    print("G4_BACKEND_EVOLUTION_V631_STATE",v631_state)
     print("STM32G4=273; mapped=272; no_mapping=1; global Production total owned by current invariants")
     print("Whole-ST Active identity coverage baseline after publication=3211/4550=70.5714%")
     return 0
