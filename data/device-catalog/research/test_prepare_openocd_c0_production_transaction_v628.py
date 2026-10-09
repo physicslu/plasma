@@ -31,6 +31,25 @@ class TestOpenOCDC0ProductionTransactionV628(unittest.TestCase):
         self.assertEqual(post["active_openocd_route_denominator"],4550)
         self.assertAlmostEqual(post["active_openocd_route_coverage_percent"],87.4725)
 
+    def test_frozen_postimages(self):
+        self.assertEqual(self.txn["postimage_lock_state"],"FROZEN")
+        self.assertEqual(
+            self.txn["affected_files"]["STM32C0"]["post_git_blob_sha"],
+            "ea59d063349da59c433315d571a558ea166f7dd0",
+        )
+        self.assertEqual(
+            self.txn["affected_files"]["STM32C0"]["post_sha256"],
+            "0a54584b8873df1199268f1edb9069e9ed70a23ed08fa71cda2aeba559087b6e",
+        )
+        self.assertEqual(
+            self.txn["affected_files"]["MANIFEST"]["post_git_blob_sha"],
+            "e5f13e0cb00273219e4d2496a616013868ed804a",
+        )
+        self.assertEqual(
+            self.txn["affected_files"]["MANIFEST"]["post_sha256"],
+            "0a435204ac17db6f117d4adc80e7f62492025d60531305e70a3184be7a7d8308",
+        )
+
     def test_hashes_and_rollback(self):
         for row in self.txn["affected_files"].values():
             self.assertEqual(len(row["pre_sha256"]),64)
