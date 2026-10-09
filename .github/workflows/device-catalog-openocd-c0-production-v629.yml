@@ -1,0 +1,32 @@
+name: OpenOCD C0 Production write v6.29
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'data/device-catalog/research/openocd-c0-production-backend-write-v6.29.json'
+      - 'data/device-catalog/research/openocd_backend_evolution_v629.py'
+      - 'data/device-catalog/research/validate_openocd_c0_production_write_v629.py'
+      - 'data/device-catalog/research/test_validate_openocd_c0_production_write_v629.py'
+      - 'data/device-catalog/research/validate_stm32c0_layer1_publication_v56.py'
+      - 'data/device-catalog/research/OPENOCD_C0_PRODUCTION_WRITE_V629.md'
+      - '.github/workflows/device-catalog-openocd-c0-production-v629.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate v6.29 write-ready or exact postwrite state
+        run: |
+          python data/device-catalog/research/validate_openocd_c0_production_write_v629.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_openocd_c0_production_write_v629.py -v
