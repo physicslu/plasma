@@ -33,6 +33,15 @@ For each row the current Production preimage must be `no_mapping` with empty bac
 
 Identity, lifecycle, package, flash, temperature, source authority and verification metadata are immutable.
 
+## Frozen dry-run postimages
+
+- STM32C0 postimage Git blob: `ea59d063349da59c433315d571a558ea166f7dd0`
+- STM32C0 postimage SHA256: `0a54584b8873df1199268f1edb9069e9ed70a23ed08fa71cda2aeba559087b6e`
+- Manifest postimage Git blob: `e5f13e0cb00273219e4d2496a616013868ed804a`
+- Manifest postimage SHA256: `0a435204ac17db6f117d4adc80e7f62492025d60531305e70a3184be7a7d8308`
+
+These values must be reproduced exactly by any later owner-approved Production write.
+
 ## Expected poststate if separately approved
 
 - Production exact identities: **4,629 → 4,629**
