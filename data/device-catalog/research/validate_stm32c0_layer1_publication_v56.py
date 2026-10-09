@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v629 import backend_state as backend_state_v629, rewind_v629_backend
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -16,8 +17,10 @@ PROPOSAL = HERE / "stm32c0-layer1-admission-proposal-v5.5.json"
 PUBLICATION = HERE / "stm32c0-layer1-production-publication-v5.6.json"
 MANIFEST = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
 
-EXPECTED_CSV_SHA256 = "8ab34090f2cb8fa033e8e50190a61ac3688f1cfc27aa2f7b1dd9c7c6b6474e8c"
-EXPECTED_CSV_BLOB = "c015e131082a3f9fe32ca226a9b2ada71a5c350d"
+EXPECTED_PRE_V629_CSV_SHA256 = "8ab34090f2cb8fa033e8e50190a61ac3688f1cfc27aa2f7b1dd9c7c6b6474e8c"
+EXPECTED_PRE_V629_CSV_BLOB = "c015e131082a3f9fe32ca226a9b2ada71a5c350d"
+EXPECTED_POST_V629_CSV_SHA256 = "0a54584b8873df1199268f1edb9069e9ed70a23ed08fa71cda2aeba559087b6e"
+EXPECTED_POST_V629_CSV_BLOB = "ea59d063349da59c433315d571a558ea166f7dd0"
 EXPECTED_GAP_SHA256 = "03b7202842b52aaa6362386864d60c62f64d9cefea74d2d039691ea170b79097"
 
 def git_blob(raw: bytes) -> str:
@@ -29,12 +32,21 @@ def require(ok: bool, msg: str) -> None:
 
 def main() -> int:
     raw = CSV.read_bytes()
-    require(hashlib.sha256(raw).hexdigest() == EXPECTED_CSV_SHA256, "C0 v5.6 CSV SHA-256 drift")
-    require(git_blob(raw) == EXPECTED_CSV_BLOB, "C0 v5.6 CSV Git blob drift")
+    raw_sha = hashlib.sha256(raw).hexdigest()
+    raw_blob = git_blob(raw)
+    require(
+        (raw_sha, raw_blob) in {
+            (EXPECTED_PRE_V629_CSV_SHA256, EXPECTED_PRE_V629_CSV_BLOB),
+            (EXPECTED_POST_V629_CSV_SHA256, EXPECTED_POST_V629_CSV_BLOB),
+        },
+        "C0 v5.6 current CSV is neither approved pre-v6.29 nor frozen post-v6.29 state",
+    )
 
     with CSV.open(newline="", encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
-    publication_rows = rewind_v616_backend(rows, "STM32C0")
+    v629_state = backend_state_v629(rows, "STM32C0")
+    publication_rows = rewind_v629_backend(rows, "STM32C0")
+    publication_rows = rewind_v616_backend(publication_rows, "STM32C0")
     require(len(rows) == 226, "C0 v5.6 row count drift")
     by = {r["icpn"]: r for r in publication_rows}
     require(len(by) == 226, "C0 v5.6 duplicate exact identity")
@@ -67,13 +79,21 @@ def main() -> int:
     c0 = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"
           and s.get("family") == "STM32C0"]
     require(len(c0) == 1, "C0 v5.6 manifest source missing/duplicated")
+    expected_current_blob = (
+        EXPECTED_PRE_V629_CSV_BLOB if v629_state == "pre"
+        else EXPECTED_POST_V629_CSV_BLOB
+    )
+    expected_current_sha = (
+        EXPECTED_PRE_V629_CSV_SHA256 if v629_state == "pre"
+        else EXPECTED_POST_V629_CSV_SHA256
+    )
     require(c0[0] == {
         "manufacturer": "STMicroelectronics",
         "family": "STM32C0",
         "path": "../research/stm32c0-commercial-icpn.csv",
         "row_count": 226,
-        "git_blob_sha": EXPECTED_CSV_BLOB,
-        "sha256": EXPECTED_CSV_SHA256,
+        "git_blob_sha": expected_current_blob,
+        "sha256": expected_current_sha,
     }, "C0 v5.6 manifest binding drift")
 
     proposal = json.loads(PROPOSAL.read_text(encoding="utf-8"))
@@ -109,6 +129,7 @@ def main() -> int:
         require(claims[key] is False, f"C0 v5.6 overclaim: {key}")
 
     print("STM32C0_LAYER1_PRODUCTION_PUBLICATION_V56_PASS")
+    print("C0_BACKEND_EVOLUTION_STATE", v629_state)
     print("C0_ROWS 226")
     print("PRODUCTION_TOTAL 4606")
     print("WHOLE_ST_ACTIVE 4527/4550")
