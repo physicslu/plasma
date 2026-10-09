@@ -201,7 +201,10 @@ def build():
         })
         expansion_counts[fam]+=1
 
-    req(\n        {fam: direct_counts[fam] for fam in sorted(EXPECTED_DIRECT)} == EXPECTED_DIRECT,\n        f"direct route counts drift: {dict(direct_counts)}",\n    )
+    req(
+        {fam: direct_counts[fam] for fam in sorted(EXPECTED_DIRECT)} == EXPECTED_DIRECT,
+        f"direct route counts drift: {dict(direct_counts)}",
+    )
     req(dict(expansion_counts)=={"STM32F3":1,"STM32G4":1},f"expansion counts drift: {dict(expansion_counts)}")
     req(dict(sorted(blocked_counts.items()))=={
         "STM32C5":172,"STM32H5":190,"STM32N6":32,"STM32WB0":24,"STM32WL3":47,
