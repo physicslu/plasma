@@ -1,0 +1,30 @@
+name: OpenOCD C0 canonical write v6.27
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/openocd-c0-bounded-route-inventory-v6.25.csv'
+      - 'data/device-catalog/research/openocd-c0-canonical-route-write-v6.27.json'
+      - 'data/device-catalog/research/validate_openocd_c0_canonical_write_v627.py'
+      - 'data/device-catalog/research/test_validate_openocd_c0_canonical_write_v627.py'
+      - 'data/device-catalog/research/OPENOCD_C0_CANONICAL_WRITE_V627.md'
+      - '.github/workflows/device-catalog-openocd-c0-canonical-v627.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate exact canonical write transaction
+        run: |
+          python data/device-catalog/research/validate_openocd_c0_canonical_write_v627.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_openocd_c0_canonical_write_v627.py -v
