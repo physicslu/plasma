@@ -9,7 +9,7 @@ from pathlib import Path
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
-CATALOG=HERE/"openocd-parts-canonical.csv"
+LEGACY=HERE/"openocd-parts-canonical.csv"\nSUCCESSOR=HERE/"openocd-parts-canonical-v627.csv"
 DELTA=HERE/"openocd-c0-bounded-route-inventory-v6.25.csv"
 RECEIPT=HERE/"openocd-c0-canonical-route-write-v6.27.json"
 MANIFEST=ROOT/"data/device-catalog/production/icpn-v1-manifest.json"
@@ -63,7 +63,7 @@ def validate()->dict:
 
     cat=parse(cat_raw)
     delta=parse(delta_raw)
-    req(len(cat)==scope["postimage_rows"]==7661,"postimage row-count drift")
+    req(len(parse(legacy_raw))==scope["legacy_rows"]==7657,"legacy row-count drift")\n    req(len(cat)==scope["successor_rows"]==7661,"successor row-count drift")
     req(len(delta)==scope["delta_rows"]==4,"delta row-count drift")
 
     delta_keys={(r["vendor"],r["part_number"].upper()) for r in delta}
@@ -104,9 +104,9 @@ def validate()->dict:
 
     summary={
         "transaction_id":receipt["transaction_id"],
-        "canonical_postimage_git_blob_sha":git_blob_sha(cat_raw),
+        "legacy_snapshot_git_blob_sha":git_blob_sha(legacy_raw),\n        "canonical_postimage_git_blob_sha":git_blob_sha(cat_raw),
         "canonical_postimage_sha256":hashlib.sha256(cat_raw).hexdigest(),
-        "canonical_rows":len(cat),
+        "legacy_rows":len(parse(legacy_raw)),\n        "canonical_rows":len(cat),
         "delta_rows":len(delta),
         "delta_sha256":hashlib.sha256(delta_raw).hexdigest(),
         "inverse_preimage_git_blob_sha":git_blob_sha(inverse_raw),
