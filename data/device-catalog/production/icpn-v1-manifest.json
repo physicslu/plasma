@@ -106,8 +106,8 @@
       "family": "STM32L4",
       "path": "../research/stm32l4-commercial-icpn.csv",
       "row_count": 449,
-      "git_blob_sha": "081aeaa80ed558785ba062255cd322fdfa505ff4",
-      "sha256": "d6275027b8dae3d53a78963c1d03643ffea25fb2190515e7c5fbc6f7f4d11f89"
+      "git_blob_sha": "b72cbbbd7dae14d3073272f1b019b51d78d092f8",
+      "sha256": "e8d1611d7d8a2dad6710cd9ed4b8944f4ce7454efd0c0d0d43526a7bed2a268a"
     },
     {
       "manufacturer": "STMicroelectronics",
