@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-c0-production-backend-dry-run-v6.28",
+  "record_state": "DRY_RUN_FROZEN_NOT_WRITE_AUTHORIZED",
+  "scope": {
+    "family": "STM32C0",
+    "exact_icpn_count": 5,
+    "exact_icpns": [
+      "STM32C011D6Y6TR",
+      "STM32C051D8Y6TR",
+      "STM32C091ECY6TR",
+      "STM32C092ECY3TR",
+      "STM32C092ECY6TR"
+    ],
+    "exact_set_sha256": "c4bbc25d50dfbb77101d8247a00e4730f8ac22e4ee05729245412808ece1a716",
+    "binding_sha256": "dffa61c93a357b6ce65ca83f3789eec162d0937e56fc0f798b81fb38f1ada90e"
+  },
+  "bindings": {
+    "STM32C011D6Y6TR": {
+      "existing_identifier": "STM32C011D6Yx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32c0x.cfg"
+    },
+    "STM32C051D8Y6TR": {
+      "existing_identifier": "STM32C051D8Yx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32c0x.cfg"
+    },
+    "STM32C091ECY6TR": {
+      "existing_identifier": "STM32C091ECYx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32c0x.cfg"
+    },
+    "STM32C092ECY3TR": {
+      "existing_identifier": "STM32C092ECYx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32c0x.cfg"
+    },
+    "STM32C092ECY6TR": {
+      "existing_identifier": "STM32C092ECYx",
+      "existing_identifier_kind": "ordering_pattern",
+      "openocd_target_config": "tcl/target/stm32c0x.cfg"
+    }
+  },
+  "route_inventory": {
+    "path": "data/device-catalog/research/openocd-parts-canonical-v627.csv",
+    "git_blob_sha": "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+    "sha256": "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+    "row_count": 7661,
+    "source_transaction": "openocd-c0-canonical-route-inventory-write-v6.27"
+  },
+  "route_delta": {
+    "path": "data/device-catalog/research/openocd-c0-bounded-route-inventory-v6.25.csv",
+    "sha256": "5d6f2b022a0efab409f57dece8cfcb06dace9cbf93c4a533beef9b4ecbf84b24",
+    "row_count": 4
+  },
+  "production_preimage": {
+    "c0_path": "data/device-catalog/research/stm32c0-commercial-icpn.csv",
+    "c0_git_blob_sha": "c015e131082a3f9fe32ca226a9b2ada71a5c350d",
+    "c0_sha256": "8ab34090f2cb8fa033e8e50190a61ac3688f1cfc27aa2f7b1dd9c7c6b6474e8c",
+    "c0_row_count": 226,
+    "manifest_path": "data/device-catalog/production/icpn-v1-manifest.json",
+    "manifest_git_blob_sha": "f3c65c166e49b107d0bd25050062f8084aeeda30",
+    "manifest_sha256": "6bd23d2bf0b31fe0302e23add861abcf92f8500755c0649ee8adc335608c3d70",
+    "production_exact_total": 4629,
+    "production_source_count": 28,
+    "mapped": 4054,
+    "no_mapping": 575,
+    "active_openocd_route": 3975,
+    "active_openocd_route_denominator": 4550
+  },
+  "projected_poststate": {
+    "production_exact_total": 4629,
+    "production_source_count": 28,
+    "mapped": 4059,
+    "no_mapping": 570,
+    "active_openocd_route": 3980,
+    "active_openocd_route_denominator": 4550,
+    "active_openocd_route_coverage_percent": 87.4725
+  },
+  "frozen_postimages": {
+    "lock_state": "FROZEN",
+    "c0_git_blob_sha": "ea59d063349da59c433315d571a558ea166f7dd0",
+    "c0_sha256": "0a54584b8873df1199268f1edb9069e9ed70a23ed08fa71cda2aeba559087b6e",
+    "c0_byte_count": 85097,
+    "manifest_git_blob_sha": "e5f13e0cb00273219e4d2496a616013868ed804a",
+    "manifest_sha256": "0a435204ac17db6f117d4adc80e7f62492025d60531305e70a3184be7a7d8308",
+    "manifest_byte_count": 9021
+  },
+  "governance": {
+    "production_write_authorized": false,
+    "requires_explicit_owner_approval": true,
+    "backend_fields_only": true,
+    "identity_fields_immutable": true,
+    "manifest_integrity_updates_only": true,
+    "rollback_preimages_frozen": true,
+    "route_inventory_successor_explicit": true,
+    "exact_set_only": true,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  },
+  "discovery_evidence": {
+    "workflow_run_id": 37923235487,
+    "artifact_id": 11612772835,
+    "artifact_zip_sha256": "fa4123d7935fd2c88edfa88c63b0a1c88e7cfd59f9c1fd324642fd6064a58bc1"
+  }
+}
