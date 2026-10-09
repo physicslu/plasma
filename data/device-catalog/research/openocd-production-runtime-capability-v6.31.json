@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "evidence_id": "openocd-production-runtime-capability-v6.31",
+  "runtime": {
+    "distribution": "upstream-openocd",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "source": "openocd-org/openocd"
+  },
+  "target_configs": {
+    "STM32F3": {
+      "path": "tcl/target/stm32f3x.cfg",
+      "present": true,
+      "git_blob_sha": "4ecc7eda3cd1c6fa0caae1000fb7bad884acf602",
+      "flash_bank_present": true
+    },
+    "STM32F7": {
+      "path": "tcl/target/stm32f7x.cfg",
+      "present": true,
+      "git_blob_sha": "3782b9a9cce5dcc4fb778b5cc52a9bccd7291037",
+      "flash_bank_present": true
+    },
+    "STM32G4": {
+      "path": "tcl/target/stm32g4x.cfg",
+      "present": true,
+      "git_blob_sha": "39ed1e38186864d12c933cc7297775b80b9c67df",
+      "flash_bank_present": true
+    },
+    "STM32WLX": {
+      "path": "tcl/target/stm32wlx.cfg",
+      "present": true,
+      "git_blob_sha": "39c897fc5d2cf80828637901eef1bf1589bba36a",
+      "flash_bank_present": true
+    },
+    "STM32C5": {
+      "path": "tcl/target/stm32c5x.cfg",
+      "present": false
+    },
+    "STM32H5": {
+      "path": "tcl/target/stm32h5x.cfg",
+      "present": false
+    },
+    "STM32N6": {
+      "path": "tcl/target/stm32n6x.cfg",
+      "present": false
+    },
+    "STM32WB0": {
+      "path": "tcl/target/stm32wb0x.cfg",
+      "present": false
+    },
+    "STM32WL3": {
+      "path": "tcl/target/stm32wl3x.cfg",
+      "present": false
+    }
+  },
+  "observations": {
+    "ST_fork": {
+      "repository": "STMicroelectronics/OpenOCD",
+      "branch": "openocd-cubeide-r7",
+      "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+      "STM32C5": {
+        "path": "tcl/target/stm32c5x.cfg",
+        "present": true,
+        "git_blob_sha": "03bce02b166b669ca0d7515656bca68ff4db8b84",
+        "production_runtime_packaged": false
+      },
+      "STM32H5": {
+        "path": "tcl/target/stm32h5x.cfg",
+        "present": true,
+        "git_blob_sha": "b9e67c604f7d824fefca03b42d0b112e1785235a",
+        "production_runtime_packaged": false
+      }
+    },
+    "newer_upstream": {
+      "repository": "openocd-org/openocd",
+      "observed_commit": "8da0578d7bce3e134821ccf10911182788debc32",
+      "STM32N6": {
+        "path": "tcl/target/stm32n6x.cfg",
+        "present": true,
+        "git_blob_sha": "668182fbf9a0a91e50851dbe998a85ae94a72d0b",
+        "flash_bank_present": false,
+        "production_runtime_packaged": false
+      }
+    }
+  },
+  "governance": {
+    "production_runtime_is_authority_for_backend_admissibility": true,
+    "alternate_distribution_presence_does_not_authorize_mapping": true,
+    "newer_unpinned_upstream_presence_does_not_authorize_mapping": true,
+    "production_write_authorized": false
+  }
+}
