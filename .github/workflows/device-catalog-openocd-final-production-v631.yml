@@ -1,0 +1,39 @@
+name: OpenOCD final Production dry-run v6.31
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-final-production-dry-run-v6.31.json'
+      - 'data/device-catalog/research/openocd-final-safe-bindings-v6.31.csv'
+      - 'data/device-catalog/research/openocd-final-runtime-blocked-v6.31.csv'
+      - 'data/device-catalog/research/prepare_openocd_final_production_v631.py'
+      - 'data/device-catalog/research/test_prepare_openocd_final_production_v631.py'
+      - '.github/workflows/device-catalog-openocd-final-production-v631.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build exact frozen-candidate Production postimages
+        run: |
+          python data/device-catalog/research/prepare_openocd_final_production_v631.py \
+            --summary /tmp/openocd-final-production-v631.json \
+            --package-dir /tmp/openocd-final-production-v631
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_openocd_final_production_v631.py -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-final-production-v631
+          path: |
+            /tmp/openocd-final-production-v631.json
+            /tmp/openocd-final-production-v631/
+          if-no-files-found: error
+          retention-days: 30
