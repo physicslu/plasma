@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-final-production-dry-run-v6.31",
+  "record_state": "DISCOVERY_PREWRITE_NOT_AUTHORIZED",
+  "source_closure": {
+    "audit_id": "openocd-final-coverage-closure-v6.31",
+    "workflow_run_id": 37968933886,
+    "artifact_id": 11634189399,
+    "artifact_zip_sha256": "f8f257c00790738a0c2cd48ca23592ba314952ac4bf74423c342df8a13f3f653",
+    "gap_exact_count": 568,
+    "gap_exact_set_sha256": "d9e8ab76062efdf17890d58200bfbf4fa1c4bba8524c4ba0a86cedd9978c205e",
+    "safe_exact_count": 103,
+    "safe_exact_set_sha256": "fb6de43b35e386c68cb9d903f57758f928006e733bf8feb7f036fb69c105aec8",
+    "blocked_exact_count": 465,
+    "blocked_exact_set_sha256": "30ba814e84e5a2c1a70f46d9b90321177c8ecdcd0d96e3150c798b1a671742b0",
+    "classification_csv_sha256": "d810049243e395369f60c731065b172bcb92cd1561e37abcb90f1d203ec2bac8",
+    "route_delta_csv_sha256": "e00b6bae2e3751c25933978f09d0603ffb8e3890c60362af36e052b3c512b68b",
+    "route_successor_csv_sha256": "6f11d74a7172f05fe81df5bdebfe55e32a5752663ad506d03d33925d94c4fd69"
+  },
+  "evidence_files": {
+    "safe_bindings": {
+      "path": "data/device-catalog/research/openocd-final-safe-bindings-v6.31.csv",
+      "git_blob_sha": "7645fc28e362d2c4329db3d4e96e3ba2a20a3fa9",
+      "exact_count": 103,
+      "sha256": null
+    },
+    "runtime_blocked": {
+      "path": "data/device-catalog/research/openocd-final-runtime-blocked-v6.31.csv",
+      "git_blob_sha": "b2d23837cee90eface07ea1c3e1524da75430bbf",
+      "exact_count": 465,
+      "sha256": null
+    }
+  },
+  "production_preimages": {
+    "STM32F3": {
+      "path": "data/device-catalog/research/stm32f3-commercial-icpn.csv",
+      "git_blob_sha": "42e3cab58f7863e1cf44502cb15c5d85086e2a0e",
+      "sha256": "0c48633a81ff6eb8785d5e730ee06f6f596a30f2264b4fea374d8df62b3f1573",
+      "row_count": 192
+    },
+    "STM32F7": {
+      "path": "data/device-catalog/research/stm32f7-commercial-icpn.csv",
+      "git_blob_sha": "b2367ac8b8120f86ef4da33966f08c9e80955305",
+      "sha256": "cb23c11bcdb166ad7bb083d98ec0e19a2117a8d923bf23382a19747f7bf60538",
+      "row_count": 173
+    },
+    "STM32G4": {
+      "path": "data/device-catalog/research/stm32g4-commercial-icpn.csv",
+      "git_blob_sha": "83a7e6f20256ca10e6fb1c3452bca8c5b9e39f56",
+      "sha256": "e1d2b369e02560d52d56a91c230eef2cc65b93394a2cfdb41915d5b5407cb2fd",
+      "row_count": 273
+    },
+    "MANIFEST": {
+      "path": "data/device-catalog/production/icpn-v1-manifest.json",
+      "git_blob_sha": "e3455db5d4098d3d0906fab1c36831de56161bdd",
+      "sha256": "a864d22e39f3f0beb72d747a3e7404c672bd29267a3a21717db4d0a215d19a94",
+      "source_count": 28,
+      "exact_total": 4629
+    },
+    "ROUTE_INVENTORY": {
+      "path": "data/device-catalog/research/openocd-parts-canonical-v627.csv",
+      "git_blob_sha": "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+      "sha256": "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+      "row_count": 7661
+    }
+  },
+  "scope": {
+    "exact_count": 103,
+    "family_counts": {
+      "STM32F3": 10,
+      "STM32F7": 92,
+      "STM32G4": 1
+    },
+    "backend_fields": [
+      "cmsis_device_name",
+      "existing_identifier",
+      "existing_identifier_kind",
+      "mapping_status",
+      "openocd_target_config"
+    ],
+    "route_delta_patterns": [
+      "STM32F378VCHx",
+      "STM32G491RCYx"
+    ],
+    "route_delta_count": 2
+  },
+  "projected_poststate": {
+    "exact_total": 4629,
+    "source_count": 28,
+    "mapped": 4164,
+    "no_mapping": 465,
+    "active_openocd_route": 4085,
+    "active_denominator": 4550,
+    "coverage_percent": 89.7802
+  },
+  "frozen_postimages": {
+    "lock_state": "DISCOVERY_PENDING",
+    "STM32F3": null,
+    "STM32F7": null,
+    "STM32G4": null,
+    "MANIFEST": null,
+    "ROUTE_INVENTORY": null
+  },
+  "approval": {
+    "owner_approval_received": false,
+    "route_inventory_write_authorized": false,
+    "production_write_authorized": false,
+    "merge_after_green_ci_authorized": false
+  },
+  "claims": {
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "electrical_readiness_claimed": false,
+    "hil_verified_claimed": false
+  }
+}
