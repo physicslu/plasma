@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/openocd-c0-production-backend-write-v6.29.json'
       - 'data/device-catalog/research/openocd_backend_evolution_v629.py'
       - 'data/device-catalog/research/validate_openocd_c0_production_write_v629.py'
