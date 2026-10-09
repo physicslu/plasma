@@ -8,7 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from openocd_backend_evolution_v616 import rewind_v616_backend\nfrom openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
+from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -288,7 +289,8 @@ def main() -> int:
         and audit["coverage_effect"]["whole_st_active_identity_coverage_after_percent"] == 91.4945,
         "coverage effect audit drift")
 
-    print("STM32F7_LAYER1_PRODUCTION_PUBLICATION_V37_PASS")\n    print("F7_BACKEND_EVOLUTION_V631_STATE", v631_state)
+    print("STM32F7_LAYER1_PRODUCTION_PUBLICATION_V37_PASS")
+    print("F7_BACKEND_EVOLUTION_V631_STATE", v631_state)
     print(f"STM32F7=173; mapped=19; no_mapping=154; current_Production={current_total}; current_sources={len(sources)}")
     print("Production backend partition=3673 mapped / 569 no_mapping")
     print("Whole-ST Active identity coverage=4163/4550=91.4945%")
