@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "transaction_id": "openocd-tier-a-tail-write-v6.30",
-  "record_state": "WRITE_READY_PREWRITE_AWAITING_OWNER_APPROVAL",
+  "record_state": "PRODUCTION_WRITE_APPLIED_ON_BRANCH_NOT_MERGED",
   "l4": {
     "exact_icpns": [
       "STM32L496WGY6PST",
@@ -80,9 +80,10 @@
     "manifest_byte_count": 9021
   },
   "approval": {
-    "owner_approval_received": false,
-    "l4_production_write_authorized": false,
-    "merge_after_green_ci_authorized": false
+    "owner_approval_received": true,
+    "l4_production_write_authorized": true,
+    "merge_after_green_ci_authorized": true,
+    "authorization_scope": "exact_v6.30_frozen_l4_and_manifest_postimages_plus_deterministic_receipt_tests_and_current_metric_update"
   },
   "claims": {
     "generic_nonterminal_x_rule_authorized": false,
@@ -99,7 +100,7 @@
     "artifact_zip_sha256": "aa9e27c522c8c11a2ed895b1cdc4836b8b52483920232864408d6112ec9153a0"
   },
   "write_state": {
-    "production_write_applied": false,
-    "applied_commit": null
+    "production_write_applied": true,
+    "applied_commit": "e2d7809ed7c3f22354a9d62f28b4d5a57a4ed6df"
   }
 }
