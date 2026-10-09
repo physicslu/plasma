@@ -34,7 +34,7 @@ The common target config is not treated as permission to invent a package substi
 
 ## Boundary
 
-This PR is write-ready in prewrite mode. It freezes exact L4 before/after Production images, preserves historical v6.2 replay through an exact backend rewind helper, and records the G4 block. Production is not changed until explicit owner approval.
+Owner approval was received. The exact frozen L4 and manifest Production postimages have been applied on the PR branch. Historical v6.2 replay remains protected through the exact backend rewind helper, and G4 remains blocked. Production is not changed until explicit owner approval.
 
 No Programming Profile, erase/program/verify, Engineering Verified, or HIL claim is made.
 
@@ -44,3 +44,7 @@ No Programming Profile, erase/program/verify, Engineering Verified, or HIL claim
 - L4 SHA256: `e8d1611d7d8a2dad6710cd9ed4b8944f4ce7454efd0c0d0d43526a7bed2a268a`
 - Manifest Git blob: `e3455db5d4098d3d0906fab1c36831de56161bdd`
 - Manifest SHA256: `a864d22e39f3f0beb72d747a3e7404c672bd29267a3a21717db4d0a215d19a94`
+
+## Applied write
+
+The approved frozen L4 Production write was applied in commit `e2d7809ed7c3f22354a9d62f28b4d5a57a4ed6df`. Merge remains conditional on fully green postwrite CI and the final lease check.
