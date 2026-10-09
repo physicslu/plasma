@@ -144,26 +144,28 @@ def _prepare_target_scenario(container: str, site_count: int) -> None:
         raise DeployError(f"cannot reload QEMU target harness: {restarted.stderr.strip()}")
 
 
-def _registry_entry(manager: str, alias: str, endpoint: str) -> dict[str, Any]:
+def _maintenance_connection(manager: str, alias: str, endpoint: str) -> dict[str, Any]:
     status, payload = _json_request(f"{manager}/api/registry")
-    _expect(status, 200, payload, "registry read")
+    _expect(status, 200, payload, "maintenance connection registry read")
+    if payload.get("mutable") is not False or payload.get("storage") != "config":
+        raise DeployError(
+            "SWPC-local maintenance Manager must use a read-only config registry; "
+            "Programming Registration belongs to the production control plane"
+        )
     ppus = payload.get("ppus")
     if not isinstance(ppus, list):
-        raise DeployError("Manager registry response omitted ppus list")
-    matches = [item for item in ppus if isinstance(item, dict) and item.get("alias") == alias]
-    if not matches:
-        status, created = _json_request(
-            f"{manager}/api/registry",
-            method="POST",
-            body={"alias": alias, "endpoint": endpoint},
+        raise DeployError("maintenance Manager registry response omitted ppus list")
+    matches = [
+        item
+        for item in ppus
+        if isinstance(item, dict)
+        and item.get("alias") == alias
+        and item.get("endpoint") == endpoint
+    ]
+    if len(matches) != 1 or len(ppus) != 1:
+        raise DeployError(
+            "z2like-demo maintenance connection does not match the canonical QEMU endpoint"
         )
-        _expect(status, 201, created, "registry add")
-        entry = created.get("entry")
-        if not isinstance(entry, dict):
-            raise DeployError("registry add omitted entry")
-        return entry
-    if len(matches) != 1 or matches[0].get("endpoint") != endpoint:
-        raise DeployError("z2like-demo Manager registry alias does not match the canonical QEMU endpoint")
     return matches[0]
 
 
@@ -319,12 +321,9 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     manager = args.manager.rstrip("/")
     _wait_json(f"{manager}/api/health/live", lambda payload: payload.get("ok") is True, timeout_s=30.0)
     endpoint = f"http://{args.ppu_ip}:18080"
-    entry = _registry_entry(manager, args.alias, endpoint)
-    lifecycle_before = entry.get("lifecycle")
-    if lifecycle_before not in {"pending", "commissioned", "disabled"}:
-        raise DeployError(f"unsupported programming Registration lifecycle: {lifecycle_before!r}")
+    _maintenance_connection(manager, args.alias, endpoint)
 
-    # Platform deployment must not mutate programming Registration. Capture a
+    # Platform deployment has no local Programming Registration authority. Capture a
     # pre-restart fleet generation only as a stale-observation boundary; whether
     # idle proof is required is decided from the actual Runtime state below.
     baseline_generation = _read_fleet_generation(manager)
@@ -469,16 +468,9 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
     _expect(targets_status, 200, targets, "QEMU Programming catalog")
     _verify_programming_catalog(targets, site_count=args.site_count, ppu_id=args.ppu_id)
 
-    # Platform maintenance must preserve programming Registration exactly as it
-    # was. Commissioning/disable belongs to the Registration workflow, not this
-    # Runtime deployment workflow.
-    entry_after = _registry_entry(manager, args.alias, endpoint)
-    lifecycle_after = entry_after.get("lifecycle")
-    if lifecycle_after != lifecycle_before:
-        raise DeployError(
-            f"Platform deployment changed programming Registration lifecycle: "
-            f"{lifecycle_before!r} -> {lifecycle_after!r}"
-        )
+    # Re-prove that the maintenance connection is still read-only after deploy.
+    # Programming Registration is owned only by the production control plane.
+    _maintenance_connection(manager, args.alias, endpoint)
 
     return {
         "result": "PASS",
@@ -487,8 +479,8 @@ def deploy(args: argparse.Namespace) -> dict[str, Any]:
         "manager_role": "SWPC-local maintenance/bootstrap only",
         "manager_origin": manager,
         "alias": args.alias,
-        "lifecycle_before": lifecycle_before,
-        "lifecycle_after": lifecycle_after,
+        "maintenance_registry_storage": "config-read-only",
+        "programming_registration_owner": "public-production-control-plane",
         "runtime_state_before": runtime_state_before,
         "runtime_state_after": "runtime_active",
         "deployment_state": "succeeded",

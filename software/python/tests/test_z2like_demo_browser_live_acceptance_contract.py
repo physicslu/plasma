@@ -16,16 +16,22 @@ def test_live_gate_is_post_merge_swpc_only() -> None:
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in workflow
     assert "persist-credentials: false" in workflow
-    assert "cancel-in-progress: false" in workflow
+    assert "group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}" in workflow
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
     assert "--expected-commit \"$GITHUB_SHA\"" in workflow
 
 
-def test_live_gate_requires_operator_converged_ingress_without_root_mutation() -> None:
+def test_live_gate_reconciles_user_owned_maintenance_manager_without_root_ingress_mutation() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "Reconcile canonical SWPC managed ingress" not in workflow
     assert "sudo -n" not in workflow
     assert "scripts/plasmactl-z2like-demo-managed-ingress install" not in workflow
-    assert "- name: Preflight canonical SWPC/QEMU target" in workflow
+    reconcile = workflow.index("Reconcile exact-commit QEMU control plane")
+    maintenance = workflow.index("Reconcile exact-commit SWPC-local maintenance Manager")
+    preflight = workflow.index("Preflight canonical SWPC/QEMU target")
+    assert reconcile < maintenance < preflight
+    assert "scripts/z2like-demo-qemu.py" in workflow
+    assert "configure-control-station" in workflow
     assert "http://127.0.0.1:18082/__plasma/bootstrap/v1/status" in workflow
     assert "Run ./scripts/plasmactl update z2like-demo as an operator before rerunning this gate." in workflow
 
@@ -75,8 +81,14 @@ def test_live_gate_covers_public_and_local_bootstrap_boundaries() -> None:
     assert "https://z2like-demo.open4th.com" in source
     assert "https://ppu-managed-lab.open4th.com" in source
     assert "http://127.0.0.1:18082" in source
+    assert "http://127.0.0.1:18380" in source
+    assert "http://172.30.77.2:18080" in source
     assert "/__plasma/bootstrap/v1/not-allowlisted" in source
     assert "wrong Browser Bootstrap method" in source
     assert "/api/manager/ppu/api/engineering/targets" in source
+    assert "payload.get(\"storage\") != \"config\"" in source
+    assert "payload.get(\"mutable\") is not False" in source
+    assert '"maintenance_registry": maintenance_registry' in source
+    assert '"programming_registration_owner": "public-production-control-plane"' in source
     assert "EXPECTED_SITE_COUNT = 8" in source
     assert "172.30.77.2:18081" not in source

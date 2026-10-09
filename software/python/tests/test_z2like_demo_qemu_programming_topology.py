@@ -147,8 +147,11 @@ def test_deployer_requires_new_generation_after_target_restart_for_existing_runt
     maintenance_gate = source.index('maintenance_requires_idle = runtime_state_before == "runtime_active"')
     idle_wait = source.index("trusted_generation = _wait_for_trusted_idle(")
     upload_create = source.index("created, trusted_generation = _create_upload_with_idle_retry(")
-    preserve_registration = source.index("lifecycle_after != lifecycle_before")
-    assert generation_baseline < reload_target < runtime_state < maintenance_gate < idle_wait < upload_create < preserve_registration
+    first_connection = source.index("_maintenance_connection(manager, args.alias, endpoint)")
+    reproved_connection = source.index("_maintenance_connection(manager, args.alias, endpoint)", first_connection + 1)
+    assert first_connection < generation_baseline < reload_target < runtime_state < maintenance_gate < idle_wait < upload_create < reproved_connection
+    assert "lifecycle_before" not in source
+    assert "lifecycle_after" not in source
     assert '_set_lifecycle(manager, args.alias, "disabled"' not in source
     assert '_set_lifecycle(manager, args.alias, "commissioned"' not in source
 
