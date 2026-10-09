@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-tier-a-tail-write-v6.30",
+  "record_state": "DISCOVERY_PREWRITE_NOT_AUTHORIZED",
+  "l4": {
+    "exact_icpns": [
+      "STM32L496WGY6PST",
+      "STM32L496WGY6PTR"
+    ],
+    "production_path": "data/device-catalog/research/stm32l4-commercial-icpn.csv",
+    "preimage_git_blob_sha": "081aeaa80ed558785ba062255cd322fdfa505ff4",
+    "preimage_sha256": "d6275027b8dae3d53a78963c1d03643ffea25fb2190515e7c5fbc6f7f4d11f89",
+    "row_count": 449,
+    "route_inventory_path": "data/device-catalog/research/openocd-parts-canonical-v627.csv",
+    "route_inventory_git_blob_sha": "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+    "route_inventory_sha256": "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+    "route_identifier": "STM32L496WGYxP",
+    "route_identifier_kind": "cmsis_device_name",
+    "mapping_status": "deterministic_cmsis_device_name",
+    "target_config": "tcl/target/stm32l4x.cfg",
+    "bounded_normalization": {
+      "STM32L496WGY6PTR": "remove terminal TR only => STM32L496WGY6P",
+      "STM32L496WGY6PST": "remove terminal ST only => STM32L496WGY6P"
+    },
+    "authority": {
+      "st_open_pin_pattern_blob_sha": "85c4f770886e119846e18917674a27841f25b8b9",
+      "l4_ordering_authority_blob_sha": "745dd3d36f41aa533b9e0e89ff8c4c91aee197da",
+      "datasheet_reference": "DS11585 Rev 20 p274"
+    }
+  },
+  "g4": {
+    "exact_icpn": "STM32G491RCY6TR",
+    "production_path": "data/device-catalog/research/stm32g4-commercial-icpn.csv",
+    "ordering_authority_blob_sha": "2799729162735e744f27a40c6eb36404c1070223",
+    "metadata_package_code": "Y",
+    "metadata_package": "WLCSP",
+    "same_base_inventory_candidates": [
+      {
+        "identifier": "STM32G491RCIx",
+        "package_semantics": "UFBGA",
+        "target_config": "tcl/target/stm32g4x.cfg"
+      },
+      {
+        "identifier": "STM32G491RCTx",
+        "package_semantics": "LQFP",
+        "target_config": "tcl/target/stm32g4x.cfg"
+      }
+    ],
+    "exact_package_route_present": false,
+    "production_write_authorized": false,
+    "blocking_reason": "no canonical STM32G491RCYx route identifier; same-target-config siblings do not authorize package substitution"
+  },
+  "manifest_preimage": {
+    "path": "data/device-catalog/production/icpn-v1-manifest.json",
+    "git_blob_sha": "e5f13e0cb00273219e4d2496a616013868ed804a",
+    "production_exact_total": 4629,
+    "production_source_count": 28,
+    "mapped": 4059,
+    "no_mapping": 570,
+    "active_openocd_route": 3980,
+    "active_openocd_route_denominator": 4550
+  },
+  "projected_poststate_if_l4_approved": {
+    "production_exact_total": 4629,
+    "production_source_count": 28,
+    "mapped": 4061,
+    "no_mapping": 568,
+    "active_openocd_route": 3982,
+    "active_openocd_route_denominator": 4550,
+    "active_openocd_route_coverage_percent": 87.5165,
+    "g4_remaining_blocked": 1
+  },
+  "frozen_postimages": {
+    "lock_state": "DISCOVERY_PENDING",
+    "l4_git_blob_sha": "b72cbbbd7dae14d3073272f1b019b51d78d092f8",
+    "l4_sha256": null,
+    "l4_byte_count": null,
+    "manifest_git_blob_sha": null,
+    "manifest_sha256": null,
+    "manifest_byte_count": null
+  },
+  "approval": {
+    "owner_approval_received": false,
+    "l4_production_write_authorized": false,
+    "merge_after_green_ci_authorized": false
+  },
+  "claims": {
+    "generic_nonterminal_x_rule_authorized": false,
+    "generic_l4_suffix_transform_authorized": false,
+    "generic_g4_package_substitution_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false
+  }
+}
