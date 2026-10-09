@@ -1,0 +1,33 @@
+name: OpenOCD Tier-A tail closure v6.30
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32l4-commercial-icpn.csv'
+      - 'data/device-catalog/research/openocd-tier-a-tail-write-v6.30.json'
+      - 'data/device-catalog/research/openocd_backend_evolution_v630.py'
+      - 'data/device-catalog/research/prepare_openocd_tier_a_tail_v630.py'
+      - 'data/device-catalog/research/validate_openocd_tier_a_tail_write_v630.py'
+      - 'data/device-catalog/research/test_prepare_openocd_tier_a_tail_v630.py'
+      - 'data/device-catalog/research/test_validate_openocd_tier_a_tail_write_v630.py'
+      - 'data/device-catalog/research/validate_st_final_layer1_publication_v62.py'
+      - 'data/device-catalog/research/OPENOCD_TIER_A_TAIL_V630.md'
+      - '.github/workflows/device-catalog-openocd-tier-a-tail-v630.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate v6.30 prewrite or exact postwrite state
+        run: |
+          python data/device-catalog/research/validate_openocd_tier_a_tail_write_v630.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_openocd_tier_a_tail_write_v630.py -v

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
 from openocd_backend_evolution_v621 import rewind_v621_backend
+from openocd_backend_evolution_v630 import rewind_v630_backend
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
@@ -83,7 +84,8 @@ def main()->int:
         rows,raw=rows_and_raw(spec["path"])
         req(len(rows)==spec["after"],f"{family}: current row-count drift")
         req(len({r["icpn"] for r in rows})==spec["after"],f"{family}: duplicate identity")
-        v616_current_rows=rewind_v621_backend(rows,family)
+        v630_current_rows=rewind_v630_backend(rows,family)
+        v616_current_rows=rewind_v621_backend(v630_current_rows,family)
         current_buf=io.StringIO(newline="")
         current_writer=csv.DictWriter(current_buf,fieldnames=list(v616_current_rows[0]),lineterminator="\n")
         current_writer.writeheader(); current_writer.writerows(v616_current_rows)
