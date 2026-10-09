@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "transaction_id": "openocd-c0-canonical-route-inventory-write-v6.27",
+  "record_state": "CANONICAL_SUCCESSOR_WRITTEN_ON_PR_BRANCH_NOT_MERGED",
+  "approved_scope": {
+    "legacy_snapshot_path": "data/device-catalog/research/openocd-parts-canonical.csv",
+    "legacy_snapshot_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "successor_path": "data/device-catalog/research/openocd-parts-canonical-v627.csv",
+    "successor_git_blob_sha": "81e44f6a6df902f3b206d06bfac38e37ec74630b",
+    "successor_sha256": "39bb6f17765b8c95fdf1cdfa9831ac1c71ef3edd08ae899fcf6f67eae4234751",
+    "source_delta_path": "data/device-catalog/research/openocd-c0-bounded-route-inventory-v6.25.csv",
+    "source_delta_sha256": "5d6f2b022a0efab409f57dece8cfcb06dace9cbf93c4a533beef9b4ecbf84b24",
+    "legacy_rows": 7657,
+    "delta_rows": 4,
+    "successor_rows": 7661,
+    "exact_icpn_count": 5
+  },
+  "transaction_commit": "36a428ae61a081c7028d9721d00e079ed5932c22",
+  "production_state_expected_unchanged": {
+    "mapped": 4054,
+    "no_mapping": 575,
+    "active_openocd_route_exact_count": 3975,
+    "active_openocd_route_denominator": 4550,
+    "active_openocd_route_coverage_percent": 87.3626
+  },
+  "next_gate": {
+    "production_mapping_write_authorized": false,
+    "production_mapping_candidate_exact_count": 5,
+    "production_route_inventory_source": "data/device-catalog/research/openocd-parts-canonical-v627.csv",
+    "owner_approval_required": true
+  },
+  "claims": {
+    "canonical_inventory_written_on_branch": false,
+    "production_mapping_write_authorized": false,
+    "programming_profile_binding_claimed": false,
+    "programming_verified_claimed": false,
+    "engineering_verified_claimed": false,
+    "hil_verified_claimed": false,
+    "canonical_successor_written_on_branch": true
+  },
+  "branch_history": {
+    "initial_legacy_path_attempt_commit": "36a428ae61a081c7028d9721d00e079ed5932c22",
+    "architecture_correction_commit": "7703204daed844b2bc44d6be398e8c2d54ec7bd5",
+    "net_legacy_snapshot_mutation": false
+  }
+}
