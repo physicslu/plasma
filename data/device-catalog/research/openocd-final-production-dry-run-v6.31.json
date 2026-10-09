@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "transaction_id": "openocd-final-production-dry-run-v6.31",
-  "record_state": "DISCOVERY_PREWRITE_NOT_AUTHORIZED",
+  "record_state": "WRITE_READY_PREWRITE_AWAITING_OWNER_APPROVAL",
   "source_closure": {
     "audit_id": "openocd-final-coverage-closure-v6.31",
     "workflow_run_id": 37968933886,
@@ -22,13 +22,13 @@
       "path": "data/device-catalog/research/openocd-final-safe-bindings-v6.31.csv",
       "git_blob_sha": "7645fc28e362d2c4329db3d4e96e3ba2a20a3fa9",
       "exact_count": 103,
-      "sha256": null
+      "sha256": "47dce542995d32ec5472b9bb46d632751aeb37835c21504f06e13f8a54c8917c"
     },
     "runtime_blocked": {
       "path": "data/device-catalog/research/openocd-final-runtime-blocked-v6.31.csv",
       "git_blob_sha": "b2d23837cee90eface07ea1c3e1524da75430bbf",
       "exact_count": 465,
-      "sha256": null
+      "sha256": "e9000343138938a00424b28c3f899b8fd35840affe18816cb4dbca13391982dd"
     }
   },
   "production_preimages": {
@@ -94,12 +94,32 @@
     "coverage_percent": 89.7802
   },
   "frozen_postimages": {
-    "lock_state": "DISCOVERY_PENDING",
-    "STM32F3": null,
-    "STM32F7": null,
-    "STM32G4": null,
-    "MANIFEST": null,
-    "ROUTE_INVENTORY": null
+    "lock_state": "FROZEN",
+    "STM32F3": {
+      "git_blob_sha": "df139546fe69293cef692b299ea15ce17217c01b",
+      "sha256": "64ec4c44758cdf5b7da61f6d14e83517aea1c9764dd1fec6ea2bbf818c1035bb",
+      "byte_count": 79447
+    },
+    "STM32F7": {
+      "git_blob_sha": "838b09f46e255506d71151fb4bac530a0bfe56b8",
+      "sha256": "3e8d2388d3cf60b8dbfe027fb6cf43bd71421566d40e95dbe3be8e940387f737",
+      "byte_count": 72725
+    },
+    "STM32G4": {
+      "git_blob_sha": "c5e4b8c9fadf511467160af609d3468b615e587c",
+      "sha256": "4844510cb8da4527da5296400c4a8a3c21c40cd6a0f74e06e2e8d978c4a133cb",
+      "byte_count": 115078
+    },
+    "MANIFEST": {
+      "git_blob_sha": "3f66a14212fbf82aa9faa16e9434892f649f736d",
+      "sha256": "78acfc300be2cf9fb5fd0a7b18b1bbce529f7ce7147f5ecb1d3fefea1084d4e1",
+      "byte_count": 9021
+    },
+    "ROUTE_INVENTORY": {
+      "git_blob_sha": "6783bcffd9fa82e03f1cebb76053b2485ab0428a",
+      "sha256": "6f11d74a7172f05fe81df5bdebfe55e32a5752663ad506d03d33925d94c4fd69",
+      "byte_count": 1583911
+    }
   },
   "approval": {
     "owner_approval_received": false,
@@ -113,5 +133,15 @@
     "engineering_verified_claimed": false,
     "electrical_readiness_claimed": false,
     "hil_verified_claimed": false
+  },
+  "dry_run_evidence": {
+    "workflow_run_id": 37969476852,
+    "artifact_id": 11634752091,
+    "artifact_zip_sha256": "d82df76ed9ad6753fa5723c7e3903974a9a76212fdc3ef2dd85c7d535e338b2c"
+  },
+  "write_state": {
+    "route_inventory_write_applied": false,
+    "production_write_applied": false,
+    "applied_commit": null
   }
 }
