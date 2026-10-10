@@ -314,7 +314,12 @@ class BackendCandidateRegistry:
         """Only use for displaying a previously Production-resolved exact identity."""
         if not row.production_admitted or row.mapping_status != "no_mapping":
             return None
-        return self._by_icpn.get(row.identifier)
+        candidate = self._by_icpn.get(row.identifier)
+        if (candidate is None or row.vendor != "STMicroelectronics"
+                or row.family != candidate["family"]
+                or row.catalog_revision_sha256 != self.catalog_revision_sha256):
+            return None
+        return candidate
 
 
 @lru_cache(maxsize=1)
