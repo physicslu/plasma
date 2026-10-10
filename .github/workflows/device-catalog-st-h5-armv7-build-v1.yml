@@ -1,0 +1,161 @@
+name: STM32H5 OpenOCD isolated ARMv7 build v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-h5-armv7-build-v1.yml'
+      - 'data/device-catalog/research/ST_H5_ARMV7_BUILD_V1.md'
+      - 'data/device-catalog/research/st-h5-armv7-build-v1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  armv7-build-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU for ARMv7
+        uses: docker/setup-qemu-action@v4
+        with:
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm
+
+      - name: Build, package and execute pinned ST fork on ARMv7 userspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/st-h5-openocd-armv7"
+          mkdir -p "$out"
+          docker run --rm \
+            --platform linux/arm/v7 \
+            --volume "$PWD:/repo:ro" \
+            --volume "$out:/out" \
+            arm32v7/ubuntu:22.04 \
+            bash -euxo pipefail -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential ca-certificates git autoconf automake libtool pkg-config python3 tcl
+              src=/tmp/openocd-src
+              mkdir -p "$src"
+              cd "$src"
+              git init
+              git remote add origin https://github.com/STMicroelectronics/OpenOCD.git
+              git fetch --depth 1 origin c8d973bdad9a6fddb51459eda109b3b95d23b57a
+              git checkout --detach FETCH_HEAD
+              test "$(git rev-parse HEAD)" = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
+              test "$(git hash-object tcl/target/stm32h5x.cfg)" = "b9e67c604f7d824fefca03b42d0b112e1785235a"
+              test "$(git hash-object src/flash/nor/stm32h5x.c)" = "b5f24a39da05e5235167ff91c110ed89c2e3f9c5"
+              test "$(git hash-object src/flash/nor/drivers.c)" = "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+              git submodule update --init --depth 1 jimtcl src/jtag/drivers/libjaylink
+              ./bootstrap
+              runtime_id=0.12.0-c8d973bdad9a
+              prefix="/opt/plasma/programming-engines/openocd/$runtime_id"
+              ./configure \
+                --prefix="$prefix" \
+                --disable-werror \
+                --disable-doxygen-html \
+                --enable-dummy \
+                --enable-remote-bitbang \
+                --disable-jlink
+              make -j2
+              make install
+              strip --strip-unneeded "$prefix/bin/openocd"
+              "$prefix/bin/openocd" --version
+              test -f "$prefix/share/openocd/scripts/target/stm32h5x.cfg"
+              "$prefix/bin/openocd" \
+                -s "$prefix/share/openocd/scripts" \
+                -c "adapter driver dummy" \
+                -c "transport select jtag" \
+                -f target/stm32h5x.cfg \
+                -c shutdown
+              python3 /repo/scripts/openocd-runtime.py build \
+                --prefix "$prefix" \
+                --output-dir /out \
+                --version 0.12.0 \
+                --source-commit c8d973bdad9a6fddb51459eda109b3b95d23b57a \
+                --architecture armv7l
+            '
+          artifact="$out/plasma-openocd-0.12.0-c8d973bdad9a-linux-armv7l.tar.gz"
+          test -f "$artifact"
+          test -f "$artifact.sha256"
+          python scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256" > "$RUNNER_TEMP/h5-armv7-verify.json"
+
+      - name: Install and execute packaged artifact on fresh ARMv7 userspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/st-h5-openocd-armv7"
+          docker run --rm \
+            --platform linux/arm/v7 \
+            --volume "$PWD:/repo:ro" \
+            --volume "$out:/artifacts:ro" \
+            arm32v7/ubuntu:22.04 \
+            bash -euxo pipefail -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends python3 tcl ca-certificates
+              artifact=/artifacts/plasma-openocd-0.12.0-c8d973bdad9a-linux-armv7l.tar.gz
+              python3 /repo/scripts/openocd-runtime.py install "$artifact" --sidecar "$artifact.sha256"
+              manifest=/opt/plasma/install/openocd-runtime.json
+              python3 - "$manifest" <<'"'"'PY'"'"'
+import json,sys
+p=json.load(open(sys.argv[1], encoding="utf-8"))
+assert p["architecture"] == "armv7l"
+assert p["source_commit"] == "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
+assert p["hardware_runtime_ready"] is False
+print(p["install_root"])
+PY
+              root=$(python3 -c '"'"'import json; print(json.load(open("/opt/plasma/install/openocd-runtime.json"))["install_root"])'"'"')
+              "$root/bin/openocd" --version
+              "$root/bin/openocd" \
+                -s "$root/share/openocd/scripts" \
+                -c "adapter driver dummy" \
+                -c "transport select jtag" \
+                -f target/stm32h5x.cfg \
+                -c shutdown
+            '
+
+      - name: Retain evidence only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+import hashlib,json,os
+from pathlib import Path
+root=Path(os.environ["RUNNER_TEMP"])
+verified=json.loads((root/"h5-armv7-verify.json").read_text())
+artifact=root/"st-h5-openocd-armv7"/"plasma-openocd-0.12.0-c8d973bdad9a-linux-armv7l.tar.gz"
+record={
+  "schema_version":1,
+  "status":"ARMV7_BUILD_ONLY",
+  "source_commit":"c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+  "runtime_id":verified["runtime_id"],
+  "architecture":verified["architecture"],
+  "artifact_sha256":verified["archive_sha256"],
+  "payload_sha256":verified["payload_sha256"],
+  "armv7_packaged_runtime_executed":True,
+  "offline_jtag_dummy_parse_pass":True,
+  "fpga_swd_adapter_qualified":False,
+  "ppu_deployed":False,
+  "real_h5_probe_verified":False,
+  "erase_program_verify_qualified":False,
+  "programming_profile_verified":False,
+  "electrical_profile_verified":False,
+  "hardware_runtime_ready":False,
+  "production_write_authorized":False,
+  "binary_uploaded_or_distributed":False
+}
+(root/"h5-armv7-build-v1-result.json").write_text(json.dumps(record,indent=2,sort_keys=True)+"\n")
+print(json.dumps(record,indent=2,sort_keys=True))
+PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: st-h5-openocd-armv7-build-v1-evidence-only
+          path: ${{ runner.temp }}/h5-armv7-build-v1-result.json
+          if-no-files-found: error
+          retention-days: 14
