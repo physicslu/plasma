@@ -1,0 +1,78 @@
+name: Production ICPN OpenOCD source provenance audit v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-backend-provenance-v1.yml'
+      - 'software/python/plasma_web/backend_provenance.py'
+      - 'software/python/tests/test_icpn_backend_provenance_v1.py'
+      - 'scripts/device-catalog-backend-provenance.py'
+      - 'release/openocd.json'
+      - 'data/device-catalog/production/**'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'data/device-catalog/research/ICPN_BACKEND_PROVENANCE_V1.md'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-backend-provenance-v1.yml'
+      - 'software/python/plasma_web/backend_provenance.py'
+      - 'software/python/tests/test_icpn_backend_provenance_v1.py'
+      - 'scripts/device-catalog-backend-provenance.py'
+      - 'release/openocd.json'
+      - 'data/device-catalog/production/**'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'data/device-catalog/research/ICPN_BACKEND_PROVENANCE_V1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-icpn-provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate current immutable Production Catalog
+        run: python3 scripts/ci/device-catalog-production-invariants.py
+      - name: Verify provenance attribution, negative tests and content hashes
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s software/python/tests -p 'test_icpn_backend_provenance_v1.py' -v
+          python3 scripts/device-catalog-backend-provenance.py \
+            --out-dir "$RUNNER_TEMP/icpn-backend-provenance"
+          python3 scripts/device-catalog-backend-provenance.py \
+            --icpn STM32H503CBT6 > "$RUNNER_TEMP/icpn-backend-provenance/h5-example.json"
+          python3 scripts/device-catalog-backend-provenance.py \
+            --icpn STM32F301C6T6 > "$RUNNER_TEMP/icpn-backend-provenance/f3-example.json"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ['RUNNER_TEMP']) / 'icpn-backend-provenance'
+          summary = json.loads((root / 'icpn-backend-provenance-v1-summary.json').read_text())
+          blob = (root / 'icpn-backend-provenance-v1.jsonl').read_bytes()
+          assert len(blob.splitlines()) == summary['total_exact_icpns'] == 4629
+          assert summary['production_mapped'] == 4164
+          assert summary['production_no_mapping'] == 465
+          assert summary['research_candidates_not_mapped'] == {'STM32C5': 172, 'STM32H5': 190}
+          assert hashlib.sha256(blob).hexdigest() == summary['records_jsonl_sha256']
+          h5 = json.loads((root / 'h5-example.json').read_text())
+          f3 = json.loads((root / 'f3-example.json').read_text())
+          assert h5['production_binding']['provider_id'] is None
+          assert h5['research_candidate']['provider_id'] == 'openocd-st-h5-research'
+          assert f3['production_binding']['provider_id'] == 'openocd-upstream'
+          assert f3['research_candidate'] is None
+          print('Per-ICPN backend source provenance: PASS')
+          PY
+      - name: Upload audit evidence (metadata only, no OpenOCD binaries)
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-icpn-openocd-provenance-v1
+          path: ${{ runner.temp }}/icpn-backend-provenance/
+          retention-days: 14
+          if-no-files-found: error
