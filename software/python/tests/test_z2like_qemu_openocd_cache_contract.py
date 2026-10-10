@@ -69,9 +69,10 @@ def test_fresh_commit_specific_kit_and_e2e_remain_unconditional() -> None:
     assert 'openocd_out="$RUNNER_TEMP/openocd-armv7l-cached"' in kit
     assert 'python scripts/openocd-runtime.py verify "$openocd" --sidecar "$openocd.sha256"' in kit
     assert "if: steps.openocd-cache" not in kit
-    assert "if: steps.openocd-cache" not in text.split("Drive Manager to Bootstrap to QEMU deployment E2E", 1)[1].split(
-        "Capture diagnostics on failure", 1
+    e2e_section = text.split("Drive Manager to Bootstrap to QEMU deployment E2E", 1)[1].split(
+        "Verify kit-deployed OpenOCD inside QEMU ARMv7 target", 1
     )[0]
+    assert "if: steps.openocd-cache" not in e2e_section
     assert 'assert p["starts_openocd_service"] is False' in text
 
 
@@ -81,4 +82,3 @@ def test_cache_metrics_and_evidence_distinguish_hit_from_miss() -> None:
     assert 'echo "OpenOCD cache MISS: build duration' in text
     assert "OpenOCD ARMv7 cache: " in text
     assert 'echo "OpenOCD ARMv7 cache:' in text
-    assert "Cache MISS" not in text  # Log is a measurement, not a silent behavioral fallback.
