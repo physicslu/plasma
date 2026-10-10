@@ -13,13 +13,15 @@ H021 = ROOT / "handover" / "H021-z2like-demo-browser-runtime-deployment-plan-202
 
 
 class Z2LikeDemoActiveJobDisableLiveContractTests(unittest.TestCase):
-    def test_live_gate_is_chained_after_successful_browser_runtime_deployment(self) -> None:
+    def test_live_gate_is_chained_after_successful_manual_browser_runtime_qualification(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("workflow_run:", workflow)
         self.assertIn('"z2like-demo Browser Runtime live acceptance"', workflow)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", workflow)
         self.assertIn("github.event.workflow_run.head_branch == 'main'", workflow)
         self.assertIn("github.event.workflow_run.head_repository.full_name == 'physicslu/plasma'", workflow)
+        self.assertIn("github.event.workflow_run.event == 'workflow_dispatch'", workflow)
+        self.assertNotIn("github.event.workflow_run.event == 'push'", workflow)
         self.assertIn("PLASMA_ACCEPTED_SHA: ${{ github.event.workflow_run.head_sha }}", workflow)
         self.assertIn("PLASMA_UPSTREAM_BROWSER_RUN_ID: ${{ github.event.workflow_run.id }}", workflow)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-integration]", workflow)
