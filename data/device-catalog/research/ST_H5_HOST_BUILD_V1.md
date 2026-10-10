@@ -27,6 +27,26 @@ Expected safe fields: `status=HOST_BUILD_ONLY`, `host_architecture=x86_64`, immu
 
 After this first build passes, the separately approved next work item is **ARMv7 Linux build of the same source**, shared library ABI compatibility and a Plasma SWD adapter binding plan. Neither should silently replace `/opt/plasma/programming-engines/openocd` on deployed Z2.
 
+## Observed CI result
+
+GitHub Actions run `38020833350` / job `114121246138` completed successfully against source commit
+`c8d973bdad9a6fddb51459eda109b3b95d23b57a`.
+
+Observed immutable evidence:
+
+- runtime id: `0.12.0-c8d973bdad9a`
+- host architecture: `x86_64`
+- local runtime artifact SHA-256: `1758f03aef0a9ce6bbd212343622b174a85f0bda446bb2e26763113f460a64db`
+- canonical payload SHA-256: `af506c77d06ffb22b178cde078f13f6a8b9272eb101695e1ea1dc00f09dc967e`
+- evidence-only upload ZIP SHA-256: `ca329fd05399c9adcda1ccf612410dd58d2c77d2249fee80bc399e6663304129`
+- `target/stm32h5x.cfg` parsed successfully with dummy JTAG and no `init`
+- `hardware_runtime_ready=false`
+- `production_write_authorized=false`
+
+The retained machine-readable receipt is
+`data/device-catalog/research/st-h5-host-build-v1-result.json`.
+The GitHub artifact is supplementary and may expire; the retained receipt therefore records the evidence boundary without storing or redistributing the vendor-derived binary.
+
 ## Local re-run
 
 The complete isolated compilation recipe is in [the dedicated CI workflow](../../../.github/workflows/device-catalog-st-h5-host-build-v1.yml). It intentionally relies on the public ST GitHub repository and runner-installed build dependencies. It never modifies local working directories outside the runner's temporary directory.
