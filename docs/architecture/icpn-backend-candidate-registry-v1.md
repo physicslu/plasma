@@ -28,7 +28,7 @@ The existing GET /api/devices/search endpoint remains unchanged in identity filt
 
 The server projects candidates only from real Production-admitted exact ICPNs. It validates full Git blob SHAs for the H5 group source evidence, C5 crosswalk, pinned DFP ledger and ST fork static source gate; ST source commits and Flash-size constraints must match the locked research. It rejects unexpected source changes, duplicate/unknown exact identities, missing/modified provenance and attempts to turn a candidate into a mapped backend.
 
-The registry is locally cached; no upstream fetch, vendor OpenOCD binary, .xldr binary, patched executable Tcl script, network loader download or additional database is introduced. The deployment checkout must retain the reviewed research metadata files. An alternative Production Catalog with no H5/C5 cohort receives no candidates.
+The registry is locally cached; no upstream fetch, vendor OpenOCD binary, .xldr binary, patched executable Tcl script, network loader download or additional database is introduced. A full checkout can display source-verified candidates. A slim packaged PPU kit that does not include the optional reviewed research metadata **suppresses candidate display** (null) without altering Production search or creating an executable route; this is a deployment boundary, not candidate qualification. If some metadata is present but has a different content hash, loading still fails closed. Deployment of the 362-candidate display on packaged PPUs therefore requires a separate package-content acceptance step. An alternative Production Catalog with no H5/C5 cohort receives no candidates.
 
 ## Acceptance
 
