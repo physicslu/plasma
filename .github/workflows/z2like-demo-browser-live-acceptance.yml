@@ -81,14 +81,15 @@ jobs:
 
   live-swpc-render-qemu:
     needs: contract
-    if: ${{ github.event_name != 'pull_request' && github.repository == 'physicslu/plasma' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository == 'physicslu/plasma' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, linux, x64, plasma-integration]
     timeout-minutes: 35
     steps:
-      - name: Assert trusted post-merge execution identity
+      - name: Assert trusted post-deployment execution identity
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
           test "$GITHUB_REPOSITORY" = "physicslu/plasma"
           test "$GITHUB_REF" = "refs/heads/main"
           test -n "$GITHUB_SHA"
