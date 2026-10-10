@@ -1,25 +1,24 @@
-# STM32H5 OpenOCD ARMv7 isolated build v1
+# STM32H5 OpenOCD ARMv7 cross-build + QEMU execution v1
 
-Status: **research-only experimental CI**. Follows host build PR #793; the branch is based on PR #793 and targets that branch to avoid requiring its merge.
+**Status: experimental, research-only.** This follow-up Draft PR #796 targets Host PR #793 and does not depend on either PR being merged.
 
-## Objective
+## Scope and rationale
 
-Compile the ST OpenOCD fork at immutable commit `c8d973bdad9a6fddb51459eda109b3b95d23b57a` inside **QEMU-emulated 32-bit ARMv7 Ubuntu 22.04 userspace** (not x86 cross-compiled and not Z2 native). Keep the binary, its installed Tcl scripts and the packaging tarball in the ephemeral CI container. Upload only machine-readable, non-hardware evidence.
+The initial run used QEMU ARMv7 userspace for **the entire vendor C toolchain compilation**, which was still running beyond 20 minutes. The corrected approach separates CPU-intensive compilation from architecture-specific runtime verification:
 
-The experiment checks:
-1. actual `uname -m=armv7l` and fixed ST source/file blob identity;
-2. build + install including H5 native Flash driver source;
-3. `openocd --version`, dummy JTAG `target/stm32h5x.cfg` syntax/config load with no `init` or physical adapter;
-4. `scripts/openocd-runtime.py build` with `--architecture armv7l`, `verify`, matching artifact digests and explicit `hardware_runtime_ready=false`.
+1. In a temporary **x86_64 Debian bookworm** container, use `gcc-arm-linux-gnueabihf`, GNU Autotools and a fixed ST source revision `c8d973bdad9a6fddb51459eda109b3b95d23b57a`. Check H5 target CFG, Flash driver and registration source Git blob SHAs; compile and install into a disposable prefix. Build includes the `dummy` JTAG adapter, **not** the Plasma FPGA SWD adapter.
+2. In a temporary **Debian bookworm ARMv7 QEMU-user** container, execute that ARM ELF and parse the H5 target Tcl configuration under **dummy JTAG, without `init`**. This is not a physical IDCODE probe.
+3. Run the existing PLASMA `scripts/openocd-runtime.py build` and `verify` from inside ARMv7 QEMU; verify ELF architecture, `--version`, shared library resolution and the archive/payload SHA256 match. Report `hardware_runtime_ready=false`.
+4. Upload **JSON evidence only**, not a compiled vendor binary or tarball; never install into the deployed Z2 image, change Production profiles, enable the device, or issue any erase/flash/security operation.
 
-## Limits
+## Qualification limitations
 
-**Emulated ARMv7 execution is not Z2 PS hardware evidence.** Container emulation does not verify PYNQ-Z2 OS/library versions, target memory, FPGA PL, SWD transport, electrical programming profiles, or an H5 physical target. Dummy adapter supports JTAG-only; its successful configuration parse says nothing about the FPGA SWD adapter. Future gates remain: Z2 ABI/library and native runtime validation; SWD transport adapter implemented and tested; controlled read-only physical die-ID probe; then separately authorized erase/program/verify.
+Cross-compilation targets ARMv7 but is **not equivalent to a real PYNQ-Z2**. Debian bookworm (glibc ABI) may differ from the Z2 OS; binary execution under QEMU is only a software smoke test. The dummy JTAG adapter does **not** exercise the intended FPGA SWD transport or demonstrate flash programming.
 
-The workflow neither deploys nor modifies the existing `/opt/plasma/programming-engines/openocd` runtime and makes **no Production Catalog changes**. No OpenOCD binary or archive is uploaded or distributed; independently review GPL compliance before release.
+If the cross-build fails, inspect its exact toolchain/config/target dependency error rather than asserting H5 ARMv7 support. A passed build must have an independent selected Z2 PS native ABI/build/provenance check and a qualified FPGA SWD adapter *before* hardware readiness can change.
 
-## Operational decision
+## Review gates
 
-Do **not merge this experiment** solely on emulated compilation. Confirm complete CI, generated evidence checksum, absence of accidental runtime output uploads, and downstream PR #793 disposition. Review/approval is required before merging.
+The canonical Production source baseline remains **4,629 exact IC identities: 4,164 mapped and 465 no_mapping**, including H5 190 and C5 172, all still route blocked. The PR stays Draft; merger requires separate authorization. Source-locked host and ARMv7 smoke evidence is not a legitimate change of IC backend mapping.
 
-The current Production baseline remains 4,629 exact identities, 4,164 mapped, 465 no_mapping. The 190 H5 and 172 C5 stay blocked.
+See workflow [device-catalog-st-h5-armv7-build-v1.yml](../../../.github/workflows/device-catalog-st-h5-armv7-build-v1.yml).
