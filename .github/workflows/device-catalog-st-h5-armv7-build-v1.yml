@@ -1,0 +1,73 @@
+name: STM32H5 pinned OpenOCD ARMv7 isolated CI v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-h5-armv7-build-v1.yml'
+      - 'data/device-catalog/research/ST_H5_ARMV7_BUILD_V1.md'
+
+permissions:
+  contents: read
+
+jobs:
+  armv7-container-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Build, parse and package inside emulated ARMv7 userspace (no hardware)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/h5-armv7-evidence"
+          docker run --rm --platform linux/arm/v7 \
+            --network bridge \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -v "$PWD:/plasma:ro" \
+            -v "$RUNNER_TEMP/h5-armv7-evidence:/evidence" \
+            arm32v7/ubuntu:22.04 /bin/bash -euxo pipefail -c '
+              apt-get update -qq
+              apt-get install -y --no-install-recommends \
+                ca-certificates git make gcc autoconf automake libtool pkg-config \
+                libusb-1.0-0-dev libhidapi-dev libftdi1-dev texinfo python3
+              test "$(uname -m)" = "armv7l"
+              git clone --quiet https://github.com/STMicroelectronics/OpenOCD.git /tmp/openocd
+              git -C /tmp/openocd checkout --quiet --detach c8d973bdad9a6fddb51459eda109b3b95d23b57a
+              test "$(git -C /tmp/openocd rev-parse HEAD)" = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
+              test "$(git -C /tmp/openocd hash-object tcl/target/stm32h5x.cfg)" = "b9e67c604f7d824fefca03b42d0b112e1785235a"
+              test "$(git -C /tmp/openocd hash-object src/flash/nor/stm32h5x.c)" = "b5f24a39da05e5235167ff91c110ed89c2e3f9c5"
+              git -C /tmp/openocd submodule update --init --recursive
+              cd /tmp/openocd
+              ./bootstrap
+              ./configure --prefix=/tmp/h5-prefix --enable-dummy --disable-werror --without-capstone
+              make -j2
+              make install
+              test -x /tmp/h5-prefix/bin/openocd
+              test -f /tmp/h5-prefix/share/openocd/scripts/target/stm32h5x.cfg
+              /tmp/h5-prefix/bin/openocd --version
+              timeout 20s /tmp/h5-prefix/bin/openocd \
+                -s /tmp/h5-prefix/share/openocd/scripts \
+                -c "adapter driver dummy" \
+                -c "transport select jtag" \
+                -f target/stm32h5x.cfg -c shutdown
+              python3 /plasma/scripts/openocd-runtime.py build \
+                --prefix /tmp/h5-prefix \
+                --output-dir /tmp/artifacts \
+                --version 0.12.0 \
+                --source-commit c8d973bdad9a6fddb51459eda109b3b95d23b57a \
+                --architecture armv7l > /tmp/build.json
+              python3 /plasma/scripts/openocd-runtime.py verify \
+                /tmp/artifacts/plasma-openocd-0.12.0-c8d973bdad9a-linux-armv7l.tar.gz \
+                > /tmp/verify.json
+              python3 -c "import json; a=json.load(open(\"/tmp/build.json\")); b=json.load(open(\"/tmp/verify.json\")); assert a[\"artifact_sha256\"] == b[\"archive_sha256\"]; assert a[\"hardware_runtime_ready\"] is b[\"hardware_runtime_ready\"] is False; print(json.dumps({\"status\":\"ARMV7_EMULATED_BUILD_PASS\",\"architecture\":\"armv7l\",\"runtime_id\":a[\"runtime_id\"],\"source_commit\":a[\"source_commit\"],\"artifact_sha256\":a[\"artifact_sha256\"],\"payload_sha256\":a[\"payload_sha256\"],\"target_cfg_dummy_jtag_parse\":True,\"physical_fpga_swd_verified\":False,\"z2_ps_native_tested\":False,\"real_ic_programmed\":False,\"hardware_runtime_ready\":False,\"production_write_authorized\":False},indent=2))" > /evidence/armv7-source-build.json
+            '
+          cat "$RUNNER_TEMP/h5-armv7-evidence/armv7-source-build.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: st-h5-armv7-emulated-evidence-only
+          path: ${{ runner.temp }}/h5-armv7-evidence/armv7-source-build.json
+          if-no-files-found: error
+          retention-days: 14
