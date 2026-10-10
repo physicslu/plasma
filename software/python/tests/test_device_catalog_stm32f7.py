@@ -43,13 +43,15 @@ def test_stm32f7_package_specific_metadata_and_f750_override() -> None:
     assert wlcsp143.package == "WLCSP"
     assert wlcsp143.pin_count == "143"
     assert wlcsp143.option_suffix == "TR"
-    assert wlcsp143.mapping_status == "no_mapping"
+    assert wlcsp143.mapping_status == "mapped"
+    assert wlcsp143.target_config == "tcl/target/stm32f7x.cfg"
 
     ufbga176 = catalog.search("STM32F765IIK6", limit=1)[0]
     assert ufbga176.package == "UFBGA"
     assert ufbga176.pin_count == "176"
     assert ufbga176.flash_size == "2048 KiB"
-    assert ufbga176.mapping_status == "no_mapping"
+    assert ufbga176.mapping_status == "mapped"
+    assert ufbga176.target_config == "tcl/target/stm32f7x.cfg"
 
     override = catalog.search("STM32F750V8T7", limit=1)[0]
     assert override.base_device == "STM32F750V8"
