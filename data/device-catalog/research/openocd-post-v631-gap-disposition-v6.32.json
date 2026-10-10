@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "audit_id": "openocd-post-v631-gap-disposition-v6.32",
+  "reference_date_utc": "2026-10-10",
+  "record_state": "RESEARCH_CLOSURE_NO_PRODUCTION_WRITE",
+  "production_baseline": {
+    "main_sha": "daf31bd94ed921effcde975d7a6c23b9b7f6d611",
+    "manifest_blob": "3f66a14212fbf82aa9faa16e9434892f649f736d",
+    "production_exact_total": 4629,
+    "mapped": 4164,
+    "no_mapping": 465,
+    "active_openocd_route_exact_count": 4085,
+    "active_denominator": 4550,
+    "active_route_coverage_percent": 89.7802
+  },
+  "dispositions": {
+    "STM32H5": {
+      "exact_count": 190,
+      "production_blob": "5d95f712445e94ef800dd54a26739203b2f2b412",
+      "disposition": "runtime_candidate_not_production_admissible",
+      "blocker_class": "candidate_provider_not_packaged_or_hardware_qualified",
+      "evidence": "Pinned ST fork c8d973bd contains native stm32h5x target config and flash driver; packaged PLASMA upstream runtime 9ea7f3d does not contain H5 support.",
+      "next_gate": "Qualify ARMv7 build/package execution, Plasma FPGA SWD adapter compatibility, approved read-only real-target ID/flash-bank probe, then Programming/Electrical Profiles before erase-program-verify."
+    },
+    "STM32C5": {
+      "exact_count": 172,
+      "production_blob": "1e0559ded8cde86a210097d9bcfce34708978e5c",
+      "disposition": "blocked_candidate_backend_not_admissible",
+      "blocker_class": "stldr_loader_and_runtime_defects",
+      "evidence": "Pinned ST fork uses stldr; source loader table is empty and retained research records Tcl scalar/array lookup defects. Loader deployment, redistribution review, RAM compatibility and real-target qualification remain incomplete.",
+      "next_gate": "Correct and qualify the bounded stldr runtime path with content-locked loaders, licensing review, ARMv7 packaging and read-only target evidence before any Production mapping."
+    },
+    "STM32N6": {
+      "exact_count": 32,
+      "production_blob": "937aeb4468fa7babd0c7b84d0bee72468d445002",
+      "disposition": "blocked_no_packaged_backend_surface",
+      "blocker_class": "packaged_runtime_target_config_absent",
+      "evidence": "PLASMA packaged upstream OpenOCD commit 9ea7f3d has no tcl/target/stm32n6x.cfg; pinned ST fork c8d973bd also has no stm32n6x target config.",
+      "next_gate": "Admit a separately pinned flash-capable provider/runtime only after source, packaging and target-programming capability evidence exists."
+    },
+    "STM32WB0": {
+      "exact_count": 24,
+      "production_blob": "b4754420d0a6342f63c3edb368c96fc7f9bf864b",
+      "disposition": "blocked_no_packaged_backend_surface",
+      "blocker_class": "packaged_runtime_target_config_absent",
+      "evidence": "Neither packaged upstream OpenOCD commit 9ea7f3d nor pinned ST fork c8d973bd contains tcl/target/stm32wb0x.cfg.",
+      "next_gate": "Find an authoritative programmable backend and qualify it as a versioned provider; do not infer compatibility from other STM32 wireless families."
+    },
+    "STM32WL3": {
+      "exact_count": 47,
+      "production_blob": "0a774823e5236e011a105cde355942821e9ebe48",
+      "disposition": "blocked_no_packaged_backend_surface",
+      "blocker_class": "packaged_runtime_target_config_absent",
+      "evidence": "Neither packaged upstream OpenOCD commit 9ea7f3d nor pinned ST fork c8d973bd contains tcl/target/stm32wl3x.cfg.",
+      "next_gate": "Find an authoritative programmable backend and qualify it as a versioned provider; stm32wlx support must not be generalized to WL3 without explicit evidence."
+    }
+  },
+  "totals": {
+    "disposition_exact_count": 465,
+    "runtime_candidate_exact_count": 190,
+    "blocked_backend_exact_count": 275
+  },
+  "claims": {
+    "all_current_no_mapping_rows_dispositioned": true,
+    "production_write_authorized": false,
+    "programming_profile_verified": false,
+    "electrical_profile_verified": false,
+    "erase_program_verify_qualified": false,
+    "engineering_verified": false,
+    "hil_verified": false,
+    "hardware_runtime_ready": false
+  }
+}
