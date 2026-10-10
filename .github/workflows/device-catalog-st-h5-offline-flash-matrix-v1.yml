@@ -1,0 +1,76 @@
+name: STM32H5 exact ICPN offline flash matrix v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-h5-offline-flash-matrix-v1.yml'
+      - 'data/device-catalog/research/st-h5-offline-flash-matrix-v1.json'
+      - 'data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py'
+      - 'data/device-catalog/research/test_validate_st_h5_offline_flash_matrix_v1.py'
+      - 'data/device-catalog/research/ST_H5_OFFLINE_FLASH_MATRIX_V1.md'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'release/openocd.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-st-h5-offline-flash-matrix-v1.yml'
+      - 'data/device-catalog/research/st-h5-offline-flash-matrix-v1.json'
+      - 'data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py'
+      - 'data/device-catalog/research/test_validate_st_h5_offline_flash_matrix_v1.py'
+      - 'data/device-catalog/research/ST_H5_OFFLINE_FLASH_MATRIX_V1.md'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'release/openocd.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-st-h5-static-crosswalk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retain full Production snapshot integrity
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Run exact H5 ID and geometry negative tests
+        run: |
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_validate_st_h5_offline_flash_matrix_v1.py' -v
+      - name: Export deterministic 190-IC research-only audit
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py \
+            --output-dir "$RUNNER_TEMP/h5-matrix"
+          python data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py \
+            --icpn STM32H503CBT6 > "$RUNNER_TEMP/h5-matrix/h503-example.json"
+          python data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py \
+            --icpn STM32H5E4IKT6 > "$RUNNER_TEMP/h5-matrix/h5e4-3m-example.json"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])/'h5-matrix'
+          summary = json.loads((root/'st-h5-offline-flash-matrix-v1-summary.json').read_text())
+          raw = (root/'st-h5-offline-flash-matrix-v1.jsonl').read_bytes()
+          assert summary['h5_exact_icpns'] == len(raw.splitlines()) == 190
+          assert summary['st_driver_device_id_groups'] == 5
+          assert summary['real_silicon_qualifications'] == 0
+          assert summary['production_backend_mapping_authorized'] is False
+          assert hashlib.sha256(raw).hexdigest() == summary['records_jsonl_sha256']
+          assert json.loads((root/'h503-example.json').read_text())['expected_device_id_from_series'] == '0x474'
+          h5e = json.loads((root/'h5e4-3m-example.json').read_text())
+          assert h5e['expected_device_id_from_series'] == '0x47A'
+          assert h5e['official_catalog_flash_kib'] == 3072
+          assert h5e['programming_write_authorized'] is False
+          print('STM32H5 190 research-only ID/flash geometry records PASS')
+          PY
+      - name: Upload evidence only, no proprietary OpenOCD binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-h5-exact-offline-flash-matrix-v1
+          path: ${{ runner.temp }}/h5-matrix/
+          retention-days: 14
+          if-no-files-found: error
