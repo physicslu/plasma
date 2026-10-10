@@ -782,24 +782,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     _expect(status, 403, blocked, "cross-origin Bootstrap mutation", code="maintenance_authorization_required")
 
-    status, blocked, _ = session.request(
-        f"{bootstrap_root}/uploads",
-        method="POST",
-        body={"size": 1, "sha256": "0" * 64},
-    )
-    _expect(status, 409, blocked, "commissioned Bootstrap upload", code="ppu_maintenance_required")
-
-    status, blocked, _ = session.request(
-        f"{bootstrap_root}/deployments",
-        method="POST",
-        body={
-            "upload_id": "0" * 32,
-            "ppu_id": str(ppu_id),
-            "facility_id": str(facility_id),
-            "display_name": str(display_name),
-        },
-    )
-    _expect(status, 409, blocked, "commissioned Bootstrap deployment", code="ppu_maintenance_required")
+    # Programming Registration is not the Platform maintenance lock.
+    # A commissioned, trusted-idle PPU is allowed to enter Bootstrap maintenance
+    # once browser authorization succeeds. Keep the pre-deployment transaction
+    # state-preserving here; the operator sequence below explicitly disables
+    # Programming Registration before the real upload/deploy so no new
+    # programming work is admitted during Platform maintenance.
 
     status, blocked, _ = session.request(f"{bootstrap_root}/not-allowlisted")
     _expect(status, 404, blocked, "unknown Browser Bootstrap route", code="bootstrap_route_not_allowed")
@@ -857,8 +845,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "cross_origin_lifecycle": "BLOCKED",
             "cross_origin_bootstrap": "BLOCKED",
             "tampered_capability": "BLOCKED",
-            "commissioned_upload": "BLOCKED",
-            "commissioned_deployment": "BLOCKED",
             "idle_disable": "PASS",
             "bounded_upload": "PASS",
             "runtime_deployment": "PASS",
