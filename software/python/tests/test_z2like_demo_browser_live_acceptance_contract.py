@@ -9,11 +9,15 @@ WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-browser-live-acceptance
 HANDOVER = ROOT / "handover" / "H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
 
 
-def test_live_gate_is_post_merge_swpc_only() -> None:
+def test_live_gate_is_manual_post_deployment_swpc_only() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert "github.event_name != 'pull_request'" in workflow
+    assert "workflow_dispatch: {}" in workflow
+    assert "\n  push:\n" in workflow
+    assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "github.event_name != 'pull_request'" not in workflow
     assert "github.repository == 'physicslu/plasma'" in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
+    assert 'test "$GITHUB_EVENT_NAME" = "workflow_dispatch"' in workflow
     assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in workflow
     assert "persist-credentials: false" in workflow
     assert "group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}" in workflow
