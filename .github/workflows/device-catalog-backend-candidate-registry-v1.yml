@@ -14,7 +14,6 @@ on:
       - "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json"
       - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
       - "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json"
-      - "data/device-catalog/production/**"
   push:
     branches: [main]
     paths:
@@ -29,7 +28,6 @@ on:
       - "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json"
       - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
       - "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json"
-      - "data/device-catalog/production/**"
   workflow_dispatch:
 
 permissions:
