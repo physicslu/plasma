@@ -162,3 +162,26 @@
   .icSelectorStatusStack { grid-column: auto; justify-items: start; }
   .icSelectorStatusRow { justify-content: flex-start; }
 }
+
+
+/* Research evidence is visually distinct from Production backend admission. */
+.icSelectorCandidateHint {
+  font-size: 0.76rem;
+  color: var(--muted, #6b7280);
+  font-weight: 600;
+}
+.icSelectorCandidateBoundary {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 14px;
+  font-size: 0.85rem;
+}
+.icSelectorCandidateBoundary strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.icSelectorCandidateBoundary p {
+  margin: 0;
+  line-height: 1.5;
+}
