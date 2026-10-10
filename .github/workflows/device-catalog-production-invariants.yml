@@ -6,12 +6,18 @@ on:
     paths:
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/*-commercial-icpn.csv"
+      - "data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py"
+      - "data/device-catalog/research/test_validate_st_c5_exact_loader_matrix_v1.py"
+      - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
       - "scripts/ci/device-catalog-production-invariants.py"
       - ".github/workflows/device-catalog-production-invariants.yml"
   pull_request:
     paths:
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/*-commercial-icpn.csv"
+      - "data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py"
+      - "data/device-catalog/research/test_validate_st_c5_exact_loader_matrix_v1.py"
+      - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
       - "scripts/ci/device-catalog-production-invariants.py"
       - ".github/workflows/device-catalog-production-invariants.yml"
 
@@ -46,3 +52,9 @@ jobs:
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_validate_st_h5_offline_flash_matrix_v1.py' -v
           python data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py
+      - name: Fail closed on C5 source-only loader readiness or mapping drift
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_validate_st_c5_exact_loader_matrix_v1.py' -v
+          python data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py
