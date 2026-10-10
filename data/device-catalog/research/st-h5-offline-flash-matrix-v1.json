@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-h5-offline-flash-matrix-v1",
+  "evidence_level": "source_and_catalog_static_crosswalk_only",
+  "candidate_status": "RESEARCH_ONLY_NOT_PRODUCTION_MAPPED",
+  "source": {
+    "repository": "https://github.com/STMicroelectronics/OpenOCD.git",
+    "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "header_path": "src/flash/nor/stm32h5x.h",
+    "header_git_blob": "980ed4673939dd31b14efc74941bbcb10ddbe7ed",
+    "driver_path": "src/flash/nor/stm32h5x.c",
+    "driver_git_blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5",
+    "target_config_path": "tcl/target/stm32h5x.cfg",
+    "target_config_git_blob": "b9e67c604f7d824fefca03b42d0b112e1785235a"
+  },
+  "flash_driver": "stm32h5x",
+  "flash_base_address": "0x08000000",
+  "secure_flash_alias_address": "0x0C000000",
+  "dbgmcu_idcode_register": "0x44024000",
+  "flash_size_register": "0x08FFF80C",
+  "flash_register_base": "0x40022000",
+  "flash_sector_kib": 8,
+  "flash_write_alignment_bytes": 16,
+  "driver_flash_size_failure_falls_back_to_max": true,
+  "driver_assumes_dual_bank": true,
+  "device_groups": [
+    {
+      "group": "STM32H50xx",
+      "expected_device_id": "0x474",
+      "series": [
+        "STM32H503"
+      ],
+      "expected_icpns": 14,
+      "max_flash_kib": 128,
+      "has_trustzone": false,
+      "wps_group_sectors": 1
+    },
+    {
+      "group": "STM32H52/H53xx",
+      "expected_device_id": "0x478",
+      "series": [
+        "STM32H523",
+        "STM32H533"
+      ],
+      "expected_icpns": 53,
+      "max_flash_kib": 512,
+      "has_trustzone": true,
+      "wps_group_sectors": 4
+    },
+    {
+      "group": "STM32H54/H55xx",
+      "expected_device_id": "0x47C",
+      "series": [
+        "STM32H543",
+        "STM32H553"
+      ],
+      "expected_icpns": 6,
+      "max_flash_kib": 1024,
+      "has_trustzone": true,
+      "wps_group_sectors": 4
+    },
+    {
+      "group": "STM32H56/H57xx",
+      "expected_device_id": "0x484",
+      "series": [
+        "STM32H562",
+        "STM32H563",
+        "STM32H573"
+      ],
+      "expected_icpns": 82,
+      "max_flash_kib": 2048,
+      "has_trustzone": true,
+      "wps_group_sectors": 4
+    },
+    {
+      "group": "STM32H5E/H5Fxx",
+      "expected_device_id": "0x47A",
+      "series": [
+        "STM32H5E4",
+        "STM32H5E5",
+        "STM32H5F4",
+        "STM32H5F5"
+      ],
+      "expected_icpns": 35,
+      "max_flash_kib": 4096,
+      "has_trustzone": true,
+      "wps_group_sectors": 4
+    }
+  ],
+  "qualification": {
+    "driver_source_identity_locked": true,
+    "expected_device_ids_inferred_from_family": true,
+    "silicon_device_id_measured": false,
+    "flash_size_register_measured": false,
+    "flash_geometry_hardware_verified": false,
+    "flash_erase_program_verify_passed": false,
+    "physical_hardware_runtime_ready": false,
+    "production_backend_mapping_authorized": false,
+    "unsafe_vendor_commands_authorized": false
+  }
+}

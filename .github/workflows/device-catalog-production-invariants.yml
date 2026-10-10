@@ -40,3 +40,9 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s software/python/tests -p 'test_icpn_backend_provenance_v1.py' -v
           python scripts/device-catalog-backend-provenance.py
+      - name: Prevent silent STM32H5 backend or Flash-geometry admission drift
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_validate_st_h5_offline_flash_matrix_v1.py' -v
+          python data/device-catalog/research/validate_st_h5_offline_flash_matrix_v1.py
