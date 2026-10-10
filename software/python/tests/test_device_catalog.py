@@ -370,13 +370,13 @@ def test_stm32g4_publication_is_catalog_visible_without_physical_qualification()
 def test_stm32g4_layer1_refresh_preserves_backend_and_metadata_boundaries() -> None:
     catalog = get_default_device_catalog()
 
-    no_mapping = catalog.search("STM32G491RCY6TR", limit=1)[0]
-    assert no_mapping.identifier == "STM32G491RCY6TR"
-    assert no_mapping.family == "STM32G4"
-    assert no_mapping.production_admitted is True
-    assert no_mapping.mapping_status == "no_mapping"
-    assert no_mapping.mapping_method == "no_mapping"
-    assert no_mapping.target_config == ""
+    promoted = catalog.search("STM32G491RCY6TR", limit=1)[0]
+    assert promoted.identifier == "STM32G491RCY6TR"
+    assert promoted.family == "STM32G4"
+    assert promoted.production_admitted is True
+    assert promoted.mapping_status == "mapped"
+    assert promoted.mapping_method == "deterministic_ordering_pattern"
+    assert promoted.target_config == "tcl/target/stm32g4x.cfg"
 
     exception = catalog.search("STM32G484PEI6", limit=1)[0]
     assert exception.identifier == "STM32G484PEI6"
@@ -385,9 +385,9 @@ def test_stm32g4_layer1_refresh_preserves_backend_and_metadata_boundaries() -> N
     assert exception.mapping_status == "mapped"
     assert exception.target_config == "tcl/target/stm32g4x.cfg"
 
-    payload = no_mapping.to_payload()
+    payload = promoted.to_payload()
     assert payload["catalog"]["scope"] == "production_admitted"
-    assert payload["backend"]["mapping_status"] == "no_mapping"
+    assert payload["backend"]["mapping_status"] == "mapped"
     assert payload["physical_validation"] == {
         "engineering_status": "no_evidence",
         "ppu_status": "no_evidence",
