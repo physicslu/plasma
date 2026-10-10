@@ -108,10 +108,15 @@ class BackendCandidateRegistryTests(unittest.TestCase):
             h5 = _device_search_payload("STM32H503CBT6", 3)
             c5 = _device_search_payload("STM32C531CBT3TR", 3)
             f1 = _device_search_payload("STM32F103C8T6", 3)
-        for payload in (h5, c5, f1):
+        # Exact match ranks first, but the search API also returns matching
+        # packing variants such as an ICPN ending in TR. Preserve that contract.
+        for payload, requested in ((h5, "STM32H503CBT6"),
+                                   (c5, "STM32C531CBT3TR"),
+                                   (f1, "STM32F103C8T6")):
             self.assertTrue(payload["ok"])
             self.assertEqual(payload["catalog_size"], self.catalog.size)
-            self.assertEqual(payload["count"], 1)
+            self.assertGreaterEqual(payload["count"], 1)
+            self.assertEqual(payload["results"][0]["icpn"], requested)
         for payload in (h5, c5):
             result = payload["results"][0]
             self.assertEqual(result["backend"]["mapping_status"], "no_mapping")
