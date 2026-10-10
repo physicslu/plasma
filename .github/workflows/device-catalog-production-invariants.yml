@@ -33,3 +33,11 @@ jobs:
           python-version: "3.12"
       - name: Validate canonical Production graph
         run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Audit pinned OpenOCD source provenance for every exact Production ICPN
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s software/python/tests -p 'test_icpn_backend_provenance_v1.py' -v
+          python scripts/device-catalog-backend-provenance.py
+
