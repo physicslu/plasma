@@ -192,6 +192,47 @@ SWPC/QEMU ARMv7 z2like-demo software path
 
 Repository CI can prove the software composition and QEMU path. Live SWPC, Render and Cloudflare routing remain deployment-state evidence and must be verified at deployment time.
 
+## QEMU CI ARMv7 OpenOCD build cache (software only)
+
+The GitHub Actions `.github/workflows/z2like-demo-qemu.yml` E2E job
+reuses a *verified build artifact*, not a previously commissioned QEMU instance.
+The OpenOCD source is **upstream `openocd-org/openocd`**, pinned by
+`release/openocd.json`. It must not be confused with the isolated
+ST-specific research build or interpreted as enabling physical programming.
+
+- **Cache key:** schema version, runner OS, ARMv7 + Ubuntu 22.04 target,
+  and the complete content hashes of `release/openocd.json`,
+  `scripts/build-openocd-runtime.sh`, and `scripts/openocd-runtime.py`.
+  No loose `restore-keys` fallback. Changing the source pin or build
+  recipe causes a cold build; increment `OPENOCD_ARMV7_CACHE_SCHEMA`
+  for non-file dependency or base-image/toolchain ABI changes.
+- **Cache hit:** skip only `scripts/build-openocd-runtime.sh`;
+  require the expected archive and detached `.sha256` sidecar, then run
+  the canonical `openocd-runtime.py verify` and check the architecture,
+  runtime ID, upstream source commit, version and `hardware_runtime_ready=false`.
+  A corrupt or incompatible cached object **fails closed**; no silent use.
+- **Cache miss:** rebuild in disposable QEMU ARMv7 Linux, verify identically,
+  and include the artifact in the current commit-specific PPU kit.
+- **Cache publisher:** only successful `main` push or main-only manual
+  run can save a cold cache, and only after full Manager→Bootstrap→QEMU
+  deploy, ARMv7 binary run, eight-Site worker isolation and loopback matrix
+  all pass. Pull requests may restore default-branch caches but cannot publish
+  shared executable build caches.
+- **Still fresh on every run:** commit-bound PPU release, simulated kit
+  packaging, temporary QEMU container, installation, process launch,
+  loopback/Tcl RPC and eight-Site recovery tests. SWPC's persistent QEMU
+  volume model is a different acceptance boundary.
+- **Measurement:** workflow run's build step time is the cold-build baseline;
+  GitHub Step Summary logs `HIT` or `MISS (recompiled)` and cold-build
+  duration in seconds. Compare matched run conditions; do not claim a
+  quantified speed-up until both cold/miss and warm/hit runs are observed.
+
+The GitHub cache is a *temporary acceleration hint*, not a long-term binary
+release registry or an installed-runtime attestation. GitHub cache eviction,
+mutable Ubuntu package versions, and ARMv7 target compatibility remain
+separate concerns; always verify the exact package when restoring. Neither a
+cache hit nor QEMU E2E PASS asserts physical PYNQ-Z2/SWD/IC readiness.
+
 ## What it cannot qualify
 
 It does not prove:
