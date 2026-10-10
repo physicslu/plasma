@@ -84,3 +84,7 @@ python -m unittest discover -s data/device-catalog/research \
 ```
 
 Source-pin assertions guard research continuity; GitHub CI does **not** build vendor OpenOCD, fetch ST binaries, qualify physical SWD or grant permission to program any IC. H5/C5 Production rows and the manifest remain unchanged by this research PR.
+
+### ARMv7 follow-up experiment
+
+Draft PR #794 carries the next bounded H5 gate: compile, package, install and execute the same pinned ST fork in the PLASMA ARMv7 userspace class, while keeping FPGA SWD, physical target access, Production mapping and `hardware_runtime_ready` explicitly out of scope. See `ST_H5_ARMV7_BUILD_V1.md`.
