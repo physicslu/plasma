@@ -44,6 +44,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install canonical Python runtime dependencies
+        run: python -m pip install -e software/python
       - name: Confirm canonical Production exact ICPNs remain unchanged
         run: python scripts/ci/device-catalog-production-invariants.py
       - name: Audit all existing ICPN OpenOCD source provenance
