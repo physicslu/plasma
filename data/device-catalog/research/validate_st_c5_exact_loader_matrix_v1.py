@@ -136,7 +136,7 @@ def build_rows(catalog: list[dict[str, str]], crosswalk: list[dict[str, str]],
                prod["family"] == "STM32C5" and prod["mapping_status"] == "no_mapping" and
                not prod["openocd_target_config"], f"Production C5 backend unexpectedly mapped: {icpn}")
         ensure(prod["verification_status"].startswith("verified_") and
-               prod["source_reference"].startswith("https://www.st.com/"),
+               prod["source_reference"].startswith(("https://www.st.com/", "https://estore.st.com/")),
                f"Production C5 exact metadata provenance missing: {icpn}")
         ensure(prod["series"].startswith("STM32C5") and icpn.startswith(prod["series"]),
                f"invalid exact C5 series: {icpn}")
