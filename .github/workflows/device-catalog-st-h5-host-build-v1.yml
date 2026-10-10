@@ -1,0 +1,120 @@
+name: STM32H5 OpenOCD isolated host build v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-h5-host-build-v1.yml'
+      - 'data/device-catalog/research/ST_H5_HOST_BUILD_V1.md'
+      - 'data/device-catalog/research/st-h5-host-build-v1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  host-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git make gcc autoconf automake libtool pkg-config \
+            libusb-1.0-0-dev libhidapi-dev libftdi1-dev texinfo
+      - name: Fetch immutable vendor source and submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/st-h5-openocd-src"
+          git clone --quiet --branch openocd-cubeide-r7 \
+            https://github.com/STMicroelectronics/OpenOCD.git "$SRC"
+          git -C "$SRC" checkout --quiet --detach c8d973bdad9a6fddb51459eda109b3b95d23b57a
+          test "$(git -C "$SRC" rev-parse HEAD)" = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
+          test "$(git -C "$SRC" hash-object tcl/target/stm32h5x.cfg)" = "b9e67c604f7d824fefca03b42d0b112e1785235a"
+          test "$(git -C "$SRC" hash-object src/flash/nor/stm32h5x.c)" = "b5f24a39da05e5235167ff91c110ed89c2e3f9c5"
+          test "$(git -C "$SRC" hash-object src/flash/nor/drivers.c)" = "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+          git -C "$SRC" submodule update --init --recursive
+      - name: Compile pinned ST fork locally (no deployment)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/st-h5-openocd-src"
+          PREFIX="$RUNNER_TEMP/st-h5-openocd-host-prefix"
+          cd "$SRC"
+          ./bootstrap
+          ./configure --prefix="$PREFIX" --enable-dummy --disable-werror --without-capstone
+          make -j2
+          make install
+          test -x "$PREFIX/bin/openocd"
+          test -f "$PREFIX/share/openocd/scripts/target/stm32h5x.cfg"
+          "$PREFIX/bin/openocd" --version
+      - name: Test offline target script parsing with dummy JTAG
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/st-h5-openocd-host-prefix"
+          timeout 15s "$PREFIX/bin/openocd" \
+            -s "$PREFIX/share/openocd/scripts" \
+            -c "adapter driver dummy" \
+            -c "transport select jtag" \
+            -f target/stm32h5x.cfg \
+            -c shutdown
+          echo "H5_OFFLINE_JTAG_TARGET_CONFIG_PARSE_PASS"
+      - name: Package only in runner and validate existing Plasma runtime archive contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/h5-private-artifacts"
+          python scripts/openocd-runtime.py build \
+            --prefix "$RUNNER_TEMP/st-h5-openocd-host-prefix" \
+            --output-dir "$RUNNER_TEMP/h5-private-artifacts" \
+            --version 0.12.0 \
+            --source-commit c8d973bdad9a6fddb51459eda109b3b95d23b57a \
+            --architecture x86_64 \
+            > "$RUNNER_TEMP/h5-build-artifact-evidence.json"
+          artifact="$RUNNER_TEMP/h5-private-artifacts/plasma-openocd-0.12.0-c8d973bdad9a-linux-x86_64.tar.gz"
+          python scripts/openocd-runtime.py verify "$artifact" > "$RUNNER_TEMP/h5-verify-evidence.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          built=json.loads((root/"h5-build-artifact-evidence.json").read_text())
+          verified=json.loads((root/"h5-verify-evidence.json").read_text())
+          assert built["result"] == verified["result"] == "PASS"
+          assert built["artifact_sha256"] == verified["archive_sha256"]
+          assert built["runtime_id"] == verified["runtime_id"]
+          assert built["hardware_runtime_ready"] is verified["hardware_runtime_ready"] is False
+          assert verified["source_commit"] == "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
+          record = {
+              "schema_version": 1,
+              "status": "HOST_BUILD_ONLY",
+              "source_commit": verified["source_commit"],
+              "runtime_id": verified["runtime_id"],
+              "host_architecture": "x86_64",
+              "artifact_sha256": verified["archive_sha256"],
+              "payload_sha256": verified["payload_sha256"],
+              "driver_source_locked": True,
+              "offline_jtag_dummy_parse_pass": True,
+              "swd_fpga_adapter_qualified": False,
+              "z2_armv7_built": False,
+              "ppu_deployed": False,
+              "real_h5_probe_verified": False,
+              "erase_program_verify_qualified": False,
+              "hardware_runtime_ready": False,
+              "production_write_authorized": False,
+              "binary_uploaded_or_distributed": False,
+          }
+          (root/"h5-host-build-v1-result.json").write_text(
+              json.dumps(record, indent=2, sort_keys=True)+"\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(record, indent=2, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: st-h5-openocd-host-build-v1-evidence-only
+          path: ${{ runner.temp }}/h5-host-build-v1-result.json
+          if-no-files-found: error
+          retention-days: 14

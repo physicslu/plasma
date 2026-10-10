@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "gate_id": "st-h5-host-build-v1",
+  "status": "ISOLATED_BUILD_EXPERIMENT_ONLY",
+  "source": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "branch": "openocd-cubeide-r7",
+    "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "target_config_blob": "b9e67c604f7d824fefca03b42d0b112e1785235a",
+    "flash_driver_blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5",
+    "registry_blob": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+  },
+  "scope": {
+    "host_architecture": "x86_64",
+    "runtime_version_expected": "0.12.0",
+    "project_artifact_tool": "scripts/openocd-runtime.py",
+    "dummy_transport": "jtag",
+    "target_config": "target/stm32h5x.cfg",
+    "downloads_public_source": true,
+    "uploads_binary": false,
+    "publishes_package": false,
+    "deployment_requested": false
+  },
+  "requirements": {
+    "host_build_compiled": false,
+    "source_hashes_verified_in_job": false,
+    "target_config_offline_parse_verified": false,
+    "artifact_checksum_verified": false,
+    "z2_armv7_built": false,
+    "fpga_swd_adapter_verified": false,
+    "physical_ic_connected": false,
+    "programming_profile_verified": false,
+    "electrical_profile_verified": false,
+    "erase_program_verify_tested": false,
+    "production_write_authorized": false,
+    "hardware_runtime_ready": false
+  },
+  "next_gate": "Accept evidence-only host build; separately qualify ARMv7 and PL SWD interface before any real target or production deployment."
+}
