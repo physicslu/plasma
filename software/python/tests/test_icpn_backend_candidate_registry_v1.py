@@ -158,6 +158,19 @@ class BackendCandidateRegistryTests(unittest.TestCase):
             with self.assertRaisesRegex(DeviceCatalogIntegrityError, "source lock mismatch"):
                 registry._locked_bytes(root, registry.C5_CROSSWALK, registry.C5_CROSSWALK_BLOB)
 
+    def test_packaged_runtime_without_research_files_disables_only_candidate_display(self):
+        # Slim PPU kit omission is not permission to fabricate backend support.
+        with tempfile.TemporaryDirectory() as temp:
+            packaged = registry.BackendCandidateRegistry(
+                self.catalog, Path(temp), allow_missing_sources=True
+            )
+            self.assertEqual(packaged.size, 0)
+            self.assertFalse(packaged.evidence_available)
+            row = self.exact("STM32H503CBT6")
+            self.assertIsNone(packaged.lookup(row))
+            self.assertEqual(row.mapping_status, "no_mapping")
+            self.assertIsNotNone(self.catalog.resolve("STMicroelectronics", row.identifier))
+
     def test_missing_authority_file_is_a_hard_error(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaisesRegex(DeviceCatalogIntegrityError, "missing"):
