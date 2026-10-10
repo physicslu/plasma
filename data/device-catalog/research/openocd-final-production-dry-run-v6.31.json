@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "transaction_id": "openocd-final-production-dry-run-v6.31",
-  "record_state": "WRITE_READY_PREWRITE_AWAITING_OWNER_APPROVAL",
+  "record_state": "WRITE_APPLIED_OWNER_APPROVED",
   "source_closure": {
     "audit_id": "openocd-final-coverage-closure-v6.31",
     "workflow_run_id": 37968933886,
@@ -122,10 +122,10 @@
     }
   },
   "approval": {
-    "owner_approval_received": false,
-    "route_inventory_write_authorized": false,
-    "production_write_authorized": false,
-    "merge_after_green_ci_authorized": false
+    "owner_approval_received": true,
+    "route_inventory_write_authorized": true,
+    "production_write_authorized": true,
+    "merge_after_green_ci_authorized": true
   },
   "claims": {
     "programming_profile_binding_claimed": false,
@@ -140,8 +140,8 @@
     "artifact_zip_sha256": "d82df76ed9ad6753fa5723c7e3903974a9a76212fdc3ef2dd85c7d535e338b2c"
   },
   "write_state": {
-    "route_inventory_write_applied": false,
-    "production_write_applied": false,
-    "applied_commit": null
+    "route_inventory_write_applied": true,
+    "production_write_applied": true,
+    "applied_commit": "6034bd16197d655917b0c7450b218ad8e679335e"
   }
 }
