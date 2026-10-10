@@ -34,8 +34,8 @@
       "family": "STM32F3",
       "path": "../research/stm32f3-commercial-icpn.csv",
       "row_count": 192,
-      "git_blob_sha": "42e3cab58f7863e1cf44502cb15c5d85086e2a0e",
-      "sha256": "0c48633a81ff6eb8785d5e730ee06f6f596a30f2264b4fea374d8df62b3f1573"
+      "git_blob_sha": "df139546fe69293cef692b299ea15ce17217c01b",
+      "sha256": "64ec4c44758cdf5b7da61f6d14e83517aea1c9764dd1fec6ea2bbf818c1035bb"
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -50,8 +50,8 @@
       "family": "STM32F7",
       "path": "../research/stm32f7-commercial-icpn.csv",
       "row_count": 173,
-      "git_blob_sha": "b2367ac8b8120f86ef4da33966f08c9e80955305",
-      "sha256": "cb23c11bcdb166ad7bb083d98ec0e19a2117a8d923bf23382a19747f7bf60538"
+      "git_blob_sha": "838b09f46e255506d71151fb4bac530a0bfe56b8",
+      "sha256": "3e8d2388d3cf60b8dbfe027fb6cf43bd71421566d40e95dbe3be8e940387f737"
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -66,8 +66,8 @@
       "family": "STM32G4",
       "path": "../research/stm32g4-commercial-icpn.csv",
       "row_count": 273,
-      "git_blob_sha": "83a7e6f20256ca10e6fb1c3452bca8c5b9e39f56",
-      "sha256": "e1d2b369e02560d52d56a91c230eef2cc65b93394a2cfdb41915d5b5407cb2fd"
+      "git_blob_sha": "c5e4b8c9fadf511467160af609d3468b615e587c",
+      "sha256": "4844510cb8da4527da5296400c4a8a3c21c40cd6a0f74e06e2e8d978c4a133cb"
     },
     {
       "manufacturer": "STMicroelectronics",
