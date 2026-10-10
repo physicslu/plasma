@@ -154,7 +154,8 @@ class H5OfflineMatrixV1Tests(unittest.TestCase):
     def test_security_flag_escalation_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for location in (m.MANIFEST, m.FACTS, m.GAP):
+            for location in (m.MANIFEST, m.FACTS, m.GAP,
+                             m.ROOT / "data/device-catalog/research/stm32h5-commercial-icpn.csv"):
                 dest = root / location.relative_to(m.ROOT)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(location, dest)
