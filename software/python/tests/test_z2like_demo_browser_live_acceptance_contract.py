@@ -60,6 +60,16 @@ def test_negative_lifecycle_authorization_probes_are_state_preserving() -> None:
     assert '_set_lifecycle(session, args.alias, "disabled", timeout_s=30.0)' in source
 
 
+def test_live_gate_does_not_use_programming_registration_as_platform_maintenance_lock() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "commissioned Bootstrap upload" not in source
+    assert "commissioned Bootstrap deployment" not in source
+    assert "ppu_maintenance_required" not in source
+    disable = source.index('_set_lifecycle(session, args.alias, "disabled", timeout_s=30.0)')
+    deploy = source.index("_upload_and_deploy(", disable)
+    assert disable < deploy
+
+
 def test_live_gate_qualifies_openocd_managed_path_and_eight_site_isolation() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")

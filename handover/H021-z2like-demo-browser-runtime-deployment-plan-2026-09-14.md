@@ -1,10 +1,10 @@
 # H021 — z2like-demo Browser Runtime Deployment Management Path
 
 **Date:** 2026-09-14  
-**Updated:** 2026-09-15  
+**Updated:** 2026-10-10  
 **Project:** Plasma  
 **Scope:** Render Control Station -> controlled QEMU Bootstrap management path  
-**Status:** Browser Runtime live path qualified on SWPC/QEMU; active-Site-Job negative follow-up still pending corrected live evidence
+**Status:** Browser Runtime live requalification in progress after correcting a stale Registration/Platform-maintenance assertion; active-Site-Job negative follow-up still pending corrected live evidence
 
 ## Implemented path
 
@@ -52,9 +52,12 @@ The qualified Programming path remains independently mapped to QEMU `:18080`.
   Public Bootstrap status remains read-only.
 - Add/remove/endpoint mutation and unrelated PATCH fields fail closed at the BFF.
 - Manager remains authoritative for lifecycle safety: disabling is rejected while
-  Site execution is active; commissioning requires a current trusted observation;
-  Runtime upload/deploy still requires the normal pending/disabled maintenance and
-  trusted-idle gates.
+  Site execution is active and commissioning requires a current trusted observation.
+  Programming Registration is not the Platform maintenance lock: an authorized
+  commissioned PPU may enter Bootstrap maintenance when trusted-idle/platform-state
+  gates permit it. The canonical operator flow still disables Programming
+  Registration before Runtime upload/deploy so no new programming work is admitted
+  during Platform maintenance.
 - SWPC exposes no generic Bootstrap API and no direct public `:18081` listener;
   only the fixed `__plasma/bootstrap` allowlist is projected through `:18082`.
 - SWPC host `127.0.0.1:18081` diagnostics retirement boundary is unchanged.
@@ -67,7 +70,7 @@ Verify & Pair Bootstrap token                authenticated, no Runtime mutation
 receive short-lived maintenance capability  browser-only opaque cookie
 commissioned -> disabled                     capability + Manager busy gate
 disabled trusted-idle proof                  Manager authoritative
-upload / commit / deploy                     capability + lifecycle admission
+upload / commit / deploy                     capability + trusted-idle/platform-state gate
 Runtime returns runtime_active               observed evidence
 disabled -> commissioned                     capability + trusted enable gate
 ```
@@ -102,6 +105,14 @@ PR #595 also produced Browser Runtime live run `34946492407`; the exact merge
 commit `709e7e84876b7d5c8875679a0c68565367692a44` was built, deployed and returned
 `runtime_active` with the configured-Mock 8-Site Programming regression passing.
 
+On 2026-10-10, OpenOCD closure requalification run `37938029019` attempt 4
+exposed a stale live-acceptance assertion: it expected commissioned Bootstrap
+upload/deploy to fail with `ppu_maintenance_required`, while the Manager contract
+and its unit tests intentionally allow a commissioned, trusted-idle PPU to enter
+Platform maintenance. The runtime returned HTTP 201 as designed. The live gate
+was corrected to stop treating Programming Registration as the Platform
+maintenance lock while retaining explicit disable-before-deploy quiescing.
+
 ### Automated live coverage in this gate
 
 ```text
@@ -112,7 +123,6 @@ verified pairing returns maintenance capability    -> required
 lifecycle PATCH without capability                 -> BLOCKED
 cross-origin lifecycle/Bootstrap mutation          -> BLOCKED
 tampered capability                                -> BLOCKED
-commissioned Bootstrap upload/deploy mutation      -> BLOCKED
 commissioned -> disabled when idle                 -> required
 bounded upload through Manager                     -> required
 Runtime deployment through Bootstrap               -> required
