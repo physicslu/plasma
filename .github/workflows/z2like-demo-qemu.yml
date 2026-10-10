@@ -121,6 +121,7 @@ jobs:
             software/python/tests/test_z2like_demo_qemu_contract.py \
             software/python/tests/test_z2like_demo_qemu_control_plane_contract.py \
             software/python/tests/test_z2like_demo_qemu_e2e_contract.py \
+            software/python/tests/test_z2like_qemu_openocd_cache_contract.py \
             software/python/tests/test_openocd_runtime_artifact.py \
             software/python/tests/test_plasmactl_deployment_profiles.py \
             software/python/tests/test_render_deployment.py
