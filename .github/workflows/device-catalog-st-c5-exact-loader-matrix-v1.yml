@@ -36,11 +36,8 @@ jobs:
           python-version: '3.12'
       - name: Keep all Production ICPN identities SHA locked
         run: python scripts/ci/device-catalog-production-invariants.py
-      - name: Verify historic pinned DFP and original ST Tcl source safety gates
-        run: |
-          set -euo pipefail
-          python data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py
-          python data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py
+      - name: Verify historical source pins against current Production 4629/172 baseline
+        run: python data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py
       - name: Test 172 C5 individual blocked backend candidates
         run: |
           python -m unittest discover -s data/device-catalog/research \
