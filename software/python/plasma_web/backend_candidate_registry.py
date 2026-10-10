@@ -93,13 +93,27 @@ def _catalog_family(catalog: DeviceCatalog, family: str, expected: int) -> list[
 class BackendCandidateRegistry:
     """Immutable read-only candidate lookup; never accepted as execution input."""
 
-    def __init__(self, catalog: DeviceCatalog, root: Path = ROOT):
+    def __init__(self, catalog: DeviceCatalog, root: Path = ROOT, *,
+                 allow_missing_sources: bool = False):
         self.catalog_revision_sha256 = catalog.revision_sha256
         self._by_icpn: dict[str, dict[str, Any]] = {}
+        self.evidence_available = False
         if not any(r.family in {"STM32H5", "STM32C5"} for r in catalog.records):
             return  # Alternate catalog without the candidate cohorts: no candidates.
         _ensure(catalog.status == "production", "requires a Production Catalog")
         _ensure(catalog.size == 4629, "unexpected Production Catalog size")
+        # Packaged PPU runtimes may include the official Production Catalog but
+        # exclude research-only source evidence. They must keep the device search
+        # operational, and must not fabricate or partially expose candidates.
+        # Present-but-mutated evidence still fails the strict integrity checks.
+        if allow_missing_sources and any(
+            not (root / name).is_file() for name in (
+                "release/openocd.json",
+                "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json",
+                H5_FACTS, C5_CROSSWALK, C5_DFP_REPORT, C5_STATIC_GATE,
+            )
+        ):
+            return
         upstream, gap = load_source_authorities(root)
         _ensure(upstream["source_commit"] == gap["packaged_runtime"]["commit"],
                 "OpenOCD release mismatch")
@@ -111,6 +125,7 @@ class BackendCandidateRegistry:
         _ensure(len(self._by_icpn) == 362, "candidate coverage must be 362 exact identities")
         _ensure(Counter(x["family"] for x in self._by_icpn.values()) ==
                 {"STM32H5": 190, "STM32C5": 172}, "unexpected candidate family count")
+        self.evidence_available = True
 
     def _add(self, row: DeviceCatalogRecord, candidate: dict[str, Any]) -> None:
         _ensure(row.identifier not in self._by_icpn, f"duplicate candidate: {row.identifier}")
@@ -304,4 +319,6 @@ class BackendCandidateRegistry:
 
 @lru_cache(maxsize=1)
 def get_default_backend_candidate_registry() -> BackendCandidateRegistry:
-    return BackendCandidateRegistry(get_default_device_catalog())
+    # Research evidence is optional in slim deployed PPU bundles. Missing
+    # candidate files may suppress display only, never block Production search.
+    return BackendCandidateRegistry(get_default_device_catalog(), allow_missing_sources=True)
