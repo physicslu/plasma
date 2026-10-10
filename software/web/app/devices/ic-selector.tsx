@@ -294,9 +294,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 ? (zh
                   ? "這顆 IC 已收錄於 Production Catalog，但目前沒有可執行的 OpenOCD Backend，無法視為已支援燒錄。"
                   : "This IC is in the Production Catalog, but no executable OpenOCD backend is mapped. It is not programming-qualified.")
-                : (zh
-                  ? "原廠料號已確認且 OpenOCD 設定已存在，但這兩項都不代表 PPU 或 Socket 已完成實機測試。實機驗證必須另外建立對應的 PPU / Socket 測試證據。"
-                  : "The manufacturer part is confirmed and an OpenOCD configuration exists, but neither proves PPU or Socket hardware validation. PPU/Socket test evidence remains separate.")}
+                : (selected.backend.mapping_status === "mapped"
+                  ? (zh
+                    ? "原廠料號已確認且 OpenOCD 設定已存在，但這兩項都不代表 PPU 或 Socket 已完成實機測試。實機驗證必須另外建立對應的 PPU / Socket 測試證據。"
+                    : "The manufacturer part is confirmed and an OpenOCD configuration exists, but neither proves PPU or Socket hardware validation. PPU/Socket test evidence remains separate.")
+                  : (zh
+                    ? "這顆原廠料號已收錄，但尚無正式 OpenOCD Mapping 或足夠實機證據。"
+                    : "This manufacturer part is cataloged without a Production OpenOCD mapping or physical qualification."))}
             </div>
           </>
         ) : (
