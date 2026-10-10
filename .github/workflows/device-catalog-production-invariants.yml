@@ -40,4 +40,3 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s software/python/tests -p 'test_icpn_backend_provenance_v1.py' -v
           python scripts/device-catalog-backend-provenance.py
-
