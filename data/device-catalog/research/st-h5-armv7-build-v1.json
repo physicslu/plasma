@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "gate_id": "st-h5-armv7-build-v1",
+  "status": "ISOLATED_ARMV7_BUILD_EXPERIMENT_ONLY",
+  "source": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "target_config_blob": "b9e67c604f7d824fefca03b42d0b112e1785235a",
+    "flash_driver_blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5",
+    "registry_blob": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+  },
+  "scope": {
+    "architecture": "armv7l",
+    "userspace": "Ubuntu 22.04 arm32v7",
+    "runtime_version_expected": "0.12.0",
+    "project_artifact_tool": "scripts/openocd-runtime.py",
+    "target_config": "target/stm32h5x.cfg",
+    "uploads_binary": false,
+    "publishes_package": false,
+    "deployment_requested": false
+  },
+  "requirements": {
+    "armv7_build_compiled": false,
+    "source_hashes_verified_in_job": false,
+    "packaged_runtime_executes_armv7": false,
+    "target_config_offline_parse_verified": false,
+    "artifact_checksum_verified": false,
+    "fpga_swd_adapter_verified": false,
+    "physical_ic_connected": false,
+    "programming_profile_verified": false,
+    "electrical_profile_verified": false,
+    "erase_program_verify_tested": false,
+    "production_write_authorized": false,
+    "hardware_runtime_ready": false
+  },
+  "next_gate": "If ARMv7 build succeeds, qualify Plasma FPGA SWD adapter binding and then an approved read-only physical H5 probe; do not promote Production mappings yet."
+}
