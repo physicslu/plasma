@@ -29,6 +29,6 @@ After this first build passes, the separately approved next work item is **ARMv7
 
 ## Local re-run
 
-The complete isolated compilation recipe is in [the dedicated CI workflow](../../../../.github/workflows/device-catalog-st-h5-host-build-v1.yml). It intentionally relies on the public ST GitHub repository and runner-installed build dependencies. It never modifies local working directories outside the runner's temporary directory.
+The complete isolated compilation recipe is in [the dedicated CI workflow](../../../.github/workflows/device-catalog-st-h5-host-build-v1.yml). It intentionally relies on the public ST GitHub repository and runner-installed build dependencies. It never modifies local working directories outside the runner's temporary directory.
 
 **Do not report these Host-only tests as real programming, manufacturing or HIL evidence.**
