@@ -24,3 +24,7 @@ The workflow intentionally uploads only JSON evidence. It does not publish or re
 ## Next gate
 
 After PASS, the next meaningful gate is the actual PLASMA SWD transport binding plus an approved read-only physical H5 identification/flash-bank probe. Physical mutation remains prohibited until electrical/profile prerequisites are verified.
+
+## Pull-request execution
+
+This experiment is executed by draft PR #794. A PR-synchronize event is intentionally used so the newly added workflow is evaluated from the proposed branch before any merge.
