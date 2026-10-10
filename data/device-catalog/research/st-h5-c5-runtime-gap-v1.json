@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "audit_id": "st-h5-c5-runtime-gap-v1",
+  "reference_date_utc": "2026-10-10",
+  "record_state": "SOURCE_RESEARCH_ONLY_NO_RUNTIME_PROMOTION",
+  "catalog_baseline": {
+    "total_exact_icpns": 4629,
+    "production_sources": 28,
+    "mapped": 4164,
+    "no_mapping": 465,
+    "runtime_blocked_exact": 465,
+    "active_openocd_routes": 4085,
+    "active_denominator": 4550,
+    "target_family_counts": {
+      "STM32H5": 190,
+      "STM32C5": 172
+    },
+    "remaining_blocked_family_counts": {
+      "STM32C5": 172,
+      "STM32H5": 190,
+      "STM32N6": 32,
+      "STM32WB0": 24,
+      "STM32WL3": 47
+    },
+    "h5_series_counts": {
+      "STM32H503": 14,
+      "STM32H523": 39,
+      "STM32H533": 14,
+      "STM32H543": 4,
+      "STM32H553": 2,
+      "STM32H562": 22,
+      "STM32H563": 37,
+      "STM32H573": 23,
+      "STM32H5E4": 13,
+      "STM32H5E5": 9,
+      "STM32H5F4": 9,
+      "STM32H5F5": 4
+    }
+  },
+  "packaged_runtime": {
+    "repository": "openocd-org/openocd",
+    "version": "0.12.0",
+    "commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "h5_config_packaged": false,
+    "c5_config_packaged": false
+  },
+  "candidate_st_fork": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "branch": "openocd-cubeide-r7",
+    "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "files": {
+      "h5_cfg": {
+        "path": "tcl/target/stm32h5x.cfg",
+        "blob": "b9e67c604f7d824fefca03b42d0b112e1785235a"
+      },
+      "h5_flash_driver": {
+        "path": "src/flash/nor/stm32h5x.c",
+        "blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5"
+      },
+      "h5_flash_header": {
+        "path": "src/flash/nor/stm32h5x.h",
+        "blob": "980ed4673939dd31b14efc74941bbcb10ddbe7ed"
+      },
+      "c5_cfg": {
+        "path": "tcl/target/stm32c5x.cfg",
+        "blob": "03bce02b166b669ca0d7515656bca68ff4db8b84"
+      },
+      "c5_stldr_driver": {
+        "path": "src/flash/nor/stldr_driver.c",
+        "blob": "99d51e696cd5cfa64948e479102472fb126afafa"
+      },
+      "flash_registry": {
+        "path": "src/flash/nor/drivers.c",
+        "blob": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+      },
+      "flash_makefile": {
+        "path": "src/flash/nor/Makefile.am",
+        "blob": "3b4f1a1c714460acc5d5e608ae1c220fa1b3c36c"
+      }
+    },
+    "license_marker": "GPL-2.0-or-later; verify build and redistribution compliance"
+  },
+  "h5_source_observations": {
+    "target_flash_driver": "stm32h5x",
+    "read_erase_write_probe_entrypoints_present": true,
+    "device_id_groups": [
+      "0x474",
+      "0x478",
+      "0x47A",
+      "0x47C",
+      "0x484"
+    ],
+    "secure_nonsecure_flash_banks_declared": true,
+    "option_and_mass_erase_commands_present_and_risky": true,
+    "real_silicon_qualifications": 0
+  },
+  "c5_source_observations": {
+    "target_flash_driver": "stldr",
+    "source_loader_table_empty": true,
+    "source_uses_scalar_set_instead_of_tcl_array": true,
+    "source_default_workarea_bytes": 32768,
+    "loader_family_groups": 3,
+    "dfp_exact_variant_matches": 139,
+    "dfp_base_only_variants": 33,
+    "dfp_source_report": "st-c5-dfp-commercial-loader-crosswalk-v0.9.json",
+    "ps_static_gate_report": "st-c5-ps-backend-static-gate-v1.1.json"
+  },
+  "production_gates": {
+    "st_fork_openocd_binary_compiled_for_z2_armv7": false,
+    "st_fork_binary_sha256_and_build_manifest_verified": false,
+    "plasma_swd_adapter_compatible_with_candidate_fork": false,
+    "h5_real_readonly_target_and_die_id_qualified": false,
+    "h5_erase_program_verify_qualified": false,
+    "c5_pinned_local_loader_table_deployed": false,
+    "c5_tcl_array_defects_qualified_in_full_runtime": false,
+    "c5_redistribution_and_licensing_review_complete": false,
+    "c5_loader_ram_compatibility_qualified": false,
+    "c5_real_readonly_target_and_die_id_qualified": false,
+    "c5_erase_program_verify_qualified": false,
+    "selected_ic_electrical_profile_verified": false,
+    "catalog_backend_write_authorized": false,
+    "h5_or_c5_hardware_runtime_ready": false
+  }
+}
