@@ -196,6 +196,9 @@ class BackendCandidateRegistryTests(unittest.TestCase):
         from dataclasses import replace
         self.assertIsNone(self.registry.lookup(replace(row, production_admitted=False)))
         self.assertIsNone(self.registry.lookup(replace(row, mapping_status="mapped")))
+        self.assertIsNone(self.registry.lookup(replace(row, vendor="OtherVendor")))
+        self.assertIsNone(self.registry.lookup(replace(row, family="STM32C5")))
+        self.assertIsNone(self.registry.lookup(replace(row, catalog_revision_sha256="0" * 64)))
 
     def test_documented_source_commits_are_pinned(self):
         h5 = self.registry.lookup(self.exact("STM32H503CBT6"))
