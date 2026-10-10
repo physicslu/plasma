@@ -75,7 +75,7 @@ Runtime returns runtime_active               observed evidence
 disabled -> commissioned                     capability + trusted enable gate
 ```
 
-## Post-merge Browser Runtime live gate
+## Manually dispatched post-deployment Browser Runtime live gate
 
 The live-acceptance transaction uses:
 
@@ -84,11 +84,20 @@ The live-acceptance transaction uses:
 
 The workflow is intentionally split:
 
-- Pull requests run source/contract validation only.
-- Live mutation is permitted only for `physicslu/plasma`, `refs/heads/main`, on
-  the trusted `[self-hosted, linux, x64, plasma-integration]` SWPC runner.
-- The public Render deployment must be the triggering `main` commit or a later
-  descendant before Browser acceptance starts.
+- Pull requests and matching `main` pushes run source/contract validation only.
+- Render deployment for `z2like-demo` is operator-triggered; a GitHub `main`
+  push is not treated as proof that the public Render service has deployed.
+- After the operator confirms the Render deployment is complete, the Browser
+  Runtime workflow is started manually with `workflow_dispatch` on `main`.
+- Live mutation is permitted only for that manual dispatch in
+  `physicslu/plasma`, `refs/heads/main`, on the trusted
+  `[self-hosted, linux, x64, plasma-integration]` SWPC runner.
+- The public Render deployment must be the manually dispatched `main` commit
+  or a later descendant before Browser acceptance starts.
+- The chained active-Site-Job live-negative gate may perform SWPC mutation only
+  when the successful upstream Browser Runtime run itself came from
+  `workflow_dispatch`; a contract-only `push` run cannot indirectly trigger
+  the live-negative mutation.
 - The canonical ARMv7 Z2 PS kit is built from the accepted source commit before
   pairing, so the 15-minute Browser maintenance capability is not consumed by
   the build stage.
@@ -112,6 +121,14 @@ and its unit tests intentionally allow a commissioned, trusted-idle PPU to enter
 Platform maintenance. The runtime returned HTTP 201 as designed. The live gate
 was corrected to stop treating Programming Registration as the Platform
 maintenance lock while retaining explicit disable-before-deploy quiescing.
+
+A subsequent main-only run `38037498800` showed a separate orchestration
+mismatch: the workflow still auto-started its SWPC live job on `push`, while
+`z2like-demo` Render deployment had been changed to an operator-triggered
+deployment. The run failed safely in public deployment preflight before ARMv7
+kit build or Browser mutation. The orchestration contract was therefore changed
+so `push` remains contract-only and SWPC live qualification begins only after
+the operator deploys Render and manually dispatches the workflow.
 
 ### Automated live coverage in this gate
 
