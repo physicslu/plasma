@@ -30,7 +30,7 @@ jobs:
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
               apt-get install -y --no-install-recommends \
-                ca-certificates git make gcc gcc-arm-linux-gnueabihf \
+                ca-certificates git make gcc gcc-arm-linux-gnueabihf libc6-dev-armhf-cross \
                 autoconf automake libtool pkg-config texinfo file
               git clone --quiet https://github.com/STMicroelectronics/OpenOCD.git /work/src
               git -C /work/src checkout --quiet --detach c8d973bdad9a6fddb51459eda109b3b95d23b57a
@@ -42,9 +42,15 @@ jobs:
               cd /work/src
               ./bootstrap
               export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
-              ./configure --host=arm-linux-gnueabihf \
+              printf "int main(void){return 0;}\\n" >/work/cc-probe.c
+              arm-linux-gnueabihf-gcc /work/cc-probe.c -o /work/cc-probe
+              file /work/cc-probe | grep -E "ELF 32-bit.*ARM"
+              if ! ./configure --host=arm-linux-gnueabihf \
                 --prefix=/work/prefix \
-                --enable-dummy --disable-werror --without-capstone
+                --enable-dummy --disable-werror --without-capstone; then
+                tail -n 140 config.log
+                exit 2
+              fi
               make -j2
               make install
               test -x /work/prefix/bin/openocd
