@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "gate_id": "st-h5-host-build-v1-result",
+  "status": "HOST_BUILD_ONLY_PASS",
+  "github_actions": {
+    "workflow_run_id": 38020833350,
+    "job_id": 114121246138,
+    "artifact_id": 11658960665,
+    "artifact_name": "st-h5-openocd-host-build-v1-evidence-only",
+    "artifact_zip_sha256": "ca329fd05399c9adcda1ccf612410dd58d2c77d2249fee80bc399e6663304129"
+  },
+  "source": {
+    "repository": "STMicroelectronics/OpenOCD",
+    "commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+    "target_config_blob": "b9e67c604f7d824fefca03b42d0b112e1785235a",
+    "flash_driver_blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5",
+    "registry_blob": "219dfa9a4a87a96d43b5e7496cbab47092f77b7a"
+  },
+  "observed": {
+    "host_architecture": "x86_64",
+    "runtime_id": "0.12.0-c8d973bdad9a",
+    "artifact_sha256": "1758f03aef0a9ce6bbd212343622b174a85f0bda446bb2e26763113f460a64db",
+    "payload_sha256": "af506c77d06ffb22b178cde078f13f6a8b9272eb101695e1ea1dc00f09dc967e",
+    "offline_jtag_dummy_parse_pass": true
+  },
+  "claims": {
+    "host_build_compiled": true,
+    "source_hashes_verified": true,
+    "target_config_offline_parse_verified": true,
+    "artifact_checksum_verified": true,
+    "z2_armv7_built": false,
+    "fpga_swd_adapter_verified": false,
+    "ppu_deployed": false,
+    "real_h5_probe_verified": false,
+    "erase_program_verify_qualified": false,
+    "programming_profile_verified": false,
+    "electrical_profile_verified": false,
+    "hardware_runtime_ready": false,
+    "production_write_authorized": false,
+    "binary_uploaded_or_distributed": false
+  },
+  "evidence_boundary": "Host-only source/build/config-load evidence. Not ARMv7, SWD, physical IC, programming, HIL, or Production runtime evidence."
+}
