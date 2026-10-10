@@ -1,0 +1,85 @@
+name: STM32C5 exact loader readiness offline matrix v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-c5-exact-loader-matrix-v1.yml'
+      - 'data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py'
+      - 'data/device-catalog/research/test_validate_st_c5_exact_loader_matrix_v1.py'
+      - 'data/device-catalog/research/ST_C5_EXACT_LOADER_READINESS_MATRIX_V1.md'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*'
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+      - 'data/device-catalog/research/stm32c5-commercial-icpn.csv'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-st-c5-exact-loader-matrix-v1.yml'
+      - 'data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py'
+      - 'data/device-catalog/research/test_validate_st_c5_exact_loader_matrix_v1.py'
+      - 'data/device-catalog/research/ST_C5_EXACT_LOADER_READINESS_MATRIX_V1.md'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*'
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+      - 'data/device-catalog/research/stm32c5-commercial-icpn.csv'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-st-c5-loader-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Keep all Production ICPN identities SHA locked
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Verify historic pinned DFP and original ST Tcl source safety gates
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/validate_st_c5_dfp_loader_crosswalk_v09.py
+          python data/device-catalog/research/validate_st_c5_ps_backend_static_gate_v11.py
+      - name: Test 172 C5 individual blocked backend candidates
+        run: |
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_validate_st_c5_exact_loader_matrix_v1.py' -v
+      - name: Export metadata-only 172 exact C5 candidates and two examples
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py \
+            --output-dir "$RUNNER_TEMP/c5-readiness"
+          python data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py \
+            --icpn STM32C531CBT3TR > "$RUNNER_TEMP/c5-readiness/base-only.json"
+          python data/device-catalog/research/validate_st_c5_exact_loader_matrix_v1.py \
+            --icpn STM32C531CBT6 > "$RUNNER_TEMP/c5-readiness/exact-dfp.json"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "c5-readiness"
+          summary = json.loads((root / "st-c5-exact-loader-readiness-v1-summary.json").read_text())
+          body = (root / "st-c5-exact-loader-readiness-v1.jsonl").read_bytes()
+          assert len(body.splitlines()) == summary["production_c5_exact_icpns"] == 172
+          assert summary["dfp_exact_dvariant_present"] == 139
+          assert summary["dfp_exact_dvariant_missing"] == 33
+          assert summary["production_exact_metadata_missing"] == 0
+          assert summary["candidate_loader_group_count"] == 3
+          assert summary["production_write_authorized"] is False
+          assert summary["hardware_runtime_ready"] is False
+          assert hashlib.sha256(body).hexdigest() == summary["records_jsonl_sha256"]
+          missing = json.loads((root / "base-only.json").read_text())
+          assert missing["dfp_exact_dvariant_present"] is False
+          assert missing["official_exact_catalog_metadata_verified"] is True
+          exact = json.loads((root / "exact-dfp.json").read_text())
+          assert exact["dfp_exact_dvariant_present"] is True
+          assert exact["hardware_runtime_ready"] is False
+          print("C5 172 offline loader readiness matrix: PASS")
+          PY
+      - name: Publish research JSON only; no vendor xldr or OpenOCD binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-c5-exact-loader-readiness-v1
+          path: ${{ runner.temp }}/c5-readiness/
+          retention-days: 14
+          if-no-files-found: error
