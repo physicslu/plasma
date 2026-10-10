@@ -1,0 +1,70 @@
+name: ICPN Backend Candidate Registry v1
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/device-catalog-backend-candidate-registry-v1.yml"
+      - "software/python/plasma_web/backend_candidate_registry.py"
+      - "software/python/plasma_web/gateway.py"
+      - "software/python/tests/test_icpn_backend_candidate_registry_v1.py"
+      - "software/web/app/devices/ic-selector.tsx"
+      - "software/web/app/devices/devices.css"
+      - "software/web/app/device-catalog-api.ts"
+      - "software/web/tests/icpn-backend-candidate-registry-contract.test.mjs"
+      - "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json"
+      - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
+      - "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json"
+      - "data/device-catalog/production/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/device-catalog-backend-candidate-registry-v1.yml"
+      - "software/python/plasma_web/backend_candidate_registry.py"
+      - "software/python/plasma_web/gateway.py"
+      - "software/python/tests/test_icpn_backend_candidate_registry_v1.py"
+      - "software/web/app/devices/ic-selector.tsx"
+      - "software/web/app/devices/devices.css"
+      - "software/web/app/device-catalog-api.ts"
+      - "software/web/tests/icpn-backend-candidate-registry-contract.test.mjs"
+      - "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json"
+      - "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.*"
+      - "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json"
+      - "data/device-catalog/production/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-only-candidate-registry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Confirm canonical Production exact ICPNs remain unchanged
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Audit all existing ICPN OpenOCD source provenance
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m unittest discover -s software/python/tests -p 'test_icpn_backend_provenance_v1.py' -v
+      - name: Test 362 research-only Backend Candidate Registry records
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m unittest discover -s software/python/tests -p 'test_icpn_backend_candidate_registry_v1.py' -v
+      - name: Test gateway device catalog route regression
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m unittest discover -s software/python/tests -p 'test_device_catalog_web_gateway.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run IC Selector research/production boundary contract tests
+        working-directory: software/web
+        run: |
+          node --test tests/ic-selector-contract.test.mjs tests/icpn-backend-candidate-registry-contract.test.mjs
