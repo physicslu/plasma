@@ -37,6 +37,10 @@ def test_live_gate_reconciles_user_owned_maintenance_manager_without_root_ingres
     assert "scripts/z2like-demo-qemu.py" in workflow
     assert "configure-control-station" in workflow
     assert "http://127.0.0.1:18082/__plasma/bootstrap/v1/status" in workflow
+    assert "curl -4 --http1.1 --fail --silent --show-error" in workflow
+    assert "--retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 70" in workflow
+    assert "--connect-timeout 5 --max-time 20" in workflow
+    assert "https://z2like-demo.open4th.com/deployment.json" in workflow
     assert "Run ./scripts/plasmactl update z2like-demo as an operator before rerunning this gate." in workflow
 
 
