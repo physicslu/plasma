@@ -77,9 +77,10 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
 
 
 def source_authority() -> tuple[dict, dict, dict]:
-    # v0.9 validates its historical snapshot and fully replayed research-ledger
-    # group/DFP observations. Historical Production=2683 is *not* today's count.
-    v09.validate()
+    # v0.9 is a historical source ledger. Its validate() transitively asserts
+    # the superseded ST Production 2683-exact/23-source state and CANNOT be
+    # replayed as a current baseline. Reuse immutable source facts/row checks
+    # here while get_catalog() independently locks today's 4629/172 snapshot.
     dfp = json.loads(DFP_REPORT.read_text(encoding="utf-8"))
     fork = json.loads(FORK_REPORT.read_text(encoding="utf-8"))
     ensure(dfp["record_state"] == "RESEARCH_ONLY_NOT_PRODUCTION_ADMISSION" and
