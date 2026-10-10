@@ -161,7 +161,7 @@ class H5OfflineMatrixV1Tests(unittest.TestCase):
                 shutil.copy2(location, dest)
             fake = root / m.FACTS.relative_to(m.ROOT)
             facts = json.loads(fake.read_text(encoding="utf-8"))
-            facts["qualification"]["programming_write_authorized"] = True
+            facts["qualification"]["unsafe_vendor_commands_authorized"] = True
             fake.write_text(json.dumps(facts), encoding="utf-8")
             with self.assertRaisesRegex(m.OfflineMatrixError, "must be false"):
                 m._load(root)
