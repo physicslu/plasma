@@ -8,7 +8,6 @@ on:
       - 'software/python/tests/test_icpn_backend_provenance_v1.py'
       - 'scripts/device-catalog-backend-provenance.py'
       - 'release/openocd.json'
-      - 'data/device-catalog/production/**'
       - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
       - 'data/device-catalog/research/ICPN_BACKEND_PROVENANCE_V1.md'
   push:
@@ -19,7 +18,6 @@ on:
       - 'software/python/tests/test_icpn_backend_provenance_v1.py'
       - 'scripts/device-catalog-backend-provenance.py'
       - 'release/openocd.json'
-      - 'data/device-catalog/production/**'
       - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
       - 'data/device-catalog/research/ICPN_BACKEND_PROVENANCE_V1.md'
   workflow_dispatch:
