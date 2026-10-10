@@ -229,6 +229,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       {manufacturerPartLabel(device.catalog_verification.status, zh)}
                     </span>
                   </div>
+                  {device.backend_candidate?.status === "research_only" && (
+                    <div className="icSelectorCandidateHint">
+                      {zh ? "ST 原始碼候選 · 僅研究，禁止燒錄" : "ST source candidate · Research only, not programmable"}
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -255,6 +260,20 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
+              {selected.backend_candidate && (
+                <>
+                  <div><dt>{zh ? "候選引擎" : "Candidate engine"}</dt><dd>{selected.backend_candidate.flash_driver} · {zh ? "僅研究" : "research only"}</dd></div>
+                  <div><dt>{zh ? "預期晶片 ID" : "Expected device ID"}</dt><dd><code>{selected.backend_candidate.expected_device_id}</code> ({zh ? "原始碼推定，未實測" : "source inferred, not measured"})</dd></div>
+                  <div><dt>{zh ? "候選設定檔" : "Candidate config"}</dt><dd><code>{selected.backend_candidate.target_config_source_path}</code> ({zh ? "未安裝" : "not installed"})</dd></div>
+                  <div><dt>{zh ? "來源 Commit" : "Source commit"}</dt><dd><code>{shortRevision(selected.backend_candidate.source_commit)}</code></dd></div>
+                  {selected.backend_candidate.loader_source_path && (
+                    <div><dt>{zh ? "候選 Flash Loader" : "Candidate Flash loader"}</dt><dd><code>{selected.backend_candidate.loader_source_path}</code> ({zh ? "未安裝／未驗證" : "not installed/verified"})</dd></div>
+                  )}
+                  {selected.backend_candidate.dfp_exact_variant_status && (
+                    <div><dt>{zh ? "DFP 精確料號" : "DFP exact variant"}</dt><dd>{selected.backend_candidate.dfp_exact_variant_status === "exact" ? (zh ? "符合舊版 DFP" : "matched in pinned DFP") : (zh ? "僅 Base Device，待補強適用性" : "base device only; applicability pending")}</dd></div>
+                  )}
+                </>
+              )}
               <div><dt>Catalog Revision</dt><dd><code>{shortRevision(selected.catalog.revision_sha256)}</code></dd></div>
               <div><dt>Authority</dt><dd>{selected.catalog_verification.source_authority ?? "—"}</dd></div>
               <div><dt>ICPN Evidence</dt><dd>{humanizeStatus(selected.catalog_verification.status)}</dd></div>
@@ -262,10 +281,22 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
             </dl>
 
+            {selected.backend_candidate && (
+              <div className="icSelectorCandidateBoundary" role="note">
+                <strong>{zh ? "Backend Candidate Registry · 尚不可燒錄" : "Backend Candidate Registry · Not programmable"}</strong>
+                <p>{zh
+                  ? "僅有固定來源版本的研究證據；預期 Device ID 尚未從實體 IC 讀取，FPGA SWD、電氣條件及 Flash 操作都尚未驗證。候選資訊不會修改 Production Mapping。"
+                  : "Source-pinned research only. Silicon ID, FPGA SWD, electrical limits and Flash operations have not been verified. This candidate does not modify Production Mapping."}</p>
+              </div>
+            )}
             <div className="icSelectorBoundary">
-              {zh
-                ? "原廠料號已確認且 OpenOCD 設定已存在，但這兩項都不代表 PPU 或 Socket 已完成實機測試。實機驗證必須另外建立對應的 PPU / Socket 測試證據。"
-                : "The manufacturer part is confirmed and an OpenOCD configuration exists, but neither proves PPU or Socket hardware validation. PPU/Socket test evidence remains separate."}
+              {selected.backend_candidate
+                ? (zh
+                  ? "這顆 IC 已收錄於 Production Catalog，但目前沒有可執行的 OpenOCD Backend，無法視為已支援燒錄。"
+                  : "This IC is in the Production Catalog, but no executable OpenOCD backend is mapped. It is not programming-qualified.")
+                : (zh
+                  ? "原廠料號已確認且 OpenOCD 設定已存在，但這兩項都不代表 PPU 或 Socket 已完成實機測試。實機驗證必須另外建立對應的 PPU / Socket 測試證據。"
+                  : "The manufacturer part is confirmed and an OpenOCD configuration exists, but neither proves PPU or Socket hardware validation. PPU/Socket test evidence remains separate.")}
             </div>
           </>
         ) : (
