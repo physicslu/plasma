@@ -8,6 +8,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
+
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 MANIFEST=ROOT/"data/device-catalog/production/icpn-v1-manifest.json"
@@ -54,12 +56,19 @@ def main()->int:
         "G4 ordering authority drift")
 
     data=G4.read_bytes()
-    req(hashlib.sha256(data).hexdigest()==EXPECTED_G4_SHA256,"G4 SHA256 drift")
-    req(git_blob(data)==EXPECTED_G4_BLOB,"G4 git blob drift")
     with G4.open(newline="",encoding="utf-8") as f:
         rows=list(csv.DictReader(f))
+    v631_state=backend_state_v631(rows,"STM32G4")
+    publication_rows=rewind_v631_backend(rows,"STM32G4")
+    hist=io.StringIO(newline="")
+    hw=csv.DictWriter(hist,fieldnames=list(publication_rows[0]),lineterminator="\n")
+    hw.writeheader();hw.writerows(publication_rows)
+    historical_data=hist.getvalue().encode()
+    req(hashlib.sha256(historical_data).hexdigest()==EXPECTED_G4_SHA256,"G4 historical SHA256 drift")
+    req(git_blob(historical_data)==EXPECTED_G4_BLOB,"G4 historical git blob drift")
     req(len(rows)==273 and len({r["icpn"] for r in rows})==273,"G4 poststate count/unique drift")
     by_icpn={r["icpn"]:r for r in rows}
+    publication_by_icpn={r["icpn"]:r for r in publication_rows}
 
     gaps=sorted(x.strip() for x in GAPS.read_text(encoding="utf-8").splitlines() if x.strip())
     req(len(gaps)==248 and len(set(gaps))==248,"G4 gap ledger drift")
@@ -67,15 +76,15 @@ def main()->int:
     req(gap_hash==EXPECTED_GAP_SHA256,"G4 gap digest drift")
     req(set(gaps)<=set(by_icpn),"approved G4 candidate missing from Production")
 
-    added=[by_icpn[x] for x in gaps]
+    added=[publication_by_icpn[x] for x in gaps]
     added_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in added)
     req(added_state==Counter({"mapped":247,"no_mapping":1}),
         f"approved G4 backend partition drift: {dict(added_state)}")
-    all_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in rows)
+    all_state=Counter("no_mapping" if r["mapping_status"]=="no_mapping" else "mapped" for r in publication_rows)
     req(all_state==Counter({"mapped":272,"no_mapping":1}),
         f"G4 backend poststate drift: {dict(all_state)}")
 
-    no_mapping=[r for r in rows if r["mapping_status"]=="no_mapping"]
+    no_mapping=[r for r in publication_rows if r["mapping_status"]=="no_mapping"]
     req([r["icpn"] for r in no_mapping]==["STM32G491RCY6TR"],"G4 no_mapping identity drift")
     for r in rows:
         req(r["manufacturer"]=="STMicroelectronics" and r["family"]=="STM32G4",
@@ -128,10 +137,11 @@ def main()->int:
     g4=[s for s in sources if s["manufacturer"]=="STMicroelectronics" and s["family"]=="STM32G4"]
     req(len(g4)==1,"Production G4 source missing/duplicated")
     s=g4[0]
-    req(s["row_count"]==273 and s["sha256"]==EXPECTED_G4_SHA256 and s["git_blob_sha"]==EXPECTED_G4_BLOB,
-        "Production manifest G4 integrity binding drift")
+    req(s["row_count"]==273 and s["sha256"]==hashlib.sha256(data).hexdigest() and s["git_blob_sha"]==git_blob(data),
+        "Production manifest G4 current integrity binding drift")
 
     print("STM32G4_LAYER1_PRODUCTION_PUBLICATION_V21_PASS")
+    print("G4_BACKEND_EVOLUTION_V631_STATE",v631_state)
     print("STM32G4=273; mapped=272; no_mapping=1; global Production total owned by current invariants")
     print("Whole-ST Active identity coverage baseline after publication=3211/4550=70.5714%")
     return 0

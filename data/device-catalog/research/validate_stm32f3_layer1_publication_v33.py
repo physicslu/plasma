@@ -10,6 +10,7 @@ from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
 from openocd_backend_evolution_v621 import rewind_v621_backend
+from openocd_backend_evolution_v631 import rewind_v631_backend
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -150,7 +151,8 @@ def main() -> int:
 
     data = F3.read_bytes()
     rows = read_rows(F3)
-    v616_current_rows = rewind_v621_backend(rows, "STM32F3")
+    v631_historical_rows = rewind_v631_backend(rows, "STM32F3")
+    v616_current_rows = rewind_v621_backend(v631_historical_rows, "STM32F3")
     buf = io.StringIO(newline="")
     writer = csv.DictWriter(buf, fieldnames=list(v616_current_rows[0]), lineterminator="\n")
     writer.writeheader()

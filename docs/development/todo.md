@@ -6,6 +6,99 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+### IC Electrical Programming Profile / Voltage Capability Database
+
+**Status:** TODO / required before physical multi-IC programming qualification
+
+**Layer:** Device Support / Programming Profile / Electrical Capability / Control Station / PPU hardware execution
+
+**Reason:** The current Production ICPN catalog identifies exact commercial IC identities and programming backend routes, but it does not yet model the electrical conditions required to power and program the selected IC safely. A valid backend route is not sufficient evidence that the programmer may apply power to a physical target. Electrical operating limits and programming conditions must therefore become a first-class, evidence-backed part of the selected IC profile rather than a separate lookup table or operator memory.
+
+Required data model:
+
+- define an evidence-backed **Electrical Programming Profile** linked to the exact ICPN and/or an explicitly authorized equivalent device family/profile;
+- model normal supply range separately from programming conditions:
+  - `vdd_operating_min/max`;
+  - `vdd_programming_min/max`;
+  - recommended programming VDD where the manufacturer specifies one;
+  - VPP requirement/range, including explicit `not_required` when authoritative;
+  - I/O / debug-interface voltage requirements and level-shifter constraints;
+  - required power-up / power-down sequencing;
+  - reset-state requirements during power sequencing where specified;
+  - per-target current limit / expected current envelope where authoritative and useful for protection;
+  - any programming-specific voltage or timing exceptions;
+- retain source authority, datasheet/programming-manual reference, revision, evidence location and verification status for every electrical profile;
+- distinguish manufacturer absolute maximum ratings from valid operating/programming ranges; absolute maximum values must never be treated as programmable setpoints;
+- never infer missing electrical values merely from another device sharing an OpenOCD target config.
+
+Selected-IC Profile integration:
+
+- when an operator selects an IC in the Control Station, the **same selected IC / Programming Profile view** must present its electrical requirements together with identity and backend information;
+- do not force operators to consult a separate voltage database or separate configuration page;
+- the selected IC profile should expose, at minimum:
+  - exact ICPN / family / package;
+  - Programming Backend and resolved target/profile;
+  - operating VDD range;
+  - permitted programming VDD range and recommended programming voltage;
+  - VPP requirement;
+  - debug/programming I/O voltage requirement;
+  - power-sequencing requirement;
+  - current-limit/protection requirement when defined;
+  - evidence / verification status;
+- clearly distinguish **IC operating range** from **the voltage Plasma will actually apply** to the selected Site;
+- show an explicit unresolved/unsupported state when electrical evidence is incomplete instead of hiding missing values.
+
+Execution and safety boundary:
+
+- physical programming readiness must require both:
+  1. a valid Programming Backend/Profile; and
+  2. a verified Electrical Programming Profile compatible with the selected PPU/Site hardware capabilities;
+- missing or conflicting electrical data must fail closed for automatic DUT power enable and physical programming;
+- software-only catalog lookup, route research and control-plane diagnostics may remain available when electrical readiness is unresolved, but must not be reported as hardware-ready;
+- the PPU must validate the requested Site voltage/current configuration against the selected IC electrical profile before enabling DUT power;
+- future programmable power rails, level shifters and protection circuitry must expose capabilities in machine-readable form so compatibility can be evaluated rather than assumed;
+- eight-Site operation must validate electrical compatibility per Site and must not assume all loaded ICs share identical voltage requirements unless the Job/Batch contract explicitly guarantees that condition.
+
+UI / API contract:
+
+- the backend API that resolves a selected IC must return the electrical profile and its evidence state together with the Programming Profile/backend resolution;
+- Control Station must render this information in the selected-IC profile surface before execution;
+- the UI must distinguish catalog/evidence values from the actual PPU/Site electrical configuration that will be applied;
+- unresolved electrical readiness must be visible to the operator and must block physical execution rather than silently falling back to a default voltage.
+
+Programming Profile Information Architecture Review:
+
+- before the physical-programming schema is finalized, perform a dedicated review of additional **software and hardware programming information** that should be presented with the selected IC;
+- candidate information to evaluate includes, but is not limited to:
+  - programming interface/protocol (SWD, JTAG, SWIM, SPI, UART, I2C or vendor-specific);
+  - backend/provider and target/algorithm identity;
+  - supported erase modes, program granularity and verify/readback behavior;
+  - flash geometry, bank/page/sector organization and address ranges;
+  - maximum/recommended programming/debug clock;
+  - reset/connect-under-reset requirements;
+  - option bytes, fuses, security/protection state and irreversible operations;
+  - mass-erase restrictions and recovery semantics;
+  - required adapter, socket, fixture or pin-routing constraints;
+  - PPU/PL feature requirements and minimum hardware/bitstream capability;
+  - per-operation timeout/retry constraints;
+  - device identification/signature expectations;
+  - known silicon/revision-specific programming exceptions;
+- decide explicitly which information belongs to:
+  1. the exact IC identity record;
+  2. the Electrical Programming Profile;
+  3. the Programming Profile / algorithm layer;
+  4. the Programmer Backend capability;
+  5. the PPU/PL/Site hardware capability;
+  rather than duplicating the same fact across multiple layers;
+- design the selected-IC UI as a composed profile sourced from these layers, not as one oversized flat CSV schema;
+- review this information architecture with actual programming use cases before freezing field names or compatibility rules.
+
+Architectural invariant:
+
+> Selecting an IC must resolve one evidence-backed programming view that combines device identity, programming capability and electrical requirements, while keeping each fact owned by the correct data layer. A backend route alone is never sufficient evidence for physical-programming readiness.
+
+Closure evidence must include schema/version contracts, authoritative source evidence, API resolution, Control Station presentation, PPU-side compatibility enforcement, fail-closed negative tests, and physical validation on representative devices before this capability is marked Current.
+
 ### OpenOCD Control-Plane Qualification
 
 **Status:** PARTIAL — CI/QEMU control-plane qualification implemented; main-only SWPC ARMv7 QEMU live gate implemented, post-merge PASS evidence still required

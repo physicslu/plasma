@@ -1,0 +1,56 @@
+name: OpenOCD final coverage closure v6.31
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-production-runtime-capability-v6.31.json'
+      - 'data/device-catalog/research/analyze_openocd_final_coverage_v631.py'
+      - 'data/device-catalog/research/test_analyze_openocd_final_coverage_v631.py'
+      - 'data/device-catalog/research/OPENOCD_FINAL_COVERAGE_V631.md'
+      - 'data/device-catalog/research/openocd-final-production-dry-run-v6.31.json'
+      - 'data/device-catalog/research/stm32f3-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32f7-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32g4-commercial-icpn.csv'
+      - 'data/device-catalog/research/openocd-parts-canonical-v631.csv'
+      - 'docs/development/todo.md'
+      - '.github/workflows/device-catalog-openocd-final-coverage-v631.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate exact 568 closure and approved Production state
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/validate_openocd_final_write_v631.py | tee /tmp/openocd-final-coverage-v631.json
+          if grep -q '"repository_write_state": "pre"' /tmp/openocd-final-coverage-v631.json; then
+            python data/device-catalog/research/analyze_openocd_final_coverage_v631.py \
+              --classification /tmp/openocd-final-coverage-v631.csv \
+              --route-delta /tmp/openocd-final-route-delta-v6.31.csv \
+              --route-successor /tmp/openocd-parts-canonical-v631.csv \
+              --summary /tmp/openocd-final-coverage-v631.json
+            python -m unittest discover -s data/device-catalog/research \
+              -p test_analyze_openocd_final_coverage_v631.py -v
+          else
+            grep -q '"repository_write_state": "post"' /tmp/openocd-final-coverage-v631.json
+            python -m unittest discover -s data/device-catalog/research \
+              -p test_validate_openocd_final_write_v631.py -v
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-final-coverage-v631
+          path: |
+            /tmp/openocd-final-coverage-v631.csv
+            /tmp/openocd-final-route-delta-v6.31.csv
+            /tmp/openocd-parts-canonical-v631.csv
+            /tmp/openocd-final-coverage-v631.json
+          if-no-files-found: error
+          retention-days: 30

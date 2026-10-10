@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from openocd_backend_evolution_v616 import rewind_v616_backend
+from openocd_backend_evolution_v631 import backend_state as backend_state_v631, rewind_v631_backend
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -183,11 +184,19 @@ def main() -> int:
     req(digest_lines(active) == EXPECTED_ACTIVE_SHA256, "F7 Active exact-set digest drift")
 
     data = F7.read_bytes()
-    req(hashlib.sha256(data).hexdigest() == EXPECTED_F7_SHA256,
-        "F7 Production SHA256 drift")
-    req(git_blob(data) == EXPECTED_F7_BLOB, "F7 Production git blob drift")
     rows = read_rows(F7)
-    publication_rows = rewind_v616_backend(rows, "STM32F7")
+    v631_state = backend_state_v631(rows, "STM32F7")
+    historical_current_rows = rewind_v631_backend(rows, "STM32F7")
+    hist_buf = io.StringIO(newline="")
+    hist_writer = csv.DictWriter(hist_buf, fieldnames=list(historical_current_rows[0]), lineterminator="\n")
+    hist_writer.writeheader()
+    hist_writer.writerows(historical_current_rows)
+    historical_current_data = hist_buf.getvalue().encode()
+    req(hashlib.sha256(historical_current_data).hexdigest() == EXPECTED_F7_SHA256,
+        "F7 historical current SHA256 drift")
+    req(git_blob(historical_current_data) == EXPECTED_F7_BLOB,
+        "F7 historical current git blob drift")
+    publication_rows = rewind_v616_backend(historical_current_rows, "STM32F7")
     req(len(rows) == 173 and len({r["icpn"] for r in rows}) == 173,
         "F7 Production count/unique drift")
     req(sorted(r["icpn"] for r in rows) == active,
@@ -242,9 +251,9 @@ def main() -> int:
     req(len(f7_sources) == 1, "Production F7 source missing/duplicated")
     source = f7_sources[0]
     req(source["row_count"] == 173
-        and source["sha256"] == EXPECTED_F7_SHA256
-        and source["git_blob_sha"] == EXPECTED_F7_BLOB,
-        "Production manifest F7 integrity binding drift")
+        and source["sha256"] == hashlib.sha256(data).hexdigest()
+        and source["git_blob_sha"] == git_blob(data),
+        "Production manifest F7 current integrity binding drift")
     current_total = sum(int(s["row_count"]) for s in sources)
     req(len(sources) >= 24, "Production source count regressed below F7 publication poststate")
     req(current_total >= 4242, "Production exact total regressed below F7 publication poststate")
@@ -281,6 +290,7 @@ def main() -> int:
         "coverage effect audit drift")
 
     print("STM32F7_LAYER1_PRODUCTION_PUBLICATION_V37_PASS")
+    print("F7_BACKEND_EVOLUTION_V631_STATE", v631_state)
     print(f"STM32F7=173; mapped=19; no_mapping=154; current_Production={current_total}; current_sources={len(sources)}")
     print("Production backend partition=3673 mapped / 569 no_mapping")
     print("Whole-ST Active identity coverage=4163/4550=91.4945%")

@@ -51,9 +51,11 @@ def test_stm32f3_package_specific_metadata_and_tr_identity() -> None:
     assert wlcsp66.package == "WLCSP"
     assert wlcsp66.pin_count == "66"
     assert wlcsp66.option_suffix == "TR"
-    assert wlcsp66.mapping_status == "no_mapping"
+    assert wlcsp66.mapping_status == "mapped"
+    assert wlcsp66.target_config == "tcl/target/stm32f3x.cfg"
 
     f398 = catalog.search("STM32F398VET6", limit=1)[0]
     assert f398.base_device == "STM32F398VE"
     assert f398.flash_size == "512 KiB"
-    assert f398.mapping_status == "no_mapping"
+    assert f398.mapping_status == "mapped"
+    assert f398.target_config == "tcl/target/stm32f3x.cfg"

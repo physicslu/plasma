@@ -1,0 +1,75 @@
+name: OpenOCD final Production dry-run v6.31
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/openocd-final-production-dry-run-v6.31.json'
+      - 'data/device-catalog/research/openocd-final-safe-bindings-v6.31.csv'
+      - 'data/device-catalog/research/openocd-final-runtime-blocked-v6.31.csv'
+      - 'data/device-catalog/research/prepare_openocd_final_production_v631.py'
+      - 'data/device-catalog/research/test_prepare_openocd_final_production_v631.py'
+      - 'data/device-catalog/research/validate_openocd_final_write_v631.py'
+      - 'data/device-catalog/research/test_validate_openocd_final_write_v631.py'
+      - '.github/workflows/device-catalog-openocd-final-production-v631.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and detect exact frozen Production state
+        id: state
+        run: |
+          python - <<'PY'
+          import contextlib
+          import io
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path('data/device-catalog/research').resolve()))
+          from validate_openocd_final_write_v631 import validate
+
+          with contextlib.redirect_stdout(io.StringIO()):
+              summary = validate()
+          Path('/tmp/openocd-final-production-v631-state.json').write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('state=' + summary['repository_write_state'] + '\n')
+          print('Validated frozen v6.31 ' + summary['repository_write_state'] + ' state')
+          PY
+      - name: Build exact frozen-candidate Production postimages (prewrite)
+        if: steps.state.outputs.state == 'pre'
+        run: |
+          python data/device-catalog/research/prepare_openocd_final_production_v631.py \
+            --summary /tmp/openocd-final-production-v631.json \
+            --package-dir /tmp/openocd-final-production-v631
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_prepare_openocd_final_production_v631.py -v
+      - name: Qualify approved frozen Production postimages (postwrite)
+        if: steps.state.outputs.state == 'post'
+        run: |
+          python data/device-catalog/research/validate_openocd_final_write_v631.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_openocd_final_write_v631.py -v
+          cp /tmp/openocd-final-production-v631-state.json \
+            /tmp/openocd-final-production-v631.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openocd-final-production-v631
+          path: |
+            /tmp/openocd-final-production-v631.json
+            /tmp/openocd-final-production-v631-state.json
+            /tmp/openocd-final-production-v631/
+          if-no-files-found: error
+          retention-days: 30
