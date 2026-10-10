@@ -58,7 +58,7 @@ def _sha256(data: bytes) -> str:
 
 
 def _git_blob_sha(data: bytes) -> str:
-    return hashlib.sha1(f"blob {len(data)}\\0".encode() + data).hexdigest()
+    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
 
 
 def _load(root: Path) -> tuple[list[dict[str, str]], dict[str, Any], dict[str, Any]]:
@@ -240,8 +240,8 @@ def audit(root: Path = ROOT) -> tuple[list[dict[str, Any]], dict[str, Any], byte
     records = make_records(rows, facts)
     if len(records) != EXPECTED_NO_MAPPING:
         raise OfflineMatrixError("H5 records count mismatch")
-    jsonl = ("\\n".join(json.dumps(r, sort_keys=True, separators=(",", ":"))
-                       for r in records) + "\\n").encode("utf-8")
+    jsonl = ("\n".join(json.dumps(r, sort_keys=True, separators=(",", ":"))
+                       for r in records) + "\n").encode("utf-8")
     summary = {
         "schema_version": 1,
         "audit_id": facts["audit_id"],
@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         (args.output_dir / "st-h5-offline-flash-matrix-v1.jsonl").write_bytes(jsonl)
         (args.output_dir / "st-h5-offline-flash-matrix-v1-summary.json").write_text(
-            json.dumps(summary, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"H5 offline matrix PASS: {len(records)} records SHA256={summary['records_jsonl_sha256']}")
     return 0
 
