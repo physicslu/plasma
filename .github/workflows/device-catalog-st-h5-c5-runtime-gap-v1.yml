@@ -1,0 +1,28 @@
+name: ST H5/C5 runtime gap v1 research gate
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'data/device-catalog/research/ST_H5_C5_RUNTIME_GAP_V1.md'
+      - 'data/device-catalog/research/validate_st_h5_c5_runtime_gap_v1.py'
+      - 'data/device-catalog/research/test_validate_st_h5_c5_runtime_gap_v1.py'
+      - '.github/workflows/device-catalog-st-h5-c5-runtime-gap-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check frozen post-v6.31 Production partitions and C5/H5 runtime boundaries
+        run: |
+          python data/device-catalog/research/validate_st_h5_c5_runtime_gap_v1.py
+          python -m unittest discover -s data/device-catalog/research \
+            -p test_validate_st_h5_c5_runtime_gap_v1.py -v
