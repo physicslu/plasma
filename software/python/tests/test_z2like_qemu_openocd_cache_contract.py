@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = ROOT / ".github/workflows/z2like-demo-qemu.yml"
+BROWSER_WORKFLOW = ROOT / ".github/workflows/z2like-demo-browser-live-acceptance.yml"
 
 
 def workflow_text() -> str:
@@ -82,3 +83,19 @@ def test_cache_metrics_and_evidence_distinguish_hit_from_miss() -> None:
     assert 'echo "OpenOCD cache MISS: build duration' in text
     assert "OpenOCD ARMv7 cache: " in text
     assert 'echo "OpenOCD ARMv7 cache:' in text
+
+
+def test_browser_live_gate_uses_the_same_qualified_cache_identity() -> None:
+    qemu = workflow_text()
+    browser = BROWSER_WORKFLOW.read_text(encoding="utf-8")
+    recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
+    key_prefix = "qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-"
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in qemu
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in browser
+    assert key_prefix in qemu
+    assert key_prefix in browser
+    assert recipe in qemu
+    assert recipe in browser
+    assert "actions/cache/save@v4" not in browser
+    assert "Qualified ARMv7 OpenOCD cache is missing" in browser
+    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$RUNNER_TEMP/openocd-armv7l-cached"' in browser

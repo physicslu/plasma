@@ -56,6 +56,9 @@ on:
 permissions:
   contents: read
 
+env:
+  OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
+
 concurrency:
   group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -143,6 +146,44 @@ jobs:
         shell: bash
         run: bash scripts/codex-cloud-setup.sh
 
+      - name: Restore qualified ARMv7 OpenOCD build cache
+        id: openocd-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/openocd-armv7l-cached
+          key: >-
+            qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-
+            ${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
+
+      - name: Require and verify qualified ARMv7 OpenOCD cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.openocd-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Qualified ARMv7 OpenOCD cache is missing. Let the main z2like-demo QEMU ARMv7 acceptance populate it before running Browser live qualification."
+            exit 1
+          fi
+          out="$RUNNER_TEMP/openocd-armv7l-cached"
+          runtime_id="$(python3 -c 'import json; print(json.load(open("release/openocd.json"))["runtime_id"])')"
+          artifact="$out/plasma-openocd-$runtime_id-linux-armv7l.tar.gz"
+          test -f "$artifact"
+          test -f "$artifact.sha256"
+          python3 scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256"             > "$RUNNER_TEMP/browser-live-openocd-cache-verified.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          release = json.loads(Path("release/openocd.json").read_text())
+          evidence = json.loads((Path(os.environ["RUNNER_TEMP"]) / "browser-live-openocd-cache-verified.json").read_text())
+          assert evidence["result"] == "PASS"
+          assert evidence["architecture"] == "armv7l"
+          assert evidence["runtime_id"] == release["runtime_id"]
+          assert evidence["source_commit"] == release["source_commit"]
+          assert evidence["openocd_version"] == release["version"]
+          assert evidence["hardware_runtime_ready"] is False
+          print("Browser live ARMv7 OpenOCD cache verification PASS")
+          PY
+          echo "Browser live OpenOCD ARMv7 cache: HIT (qualified artifact reused)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build canonical ARMv7 Z2 PS kit
         shell: bash
         run: |
@@ -151,6 +192,7 @@ jobs:
           rm -rf "$build_root"
           build_json="$(
             PLASMA_Z2LIKE_DEMO_BUILD_PYTHON="$PWD/software/python/.venv/bin/python" \
+            PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$RUNNER_TEMP/openocd-armv7l-cached" \
               python3 scripts/z2like-demo-qemu-build-kit.py --output-dir "$build_root"
           )"
           LIVE_KIT="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["kit"])' <<<"$build_json")"

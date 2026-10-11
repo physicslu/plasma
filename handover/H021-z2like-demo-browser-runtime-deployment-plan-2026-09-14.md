@@ -138,6 +138,29 @@ to IPv4 + HTTP/1.1 and uses bounded retries. The hostname remains authoritative;
 no CDN/Render edge IP is hard-coded, and the later acceptance still verifies the
 deployed commit identity rather than treating transport success as qualification.
 
+
+Manual Browser Runtime run `38106966417` on commit
+`552624670a162c38aadf3834ecf033581b88272e` then passed the post-deployment
+identity, exact-commit QEMU reconcile, maintenance Manager and public preflight,
+but exposed an OpenOCD artifact-identity split. The live workflow rebuilt the same
+pinned runtime ID instead of restoring the already-qualified QEMU E2E cache. The
+QEMU E2E cache artifact had payload SHA-256
+`0e23eee3908be99e53eab9718aefbbf578d221e72c4bf2f7bd722e3000a64554`,
+while the independent Browser build produced
+`eab3aec3e38d44fbd4ce718b7b8c18c8035e82985df38bfecd15118856d8308d`.
+The production OpenOCD installer correctly rejected the same-runtime-ID /
+different-payload state.
+
+The Browser live gate therefore consumes the same exact cache identity as the
+QEMU E2E producer, requires a cache hit, re-verifies the restored artifact, and
+passes that directory into the commit-specific kit builder. It never publishes
+the cache and never falls back to an independent OpenOCD compile. For the
+persistent **simulation-only** QEMU product volume, the kit-local simulation
+adapter may retire a retained runtime only when its trusted manifest has the
+same runtime/version/source/architecture identity and a different verified
+payload SHA. Missing, corrupt, or identity-drifted state remains fail-closed.
+The production `openocd-runtime.py install` policy is unchanged.
+
 ### Automated live coverage in this gate
 
 ```text
