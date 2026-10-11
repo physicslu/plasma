@@ -11,7 +11,7 @@ from pathlib import Path
 from plasma_web.backend_provenance import load_source_authorities
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.openocd_provider_registry import (
-    H5_BUILD_EXPECTED, OpenOCDProviderRegistry, _h5_build_evidence,
+    ROOT, H5_BUILD_EXPECTED, OpenOCDProviderRegistry, _h5_build_evidence,
     offline_build_correlates,
 )
 
@@ -129,7 +129,7 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         self.assertFalse(offline_build_correlates(self.describe("STM32F103C8T6")[0], original))
 
     def test_malformed_source_or_security_promotion_fails_closed(self):
-        upstream, gap = load_source_authorities()
+        upstream, gap = load_source_authorities(ROOT)
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)/"data/device-catalog/research/st-h5-offline-runtime-evidence-v1.json"
             p.parent.mkdir(parents=True)
