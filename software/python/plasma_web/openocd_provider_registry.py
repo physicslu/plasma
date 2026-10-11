@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -253,3 +254,23 @@ def offline_build_correlates(record: dict[str, Any], observation: dict[str, Any]
         and record.get("executable") is False
         and record.get("installed_binary_sha256") is None
     )
+
+
+@lru_cache(maxsize=1)
+def get_default_openocd_provider_registry() -> OpenOCDProviderRegistry | None:
+    """Optional in slim PPU kits. Absence may hide metadata, never break search.
+
+    Present but modified source files still fail the pinned-hash/source review.
+    """
+    required = (
+        "release/openocd.json",
+        "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json",
+        "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json",
+        "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv",
+        "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.json",
+        "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json",
+        EVIDENCE_REL,
+    )
+    if any(not (ROOT / rel).is_file() for rel in required):
+        return None
+    return OpenOCDProviderRegistry(get_default_device_catalog())
