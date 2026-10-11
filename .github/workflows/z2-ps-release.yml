@@ -35,6 +35,7 @@ on:
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
+      - "software/python/tests/test_openocd_release_cache_contract.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
   pull_request:
@@ -68,6 +69,7 @@ on:
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
+      - "software/python/tests/test_openocd_release_cache_contract.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
 
@@ -223,7 +225,9 @@ jobs:
           python -m py_compile scripts/openocd-runtime.py
           bash -n scripts/build-openocd-runtime.sh
           python -m pip install pytest
-          python -m pytest -q software/python/tests/test_openocd_runtime_artifact.py
+          python -m pytest -q \
+            software/python/tests/test_openocd_runtime_artifact.py \
+            software/python/tests/test_openocd_release_cache_contract.py
 
       - name: Build pinned OpenOCD runtime on cache miss
         if: steps.openocd-cache.outputs.cache-hit != 'true'
