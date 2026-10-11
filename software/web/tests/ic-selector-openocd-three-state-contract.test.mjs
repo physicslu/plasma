@@ -44,5 +44,14 @@ test("mapped is green, candidate amber and no mapping neutral without granting p
   assert.match(source, /selected\.backend_source_reference\.installed_binary_sha256/);
   assert.match(source, /驗證範圍/);
   assert.match(source, /未提供實機證據/);
+  assert.match(source, /selected\.backend_providers\?\.map/);
+  assert.match(source, /provider\.provider_distribution/);
+  assert.match(source, /provider\.source_version/);
+  assert.match(source, /provider\.source_commit/);
+  assert.match(source, /provider\.declared_release_runtime_id/);
+  assert.match(source, /provider\.software_build_evidence\.map/);
+  assert.match(source, /build\.artifact_sha256/);
+  assert.match(source, /build\.github_actions_run_id/);
+  assert.match(source, /未開放（僅 Metadata）/);
   assert.match(source, /未實機測試/);
 });
