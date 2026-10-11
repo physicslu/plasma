@@ -92,7 +92,9 @@ jobs:
             echo "::error::SWPC managed Bootstrap status probe failed at 127.0.0.1:18082. Run ./scripts/plasmactl update z2like-demo as an operator before rerunning the upstream Browser Runtime gate."
             exit 1
           fi
-          if ! curl --fail --silent --show-error --max-time 15 \
+          if ! curl -4 --http1.1 --fail --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 70 \
+            --connect-timeout 5 --max-time 20 \
             https://z2like-demo.open4th.com/deployment.json >/dev/null; then
             echo "::error::Public z2like-demo deployment identity probe failed"
             exit 1

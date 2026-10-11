@@ -30,6 +30,10 @@ class Z2LikeDemoActiveJobDisableLiveContractTests(unittest.TestCase):
         self.assertIn('--expected-commit "$PLASMA_ACCEPTED_SHA"', workflow)
         self.assertIn('--upstream-browser-run-id "$PLASMA_UPSTREAM_BROWSER_RUN_ID"', workflow)
         self.assertNotIn("\n  push:\n", workflow)
+        self.assertIn("curl -4 --http1.1 --fail --silent --show-error", workflow)
+        self.assertIn("--retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 70", workflow)
+        self.assertIn("--connect-timeout 5 --max-time 20", workflow)
+        self.assertIn("https://z2like-demo.open4th.com/deployment.json", workflow)
 
     def test_browser_runtime_gate_is_triggered_by_active_gate_deployment_inputs(self) -> None:
         workflow = BROWSER_WORKFLOW.read_text(encoding="utf-8")

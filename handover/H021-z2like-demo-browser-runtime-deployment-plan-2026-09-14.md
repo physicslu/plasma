@@ -130,6 +130,14 @@ kit build or Browser mutation. The orchestration contract was therefore changed
 so `push` remains contract-only and SWPC live qualification begins only after
 the operator deploys Render and manually dispatches the workflow.
 
+Later SWPC diagnostics isolated an intermittent public-edge transport problem:
+IPv4 TCP/TLS completed, but HTTP/2 requests to `/deployment.json` could stall
+until timeout, while HTTP/1.1 returned HTTP 200 through both observed Render edge
+addresses. The live preflight therefore pins the public deployment identity probe
+to IPv4 + HTTP/1.1 and uses bounded retries. The hostname remains authoritative;
+no CDN/Render edge IP is hard-coded, and the later acceptance still verifies the
+deployed commit identity rather than treating transport success as qualification.
+
 ### Automated live coverage in this gate
 
 ```text
