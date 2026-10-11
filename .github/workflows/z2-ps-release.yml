@@ -82,6 +82,9 @@ env:
   Z2_PYTHON_VERSION: "3.12.13"
   Z2_PYTHON_SOURCE_SHA256: "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"
   Z2_PYTHON_CACHE_SCHEMA: "v1"
+  OPENOCD_CACHE_SCHEMA: "v1"
+  # Increment when Ubuntu 22.04 toolchain, package dependencies or image policy changes.
+  OPENOCD_TOOLCHAIN_EPOCH: "jammy-build-deps-2026-10-v1"
 
 jobs:
   z2-python-runtime:
@@ -201,6 +204,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Restore verified OpenOCD runtime build cache
+        id: openocd-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/openocd-${{ matrix.architecture }}
+          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
+
       - name: Set up QEMU for ARMv7 build and runtime smoke
         if: matrix.architecture == 'armv7l'
         uses: docker/setup-qemu-action@v4
@@ -215,15 +225,23 @@ jobs:
           python -m pip install pytest
           python -m pytest -q software/python/tests/test_openocd_runtime_artifact.py
 
-      - name: Build pinned OpenOCD runtime
-        id: build
+      - name: Build pinned OpenOCD runtime on cache miss
+        if: steps.openocd-cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          ARCH: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          bash scripts/build-openocd-runtime.sh "$RUNNER_TEMP/openocd-$ARCH" "$ARCH"
+
+      - name: Verify OpenOCD runtime on cache hit and cache miss
+        id: runtime
         shell: bash
         env:
           ARCH: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/openocd-$ARCH"
-          bash scripts/build-openocd-runtime.sh "$out" "$ARCH"
           runtime_id="$(python -c 'import json; print(json.load(open("release/openocd.json"))["runtime_id"])')"
           artifact="$out/plasma-openocd-$runtime_id-linux-$ARCH.tar.gz"
           test -f "$artifact"
@@ -231,12 +249,13 @@ jobs:
           python scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256"
           echo "runtime_id=$runtime_id" >> "$GITHUB_OUTPUT"
           echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          echo "cache_hit=${{ steps.openocd-cache.outputs.cache-hit }}" >> "$GITHUB_OUTPUT"
 
       - name: Qualify real OpenOCD Tcl RPC worker
         if: matrix.architecture == 'x86_64'
         shell: bash
         env:
-          ARTIFACT: ${{ steps.build.outputs.artifact }}
+          ARTIFACT: ${{ steps.runtime.outputs.artifact }}
         run: |
           set -euo pipefail
           python -m pip install -e "./software/python[dev]"
@@ -253,7 +272,7 @@ jobs:
         shell: bash
         env:
           ARCH: ${{ matrix.architecture }}
-          ARTIFACT: ${{ steps.build.outputs.artifact }}
+          ARTIFACT: ${{ steps.runtime.outputs.artifact }}
         run: |
           set -euo pipefail
           artifact_dir="$(dirname "$ARTIFACT")"
@@ -287,13 +306,23 @@ jobs:
               python3 -c '"'"'import json; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["hardware_runtime_ready"] is False'"'"'
             '
 
+      - name: Save verified OpenOCD runtime build cache
+        if: >-
+          steps.openocd-cache.outputs.cache-hit != 'true' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/openocd-${{ matrix.architecture }}
+          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
+
       - name: Upload qualified OpenOCD runtime candidate
         uses: actions/upload-artifact@v4
         with:
-          name: plasma-openocd-${{ steps.build.outputs.runtime_id }}-linux-${{ matrix.architecture }}-${{ github.sha }}
+          name: plasma-openocd-${{ steps.runtime.outputs.runtime_id }}-linux-${{ matrix.architecture }}-${{ github.sha }}
           path: |
-            ${{ steps.build.outputs.artifact }}
-            ${{ steps.build.outputs.artifact }}.sha256
+            ${{ steps.runtime.outputs.artifact }}
+            ${{ steps.runtime.outputs.artifact }}.sha256
           if-no-files-found: error
           retention-days: 14
 
