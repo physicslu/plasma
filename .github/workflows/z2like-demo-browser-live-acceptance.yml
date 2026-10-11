@@ -58,6 +58,7 @@ permissions:
 
 env:
   OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
+  OPENOCD_ARMV7_CACHE_DIR: "../.plasma-cache/openocd-armv7l-cached"
 
 concurrency:
   group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}
@@ -150,7 +151,7 @@ jobs:
         id: openocd-cache
         uses: actions/cache/restore@v4
         with:
-          path: ${{ runner.temp }}/openocd-armv7l-cached
+          path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}
           key: >-
             qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-
             ${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
@@ -163,7 +164,7 @@ jobs:
             echo "::error::Qualified ARMv7 OpenOCD cache is missing. Let the main z2like-demo QEMU ARMv7 acceptance populate it before running Browser live qualification."
             exit 1
           fi
-          out="$RUNNER_TEMP/openocd-armv7l-cached"
+          out="$OPENOCD_ARMV7_CACHE_DIR"
           runtime_id="$(python3 -c 'import json; print(json.load(open("release/openocd.json"))["runtime_id"])')"
           artifact="$out/plasma-openocd-$runtime_id-linux-armv7l.tar.gz"
           test -f "$artifact"
@@ -192,7 +193,7 @@ jobs:
           rm -rf "$build_root"
           build_json="$(
             PLASMA_Z2LIKE_DEMO_BUILD_PYTHON="$PWD/software/python/.venv/bin/python" \
-            PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$RUNNER_TEMP/openocd-armv7l-cached" \
+            PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$OPENOCD_ARMV7_CACHE_DIR" \
               python3 scripts/z2like-demo-qemu-build-kit.py --output-dir "$build_root"
           )"
           LIVE_KIT="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["kit"])' <<<"$build_json")"
