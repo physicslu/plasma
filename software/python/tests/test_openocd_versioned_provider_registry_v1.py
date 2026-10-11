@@ -7,11 +7,13 @@ import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
+from unittest.mock import patch
 
 from plasma_web.backend_provenance import load_source_authorities
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.openocd_provider_registry import (
     ROOT, H5_BUILD_EXPECTED, OpenOCDProviderRegistry, _h5_build_evidence,
+    get_default_openocd_provider_registry,
     offline_build_correlates,
 )
 
@@ -151,6 +153,39 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         b = self.describe("STM32H503CBT6")
         self.assertNotEqual(b[0]["software_build_evidence"][0]["artifact_sha256"], "0"*64)
         self.assertEqual(b[0]["qualified_hardware_operations"], [])
+
+    def test_gateway_adds_read_only_provider_list_without_authorizing_job(self):
+        from plasma_web.backend_candidate_registry import BackendCandidateRegistry
+        from plasma_web.gateway import _device_search_payload
+        candidates = BackendCandidateRegistry(self.catalog)
+        with (
+            patch("plasma_web.gateway.get_default_device_catalog", return_value=self.catalog),
+            patch("plasma_web.gateway.get_default_backend_candidate_registry", return_value=candidates),
+            patch("plasma_web.gateway.get_default_openocd_provider_registry", return_value=self.provider),
+        ):
+            for part, expected in (
+                ("STM32F103C8T6", "openocd-upstream"),
+                ("STM32H503CBT6", "openocd-st-h5-research"),
+                ("STM32C531CBT6", "openocd-st-c5-stldr-research"),
+            ):
+                payload = _device_search_payload(part, 1)
+                row = payload["results"][0]
+                self.assertEqual(row["icpn"], part)
+                self.assertEqual(len(row["backend_providers"]), 1)
+                self.assertEqual(row["backend_providers"][0]["provider_id"], expected)
+                self.assertFalse(row["backend_providers"][0]["executable"])
+                self.assertFalse(row["backend_providers"][0]["production_write_authorized"])
+                self.assertFalse(row["backend_providers"][0]["hardware_runtime_ready"])
+            h5 = _device_search_payload("STM32H503CBT6", 1)["results"][0]
+            self.assertEqual(h5["backend"]["mapping_status"], "no_mapping")
+            self.assertEqual(h5["backend"]["target_config"], "")
+
+    def test_slim_ppu_without_optional_metadata_has_no_provider_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("plasma_web.openocd_provider_registry.ROOT", Path(tmp)):
+                get_default_openocd_provider_registry.cache_clear()
+                self.assertIsNone(get_default_openocd_provider_registry())
+            get_default_openocd_provider_registry.cache_clear()
 
     def test_no_fabricated_provider_for_wrong_vendor_or_unknown_icpn(self):
         self.assertEqual(self.provider.describe("OtherVendor", "STM32H503CBT6"), [])
