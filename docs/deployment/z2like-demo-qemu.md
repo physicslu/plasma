@@ -211,7 +211,7 @@ ST-specific research build or interpreted as enabling physical programming.
   \`../.plasma-cache/openocd-armv7l-cached\`. Do not substitute
   \`\${{ runner.temp }}\` or another runner-specific absolute root: GitHub cache
   versioning includes the configured path, so hosted and self-hosted runners
-  would otherwise produce different cache versions even with an identical key.
+  would otherwise produce different cache versions even with an identical key. Both producer and consumer require `zstd` before cache access to keep the compression/version component aligned as well.
 - **Cache hit:** skip only `scripts/build-openocd-runtime.sh`;
   require the expected archive and detached `.sha256` sidecar, then run
   the canonical `openocd-runtime.py verify` and check the architecture,
