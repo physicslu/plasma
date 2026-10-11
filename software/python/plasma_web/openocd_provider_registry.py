@@ -230,26 +230,26 @@ class OpenOCDProviderRegistry:
         return dict(sorted(c.items()))
 
 
-def runtime_attestation_matches(record: dict[str, Any], attestation: dict[str, Any]) -> bool:
-    """Fail-closed cross-check for future PS runtime qualification.
 
-    Matching a runtime_id is not enough. Source/architecture/artifact/payload
-    digests must agree; installed binary hash must be independently present.
-    This is an *identity check*, not permission to execute a flash command.
+def offline_build_correlates(record: dict[str, Any], observation: dict[str, Any]) -> bool:
+    """Prove equality to a known offline *build artifact* only.
+
+    This cannot attest installed files, prove loader/adapter capability, select
+    a Production backend, authorize erase/write, or validate real silicon.
+    Even a positive match does not make a source candidate executable.
     """
     if record.get("provider_id") != "openocd-st-h5-research":
         return False
-    if attestation.get("source_commit") != record.get("source_commit"):
+    if observation.get("source_commit") != record.get("source_commit"):
         return False
     b = next((r for r in record["software_build_evidence"]
-              if r["architecture"] == attestation.get("architecture")), None)
+              if r["architecture"] == observation.get("architecture")), None)
     if b is None:
         return False
-    return all((
-        attestation.get("runtime_id") == b["runtime_id"],
-        attestation.get("artifact_sha256") == b["artifact_sha256"],
-        attestation.get("payload_sha256") == b["payload_sha256"],
-        _is_sha256(attestation.get("installed_binary_sha256")),
-        attestation.get("installed_binary_sha256") ==
-            attestation.get("measured_binary_sha256"),
-    ))
+    return (
+        observation.get("runtime_id") == b["runtime_id"]
+        and observation.get("artifact_sha256") == b["artifact_sha256"]
+        and observation.get("payload_sha256") == b["payload_sha256"]
+        and record.get("executable") is False
+        and record.get("installed_binary_sha256") is None
+    )
