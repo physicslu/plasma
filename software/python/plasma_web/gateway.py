@@ -18,6 +18,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .backend_candidate_registry import get_default_backend_candidate_registry
+from .backend_source_reference import backend_source_reference, default_pinned_upstream
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
@@ -79,10 +80,13 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
     # Candidate evidence is an independent, read-only display projection.
     # It never modifies the authoritative backend mapping or Job resolution.
     candidates = get_default_backend_candidate_registry()
+    upstream = default_pinned_upstream()
     results = []
     for record in matches:
         item = record.to_payload()
-        item["backend_candidate"] = candidates.lookup(record)
+        candidate = candidates.lookup(record)
+        item["backend_candidate"] = candidate
+        item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
         results.append(item)
     return {
         "ok": True,
