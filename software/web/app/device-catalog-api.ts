@@ -34,6 +34,23 @@ export type BackendCandidateEvidence = {
   blockers: string[];
 };
 
+export type BackendSourceReference = {
+  provider_id: string;
+  provider_name: string;
+  mapping_status: "mapped" | "candidate";
+  target_config: string;
+  flash_driver: string | null;
+  source_repository: string | null;
+  source_version: string | null;
+  source_commit: string | null;
+  pinned_release_runtime_id: string | null;
+  installed_runtime_id: string | null;
+  installed_binary_sha256: string | null;
+  evidence_scope: "catalog_mapping_only" | "source_pinned_research_only";
+  hardware_runtime_ready: false;
+  physical_programming_qualified: false;
+};
+
 export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
 export type DeviceSearchResult = {
@@ -76,6 +93,7 @@ export type DeviceSearchResult = {
   };
   catalog_origin: string;
   backend_candidate?: BackendCandidateEvidence | null;
+  backend_source_reference?: BackendSourceReference | null;
 };
 
 export type DeviceSearchResponse = {
