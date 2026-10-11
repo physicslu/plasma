@@ -51,6 +51,42 @@ export type BackendSourceReference = {
   physical_programming_qualified: false;
 };
 
+export type BackendSoftwareBuildEvidence = {
+  architecture: string;
+  environment: string;
+  runtime_id: string;
+  artifact_sha256: string;
+  payload_sha256: string;
+  binary_sha256: null;
+  github_actions_run_id: number;
+  qualification: string;
+  scope: string;
+  published_binary: false;
+};
+
+export type VersionedOpenOCDProvider = {
+  provider_id: string;
+  provider_distribution: string;
+  source_repository: string;
+  source_commit: string;
+  source_version: string | null;
+  declared_release_runtime_id: string | null;
+  target_config: string;
+  flash_driver: string | null;
+  mapping_status: "mapped" | "candidate";
+  software_build_evidence: BackendSoftwareBuildEvidence[];
+  installed_runtime_id: null;
+  installed_binary_sha256: null;
+  site_id: null;
+  software_process_capability: "metadata_description_only";
+  qualified_hardware_operations: [];
+  hardware_runtime_ready: false;
+  real_ic_erase_program_verify: false;
+  production_write_authorized: false;
+  executable: false;
+  source_evidence_only: true;
+};
+
 export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
 export type DeviceSearchResult = {
@@ -94,6 +130,7 @@ export type DeviceSearchResult = {
   catalog_origin: string;
   backend_candidate?: BackendCandidateEvidence | null;
   backend_source_reference?: BackendSourceReference | null;
+  backend_providers?: VersionedOpenOCDProvider[];
 };
 
 export type DeviceSearchResponse = {
