@@ -58,7 +58,7 @@ permissions:
 
 env:
   OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
-  OPENOCD_ARMV7_CACHE_DIR: "../.plasma-cache/openocd-armv7l-cached"
+  OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"
 
 concurrency:
   group: z2like-demo-browser-runtime-live-acceptance-${{ github.ref }}
@@ -146,6 +146,14 @@ jobs:
       - name: Set up repository validation dependencies
         shell: bash
         run: bash scripts/codex-cloud-setup.sh
+
+      - name: Prepare portable ARMv7 OpenOCD cache path
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v zstd >/dev/null
+          rm -rf "$OPENOCD_ARMV7_CACHE_DIR"
+          mkdir -p "$(dirname "$OPENOCD_ARMV7_CACHE_DIR")"
 
       - name: Restore qualified ARMv7 OpenOCD build cache
         id: openocd-cache
