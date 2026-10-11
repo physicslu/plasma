@@ -294,6 +294,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <dd>
                     <strong>{provider.provider_distribution} · {provider.mapping_status === "candidate" ? "Candidate" : "Mapped"}</strong>
                     <div>{zh ? "來源版本" : "Source version"}: {provider.source_version ?? (zh ? "未確認" : "Unknown")}</div>
+                    <div>Source Repository: <code>{provider.source_repository}</code></div>
                     <div>Source Commit: <code>{provider.source_commit}</code></div>
                     <div>Runtime ID: <code>{provider.declared_release_runtime_id ?? (zh ? "未建立正式發行綁定" : "No declared release binding")}</code></div>
                     <div>Flash Driver: <code>{provider.flash_driver ?? (zh ? "未個別驗證" : "Not individually proven")}</code></div>
@@ -307,7 +308,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                           <a href={`https://github.com/physicslu/plasma/actions/runs/${build.github_actions_run_id}`} target="_blank" rel="noreferrer">
                             {build.architecture} · {build.qualification}
                           </a>
+                          <div>Build Runtime ID: <code>{build.runtime_id}</code></div>
                           <div>Artifact SHA-256: <code>{build.artifact_sha256}</code></div>
+                          <div>Payload SHA-256: <code>{build.payload_sha256}</code></div>
                           <div>{zh ? "驗證界線" : "Evidence scope"}: {build.scope} · {zh ? "未實機測試" : "No physical test"}</div>
                         </div>
                       ))}
