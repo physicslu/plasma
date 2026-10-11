@@ -51,15 +51,20 @@ def test_live_gate_reuses_verified_qemu_openocd_cache_without_recompile() -> Non
     qemu_workflow = QEMU_WORKFLOW.read_text(encoding="utf-8")
     recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
     assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in workflow
+    assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in workflow
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in workflow
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in workflow
     assert recipe in workflow
     assert recipe in qemu_workflow
+    assert "Prepare portable ARMv7 OpenOCD cache path" in workflow
+    assert "command -v zstd >/dev/null" in workflow
     assert "Restore qualified ARMv7 OpenOCD build cache" in workflow
     assert "uses: actions/cache/restore@v4" in workflow
     assert "Require and verify qualified ARMv7 OpenOCD cache" in workflow
     assert 'steps.openocd-cache.outputs.cache-hit' in workflow
     assert "Qualified ARMv7 OpenOCD cache is missing" in workflow
     assert 'scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256"' in workflow
-    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$RUNNER_TEMP/openocd-armv7l-cached"' in workflow
+    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$OPENOCD_ARMV7_CACHE_DIR"' in workflow
     assert "scripts/build-openocd-runtime.sh" in recipe
     restore = workflow.index("Restore qualified ARMv7 OpenOCD build cache")
     verify = workflow.index("Require and verify qualified ARMv7 OpenOCD cache")

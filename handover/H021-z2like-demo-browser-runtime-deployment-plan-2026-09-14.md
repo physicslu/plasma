@@ -161,6 +161,17 @@ same runtime/version/source/architecture identity and a different verified
 payload SHA. Missing, corrupt, or identity-drifted state remains fail-closed.
 The production `openocd-runtime.py install` policy is unchanged.
 
+A follow-up manual Browser run (#102 / workflow run \`38122573368\`) then proved
+that matching the cache **key** was insufficient: the QEMU producer saved
+\`\${RUNNER_TEMP}/openocd-armv7l-cached\` on a GitHub-hosted runner, while the
+SWPC self-hosted consumer expanded the same expression under a different
+absolute temp root. GitHub cache versioning includes the configured cache path,
+so the identical key still resolved to a different cache version and the
+Browser gate failed closed on cache miss. Both producer and consumer now use
+the same repository-relative path
+\`../.plasma-cache/openocd-armv7l-cached\`; downstream scripts reference that
+shared literal path contract rather than runner-specific temp roots. Both workflows also require `zstd` before cache access so the cache compression/version contract remains aligned.
+
 ### Automated live coverage in this gate
 
 ```text
