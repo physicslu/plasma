@@ -301,7 +301,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     <div>Target CFG: <code>{provider.target_config}</code></div>
                     <div>{zh ? "已安裝 Runtime" : "Installed runtime"}: {provider.installed_runtime_id ?? (zh ? "尚無實機安裝證據" : "Not attested")}</div>
                     <div>Installed Binary SHA-256: <code>{provider.installed_binary_sha256 ?? (zh ? "尚無實機安裝證據" : "Not attested")}</code></div>
-                    <div>{zh ? "已記錄軟體測試" : "Recorded software builds"}: {provider.software_build_evidence.length === 0
+                    <div>{zh ? "Provider 層級離線建置證據（非逐顆 MCU 驗證）" : "Provider-level offline build evidence (not per-IC qualification)"}: {provider.software_build_evidence.length === 0
                       ? (zh ? "無此版本的獨立建置驗證紀錄" : "No independent build evidence for this variant")
                       : provider.software_build_evidence.map(build => (
                         <div key={build.architecture} className="icSelectorBackendBuild">
