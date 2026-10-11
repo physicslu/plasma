@@ -40,11 +40,29 @@ function statusClass(value: string | null): string {
   return "pending";
 }
 
-function openOcdConfigLabel(status: string, zh: boolean): string {
+type OpenOcdTagState = "mapped" | "candidate" | "no_mapping";
+
+/** Display projection only: source candidates never change Production routing. */
+function openOcdTagState(device: DeviceSearchResult): OpenOcdTagState {
+  if (device.backend.mapping_status === "mapped") return "mapped";
+  if (
+    device.backend.mapping_status === "no_mapping"
+    && !device.backend.target_config
+    && device.catalog.scope === "production_admitted"
+    && device.backend_candidate?.status === "research_only"
+    && device.backend_candidate.production_mapping_status === "no_mapping"
+    && device.backend_candidate.executable === false
+    && device.backend_candidate.production_binding_authorized === false
+    && device.backend_candidate.hardware_runtime_ready === false
+    && device.backend_candidate.family === device.family
+  ) return "candidate";
+  return "no_mapping";
+}
+
+function openOcdConfigLabel(status: OpenOcdTagState, zh: boolean): string {
   if (status === "mapped") return zh ? "OpenOCD 設定 · 已存在" : "OpenOCD config · Present";
-  if (status === "no_mapping") return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
-  if (status === "rejected") return zh ? "OpenOCD 設定 · 已拒絕" : "OpenOCD config · Rejected";
-  return zh ? `OpenOCD 設定 · ${humanizeStatus(status)}` : `OpenOCD config · ${humanizeStatus(status)}`;
+  if (status === "candidate") return zh ? "OpenOCD 設定 · 候選" : "OpenOCD config · Candidate";
+  return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
 }
 
 function manufacturerPartLabel(status: string | null, zh: boolean): string {
@@ -222,18 +240,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </span>
                   </div>
                   <div className="icSelectorStatusRow icSelectorStatusEvidence">
-                    <span className={statusClass(device.backend.mapping_status)}>
-                      {openOcdConfigLabel(device.backend.mapping_status, zh)}
+                    <span className={openOcdTagState(device) === "mapped" ? "verified" : openOcdTagState(device) === "candidate" ? "pending" : "unmapped"}>
+                      {openOcdConfigLabel(openOcdTagState(device), zh)}
                     </span>
                     <span className={statusClass(device.catalog_verification.status)}>
                       {manufacturerPartLabel(device.catalog_verification.status, zh)}
                     </span>
                   </div>
-                  {device.backend_candidate?.status === "research_only" && (
-                    <div className="icSelectorCandidateHint">
-                      {zh ? "ST 原始碼候選 · 僅研究，禁止燒錄" : "ST source candidate · Research only, not programmable"}
-                    </div>
-                  )}
                 </div>
               </button>
             );
