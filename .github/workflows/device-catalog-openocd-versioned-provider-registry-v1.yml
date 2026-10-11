@@ -1,0 +1,48 @@
+name: OpenOCD Versioned Provider Source Registry v1
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/device-catalog-openocd-versioned-provider-registry-v1.yml"
+      - "software/python/plasma_web/openocd_provider_registry.py"
+      - "software/python/tests/test_openocd_versioned_provider_registry_v1.py"
+      - "data/device-catalog/research/st-h5-offline-runtime-evidence-v1.json"
+      - "docs/architecture/openocd-versioned-provider-registry-v1.md"
+      - "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/device-catalog-openocd-versioned-provider-registry-v1.yml"
+      - "software/python/plasma_web/openocd_provider_registry.py"
+      - "software/python/tests/test_openocd_versioned_provider_registry_v1.py"
+      - "data/device-catalog/research/st-h5-offline-runtime-evidence-v1.json"
+      - "docs/architecture/openocd-versioned-provider-registry-v1.md"
+      - "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  versioned-offline-provider-sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project Python dependencies
+        run: python -m pip install -e software/python
+      - name: Guard Production exact ICPN manifest without any mapping mutation
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Check all 4629 exact provider bindings, 190 H5 and 172 C5 source-only routes
+        run: |
+          python -m unittest discover -s software/python/tests \
+            -p "test_openocd_versioned_provider_registry_v1.py" -v
+      - name: Cross-check H5 and C5 immutable candidate evidence and failure modes
+        run: |
+          python -m unittest discover -s software/python/tests \
+            -p "test_icpn_backend_candidate_registry_v1.py" -v
+          python -m unittest discover -s software/python/tests \
+            -p "test_icpn_backend_provenance_v1.py" -v
