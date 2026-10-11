@@ -6,6 +6,8 @@
 
 A source Commit does not uniquely identify a compiled binary, and the same reported OpenOCD runtime ID can refer to different artifacts. Software test results are scoped to one particular source commit, architecture, artifact SHA256 and payload SHA256. This is never proof that the binary is actually installed or can program a target.
 
+The existing GET /api/devices/search API adds a separate read-only backend_providers array, used only for display. It does not change the authoritative backend.mapping_status, target_config, source candidate safety state or Job/Batch resolver. Slim PPU bundles missing the evidence ledger return an empty array instead of inventing a provider.
+
 The read-only versioned provider registry produces a **list** of possible software engines for each exact admitted Production ICPN. It can model multiple providers per device but current evidence only establishes one each; it must never invent a competing provider. Current output is:
 
 | Cohort | Provider | Mapping state | Exact parts |
