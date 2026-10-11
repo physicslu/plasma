@@ -78,7 +78,7 @@ permissions:
 
 env:
   OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
-  OPENOCD_ARMV7_CACHE_DIR: "../.plasma-cache/openocd-armv7l-cached"
+  OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"
 
 jobs:
   contracts:
@@ -201,6 +201,14 @@ jobs:
 
       # Reuse only source/recipe-identical binaries; never restore a broader cache key.
       # GitHub Actions PRs may read default-branch caches but may not publish them.
+      - name: Prepare portable ARMv7 OpenOCD cache path
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v zstd >/dev/null
+          rm -rf "$OPENOCD_ARMV7_CACHE_DIR"
+          mkdir -p "$(dirname "$OPENOCD_ARMV7_CACHE_DIR")"
+
       - name: Restore pinned ARMv7 OpenOCD build cache
         id: openocd-cache
         uses: actions/cache/restore@v4
