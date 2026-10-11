@@ -273,6 +273,20 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
+              {selected.backend_source_reference && (
+                <>
+                  <div><dt>{zh ? "Backend Provider" : "Backend provider"}</dt><dd>{selected.backend_source_reference.provider_name} ({selected.backend_source_reference.provider_id})</dd></div>
+                  <div><dt>{zh ? "來源版本" : "Source version"}</dt><dd>{selected.backend_source_reference.source_version ?? (zh ? "未確認" : "Not attested")}</dd></div>
+                  <div><dt>{zh ? "來源 Commit" : "Source commit"}</dt><dd><code>{selected.backend_source_reference.source_commit ?? (zh ? "未確認" : "Not attested")}</code></dd></div>
+                  <div><dt>{zh ? "來源儲存庫" : "Source repository"}</dt><dd><code>{selected.backend_source_reference.source_repository ?? "—"}</code></dd></div>
+                  <div><dt>{zh ? "發行 Runtime ID" : "Pinned release runtime ID"}</dt><dd><code>{selected.backend_source_reference.pinned_release_runtime_id ?? (zh ? "未確認" : "Not attested")}</code></dd></div>
+                  <div><dt>{zh ? "已安裝 Runtime ID" : "Installed runtime ID"}</dt><dd>{selected.backend_source_reference.installed_runtime_id ?? (zh ? "未提供實機證據" : "No device attestation")}</dd></div>
+                  <div><dt>Binary SHA-256</dt><dd><code>{selected.backend_source_reference.installed_binary_sha256 ?? (zh ? "未提供實機證據" : "No device attestation")}</code></dd></div>
+                  <div><dt>{zh ? "驗證範圍" : "Evidence scope"}</dt><dd>{selected.backend_source_reference.evidence_scope === "catalog_mapping_only"
+                    ? (zh ? "僅 Catalog 路由證據" : "Catalog route evidence only")
+                    : (zh ? "僅固定來源研究證據" : "Pinned source research only")}</dd></div>
+                </>
+              )}
               {selected.backend_candidate && (
                 <>
                   <div><dt>{zh ? "候選引擎" : "Candidate engine"}</dt><dd>{selected.backend_candidate.flash_driver} · {zh ? "僅研究" : "research only"}</dd></div>
