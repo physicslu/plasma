@@ -36,5 +36,13 @@ test("mapped is green, candidate amber and no mapping neutral without granting p
   assert.match(source, /Backend Candidate Registry · 尚不可燒錄/);
   assert.match(source, /selected\.backend\.mapping_status/);
   assert.match(source, /原廠料號 · 已確認/);
+  assert.match(source, /selected\.backend_source_reference\.provider_name/);
+  assert.match(source, /selected\.backend_source_reference\.source_version/);
+  assert.match(source, /selected\.backend_source_reference\.source_commit/);
+  assert.match(source, /selected\.backend_source_reference\.pinned_release_runtime_id/);
+  assert.match(source, /selected\.backend_source_reference\.installed_runtime_id/);
+  assert.match(source, /selected\.backend_source_reference\.installed_binary_sha256/);
+  assert.match(source, /驗證範圍/);
+  assert.match(source, /未提供實機證據/);
   assert.match(source, /未實機測試/);
 });
