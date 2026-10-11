@@ -20,7 +20,7 @@ test("IC Selector displays ST candidate evidence without turning it into an exec
   assert.match(selector, /selected\.backend_candidate\.loader_source_path/);
   assert.match(selector, /selected\.backend_candidate\.source_commit/);
   assert.match(selector, /selected\.backend_candidate\.dfp_exact_variant_status/);
-  assert.match(selector, /禁止燒錄/);
+  assert.match(selector, /尚不可燒錄/);
   assert.match(selector, /尚不可燒錄/);
   assert.match(selector, /無法視為已支援燒錄/);
   assert.doesNotMatch(selector, /device\.backend_candidate\.executable\s*\?\s*onSelect/);
