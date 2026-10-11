@@ -19,7 +19,9 @@ def test_cache_key_is_pinned_to_architecture_release_and_build_recipe() -> None:
     assert "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')" in text
     assert "restore-keys:" not in text
     assert "hashFiles('.github/workflows/z2like-demo-qemu.yml'" not in text
-    assert "path: ${{ runner.temp }}/openocd-armv7l-cached" in text
+    assert 'OPENOCD_ARMV7_CACHE_DIR: "../.plasma-cache/openocd-armv7l-cached"' in text
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in text
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in text
 
 
 def test_prs_may_restore_but_only_main_can_save_cache() -> None:
@@ -47,7 +49,7 @@ def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
     assert restore < build < verify < kit < e2e < run_arm < eight_sites < matrix < save
     build_part = text[build:verify]
     assert "if: steps.openocd-cache.outputs.cache-hit != 'true'" in build_part
-    assert 'bash scripts/build-openocd-runtime.sh "$RUNNER_TEMP/openocd-armv7l-cached" armv7l' in build_part
+    assert 'bash scripts/build-openocd-runtime.sh "$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part
     verify_part = text[verify:kit]
     assert "if: steps.openocd-cache.outputs.cache-hit" not in verify_part
     assert 'test -f "$artifact"' in verify_part
@@ -67,7 +69,7 @@ def test_fresh_commit_specific_kit_and_e2e_remain_unconditional() -> None:
     assert 'sha="$(git rev-parse HEAD)"' in kit
     assert 'python scripts/ppu-runtime.py build --output-dir "$runtime"' in kit
     assert 'python scripts/ppu-release.py' in kit
-    assert 'openocd_out="$RUNNER_TEMP/openocd-armv7l-cached"' in kit
+    assert 'openocd_out="$OPENOCD_ARMV7_CACHE_DIR"' in kit
     assert 'python scripts/openocd-runtime.py verify "$openocd" --sidecar "$openocd.sha256"' in kit
     assert "if: steps.openocd-cache" not in kit
     e2e_section = text.split("Drive Manager to Bootstrap to QEMU deployment E2E", 1)[1].split(
@@ -92,10 +94,17 @@ def test_browser_live_gate_uses_the_same_qualified_cache_identity() -> None:
     key_prefix = "qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-"
     assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in qemu
     assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in browser
+    portable_path = 'OPENOCD_ARMV7_CACHE_DIR: "../.plasma-cache/openocd-armv7l-cached"'
+    assert portable_path in qemu
+    assert portable_path in browser
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in qemu
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in browser
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in qemu
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in browser
     assert key_prefix in qemu
     assert key_prefix in browser
     assert recipe in qemu
     assert recipe in browser
     assert "actions/cache/save@v4" not in browser
     assert "Qualified ARMv7 OpenOCD cache is missing" in browser
-    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$RUNNER_TEMP/openocd-armv7l-cached"' in browser
+    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$OPENOCD_ARMV7_CACHE_DIR"' in browser
