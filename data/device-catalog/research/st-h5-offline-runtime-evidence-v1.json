@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "evidence_id": "st-h5-source-locked-host-and-armv7-ci-v1",
+  "status": "OFFLINE_SOFTWARE_ONLY",
+  "source_repository": "https://github.com/STMicroelectronics/OpenOCD.git",
+  "source_commit": "c8d973bdad9a6fddb51459eda109b3b95d23b57a",
+  "target_config_path": "tcl/target/stm32h5x.cfg",
+  "target_config_git_blob": "b9e67c604f7d824fefca03b42d0b112e1785235a",
+  "flash_driver_path": "src/flash/nor/stm32h5x.c",
+  "flash_driver_git_blob": "b5f24a39da05e5235167ff91c110ed89c2e3f9c5",
+  "reported_openocd_version": "0.12.0",
+  "builds": [
+    {
+      "environment": "ubuntu-24.04-host",
+      "architecture": "x86_64",
+      "runtime_id": "0.12.0-c8d973bdad9a",
+      "artifact_sha256": "1758f03aef0a9ce6bbd212343622b174a85f0bda446bb2e26763113f460a64db",
+      "payload_sha256": "af506c77d06ffb22b178cde078f13f6a8b9272eb101695e1ea1dc00f09dc967e",
+      "binary_sha256": null,
+      "github_actions_run_id": 38020833350,
+      "qualification": "SOURCE_BUILD_AND_DUMMY_JTAG_CFG_PARSE_PASS",
+      "scope": "no_real_target_no_fpga_no_hardware",
+      "published_binary": false
+    },
+    {
+      "environment": "debian-bookworm-armv7-qemu-user",
+      "architecture": "armv7l",
+      "runtime_id": "0.12.0-c8d973bdad9a",
+      "artifact_sha256": "f3a60db251a53bd18bf2a5acb80625abfc47c2eb298bb8a3a17112827cb502cd",
+      "payload_sha256": "a7216d585358faf2710444b04d004c2aa531a16ef105d04129268883f0fc863d",
+      "binary_sha256": null,
+      "github_actions_run_id": 38034789548,
+      "qualification": "ARMV7_SOURCE_BUILD_AND_QEMU_DUMMY_CFG_PARSE_PASS",
+      "scope": "not_z2_abi_not_fpga_swd_no_real_target",
+      "published_binary": false
+    }
+  ],
+  "physical_silicon_qualified": false,
+  "ppu_installed_runtime_attested": false,
+  "hardware_runtime_ready": false,
+  "production_mapping_authorized": false,
+  "redistribution_license_review_complete": false
+}
