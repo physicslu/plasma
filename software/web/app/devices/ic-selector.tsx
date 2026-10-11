@@ -273,7 +273,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
-              {selected.backend_source_reference && (
+              {!selected.backend_providers?.length && selected.backend_source_reference && (
                 <>
                   <div><dt>{zh ? "Backend Provider" : "Backend provider"}</dt><dd>{selected.backend_source_reference.provider_name} ({selected.backend_source_reference.provider_id})</dd></div>
                   <div><dt>{zh ? "來源版本" : "Source version"}</dt><dd>{selected.backend_source_reference.source_version ?? (zh ? "未確認" : "Not attested")}</dd></div>
@@ -287,6 +287,35 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     : (zh ? "僅固定來源研究證據" : "Pinned source research only")}</dd></div>
                 </>
               )}
+
+              {selected.backend_providers?.map((provider, idx) => (
+                <div key={provider.provider_id} className="icSelectorBackendProvider">
+                  <dt>{zh ? "Backend 選項" : "Backend option"} {idx + 1}</dt>
+                  <dd>
+                    <strong>{provider.provider_distribution} · {provider.mapping_status === "candidate" ? "Candidate" : "Mapped"}</strong>
+                    <div>{zh ? "來源版本" : "Source version"}: {provider.source_version ?? (zh ? "未確認" : "Unknown")}</div>
+                    <div>Source Commit: <code>{provider.source_commit}</code></div>
+                    <div>Runtime ID: <code>{provider.declared_release_runtime_id ?? (zh ? "未建立正式發行綁定" : "No declared release binding")}</code></div>
+                    <div>Flash Driver: <code>{provider.flash_driver ?? (zh ? "未個別驗證" : "Not individually proven")}</code></div>
+                    <div>Target CFG: <code>{provider.target_config}</code></div>
+                    <div>{zh ? "已安裝 Runtime" : "Installed runtime"}: {provider.installed_runtime_id ?? (zh ? "尚無實機安裝證據" : "Not attested")}</div>
+                    <div>Installed Binary SHA-256: <code>{provider.installed_binary_sha256 ?? (zh ? "尚無實機安裝證據" : "Not attested")}</code></div>
+                    <div>{zh ? "已記錄軟體測試" : "Recorded software builds"}: {provider.software_build_evidence.length === 0
+                      ? (zh ? "無此版本的獨立建置驗證紀錄" : "No independent build evidence for this variant")
+                      : provider.software_build_evidence.map(build => (
+                        <div key={build.architecture} className="icSelectorBackendBuild">
+                          <a href={`https://github.com/physicslu/plasma/actions/runs/${build.github_actions_run_id}`} target="_blank" rel="noreferrer">
+                            {build.architecture} · {build.qualification}
+                          </a>
+                          <div>Artifact SHA-256: <code>{build.artifact_sha256}</code></div>
+                          <div>{zh ? "驗證界線" : "Evidence scope"}: {build.scope} · {zh ? "未實機測試" : "No physical test"}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div>{zh ? "執行權限" : "Execution"}: {zh ? "未開放（僅 Metadata）" : "Not enabled (metadata only)"}</div>
+                  </dd>
+                </div>
+              ))}
               {selected.backend_candidate && (
                 <>
                   <div><dt>{zh ? "候選引擎" : "Candidate engine"}</dt><dd>{selected.backend_candidate.flash_driver} · {zh ? "僅研究" : "research only"}</dd></div>
