@@ -489,3 +489,98 @@ async def test_port_lease_released_when_launcher_raises(tmp_path: Path) -> None:
         assert (await good.start()).rpc_port == port
     finally:
         await asyncio.gather(failed.stop(), good.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ("stop", "kill"))
+async def test_cancelled_teardown_retains_port_until_child_exits(
+    tmp_path: Path, method: str,
+) -> None:
+    """Cancellation must not free a still-listening child's RPC port."""
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    port = _free_port()
+    one = OpenOCDWorker(
+        site_id=1, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, process_launcher=launcher,
+    )
+    two = OpenOCDWorker(
+        site_id=2, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, max_start_attempts=1,
+        process_launcher=launcher,
+    )
+    process = None
+    task = None
+    original = None
+    try:
+        await one.start()
+        process = one._process
+        assert process is not None
+        entered = asyncio.Event()
+        original = getattr(process, "terminate" if method == "stop" else "kill")
+        setattr(process, "terminate" if method == "stop" else "kill",
+                lambda: entered.set())
+        task = asyncio.create_task(getattr(one, method)())
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        task.cancel()
+        await asyncio.sleep(0)
+        with pytest.raises(PlasmaError) as caught:
+            await two.start()
+        assert caught.value.code == ErrorCode.INTERFACE_FAILURE
+        # A second launch would be a false ownership attempt even if bind fails.
+        assert launcher.launch_ports == [port]
+        original()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2)
+        assert (await two.start()).rpc_port == port
+    finally:
+        if process is not None and original is not None:
+            setattr(process, "terminate" if method == "stop" else "kill", original)
+            if process.returncode is None:
+                original()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_kill_queued_during_start_releases_actual_new_lease(
+    tmp_path: Path,
+) -> None:
+    """Kill must acquire lifecycle ownership before reading the lease."""
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    port = _free_port()
+    launch_entered, allow_launch = asyncio.Event(), asyncio.Event()
+
+    async def controlled_launcher(*argv: str, **kwargs: Any) -> _FakeProcess:
+        launch_entered.set()
+        await allow_launch.wait()
+        return await launcher(*argv, **kwargs)
+
+    one = OpenOCDWorker(
+        site_id=1, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, process_launcher=controlled_launcher,
+    )
+    two = OpenOCDWorker(
+        site_id=2, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, max_start_attempts=1,
+        process_launcher=launcher,
+    )
+    start_task = asyncio.create_task(one.start())
+    kill_task = None
+    try:
+        await asyncio.wait_for(launch_entered.wait(), timeout=1)
+        kill_task = asyncio.create_task(one.kill())
+        await asyncio.sleep(0)  # allow kill() to block on the lifecycle lock
+        allow_launch.set()
+        await asyncio.wait_for(asyncio.gather(start_task, kill_task), timeout=3)
+        assert not one.running
+        assert (await two.start()).rpc_port == port
+        assert launcher.launch_ports == [port, port]
+    finally:
+        allow_launch.set()
+        await asyncio.gather(start_task, return_exceptions=True)
+        if kill_task is not None:
+            await asyncio.gather(kill_task, return_exceptions=True)
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
