@@ -76,3 +76,24 @@ test("shared PMode and EMode picker is constrained to admitted exact ICPNs", asy
   assert.match(picker, /OCD Mapped/);
   assert.doesNotMatch(picker, /IC identifier/);
 });
+
+test("selected IC profile presents device, programming, and Plasma compatibility as separate layers", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const styles = await source("../app/devices/devices.css");
+  const api = await source("../app/device-catalog-api.ts");
+
+  assert.match(api, /SelectedICProfile/);
+  assert.match(api, /selected_profile\?:\s*SelectedICProfile\s*\|\s*null/);
+  assert.match(selector, /data-profile-section="device"/);
+  assert.match(selector, /data-profile-section="programming"/);
+  assert.match(selector, /data-profile-section="compatibility"/);
+  assert.match(selector, /IC Information/);
+  assert.match(selector, /Programming VDD/);
+  assert.match(selector, /PLASMA Compatibility/);
+  assert.match(selector, /原廠文件未明確指定/);
+  assert.match(selector, /manufacturer_baseline\.sha256/);
+  assert.match(selector, /hardware_runtime_ready/);
+  assert.match(selector, /physical_programming_qualified/);
+  assert.match(styles, /\.icSelectorProfileSection\s*\{/);
+  assert.match(styles, /\.icSelectorEvidenceDetails\s*\{/);
+});
