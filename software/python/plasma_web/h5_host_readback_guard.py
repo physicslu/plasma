@@ -24,7 +24,7 @@ class H5SyntheticReads:
     flash_size_register_kib: int | None
     idcode_read_state: str
     flash_size_read_state: str
-    flash_size_origin: str = "direct_register"
+    flash_size_origin: str = "unknown"
 
 
 class H5HostReadbackGuard:

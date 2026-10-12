@@ -57,6 +57,18 @@ class H5HostReadbackGuardTests(unittest.TestCase):
         self.assertEqual(count, 190)
         self.assertEqual(groups, {"0x474", "0x478", "0x47A", "0x47C", "0x484"})
 
+    def test_omitted_flash_provenance_defaults_to_unknown_and_blocks(self):
+        """A missing origin must NEVER assert direct register readback."""
+        sample = H5SyntheticReads(
+            idcode=0x474, flash_size_register_kib=128,
+            idcode_read_state="ok", flash_size_read_state="ok",
+        )
+        self.assertEqual(sample.flash_size_origin, "unknown")
+        result = self.guard.evaluate("STM32H503CBT6", sample)
+        self.assertEqual(result["assessment"], "blocked")
+        self.assertEqual(result["reason"], "flash_size_not_direct_register")
+        self.assert_not_hardware_admitted(result)
+
     def test_bad_read_status_is_blocked_even_when_fallback_equals_catalog(self):
         # 128 KiB is both the H503 declared size and driver group maximum.
         base = self.sample(0x474, 128)
