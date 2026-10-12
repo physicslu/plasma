@@ -296,7 +296,24 @@ class OpenOCDWorker:
             context={"site_id": self.site_id, "log_tail": list(self._log_tail)},
         )
 
+    @staticmethod
+    async def _finish_teardown(teardown: Awaitable[None]) -> None:
+        # Await the actual child cleanup even if a caller cancels stop/kill.
+        # The port lease must not be released while its OpenOCD can still
+        # answer another worker's readiness probe.
+        task = asyncio.create_task(teardown)
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            try:
+                await asyncio.shield(task)
+            finally:
+                raise
+
     async def _stop_locked(self) -> None:
+        await self._finish_teardown(self._stop_locked_impl())
+
+    async def _stop_locked_impl(self) -> None:
         leased_port = self._leased_port
         self._leased_port = None
         try:
@@ -428,34 +445,39 @@ class OpenOCDWorker:
             await self._stop_locked()
 
     async def kill(self) -> None:
+        async with self._lifecycle_lock:
+            # Observe the current lease only after acquiring lifecycle
+            # ownership, never before a concurrent start() finishes.
+            await self._finish_teardown(self._kill_locked_impl())
+
+    async def _kill_locked_impl(self) -> None:
         leased_port = self._leased_port
         self._leased_port = None
         try:
-            async with self._lifecycle_lock:
-                rpc = self._rpc
-                process = self._process
-                log_task = self._log_task
-                self._rpc = None
-                self._rpc_port = None
-                self._process = None
-                self._log_task = None
-                if process is not None and process.returncode is None:
+            rpc = self._rpc
+            process = self._process
+            log_task = self._log_task
+            self._rpc = None
+            self._rpc_port = None
+            self._process = None
+            self._log_task = None
+            if process is not None and process.returncode is None:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+            if rpc is not None:
+                await rpc.close()
+            if log_task is not None and not log_task.done():
+                try:
+                    await asyncio.wait_for(log_task, timeout=0.5)
+                except TimeoutError:
+                    log_task.cancel()
                     try:
-                        process.kill()
-                    except ProcessLookupError:
+                        await log_task
+                    except asyncio.CancelledError:
                         pass
-                    await process.wait()
-                if rpc is not None:
-                    await rpc.close()
-                if log_task is not None and not log_task.done():
-                    try:
-                        await asyncio.wait_for(log_task, timeout=0.5)
-                    except TimeoutError:
-                        log_task.cancel()
-                        try:
-                            await log_task
-                        except asyncio.CancelledError:
-                            pass
         finally:
             if leased_port is not None:
                 _release_loopback_port(leased_port)
