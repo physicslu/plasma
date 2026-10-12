@@ -1,0 +1,48 @@
+name: STM32H5 host-only readback safety guard v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-h5-host-readback-guard-v1.yml'
+      - 'software/python/plasma_web/h5_host_readback_guard.py'
+      - 'software/python/tests/test_h5_host_readback_guard_v1.py'
+      - 'docs/architecture/st-h5-host-readback-guard-v1.md'
+      - 'software/python/plasma_web/backend_candidate_registry.py'
+      - 'data/device-catalog/research/st-h5-offline-flash-matrix-v1.json'
+      - 'data/device-catalog/research/stm32h5-commercial-icpn.csv'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'release/openocd.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-st-h5-host-readback-guard-v1.yml'
+      - 'software/python/plasma_web/h5_host_readback_guard.py'
+      - 'software/python/tests/test_h5_host_readback_guard_v1.py'
+      - 'docs/architecture/st-h5-host-readback-guard-v1.md'
+      - 'software/python/plasma_web/backend_candidate_registry.py'
+      - 'data/device-catalog/research/st-h5-offline-flash-matrix-v1.json'
+      - 'data/device-catalog/research/stm32h5-commercial-icpn.csv'
+      - 'data/device-catalog/research/st-h5-c5-runtime-gap-v1.json'
+      - 'release/openocd.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-only-h5-readback-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install local Python package
+        run: python -m pip install -e software/python
+      - name: Preserve exact Production catalog baseline
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Verify 190 synthetic H5 records and fail-closed regressions
+        run: |
+          python -m unittest discover -s software/python/tests \
+            -p 'test_h5_host_readback_guard_v1.py' -v
