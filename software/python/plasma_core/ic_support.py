@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -34,6 +35,8 @@ EXPECTED_CATALOG_FIELDS = (
     "flash_size",
     "openocd_target_config",
 )
+MANUFACTURER_BASELINE_DIRNAME = "manufacturer-baseline"
+MANUFACTURER_BASELINE_GLOB = "*-manufacturer-only-v1.json"
 
 
 class ICSupportIntegrityError(RuntimeError):
@@ -110,6 +113,133 @@ class ResolvedProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedManufacturerProfile:
+    baseline_id: str
+    status: str
+    target: dict[str, Any]
+    source_policy: dict[str, Any]
+    device_profile: dict[str, Any]
+    programming_profile: dict[str, Any]
+    program_model: dict[str, Any]
+    qualification_boundary: dict[str, Any]
+    canonical_file_sha256: str
+
+    @classmethod
+    def from_files(cls, baseline_path: Path, lock_path: Path) -> "ResolvedManufacturerProfile":
+        try:
+            raw = baseline_path.read_bytes()
+        except OSError as exc:
+            raise ICSupportIntegrityError(f"cannot read manufacturer baseline: {baseline_path}") from exc
+        baseline = _load_object(baseline_path)
+        lock = _load_object(lock_path)
+
+        baseline_id = baseline.get("baseline_id")
+        status = baseline.get("status")
+        target = baseline.get("target")
+        source_policy = baseline.get("source_policy")
+        device_profile = baseline.get("device_profile")
+        programming_profile = baseline.get("programming_profile")
+        program_model = baseline.get("program_model")
+        qualification_boundary = baseline.get("qualification_boundary")
+        digest = hashlib.sha256(raw).hexdigest()
+
+        _require(isinstance(baseline_id, str) and baseline_id, f"{baseline_path}: baseline_id is required")
+        _require(status == "frozen_manufacturer_only", f"{baseline_id}: baseline must be frozen manufacturer-only")
+        _require(isinstance(target, dict), f"{baseline_id}: target must be an object")
+        _require(isinstance(target.get("icpn"), str) and target["icpn"], f"{baseline_id}: exact target ICPN is required")
+        _require(isinstance(source_policy, dict), f"{baseline_id}: source_policy must be an object")
+        _require(
+            source_policy.get("derivation_authority") == "manufacturer_official_only",
+            f"{baseline_id}: manufacturer-only derivation authority is required",
+        )
+        _require(isinstance(device_profile, dict), f"{baseline_id}: device_profile must be an object")
+        _require(isinstance(programming_profile, dict), f"{baseline_id}: programming_profile must be an object")
+        _require(isinstance(program_model, dict), f"{baseline_id}: program_model must be an object")
+        _require(isinstance(qualification_boundary, dict), f"{baseline_id}: qualification_boundary must be an object")
+        _require(
+            qualification_boundary.get("hardware_runtime_ready") is False
+            and qualification_boundary.get("physical_programming_qualified") is False,
+            f"{baseline_id}: manufacturer profile must not claim hardware qualification",
+        )
+        _require(
+            lock.get("baseline_id") == baseline_id,
+            f"{baseline_id}: manufacturer baseline lock identity mismatch",
+        )
+        _require(
+            lock.get("canonical_file_sha256") == digest,
+            f"{baseline_id}: manufacturer baseline digest drift",
+        )
+
+        operating = device_profile.get("operating_electrical")
+        programming_electrical = programming_profile.get("programming_electrical")
+        _require(isinstance(operating, dict), f"{baseline_id}: operating electrical characteristics are required")
+        _require(isinstance(operating.get("vdd_v"), dict), f"{baseline_id}: operating VDD range is required")
+        _require(
+            isinstance(programming_electrical, dict),
+            f"{baseline_id}: programming electrical conditions are required",
+        )
+        _require(
+            isinstance(programming_electrical.get("vdd_programming_v"), dict),
+            f"{baseline_id}: programming VDD range is required",
+        )
+        _require(
+            isinstance(device_profile.get("memory_map"), dict),
+            f"{baseline_id}: Device Profile memory map is required",
+        )
+        interfaces = programming_profile.get("interfaces")
+        _require(isinstance(interfaces, dict) and interfaces, f"{baseline_id}: programming interfaces are required")
+
+        return cls(
+            baseline_id=baseline_id,
+            status=status,
+            target=copy.deepcopy(target),
+            source_policy=copy.deepcopy(source_policy),
+            device_profile=copy.deepcopy(device_profile),
+            programming_profile=copy.deepcopy(programming_profile),
+            program_model=copy.deepcopy(program_model),
+            qualification_boundary=copy.deepcopy(qualification_boundary),
+            canonical_file_sha256=digest,
+        )
+
+    @property
+    def icpn(self) -> str:
+        return str(self.target["icpn"])
+
+    def to_selected_profile_payload(self) -> dict[str, Any]:
+        interfaces = copy.deepcopy(self.programming_profile["interfaces"])
+        return {
+            "schema_version": "1.0.0",
+            "status": "manufacturer_profile_available",
+            "manufacturer_baseline": {
+                "baseline_id": self.baseline_id,
+                "status": self.status,
+                "sha256": self.canonical_file_sha256,
+                "authority": self.source_policy["derivation_authority"],
+                "sources": copy.deepcopy(self.source_policy.get("locked_sources", [])),
+            },
+            "device": {
+                "identity": copy.deepcopy(self.device_profile["identity"]),
+                "operating_electrical": copy.deepcopy(self.device_profile["operating_electrical"]),
+                "memory_map": copy.deepcopy(self.device_profile["memory_map"]),
+            },
+            "programming": {
+                "interfaces": interfaces,
+                "electrical": copy.deepcopy(self.programming_profile["programming_electrical"]),
+                "flash_geometry": copy.deepcopy(self.programming_profile["flash_geometry"]),
+                "flash_controller": copy.deepcopy(self.programming_profile["flash_controller"]),
+                "special_constraints": copy.deepcopy(self.programming_profile["special_constraints"]),
+                "program_model": copy.deepcopy(self.program_model),
+            },
+            "plasma_compatibility": {
+                "site_electrical_compatibility": "not_evaluated",
+                "socket_compatibility": "not_evaluated",
+                "hardware_runtime_ready": False,
+                "physical_programming_qualified": False,
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedICSupport:
     icpn: str
     binding_set_id: str
@@ -117,6 +247,7 @@ class ResolvedICSupport:
     expected_catalog: dict[str, Any]
     profiles: dict[str, ResolvedProfile]
     revision_overrides: tuple[dict[str, Any], ...]
+    manufacturer_profile: ResolvedManufacturerProfile | None = None
 
     def profile(self, kind: str) -> ResolvedProfile:
         try:
@@ -135,6 +266,27 @@ class ResolvedICSupport:
     @property
     def openocd_target_config(self) -> str:
         return str(self.expected_catalog["openocd_target_config"])
+
+    def to_selected_profile_payload(self) -> dict[str, Any] | None:
+        if self.manufacturer_profile is None:
+            return None
+        payload = self.manufacturer_profile.to_selected_profile_payload()
+        payload["icpn"] = self.icpn
+        payload["catalog_identity"] = {
+            "base_device": self.expected_catalog["base_device"],
+            "package": self.expected_catalog["package"],
+            "pin_count": self.expected_catalog["pin_count"],
+            "flash_size": self.expected_catalog["flash_size"],
+        }
+        payload["ic_support"] = {
+            "binding_set_id": self.binding_set_id,
+            "binding_status": self.binding_status,
+            "profiles": {
+                kind: self.profiles[kind].to_summary()
+                for kind in EXPECTED_PROFILE_KINDS
+            },
+        }
+        return payload
 
     def to_runtime_payload(self) -> dict[str, Any]:
         """Return a browser/log-safe resolution summary, not executable driver state."""
@@ -208,6 +360,25 @@ class ICSupportResolver:
                 profiles[profile.profile_id] = profile
         _require(profiles, f"no IC Support profiles found under {profiles_root}")
 
+        manufacturer_profiles: dict[str, ResolvedManufacturerProfile] = {}
+        manufacturer_root = resolved_root / MANUFACTURER_BASELINE_DIRNAME
+        if manufacturer_root.exists():
+            for baseline_path in sorted(manufacturer_root.glob(MANUFACTURER_BASELINE_GLOB)):
+                lock_path = baseline_path.with_name(
+                    baseline_path.name.removesuffix(".json") + ".lock.json"
+                )
+                _require(lock_path.is_file(), f"{baseline_path}: manufacturer baseline lock is required")
+                manufacturer_profile = ResolvedManufacturerProfile.from_files(
+                    baseline_path,
+                    lock_path,
+                )
+                key = manufacturer_profile.icpn.casefold()
+                _require(
+                    key not in manufacturer_profiles,
+                    f"duplicate manufacturer profile for exact ICPN: {manufacturer_profile.icpn}",
+                )
+                manufacturer_profiles[key] = manufacturer_profile
+
         records: dict[str, ResolvedICSupport] = {}
         for path in sorted(bindings_root.glob("*.json")):
             payload = _load_object(path)
@@ -258,6 +429,29 @@ class ICSupportResolver:
                     )
                     selected[kind] = profile
 
+                manufacturer_profile = manufacturer_profiles.get(key)
+                if manufacturer_profile is not None:
+                    target = manufacturer_profile.target
+                    _require(
+                        target.get("manufacturer") == expected_catalog["manufacturer"],
+                        f"{canonical_icpn}: manufacturer profile manufacturer does not match catalog binding",
+                    )
+                    _require(
+                        target.get("base_device") == expected_catalog["base_device"],
+                        f"{canonical_icpn}: manufacturer profile base_device does not match catalog binding",
+                    )
+                    baseline_flash = (
+                        manufacturer_profile.device_profile
+                        .get("memory_map", {})
+                        .get("main_flash", {})
+                        .get("size_bytes")
+                    )
+                    expected_flash = str(expected_catalog["flash_size"])
+                    _require(
+                        isinstance(baseline_flash, int) and f"{baseline_flash // 1024} KiB" == expected_flash,
+                        f"{canonical_icpn}: manufacturer profile Flash size does not match catalog binding",
+                    )
+
                 records[key] = ResolvedICSupport(
                     icpn=canonical_icpn,
                     binding_set_id=binding_set_id,
@@ -265,6 +459,7 @@ class ICSupportResolver:
                     expected_catalog=copy.deepcopy(expected_catalog),
                     profiles=selected,
                     revision_overrides=tuple(normalized_overrides),
+                    manufacturer_profile=manufacturer_profile,
                 )
 
         _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
@@ -289,6 +484,10 @@ class ICSupportResolver:
             "resolved_exact_icpns": self.size,
             "programming_profiles": len(programming_profiles),
             "programming_profile_ids": programming_profiles,
+            "manufacturer_selected_profiles": sum(
+                1 for record in self._records.values()
+                if record.manufacturer_profile is not None
+            ),
             "native_ppu_runtime_ready_exact_icpns": 0,
             "exact_icpns": list(self.exact_icpns),
         }
