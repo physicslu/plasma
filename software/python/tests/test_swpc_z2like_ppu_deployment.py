@@ -44,6 +44,7 @@ def test_swpc_surrogate_site_config_write_boundary_is_gateway_only() -> None:
     assert 'chmod 0640 "$config_path"' in text
     assert 'chown plasma:plasma "$config_path"' in text
     assert "module.render_systemd_units(" in text
+    assert 'ic_support_relative="data/ic-support"' in text
     assert '"runtime_apply_supported": true' in text
     assert '"upgrade_preserves_existing_config": true' in text
     assert "preserving existing canonical Desired configuration" in text
