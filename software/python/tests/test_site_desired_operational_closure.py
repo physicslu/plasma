@@ -57,6 +57,9 @@ def test_z2_server_and_gateway_share_one_explicit_canonical_config(tmp_path: Pat
     assert str(paths.config_root) not in server_write_line
     assert "ProtectSystem=strict" in server
     assert "ProtectSystem=strict" in gateway
+    expected_ic_support = paths.current / "runtime" / "data" / "ic-support"
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={expected_ic_support}" in server
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={expected_ic_support}" in gateway
 
 
 def test_z2_config_directory_permission_migration_is_rollback_safe(
