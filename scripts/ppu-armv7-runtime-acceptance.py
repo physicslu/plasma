@@ -266,11 +266,13 @@ def run_acceptance(
     if not app.is_file():
         raise ARMv7AcceptanceError(f"PPU zipapp is missing: {app}")
     manifest = _load_runtime_manifest(runtime_dir)
-    catalog = runtime_dir / str(
-        ((manifest.get("data") or {}).get("device_catalog_manifest"))
-    )
+    data = manifest.get("data") or {}
+    catalog = runtime_dir / str(data.get("device_catalog_manifest"))
+    ic_support = runtime_dir / str(data.get("ic_support_root"))
     if not catalog.is_file():
         raise ARMv7AcceptanceError(f"production Device Catalog manifest is missing: {catalog}")
+    if not (ic_support / "profiles").is_dir() or not (ic_support / "bindings").is_dir():
+        raise ARMv7AcceptanceError(f"IC Support runtime data is missing: {ic_support}")
 
     work_dir.mkdir(parents=True, exist_ok=True)
     config_path = _write_config(work_dir, server_port=server_port)
@@ -281,6 +283,7 @@ def run_acceptance(
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    env["PLASMA_IC_SUPPORT_ROOT"] = str(ic_support)
 
     server: subprocess.Popen[bytes] | None = None
     gateway: subprocess.Popen[bytes] | None = None

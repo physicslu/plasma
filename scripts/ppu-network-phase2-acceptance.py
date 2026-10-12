@@ -413,8 +413,10 @@ def _print_summary(result: Mapping[str, Any], report: Path) -> None:
 def _inside_ppu(args: argparse.Namespace) -> int:
     if platform.machine().lower() not in {"armv7","armv7l"}: raise AcceptanceError(f"inside PPU requires ARMv7, got {platform.machine()}")
     runtime=args.runtime_dir.resolve(); work=args.work_dir.resolve(); app=runtime/"ppu/ppu.pyz"
-    manifest=json.loads((runtime/"ppu-runtime.json").read_text(encoding="utf-8")); catalog=runtime/str((manifest.get("data") or {}).get("device_catalog_manifest"))
-    env=dict(os.environ); env["PYTHONUNBUFFERED"]="1"; env["PLASMA_DEVICE_CATALOG_MANIFEST"]=str(catalog)
+    manifest=json.loads((runtime/"ppu-runtime.json").read_text(encoding="utf-8")); data=manifest.get("data") or {}; catalog=runtime/str(data.get("device_catalog_manifest")); ic_support=runtime/str(data.get("ic_support_root"))
+    if not catalog.is_file(): raise AcceptanceError(f"Device Catalog manifest is missing: {catalog}")
+    if not (ic_support/"profiles").is_dir() or not (ic_support/"bindings").is_dir(): raise AcceptanceError(f"IC Support runtime data is missing: {ic_support}")
+    env=dict(os.environ); env["PYTHONUNBUFFERED"]="1"; env["PLASMA_DEVICE_CATALOG_MANIFEST"]=str(catalog); env["PLASMA_IC_SUPPORT_ROOT"]=str(ic_support)
     for directory in (work/"server-output",work/"gateway-output",work/"logs"): directory.mkdir(parents=True,exist_ok=True)
     server=gateway=None
     try:

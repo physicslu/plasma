@@ -107,6 +107,7 @@ def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state
 
     assert "preserving existing canonical Desired configuration" in installer
     assert "module.render_systemd_units(" in installer
+    assert 'ic_support_relative="data/ic-support"' in installer
     assert '"runtime_apply_supported": true' in installer
     assert '"upgrade_preserves_existing_config": true' in installer
     assert '"scope": "restart-plasma-server-only"' in installer

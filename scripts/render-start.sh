@@ -13,6 +13,7 @@ ppu_alias="${PLASMA_RENDER_PPU_ALIAS:-render-demo-ppu}"
 flash_bytes="${PLASMA_RENDER_FLASH_BYTES:-1048576}"
 engineering_enabled="${PLASMA_RENDER_ENGINEERING_MOCK:-1}"
 catalog_manifest="${PLASMA_DEVICE_CATALOG_MANIFEST:-${repo_root}/data/device-catalog/production/icpn-v1-manifest.json}"
+ic_support_root="${PLASMA_IC_SUPPORT_ROOT:-${repo_root}/data/ic-support}"
 server_pid=""
 gateway_pid=""
 manager_pid=""
@@ -45,11 +46,18 @@ if [[ ! -f "${catalog_manifest}" ]]; then
   printf '[render-start] Missing production Device Catalog manifest: %s\n' "${catalog_manifest}" >&2
   exit 69
 fi
+if [[ ! -d "${ic_support_root}/profiles" || ! -d "${ic_support_root}/bindings" ]]; then
+  printf '[render-start] Missing IC Support runtime data root: %s\n' "${ic_support_root}" >&2
+  exit 69
+fi
 export PLASMA_DEVICE_CATALOG_MANIFEST="${catalog_manifest}"
+export PLASMA_IC_SUPPORT_ROOT="${ic_support_root}"
 
-# Fail closed before binding a public socket. This validates manifest identity,
-# admitted-source Git blob bindings, canonical schemas, row counts and duplicate ICPNs.
+# Fail closed before binding a public socket. These checks validate the exact
+# deployment-owned data roots instead of deriving repository data from Python
+# package installation paths.
 python -m plasma_web.device_catalog --manifest "${catalog_manifest}" >/dev/null
+python -m plasma_core.ic_support --icpn STM32F103C8T6 >/dev/null
 
 cleanup() {
   for pid_name in console_pid manager_pid gateway_pid server_pid; do
@@ -132,6 +140,31 @@ while time.monotonic() < deadline:
         time.sleep(0.1)
 else:
     raise SystemExit("[render-start] Mock PPU Plasma Gateway did not become ready")
+PY
+
+# Deployment regression guard: exercise the exact request path that composes
+# Device Catalog + IC Support Selected IC Profile. A health-only probe would
+# not catch an installed-package data-root regression.
+python - "${gateway_port}" <<'PY'
+import json
+import sys
+from urllib.request import ProxyHandler, build_opener
+
+port = int(sys.argv[1])
+opener = build_opener(ProxyHandler({}))
+url = f"http://127.0.0.1:{port}/api/devices/search?q=STM32F103C8T6&limit=1"
+with opener.open(url, timeout=5) as response:
+    payload = json.loads(response.read())
+
+results = payload.get("results")
+if not isinstance(results, list) or len(results) != 1:
+    raise SystemExit(f"[render-start] IC Selector smoke returned unexpected results: {payload!r}")
+selected = results[0]
+if selected.get("icpn") != "STM32F103C8T6":
+    raise SystemExit(f"[render-start] IC Selector smoke returned wrong ICPN: {selected!r}")
+profile = selected.get("selected_profile")
+if not isinstance(profile, dict) or profile.get("status") != "manufacturer_profile_available":
+    raise SystemExit(f"[render-start] IC Selector smoke missing Selected IC Profile: {selected!r}")
 PY
 
 python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${gateway_port}" <<'PY'

@@ -303,14 +303,29 @@ def _verify_runtime(root: Path) -> dict[str, object]:
     data = manifest.get("data")
     if not isinstance(data, dict):
         raise Z2InstallerError("PPU runtime data manifest is invalid")
+
     catalog_rel = data.get("device_catalog_manifest")
-    if not isinstance(catalog_rel, str):
-        raise Z2InstallerError("PPU runtime Device Catalog manifest path is missing")
-    pure = PurePosixPath(catalog_rel)
-    if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != catalog_rel:
-        raise Z2InstallerError("PPU runtime Device Catalog manifest path is unsafe")
-    if not (runtime / Path(*pure.parts)).is_file():
+    ic_support_rel = data.get("ic_support_root")
+    for label, value in (
+        ("Device Catalog manifest", catalog_rel),
+        ("IC Support root", ic_support_rel),
+    ):
+        if not isinstance(value, str):
+            raise Z2InstallerError(f"PPU runtime {label} path is missing")
+        pure = PurePosixPath(value)
+        if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != value:
+            raise Z2InstallerError(f"PPU runtime {label} path is unsafe")
+
+    catalog = runtime / Path(*PurePosixPath(catalog_rel).parts)
+    if not catalog.is_file():
         raise Z2InstallerError("PPU runtime production Device Catalog manifest is missing")
+
+    ic_support = runtime / Path(*PurePosixPath(ic_support_rel).parts)
+    for dirname in ("profiles", "bindings", "manufacturer-baseline"):
+        if not (ic_support / dirname).is_dir():
+            raise Z2InstallerError(
+                f"PPU runtime IC Support directory is missing: {dirname}"
+            )
     return manifest
 
 
@@ -434,6 +449,13 @@ def _catalog_relative(runtime_manifest: Mapping[str, object]) -> str:
     return str(data["device_catalog_manifest"])
 
 
+def _ic_support_relative(runtime_manifest: Mapping[str, object]) -> str:
+    data = runtime_manifest.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("ic_support_root"), str):
+        raise Z2InstallerError("runtime manifest is missing IC Support data-root identity")
+    return str(data["ic_support_root"])
+
+
 def render_ppu_config(
     *,
     ppu_id: str,
@@ -481,11 +503,13 @@ def render_systemd_units(
     python_runtime: PythonRuntime,
     gateway_host: str,
     catalog_relative: str,
+    ic_support_relative: str,
 ) -> dict[str, str]:
     current_runtime = paths.current / "runtime"
     app = current_runtime / "ppu" / "ppu.pyz"
     config = paths.config_root / "ppu.yaml"
     catalog = current_runtime / Path(*PurePosixPath(catalog_relative).parts)
+    ic_support = current_runtime / Path(*PurePosixPath(ic_support_relative).parts)
     common = [
         "User=plasma",
         "Group=plasma",
@@ -497,6 +521,7 @@ def render_systemd_units(
         "ProtectSystem=strict",
         "Environment=PYTHONUNBUFFERED=1",
         f"Environment=PLASMA_DEVICE_CATALOG_MANIFEST={catalog}",
+        f"Environment=PLASMA_IC_SUPPORT_ROOT={ic_support}",
     ]
     server = "\n".join(
         [
@@ -861,6 +886,7 @@ def install_release(
         python_runtime=python_runtime,
         gateway_host=gateway_host,
         catalog_relative=_catalog_relative(verified.runtime_manifest),
+        ic_support_relative=_ic_support_relative(verified.runtime_manifest),
     )
 
     _write_text_atomic(config_path, config, 0o640)

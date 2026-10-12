@@ -86,7 +86,10 @@ def deployment_commit(origin: str, *, timeout: float) -> str | None:
 
 
 def managed_prefix(report: SmokeReport) -> str:
-    return "/api/manager/ppu" if report.expected_commit is not None else ""
+    # The public Render product is a managed Control Station in both PR
+    # observation and pinned post-deploy acceptance. Deployment identity
+    # controls commit pinning only; it must not change the API routing mode.
+    return "/api/manager/ppu"
 
 
 def wait_until_ready(
@@ -101,7 +104,7 @@ def wait_until_ready(
     started = time.monotonic()
     deadline = started + wake_timeout
     last_issue = "service has not responded yet"
-    readiness_path = "/api/manager/ppu/api/health/ready" if expected_commit else "/api/health/ready"
+    readiness_path = f"{managed_prefix(report)}/api/health/ready"
 
     try:
         request(origin, "/", timeout=request_timeout)
@@ -125,7 +128,7 @@ def wait_until_ready(
             if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
                 report.cold_start_seconds = round(time.monotonic() - started, 3)
                 report.checks["readiness"] = "PASS"
-                report.checks["routing"] = "MANAGED" if expected_commit else "LEGACY_PR_OBSERVATION"
+                report.checks["routing"] = "MANAGED"
                 return payload
             last_issue = f"readiness payload not ready: {payload!r}"
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
@@ -145,12 +148,9 @@ def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> Non
             raise RuntimeError(f"{path} did not return an HTML product shell")
         if b"SITE MATRIX" in body or b"PPU CONTROL" in body:
             raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
-        if report.expected_commit is None and b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
-            # PR smoke observes the currently deployed main revision, which may still
-            # be the pre-convergence static shell. Pinned acceptance proves the new
-            # BFF identity via deployment metadata plus managed routing instead of
-            # coupling to SSR text that Vinext does not guarantee.
-            raise RuntimeError(f"{path} does not contain a recognized deployed Plasma shell")
+        # Product-shell identity is covered by browser/runtime acceptance. Vinext
+        # does not guarantee product title text in SSR HTML, so this HTTP smoke
+        # validates route availability and rejects only the retired programming shell.
         report.checks[f"ui:{path}"] = "PASS"
 
 
@@ -176,22 +176,30 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
         raise RuntimeError(f"Engineering target catalog mismatch: {actual_counts!r}")
     report.checks["api:engineering-targets"] = "PASS"
 
-    if report.expected_commit is not None:
-        device_search = request_json(origin, f"{prefix}/api/devices/search?q=stm32&limit=1", timeout=timeout)
-        results = device_search.get("results")
-        catalog_size = device_search.get("catalog_size")
-        if device_search.get("ok") is not True or device_search.get("rest_contract_version") != "3":
-            raise RuntimeError("Device Catalog search is not Web REST v3 ready")
-        if isinstance(catalog_size, bool) or not isinstance(catalog_size, int) or catalog_size < 900:
-            raise RuntimeError(f"Device Catalog size is invalid: {catalog_size!r}")
-        if not isinstance(results, list) or not results:
-            raise RuntimeError("Device Catalog search returned no STM32 result")
-        identifier = results[0].get("identifier") if isinstance(results[0], dict) else None
-        if not isinstance(identifier, str) or "stm32" not in identifier.casefold():
-            raise RuntimeError(f"Device Catalog search returned unexpected identifier: {identifier!r}")
-        report.checks["api:device-catalog-search"] = "PASS"
-    else:
-        report.checks["api:device-catalog-search"] = "SKIP_UNPINNED"
+    device_search = request_json(
+        origin,
+        f"{prefix}/api/devices/search?q=STM32F103C8T6&limit=1",
+        timeout=timeout,
+    )
+    results = device_search.get("results")
+    catalog_size = device_search.get("catalog_size")
+    if device_search.get("ok") is not True or device_search.get("rest_contract_version") != "3":
+        raise RuntimeError("Device Catalog search is not Web REST v3 ready")
+    if isinstance(catalog_size, bool) or not isinstance(catalog_size, int) or catalog_size < 900:
+        raise RuntimeError(f"Device Catalog size is invalid: {catalog_size!r}")
+    if not isinstance(results, list) or len(results) != 1 or not isinstance(results[0], dict):
+        raise RuntimeError("Device Catalog exact search did not return one STM32F103C8T6 result")
+    selected = results[0]
+    if selected.get("icpn") != "STM32F103C8T6":
+        raise RuntimeError(f"Device Catalog search returned unexpected ICPN: {selected.get('icpn')!r}")
+    selected_profile = selected.get("selected_profile")
+    if (
+        not isinstance(selected_profile, dict)
+        or selected_profile.get("status") != "manufacturer_profile_available"
+    ):
+        raise RuntimeError("STM32F103C8T6 Selected IC Profile is unavailable")
+    report.checks["api:device-catalog-search"] = "PASS"
+    report.checks["api:selected-ic-profile"] = "PASS"
 
     mock_runtime = request_json(origin, f"{prefix}/api/mock/runtime", timeout=timeout)
     settings = mock_runtime.get("mock_runtime")

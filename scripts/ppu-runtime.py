@@ -26,6 +26,9 @@ from typing import Mapping, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_SCHEMA_VERSION = 1
 ROLE = "ppu"
+DEVICE_CATALOG_RELATIVE = Path("data/device-catalog/production/icpn-v1-manifest.json")
+IC_SUPPORT_ROOT_RELATIVE = Path("data/ic-support")
+IC_SUPPORT_RUNTIME_DIRS = ("profiles", "bindings", "manufacturer-baseline")
 PPU_PACKAGES = (
     "plasma_core",
     "plasma_interfaces",
@@ -151,6 +154,16 @@ def _copy_device_catalog(repo_root: Path, runtime_dir: Path) -> None:
     shutil.copytree(source, runtime_dir / "data" / "device-catalog" / "production")
 
 
+def _copy_ic_support_runtime(repo_root: Path, runtime_dir: Path) -> None:
+    source_root = repo_root / "data" / "ic-support"
+    destination_root = runtime_dir / IC_SUPPORT_ROOT_RELATIVE
+    for dirname in IC_SUPPORT_RUNTIME_DIRS:
+        source = source_root / dirname
+        if not source.is_dir():
+            raise PPURuntimePackagingError(f"IC Support runtime directory is missing: {source}")
+        shutil.copytree(source, destination_root / dirname)
+
+
 def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, object]:
     return {
         "schema_version": RUNTIME_SCHEMA_VERSION,
@@ -195,7 +208,8 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
         },
         "packaging": {"python": "python-zipapp"},
         "data": {
-            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
+            "device_catalog_manifest": DEVICE_CATALOG_RELATIVE.as_posix(),
+            "ic_support_root": IC_SUPPORT_ROOT_RELATIVE.as_posix(),
         },
         "third_party": {
             "PyYAML": {
@@ -225,6 +239,7 @@ def build_runtime(*, repo_root: Path, output_dir: Path) -> Path:
         license_dir.mkdir(parents=True, exist_ok=True)
         (license_dir / "PyYAML.txt").write_text(license_text, encoding="utf-8")
         _copy_device_catalog(repo_root, output_dir)
+        _copy_ic_support_runtime(repo_root, output_dir)
         (output_dir / "ppu-runtime.json").write_text(
             json.dumps(
                 _manifest(
@@ -314,9 +329,30 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     missing = sorted(required - names)
     if missing:
         raise PPURuntimePackagingError(f"PPU zipapp is incomplete: missing {missing}")
-    catalog = runtime_dir / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
+    data = _require_mapping(manifest.get("data"), "data")
+    if data.get("device_catalog_manifest") != DEVICE_CATALOG_RELATIVE.as_posix():
+        raise PPURuntimePackagingError("PPU runtime has an invalid Device Catalog manifest identity")
+    if data.get("ic_support_root") != IC_SUPPORT_ROOT_RELATIVE.as_posix():
+        raise PPURuntimePackagingError("PPU runtime has an invalid IC Support data-root identity")
+
+    catalog = runtime_dir / DEVICE_CATALOG_RELATIVE
     if not catalog.is_file():
         raise PPURuntimePackagingError("PPU runtime is missing the production Device Catalog manifest")
+    ic_support_root = runtime_dir / IC_SUPPORT_ROOT_RELATIVE
+    for dirname in IC_SUPPORT_RUNTIME_DIRS:
+        if not (ic_support_root / dirname).is_dir():
+            raise PPURuntimePackagingError(
+                f"PPU runtime is missing IC Support runtime directory: {dirname}"
+            )
+    if not (ic_support_root / "bindings" / "stm32f103c-pilot-v0.json").is_file():
+        raise PPURuntimePackagingError("PPU runtime is missing the STM32F103C IC Support binding")
+    if not (
+        ic_support_root
+        / "manufacturer-baseline"
+        / "stm32f103c8t6-manufacturer-only-v1.json"
+    ).is_file():
+        raise PPURuntimePackagingError("PPU runtime is missing the STM32F103C8T6 manufacturer baseline")
+
     license_path = runtime_dir / "ppu" / "THIRD_PARTY_LICENSES" / "PyYAML.txt"
     if not license_path.is_file() or not license_path.read_text(encoding="utf-8").strip():
         raise PPURuntimePackagingError("PPU runtime is missing the PyYAML license")
