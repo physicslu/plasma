@@ -19,6 +19,7 @@ from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
+from .openocd_provider_registry import get_default_openocd_provider_registry
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
@@ -81,12 +82,17 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
     # It never modifies the authoritative backend mapping or Job resolution.
     candidates = get_default_backend_candidate_registry()
     upstream = default_pinned_upstream()
+    versioned_providers = get_default_openocd_provider_registry()
     results = []
     for record in matches:
         item = record.to_payload()
         candidate = candidates.lookup(record)
         item["backend_candidate"] = candidate
         item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
+        item["backend_providers"] = (
+            versioned_providers.describe(record.vendor, record.identifier)
+            if versioned_providers is not None else []
+        )
         results.append(item)
     return {
         "ok": True,
