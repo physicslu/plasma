@@ -86,7 +86,11 @@ def deployment_commit(origin: str, *, timeout: float) -> str | None:
 
 
 def managed_prefix(report: SmokeReport) -> str:
-    return "/api/manager/ppu" if report.checks.get("routing") == "MANAGED" else ""
+    return (
+        "/api/manager/ppu"
+        if report.expected_commit is not None or report.checks.get("routing") == "MANAGED"
+        else ""
+    )
 
 
 def wait_until_ready(
@@ -105,8 +109,8 @@ def wait_until_ready(
         [("/api/manager/ppu/api/health/ready", "MANAGED")]
         if expected_commit
         else [
-            ("/api/manager/ppu/api/health/ready", "MANAGED"),
             ("/api/health/ready", "LEGACY_PR_OBSERVATION"),
+            ("/api/manager/ppu/api/health/ready", "MANAGED"),
         ]
     )
 
