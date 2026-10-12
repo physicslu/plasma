@@ -111,6 +111,18 @@ The manufacturer-only Evidence Pack A/B experiment is deliberately separate from
 
 Actual manufacturer-content-derived pack outputs are generated outside Git. `.github/workflows/ic-evidence-live-validation.yml` separately verifies the exact DS5319 source and semantic policy against the real PDF while retaining only metadata/digests as an artifact; ordinary deterministic AI IC Support research CI remains independent of ST availability.
 
+## Manufacturer-only native-programmer pilot
+
+The STM32F103C8T6 pilot now has a separate manufacturer-only knowledge baseline under
+`manufacturer-baseline/`. Its exact bytes are SHA-256 locked before any OpenOCD source
+is inspected. The baseline includes Device Profile facts, operating electrical
+characteristics, memory map, Programming Interface facts, programming electrical
+conditions and machine-readable Flash unlock/erase/program semantics.
+
+The subsequent OpenOCD comparison lives under `openocd-comparison/` and is analysis
+only. Backend defaults and optimizations cannot mutate the manufacturer baseline. This is
+the reference method for future Plasma-native programmer knowledge extraction.
+
 ## Validation
 
 Run the deterministic/offline checks from the repository root:

@@ -110,6 +110,15 @@ jobs:
         run: python data/ic-support/validate_stm32f103c_retained_source_lock.py
       - name: Compare STM32F103C benchmark
         run: python data/ic-support/compare_benchmark.py
+      - name: Validate frozen STM32F103 manufacturer programming baseline
+        run: |
+          python data/ic-support/manufacturer_program_model.py
+          python data/ic-support/manufacturer_program_model.py --signature
+          python data/ic-support/test_manufacturer_program_model.py
+      - name: Validate post-freeze manufacturer/OpenOCD comparison
+        run: |
+          python data/ic-support/compare_manufacturer_openocd.py
+          python data/ic-support/test_manufacturer_openocd_comparison.py
       - name: Run IC Support research regression
         run: python data/ic-support/test_ic_support.py
       - name: Report research coverage projection against current catalog
