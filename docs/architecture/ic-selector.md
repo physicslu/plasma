@@ -3,6 +3,7 @@
 Status: Phase 1 implementation contract
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
+Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
 
 ## Purpose
 
@@ -127,6 +128,24 @@ A future physical validation record binds at least the relevant device/ICPN, pac
 Package is part of the target domain model because Socket compatibility depends on it. The current canonical research snapshot does not reliably provide package data. Phase 1 therefore exposes `package = null` rather than deriving package from an ICPN suffix heuristically.
 
 Package enrichment is a separate authoritative-data task.
+
+## Selected IC composed profile
+
+For exact ICPNs with an admitted manufacturer-derived profile, the same search result may
+carry an additive `selected_profile` projection. The browser presents that projection in
+three primary information layers:
+
+1. IC Information — intrinsic device identity, operating electrical characteristics and
+   memory map.
+2. Programming — programming interface, manufacturer speed evidence, programming
+   electrical conditions, Flash geometry and programming-flow semantics.
+3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
+
+An admitted ICPN without manufacturer enrichment returns `selected_profile=null`.
+Neither OpenOCD defaults nor family similarity may fill missing manufacturer facts.
+
+Advanced Backend / Evidence remains available separately so provider runtime/build
+provenance is not confused with IC characteristics or physical qualification.
 
 ## Reusable UI contract
 

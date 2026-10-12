@@ -89,6 +89,108 @@ export type VersionedOpenOCDProvider = {
 
 export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
+export type SelectedICProfile = {
+  schema_version: "1.0.0";
+  status: "manufacturer_profile_available";
+  icpn: string;
+  manufacturer_baseline: {
+    baseline_id: string;
+    status: "frozen_manufacturer_only";
+    sha256: string;
+    authority: "manufacturer_official_only";
+    sources: Array<{
+      source_id: string;
+      document_number?: string;
+      revision?: string;
+      sha256?: string;
+      used_for?: string[];
+    }>;
+  };
+  catalog_identity: {
+    base_device: string;
+    package: string;
+    pin_count: number | string;
+    flash_size: string;
+  };
+  device: {
+    identity: {
+      cpu_core?: string;
+      cpu_max_frequency_hz?: number;
+      package?: string;
+      pin_count?: number;
+      temperature_grade?: string;
+      ambient_temperature_c?: { min: number; max: number };
+    };
+    operating_electrical: {
+      vdd_v: { min: number; max: number };
+      io_supply_v?: { min: number; max: number };
+      vdda_v?: { min: number; max: number };
+      vdda_min_when_adc_used_v?: number;
+      absolute_maximum_values_are_not_setpoints?: boolean;
+    };
+    memory_map: {
+      main_flash: {
+        start: string;
+        end: string;
+        size_bytes: number;
+        page_size_bytes: number;
+        page_count: number;
+      };
+      sram?: { start: string; end: string; size_bytes: number };
+      system_memory?: { start: string; end: string; size_bytes: number };
+      option_bytes?: { start: string; end: string; size_bytes: number };
+    };
+  };
+  programming: {
+    interfaces: Record<string, {
+      clock_hz: {
+        manufacturer_min: number | null;
+        manufacturer_max: number | null;
+        manufacturer_recommended: number | null;
+        status: string;
+      };
+      required_signal_pins?: Array<{ signal: string; mcu_pin: string; io_level?: string }>;
+      recommended_support_signals?: string[];
+      special_requirements?: string[];
+    }>;
+    electrical: {
+      vdd_programming_v: { min: number; max: number; basis?: string };
+      recommended_vdd_v?: { status: string; value: number | null };
+      external_vpp?: { required: boolean; basis?: string };
+      io_reference?: string;
+      programmer_current_limit?: { status: string; value: number | null };
+      programming_specific_power_sequence?: { status: string };
+    };
+    flash_geometry: {
+      erase_unit: string;
+      erase_unit_bytes: number;
+      program_unit: string;
+      program_unit_bytes: number;
+      program_alignment_bytes: number;
+      mass_erase_supported: boolean;
+      verify_by_readback: boolean;
+    };
+    flash_controller: Record<string, unknown>;
+    special_constraints: Array<{ id: string; effect: string; recovery?: string }>;
+    program_model: {
+      normal_write_flow: string[];
+      not_yet_modeled: string[];
+      operations: Record<string, Array<Record<string, unknown>>>;
+    };
+  };
+  plasma_compatibility: {
+    site_electrical_compatibility: "not_evaluated";
+    socket_compatibility: "not_evaluated";
+    hardware_runtime_ready: false;
+    physical_programming_qualified: false;
+  };
+  ic_support: {
+    binding_set_id: string;
+    binding_status: string;
+    profiles: Record<string, { profile_id: string; kind: string; status: string }>;
+  };
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -131,6 +233,7 @@ export type DeviceSearchResult = {
   backend_candidate?: BackendCandidateEvidence | null;
   backend_source_reference?: BackendSourceReference | null;
   backend_providers?: VersionedOpenOCDProvider[];
+  selected_profile?: SelectedICProfile | null;
 };
 
 export type DeviceSearchResponse = {

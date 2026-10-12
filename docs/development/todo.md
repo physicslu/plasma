@@ -68,6 +68,13 @@ UI / API contract:
 
 Pilot evidence / model status (STM32F103C8T6):
 
+- Selected IC Profile v1 now composes the frozen manufacturer baseline into the read-only
+  IC Support resolver and `GET /api/devices/search` result without changing execution admission;
+- IC Selector presents IC Information, Programming and PLASMA Compatibility as separate
+  primary sections, with backend/runtime provenance moved to Advanced Evidence;
+- missing operating/programming electrical facts fail profile resolution closed;
+- exact ICPN Flash capacity is cross-checked against Catalog identity so the Blue Pill
+  128-KiB OpenOCD board override cannot contaminate STM32F103C8T6's 64-KiB Device Profile;
 - a manufacturer-only Device + Programming baseline is now frozen before backend inspection;
 - operating VDD and memory map are owned by the Device Profile while programming VDD,
   interface behavior and Flash operations are owned by the Programming Profile;
