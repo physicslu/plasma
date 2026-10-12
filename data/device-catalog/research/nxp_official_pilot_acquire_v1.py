@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "nxp-official-pilot-products-v1.json"
-CODES = re.compile(r"\b(?:MCX[A-Z0-9]{5,22}|MKL25Z[A-Z0-9]{3,18})\b")
+CODES = re.compile(r"\b(?:MCX[A-Z0-9]{5,22}|MKL25Z[A-Z0-9]{3,18}|LPC[A-Z0-9]{5,22}|K32[A-Z0-9]{5,22}|MIMXRT[A-Z0-9]{5,22}|KW45[A-Z0-9]{5,22})\b")
 STATUS = re.compile(r"\b(No Longer Manufactured|Not Recommended for New Designs|Discontinued|Qualification|Obsolete|NRND|Active)\b", re.I)
 KNOWN = {
     "active": "Active",

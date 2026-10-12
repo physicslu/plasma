@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        product: [mcx-c04x, mcx-n23x, kl25]
+        product: [mcx-c04x, mcx-n23x, kl25, lpc55s6x, k32-l2, imx-rt1060, kw45]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

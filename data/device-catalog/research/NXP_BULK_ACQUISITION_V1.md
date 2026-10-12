@@ -76,3 +76,15 @@ Cross-product lifecycle contradictions are hard errors.
 `observed_active_missing_from_production` is only the gap within these three
 verified pages. Full family inventory and manufacturer category completeness
 remain open research gates.
+
+## Gate 1c — six portfolio lanes represented by live manufacturer product pages
+
+The official read-only pilot matrix now includes fixed NXP Package/Quality
+pages for `LPC55S6x`, `K32-L2`, `i.MX-RT1060` and `KW45` alongside
+MCX C04x, MCX N23x and KL25. Thus all six **research acquisition lanes**
+(MCX, Kinetis, LPC, K32, i.MX RT, wireless) have bounded current-surface
+probes. This is *not* a manufacturer family-wide or portfolio-wide
+enumeration; all seven remain `source_population_complete=false`.
+Retain `Active`, `Qualification` and `No Longer Manufactured` as
+different literal official lifecycle states. No unmapped NXP device gains
+a Programming Profile merely by appearing in this report.

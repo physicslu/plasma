@@ -54,7 +54,7 @@ def reconcile(root: Path) -> dict:
             and registry["production_write_authorized"] is False,
             "research-only scope changed")
     products = registry["products"]
-    require(len(products) == 3 and len({p["id"] for p in products}) == 3,
+    require(len(products) == 7 and len({p["id"] for p in products}) == 7,
             "fixed official product set drift")
     production = load(PRODUCTION_MANIFEST)
     require(production.get("status") == "production", "bad Production manifest")

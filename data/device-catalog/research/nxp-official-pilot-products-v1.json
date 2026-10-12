@@ -24,6 +24,34 @@
       "url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
       "prefix": "MKL25Z",
       "must_include": "MKL25Z128VLK4"
+    },
+    {
+      "id": "lpc55s6x",
+      "segment": "lpc",
+      "url": "https://www.nxp.com/products/LPC55S6x?tab=Package_Quality_Tab",
+      "prefix": "LPC55",
+      "must_include": "LPC55S69JEV98"
+    },
+    {
+      "id": "k32-l2",
+      "segment": "k32",
+      "url": "https://www.nxp.com/products/K32-L2?tab=Package_Quality_Tab",
+      "prefix": "K32L",
+      "must_include": "K32L2B31VMP0A"
+    },
+    {
+      "id": "imx-rt1060",
+      "segment": "imx-rt",
+      "url": "https://www.nxp.com/products/i.MX-RT1060?tab=Package_Quality_Tab",
+      "prefix": "MIMXRT",
+      "must_include": "MIMXRT106VDVL6B"
+    },
+    {
+      "id": "kw45",
+      "segment": "wireless",
+      "url": "https://www.nxp.com/products/KW45?tab=Package_Quality_Tab",
+      "prefix": "KW45",
+      "must_include": "KW45Z41083AFTBT"
     }
   ]
 }
