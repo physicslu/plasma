@@ -185,14 +185,30 @@ def _runtime_environment(current: Path) -> dict[str, str]:
         raise TargetError(f"runtime manifest is unreadable: {exc}") from exc
     data = manifest.get("data") if isinstance(manifest, dict) else None
     catalog_rel = data.get("device_catalog_manifest") if isinstance(data, dict) else None
-    if not isinstance(catalog_rel, str) or not catalog_rel or catalog_rel.startswith("/") or ".." in Path(catalog_rel).parts:
-        raise TargetError("runtime Device Catalog path is invalid")
+    ic_support_rel = data.get("ic_support_root") if isinstance(data, dict) else None
+    for label, value in (
+        ("Device Catalog", catalog_rel),
+        ("IC Support", ic_support_rel),
+    ):
+        if (
+            not isinstance(value, str)
+            or not value
+            or value.startswith("/")
+            or ".." in Path(value).parts
+        ):
+            raise TargetError(f"runtime {label} path is invalid")
+
     catalog = current / "runtime" / catalog_rel
+    ic_support = current / "runtime" / ic_support_rel
     if not catalog.is_file():
         raise TargetError(f"runtime Device Catalog is missing: {catalog}")
+    if not (ic_support / "profiles").is_dir() or not (ic_support / "bindings").is_dir():
+        raise TargetError(f"runtime IC Support data is missing: {ic_support}")
+
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    env["PLASMA_IC_SUPPORT_ROOT"] = str(ic_support)
     return env
 
 
