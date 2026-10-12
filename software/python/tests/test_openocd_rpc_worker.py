@@ -493,8 +493,9 @@ async def test_port_lease_released_when_launcher_raises(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method", ("stop", "kill"))
+@pytest.mark.parametrize("cancel_count", (1, 2))
 async def test_cancelled_teardown_retains_port_until_child_exits(
-    tmp_path: Path, method: str,
+    tmp_path: Path, method: str, cancel_count: int,
 ) -> None:
     """Cancellation must not free a still-listening child's RPC port."""
     executable, scripts = _runtime_paths(tmp_path)
@@ -522,8 +523,11 @@ async def test_cancelled_teardown_retains_port_until_child_exits(
                 lambda: entered.set())
         task = asyncio.create_task(getattr(one, method)())
         await asyncio.wait_for(entered.wait(), timeout=1)
-        task.cancel()
-        await asyncio.sleep(0)
+        for _ in range(cancel_count):
+            task.cancel()
+            await asyncio.sleep(0)
+        # Even repeat-cancel must not release lifecycle ownership early.
+        assert not task.done()
         with pytest.raises(PlasmaError) as caught:
             await two.start()
         assert caught.value.code == ErrorCode.INTERFACE_FAILURE
