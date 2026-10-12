@@ -66,6 +66,20 @@ UI / API contract:
 - the UI must distinguish catalog/evidence values from the actual PPU/Site electrical configuration that will be applied;
 - unresolved electrical readiness must be visible to the operator and must block physical execution rather than silently falling back to a default voltage.
 
+Pilot evidence / model status (STM32F103C8T6):
+
+- a manufacturer-only Device + Programming baseline is now frozen before backend inspection;
+- operating VDD and memory map are owned by the Device Profile while programming VDD,
+  interface behavior and Flash operations are owned by the Programming Profile;
+- manufacturer-unknown SWD/JTAG clock limits remain explicitly unknown rather than being
+  populated from backend defaults;
+- the machine-readable manufacturer Flash sequence is compared only after freeze against
+  the pinned OpenOCD implementation;
+- the pilot comparison explicitly prevents the OpenOCD Blue Pill 128-KiB convenience
+  override from changing the exact STM32F103C8T6 64-KiB Device Profile;
+- this pilot proves the information-architecture method only; broad ST enrichment,
+  PPU/Site capability matching and physical qualification remain open.
+
 Programming Profile Information Architecture Review:
 
 - before the physical-programming schema is finalized, perform a dedicated review of additional **software and hardware programming information** that should be presented with the selected IC;
