@@ -144,6 +144,69 @@
 .icSelectorDetailEmpty b { color: var(--text-soft); font-size: 13px; }
 .icSelectorDetailEmpty p { max-width: 240px; margin: 6px 0 0; font-size: 10px; line-height: 1.5; }
 
+.icSelectorProfileSection {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-3) 55%, transparent);
+}
+.icSelectorProfileHead {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.icSelectorProfileHead > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--cyan);
+  font: 750 10px var(--font-mono);
+}
+.icSelectorProfileHead h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.icSelectorProfileHead p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.icSelectorProfileSection dl {
+  margin-top: 10px;
+}
+.icSelectorProfileUnavailable {
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.icSelectorProgramFlow {
+  font-family: var(--font-mono);
+  font-size: 10px !important;
+  line-height: 1.6 !important;
+}
+.icSelectorEvidenceDetails {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.icSelectorEvidenceDetails summary {
+  cursor: pointer;
+  color: var(--muted);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .04em;
+}
+
 @media (max-width: 1050px) {
   .icSelector { grid-template-columns: 1fr; }
   .icSelectorDetail { position: static; }
