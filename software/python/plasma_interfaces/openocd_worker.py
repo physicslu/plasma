@@ -298,17 +298,18 @@ class OpenOCDWorker:
 
     @staticmethod
     async def _finish_teardown(teardown: Awaitable[None]) -> None:
-        # Await the actual child cleanup even if a caller cancels stop/kill.
-        # The port lease must not be released while its OpenOCD can still
-        # answer another worker's readiness probe.
+        # Complete actual child reaping despite repeated caller cancellations.
+        # Until this finishes the lifecycle lock and RPC lease stay owned.
         task = asyncio.create_task(teardown)
-        try:
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
+        cancelled = False
+        while not task.done():
             try:
                 await asyncio.shield(task)
-            finally:
-                raise
+            except asyncio.CancelledError:
+                cancelled = True
+        await task
+        if cancelled:
+            raise asyncio.CancelledError
 
     async def _stop_locked(self) -> None:
         await self._finish_teardown(self._stop_locked_impl())
