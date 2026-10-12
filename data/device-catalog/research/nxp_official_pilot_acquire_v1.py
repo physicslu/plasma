@@ -50,6 +50,26 @@ def lifecycle(row_text: str) -> str | None:
     require(len(states) <= 1, "contradictory NXP lifecycle in row")
     return next(iter(states), None)
 
+def consolidate_lifecycle_rows(grouped: dict) -> list[dict]:
+    """Keep all source evidence for same-state duplicates, reject any conflict."""
+    rows = []
+    for icpn, records in sorted(grouped.items()):
+        require(len(records) > 0, "empty grouped NXP lifecycle evidence")
+        require(all(record["icpn"] == icpn for record in records),
+                "part number/evidence row disagreement")
+        statuses = {record["lifecycle"] for record in records}
+        require(len(statuses) == 1, "same exact IC has contradictory marketing states")
+        consolidated = dict(records[0])
+        consolidated["official_lifecycle_row_occurrences"] = len(records)
+        consolidated["row_evidence_sha256s"] = sorted({
+            record["evidence_sha256"] for record in records
+        })
+        consolidated["row_markup_sha256s"] = sorted({
+            record["row_markup_sha256"] for record in records
+        })
+        rows.append(consolidated)
+    return rows
+
 def acquire(page, source: dict, out: Path, browser_version: str) -> dict:
     url, prefix = source["url"], source["prefix"]
     require(official(url), "untrusted acquisition URL")
@@ -87,12 +107,7 @@ def acquire(page, source: dict, out: Path, browser_version: str) -> dict:
             "visible_row_excerpt": visible[:450],
         })
     require(source["must_include"] in grouped, "frozen representative missing")
-    rows = []
-    for icpn, records in sorted(grouped.items()):
-        statuses = {record["lifecycle"] for record in records}
-        require(len(statuses) == 1, "same exact IC has contradictory marketing states")
-        require(len(records) == 1, "duplicated official lifecycle row for exact IC")
-        rows.append(records[0])
+    rows = consolidate_lifecycle_rows(grouped)
     require(len(rows) > 0, "no exact orderable identities on NXP product page")
     result = {
         "schema_version": 1,
