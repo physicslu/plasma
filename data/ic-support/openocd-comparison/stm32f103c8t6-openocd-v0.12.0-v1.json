@@ -1,0 +1,257 @@
+{
+  "schema_version": "1.0.0",
+  "comparison_id": "stm32f103c8t6-openocd-v0-12-0-v1",
+  "status": "post_freeze_comparison",
+  "target": {
+    "manufacturer": "STMicroelectronics",
+    "icpn": "STM32F103C8T6",
+    "family": "STM32F1",
+    "base_device": "STM32F103C8"
+  },
+  "manufacturer_control": {
+    "baseline_id": "stm32f103c8t6-manufacturer-only-v1",
+    "baseline_path": "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json",
+    "baseline_sha256": "3fd230e73e9f72db62199ed73a56311d25fb0d3c5623cba22d0ba5301794b6c7",
+    "freeze_commit": "2296863cd7c68d76c5e18a6db08fe6e319ebf4cd",
+    "mutation_allowed": false
+  },
+  "backend_reference": {
+    "backend": "OpenOCD",
+    "version": "0.12.0",
+    "source_repository": "openocd-org/openocd",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "files": [
+      "src/flash/nor/stm32f1x.c",
+      "contrib/loaders/flash/stm32/stm32f1x.S",
+      "tcl/target/stm32f1x.cfg",
+      "tcl/board/stm32f103c8_blue_pill.cfg"
+    ]
+  },
+  "classification_definitions": {
+    "exact_match": "The backend value or sequence agrees directly with the frozen manufacturer baseline.",
+    "functionally_equivalent": "The backend uses a different implementation form while preserving the manufacturer-required effect.",
+    "backend_optimization": "Backend-specific optimization not required by the manufacturer programming semantics.",
+    "backend_assumption_or_default": "Backend operational constraint/default that is not an IC specification.",
+    "manufacturer_unresolved_backend_value": "Backend supplies a value where the locked manufacturer baseline intentionally remains unknown.",
+    "conflict_or_out_of_spec": "Backend/board convenience contradicts or exceeds the exact-ICPN manufacturer specification.",
+    "backend_extra_requires_manufacturer_validation": "Useful backend behavior not modeled in the frozen baseline and not eligible for native adoption without manufacturer evidence."
+  },
+  "observations": [
+    {
+      "id": "flash_register_map",
+      "classification": "exact_match",
+      "manufacturer": "FLASH interface base 0x40022000 with ACR/KEYR/OPTKEYR/SR/CR/AR/OBR/WRPR offsets 0x00/04/08/0C/10/14/1C/20.",
+      "openocd": "Uses the same base and offsets.",
+      "native_programmer_implication": "safe_semantic_candidate"
+    },
+    {
+      "id": "flash_unlock_keys",
+      "classification": "exact_match",
+      "manufacturer": [
+        "0x45670123",
+        "0xCDEF89AB"
+      ],
+      "openocd": [
+        "0x45670123",
+        "0xCDEF89AB"
+      ],
+      "native_programmer_implication": "safe_semantic_candidate"
+    },
+    {
+      "id": "flash_status_bits",
+      "classification": "exact_match",
+      "manufacturer": [
+        "BSY",
+        "PGERR",
+        "WRPRTERR",
+        "EOP"
+      ],
+      "openocd": [
+        "BSY",
+        "PGERR",
+        "WRPRTERR",
+        "EOP"
+      ],
+      "native_programmer_implication": "safe_semantic_candidate"
+    },
+    {
+      "id": "medium_density_page_size",
+      "classification": "exact_match",
+      "manufacturer": {
+        "page_size_bytes": 1024
+      },
+      "openocd": {
+        "device_id": "0x410",
+        "page_size_bytes": 1024
+      },
+      "native_programmer_implication": "safe_semantic_candidate"
+    },
+    {
+      "id": "program_alignment",
+      "classification": "exact_match",
+      "manufacturer": {
+        "program_unit_bytes": 2,
+        "unit": "halfword"
+      },
+      "openocd": {
+        "write_start_alignment": 2,
+        "write_end_alignment": 2,
+        "count_unit": "halfword"
+      },
+      "native_programmer_implication": "safe_semantic_candidate"
+    },
+    {
+      "id": "page_erase_core",
+      "classification": "exact_match",
+      "manufacturer": [
+        "wait_BSY_clear",
+        "set_PER",
+        "write_AR",
+        "set_STRT",
+        "wait_BSY_clear"
+      ],
+      "openocd": [
+        "unlock",
+        "write_CR_PER",
+        "write_AR",
+        "write_CR_PER_STRT",
+        "wait_BSY_clear",
+        "lock"
+      ],
+      "native_programmer_implication": "core_sequence_matches"
+    },
+    {
+      "id": "mass_erase_core",
+      "classification": "exact_match",
+      "manufacturer": [
+        "wait_BSY_clear",
+        "set_MER",
+        "set_STRT",
+        "wait_BSY_clear"
+      ],
+      "openocd": [
+        "unlock",
+        "write_CR_MER",
+        "write_CR_MER_STRT",
+        "wait_BSY_clear",
+        "lock"
+      ],
+      "native_programmer_implication": "core_sequence_matches"
+    },
+    {
+      "id": "program_core",
+      "classification": "exact_match",
+      "manufacturer": [
+        "set_PG",
+        "write_halfword",
+        "wait_BSY_clear",
+        "check_PGERR_WRPRTERR"
+      ],
+      "openocd": [
+        "set_FLASH_PG",
+        "write_halfwords",
+        "wait_BSY_clear",
+        "check_FLASH_PGERR_FLASH_WRPRTERR"
+      ],
+      "native_programmer_implication": "core_sequence_matches"
+    },
+    {
+      "id": "unlock_lock_handling",
+      "classification": "functionally_equivalent",
+      "manufacturer": "Unlock only when needed, perform operation, then lock.",
+      "openocd": "Writes KEY1/KEY2 before erase/write and writes FLASH_LOCK at operation exit.",
+      "native_programmer_implication": "implementation_choice_keep_separate_from_ic_spec"
+    },
+    {
+      "id": "ram_flash_loader",
+      "classification": "backend_optimization",
+      "manufacturer": "No RAM-loader requirement in the frozen programming semantics.",
+      "openocd": "Uploads stm32f1x flash loader into target working RAM and uses an async FIFO/block-write algorithm; falls back when working area is unavailable.",
+      "native_programmer_implication": "candidate_performance_optimization_not_baseline_requirement"
+    },
+    {
+      "id": "target_halted_requirement",
+      "classification": "backend_assumption_or_default",
+      "manufacturer": "Frozen manufacturer baseline does not define 'OpenOCD target halted' as an IC programming electrical/flash requirement.",
+      "openocd": "Erase/write/protection paths reject operations unless TARGET_HALTED.",
+      "native_programmer_implication": "backend_control_policy_not_device_fact"
+    },
+    {
+      "id": "backend_timeouts",
+      "classification": "backend_assumption_or_default",
+      "manufacturer": "Frozen baseline has no numeric software timeout policy.",
+      "openocd": {
+        "FLASH_WRITE_TIMEOUT": 10,
+        "FLASH_ERASE_TIMEOUT": 100,
+        "wait_loop_sleep_ms": 1
+      },
+      "native_programmer_implication": "must_be_qualified_or_derived_before_plasma_native_use"
+    },
+    {
+      "id": "debug_adapter_speed",
+      "classification": "manufacturer_unresolved_backend_value",
+      "manufacturer": {
+        "min_hz": null,
+        "max_hz": null,
+        "recommended_hz": null,
+        "status": "not_specified_by_locked_manufacturer_sources"
+      },
+      "openocd": {
+        "adapter_speed_khz": 1000,
+        "rationale": "JTAG <= F_CPU/6; reset CPU assumed 8 MHz, therefore choose 1 MHz"
+      },
+      "native_programmer_implication": "do_not_promote_to_manufacturer_limit"
+    },
+    {
+      "id": "verify_layering",
+      "classification": "functionally_equivalent",
+      "manufacturer": "Frozen reference flow requires readback/erase verification as an explicit programming-flow step.",
+      "openocd": "Low-level stm32f1x erase/write driver performs Flash operations and status/error checks; readback/blank verification is provided as separate framework/program flow rather than embedded in each low-level driver operation.",
+      "native_programmer_implication": "keep_verify_as_explicit_plasma_operation"
+    },
+    {
+      "id": "device_family_probe",
+      "classification": "backend_extra_requires_manufacturer_validation",
+      "manufacturer": "Exact ICPN identity is not inferred from a family Device ID in the frozen baseline.",
+      "openocd": "Reads DBGMCU ID at 0xE0042000; 0x410 identifies STM32F10x medium-density class and also contains special handling for several GD32 revisions.",
+      "native_programmer_implication": "useful_probe_logic_but_not_exact_icpn_identity"
+    },
+    {
+      "id": "flash_size_probe",
+      "classification": "backend_extra_requires_manufacturer_validation",
+      "manufacturer": "Exact STM32F103C8T6 profile fixes main Flash at 64 KiB.",
+      "openocd": "Reads Flash-size register at 0x1FFFF7E0; if read fails/returns invalid for device ID 0x410, falls back to family maximum 128 KiB.",
+      "native_programmer_implication": "never_replace_exact_icpn_capacity_with_family_fallback_without_explicit_policy"
+    },
+    {
+      "id": "blue_pill_flash_override",
+      "classification": "conflict_or_out_of_spec",
+      "manufacturer": {
+        "STM32F103C8T6_flash_kib": 64
+      },
+      "openocd": {
+        "board_file": "tcl/board/stm32f103c8_blue_pill.cfg",
+        "forced_FLASH_SIZE_hex": "0x20000",
+        "forced_flash_kib": 128,
+        "warning": "may operate a particular C8 board outside its specification"
+      },
+      "native_programmer_implication": "must_not_enter_exact_icpn_device_profile"
+    },
+    {
+      "id": "clone_compatibility",
+      "classification": "backend_extra_requires_manufacturer_validation",
+      "manufacturer": "STM32F103C8T6 baseline describes ST silicon only.",
+      "openocd": "The shared stm32f1x driver recognizes GD32-related revision IDs and applies variant-specific behavior.",
+      "native_programmer_implication": "model_clone_devices_as_separate_identity_profiles_not_as_ST_exact_icpn"
+    }
+  ],
+  "conclusions": {
+    "same_core_flash_programming_semantics": true,
+    "openocd_is_not_manufacturer_authority": true,
+    "openocd_defaults_must_not_become_device_limits": true,
+    "blue_pill_board_config_is_not_exact_icpn_authority": true,
+    "manufacturer_baseline_remains_immutable": true,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}
