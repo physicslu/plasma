@@ -308,6 +308,58 @@ def _desired(address: str) -> dict[str, Any]:
     return {"mode":"static","address":address,"prefix_length":24,"gateway":LAB_GATEWAY,"dns_servers":[LAB_GATEWAY]}
 
 
+def _capture_failure_diagnostics(
+    work: Path, ppu: str, helper: str, probe: str, checks: Mapping[str, str]
+) -> None:
+    """Best-effort bounded pre-cleanup evidence; never changes acceptance result.
+
+    No host environment, tokens, network configuration files or binaries are
+    captured. Container stdout/stderr is limited to the latest diagnostic lines.
+    """
+    commands = {
+        "ppu_state": ["docker", "inspect", "--format", "{{json .State}}", ppu],
+        "helper_state": ["docker", "inspect", "--format", "{{json .State}}", helper],
+        "probe_state": ["docker", "inspect", "--format", "{{json .State}}", probe],
+        "ppu_logs": ["docker", "logs", "--tail", "80", ppu],
+        "helper_logs": ["docker", "logs", "--tail", "80", helper],
+        "probe_logs": ["docker", "logs", "--tail", "20", probe],
+        "ppu_local_tcp": [
+            "docker", "exec", ppu, "python3", "-c",
+            "import json,socket\n"
+            "out={}\n"
+            "for ip in ('127.0.0.1','192.168.77.10','192.168.77.40'):\n"
+            " s=socket.socket();s.settimeout(0.7)\n"
+            " try:s.connect((ip,18080));out[ip]='connected'\n"
+            " except OSError as e:out[ip]=type(e).__name__+': '+str(e)\n"
+            " finally:s.close()\n"
+            "print(json.dumps(out,sort_keys=True))",
+        ],
+    }
+    result: dict[str, Any] = {
+        "evidence_scope": "ppu-phase2-diagnostic-only-no-hardware",
+        "passed_checks_before_failure": dict(checks),
+        "observations": {},
+    }
+    for key, command in commands.items():
+        try:
+            completed = subprocess.run(
+                command, capture_output=True, text=True, check=False, timeout=5
+            )
+            result["observations"][key] = {
+                "returncode": completed.returncode,
+                "stdout_tail": completed.stdout[-10000:],
+                "stderr_tail": completed.stderr[-10000:],
+            }
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            result["observations"][key] = {"capture_error": type(exc).__name__}
+    try:
+        path = work / "failure-diagnostics.json"
+        path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"PPU Phase 2 pre-cleanup diagnostics: {path}", file=sys.stderr)
+    except OSError as exc:
+        print(f"PPU Phase 2 diagnostics unavailable: {type(exc).__name__}", file=sys.stderr)
+
+
 def _host_mode(args: argparse.Namespace) -> int:
     repo = _repo_root(); python = _host_python(repo); git_sha = _git_sha(repo); version = _product_version(repo)
     work = (repo / args.work_dir).resolve() if not args.work_dir.is_absolute() else args.work_dir.resolve()
@@ -372,6 +424,9 @@ def _host_mode(args: argparse.Namespace) -> int:
         checks["durable_journal"]="PASS"
         result={"overall_result":"PASS","transaction_result":"PASS","evidence_level":"swpc-qemu-armv7-isolated-static-ipv4","git_sha":git_sha,"product_version":version,"architecture":"armv7l","release_artifact":archive.name,"release_sha256":release_sha,"arm_binfmt_installed_now":installed_binfmt,"docker_control_ipv4":PPU_CONTROL_IP,"initial_ipv4":INITIAL_IP,"committed_ipv4":COMMITTED_IP,"rollback_candidate_ipv4":ROLLBACK_CANDIDATE_IP,"ppu_id":initial_ppu_id,"committed_revision":rev2,"desired_revision_after_rollback":rev3,"checks":checks,"actual_network_mutation":"helper-owned-management-ipv4-on-eth0","privilege_separation":{"gateway_cap_net_admin":False,"helper_cap_net_admin":True},"not_claimed":["PYNQ-Z2 hardware","final Z2 Linux network-manager backend","primary-address replacement under Docker IPAM","DHCP activation","DNS mutation","default-route mutation","boot-time network persistence","Manager production integration","PS-to-PL","Site I/O","real IC programming"]}
         report.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n",encoding="utf-8"); _print_summary(result,report); return 0
+    except Exception:
+        _capture_failure_diagnostics(work, ppu, helper, probe, checks)
+        raise
     finally:
         for name in (helper,probe,ppu): _docker_rm(name)
         _docker_network_rm(network)

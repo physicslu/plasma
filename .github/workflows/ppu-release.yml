@@ -99,6 +99,7 @@ jobs:
           software/python/tests/test_ppu_armv7_runtime_acceptance.py
           software/python/tests/test_ppu_armv7_runtime_lab.py
           software/python/tests/test_ppu_network_phase1_acceptance.py
+          software/python/tests/test_ppu_network_phase2_diagnostics.py
           software/python/tests/test_ppu_network_activation.py
           software/python/tests/test_ppu_network_activation_rest.py
           software/python/tests/test_ppu_network_activation_security.py
@@ -302,6 +303,7 @@ jobs:
             ${{ runner.temp }}/plasma-ppu-environment-fingerprint.json
             ${{ runner.temp }}/plasma-ppu-network-phase1.json
             ${{ runner.temp }}/plasma-ppu-network-phase2.json
+            ${{ runner.temp }}/plasma-ppu-network-phase2/failure-diagnostics.json
             ${{ runner.temp }}/plasma-virtual-ppu-network-lab.json
             ${{ runner.temp }}/plasma-static-ipv4-fault-injection-repeatability.json
             ${{ runner.temp }}/plasma-static-ipv4-fault-injection-repeatability-run1.json
