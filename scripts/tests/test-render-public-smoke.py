@@ -86,7 +86,11 @@ def deployment_commit(origin: str, *, timeout: float) -> str | None:
 
 
 def managed_prefix(report: SmokeReport) -> str:
-    return "/api/manager/ppu" if report.expected_commit is not None else ""
+    return (
+        "/api/manager/ppu"
+        if report.expected_commit is not None or report.checks.get("routing") == "MANAGED"
+        else ""
+    )
 
 
 def wait_until_ready(
@@ -101,7 +105,14 @@ def wait_until_ready(
     started = time.monotonic()
     deadline = started + wake_timeout
     last_issue = "service has not responded yet"
-    readiness_path = "/api/manager/ppu/api/health/ready" if expected_commit else "/api/health/ready"
+    readiness_paths = (
+        [("/api/manager/ppu/api/health/ready", "MANAGED")]
+        if expected_commit
+        else [
+            ("/api/health/ready", "LEGACY_PR_OBSERVATION"),
+            ("/api/manager/ppu/api/health/ready", "MANAGED"),
+        ]
+    )
 
     try:
         request(origin, "/", timeout=request_timeout)
@@ -120,16 +131,17 @@ def wait_until_ready(
                 last_issue = f"Render is serving commit {observed}, waiting for expected {expected_commit}"
                 time.sleep(poll_interval)
                 continue
-        try:
-            payload = request_json(origin, readiness_path, timeout=request_timeout)
-            if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
-                report.cold_start_seconds = round(time.monotonic() - started, 3)
-                report.checks["readiness"] = "PASS"
-                report.checks["routing"] = "MANAGED" if expected_commit else "LEGACY_PR_OBSERVATION"
-                return payload
-            last_issue = f"readiness payload not ready: {payload!r}"
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
-            last_issue = f"{type(exc).__name__}: {exc}"
+        for readiness_path, routing in readiness_paths:
+            try:
+                payload = request_json(origin, readiness_path, timeout=request_timeout)
+                if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
+                    report.cold_start_seconds = round(time.monotonic() - started, 3)
+                    report.checks["readiness"] = "PASS"
+                    report.checks["routing"] = routing
+                    return payload
+                last_issue = f"{readiness_path} payload not ready: {payload!r}"
+            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
+                last_issue = f"{readiness_path}: {type(exc).__name__}: {exc}"
         time.sleep(poll_interval)
 
     raise RuntimeError(
@@ -145,11 +157,15 @@ def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> Non
             raise RuntimeError(f"{path} did not return an HTML product shell")
         if b"SITE MATRIX" in body or b"PPU CONTROL" in body:
             raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
-        if report.expected_commit is None and b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
-            # PR smoke observes the currently deployed main revision, which may still
-            # be the pre-convergence static shell. Pinned acceptance proves the new
-            # BFF identity via deployment metadata plus managed routing instead of
-            # coupling to SSR text that Vinext does not guarantee.
+        if (
+            report.expected_commit is None
+            and report.checks.get("routing") != "MANAGED"
+            and b"Plasma Control Station" not in body
+            and b"Plasma PPU Console" not in body
+        ):
+            # Legacy PR observation still recognizes the pre-convergence shell by
+            # rendered text. Managed routing has already established the current BFF
+            # identity and must not depend on framework-specific SSR text.
             raise RuntimeError(f"{path} does not contain a recognized deployed Plasma shell")
         report.checks[f"ui:{path}"] = "PASS"
 

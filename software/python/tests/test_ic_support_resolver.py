@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import plasma_core.ic_support as ic_support_module
 from plasma_core.ic_support import (
     IC_SUPPORT_ROOT_ENV,
     ICSupportIntegrityError,
@@ -96,6 +97,18 @@ class ICSupportResolverTests(unittest.TestCase):
         configured = Path("/tmp/plasma-ic-support")
         with patch.dict("os.environ", {IC_SUPPORT_ROOT_ENV: str(configured)}):
             self.assertEqual(default_ic_support_root(), configured)
+
+    def test_installed_package_layout_requires_explicit_repository_data_root(self) -> None:
+        fake_installed_root = Path("/opt/render/project/src/.venv/lib")
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch.object(ic_support_module, "_repository_root", return_value=fake_installed_root),
+            self.assertRaisesRegex(
+                ICSupportIntegrityError,
+                "PLASMA_IC_SUPPORT_ROOT must point to repository-owned IC Support data",
+            ),
+        ):
+            default_ic_support_root()
 
     def test_duplicate_exact_icpn_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as root:
