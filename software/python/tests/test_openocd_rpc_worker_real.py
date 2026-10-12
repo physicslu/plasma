@@ -97,11 +97,12 @@ async def test_real_openocd_port_collision_is_retried() -> None:
 
 
 @pytest.mark.asyncio
-async def test_real_openocd_eight_workers_isolate_one_site_failure() -> None:
+@pytest.mark.parametrize("cycle", range(10))
+async def test_real_openocd_eight_workers_isolate_one_site_failure(cycle: int) -> None:
     workers = [_worker(site_id) for site_id in range(1, 9)]
     try:
         statuses = await asyncio.gather(*(worker.start() for worker in workers))
-        assert len({status.rpc_port for status in statuses}) == 8
+        assert len({status.rpc_port for status in statuses}) == 8, f"cycle={cycle}: duplicate RPC port"
         responses = await asyncio.gather(*(worker.command("version") for worker in workers))
         assert all("Open On-Chip Debugger" in response for response in responses)
 

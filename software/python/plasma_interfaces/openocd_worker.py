@@ -4,6 +4,7 @@ import asyncio
 import math
 import os
 import socket
+import threading
 from collections import deque
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -28,6 +29,30 @@ def allocate_loopback_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind(("127.0.0.1", 0))
         return int(probe.getsockname()[1])
+
+
+# Per-process leases bridge the close-to-bind gap in allocate_loopback_port.
+# OpenOCD cannot accept an already-bound socket. A lease is retained from before
+# launching the child until its process and RPC session have been torn down.
+# This prevents one Plasma worker's readiness probe from accepting a *different*
+# concurrent Plasma worker's Tcl endpoint at the same 127.0.0.1:port.
+# External processes remain protected by OpenOCD bind errors/retry; an OS-wide
+# reservation/ownership protocol would be a separate qualification.
+_LOOPBACK_PORT_LEASE_LOCK = threading.Lock()
+_LOOPBACK_PORT_LEASES: set[int] = set()
+
+
+def _claim_loopback_port(port: int) -> bool:
+    with _LOOPBACK_PORT_LEASE_LOCK:
+        if port in _LOOPBACK_PORT_LEASES:
+            return False
+        _LOOPBACK_PORT_LEASES.add(port)
+        return True
+
+
+def _release_loopback_port(port: int) -> None:
+    with _LOOPBACK_PORT_LEASE_LOCK:
+        _LOOPBACK_PORT_LEASES.discard(port)
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +140,7 @@ class OpenOCDWorker:
         self._process: asyncio.subprocess.Process | None = None
         self._rpc: OpenOCDRpcClient | None = None
         self._rpc_port: int | None = None
+        self._leased_port: int | None = None
         self._log_task: asyncio.Task[None] | None = None
         self._log_tail: deque[str] = deque(maxlen=log_tail_lines)
         self._generation = 0
@@ -270,49 +296,73 @@ class OpenOCDWorker:
             context={"site_id": self.site_id, "log_tail": list(self._log_tail)},
         )
 
+    @staticmethod
+    async def _finish_teardown(teardown: Awaitable[None]) -> None:
+        # Complete actual child reaping despite repeated caller cancellations.
+        # Until this finishes the lifecycle lock and RPC lease stay owned.
+        task = asyncio.create_task(teardown)
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        await task
+        if cancelled:
+            raise asyncio.CancelledError
+
     async def _stop_locked(self) -> None:
-        rpc = self._rpc
-        process = self._process
-        log_task = self._log_task
+        await self._finish_teardown(self._stop_locked_impl())
 
-        self._rpc = None
-        self._rpc_port = None
-        self._process = None
-        self._log_task = None
+    async def _stop_locked_impl(self) -> None:
+        leased_port = self._leased_port
+        self._leased_port = None
+        try:
+            rpc = self._rpc
+            process = self._process
+            log_task = self._log_task
 
-        if process is not None and process.returncode is None:
-            try:
-                process.terminate()
-            except ProcessLookupError:
-                pass
-            try:
-                await asyncio.wait_for(process.wait(), timeout=self.stop_timeout_s)
-            except TimeoutError:
-                if process.returncode is None:
-                    try:
-                        process.kill()
-                    except ProcessLookupError:
-                        pass
-                    await process.wait()
+            self._rpc = None
+            self._rpc_port = None
+            self._process = None
+            self._log_task = None
 
-        if rpc is not None:
-            await rpc.close()
-
-        if log_task is not None:
-            if not log_task.done():
+            if process is not None and process.returncode is None:
                 try:
-                    await asyncio.wait_for(log_task, timeout=0.5)
-                except TimeoutError:
-                    log_task.cancel()
-                    try:
-                        await log_task
-                    except asyncio.CancelledError:
-                        pass
-            else:
-                try:
-                    log_task.result()
-                except (asyncio.CancelledError, ConnectionError, OSError, ValueError):
+                    process.terminate()
+                except ProcessLookupError:
                     pass
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=self.stop_timeout_s)
+                except TimeoutError:
+                    if process.returncode is None:
+                        try:
+                            process.kill()
+                        except ProcessLookupError:
+                            pass
+                        await process.wait()
+
+            if rpc is not None:
+                await rpc.close()
+
+            if log_task is not None:
+                if not log_task.done():
+                    try:
+                        await asyncio.wait_for(log_task, timeout=0.5)
+                    except TimeoutError:
+                        log_task.cancel()
+                        try:
+                            await log_task
+                        except asyncio.CancelledError:
+                            pass
+                else:
+                    try:
+                        log_task.result()
+                    except (asyncio.CancelledError, ConnectionError, OSError, ValueError):
+                        pass
+        finally:
+            if leased_port is not None:
+                _release_loopback_port(leased_port)
 
     async def start(self) -> OpenOCDWorkerStatus:
         async with self._lifecycle_lock:
@@ -330,6 +380,16 @@ class OpenOCDWorker:
                         "OpenOCD worker port allocator returned an invalid port",
                         context={"port": port, "site_id": self.site_id},
                     )
+                if not _claim_loopback_port(port):
+                    last_error = PlasmaError(
+                        ErrorCode.INTERFACE_FAILURE,
+                        "OpenOCD Tcl port already leased to another Plasma worker",
+                        recoverable=True,
+                        context={"site_id": self.site_id, "port": port},
+                    )
+                    continue
+
+                self._leased_port = port
                 argv = self._arguments(port)
                 self._last_argv = tuple(argv)
                 self._log_tail.clear()
@@ -341,32 +401,29 @@ class OpenOCDWorker:
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.STDOUT,
                     )
-                except (FileNotFoundError, OSError) as exc:
-                    last_error = exc
-                    continue
-
-                rpc = OpenOCDRpcClient(
-                    self.rpc_host,
-                    port,
-                    connect_timeout_s=self.rpc_connect_timeout_s,
-                    command_timeout_s=self.command_timeout_s,
-                )
-                self._process = process
-                self._rpc = rpc
-                self._rpc_port = port
-                self._log_task = asyncio.create_task(
-                    self._drain_output(process),
-                    name=f"openocd-site-{self.site_id}-log",
-                )
-
-                try:
+                    self._process = process
+                    rpc = OpenOCDRpcClient(
+                        self.rpc_host,
+                        port,
+                        connect_timeout_s=self.rpc_connect_timeout_s,
+                        command_timeout_s=self.command_timeout_s,
+                    )
+                    self._rpc = rpc
+                    self._rpc_port = port
+                    self._log_task = asyncio.create_task(
+                        self._drain_output(process),
+                        name=f"openocd-site-{self.site_id}-log",
+                    )
                     await self._wait_ready(process, rpc)
-                except PlasmaError as exc:
+                except (FileNotFoundError, OSError, PlasmaError) as exc:
                     last_error = exc
                     await self._stop_locked()
-                    if attempt < self.max_start_attempts:
-                        continue
-                    break
+                    continue
+                except BaseException:
+                    # Includes task cancellation and unexpected launcher errors.
+                    # Never leave a lease held across an unsuccessful start.
+                    await self._stop_locked()
+                    raise
 
                 self._generation += 1
                 return self.status()
@@ -390,6 +447,14 @@ class OpenOCDWorker:
 
     async def kill(self) -> None:
         async with self._lifecycle_lock:
+            # Observe the current lease only after acquiring lifecycle
+            # ownership, never before a concurrent start() finishes.
+            await self._finish_teardown(self._kill_locked_impl())
+
+    async def _kill_locked_impl(self) -> None:
+        leased_port = self._leased_port
+        self._leased_port = None
+        try:
             rpc = self._rpc
             process = self._process
             log_task = self._log_task
@@ -414,6 +479,9 @@ class OpenOCDWorker:
                         await log_task
                     except asyncio.CancelledError:
                         pass
+        finally:
+            if leased_port is not None:
+                _release_loopback_port(leased_port)
 
     async def restart(self) -> OpenOCDWorkerStatus:
         await self.stop()

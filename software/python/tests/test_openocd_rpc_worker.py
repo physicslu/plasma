@@ -369,3 +369,222 @@ async def test_eight_workers_isolate_single_site_failure(tmp_path: Path) -> None
         assert "Open On-Chip Debugger" in await workers[3].command("version")
     finally:
         await asyncio.gather(*(worker.stop() for worker in workers), return_exceptions=True)
+
+
+class _PortLaunchRecorder(_FakeOpenOCDLauncher):
+    def __init__(self) -> None:
+        super().__init__()
+        self.launch_ports: list[int] = []
+
+    async def __call__(self, *argv: str, **kwargs: Any) -> _FakeProcess:
+        commands = [argv[i + 1] for i, value in enumerate(argv[:-1]) if value == "-c"]
+        port = int(next(x.split()[1] for x in commands if x.startswith("tcl_port ")))
+        self.launch_ports.append(port)
+        return await super().__call__(*argv, **kwargs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cycle", range(12))
+async def test_concurrent_workers_lease_distinct_ports_before_launch(
+    tmp_path: Path, cycle: int,
+) -> None:
+    """Deterministic duplicate-first-choice under eight simultaneous starts."""
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    ports: set[int] = set()
+    while len(ports) < 9:
+        ports.add(_free_port())
+    shared, *alternates = sorted(ports)
+    workers: list[OpenOCDWorker] = []
+    for site_id in range(1, 9):
+        choices = iter((shared, alternates[site_id - 1]))
+        workers.append(
+            OpenOCDWorker(
+                site_id=site_id,
+                executable=executable,
+                scripts_root=scripts,
+                startup_timeout_s=1,
+                process_launcher=launcher,
+                port_allocator=lambda choices=choices: next(choices),
+            )
+        )
+    try:
+        statuses = await asyncio.gather(*(w.start() for w in workers))
+        assert len({s.rpc_port for s in statuses}) == 8
+        assert len({s.pid for s in statuses}) == 8
+        # Crucial assertion: no launch attempt may reuse another live
+        # worker's port (not merely eventual retry after a bind collision).
+        assert len(launcher.launch_ports) == 8
+        assert len(set(launcher.launch_ports)) == 8
+        assert all("Open On-Chip Debugger" in response for response in
+                   await asyncio.gather(*(w.command("version") for w in workers)))
+        await workers[4].kill()
+        assert len(await asyncio.gather(
+            *(w.command("version") for i, w in enumerate(workers) if i != 4)
+        )) == 7
+    finally:
+        await asyncio.gather(*(w.stop() for w in workers), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_port_lease_released_on_stop_and_kill(tmp_path: Path) -> None:
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _FakeOpenOCDLauncher()
+    port = _free_port()
+    one = OpenOCDWorker(site_id=1, executable=executable, scripts_root=scripts,
+                        port_allocator=lambda: port, process_launcher=launcher)
+    two = OpenOCDWorker(site_id=2, executable=executable, scripts_root=scripts,
+                        port_allocator=lambda: port, process_launcher=launcher)
+    try:
+        assert (await one.start()).rpc_port == port
+        await one.stop()
+        assert (await two.start()).rpc_port == port
+        await two.kill()
+        assert (await one.start()).rpc_port == port
+    finally:
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_port_lease_fails_closed_and_survives_other_worker_stop(tmp_path: Path) -> None:
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    port = _free_port()
+    one = OpenOCDWorker(site_id=1, executable=executable, scripts_root=scripts,
+                        port_allocator=lambda: port, process_launcher=launcher)
+    two = OpenOCDWorker(site_id=2, executable=executable, scripts_root=scripts,
+                        port_allocator=lambda: port, max_start_attempts=2,
+                        process_launcher=launcher)
+    try:
+        await one.start()
+        with pytest.raises(PlasmaError) as caught:
+            await two.start()
+        assert caught.value.code == ErrorCode.INTERFACE_FAILURE
+        assert launcher.launch_ports == [port]
+        assert "Open On-Chip Debugger" in await one.command("version")
+        await one.stop()
+        assert (await two.start()).rpc_port == port
+    finally:
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_port_lease_released_when_launcher_raises(tmp_path: Path) -> None:
+    executable, scripts = _runtime_paths(tmp_path)
+    port = _free_port()
+
+    async def failed_launcher(*_argv: str, **_kwargs: Any) -> _FakeProcess:
+        raise OSError("injected launcher failure")
+
+    failed = OpenOCDWorker(site_id=1, executable=executable, scripts_root=scripts,
+                           max_start_attempts=1, port_allocator=lambda: port,
+                           process_launcher=failed_launcher)
+    good = OpenOCDWorker(site_id=2, executable=executable, scripts_root=scripts,
+                         port_allocator=lambda: port,
+                         process_launcher=_FakeOpenOCDLauncher())
+    try:
+        with pytest.raises(PlasmaError) as caught:
+            await failed.start()
+        assert caught.value.code == ErrorCode.INTERFACE_FAILURE
+        assert (await good.start()).rpc_port == port
+    finally:
+        await asyncio.gather(failed.stop(), good.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ("stop", "kill"))
+@pytest.mark.parametrize("cancel_count", (1, 2))
+async def test_cancelled_teardown_retains_port_until_child_exits(
+    tmp_path: Path, method: str, cancel_count: int,
+) -> None:
+    """Cancellation must not free a still-listening child's RPC port."""
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    port = _free_port()
+    one = OpenOCDWorker(
+        site_id=1, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, process_launcher=launcher,
+    )
+    two = OpenOCDWorker(
+        site_id=2, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, max_start_attempts=1,
+        process_launcher=launcher,
+    )
+    process = None
+    task = None
+    original = None
+    try:
+        await one.start()
+        process = one._process
+        assert process is not None
+        entered = asyncio.Event()
+        original = getattr(process, "terminate" if method == "stop" else "kill")
+        setattr(process, "terminate" if method == "stop" else "kill",
+                lambda: entered.set())
+        task = asyncio.create_task(getattr(one, method)())
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        for _ in range(cancel_count):
+            task.cancel()
+            await asyncio.sleep(0)
+        # Even repeat-cancel must not release lifecycle ownership early.
+        assert not task.done()
+        with pytest.raises(PlasmaError) as caught:
+            await two.start()
+        assert caught.value.code == ErrorCode.INTERFACE_FAILURE
+        # A second launch would be a false ownership attempt even if bind fails.
+        assert launcher.launch_ports == [port]
+        original()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2)
+        assert (await two.start()).rpc_port == port
+    finally:
+        if process is not None and original is not None:
+            setattr(process, "terminate" if method == "stop" else "kill", original)
+            if process.returncode is None:
+                original()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_kill_queued_during_start_releases_actual_new_lease(
+    tmp_path: Path,
+) -> None:
+    """Kill must acquire lifecycle ownership before reading the lease."""
+    executable, scripts = _runtime_paths(tmp_path)
+    launcher = _PortLaunchRecorder()
+    port = _free_port()
+    launch_entered, allow_launch = asyncio.Event(), asyncio.Event()
+
+    async def controlled_launcher(*argv: str, **kwargs: Any) -> _FakeProcess:
+        launch_entered.set()
+        await allow_launch.wait()
+        return await launcher(*argv, **kwargs)
+
+    one = OpenOCDWorker(
+        site_id=1, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, process_launcher=controlled_launcher,
+    )
+    two = OpenOCDWorker(
+        site_id=2, executable=executable, scripts_root=scripts,
+        port_allocator=lambda: port, max_start_attempts=1,
+        process_launcher=launcher,
+    )
+    start_task = asyncio.create_task(one.start())
+    kill_task = None
+    try:
+        await asyncio.wait_for(launch_entered.wait(), timeout=1)
+        kill_task = asyncio.create_task(one.kill())
+        await asyncio.sleep(0)  # allow kill() to block on the lifecycle lock
+        allow_launch.set()
+        await asyncio.wait_for(asyncio.gather(start_task, kill_task), timeout=3)
+        assert not one.running
+        assert (await two.start()).rpc_port == port
+        assert launcher.launch_ports == [port, port]
+    finally:
+        allow_launch.set()
+        await asyncio.gather(start_task, return_exceptions=True)
+        if kill_task is not None:
+            await asyncio.gather(kill_task, return_exceptions=True)
+        await asyncio.gather(one.stop(), two.stop(), return_exceptions=True)
