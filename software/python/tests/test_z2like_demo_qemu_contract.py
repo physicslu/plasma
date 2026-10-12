@@ -86,7 +86,11 @@ def test_maintenance_registry_ownership_is_documented_as_single_owner():
     assert "public production control plane remains the sole owner of Programming Registration" in deployment
     assert "manager-registry.json" in deployment
     assert "ignored and is not an authority" in deployment
-    assert "implementation closure candidate; post-merge SWPC live evidence pending" in todo
+    # The post-merge live gate has passed; reject the obsolete pending status.
+    assert "### Dual Manager Lifecycle Ownership / State Drift" in todo
+    assert "Resolved by the fixed read-only SWPC-local maintenance registry" in todo
+    assert "post-merge Browser Runtime live qualification" in todo
+    assert "programming_registration_owner=public-production-control-plane" in todo
     assert "storage=config" in todo
     assert "mutable=false" in todo
 
