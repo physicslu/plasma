@@ -36,8 +36,11 @@ def _fake_release(
     runtime = bundle / "runtime"
     app = runtime / "ppu" / "ppu.pyz"
     catalog = runtime / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
+    ic_support = runtime / "data" / "ic-support"
     app.parent.mkdir(parents=True)
     catalog.parent.mkdir(parents=True)
+    for dirname in ("profiles", "bindings", "manufacturer-baseline"):
+        (ic_support / dirname).mkdir(parents=True)
 
     with zipfile.ZipFile(app, "w") as archive:
         archive.writestr("__main__.py", "print('ok')\n")
@@ -47,7 +50,8 @@ def _fake_release(
         "schema_version": 1,
         "role": "ppu",
         "data": {
-            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
+            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
+            "ic_support_root": "data/ic-support",
         },
         "hardware_boundary": hardware_boundary
         if hardware_boundary is not None
@@ -212,6 +216,7 @@ def test_systemd_units_bind_absolute_isolated_python_and_keep_ps_only_boundary(t
         python_runtime=runtime,
         gateway_host="192.168.2.99",
         catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
+        ic_support_relative="data/ic-support",
     )
     server = units["plasma-server.service"]
     gateway = units["plasma-web.service"]
@@ -222,6 +227,9 @@ def test_systemd_units_bind_absolute_isolated_python_and_keep_ps_only_boundary(t
     assert "--plasma-host 127.0.0.1 --plasma-port 9900" in gateway
     assert "NoNewPrivileges=true" in server
     assert "ProtectSystem=strict" in server
+    expected_ic_support = paths.current / "runtime" / "data" / "ic-support"
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={expected_ic_support}" in server
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={expected_ic_support}" in gateway
 
     config = installer.render_ppu_config(
         ppu_id="z2-dev-01",
