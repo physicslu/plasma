@@ -43,15 +43,29 @@ class ICSupportIntegrityError(RuntimeError):
     """Checked-in IC Support data is incomplete, contradictory, or malformed."""
 
 
-def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+def _source_tree_ic_support_root() -> Path:
+    """Return the development-tree IC Support root.
+
+    This is a source-tree convenience only. Installed runtimes must provide
+    PLASMA_IC_SUPPORT_ROOT explicitly instead of deriving repository-owned data
+    from the installed Python package location.
+    """
+    return (Path(__file__).resolve().parents[3] / IC_SUPPORT_RELATIVE_ROOT).resolve()
 
 
 def default_ic_support_root() -> Path:
     configured = os.environ.get(IC_SUPPORT_ROOT_ENV)
     if configured:
         return Path(configured).expanduser().resolve()
-    return (_repository_root() / IC_SUPPORT_RELATIVE_ROOT).resolve()
+
+    source_tree_root = _source_tree_ic_support_root()
+    if (source_tree_root / "profiles").is_dir() and (source_tree_root / "bindings").is_dir():
+        return source_tree_root
+
+    raise ICSupportIntegrityError(
+        f"{IC_SUPPORT_ROOT_ENV} is required outside a repository source tree; "
+        f"source-tree IC Support data is unavailable at {source_tree_root}"
+    )
 
 
 def _require(condition: bool, message: str) -> None:
