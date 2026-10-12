@@ -1,0 +1,54 @@
+name: NXP official bounded product page acquisition v1
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-official-pilot-products-v1.json'
+      - 'data/device-catalog/research/nxp_official_pilot_acquire_v1.py'
+      - 'data/device-catalog/research/test_nxp_official_pilot_acquire_v1.py'
+      - '.github/workflows/device-catalog-nxp-official-pilot-acquire-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_official_pilot_acquire_v1.py' -v
+
+  acquire-official-product:
+    needs: parser-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        product: [mcx-c04x, mcx-n23x, kl25]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m playwright install chromium --with-deps
+      - name: Acquire official live NXP Package/Quality rows
+        run: |
+          python data/device-catalog/research/nxp_official_pilot_acquire_v1.py \
+            --product "${{ matrix.product }}" \
+            --output "/tmp/nxp-official-${{ matrix.product }}"
+      - name: Upload bounded raw DOM and row-level evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxp-official-v1-${{ matrix.product }}
+          path: /tmp/nxp-official-${{ matrix.product }}/
+          if-no-files-found: error
+          retention-days: 14

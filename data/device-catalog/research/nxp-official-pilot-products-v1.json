@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "policy": "curated official NXP product pages; bounded proof-of-acquisition only, not manufacturer-wide enumeration",
+  "global_active_denominator_claimed": false,
+  "production_write_authorized": false,
+  "products": [
+    {
+      "id": "mcx-c04x",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-C04x?tab=Package_Quality_Tab",
+      "prefix": "MCXC",
+      "must_include": "MCXC041VFK"
+    },
+    {
+      "id": "mcx-n23x",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-N23X?tab=Package_Quality_Tab",
+      "prefix": "MCXN",
+      "must_include": "MCXN236VPBT"
+    },
+    {
+      "id": "kl25",
+      "segment": "kinetis",
+      "url": "https://www.nxp.com/products/KL2x?tab=Package_Quality_Tab",
+      "prefix": "MKL25Z",
+      "must_include": "MKL25Z128VLK4"
+    }
+  ]
+}

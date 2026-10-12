@@ -51,7 +51,15 @@ def default_ic_support_root() -> Path:
     configured = os.environ.get(IC_SUPPORT_ROOT_ENV)
     if configured:
         return Path(configured).expanduser().resolve()
-    return (_repository_root() / IC_SUPPORT_RELATIVE_ROOT).resolve()
+
+    source_tree_root = (_repository_root() / IC_SUPPORT_RELATIVE_ROOT).resolve()
+    if source_tree_root.is_dir():
+        return source_tree_root
+
+    raise ICSupportIntegrityError(
+        f"{IC_SUPPORT_ROOT_ENV} must point to repository-owned IC Support data "
+        "when Plasma runs from an installed Python package"
+    )
 
 
 def _require(condition: bool, message: str) -> None:

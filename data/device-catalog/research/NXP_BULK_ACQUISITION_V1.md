@@ -47,3 +47,15 @@ Once family acquisition jobs exist, point `--evidence-root` at a directory with 
 ## Retained KL25 pilot
 
 Existing official NXP KL2x research identified **12** Active KL25 ordering codes with `catalog_admission_ready=true`. These 12 are a suitable *first bounded family publication candidate*, but they do not establish NXP portfolio denominator; the current Production manifest still has only ST sources. Neither prior KL25 Software Executor evidence nor this bulk plan grants Production publication or physical SWD programming.
+
+
+## Gate 1a — real NXP Official Product Page Pilot (separate live acquisition workflow)
+
+The read-only matrix workflow `.github/workflows/device-catalog-nxp-official-pilot-acquire-v1.yml`
+captures three **curated** official NXP product-page lifecycle tables, independently:
+
+- `mcx-c04x` — MCX C04x, expected exact Active row `MCXC041VFK`.
+- `mcx-n23x` — MCX N23x, expected exact row `MCXN236VPBT`. The NXP official table includes `Qualification` entries which must *not* be counted as Active.
+- `kl25` — NXP KL2x Package/Quality page, restricted to `MKL25Z` exact codes and expected `MKL25Z128VLK4`.
+
+The Playwright scraper captures rendered raw HTML before parsing, only keeps first-cell exact part numbers with an official row lifecycle, rejects contradictory or duplicate states, and uploads JSON + HTML as temporary GitHub Actions artifacts even on failure. The product URLs are fixed in `nxp-official-pilot-products-v1.json` and cannot be supplied arbitrarily. **Every snapshot has `source_population_complete=false`**, since a bounded product page does not establish complete MCX/Kinetis/NXP manufacturer coverage. This pilot is an actual manufacturer acquisition probe, not a mass-portfolio denominator or a production admission.
