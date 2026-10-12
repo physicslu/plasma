@@ -14,14 +14,14 @@ def workflow_text() -> str:
 
 def test_cache_key_is_pinned_to_architecture_release_and_build_recipe() -> None:
     text = workflow_text()
-    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in text
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v2"' in text
     assert "armv7-ubuntu22.04-" in text
     assert "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')" in text
     assert "restore-keys:" not in text
     assert "hashFiles('.github/workflows/z2like-demo-qemu.yml'" not in text
-    assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in text
+    assert 'OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"' in text
     assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in text
-    assert "${{ runner.temp }}/openocd-armv7l-cached" not in text
+    assert "/tmp/plasma-openocd-armv7l-cached" not in text
 
 
 def test_prs_may_restore_but_only_main_can_save_cache() -> None:
@@ -92,15 +92,15 @@ def test_browser_live_gate_uses_the_same_qualified_cache_identity() -> None:
     browser = BROWSER_WORKFLOW.read_text(encoding="utf-8")
     recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
     key_prefix = "qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-"
-    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in qemu
-    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in browser
-    portable_path = 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"'
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v2"' in qemu
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v2"' in browser
+    portable_path = 'OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"'
     assert portable_path in qemu
     assert portable_path in browser
     assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in qemu
     assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in browser
-    assert "${{ runner.temp }}/openocd-armv7l-cached" not in qemu
-    assert "${{ runner.temp }}/openocd-armv7l-cached" not in browser
+    assert "/tmp/plasma-openocd-armv7l-cached" not in qemu
+    assert "/tmp/plasma-openocd-armv7l-cached" not in browser
     assert key_prefix in qemu
     assert key_prefix in browser
     assert recipe in qemu
@@ -117,4 +117,4 @@ def test_cache_path_preparation_is_identical_and_requires_zstd() -> None:
         assert "Prepare portable ARMv7 OpenOCD cache path" in text
         assert "command -v zstd >/dev/null" in text
         assert 'rm -rf "$OPENOCD_ARMV7_CACHE_DIR"' in text
-        assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in text
+        assert 'OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"' in text
