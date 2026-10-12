@@ -23,6 +23,7 @@ import os
 import platform
 import shutil
 import subprocess
+import struct
 import sys
 import tempfile
 from pathlib import Path
@@ -133,15 +134,64 @@ def _verified_openocd_identity(
     return payload
 
 
+def _installed_payload_sha256(target: Path) -> str:
+    """Hash an installed runtime payload while excluding its retained manifest."""
+
+    if target.is_symlink() or not target.is_dir():
+        raise QEMUSimulationKitError(
+            "existing simulation OpenOCD runtime target is not a safe directory"
+        )
+    digest = hashlib.sha256()
+    root_mode = target.stat().st_mode & 0o777
+    digest.update(b"d")
+    digest.update(struct.pack(">I", 0))
+    digest.update(struct.pack(">I", root_mode))
+    digest.update(struct.pack(">Q", 0))
+    retained_manifest = target / "plasma-runtime.json"
+    for path in sorted(target.rglob("*")):
+        if path == retained_manifest:
+            continue
+        if path.is_symlink():
+            raise QEMUSimulationKitError(
+                f"existing simulation OpenOCD runtime contains a symlink: {path}"
+            )
+        relative = path.relative_to(target).as_posix().encode("utf-8")
+        stat = path.stat()
+        mode = stat.st_mode & 0o777
+        if path.is_dir():
+            kind = b"d"
+            size = 0
+        elif path.is_file():
+            kind = b"f"
+            size = stat.st_size
+        else:
+            raise QEMUSimulationKitError(
+                f"existing simulation OpenOCD runtime contains an unsupported file type: {path}"
+            )
+        digest.update(kind)
+        digest.update(struct.pack(">I", len(relative)))
+        digest.update(relative)
+        digest.update(struct.pack(">I", mode))
+        digest.update(struct.pack(">Q", size))
+        if path.is_file():
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _reconcile_simulation_openocd_runtime(
     product_root: Path, incoming: dict[str, object]
 ) -> dict[str, object]:
-    """Retire only a stale same-identity OpenOCD payload inside the QEMU simulation.
+    """Retire only a safe same-identity OpenOCD payload inside the QEMU simulation.
 
-    Production installation remains fail-closed.  This narrow reconciliation is
-    permitted only on the explicit ARMv7 QEMU target and only when the retained
-    runtime manifest has the same canonical identity but a different verified
-    payload SHA.  Corrupt, missing, or identity-drifted state is never deleted.
+    Production installation remains fail-closed. This narrow reconciliation is
+    permitted only on the explicit ARMv7 QEMU target. A retained runtime with
+    the same canonical identity may be replaced when it either has a different
+    verified payload SHA or is a legacy pre-payload-identity install whose
+    manifest omits payload_sha256 entirely. Malformed payload identities,
+    corrupt manifests, unsafe filesystem entries, and identity drift are never
+    deleted implicitly.
     """
 
     _require_simulation_target()
@@ -175,14 +225,22 @@ def _reconcile_simulation_openocd_runtime(
                 f"existing simulation OpenOCD runtime identity mismatch for {field}; refusing cleanup"
             )
 
-    retained_payload = retained.get("payload_sha256")
+    if "payload_sha256" not in retained:
+        observed_payload = _installed_payload_sha256(target)
+        result["legacy_observed_payload_sha256"] = observed_payload
+        result["legacy_observed_matches_incoming_payload"] = observed_payload == incoming_payload
+        shutil.rmtree(target)
+        result["action"] = "replaced_legacy_unidentified_payload"
+        return result
+
+    retained_payload = retained["payload_sha256"]
     if (
         not isinstance(retained_payload, str)
         or len(retained_payload) != 64
         or any(ch not in "0123456789abcdef" for ch in retained_payload)
     ):
         raise QEMUSimulationKitError(
-            "existing simulation OpenOCD runtime payload identity is missing or invalid"
+            "existing simulation OpenOCD runtime payload identity is invalid"
         )
     result["previous_payload_sha256"] = retained_payload
     if retained_payload == incoming_payload:
@@ -192,7 +250,6 @@ def _reconcile_simulation_openocd_runtime(
     shutil.rmtree(target)
     result["action"] = "replaced_stale_verified_payload"
     return result
-
 
 def _validated_deployment_release_id(payload: object) -> str:
     if not isinstance(payload, dict) or payload.get("result") != "PASS":
