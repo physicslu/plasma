@@ -153,11 +153,15 @@ def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> Non
             raise RuntimeError(f"{path} did not return an HTML product shell")
         if b"SITE MATRIX" in body or b"PPU CONTROL" in body:
             raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
-        if report.expected_commit is None and b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
-            # PR smoke observes the currently deployed main revision, which may still
-            # be the pre-convergence static shell. Pinned acceptance proves the new
-            # BFF identity via deployment metadata plus managed routing instead of
-            # coupling to SSR text that Vinext does not guarantee.
+        if (
+            report.expected_commit is None
+            and report.checks.get("routing") != "MANAGED"
+            and b"Plasma Control Station" not in body
+            and b"Plasma PPU Console" not in body
+        ):
+            # Legacy PR observation still recognizes the pre-convergence shell by
+            # rendered text. Managed routing has already established the current BFF
+            # identity and must not depend on framework-specific SSR text.
             raise RuntimeError(f"{path} does not contain a recognized deployed Plasma shell")
         report.checks[f"ui:{path}"] = "PASS"
 
