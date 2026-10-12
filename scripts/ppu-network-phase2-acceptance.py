@@ -323,6 +323,20 @@ def _capture_failure_diagnostics(
         "ppu_logs": ["docker", "logs", "--tail", "80", ppu],
         "helper_logs": ["docker", "logs", "--tail", "80", helper],
         "probe_logs": ["docker", "logs", "--tail", "20", probe],
+        "probe_to_ppu_tcp": [
+            "docker", "exec", probe, "python3", "-c",
+            "import json,socket\n"
+            "out={}\n"
+            "for ip in ('192.168.77.10','192.168.77.40'):\n"
+            " s=socket.socket();s.settimeout(1.0)\n"
+            " try:s.connect((ip,18080));out[ip]='connected'\n"
+            " except OSError as e:out[ip]=type(e).__name__+': '+str(e)\n"
+            " finally:s.close()\n"
+            "print(json.dumps(out,sort_keys=True))",
+        ],
+        "ppu_route": ["docker", "exec", ppu, "cat", "/proc/net/route"],
+        "probe_route": ["docker", "exec", probe, "cat", "/proc/net/route"],
+        "probe_arp": ["docker", "exec", probe, "cat", "/proc/net/arp"],
         "ppu_local_tcp": [
             "docker", "exec", ppu, "python3", "-c",
             "import json,socket\n"

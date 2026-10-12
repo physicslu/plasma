@@ -41,10 +41,12 @@ class Phase2DiagnosticTests(unittest.TestCase):
             self.assertEqual(result["evidence_scope"], "ppu-phase2-diagnostic-only-no-hardware")
             self.assertEqual(result["passed_checks_before_failure"],
                              {"helper_socket_ready": "PASS"})
-            self.assertEqual(len(commands), 7)
+            self.assertEqual(len(commands), 11)
             self.assertEqual(result["observations"]["helper_logs"],
                              {"capture_error": "TimeoutExpired"})
             self.assertEqual(result["observations"]["ppu_local_tcp"]["returncode"], 0)
+            self.assertEqual(result["observations"]["probe_to_ppu_tcp"]["returncode"], 0)
+            self.assertEqual(result["observations"]["probe_arp"]["returncode"], 0)
 
     def test_diagnostic_capture_failure_does_not_override_original_error(self):
         with tempfile.TemporaryDirectory() as temp:
