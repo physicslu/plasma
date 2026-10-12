@@ -14,6 +14,7 @@ from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.ic_support import get_default_ic_support_resolver
 
 from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
@@ -83,6 +84,7 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
     candidates = get_default_backend_candidate_registry()
     upstream = default_pinned_upstream()
     versioned_providers = get_default_openocd_provider_registry()
+    ic_support = get_default_ic_support_resolver()
     results = []
     for record in matches:
         item = record.to_payload()
@@ -92,6 +94,12 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
         item["backend_providers"] = (
             versioned_providers.describe(record.vendor, record.identifier)
             if versioned_providers is not None else []
+        )
+        support = ic_support.resolve_exact(record.icpn or record.identifier)
+        item["selected_profile"] = (
+            support.to_selected_profile_payload()
+            if support is not None
+            else None
         )
         results.append(item)
     return {

@@ -47,6 +47,17 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(c8.openocd_target_config, "tcl/target/stm32f1x.cfg")
         self.assertEqual(cb.openocd_target_config, c8.openocd_target_config)
 
+        self.assertIsNotNone(c8.manufacturer_profile)
+        self.assertIsNone(cb.manufacturer_profile)
+        selected = c8.to_selected_profile_payload()
+        assert selected is not None
+        self.assertEqual(selected["device"]["operating_electrical"]["vdd_v"], {"min": 2.0, "max": 3.6})
+        self.assertEqual(selected["device"]["memory_map"]["main_flash"]["size_bytes"], 64 * 1024)
+        self.assertEqual(selected["programming"]["electrical"]["vdd_programming_v"], {"min": 2.0, "max": 3.6, "basis": "PM0075 states Program/Erase operations are supported over the whole product voltage range"})
+        self.assertIsNone(selected["programming"]["interfaces"]["SWD"]["clock_hz"]["manufacturer_max"])
+        self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
+        self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
+
     def test_runtime_payload_separates_profile_resolution_from_backend_implementation(self) -> None:
         payload = ICSupportResolver.from_root(IC_SUPPORT_ROOT).require_exact(
             "STM32F103C8T6"
@@ -78,6 +89,7 @@ class ICSupportResolverTests(unittest.TestCase):
             summary["programming_profile_ids"],
             ["stm32f1-medium-density-flash-v0"],
         )
+        self.assertEqual(summary["manufacturer_selected_profiles"], 1)
         self.assertEqual(summary["native_ppu_runtime_ready_exact_icpns"], 0)
 
     def test_environment_root_override_is_authoritative(self) -> None:
@@ -145,6 +157,44 @@ class ICSupportResolverTests(unittest.TestCase):
         resolver = get_default_ic_support_resolver()
         self.assertEqual(resolver.size, 2)
         self.assertEqual(resolver.require_exact("STM32F103C8T6").expected_catalog["base_device"], "STM32F103C8")
+
+    def test_manufacturer_profile_fails_closed_when_programming_electrical_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            test_root = Path(root) / "ic-support"
+            shutil.copytree(IC_SUPPORT_ROOT, test_root)
+            baseline = test_root / "manufacturer-baseline" / "stm32f103c8t6-manufacturer-only-v1.json"
+            payload = json.loads(baseline.read_text(encoding="utf-8"))
+            del payload["programming_profile"]["programming_electrical"]["vdd_programming_v"]
+            baseline.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+            import hashlib
+            lock = test_root / "manufacturer-baseline" / "stm32f103c8t6-manufacturer-only-v1.lock.json"
+            lock_payload = json.loads(lock.read_text(encoding="utf-8"))
+            lock_payload["canonical_file_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            lock.write_text(json.dumps(lock_payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ICSupportIntegrityError, "programming VDD range is required"):
+                ICSupportResolver.from_root(test_root)
+
+    def test_manufacturer_profile_rejects_blue_pill_128k_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            test_root = Path(root) / "ic-support"
+            shutil.copytree(IC_SUPPORT_ROOT, test_root)
+            baseline = test_root / "manufacturer-baseline" / "stm32f103c8t6-manufacturer-only-v1.json"
+            payload = json.loads(baseline.read_text(encoding="utf-8"))
+            payload["device_profile"]["memory_map"]["main_flash"]["size_bytes"] = 128 * 1024
+            payload["device_profile"]["memory_map"]["main_flash"]["end"] = "0x0801FFFF"
+            payload["device_profile"]["memory_map"]["main_flash"]["page_count"] = 128
+            baseline.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+            import hashlib
+            lock = test_root / "manufacturer-baseline" / "stm32f103c8t6-manufacturer-only-v1.lock.json"
+            lock_payload = json.loads(lock.read_text(encoding="utf-8"))
+            lock_payload["canonical_file_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            lock.write_text(json.dumps(lock_payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ICSupportIntegrityError, "Flash size does not match catalog binding"):
+                ICSupportResolver.from_root(test_root)
 
 
 if __name__ == "__main__":
