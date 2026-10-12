@@ -99,111 +99,6 @@ Architectural invariant:
 
 Closure evidence must include schema/version contracts, authoritative source evidence, API resolution, Control Station presentation, PPU-side compatibility enforcement, fail-closed negative tests, and physical validation on representative devices before this capability is marked Current.
 
-### OpenOCD Control-Plane Qualification
-
-**Status:** PARTIAL — CI/QEMU control-plane qualification implemented; main-only SWPC ARMv7 QEMU live gate implemented, post-merge PASS evidence still required
-
-**Layer:** SW/PPU / Programming Backend / PPU runtime
-
-**Reason:** Plasma already has a software-only compiled-plan executor, fake OpenOCD subprocess coverage, Site safety sequencing, Control Station routing, packaged ARMv7 PPU runtime and SWPC/QEMU acceptance. The next product step is to qualify the real OpenOCD process-control path from Console to PS without prematurely claiming SWD, PL, target-power or real-IC readiness.
-
-The milestone is intentionally scoped to:
-
-```text
-Console
-  -> BFF / Manager
-  -> PPU Gateway
-  -> Plasma PS Runtime
-  -> OpenOCD Worker
-  -> Tcl RPC
-  -> real OpenOCD process
-```
-
-It must keep:
-
-```text
-hardware_runtime_ready = false
-```
-
-until a later physical Z2 + adapter + target qualification explicitly promotes the hardware path.
-
-Required work packages:
-
-Merged/CI-qualified foundation: work packages 1–3. The current control-plane transaction adds work packages 4–5 as required CI/QEMU gates while preserving the live-SWPC distinction.
-
-1. **OpenOCD Runtime Packaging**
-   - pin the qualified OpenOCD version and build inputs;
-   - produce immutable x86_64 CI and Linux ARMv7 artifacts;
-   - install under a Plasma-owned versioned programming-engine path rather than relying on distro `apt openocd`;
-   - retain the OpenOCD script tree with the binary;
-   - verify artifact SHA-256, executable architecture and runtime/shared-library dependencies.
-
-2. **OpenOCD Tcl RPC / Worker**
-   - implement a production `OpenOCDRpcClient` using the Tcl machine interface and `0x1A` framing;
-   - implement `OpenOCDWorker` process lifecycle, readiness, timeout, cancellation, kill/restart and cleanup;
-   - bind Tcl RPC to loopback only and disable normal GDB/Telnet services for offline programming runtime use;
-   - allocate per-Site local RPC endpoints dynamically rather than hard-coding one global port;
-   - reuse the existing canonical plan validation, artifact staging and command-rendering contracts rather than creating a second programming-plan implementation.
-
-3. **CI Real-OpenOCD Qualification**
-   - run the real OpenOCD binary with a software-only/dummy adapter where supported;
-   - validate RPC connection, command/response framing, invalid commands, timeout, disconnect, crash/restart, cancellation and port-collision behavior;
-   - run eight isolated workers and prove one worker failure does not block recovery/control of the other Sites;
-   - retain fake-process tests for narrow deterministic failure injection, but do not treat them as the final OpenOCD process qualification.
-
-4. **Console -> PS OpenOCD Loop Test**
-   - add an Engineering/Platform diagnostic that follows the real production routing owner from Console through Manager/Gateway to the PPU Runtime;
-   - start or inspect the real OpenOCD worker on the PS and issue only safe control-plane Tcl commands;
-   - report OpenOCD version, process state, Tcl RPC state, architecture, Site identity, latency and PASS/FAIL;
-   - return an explicit evidence boundary such as `execution_capability=openocd-control-plane-only` and `hardware_runtime_ready=false`;
-   - do not touch SWD/JTAG, DUT POWER/RESET, target detection or flash in this loop test.
-
-5. **SWPC QEMU ARMv7 End-to-End Qualification**
-   - include the ARMv7 OpenOCD artifact in the canonical z2like-demo PPU package;
-   - execute the real ARMv7 OpenOCD binary inside the SWPC QEMU PPU;
-   - drive the OpenOCD Loop Test from the real Console/Manager/Gateway route;
-   - validate packaging, permissions, script lookup, Tcl RPC, process recovery and eight-Site failure isolation;
-   - add an explicit CI/CD gate for this ARMv7 control-plane path.
-
-Exit criteria:
-
-```text
-Console -> PS -> real OpenOCD -> Tcl RPC
-```
-
-must pass in both CI and SWPC ARMv7 QEMU with deterministic failure/recovery coverage and without enabling the production hardware route.
-
-The SWPC half of this exit criterion is satisfied only by an uploaded main-only live acceptance artifact that proves all eight public managed Site diagnostics plus the direct eight-worker ARMv7 isolation/fault-restart evidence on the persistent SWPC QEMU target. Repository CI success alone is insufficient.
-
-Out of scope for this milestone:
-
-- custom `plasma_adapter.c`;
-- FPGA SWD/JTAG transport;
-- physical DUT power/reset sequencing;
-- target detection;
-- flash erase/program/verify on real silicon;
-- `hardware_runtime_ready=true`;
-- real-IC or physical eight-Site qualification.
-
-Only after this milestone passes should the next hardware phase proceed to:
-
-```text
-Physical Z2
-  -> OpenOCD
-  -> Plasma adapter
-  -> FPGA SWD/JTAG engine
-  -> target IC
-```
-
-Related architecture:
-
-- [Device Support / Hardware Execution / OpenOCD Architecture](../architecture/device-support-hardware-openocd.md)
-- [IC Support OpenOCD Compiled-Plan Executor](../architecture/ic-support-openocd-plan-executor.md)
-
-Architectural invariant:
-
-> Qualify the OpenOCD control plane before adding the hardware transport. CI/QEMU evidence may prove process/routing/runtime behavior, but it must never be reported as SWD, PL, electrical or real-IC evidence.
-
 ### Security Rollout and Identity Integration
 
 **Status:** TODO / follow-up after PRs #167-#169
@@ -242,37 +137,6 @@ Required work:
 Closure evidence must include a rebuilt/installed macOS package and real browser Network evidence showing required static/font assets load successfully without the previously observed 404 class.
 
 ## Deferred architecture evolution
-
-### Dual Manager Lifecycle Ownership / State Drift
-
-**Status:** IN PROGRESS / implementation closure candidate; post-merge SWPC live evidence pending
-
-**Layer:** Control Plane / Manager / PPU Registration / Platform Maintenance
-
-**Reason:** Live SWPC/QEMU qualification exposed a real ownership defect: the public `z2like-demo` Manager and the SWPC-local maintenance Manager (`127.0.0.1:18380`) could independently persist `commissioned` / `disabled` state for the same PPU alias. That allowed contradictory Programming Registration state to affect Platform maintenance and forced manual synchronization between two Manager registries.
-
-Implementation closure direction:
-
-- Programming Registration remains a programming-admission concern owned by the public production control plane;
-- the SWPC-local maintenance Manager is reduced to a fixed, **read-only config connection registry** for the canonical QEMU alias/endpoint;
-- the local Manager writes `registry_state_path: null`, so installer/environment fallback cannot silently re-enable a mutable registry;
-- existing legacy `manager-registry.json` files are intentionally not deleted, but are ignored and no longer authoritative;
-- the Runtime deployer no longer reads, mutates, preserves, or compares local `pending` / `commissioned` / `disabled` lifecycle state;
-- Platform Maintenance Authorization remains separately bounded by device pairing, active-execution exclusion, Runtime state, recovery state and current trusted-idle observation;
-- regression contracts reject restoration of a mutable local Registration registry or lifecycle-based maintenance admission.
-
-Remaining closure evidence:
-
-- merge the implementation only after normal repository/QEMU CI passes;
-- execute the main-only SWPC/Render/QEMU live acceptance on the merged commit;
-- prove `plasmactl update z2like-demo` completes without any manual mutation or synchronization of a second Programming Registration lifecycle;
-- retain explicit evidence that the local maintenance registry is `storage=config` and `mutable=false`.
-
-Architectural invariant:
-
-> One semantic lifecycle state must have one authoritative owner. Programming Registration and Platform Maintenance Authorization are separate concerns and must not be conflated or independently duplicated across Managers.
-
-This item may be marked complete only after the post-merge live evidence proves the canonical SWPC/QEMU maintenance path no longer depends on a second mutable Programming Registration authority.
 
 ### Mock Runtime Core Convergence
 
@@ -470,6 +334,39 @@ Relevant guardrails include:
 - `software/web/e2e/tests/programming-job-real-stack-parity.spec.ts`.
 
 ## Resolved architecture debt
+
+### OpenOCD Control-Plane Qualification
+
+Resolved on main by the ARMv7 QEMU / Browser Runtime qualification sequence culminating in commit `50816ada8450d7a347be02be7c2333e4ef228a7e` and workflow run `38199283003` (Browser Runtime run #120, successful attempt 2).
+
+Closure evidence now proves:
+
+- the production routing chain reaches the real Plasma-owned ARMv7 OpenOCD runtime through Console / BFF / Manager / PPU Gateway / PS Runtime;
+- the qualified OpenOCD `0.12.0` runtime is restored from the portable v2 cache and re-verified before use;
+- the canonical ARMv7 Z2 PS kit is built and deployed through the managed runtime path;
+- the live OpenOCD control plane reports `result=PASS`, `execution_capability=openocd-control-plane-only`, and `hardware_runtime_ready=false`;
+- all eight managed Site diagnostics pass through the Browser / Render / SWPC QEMU route;
+- direct ARMv7 eight-worker isolation and failed-Site restart evidence passes;
+- the live evidence artifact `z2like-demo-browser-runtime-live-50816ada8450d7a347be02be7c2333e4ef228a7e` was uploaded successfully.
+
+This closes the software OpenOCD control-plane milestone only. It does **not** claim physical SWD/JTAG, FPGA/PL transport, target power/reset, target detection, flash programming, physical PYNQ-Z2, or real-IC readiness.
+
+### Dual Manager Lifecycle Ownership / State Drift
+
+Resolved by the fixed read-only SWPC-local maintenance registry plus the post-merge Browser Runtime live qualification on commit `50816ada8450d7a347be02be7c2333e4ef228a7e`, workflow run `38199283003`.
+
+The live acceptance contract fails unless the local maintenance Manager reports:
+
+- `storage=config`;
+- `mutable=false`;
+- exactly one canonical `z2like-qemu` connection bound to the expected QEMU endpoint;
+- `programming_registration_owner=public-production-control-plane`.
+
+The same live run also proved runtime deployment, return to commissioned state, verified pairing while commissioned, and the managed OpenOCD control-plane path without requiring synchronization of a second mutable Programming Registration lifecycle.
+
+Architectural invariant:
+
+> Programming Registration has one authoritative owner in the public production control plane. The SWPC-local maintenance Manager owns only a fixed read-only connection registry and Platform maintenance access.
 
 ### Remote Write Authentication and Authorization
 
