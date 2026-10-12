@@ -40,6 +40,7 @@ on:
       - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
       - "software/python/tests/test_ppu_armv7_runtime_lab.py"
       - "software/python/tests/test_ppu_network_phase1_acceptance.py"
+      - "software/python/tests/test_ppu_network_phase2_bootstrap.py"
       - "software/python/tests/test_ppu_network_activation.py"
       - "software/python/tests/test_ppu_network_activation_rest.py"
       - "software/python/tests/test_ppu_network_activation_security.py"
@@ -99,6 +100,7 @@ jobs:
           software/python/tests/test_ppu_armv7_runtime_acceptance.py
           software/python/tests/test_ppu_armv7_runtime_lab.py
           software/python/tests/test_ppu_network_phase1_acceptance.py
+          software/python/tests/test_ppu_network_phase2_bootstrap.py
           software/python/tests/test_ppu_network_activation.py
           software/python/tests/test_ppu_network_activation_rest.py
           software/python/tests/test_ppu_network_activation_security.py

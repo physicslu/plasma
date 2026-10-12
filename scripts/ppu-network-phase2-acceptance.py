@@ -304,6 +304,19 @@ def _node_ppu_id(payload: Mapping[str, Any]) -> str:
     return ppu_id
 
 
+def _wait_gateway_bootstrap_control(container: str) -> str:
+    """Differentiate emulated Gateway cold start from managed-IP reachability.
+
+    Docker owns this stable control address independently of managed IPv4
+    mutation. Do not relax the original 8-second managed-IP acceptance gate.
+    """
+    node = _wait_reachable(container, PPU_CONTROL_IP, timeout_s=30.0)
+    ppu_id = _node_ppu_id(node)
+    if ppu_id != PPU_ID:
+        raise AcceptanceError(f"unexpected bootstrap control ppu_id: {ppu_id}")
+    return ppu_id
+
+
 def _desired(address: str) -> dict[str, Any]:
     return {"mode":"static","address":address,"prefix_length":24,"gateway":LAB_GATEWAY,"dns_servers":[LAB_GATEWAY]}
 
@@ -335,7 +348,13 @@ def _host_mode(args: argparse.Namespace) -> int:
         if _has_cap(_cap_eff(ppu), CAP_NET_ADMIN): raise AcceptanceError("Gateway unexpectedly has CAP_NET_ADMIN")
         if not _has_cap(_cap_eff(helper), CAP_NET_ADMIN): raise AcceptanceError("helper missing CAP_NET_ADMIN")
         checks["gateway_no_net_admin"]="PASS"; checks["helper_has_net_admin"]="PASS"
+        # Require a canonical PPU identity on immutable Docker control IPv4
+        # before starting the existing 8-second management address gate.
+        bootstrap_ppu_id=_wait_gateway_bootstrap_control(probe)
+        checks["gateway_bootstrap_control_ready"]="PASS"
         initial_node=_wait_reachable(probe, INITIAL_IP); initial_ppu_id=_node_ppu_id(initial_node)
+        if initial_ppu_id != bootstrap_ppu_id:
+            raise AcceptanceError("managed IPv4 ppu_id differs from bootstrap control")
         if initial_ppu_id != PPU_ID: raise AcceptanceError(f"unexpected initial ppu_id: {initial_ppu_id}")
         checks["initial_managed_endpoint"]="PASS"
         # The Docker-owned control address is intentionally outside the DUT management transaction.

@@ -1,0 +1,147 @@
+name: PLASMA Actions control bridge
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/plasma-actions-control.json"
+      - ".github/workflows/plasma-actions-control-bridge.yml"
+      - "scripts/plasma-actions-control-bridge-contract.py"
+      - "docs/development/plasma-actions-control-bridge.md"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/plasma-actions-control.json"
+      - ".github/workflows/plasma-actions-control-bridge.yml"
+      - "scripts/plasma-actions-control-bridge-contract.py"
+      - "docs/development/plasma-actions-control-bridge.md"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate control bridge contract
+        run: python3 scripts/plasma-actions-control-bridge-contract.py
+
+  control:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.number == 814 &&
+      github.actor == 'physicslu'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Execute allowlisted Actions command
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+
+            const cfg = JSON.parse(
+              fs.readFileSync(".github/plasma-actions-control.json", "utf8")
+            );
+
+            const issueNumber = context.payload.issue?.number;
+            const actor = context.actor;
+            if (issueNumber !== cfg.control_issue) {
+              core.setFailed(`unexpected control issue: ${issueNumber}`);
+              return;
+            }
+            if (!cfg.allowed_actors.includes(actor)) {
+              core.setFailed(`actor is not allowlisted: ${actor}`);
+              return;
+            }
+
+            const body = String(context.payload.comment?.body || "").trim();
+            const parts = body.split(/\s+/);
+            if (parts.length !== 3 || parts[0] !== "/plasma-actions") {
+              core.notice("Ignored non-command comment on the dedicated control issue.");
+              return;
+            }
+
+            const operation = parts[1];
+            const argument = parts[2];
+            const allowed = new Set(cfg.allowed_workflows);
+            const { owner, repo } = context.repo;
+
+            const requireAllowedWorkflow = (workflow) => {
+              if (
+                !/^[A-Za-z0-9._-]+\.ya?ml$/.test(workflow) ||
+                workflow.includes("/") ||
+                !allowed.has(workflow)
+              ) {
+                throw new Error(`workflow is not allowlisted: ${workflow}`);
+              }
+            };
+
+            if (operation === "dispatch") {
+              requireAllowedWorkflow(argument);
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: argument,
+                ref: cfg.dispatch_ref,
+              });
+              core.notice(
+                `Dispatched ${argument} at ref ${cfg.dispatch_ref}.`
+              );
+              return;
+            }
+
+            if (operation === "cancel" || operation === "rerun") {
+              if (!/^[1-9][0-9]*$/.test(argument)) {
+                throw new Error(`invalid workflow run id: ${argument}`);
+              }
+              const runId = Number(argument);
+              const { data: run } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
+              const workflow = path.posix.basename(run.path || "");
+              requireAllowedWorkflow(workflow);
+              if (run.head_branch !== cfg.dispatch_ref) {
+                throw new Error(
+                  `workflow run is not on allowed branch ${cfg.dispatch_ref}: ${run.head_branch}`
+                );
+              }
+
+              if (operation === "cancel") {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: runId,
+                });
+                core.notice(`Cancelled allowlisted workflow run ${runId}.`);
+              } else {
+                await github.rest.actions.reRunWorkflow({
+                  owner,
+                  repo,
+                  run_id: runId,
+                });
+                core.notice(`Re-ran allowlisted workflow run ${runId}.`);
+              }
+              return;
+            }
+
+            throw new Error(`unsupported control operation: ${operation}`);

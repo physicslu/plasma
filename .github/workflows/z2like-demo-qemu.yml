@@ -77,8 +77,8 @@ permissions:
   contents: read
 
 env:
-  OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
-  OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"
+  OPENOCD_ARMV7_CACHE_SCHEMA: "v2"
+  OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"
 
 jobs:
   contracts:
@@ -224,7 +224,7 @@ jobs:
         run: |
           set -euo pipefail
           start="$(date +%s)"
-          bash scripts/build-openocd-runtime.sh "$OPENOCD_ARMV7_CACHE_DIR" armv7l
+          bash scripts/build-openocd-runtime.sh "$GITHUB_WORKSPACE/$OPENOCD_ARMV7_CACHE_DIR" armv7l
           echo "OpenOCD cache MISS: build duration $(( $(date +%s) - start )) seconds" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify cached or freshly built ARMv7 OpenOCD and pinned source identity

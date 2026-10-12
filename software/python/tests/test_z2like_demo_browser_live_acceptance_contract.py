@@ -50,10 +50,10 @@ def test_live_gate_reuses_verified_qemu_openocd_cache_without_recompile() -> Non
     workflow = WORKFLOW.read_text(encoding="utf-8")
     qemu_workflow = QEMU_WORKFLOW.read_text(encoding="utf-8")
     recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
-    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in workflow
-    assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in workflow
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v2"' in workflow
+    assert 'OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"' in workflow
     assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in workflow
-    assert "${{ runner.temp }}/openocd-armv7l-cached" not in workflow
+    assert "/tmp/plasma-openocd-armv7l-cached" not in workflow
     assert recipe in workflow
     assert recipe in qemu_workflow
     assert "Prepare portable ARMv7 OpenOCD cache path" in workflow

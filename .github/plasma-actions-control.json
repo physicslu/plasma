@@ -1,0 +1,11 @@
+{
+  "control_issue": 814,
+  "allowed_actors": [
+    "physicslu"
+  ],
+  "dispatch_ref": "main",
+  "allowed_workflows": [
+    "z2like-demo-browser-live-acceptance.yml",
+    "z2like-demo-qemu.yml"
+  ]
+}
