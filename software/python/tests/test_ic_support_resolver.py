@@ -97,6 +97,19 @@ class ICSupportResolverTests(unittest.TestCase):
         with patch.dict("os.environ", {IC_SUPPORT_ROOT_ENV: str(configured)}):
             self.assertEqual(default_ic_support_root(), configured)
 
+    def test_installed_runtime_without_explicit_data_root_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            missing = Path(root) / "site-packages-derived" / "data" / "ic-support"
+            with (
+                patch.dict("os.environ", {}, clear=True),
+                patch("plasma_core.ic_support._source_tree_ic_support_root", return_value=missing),
+            ):
+                with self.assertRaisesRegex(
+                    ICSupportIntegrityError,
+                    "PLASMA_IC_SUPPORT_ROOT is required outside a repository source tree",
+                ):
+                    default_ic_support_root()
+
     def test_duplicate_exact_icpn_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             test_root = Path(root) / "ic-support"
