@@ -1,5 +1,7 @@
 # Plasma OpenOCD Target Catalog — Seed v1
 
+> **ST ICPN status (2026-10-12):** [Catalog Complete / Maintenance Mode](ST_ICPN_CATALOG_MAINTENANCE_MODE_V1.md) applies only to ST exact-identity coverage against the locked 2026-10-01 Active STM32 population. This is distinct from this historical OpenOCD seed and from backend/physical qualification.
+
 This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries into a simple user-facing seed taxonomy, then enriches MCU vendors from official device sources. It is not a production-support claim or the canonical Phase 1 catalog artifact.
 
 ## Scope
