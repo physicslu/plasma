@@ -77,8 +77,8 @@ permissions:
   contents: read
 
 env:
-  OPENOCD_ARMV7_CACHE_SCHEMA: "v1"
-  OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"
+  OPENOCD_ARMV7_CACHE_SCHEMA: "v2"
+  OPENOCD_ARMV7_CACHE_DIR: ".cache/plasma-openocd-armv7l-cached"
 
 jobs:
   contracts:
