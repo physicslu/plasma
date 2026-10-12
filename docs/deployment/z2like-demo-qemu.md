@@ -206,6 +206,12 @@ ST-specific research build or interpreted as enabling physical programming.
   No loose `restore-keys` fallback. Changing the source pin or build
   recipe causes a cold build; increment `OPENOCD_ARMV7_CACHE_SCHEMA`
   for non-file dependency or base-image/toolchain ABI changes.
+  Producer and Browser-live consumer also use the same literal
+  repository-relative cache path
+  \`../.plasma-cache/openocd-armv7l-cached\`. Do not substitute
+  \`\${{ runner.temp }}\` or another runner-specific absolute root: GitHub cache
+  versioning includes the configured path, so hosted and self-hosted runners
+  would otherwise produce different cache versions even with an identical key. Both producer and consumer require `zstd` before cache access to keep the compression/version component aligned as well.
 - **Cache hit:** skip only `scripts/build-openocd-runtime.sh`;
   require the expected archive and detached `.sha256` sidecar, then run
   the canonical `openocd-runtime.py verify` and check the architecture,
@@ -222,6 +228,18 @@ ST-specific research build or interpreted as enabling physical programming.
   packaging, temporary QEMU container, installation, process launch,
   loopback/Tcl RPC and eight-Site recovery tests. SWPC's persistent QEMU
   volume model is a different acceptance boundary.
+- **Browser live consumer:** the SWPC Browser Runtime live gate restores the
+  exact same cache key, requires a cache hit, re-runs `openocd-runtime.py verify`,
+  and supplies the restored directory through
+  `PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR`. It does not compile or publish
+  OpenOCD. This keeps the Browser kit on the same verified executable payload
+  already qualified by the QEMU E2E producer.
+- **Persistent SWPC/QEMU reconciliation:** only the explicit ARMv7 simulation
+  adapter may retire a stale retained OpenOCD directory, and only when the
+  retained `plasma-runtime.json` has the same runtime/version/source/architecture
+  identity but a different verified `payload_sha256`. Missing/corrupt manifests
+  or identity drift fail closed. Production OpenOCD installation semantics are
+  unchanged.
 - **Measurement:** workflow run's build step time is the cold-build baseline;
   GitHub Step Summary logs `HIT` or `MISS (recompiled)` and cold-build
   duration in seconds. Compare matched run conditions; do not claim a

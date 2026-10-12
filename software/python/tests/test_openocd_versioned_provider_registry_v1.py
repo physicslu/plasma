@@ -173,6 +173,12 @@ class VersionedProviderRegistryTests(unittest.TestCase):
                 self.assertEqual(row["icpn"], part)
                 self.assertEqual(len(row["backend_providers"]), 1)
                 self.assertEqual(row["backend_providers"][0]["provider_id"], expected)
+                # PR #806 source reference and PR #807 provider array coexist.
+                self.assertEqual(row["backend_source_reference"]["provider_id"], expected)
+                self.assertEqual(row["backend_source_reference"]["source_commit"],
+                                 row["backend_providers"][0]["source_commit"])
+                self.assertIsNone(row["backend_source_reference"]["installed_binary_sha256"])
+                self.assertFalse(row["backend_source_reference"]["hardware_runtime_ready"])
                 self.assertFalse(row["backend_providers"][0]["executable"])
                 self.assertFalse(row["backend_providers"][0]["production_write_authorized"])
                 self.assertFalse(row["backend_providers"][0]["hardware_runtime_ready"])

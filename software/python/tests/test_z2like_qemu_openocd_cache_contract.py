@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = ROOT / ".github/workflows/z2like-demo-qemu.yml"
+BROWSER_WORKFLOW = ROOT / ".github/workflows/z2like-demo-browser-live-acceptance.yml"
 
 
 def workflow_text() -> str:
@@ -18,7 +19,9 @@ def test_cache_key_is_pinned_to_architecture_release_and_build_recipe() -> None:
     assert "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')" in text
     assert "restore-keys:" not in text
     assert "hashFiles('.github/workflows/z2like-demo-qemu.yml'" not in text
-    assert "path: ${{ runner.temp }}/openocd-armv7l-cached" in text
+    assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in text
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in text
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in text
 
 
 def test_prs_may_restore_but_only_main_can_save_cache() -> None:
@@ -46,7 +49,7 @@ def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
     assert restore < build < verify < kit < e2e < run_arm < eight_sites < matrix < save
     build_part = text[build:verify]
     assert "if: steps.openocd-cache.outputs.cache-hit != 'true'" in build_part
-    assert 'bash scripts/build-openocd-runtime.sh "$RUNNER_TEMP/openocd-armv7l-cached" armv7l' in build_part
+    assert 'bash scripts/build-openocd-runtime.sh "$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part
     verify_part = text[verify:kit]
     assert "if: steps.openocd-cache.outputs.cache-hit" not in verify_part
     assert 'test -f "$artifact"' in verify_part
@@ -66,7 +69,7 @@ def test_fresh_commit_specific_kit_and_e2e_remain_unconditional() -> None:
     assert 'sha="$(git rev-parse HEAD)"' in kit
     assert 'python scripts/ppu-runtime.py build --output-dir "$runtime"' in kit
     assert 'python scripts/ppu-release.py' in kit
-    assert 'openocd_out="$RUNNER_TEMP/openocd-armv7l-cached"' in kit
+    assert 'openocd_out="$OPENOCD_ARMV7_CACHE_DIR"' in kit
     assert 'python scripts/openocd-runtime.py verify "$openocd" --sidecar "$openocd.sha256"' in kit
     assert "if: steps.openocd-cache" not in kit
     e2e_section = text.split("Drive Manager to Bootstrap to QEMU deployment E2E", 1)[1].split(
@@ -82,3 +85,36 @@ def test_cache_metrics_and_evidence_distinguish_hit_from_miss() -> None:
     assert 'echo "OpenOCD cache MISS: build duration' in text
     assert "OpenOCD ARMv7 cache: " in text
     assert 'echo "OpenOCD ARMv7 cache:' in text
+
+
+def test_browser_live_gate_uses_the_same_qualified_cache_identity() -> None:
+    qemu = workflow_text()
+    browser = BROWSER_WORKFLOW.read_text(encoding="utf-8")
+    recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
+    key_prefix = "qemu-openocd-${{ env.OPENOCD_ARMV7_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-"
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in qemu
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in browser
+    portable_path = 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"'
+    assert portable_path in qemu
+    assert portable_path in browser
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in qemu
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in browser
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in qemu
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in browser
+    assert key_prefix in qemu
+    assert key_prefix in browser
+    assert recipe in qemu
+    assert recipe in browser
+    assert "actions/cache/save@v4" not in browser
+    assert "Qualified ARMv7 OpenOCD cache is missing" in browser
+    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$OPENOCD_ARMV7_CACHE_DIR"' in browser
+
+
+def test_cache_path_preparation_is_identical_and_requires_zstd() -> None:
+    qemu = workflow_text()
+    browser = BROWSER_WORKFLOW.read_text(encoding="utf-8")
+    for text in (qemu, browser):
+        assert "Prepare portable ARMv7 OpenOCD cache path" in text
+        assert "command -v zstd >/dev/null" in text
+        assert 'rm -rf "$OPENOCD_ARMV7_CACHE_DIR"' in text
+        assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in text

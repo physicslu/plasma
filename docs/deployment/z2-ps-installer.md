@@ -72,6 +72,37 @@ target power/reset and real-IC qualification remain later gates.
 
 PYNQ continues to own System Python. Bootstrap tooling remains Python-3.10-compatible; Plasma Server, Gateway and helper use the isolated Plasma interpreter and never replace `/usr/bin/python3` or the PYNQ venv.
 
+## Verified OpenOCD build cache (CI only)
+
+The Z2 PS release workflow caches the *build archive and detached SHA-256 sidecar*
+for both `x86_64` and `armv7l` independently. The exact cache key is derived
+from `release/openocd.json` (fixed OpenOCD source/commit), the build recipe
+`scripts/build-openocd-runtime.sh`, the artifact implementation
+`scripts/openocd-runtime.py`, the architecture, Ubuntu 22.04 baseline and
+the explicit `OPENOCD_TOOLCHAIN_EPOCH`. No loose `restore-keys` are used.
+
+The cache is a **build optimization**, not a new trust or deployment boundary:
+
+- Every hit and miss must pass the existing independent archive and detached
+  SHA-256 verifier; the Host real-Tcl-RPC test and the fresh matching
+  Ubuntu 22.04 install/runtime smoke also run unconditionally.
+- Only a successful `main` push or manual `main` workflow can write a cache,
+  after complete verification and runtime smoke. PRs can restore but do not
+  publish cache entries.
+- Every workflow run still uploads its own verified OpenOCD runtime artifact,
+  and the PPU kit still consumes that run's artifact by GitHub Actions identity,
+  **not directly from a shared cache**.
+- `OPENOCD_TOOLCHAIN_EPOCH` is an **explicit invalidation control**, not
+  automatic detection of external apt/image updates. Ubuntu 22.04 base tags and
+  `apt-get` dependencies are not hermetically pinned at present. Maintainers
+  MUST bump this epoch after toolchain, package, image or dependency-policy
+  changes; for cryptographic reproducibility, a later improvement should pin
+  the image digest and package snapshot. Do not infer that a cache hit
+  reproduces a newer floating toolchain.
+- Cache hit still proves only software build/package/runtime smoke. It never
+  grants FPGA SWD, target power/reset, actual MCU programming or
+  `hardware_runtime_ready=true`.
+
 ## GitHub-built Z2 PS kit
 
 Workflow:

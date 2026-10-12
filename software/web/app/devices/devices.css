@@ -121,6 +121,7 @@
 .icSelectorStatusRow .verified { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); color: var(--green); }
 .icSelectorStatusRow .failed { border-color: color-mix(in srgb, var(--red) 55%, var(--line)); color: var(--red); }
 .icSelectorStatusRow .pending { border-color: color-mix(in srgb, var(--amber) 40%, var(--line)); color: var(--amber); }
+.icSelectorStatusRow .unmapped { border-color: var(--line); color: var(--muted); }
 
 .icSelectorKind {
   display: inline-block;

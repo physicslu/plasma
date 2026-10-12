@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -245,3 +246,81 @@ def test_simulation_does_not_claim_physical_z2_or_reboot_qualification():
         "real IC programming",
     ):
         assert boundary in combined
+
+
+def _simulation_openocd_identity(payload_sha256: str) -> dict[str, object]:
+    return {
+        "result": "PASS",
+        "runtime_id": "0.12.0-9ea7f3d647c8",
+        "openocd_version": "0.12.0",
+        "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+        "architecture": "armv7l",
+        "payload_sha256": payload_sha256,
+        "hardware_runtime_ready": False,
+    }
+
+
+def _enable_armv7_simulation_marker(kit, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(kit.TARGET_MARKER, "1")
+    monkeypatch.setattr(kit.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(kit.platform, "machine", lambda: "armv7l")
+
+
+def test_simulation_reconciles_only_same_identity_stale_openocd_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = _load(KIT, "plasma_z2like_demo_stale_openocd_reconcile_test")
+    _enable_armv7_simulation_marker(kit, monkeypatch)
+    product_root = tmp_path / "product"
+    incoming = _simulation_openocd_identity("b" * 64)
+    target = product_root / "programming-engines" / "openocd" / str(incoming["runtime_id"])
+    target.mkdir(parents=True)
+    retained = dict(incoming)
+    retained["payload_sha256"] = "a" * 64
+    (target / "plasma-runtime.json").write_text(json.dumps(retained), encoding="utf-8")
+    (target / "stale.bin").write_bytes(b"stale")
+
+    evidence = kit._reconcile_simulation_openocd_runtime(product_root, incoming)
+
+    assert evidence["simulation_only"] is True
+    assert evidence["action"] == "replaced_stale_verified_payload"
+    assert evidence["previous_payload_sha256"] == "a" * 64
+    assert evidence["incoming_payload_sha256"] == "b" * 64
+    assert not target.exists()
+
+
+def test_simulation_keeps_matching_openocd_payload_for_installer_integrity_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = _load(KIT, "plasma_z2like_demo_matching_openocd_reconcile_test")
+    _enable_armv7_simulation_marker(kit, monkeypatch)
+    product_root = tmp_path / "product"
+    incoming = _simulation_openocd_identity("c" * 64)
+    target = product_root / "programming-engines" / "openocd" / str(incoming["runtime_id"])
+    target.mkdir(parents=True)
+    (target / "plasma-runtime.json").write_text(json.dumps(incoming), encoding="utf-8")
+
+    evidence = kit._reconcile_simulation_openocd_runtime(product_root, incoming)
+
+    assert evidence["action"] == "already_matches_verified_payload"
+    assert target.is_dir()
+
+
+def test_simulation_refuses_cleanup_when_openocd_identity_drifted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = _load(KIT, "plasma_z2like_demo_drifted_openocd_reconcile_test")
+    _enable_armv7_simulation_marker(kit, monkeypatch)
+    product_root = tmp_path / "product"
+    incoming = _simulation_openocd_identity("d" * 64)
+    target = product_root / "programming-engines" / "openocd" / str(incoming["runtime_id"])
+    target.mkdir(parents=True)
+    retained = dict(incoming)
+    retained["source_commit"] = "0" * 40
+    retained["payload_sha256"] = "e" * 64
+    (target / "plasma-runtime.json").write_text(json.dumps(retained), encoding="utf-8")
+
+    with pytest.raises(kit.QEMUSimulationKitError, match="identity mismatch"):
+        kit._reconcile_simulation_openocd_runtime(product_root, incoming)
+
+    assert target.is_dir()

@@ -40,11 +40,29 @@ function statusClass(value: string | null): string {
   return "pending";
 }
 
-function openOcdConfigLabel(status: string, zh: boolean): string {
+type OpenOcdTagState = "mapped" | "candidate" | "no_mapping";
+
+/** Display projection only: source candidates never change Production routing. */
+function openOcdTagState(device: DeviceSearchResult): OpenOcdTagState {
+  if (device.backend.mapping_status === "mapped") return "mapped";
+  if (
+    device.backend.mapping_status === "no_mapping"
+    && !device.backend.target_config
+    && device.catalog.scope === "production_admitted"
+    && device.backend_candidate?.status === "research_only"
+    && device.backend_candidate.production_mapping_status === "no_mapping"
+    && device.backend_candidate.executable === false
+    && device.backend_candidate.production_binding_authorized === false
+    && device.backend_candidate.hardware_runtime_ready === false
+    && device.backend_candidate.family === device.family
+  ) return "candidate";
+  return "no_mapping";
+}
+
+function openOcdConfigLabel(status: OpenOcdTagState, zh: boolean): string {
   if (status === "mapped") return zh ? "OpenOCD 設定 · 已存在" : "OpenOCD config · Present";
-  if (status === "no_mapping") return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
-  if (status === "rejected") return zh ? "OpenOCD 設定 · 已拒絕" : "OpenOCD config · Rejected";
-  return zh ? `OpenOCD 設定 · ${humanizeStatus(status)}` : `OpenOCD config · ${humanizeStatus(status)}`;
+  if (status === "candidate") return zh ? "OpenOCD 設定 · 候選" : "OpenOCD config · Candidate";
+  return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
 }
 
 function manufacturerPartLabel(status: string | null, zh: boolean): string {
@@ -222,18 +240,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </span>
                   </div>
                   <div className="icSelectorStatusRow icSelectorStatusEvidence">
-                    <span className={statusClass(device.backend.mapping_status)}>
-                      {openOcdConfigLabel(device.backend.mapping_status, zh)}
+                    <span className={openOcdTagState(device) === "mapped" ? "verified" : openOcdTagState(device) === "candidate" ? "pending" : "unmapped"}>
+                      {openOcdConfigLabel(openOcdTagState(device), zh)}
                     </span>
                     <span className={statusClass(device.catalog_verification.status)}>
                       {manufacturerPartLabel(device.catalog_verification.status, zh)}
                     </span>
                   </div>
-                  {device.backend_candidate?.status === "research_only" && (
-                    <div className="icSelectorCandidateHint">
-                      {zh ? "ST 原始碼候選 · 僅研究，禁止燒錄" : "ST source candidate · Research only, not programmable"}
-                    </div>
-                  )}
                 </div>
               </button>
             );
@@ -260,6 +273,52 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
+              {!selected.backend_providers?.length && selected.backend_source_reference && (
+                <>
+                  <div><dt>{zh ? "Backend Provider" : "Backend provider"}</dt><dd>{selected.backend_source_reference.provider_name} ({selected.backend_source_reference.provider_id})</dd></div>
+                  <div><dt>{zh ? "來源版本" : "Source version"}</dt><dd>{selected.backend_source_reference.source_version ?? (zh ? "未確認" : "Not attested")}</dd></div>
+                  <div><dt>{zh ? "來源 Commit" : "Source commit"}</dt><dd><code>{selected.backend_source_reference.source_commit ?? (zh ? "未確認" : "Not attested")}</code></dd></div>
+                  <div><dt>{zh ? "來源儲存庫" : "Source repository"}</dt><dd><code>{selected.backend_source_reference.source_repository ?? "—"}</code></dd></div>
+                  <div><dt>{zh ? "發行 Runtime ID" : "Pinned release runtime ID"}</dt><dd><code>{selected.backend_source_reference.pinned_release_runtime_id ?? (zh ? "未確認" : "Not attested")}</code></dd></div>
+                  <div><dt>{zh ? "已安裝 Runtime ID" : "Installed runtime ID"}</dt><dd>{selected.backend_source_reference.installed_runtime_id ?? (zh ? "未提供實機證據" : "No device attestation")}</dd></div>
+                  <div><dt>Binary SHA-256</dt><dd><code>{selected.backend_source_reference.installed_binary_sha256 ?? (zh ? "未提供實機證據" : "No device attestation")}</code></dd></div>
+                  <div><dt>{zh ? "驗證範圍" : "Evidence scope"}</dt><dd>{selected.backend_source_reference.evidence_scope === "catalog_mapping_only"
+                    ? (zh ? "僅 Catalog 路由證據" : "Catalog route evidence only")
+                    : (zh ? "僅固定來源研究證據" : "Pinned source research only")}</dd></div>
+                </>
+              )}
+
+              {selected.backend_providers?.map((provider, idx) => (
+                <div key={provider.provider_id} className="icSelectorBackendProvider">
+                  <dt>{zh ? "Backend 選項" : "Backend option"} {idx + 1}</dt>
+                  <dd>
+                    <strong>{provider.provider_distribution} · {provider.mapping_status === "candidate" ? "Candidate" : "Mapped"}</strong>
+                    <div>{zh ? "來源版本" : "Source version"}: {provider.source_version ?? (zh ? "未確認" : "Unknown")}</div>
+                    <div>Source Repository: <code>{provider.source_repository}</code></div>
+                    <div>Source Commit: <code>{provider.source_commit}</code></div>
+                    <div>Runtime ID: <code>{provider.declared_release_runtime_id ?? (zh ? "未建立正式發行綁定" : "No declared release binding")}</code></div>
+                    <div>Flash Driver: <code>{provider.flash_driver ?? (zh ? "未個別驗證" : "Not individually proven")}</code></div>
+                    <div>Target CFG: <code>{provider.target_config}</code></div>
+                    <div>{zh ? "已安裝 Runtime" : "Installed runtime"}: {provider.installed_runtime_id ?? (zh ? "尚無實機安裝證據" : "Not attested")}</div>
+                    <div>Installed Binary SHA-256: <code>{provider.installed_binary_sha256 ?? (zh ? "尚無實機安裝證據" : "Not attested")}</code></div>
+                    <div>{zh ? "Provider 層級離線建置證據（非逐顆 MCU 驗證）" : "Provider-level offline build evidence (not per-IC qualification)"}: {provider.software_build_evidence.length === 0
+                      ? (zh ? "無此版本的獨立建置驗證紀錄" : "No independent build evidence for this variant")
+                      : provider.software_build_evidence.map(build => (
+                        <div key={build.architecture} className="icSelectorBackendBuild">
+                          <a href={`https://github.com/physicslu/plasma/actions/runs/${build.github_actions_run_id}`} target="_blank" rel="noreferrer">
+                            {build.architecture} · {build.qualification}
+                          </a>
+                          <div>Build Runtime ID: <code>{build.runtime_id}</code></div>
+                          <div>Artifact SHA-256: <code>{build.artifact_sha256}</code></div>
+                          <div>Payload SHA-256: <code>{build.payload_sha256}</code></div>
+                          <div>{zh ? "驗證界線" : "Evidence scope"}: {build.scope} · {zh ? "未實機測試" : "No physical test"}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div>{zh ? "執行權限" : "Execution"}: {zh ? "未開放（僅 Metadata）" : "Not enabled (metadata only)"}</div>
+                  </dd>
+                </div>
+              ))}
               {selected.backend_candidate && (
                 <>
                   <div><dt>{zh ? "候選引擎" : "Candidate engine"}</dt><dd>{selected.backend_candidate.flash_driver} · {zh ? "僅研究" : "research only"}</dd></div>

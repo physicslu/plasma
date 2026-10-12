@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "z2like-demo-browser-live-acceptance.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-browser-live-acceptance.yml"
+QEMU_WORKFLOW = ROOT / ".github" / "workflows" / "z2like-demo-qemu.yml"
 HANDOVER = ROOT / "handover" / "H021-z2like-demo-browser-runtime-deployment-plan-2026-09-14.md"
 
 
@@ -42,6 +43,33 @@ def test_live_gate_reconciles_user_owned_maintenance_manager_without_root_ingres
     assert "--connect-timeout 5 --max-time 20" in workflow
     assert "https://z2like-demo.open4th.com/deployment.json" in workflow
     assert "Run ./scripts/plasmactl update z2like-demo as an operator before rerunning this gate." in workflow
+
+
+
+def test_live_gate_reuses_verified_qemu_openocd_cache_without_recompile() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    qemu_workflow = QEMU_WORKFLOW.read_text(encoding="utf-8")
+    recipe = "hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py')"
+    assert 'OPENOCD_ARMV7_CACHE_SCHEMA: "v1"' in workflow
+    assert 'OPENOCD_ARMV7_CACHE_DIR: "/tmp/plasma-openocd-armv7l-cached"' in workflow
+    assert "path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}" in workflow
+    assert "${{ runner.temp }}/openocd-armv7l-cached" not in workflow
+    assert recipe in workflow
+    assert recipe in qemu_workflow
+    assert "Prepare portable ARMv7 OpenOCD cache path" in workflow
+    assert "command -v zstd >/dev/null" in workflow
+    assert "Restore qualified ARMv7 OpenOCD build cache" in workflow
+    assert "uses: actions/cache/restore@v4" in workflow
+    assert "Require and verify qualified ARMv7 OpenOCD cache" in workflow
+    assert 'steps.openocd-cache.outputs.cache-hit' in workflow
+    assert "Qualified ARMv7 OpenOCD cache is missing" in workflow
+    assert 'scripts/openocd-runtime.py verify "$artifact" --sidecar "$artifact.sha256"' in workflow
+    assert 'PLASMA_Z2LIKE_DEMO_OPENOCD_ARTIFACT_DIR="$OPENOCD_ARMV7_CACHE_DIR"' in workflow
+    assert "scripts/build-openocd-runtime.sh" in recipe
+    restore = workflow.index("Restore qualified ARMv7 OpenOCD build cache")
+    verify = workflow.index("Require and verify qualified ARMv7 OpenOCD cache")
+    build = workflow.index("Build canonical ARMv7 Z2 PS kit")
+    assert restore < verify < build
 
 
 def test_live_gate_keeps_pairing_secret_and_capability_out_of_evidence() -> None:

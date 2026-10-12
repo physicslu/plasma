@@ -21,6 +21,7 @@ import importlib.util
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -80,6 +81,119 @@ def _require_simulation_target() -> None:
         )
 
 
+def _verified_openocd_identity(
+    tool: Path, artifact: Path, sidecar: Path
+) -> dict[str, object]:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "verify",
+            str(artifact),
+            "--sidecar",
+            str(sidecar),
+        ],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=120,
+    )
+    if completed.returncode != 0:
+        tail = completed.stdout[-8000:] if completed.stdout else ""
+        raise QEMUSimulationKitError(
+            f"kit-local OpenOCD verification failed with exit {completed.returncode}: {tail}"
+        )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise QEMUSimulationKitError("kit-local OpenOCD verifier returned invalid JSON") from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("result") != "PASS"
+        or payload.get("architecture") not in {"armv7", "armv7l"}
+        or payload.get("hardware_runtime_ready") is not False
+    ):
+        raise QEMUSimulationKitError("verified OpenOCD identity violates the simulation safety boundary")
+    runtime_id = payload.get("runtime_id")
+    payload_sha256 = payload.get("payload_sha256")
+    if (
+        not isinstance(runtime_id, str)
+        or not runtime_id
+        or Path(runtime_id).name != runtime_id
+        or runtime_id in {".", ".."}
+    ):
+        raise QEMUSimulationKitError("verified OpenOCD runtime identity is unsafe")
+    if (
+        not isinstance(payload_sha256, str)
+        or len(payload_sha256) != 64
+        or any(ch not in "0123456789abcdef" for ch in payload_sha256)
+    ):
+        raise QEMUSimulationKitError("verified OpenOCD payload identity is missing or invalid")
+    return payload
+
+
+def _reconcile_simulation_openocd_runtime(
+    product_root: Path, incoming: dict[str, object]
+) -> dict[str, object]:
+    """Retire only a stale same-identity OpenOCD payload inside the QEMU simulation.
+
+    Production installation remains fail-closed.  This narrow reconciliation is
+    permitted only on the explicit ARMv7 QEMU target and only when the retained
+    runtime manifest has the same canonical identity but a different verified
+    payload SHA.  Corrupt, missing, or identity-drifted state is never deleted.
+    """
+
+    _require_simulation_target()
+    runtime_id = str(incoming["runtime_id"])
+    incoming_payload = str(incoming["payload_sha256"])
+    target = product_root.resolve() / "programming-engines" / "openocd" / runtime_id
+    result: dict[str, object] = {
+        "simulation_only": True,
+        "runtime_id": runtime_id,
+        "incoming_payload_sha256": incoming_payload,
+        "action": "absent",
+    }
+    if not target.exists():
+        return result
+    if target.is_symlink() or not target.is_dir():
+        raise QEMUSimulationKitError("existing simulation OpenOCD runtime target is not a safe directory")
+
+    manifest_path = target / "plasma-runtime.json"
+    try:
+        retained = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise QEMUSimulationKitError(
+            f"existing simulation OpenOCD runtime manifest is not trustworthy: {exc}"
+        ) from exc
+    if not isinstance(retained, dict):
+        raise QEMUSimulationKitError("existing simulation OpenOCD runtime manifest is not an object")
+
+    for field in ("runtime_id", "openocd_version", "source_commit", "architecture"):
+        if retained.get(field) != incoming.get(field):
+            raise QEMUSimulationKitError(
+                f"existing simulation OpenOCD runtime identity mismatch for {field}; refusing cleanup"
+            )
+
+    retained_payload = retained.get("payload_sha256")
+    if (
+        not isinstance(retained_payload, str)
+        or len(retained_payload) != 64
+        or any(ch not in "0123456789abcdef" for ch in retained_payload)
+    ):
+        raise QEMUSimulationKitError(
+            "existing simulation OpenOCD runtime payload identity is missing or invalid"
+        )
+    result["previous_payload_sha256"] = retained_payload
+    if retained_payload == incoming_payload:
+        result["action"] = "already_matches_verified_payload"
+        return result
+
+    shutil.rmtree(target)
+    result["action"] = "replaced_stale_verified_payload"
+    return result
+
+
 def _validated_deployment_release_id(payload: object) -> str:
     if not isinstance(payload, dict) or payload.get("result") != "PASS":
         raise QEMUSimulationKitError("deployment coordinator did not return PASS evidence")
@@ -96,7 +210,9 @@ def _validated_deployment_release_id(payload: object) -> str:
     return transaction_release
 
 
-def _install_openocd_from_verified_kit(verified, *, product_root: Path) -> tuple[str, dict[str, object]]:
+def _install_openocd_from_verified_kit(
+    verified, *, product_root: Path
+) -> tuple[str, dict[str, object], dict[str, object]]:
     """Install the verified kit OpenOCD artifact through kit-local tooling.
 
     The QEMU simulation bypasses plasmactl z2-ps only for the product Python
@@ -113,6 +229,12 @@ def _install_openocd_from_verified_kit(verified, *, product_root: Path) -> tuple
     tool = verified.root / "scripts" / "openocd-runtime.py"
     if not tool.is_file():
         raise QEMUSimulationKitError(f"QEMU simulation kit is missing OpenOCD installer: {tool}")
+    incoming_identity = _verified_openocd_identity(
+        tool,
+        verified.openocd_artifact,
+        verified.openocd_sidecar,
+    )
+    reconciliation = _reconcile_simulation_openocd_runtime(product_root, incoming_identity)
     completed = subprocess.run(
         [
             sys.executable,
@@ -149,7 +271,7 @@ def _install_openocd_from_verified_kit(verified, *, product_root: Path) -> tuple
         or evidence.get("starts_openocd_service") is not False
     ):
         raise QEMUSimulationKitError("kit-local OpenOCD installation evidence violates the safety boundary")
-    return openocd_sha, evidence
+    return openocd_sha, evidence, reconciliation
 
 
 def deploy(
@@ -176,7 +298,7 @@ def deploy(
             verified.python_sidecar,
             "Plasma Python artifact",
         )
-        openocd_sha, openocd_evidence = _install_openocd_from_verified_kit(
+        openocd_sha, openocd_evidence, openocd_reconciliation = _install_openocd_from_verified_kit(
             verified,
             product_root=product_root,
         )
@@ -258,6 +380,7 @@ def deploy(
             "openocd_artifact_sha256": openocd_sha,
             "openocd_runtime_id": openocd_evidence.get("runtime_id"),
             "openocd_hardware_runtime_ready": openocd_evidence.get("hardware_runtime_ready"),
+            "openocd_simulation_reconciliation": openocd_reconciliation,
             "kit_local_deployment_coordinator": str(coordinator),
             "kit_local_installer_core": str(installer_core),
             "kit_local_simulation_installer": str(installer),
