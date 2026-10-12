@@ -86,7 +86,7 @@ def deployment_commit(origin: str, *, timeout: float) -> str | None:
 
 
 def managed_prefix(report: SmokeReport) -> str:
-    return "/api/manager/ppu" if report.expected_commit is not None else ""
+    return "/api/manager/ppu" if report.checks.get("routing") == "MANAGED" else ""
 
 
 def wait_until_ready(
@@ -101,7 +101,14 @@ def wait_until_ready(
     started = time.monotonic()
     deadline = started + wake_timeout
     last_issue = "service has not responded yet"
-    readiness_path = "/api/manager/ppu/api/health/ready" if expected_commit else "/api/health/ready"
+    readiness_paths = (
+        [("/api/manager/ppu/api/health/ready", "MANAGED")]
+        if expected_commit
+        else [
+            ("/api/manager/ppu/api/health/ready", "MANAGED"),
+            ("/api/health/ready", "LEGACY_PR_OBSERVATION"),
+        ]
+    )
 
     try:
         request(origin, "/", timeout=request_timeout)
@@ -120,16 +127,17 @@ def wait_until_ready(
                 last_issue = f"Render is serving commit {observed}, waiting for expected {expected_commit}"
                 time.sleep(poll_interval)
                 continue
-        try:
-            payload = request_json(origin, readiness_path, timeout=request_timeout)
-            if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
-                report.cold_start_seconds = round(time.monotonic() - started, 3)
-                report.checks["readiness"] = "PASS"
-                report.checks["routing"] = "MANAGED" if expected_commit else "LEGACY_PR_OBSERVATION"
-                return payload
-            last_issue = f"readiness payload not ready: {payload!r}"
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
-            last_issue = f"{type(exc).__name__}: {exc}"
+        for readiness_path, routing in readiness_paths:
+            try:
+                payload = request_json(origin, readiness_path, timeout=request_timeout)
+                if payload.get("ok") is True and payload.get("gateway") == "alive" and payload.get("execution") == "ready":
+                    report.cold_start_seconds = round(time.monotonic() - started, 3)
+                    report.checks["readiness"] = "PASS"
+                    report.checks["routing"] = routing
+                    return payload
+                last_issue = f"{readiness_path} payload not ready: {payload!r}"
+            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
+                last_issue = f"{readiness_path}: {type(exc).__name__}: {exc}"
         time.sleep(poll_interval)
 
     raise RuntimeError(
