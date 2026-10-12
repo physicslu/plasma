@@ -81,12 +81,20 @@ def render_runtime_activation_unit(*, paths, python_runtime) -> str:
     )
 
 
-def render_systemd_units(*, paths, python_runtime, gateway_host: str, catalog_relative: str) -> dict[str, str]:
+def render_systemd_units(
+    *,
+    paths,
+    python_runtime,
+    gateway_host: str,
+    catalog_relative: str,
+    ic_support_relative: str,
+) -> dict[str, str]:
     units = _original_render_systemd_units(
         paths=paths,
         python_runtime=python_runtime,
         gateway_host=gateway_host,
         catalog_relative=catalog_relative,
+        ic_support_relative=ic_support_relative,
     )
     server = units["plasma-server.service"]
     server = server.replace(
@@ -149,6 +157,7 @@ def install_release(
         python_runtime=python_runtime,
         gateway_host=_core._validate_gateway_host(gateway_host),
         catalog_relative=_core._catalog_relative(verified.runtime_manifest),
+        ic_support_relative=_core._ic_support_relative(verified.runtime_manifest),
     )
 
     helper_unit.parent.mkdir(parents=True, exist_ok=True)
