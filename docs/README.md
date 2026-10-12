@@ -48,6 +48,7 @@
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
+- **Current** — [STM32H5 Host-only Readback Guard v1](architecture/st-h5-host-readback-guard-v1.md)：190 顆 H5 合成讀值的安全邊界測試；失敗／fallback／不匹配一律阻擋，不代表實機燒錄資格.
 - **Current** — [Versioned OpenOCD Provider Registry v1](architecture/openocd-versioned-provider-registry-v1.md)：將 Upstream／ST 來源與 x86／ARMv7 Artifact SHA-256 分離，沒有實機安裝證據不宣稱可燒錄。
 - **Current** — [ICPN Backend Candidate Registry v1](architecture/icpn-backend-candidate-registry-v1.md)：H5／C5 合計 362 顆來源鎖定的唯讀候選資訊，與 Production Backend Mapping、燒錄資格分離。
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
