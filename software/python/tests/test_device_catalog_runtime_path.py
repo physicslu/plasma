@@ -132,6 +132,15 @@ class DeviceCatalogRuntimePathTests(unittest.TestCase):
         self.assertIn("python -m plasma_web.device_catalog --manifest", script)
         self.assertNotIn("openocd-parts-canonical.csv", script)
 
+    def test_render_start_binds_ic_support_root_and_smokes_selected_profile(self) -> None:
+        script = (REPOSITORY_ROOT / "scripts/render-start.sh").read_text(encoding="utf-8")
+        self.assertIn('ic_support_root="${PLASMA_IC_SUPPORT_ROOT:-${repo_root}/data/ic-support}"', script)
+        self.assertIn('export PLASMA_IC_SUPPORT_ROOT="${ic_support_root}"', script)
+        self.assertIn("Missing IC Support runtime data root", script)
+        self.assertIn("python -m plasma_core.ic_support --icpn STM32F103C8T6", script)
+        self.assertIn("/api/devices/search?q=STM32F103C8T6&limit=1", script)
+        self.assertIn('profile.get("status") != "manufacturer_profile_available"', script)
+
 
 if __name__ == "__main__":
     unittest.main()
