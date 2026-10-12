@@ -99,6 +99,29 @@ function shortRevision(value: string | null): string {
   return value ? value.slice(0, 12) : "—";
 }
 
+function voltageRange(value?: { min: number; max: number }): string {
+  if (!value) return "—";
+  return `${value.min}–${value.max} V`;
+}
+
+function formatClock(
+  value: { manufacturer_min: number | null; manufacturer_max: number | null; manufacturer_recommended: number | null; status: string },
+  zh: boolean,
+): string {
+  if (
+    value.manufacturer_min === null
+    && value.manufacturer_max === null
+    && value.manufacturer_recommended === null
+  ) {
+    return zh ? "原廠文件未明確指定" : "Not specified by manufacturer";
+  }
+  const parts = [];
+  if (value.manufacturer_min !== null) parts.push(`min ${value.manufacturer_min.toLocaleString()} Hz`);
+  if (value.manufacturer_max !== null) parts.push(`max ${value.manufacturer_max.toLocaleString()} Hz`);
+  if (value.manufacturer_recommended !== null) parts.push(`recommended ${value.manufacturer_recommended.toLocaleString()} Hz`);
+  return parts.join(" · ");
+}
+
 export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorProps) {
   const { locale } = useI18n();
   const zh = locale === "zh-TW";
@@ -261,7 +284,90 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             <h2>{selected.icpn ?? selected.identifier}</h2>
             <span className="icSelectorKind">Exact ICPN · Catalog v{selected.catalog.version ?? "—"}</span>
 
-            <dl>
+            <section className="icSelectorProfileSection" data-profile-section="device">
+              <div className="icSelectorProfileHead">
+                <span>01</span>
+                <div>
+                  <h3>{zh ? "IC Information" : "IC Information"}</h3>
+                  <p>{zh ? "IC 身分、工作電氣特性與 Memory Map" : "Identity, operating electrical characteristics, and memory map"}</p>
+                </div>
+              </div>
+              <dl>
+                <div><dt>Vendor</dt><dd>{selected.vendor}</dd></div>
+                <div><dt>Family</dt><dd>{selected.family}</dd></div>
+                <div><dt>Series</dt><dd>{selected.subfamily ?? "—"}</dd></div>
+                <div><dt>Base Device</dt><dd>{selected.base_device ?? "—"}</dd></div>
+                <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
+                <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
+                <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
+                {selected.selected_profile ? (
+                  <>
+                    <div><dt>SRAM</dt><dd>{selected.selected_profile.device.memory_map.sram ? `${selected.selected_profile.device.memory_map.sram.size_bytes / 1024} KiB` : "—"}</dd></div>
+                    <div><dt>{zh ? "工作 VDD" : "Operating VDD"}</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.vdd_v)}</dd></div>
+                    <div><dt>Main Flash Map</dt><dd><code>{selected.selected_profile.device.memory_map.main_flash.start}–{selected.selected_profile.device.memory_map.main_flash.end}</code></dd></div>
+                    <div><dt>{zh ? "Flash Page" : "Flash page"}</dt><dd>{selected.selected_profile.device.memory_map.main_flash.page_size_bytes} bytes × {selected.selected_profile.device.memory_map.main_flash.page_count}</dd></div>
+                  </>
+                ) : (
+                  <div><dt>{zh ? "Device Profile" : "Device profile"}</dt><dd>{zh ? "尚未建立 manufacturer enrichment" : "Manufacturer enrichment not available"}</dd></div>
+                )}
+              </dl>
+            </section>
+
+            <section className="icSelectorProfileSection" data-profile-section="programming">
+              <div className="icSelectorProfileHead">
+                <span>02</span>
+                <div>
+                  <h3>{zh ? "Programming" : "Programming"}</h3>
+                  <p>{zh ? "燒錄介面、電氣條件、Flash geometry 與程序" : "Interface, electrical conditions, Flash geometry, and programming flow"}</p>
+                </div>
+              </div>
+              {selected.selected_profile ? (
+                <dl>
+                  <div><dt>{zh ? "燒錄 VDD" : "Programming VDD"}</dt><dd>{voltageRange(selected.selected_profile.programming.electrical.vdd_programming_v)}</dd></div>
+                  <div><dt>External VPP</dt><dd>{selected.selected_profile.programming.electrical.external_vpp?.required ? (zh ? "需要" : "Required") : (zh ? "不需要" : "Not required")}</dd></div>
+                  {Object.entries(selected.selected_profile.programming.interfaces).map(([name, iface]) => (
+                    <div key={name}>
+                      <dt>{name}</dt>
+                      <dd>
+                        <strong>{formatClock(iface.clock_hz, zh)}</strong>
+                        {iface.required_signal_pins?.length ? (
+                          <div>{zh ? "Pins" : "Pins"}: {iface.required_signal_pins.map(pin => `${pin.signal}(${pin.mcu_pin})`).join(", ")}</div>
+                        ) : null}
+                      </dd>
+                    </div>
+                  ))}
+                  <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
+                  <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.program_unit} · {selected.selected_profile.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
+                  <div><dt>{zh ? "燒錄程序" : "Programming flow"}</dt><dd className="icSelectorProgramFlow">{selected.selected_profile.programming.program_model.normal_write_flow.join(" → ")}</dd></div>
+                  <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
+                </dl>
+              ) : (
+                <div className="icSelectorProfileUnavailable">
+                  {zh ? "此 ICPN 尚未建立 manufacturer-derived Programming Profile。" : "No manufacturer-derived Programming Profile exists for this ICPN yet."}
+                </div>
+              )}
+            </section>
+
+            <section className="icSelectorProfileSection" data-profile-section="compatibility">
+              <div className="icSelectorProfileHead">
+                <span>03</span>
+                <div>
+                  <h3>{zh ? "PLASMA Compatibility" : "PLASMA Compatibility"}</h3>
+                  <p>{zh ? "Site / Socket / 實機資格是獨立證據，不由 Catalog 或 OpenOCD 推論" : "Site, socket, and physical qualification remain independent evidence"}</p>
+                </div>
+              </div>
+              <dl>
+                <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
+                <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
+                <div><dt>{zh ? "Site 電氣相容" : "Site electrical"}</dt><dd>{selected.selected_profile ? humanizeStatus(selected.selected_profile.plasma_compatibility.site_electrical_compatibility) : (zh ? "未評估" : "Not evaluated")}</dd></div>
+                <div><dt>Hardware Ready</dt><dd>{selected.selected_profile?.plasma_compatibility.hardware_runtime_ready ? "TRUE" : "FALSE"}</dd></div>
+                <div><dt>{zh ? "實體燒錄資格" : "Physical programming"}</dt><dd>{selected.selected_profile?.plasma_compatibility.physical_programming_qualified ? "QUALIFIED" : "NOT QUALIFIED"}</dd></div>
+              </dl>
+            </section>
+
+            <details className="icSelectorEvidenceDetails">
+              <summary>{zh ? "Advanced Backend / Evidence" : "Advanced Backend / Evidence"}</summary>
+              <dl>
               <div><dt>Vendor</dt><dd>{selected.vendor}</dd></div>
               <div><dt>Family</dt><dd>{selected.family}</dd></div>
               <div><dt>Series</dt><dd>{selected.subfamily ?? "—"}</dd></div>
@@ -338,7 +444,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>ICPN Evidence</dt><dd>{humanizeStatus(selected.catalog_verification.status)}</dd></div>
               <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
               <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
+              {selected.selected_profile && (
+                <>
+                  <div><dt>{zh ? "Manufacturer Baseline" : "Manufacturer baseline"}</dt><dd><code>{selected.selected_profile.manufacturer_baseline.baseline_id}</code></dd></div>
+                  <div><dt>Baseline SHA-256</dt><dd><code>{selected.selected_profile.manufacturer_baseline.sha256}</code></dd></div>
+                </>
+              )}
             </dl>
+            </details>
 
             {selected.backend_candidate && (
               <div className="icSelectorCandidateBoundary" role="note">
