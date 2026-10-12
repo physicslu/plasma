@@ -52,6 +52,48 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["physical_validation"]["ppu_status"], "no_evidence")
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
+        selected = result["selected_profile"]
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["status"], "manufacturer_profile_available")
+        self.assertEqual(selected["icpn"], "STM32F103C8T6")
+        self.assertEqual(selected["catalog_identity"]["flash_size"], "64 KiB")
+        self.assertEqual(selected["device"]["memory_map"]["main_flash"]["size_bytes"], 64 * 1024)
+        self.assertEqual(
+            selected["device"]["operating_electrical"]["vdd_v"],
+            {"min": 2.0, "max": 3.6},
+        )
+        self.assertEqual(
+            selected["programming"]["electrical"]["vdd_programming_v"]["min"],
+            2.0,
+        )
+        self.assertEqual(
+            selected["programming"]["electrical"]["vdd_programming_v"]["max"],
+            3.6,
+        )
+        self.assertIsNone(
+            selected["programming"]["interfaces"]["SWD"]["clock_hz"]["manufacturer_max"]
+        )
+        self.assertEqual(
+            selected["programming"]["interfaces"]["SWD"]["clock_hz"]["status"],
+            "not_specified_by_locked_manufacturer_sources",
+        )
+        self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
+        self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
+
+    def test_admitted_icpn_without_manufacturer_selected_profile_returns_null(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F407VGT6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        self.assertIsNone(payload["results"][0]["selected_profile"])
+
+    def test_c8_selected_profile_does_not_use_blue_pill_128k_override(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=1")
+        self.assertEqual(status, 200)
+        selected = payload["results"][0]["selected_profile"]
+        self.assertEqual(selected["device"]["memory_map"]["main_flash"]["size_bytes"], 65536)
+        self.assertEqual(selected["device"]["memory_map"]["main_flash"]["end"], "0x0800FFFF")
+        self.assertNotEqual(selected["device"]["memory_map"]["main_flash"]["size_bytes"], 131072)
+
     def test_g0_bounded_backend_mapping_is_visible_without_physical_overclaim(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G0B1RBI3N&limit=1")
         self.assertEqual(status, 200)
