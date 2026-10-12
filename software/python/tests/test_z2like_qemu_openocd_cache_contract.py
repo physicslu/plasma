@@ -49,7 +49,7 @@ def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
     assert restore < build < verify < kit < e2e < run_arm < eight_sites < matrix < save
     build_part = text[build:verify]
     assert "if: steps.openocd-cache.outputs.cache-hit != 'true'" in build_part
-    assert 'bash scripts/build-openocd-runtime.sh "$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part
+    assert 'bash scripts/build-openocd-runtime.sh "$GITHUB_WORKSPACE/$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part
     verify_part = text[verify:kit]
     assert "if: steps.openocd-cache.outputs.cache-hit" not in verify_part
     assert 'test -f "$artifact"' in verify_part
