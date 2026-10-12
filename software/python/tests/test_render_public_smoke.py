@@ -95,12 +95,15 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
             report=self.report(expected_commit),
         )
 
-    def test_unpinned_smoke_observes_legacy_deployment_readiness(self) -> None:
+    def test_unpinned_smoke_uses_managed_deployment_readiness(self) -> None:
         payload = self.wait(None)
 
         self.assertTrue(payload["ok"])
         self.assertEqual(FakeRenderHandler.readiness_calls, 1)
-        self.assertEqual(FakeRenderHandler.last_readiness_path, "/api/health/ready")
+        self.assertEqual(
+            FakeRenderHandler.last_readiness_path,
+            "/api/manager/ppu/api/health/ready",
+        )
 
     def test_pinned_smoke_fails_closed_when_deployment_metadata_is_missing(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "deployment identity is not available"):
@@ -161,16 +164,24 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
                     "default_image_size_bytes": 1024,
                 },
             }
-        if normalized == "/api/devices/search?q=stm32&limit=1":
+        if normalized == "/api/devices/search?q=STM32F103C8T6&limit=1":
             return {
                 "ok": True,
                 "rest_contract_version": "3",
                 "catalog_size": 912,
-                "results": [{"identifier": "STM32F103C8T6"}],
+                "results": [
+                    {
+                        "identifier": "STM32F103C8T6",
+                        "icpn": "STM32F103C8T6",
+                        "selected_profile": {
+                            "status": "manufacturer_profile_available",
+                        },
+                    }
+                ],
             }
         raise AssertionError(f"unexpected contract path: {path}")
 
-    def test_unpinned_pr_observation_skips_new_device_catalog_and_program_contracts(self) -> None:
+    def test_unpinned_pr_observation_checks_selected_ic_profile_without_programming(self) -> None:
         calls: list[str] = []
 
         def request_json(_origin: str, path: str, *, timeout: float):
@@ -181,14 +192,18 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
         with patch.object(SMOKE, "request_json", side_effect=request_json):
             SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
 
-        self.assertEqual(report.checks["api:device-catalog-search"], "SKIP_UNPINNED")
-        self.assertNotIn("/api/devices/search?q=stm32&limit=1", calls)
+        self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
+        self.assertEqual(report.checks["api:selected-ic-profile"], "PASS")
+        self.assertIn(
+            "/api/manager/ppu/api/devices/search?q=STM32F103C8T6&limit=1",
+            calls,
+        )
         self.assertNotIn("api:managed-mock-program", report.checks)
 
     def test_unpinned_pr_observation_accepts_the_current_main_topology(self) -> None:
         def request_json(_origin: str, path: str, *, timeout: float):
             payload = self.contract_payload(path)
-            if path == "/api/engineering/targets":
+            if path == "/api/manager/ppu/api/engineering/targets":
                 return {**payload, "facility_count": 3, "ppu_count": 12, "site_count": 60}
             return payload
 
@@ -219,8 +234,12 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
             SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
 
         self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
+        self.assertEqual(report.checks["api:selected-ic-profile"], "PASS")
         self.assertEqual(report.checks["api:managed-mock-program"], "PASS")
-        self.assertIn("/api/manager/ppu/api/devices/search?q=stm32&limit=1", calls)
+        self.assertIn(
+            "/api/manager/ppu/api/devices/search?q=STM32F103C8T6&limit=1",
+            calls,
+        )
         self.assertIn("/api/manager/ppu/api/status?job=job-1", calls)
         self.assertEqual(posts, ["/api/manager/ppu/api/jobs"])
 
