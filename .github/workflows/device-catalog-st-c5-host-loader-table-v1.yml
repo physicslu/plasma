@@ -1,0 +1,51 @@
+name: STM32C5 Host-only STLDR Loader Source Guard v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-st-c5-host-loader-table-v1.yml'
+      - 'software/python/plasma_web/c5_host_loader_guard.py'
+      - 'software/python/tests/test_c5_host_loader_guard_v1.py'
+      - 'software/python/tests/fixtures/c5_stldr_array_lookup_v1.tcl'
+      - 'docs/architecture/st-c5-host-loader-table-v1.md'
+      - 'docs/README.md'
+      - 'software/python/plasma_web/backend_candidate_registry.py'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv'
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-st-c5-host-loader-table-v1.yml'
+      - 'software/python/plasma_web/c5_host_loader_guard.py'
+      - 'software/python/tests/test_c5_host_loader_guard_v1.py'
+      - 'software/python/tests/fixtures/c5_stldr_array_lookup_v1.tcl'
+      - 'docs/architecture/st-c5-host-loader-table-v1.md'
+      - 'docs/README.md'
+      - 'software/python/plasma_web/backend_candidate_registry.py'
+      - 'data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv'
+      - 'data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-host-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python dependencies and Tcl fixture interpreter
+        run: |
+          python -m pip install -e software/python
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tcl
+      - name: Ensure immutable Production baseline
+        run: python scripts/ci/device-catalog-production-invariants.py
+      - name: Check 172 exact C5 source-only candidates and 139/33 DFP split
+        run: python -m unittest discover -s software/python/tests -p 'test_c5_host_loader_guard_v1.py' -v
+      - name: Test three isolated Tcl array lookups without OpenOCD
+        run: tclsh software/python/tests/fixtures/c5_stldr_array_lookup_v1.tcl
