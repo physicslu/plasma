@@ -289,6 +289,49 @@ def test_simulation_reconciles_only_same_identity_stale_openocd_payload(
     assert not target.exists()
 
 
+def test_simulation_migrates_same_identity_legacy_openocd_without_payload_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = _load(KIT, "plasma_z2like_demo_legacy_openocd_reconcile_test")
+    _enable_armv7_simulation_marker(kit, monkeypatch)
+    product_root = tmp_path / "product"
+    incoming = _simulation_openocd_identity("0" * 64)
+    target = product_root / "programming-engines" / "openocd" / str(incoming["runtime_id"])
+    (target / "bin").mkdir(parents=True)
+    (target / "bin" / "openocd").write_bytes(b"legacy-openocd")
+    observed = kit._installed_payload_sha256(target)
+    incoming["payload_sha256"] = observed
+    retained = dict(incoming)
+    retained.pop("payload_sha256")
+    (target / "plasma-runtime.json").write_text(json.dumps(retained), encoding="utf-8")
+
+    evidence = kit._reconcile_simulation_openocd_runtime(product_root, incoming)
+
+    assert evidence["simulation_only"] is True
+    assert evidence["action"] == "replaced_legacy_unidentified_payload"
+    assert evidence["legacy_observed_payload_sha256"] == observed
+    assert evidence["legacy_observed_matches_incoming_payload"] is True
+    assert not target.exists()
+
+
+def test_simulation_refuses_malformed_retained_openocd_payload_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kit = _load(KIT, "plasma_z2like_demo_malformed_openocd_identity_test")
+    _enable_armv7_simulation_marker(kit, monkeypatch)
+    product_root = tmp_path / "product"
+    incoming = _simulation_openocd_identity("c" * 64)
+    target = product_root / "programming-engines" / "openocd" / str(incoming["runtime_id"])
+    target.mkdir(parents=True)
+    retained = dict(incoming)
+    retained["payload_sha256"] = "invalid"
+    (target / "plasma-runtime.json").write_text(json.dumps(retained), encoding="utf-8")
+
+    with pytest.raises(kit.QEMUSimulationKitError, match="payload identity is invalid"):
+        kit._reconcile_simulation_openocd_runtime(product_root, incoming)
+
+    assert target.is_dir()
+
 def test_simulation_keeps_matching_openocd_payload_for_installer_integrity_check(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
