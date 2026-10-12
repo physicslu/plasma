@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "nxp-bulk-portfolio-segment-registry-v1",
+  "manufacturer": "NXP",
+  "scope": "NXP Arm-based general-purpose, crossover, and wireless MCUs; automotive, 8/16-bit, application processors, and analog ICs excluded from the v1 denominator",
+  "population_boundary_validated": false,
+  "production_write_authorized": false,
+  "global_active_denominator": null,
+  "source_policy": "Manufacturer-current ordering-code rows only; CMSIS and pattern lists are discovery seeds, never membership or lifecycle evidence",
+  "segments": [
+    {
+      "id": "mcx",
+      "label": "MCX",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m:MCX-MCUS",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "kinetis",
+      "label": "Kinetis (K/L/E/KV/KW)",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus:GENERAL-PURPOSE-MCUS",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "lpc",
+      "label": "LPC",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus:GENERAL-PURPOSE-MCUS",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "k32",
+      "label": "K32",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus:GENERAL-PURPOSE-MCUS",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "imx-rt",
+      "label": "i.MX RT Crossover MCUs",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers:ARM-MICROCONTROLLERS",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "wireless",
+      "label": "Wireless MCUs",
+      "index_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers:ARM-MICROCONTROLLERS",
+      "inventory_status": "pending",
+      "population_complete": false
+    }
+  ],
+  "excluded_deferred_segments": [
+    "S32K automotive MCU",
+    "S32M motor-control IC",
+    "i.MX application processors",
+    "NXP analog/power devices",
+    "8-bit and 16-bit MCU portfolios"
+  ],
+  "retained_pilot": {
+    "family": "KL25",
+    "segment_id": "kinetis",
+    "discovered_active_exact_icpns": 12,
+    "official_observation_date": "2026-09-29",
+    "catalog_admission_ready": true,
+    "evidence_gate": "nxp-kl25-admission-readiness.json",
+    "authoritative_research_csv": "nxp-kl25-commercial-icpn.csv",
+    "production_published": false
+  }
+}
