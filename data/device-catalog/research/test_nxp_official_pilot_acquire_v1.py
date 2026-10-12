@@ -28,6 +28,30 @@ class LivePilotParserTest(unittest.TestCase):
         self.assertFalse(module.official("https://www.nxp.com.evil.invalid/products"))
         self.assertFalse(module.official("http://www.nxp.com/products"))
         self.assertTrue(module.official("https://www.nxp.com/products/MCX-C04x"))
+    def test_same_state_rows_keep_all_source_digests(self):
+        rows = module.consolidate_lifecycle_rows({
+            "MCXN236VPBT": [
+                {"icpn": "MCXN236VPBT", "lifecycle": "Active",
+                 "evidence_sha256": "a" * 64, "row_markup_sha256": "c" * 64},
+                {"icpn": "MCXN236VPBT", "lifecycle": "Active",
+                 "evidence_sha256": "b" * 64, "row_markup_sha256": "d" * 64},
+            ]
+        })
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["official_lifecycle_row_occurrences"], 2)
+        self.assertEqual(rows[0]["row_evidence_sha256s"], ["a" * 64, "b" * 64])
+
+    def test_same_exact_mpn_conflicting_lifecycle_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "contradictory"):
+            module.consolidate_lifecycle_rows({
+                "MCXN236VPBT": [
+                    {"icpn": "MCXN236VPBT", "lifecycle": "Active",
+                     "evidence_sha256": "a" * 64, "row_markup_sha256": "a" * 64},
+                    {"icpn": "MCXN236VPBT", "lifecycle": "Qualification",
+                     "evidence_sha256": "b" * 64, "row_markup_sha256": "b" * 64},
+                ]
+            })
+
     def test_ambiguous_code_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             module.exact_code("MCXC041VFK MCXC041VFGR", "MCXC")
