@@ -52,3 +52,28 @@ jobs:
           path: /tmp/nxp-official-${{ matrix.product }}/
           if-no-files-found: error
           retention-days: 14
+
+  reconcile-bounded-gap:
+    needs: acquire-official-product
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nxp-official-v1-*
+          path: /tmp/nxp-pilot
+      - name: Reconcile 3 manufacturer pages with strict evidence digests
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_official_pilot_reconcile_v1.py' -v
+          python data/device-catalog/research/nxp_official_pilot_reconcile_v1.py \
+            --evidence-root /tmp/nxp-pilot \
+            --output /tmp/nxp-bounded-gap
+          cat /tmp/nxp-bounded-gap/bounded-pilot-gap.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-official-v1-bounded-gap-report
+          path: /tmp/nxp-bounded-gap/
+          if-no-files-found: warn
+          retention-days: 30

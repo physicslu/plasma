@@ -59,3 +59,20 @@ captures three **curated** official NXP product-page lifecycle tables, independe
 - `kl25` — NXP KL2x Package/Quality page, restricted to `MKL25Z` exact codes and expected `MKL25Z128VLK4`.
 
 The Playwright scraper captures rendered raw HTML before parsing, only keeps first-cell exact part numbers with an official row lifecycle, rejects contradictory or duplicate states, and uploads JSON + HTML as temporary GitHub Actions artifacts even on failure. The product URLs are fixed in `nxp-official-pilot-products-v1.json` and cannot be supplied arbitrarily. **Every snapshot has `source_population_complete=false`**, since a bounded product page does not establish complete MCX/Kinetis/NXP manufacturer coverage. This pilot is an actual manufacturer acquisition probe, not a mass-portfolio denominator or a production admission.
+
+
+## Gate 1b — Bounded official evidence Gap Reconciliation
+
+After all three official product-page acquisitions pass, the workflow downloads each
+source's raw rendered HTML and normalized row evidence. The offline
+`nxp_official_pilot_reconcile_v1.py` re-hashes the raw HTML, checks the
+fixed product-page allowlist, exact SKU and lifecycle integrity, checks live KL25's
+exact 12 Active identities against the frozen manufacturer evidence, then produces
+`bounded-pilot-gap.json` and observed Active / Qualification exact-MPN lists.
+Cross-product lifecycle contradictions are hard errors.
+
+**This report is bounded observed-source coverage, not whole-NXP coverage.**
+`global_active_denominator` and `global_active_coverage` stay JSON `null`;
+`observed_active_missing_from_production` is only the gap within these three
+verified pages. Full family inventory and manufacturer category completeness
+remain open research gates.
