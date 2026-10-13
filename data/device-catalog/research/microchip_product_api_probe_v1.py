@@ -63,6 +63,17 @@ def validate_page(payload: object, expected_page: int, page_size: int) -> dict:
     return payload
 
 
+def parse_json_response(raw: bytes) -> object:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        prefix = repr(raw[:160].decode("utf-8", errors="replace"))
+        digest = hashlib.sha256(raw).hexdigest()
+        raise ProbeError(
+            f"response is not valid JSON (bytes={len(raw)}, sha256={digest}, prefix={prefix})"
+        ) from exc
+
+
 def fetch_page(page_number: int) -> bytes:
     query = urlencode({
         "part": QUERY,
@@ -100,7 +111,7 @@ def run(output_dir: Path) -> dict:
         first_bytes = fetch_page(1)
         first_path = output_dir / "page-001.json"
         first_path.write_bytes(first_bytes)
-        first = validate_page(json.loads(first_bytes), 1, PAGE_SIZE)
+        first = validate_page(parse_json_response(first_bytes), 1, PAGE_SIZE)
         shared_totals = (first["totalRecords"], first["totalPages"])
         require(first["totalPages"] <= MAX_PAGES,
                 f"reported totalPages exceeds safety limit {MAX_PAGES}")
@@ -109,7 +120,7 @@ def run(output_dir: Path) -> dict:
         for page_number in range(2, first["totalPages"] + 1):
             raw = fetch_page(page_number)
             (output_dir / f"page-{page_number:03d}.json").write_bytes(raw)
-            payload = validate_page(json.loads(raw), page_number, PAGE_SIZE)
+            payload = validate_page(parse_json_response(raw), page_number, PAGE_SIZE)
             require((payload["totalRecords"], payload["totalPages"]) == shared_totals,
                     "pagination totals changed between pages")
             pages.append(payload)
