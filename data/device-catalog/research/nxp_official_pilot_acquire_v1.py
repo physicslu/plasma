@@ -50,6 +50,26 @@ def lifecycle(row_text: str) -> str | None:
     require(len(states) <= 1, "contradictory NXP lifecycle in row")
     return next(iter(states), None)
 
+def orderable_from_environment_cells(cell_texts: list[str], prefix: str) -> tuple[str, str] | None:
+    """Find the *orderable* material-declaration SKU immediately before Status.
+
+    The first Part/Package cell is often a rowspan/group label. For example
+    MCXC041VFK can group separate MCXC041VFK and MCXC041VFKR orderable
+    material-declaration rows. Continuation rows omit the group cell.
+    Quality Information rows have no official Status cell and are ignored.
+    """
+    matches = []
+    for i in range(1, len(cell_texts)):
+        status_text = " ".join(cell_texts[i].split())
+        state = lifecycle(status_text)
+        if state is None or status_text.casefold() not in KNOWN:
+            continue
+        code = exact_code(cell_texts[i - 1], prefix)
+        if code:
+            matches.append((code, state))
+    require(len(matches) <= 1, "ambiguous orderable SKU/status in NXP row")
+    return matches[0] if matches else None
+
 def consolidate_lifecycle_rows(grouped: dict) -> list[dict]:
     """Keep all source evidence for same-state duplicates, reject any conflict."""
     rows = []
@@ -89,14 +109,11 @@ def acquire(page, source: dict, out: Path, browser_version: str) -> dict:
         cells = tr.locator("td")
         if cells.count() < 2:
             continue
-        first = cells.first.inner_text(timeout=3000)
-        code = exact_code(first, prefix)
-        if not code:
+        orderable = orderable_from_environment_cells(cells.all_inner_texts(), prefix)
+        if orderable is None:
             continue
+        code, state = orderable
         visible = tr.inner_text(timeout=3000)
-        state = lifecycle(visible)
-        if state is None:
-            continue
         markup = tr.evaluate("(node) => node.outerHTML")
         grouped[code].append({
             "icpn": code,
