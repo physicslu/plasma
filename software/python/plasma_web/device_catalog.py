@@ -359,10 +359,16 @@ class DeviceCatalog:
         ]
         return matches[0] if len(matches) == 1 else None
 
-    def search(self, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT) -> list[DeviceCatalogRecord]:
+    def search_with_total(
+        self,
+        query: str,
+        *,
+        limit: int = DEFAULT_SEARCH_LIMIT,
+    ) -> tuple[list[DeviceCatalogRecord], int]:
+        """Return the ranked page plus the full filtered match count."""
         normalized = query.strip().casefold()
         if not normalized:
-            return []
+            return [], 0
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > MAX_SEARCH_LIMIT:
             raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
         tokens = normalized.split()
@@ -404,7 +410,12 @@ class DeviceCatalog:
                 )
             )
         ranked.sort(key=lambda item: item[:-1])
-        return [item[-1] for item in ranked[:limit]]
+        total_count = len(ranked)
+        return [item[-1] for item in ranked[:limit]], total_count
+
+    def search(self, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT) -> list[DeviceCatalogRecord]:
+        matches, _ = self.search_with_total(query, limit=limit)
+        return matches
 
 
 def _parse_admitted_source(
