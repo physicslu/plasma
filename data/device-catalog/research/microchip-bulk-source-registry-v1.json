@@ -9,7 +9,7 @@
   "source_policy": "Official Microchip product-family indexes are discovery surfaces; exact ordering codes and lifecycle must be captured from manufacturer product records. CMSIS packs, OpenOCD identifiers, parametric-search snippets and family names are discovery seeds only.",
   "segments": [
     {"id":"8bit","label":"8-bit PIC and AVR MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus","inventory_status":"pending","population_complete":false},
-    {"id":"16bit","label":"16-bit PIC24 MCUs and dsPIC DSCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers-and-microprocessors/16-bit-mcus","inventory_status":"pending","population_complete":false},
+    {"id":"16bit","label":"16-bit PIC24 MCUs and dsPIC DSCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus","inventory_status":"pending","population_complete":false},
     {"id":"32bit-pic-sam","label":"32-bit PIC32 and SAM Arm MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam","inventory_status":"pending","population_complete":false},
     {"id":"32bit-avr-risc","label":"32-bit AVR and RISC MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus","inventory_status":"pending","population_complete":false},
     {"id":"wireless","label":"Wireless MCUs and SoCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/wireless","inventory_status":"pending","population_complete":false}
