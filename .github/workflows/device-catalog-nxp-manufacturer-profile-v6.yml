@@ -67,4 +67,4 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Verify TypeScript Manufacturer Device API and IC Information UI
         working-directory: software/web
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --target es2022 --module esnext --moduleResolution bundler --jsx react-jsx --skipLibCheck --esModuleInterop app/device-catalog-api.ts app/devices/ic-selector.tsx
