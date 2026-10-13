@@ -15,6 +15,7 @@ from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
+from plasma_core.manufacturer_device_basic import get_default_manufacturer_device_basic_resolver
 
 from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
@@ -85,6 +86,7 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
     upstream = default_pinned_upstream()
     versioned_providers = get_default_openocd_provider_registry()
     ic_support = get_default_ic_support_resolver()
+    device_basic = get_default_manufacturer_device_basic_resolver()
     results = []
     for record in matches:
         item = record.to_payload()
@@ -95,7 +97,22 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
             versioned_providers.describe(record.vendor, record.identifier)
             if versioned_providers is not None else []
         )
-        support = ic_support.resolve_exact(record.icpn or record.identifier)
+        exact_icpn = record.icpn or record.identifier
+        basic = device_basic.resolve_exact(
+            exact_icpn,
+            manufacturer=record.vendor,
+            family=record.family,
+            series=record.subfamily,
+            base_device=record.base_device,
+            package=record.package,
+            pin_count=record.pin_count,
+            flash_size=record.flash_size,
+            temperature_grade=record.temperature_grade,
+        )
+        item["manufacturer_device_basic_profile"] = (
+            basic.to_payload() if basic is not None else None
+        )
+        support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()
             if support is not None
