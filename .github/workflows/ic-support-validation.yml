@@ -130,6 +130,10 @@ jobs:
         run: |
           python data/ic-support/compare_generated_programmer_openocd.py
           python data/ic-support/test_generated_programmer_openocd.py
+      - name: Validate real-OpenOCD STM32F103 software acceptance contract
+        run: |
+          python -m py_compile data/ic-support/validate_stm32f103_openocd_real_binary.py
+          python data/ic-support/test_stm32f103_openocd_real_binary.py
       - name: Run IC Support research regression
         run: python data/ic-support/test_ic_support.py
       - name: Report research coverage projection against current catalog
