@@ -36,6 +36,14 @@ class ICSupportResolverTests(unittest.TestCase):
 
         self.assertEqual(c8.programming_profile.profile_id, "stm32f1-medium-density-flash-v0")
         self.assertEqual(cb.programming_profile.profile_id, c8.programming_profile.profile_id)
+        self.assertEqual(
+            c8.profile("programming_route").profile_id,
+            "stm32f103-medium-density-programming-routes-v1",
+        )
+        self.assertEqual(
+            cb.profile("programming_route").profile_id,
+            c8.profile("programming_route").profile_id,
+        )
         self.assertEqual(c8.profile("option").profile_id, cb.profile("option").profile_id)
         self.assertEqual(c8.profile("security").profile_id, cb.profile("security").profile_id)
         self.assertEqual(c8.profile("package_hardware").profile_id, cb.profile("package_hardware").profile_id)
@@ -56,6 +64,19 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(selected["device"]["memory_map"]["main_flash"]["size_bytes"], 64 * 1024)
         self.assertEqual(selected["programming"]["electrical"]["vdd_programming_v"], {"min": 2.0, "max": 3.6, "basis": "PM0075 states Program/Erase operations are supported over the whole product voltage range"})
         self.assertIsNone(selected["programming"]["interfaces"]["SWD"]["clock_hz"]["manufacturer_max"])
+        routes = {route["route_id"]: route for route in selected["programming"]["routes"]}
+        self.assertEqual(set(routes), {"swd_debug", "system_rom_bootloader_usart1"})
+        self.assertTrue(routes["swd_debug"]["contexts"]["icp"]["supported"])
+        self.assertTrue(routes["swd_debug"]["contexts"]["offline_socket"]["supported"])
+        self.assertEqual(routes["swd_debug"]["entry_requirements"]["strap_states"], [])
+        self.assertFalse(routes["system_rom_bootloader_usart1"]["contexts"]["icp"]["supported"])
+        self.assertTrue(routes["system_rom_bootloader_usart1"]["contexts"]["offline_socket"]["supported"])
+        self.assertEqual(
+            routes["system_rom_bootloader_usart1"]["entry_requirements"]["strap_states"],
+            [{"signal": "BOOT0", "state": "high"}, {"signal": "BOOT1", "state": "low"}],
+        )
+        self.assertEqual(selected["programming"]["package_signal_map"]["BOOT0"]["package_pin"], 44)
+        self.assertEqual(selected["programming"]["package_signal_map"]["BOOT1"]["package_pin"], 20)
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
 
@@ -91,8 +112,63 @@ class ICSupportResolverTests(unittest.TestCase):
             ["stm32f1-medium-density-flash-v0"],
         )
         self.assertEqual(summary["manufacturer_selected_profiles"], 1)
+        self.assertEqual(summary["programming_route_profiles"], 1)
+        self.assertEqual(
+            summary["programming_route_profile_ids"],
+            ["stm32f103-medium-density-programming-routes-v1"],
+        )
         self.assertEqual(summary["native_ppu_runtime_ready_exact_icpns"], 0)
 
+    def test_programming_route_schema_is_vendor_neutral_while_st_instance_owns_boot_names(self) -> None:
+        schema = (IC_SUPPORT_ROOT / "schema" / "ic-support-v0.schema.json").read_text(encoding="utf-8")
+        route = (
+            IC_SUPPORT_ROOT
+            / "profiles"
+            / "programming-route"
+            / "stm32f103-medium-density-programming-routes-v1.json"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("programming_route", schema)
+        self.assertNotIn("BOOT0", schema)
+        self.assertNotIn("BOOT1", schema)
+        self.assertIn('"BOOT0"', route)
+        self.assertIn('"BOOT1"', route)
+
+    def test_programming_route_fails_closed_when_entry_requirement_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            test_root = Path(root) / "ic-support"
+            shutil.copytree(IC_SUPPORT_ROOT, test_root)
+            route_path = (
+                test_root
+                / "profiles"
+                / "programming-route"
+                / "stm32f103-medium-density-programming-routes-v1.json"
+            )
+            payload = json.loads(route_path.read_text(encoding="utf-8"))
+            rom = next(route for route in payload["data"]["routes"] if route["route_id"] == "system_rom_bootloader_usart1")
+            del rom["entry_requirements"]["reset_sequence"]
+            route_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ICSupportIntegrityError, "reset_sequence must be an object"):
+                ICSupportResolver.from_root(test_root)
+
+    def test_strap_controlled_route_cannot_be_promoted_to_icp_context(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            test_root = Path(root) / "ic-support"
+            shutil.copytree(IC_SUPPORT_ROOT, test_root)
+            route_path = (
+                test_root
+                / "profiles"
+                / "programming-route"
+                / "stm32f103-medium-density-programming-routes-v1.json"
+            )
+            payload = json.loads(route_path.read_text(encoding="utf-8"))
+            rom = next(route for route in payload["data"]["routes"] if route["route_id"] == "system_rom_bootloader_usart1")
+            rom["contexts"]["icp"]["supported"] = True
+            route_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(ICSupportIntegrityError, "strap-controlled route cannot be ICP-supported"):
+                ICSupportResolver.from_root(test_root)
     def test_environment_root_override_is_authoritative(self) -> None:
         configured = Path("/tmp/plasma-ic-support")
         with patch.dict("os.environ", {IC_SUPPORT_ROOT_ENV: str(configured)}):
