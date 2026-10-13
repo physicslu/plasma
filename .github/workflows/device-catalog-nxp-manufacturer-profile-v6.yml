@@ -1,0 +1,70 @@
+name: NXP 212 Manufacturer Device API and 277 source gap v6
+
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_web/nxp_manufacturer_device_evidence.py'
+      - 'software/python/plasma_web/gateway.py'
+      - 'software/python/tests/test_nxp_manufacturer_device_evidence_v6.py'
+      - 'software/web/app/device-catalog-api.ts'
+      - 'software/web/app/devices/ic-selector.tsx'
+      - 'data/device-catalog/research/nxp-277-manufacturer-gap-review-v6.csv'
+      - 'data/device-catalog/research/nxp-277-gap-summary-v6.json'
+      - 'data/device-catalog/research/test_nxp_277_gap_review_v6.py'
+      - 'data/device-catalog/research/NXP_277_GAP_AND_212_PROFILE_V6.md'
+      - '.github/workflows/device-catalog-nxp-manufacturer-profile-v6.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manufacturer-only-source-and-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Control Station dependencies
+        run: python -m pip install -e software/python
+      - name: Run 212 Source-integrity/Catalog/API negative and positive tests
+        run: |
+          python -m unittest discover \
+            -s software/python/tests \
+            -p 'test_nxp_manufacturer_device_evidence_v6.py' -v
+      - name: Check exact 277 manufacturer gap ledger and immutable source SHA
+        run: |
+          python data/device-catalog/research/test_nxp_277_gap_review_v6.py
+      - name: Assert independent manufacturer-only and no program execution claims
+        run: |
+          python - <<'PY'
+          from plasma_web.nxp_manufacturer_device_evidence import (
+              get_default_nxp_manufacturer_device_evidence as evidence,
+          )
+          from plasma_web.device_catalog import get_default_device_catalog
+          catalog=get_default_device_catalog()
+          assert catalog.size == 4853
+          assert evidence().size == 212
+          assert sum(r.vendor=="NXP" for r in catalog.records)==224
+          assert sum(r.vendor=="STMicroelectronics" for r in catalog.records)==4629
+          assert all(r.mapping_status == "no_mapping" and not r.target_config for
+                     r in catalog.records if r.vendor=="NXP" and r.family in {"MCX","K32L2"})
+          print("NXP 212 source-bound Device payload PASS; backend and Production unchanged")
+          PY
+
+  manufacturer-device-browser-types:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install checked-in web dependencies
+        working-directory: software/web
+        run: npm ci --no-audit --no-fund
+      - name: Verify TypeScript Manufacturer Device API and IC Information UI
+        working-directory: software/web
+        run: npx tsc --noEmit
