@@ -57,22 +57,45 @@ def gitblob(data: bytes) -> str:
 
 
 def read_manifest() -> tuple[dict, int]:
+    """Prove proposed branch manifest is exactly ST prestate + one KL25 source.
+
+    The NXP source is staged only in the owner-gated PR. Removing it must
+    reproduce the *exact* former Production Git blob (28 ST sources).
+    This is stronger than checking aggregate counts, and fails closed
+    against concurrent manifest edits or unrelated source publication.
+    """
     raw = MANIFEST.read_bytes()
-    require(gitblob(raw) == EXPECTED_PRODUCTION_MANIFEST_BLOB,
+    document = json.loads(raw)
+    sources = document["sources"]
+    require(document["status"] == "production" and
+            document["catalog_version"] == "1.0.0" and
+            document["selection_policy"] == "admitted_exact_manufacturer_part_number_only" and
+            len(sources) == EXPECTED_PRODUCTION_SOURCES + 1,
+            "Production staged KL25 source/manifest drift")
+    final_source = sources[-1]
+    require(final_source == {
+        "manufacturer": "NXP",
+        "family": "KL25",
+        "path": "../research/nxp-kl25-commercial-icpn.csv",
+        "row_count": 12,
+        "git_blob_sha": KL25_BLOB_SHA,
+        "sha256": KL25_SOURCE_SHA,
+    }, "Production staged KL25 source binding changed")
+    require(sum(int(x["row_count"]) for x in sources) ==
+            EXPECTED_PRODUCTION_ROWS + 12,
+            "Production staged total must be exactly previous 4629 + KL25 12")
+    old = json.loads(json.dumps(document))
+    old["sources"].pop()
+    reconstructed = (json.dumps(old, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    require(gitblob(reconstructed) == EXPECTED_PRODUCTION_MANIFEST_BLOB,
             "Production manifest changed: new owner-reviewed dry-run baseline required")
-    doc = json.loads(raw)
-    src = doc["sources"]
-    total = sum(int(s["row_count"]) for s in src)
-    require(doc["status"] == "production" and
-            doc["selection_policy"] == "admitted_exact_manufacturer_part_number_only"
-            and len(src) == EXPECTED_PRODUCTION_SOURCES and
-            total == EXPECTED_PRODUCTION_ROWS,
-            "Production prestate count/version changed")
-    require(all(s["manufacturer"] != "NXP" for s in src),
-            "NXP already exists in Production; refuse duplicate admission")
-    require(all(s["manufacturer"] == "STMicroelectronics" for s in src),
-            "unexpected existing manufacturer state")
-    return doc, total
+    require(len(old["sources"]) == EXPECTED_PRODUCTION_SOURCES and
+            all(x["manufacturer"] == "STMicroelectronics"
+                for x in old["sources"]) and
+            sum(int(x["row_count"]) for x in old["sources"]) ==
+                EXPECTED_PRODUCTION_ROWS,
+            "Production original 28-source ST scope drift")
+    return old, EXPECTED_PRODUCTION_ROWS
 
 
 def kl25_rows() -> tuple[list[dict], bytes]:
