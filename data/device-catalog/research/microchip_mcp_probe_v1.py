@@ -127,9 +127,69 @@ class Client:
         return decode(raw, request_id) if request_id is not None else None
 
 
+def verify_transcript(manifest, output):
+    """Validate the archived MCP handshake and exact bounded request sequence."""
+    responses = manifest.get('responses')
+    require(isinstance(responses, list) and 5 <= len(responses) <= 4 + MAX_ROWS // 2,
+            'invalid MCP capture length')
+    require(isinstance(manifest.get('endpoint'), str) and
+            manifest['endpoint'] == ENDPOINT, 'unexpected evidence source')
+    for index, evidence in enumerate(responses):
+        require(isinstance(evidence, dict), 'invalid evidence record')
+        filename = evidence.get('file')
+        require(isinstance(filename, str) and
+                filename == f'response-{index:02d}.txt', 'unexpected evidence filename/order')
+        request = evidence.get('request')
+        require(isinstance(request, dict) and request.get('jsonrpc') == '2.0',
+                'invalid request envelope')
+        method = request.get('method')
+        expected = ('initialize', 'notifications/initialized', 'tools/list')
+        expected_method = expected[index] if index < 3 else 'tools/call'
+        require(method == expected_method, 'unexpected MCP method/order')
+        expected_id = None if index == 1 else (1 if index == 0 else index)
+        require(request.get('id') == expected_id and
+                (('id' in request) == (expected_id is not None)), 'request ID mismatch')
+        require(evidence.get('http_status') == (202 if index == 1 else 200),
+                'unexpected archived HTTP status')
+        require(isinstance(evidence.get('sha256'), str) and
+                len(evidence['sha256']) == 64, 'missing evidence digest')
+        raw = (output / filename).read_bytes()
+        require(hashlib.sha256(raw).hexdigest() == evidence['sha256'],
+                'evidence digest mismatch')
+        if index == 0:
+            require(request.get('params') == {
+                'protocolVersion': '2025-03-26', 'capabilities': {},
+                'clientInfo': {'name': 'plasma-microchip-research', 'version': '1.0'}},
+                'unexpected MCP initialization request')
+            require(decode(raw, 1).get('protocolVersion') == '2025-03-26',
+                    'archived MCP protocol mismatch')
+        elif index == 1:
+            require('params' not in request, 'unexpected initialized parameters')
+        elif index == 2:
+            require(request.get('params') == {}, 'unexpected tool-list parameters')
+            catalog = decode(raw, 2)
+            require(not catalog.get('nextCursor'), 'tool listing incomplete')
+            tools = catalog.get('tools')
+            require(isinstance(tools, list), 'missing archived tool list')
+            matching = [t for t in tools if isinstance(t, dict) and
+                        t.get('name') == 'search_products']
+            require(len(matching) == 1, 'search_products tool absent or duplicated')
+            schema = matching[0].get('inputSchema', {})
+            require(isinstance(schema, dict) and isinstance(schema.get('properties'), dict)
+                    and {'searchTerm', 'limit', 'offset'} <= set(schema['properties']),
+                    'archived product search schema changed')
+        else:
+            expected_args = {'searchTerm': QUERY,
+                             'limit': MAX_ROWS if index == len(responses) - 1 else 2,
+                             'offset': 0 if index == len(responses) - 1 else (index - 3) * 2}
+            require(request.get('params') == {'name': 'search_products',
+                                               'arguments': expected_args},
+                    'unexpected product search request')
+
+
 def replay(output):
     manifest = json.loads((output / 'manifest.json').read_text())
-    require(manifest['endpoint'] == ENDPOINT, 'unexpected evidence source')
+    verify_transcript(manifest, output)
     pages, comparison = [], None
     for evidence in manifest['responses']:
         filename = evidence['file']
