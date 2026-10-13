@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "manufacturer": "Microchip",
+  "source_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+  "source_type": "original_microchip_dfp_index_supported_device_names",
+  "canary_type": "cross_lanes_bounded_mcp_text_search",
+  "ordered_queries": [
+    {
+      "device_name": "PIC16F18855",
+      "pack_name": "PIC16F1xxxx_DFP",
+      "lane": "8bit"
+    },
+    {
+      "device_name": "dsPIC33CK128MP506",
+      "pack_name": "dsPIC33CK-MP_DFP",
+      "lane": "16bit"
+    },
+    {
+      "device_name": "PIC32MX470F512H",
+      "pack_name": "PIC32MX_DFP",
+      "lane": "32bit-pic-sam"
+    },
+    {
+      "device_name": "PIC32CX1012BZ24032",
+      "pack_name": "PIC32CX-BZ_DFP",
+      "lane": "wireless"
+    },
+    {
+      "device_name": "ATmega4809",
+      "pack_name": "ATmega_DFP",
+      "lane": "8bit"
+    },
+    {
+      "device_name": "PIC24FJ128GA606",
+      "pack_name": "PIC24F-GA-GB_DFP",
+      "lane": "16bit"
+    },
+    {
+      "device_name": "ATSAMD21G18A",
+      "pack_name": "SAMD21_DFP",
+      "lane": "32bit-pic-sam"
+    },
+    {
+      "device_name": "ATSAMR21G18A",
+      "pack_name": "SAMR21_DFP",
+      "lane": "wireless"
+    },
+    {
+      "device_name": "AVR128DA28",
+      "pack_name": "AVR-Dx_DFP",
+      "lane": "8bit"
+    },
+    {
+      "device_name": "PIC12F615",
+      "pack_name": "PIC10-12Fxxx_DFP",
+      "lane": "8bit"
+    }
+  ],
+  "query_count": 10,
+  "approved_max_query_counts": [
+    3,
+    10
+  ],
+  "query_names_are_commercial_ordering_skus": false,
+  "manufacturer_population_complete": false,
+  "population_boundary_validated": false,
+  "global_active_denominator": null,
+  "production_write_authorized": false,
+  "live_capture_performed": false
+}

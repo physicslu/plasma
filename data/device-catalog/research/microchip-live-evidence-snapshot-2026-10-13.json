@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "type": "source-linked research ICPN overlap observation",
+  "manufacturer": "Microchip",
+  "captured_utc_day": "2026-10-13",
+  "original_dfp_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+  "datasets": [
+    {
+      "dataset": "PIC10/PIC12 pilot",
+      "query_count": 27,
+      "verified_queries": 26,
+      "unique_exact_prefix_candidates": 347,
+      "github_artifact_id": 11786520772,
+      "github_run_id": 38338627747,
+      "archived_zip_sha256": "1e89ae785c221f151e40b8d06ed98ebf054b19951d3309c9574d66fce8d1f281",
+      "validated_ledger_sha256": "0bea8581900f82c02767c60fd6206b8bcc1148a7b55ffa2573473cefcdc02b5d"
+    },
+    {
+      "dataset": "crosslane ten source-recovered archive",
+      "query_count": 10,
+      "verified_queries": 10,
+      "unique_exact_prefix_candidates": 151,
+      "github_artifact_id": 11789554442,
+      "github_run_id": 38348398967,
+      "archived_zip_sha256": "d141fc6acc51525cbbdde64408ea59dc9ba9b3ca16ad7bde4d3f5fa22b722d74",
+      "validated_ledger_sha256": "3207134552bfe9252663fdcff09e43b426252d2685004996936d6026c05e59d3"
+    }
+  ],
+  "verified_distinct_query_union_count": 35,
+  "overlapping_query_names": [
+    "PIC12F615"
+  ],
+  "candidate_exact_identity_overlap_count": 31,
+  "candidate_exact_identity_union_count": 467,
+  "cross_source_raw_lifecycle_conflicts": 0,
+  "observed_raw_lifecycle_values": [
+    "Active"
+  ],
+  "dfp_query_plan_eligible_names": 3198,
+  "verified_dfp_query_progress_percent": 1.0944,
+  "method": "Exact partNumber identity set union of two SHA-256-verified original source-linked research ledgers. Cross-source raw lifecycle equality checked for every overlapping partNumber.",
+  "first_party_manufacturer_global_active_denominator_established": false,
+  "manufacturer_population_complete": false,
+  "global_active_denominator": null,
+  "production_write_authorized": false,
+  "programming_support_claimed": false,
+  "blocking_limitations": [
+    "The source data only cover 35 distinct DFP text-search queries, not the entire current/historical orderable product universe.",
+    "Raw Active values are vendor text-search observations, not independent SKU lifecycle reconciliation.",
+    "No Production catalog or hardware programming support update authorized.",
+    "A separate 16-batch read-only multi-lane sweep is in progress and is not included in these counts."
+  ]
+}

@@ -1,0 +1,67 @@
+name: Microchip independent replay of real 10-query crosslane evidence
+on:
+  push:
+    branches:
+      - agent/microchip-bulk-coverage-discovery-v1
+    paths:
+      - '.github/workflows/device-catalog-microchip-live-evidence-10-replay.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  ten-query-real-archive-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/source-dfp
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-source-pinned-crosslane-10-raw-canary-v1
+          repository: physicslu/plasma
+          run-id: 38347572588
+          github-token: ${{ github.token }}
+          path: /tmp/crosslane-evidence
+      - name: Replay original 10 source-bound vendor transcripts with corrected validator
+        run: |
+          set -euo pipefail
+          echo '9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/source-dfp/index.html' | sha256sum --check
+          python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+            --evidence-root /tmp/source-dfp \
+            --target-root /tmp/crosslane-evidence \
+            --max-queries 10 > /tmp/crosslane-replay-summary.json
+          python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0,'data/device-catalog/research')
+          import microchip_mcp_evidence_ledger_v1 as ledger
+          import microchip_mcp_crosslane_canary_v1 as canary
+          m=json.load(open(canary.CANARY))
+          names=[row['device_name'] for row in m['ordered_queries']]
+          result=ledger.build('/tmp/crosslane-evidence/crosslane-10',names)
+          assert result['all_queries_reconciled'] is True
+          assert result['fully_replayed_queries'] == 10
+          assert result['production_write_authorized'] is False
+          assert result['global_active_denominator'] is None
+          with open('/tmp/crosslane-ten-ledger.json','w') as f: json.dump(result,f,indent=2,sort_keys=True)
+          print('verified queries',result['fully_replayed_queries'])
+          print('source linked candidates',result['unique_exact_ordering_candidates'])
+          PY
+      - name: Save replayed source-linked candidate evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-real-crosslane-ten-replay-ledger
+          path: |
+            /tmp/crosslane-replay-summary.json
+            /tmp/crosslane-ten-ledger.json
+          if-no-files-found: warn
+          retention-days: 90
