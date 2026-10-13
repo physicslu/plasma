@@ -47,6 +47,8 @@ def rows() -> list[str]:
     missing = [r["icpn"] for r in records if
                r["metadata_gate"] == "manufacturer_metadata_missing"]
     require(len(missing) == 341, "NXP bulk metadata gap cardinality drift")
+    require(all(re.fullmatch(r"[A-Z0-9]+", sku) for sku in missing),
+            "unsafe manufacturer SKU for deterministic URL/artifact path")
     return missing
 
 
