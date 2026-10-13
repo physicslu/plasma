@@ -1,0 +1,75 @@
+name: Microchip eight quarantined 8-bit DFP batch recovery (read-only)
+on:
+  push:
+    branches: [agent/microchip-research-recovery-v2]
+    paths: ['.github/workflows/device-catalog-microchip-recovery-v2.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: microchip-research-eight-timeout-batches-v2
+  cancel-in-progress: false
+jobs:
+  source-pinned-recapture:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        batch: [8bit-0004,8bit-0005,8bit-0013,8bit-0048,8bit-0071,8bit-0072,8bit-0082,8bit-0105]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore original immutable manufacturer DFP source
+        uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/microchip-original-dfp
+      - name: Verify original vendor source; re-derive exact research batch plan
+        run: |
+          set -euo pipefail
+          echo '9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/microchip-original-dfp/index.html' | sha256sum -c -
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_timeout_recovery_v2.py' -v
+          python data/device-catalog/research/microchip_mcp_batch_plan_v1.py \
+            --evidence-root /tmp/microchip-original-dfp \
+            --output /tmp/microchip-exact-plan.json --batch-size 10
+      - name: Capture every device individually, attestation pre-written
+        timeout-minutes: 19
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_timeout_recovery_v2.py \
+            --evidence-root /tmp/microchip-original-dfp \
+            --plan /tmp/microchip-exact-plan.json \
+            --batch-id ${{ matrix.batch }} \
+            --output-root /tmp/microchip-recovery-raw \
+            --log-root /tmp/microchip-recovery-diagnostics \
+            --query-timeout 85 --capture
+      - name: Independent full-original-byte Research replay
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          test -f /tmp/microchip-recovery-raw/${{ matrix.batch }}/batch-source.json
+          python data/device-catalog/research/microchip_mcp_timeout_recovery_v2.py \
+            --evidence-root /tmp/microchip-original-dfp \
+            --plan /tmp/microchip-exact-plan.json \
+            --batch-id ${{ matrix.batch }} \
+            --output-root /tmp/microchip-recovery-raw \
+            > /tmp/microchip-recovery-verification.json
+      - name: Retain all read-only original raw evidence and failure logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-recovery-v2-${{ matrix.batch }}-raw
+          path: |
+            /tmp/microchip-recovery-raw/
+            /tmp/microchip-recovery-diagnostics/
+            /tmp/microchip-recovery-verification.json
+            /tmp/microchip-exact-plan.json
+          if-no-files-found: warn
+          retention-days: 90
