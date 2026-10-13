@@ -70,9 +70,15 @@ def read_manifest() -> tuple[dict, int]:
     require(document["status"] == "production" and
             document["catalog_version"] == "1.0.0" and
             document["selection_policy"] == "admitted_exact_manufacturer_part_number_only" and
-            len(sources) == EXPECTED_PRODUCTION_SOURCES + 1,
+            len(sources) == 31 and
+            sum(int(x["row_count"]) for x in sources) == 4853,
             "Production staged KL25 source/manifest drift")
-    final_source = sources[-1]
+    require([(x["manufacturer"],x["family"],x["row_count"]) for x in sources[28:]]
+            == [("NXP","KL25",12),("NXP","MCX",196),("NXP","K32L2",16)],
+            "unexpected additional manufacturer source in historical KL25 replay")
+    previous = json.loads(json.dumps(document))
+    previous["sources"] = previous["sources"][:29]
+    final_source = previous["sources"][-1]
     require(final_source == {
         "manufacturer": "NXP",
         "family": "KL25",
@@ -81,10 +87,10 @@ def read_manifest() -> tuple[dict, int]:
         "git_blob_sha": KL25_BLOB_SHA,
         "sha256": KL25_SOURCE_SHA,
     }, "Production staged KL25 source binding changed")
-    require(sum(int(x["row_count"]) for x in sources) ==
+    require(sum(int(x["row_count"]) for x in previous["sources"]) ==
             EXPECTED_PRODUCTION_ROWS + 12,
-            "Production staged total must be exactly previous 4629 + KL25 12")
-    old = json.loads(json.dumps(document))
+            "historical KL25 production total must be 4629 + 12")
+    old = json.loads(json.dumps(previous))
     old["sources"].pop()
     reconstructed = (json.dumps(old, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     require(gitblob(reconstructed) == EXPECTED_PRODUCTION_MANIFEST_BLOB,
@@ -96,7 +102,6 @@ def read_manifest() -> tuple[dict, int]:
                 EXPECTED_PRODUCTION_ROWS,
             "Production original 28-source ST scope drift")
     return old, EXPECTED_PRODUCTION_ROWS
-
 
 def kl25_rows() -> tuple[list[dict], bytes]:
     raw = KL25.read_bytes()
