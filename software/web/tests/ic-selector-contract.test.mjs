@@ -126,8 +126,8 @@ test("IC Information uses the independent Manufacturer Device Basic Profile", as
 
   assert.match(api, /ManufacturerDeviceBasicProfile/);
   assert.match(api, /manufacturer_device_basic_profile\?:\s*ManufacturerDeviceBasicProfile\s*\|\s*null/);
-  assert.match(api, /source_surface:\\s*"st_product_selector"\\s*\\|\\s*"st_estore"/);
-  assert.match(api, /evidence_strength:\\s*"official_product_selector_observation"\\s*\\|\\s*"official_estore_observation"/);
+  assert.match(api, /source_surface:\s*"st_product_selector"\s*\|\s*"st_estore"/);
+  assert.match(api, /evidence_strength:\s*"official_product_selector_observation"\s*\|\s*"official_estore_observation"/);
   assert.match(selector, /selected\.manufacturer_device_basic_profile/);
   assert.match(selector, /<dt>ICPN<\/dt>/);
   assert.match(selector, /<dt>Base Device<\/dt>/);
