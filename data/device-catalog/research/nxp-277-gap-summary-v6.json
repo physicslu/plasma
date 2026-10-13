@@ -1,0 +1,32 @@
+{
+  "schema_version": 6,
+  "manufacturer": "NXP",
+  "main_production_exact": 4853,
+  "main_production_nxp_exact": 224,
+  "bounded_active_exact_501": 501,
+  "pending_active_exact": 277,
+  "original_gap": 129,
+  "new_active_gap": 148,
+  "new_exceptions": {
+    "OFFICIAL_EXACT_PART_PAGE_BLOCKED": 114,
+    "FOUR_BASIC_FIELDS_OBSERVED_REVIEW_REQUIRED": 3,
+    "PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED": 31
+  },
+  "old_exceptions": {
+    "http_non200": 85,
+    "flash_multi_value": 8,
+    "wireless_ambient": 8,
+    "mcx_flash_ambient": 5,
+    "imx_rt_flash_temperature": 23
+  },
+  "already_verified_manufacturer_device_212": 212,
+  "production_catalog_authorized": false,
+  "physical_programming_qualified": false,
+  "manufacturer_global_denominator": null,
+  "source_git_blobs": {
+    "original_129": "c21378432354c7d6604f3f08a4d0b4901d3927aa",
+    "new_148": "c3eb4137acfbfa5a8f836bdcf2f1e43d6c1fcf18",
+    "admitted_212": "541a62a9e6bf5a8c79436bd0e09ab1845394b964",
+    "production_manifest": "0c252b4d8673f722033302758db4705957f965c5"
+  }
+}
