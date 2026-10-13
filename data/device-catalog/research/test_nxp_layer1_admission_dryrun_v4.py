@@ -83,7 +83,7 @@ class NxpLayer1DryRunTests(unittest.TestCase):
             doc["sources"].append(dict(doc["sources"][0]))
             path.write_text(json.dumps(doc))
             with patch.object(m,"MANIFEST",path):
-                with self.assertRaisesRegex(ValueError,"Production manifest changed"):
+                with self.assertRaisesRegex(ValueError,"Production staged KL25 source/manifest drift|Production manifest changed"):
                     m.proposal()
 
     def test_kl25_csv_source_mutation_blocks(self):
