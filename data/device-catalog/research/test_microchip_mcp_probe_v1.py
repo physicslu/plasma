@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from microchip_mcp_probe_v1 import decode, product_data, reconcile, replay
+from microchip_mcp_probe_v1 import decode, product_data, reconcile, replay, run
 
 
 def page(offset, limit=2):
@@ -68,6 +68,28 @@ class ProbeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reconcile([page(0), page(2)], other)
 
+
+    def test_explicit_alternate_base_device_query(self):
+        def rename(data):
+            value = copy.deepcopy(data)
+            value['searchTerm'] = 'PIC10F206'
+            for row in value['products']:
+                row['partNumber'] = row['partNumber'].replace('PIC10F202', 'PIC10F206')
+                row['basePartNumber'] = 'PIC10F206'
+            return value
+        result = reconcile([rename(page(0)), rename(page(2))],
+                           rename(page(0, 60)), query='PIC10F206')
+        self.assertEqual(result['query'], 'PIC10F206')
+        self.assertEqual(result['unique_ordering_count'], 3)
+        with self.assertRaisesRegex(ValueError, 'query mismatch'):
+            reconcile([rename(page(0)), rename(page(2))], rename(page(0, 60)),
+                      query='PIC10F202')
+
+    def test_query_rejects_punctuation_without_issuing_network_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, 'alphanumeric'):
+                run(Path(temp) / 'uncreated', query='PIC10F202/evil')
+            self.assertFalse((Path(temp) / 'uncreated').exists())
 
     @staticmethod
     def archived_capture(folder):
