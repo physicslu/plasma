@@ -421,6 +421,36 @@ SKU lifecycles; complete fuzzy-only queries are counted as validated searches
 with **zero admitted part numbers**. All results are Research only; the
 separate manufacturer ordering-SKU population denominator stays null.
 
+## Manufacturer Device vs Programming Profile vs Module boundary (23 audited exceptions)
+
+The manufacturer's DFP index is a *programming-support identity* list, not
+a complete table of separately orderable commercial ICs. The research audit
+`microchip-dfp-ordering-boundary-review-v1.json` freezes all 23 exceptional
+observations from the 16-batch original source archive, without amending
+or overwriting any vendor response:
+
+- **8 wireless module family identities:** WBZ350, WBZ351, WBZ450,
+  WBZ451, WBZ451H and WFI32E01/E02/E03. Manufacturer ordering documentation
+  distinguishes **module-specific PE/UE and other suffixed ordering codes**
+  from the corresponding underlying PIC32Cx/PIC32MZ MCU SoC. These
+  need a dedicated module/SoC scope and exact ordering-code reconciliation,
+  **not automatic inclusion in an MCU IC-only ICPN**.
+- **5 dsPIC33CH...S1 identity records:** The official dsPIC33CH device
+  comparison groups them as distinct slave-core programming identities
+  associated with master-device models. This is a potential Programming
+  Profile/subtarget mapping, **not yet evidence of a separately purchasable
+  package**, and not flash-backend qualification.
+- **10 additional observations:** one AVR suffix/variant ambiguity plus
+  nine other unresolved Microchip MCP NOT_FOUND queries. Their statuses
+  remain unapplied to SKU lifecycle until independent manufacturer
+  ordering evidence exists.
+
+The official source links in the JSON permit future part-by-part audits;
+records intentionally keep `exact_ordering_code_verified=false`,
+`production_admission=false` and `global_active_denominator=null`.
+Do not collapse module family names or secondary-core identifiers into
+manufacturing SKU counts merely to fill coverage gaps.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
