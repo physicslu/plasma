@@ -69,7 +69,7 @@ class DevicePackParser(HTMLParser):
             self.pack['last_chip_id'] = chip_id
             self.pack['device_names'].append(chip_id)
         field = None
-        if tag == 'span' and 'pack-subtitle' in classes:
+        if tag in ('div', 'span') and 'pack-subtitle' in classes:
             field = 'subtitle'
         elif tag == 'span' and 'pack-badge' in classes:
             field = 'badge'
