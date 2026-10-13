@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from test_microchip_mcp_probe_v1 import ProbeTests
+from test_microchip_mcp_paged_probe_v2 import make_archive
 import microchip_mcp_evidence_ledger_v1 as ledger
 
 
@@ -28,6 +29,33 @@ class LedgerTests(unittest.TestCase):
                 self.assertEqual(len(row['sources']), 1)
                 self.assertEqual(row['sources'][0]['query'], 'PIC10F202')
                 self.assertEqual(len(row['sources'][0]['response_sha256']), 64)
+
+    def test_v2_paged_provenance_has_original_primary_page_digests(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / 'PIC10F202'
+            folder.mkdir()
+            make_archive(folder)
+            result = ledger.build(root, ['PIC10F202'])
+            self.assertTrue(result['all_queries_reconciled'])
+            self.assertEqual(result['fully_replayed_queries'], 1)
+            self.assertEqual(result['unique_exact_ordering_candidates'], 75)
+            self.assertEqual(result['raw_lifecycle_values'], ['Active'])
+            self.assertEqual({x['sources'][0]['evidence_file'].split('/')[1]
+                              for x in result['ordering_candidates']},
+                             {'response-03.txt', 'response-04.txt',
+                              'response-05.txt', 'response-06.txt'})
+
+    def test_v2_mutated_original_bytes_drop_entire_query(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / 'PIC10F202'
+            folder.mkdir()
+            make_archive(folder)
+            (folder / 'response-05.txt').write_bytes(b'corrupted')
+            result = ledger.build(root, ['PIC10F202'])
+            self.assertFalse(result['all_queries_reconciled'])
+            self.assertEqual(result['unique_exact_ordering_candidates'], 0)
 
     def test_mutated_original_bytes_fail_closed_to_zero_admitted_research_rows(self):
         with tempfile.TemporaryDirectory() as temp:

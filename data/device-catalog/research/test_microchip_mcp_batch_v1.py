@@ -57,6 +57,25 @@ class BatchTests(unittest.TestCase):
             self.assertEqual(json.loads((output / 'batch-summary.json').read_text())
                              ['bounded_reconciled_queries'], 3)
 
+    def test_paged_v2_live_capture_is_explicit_and_bounded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / 'paged'
+            with patch.object(batch.paged, 'run',
+                              side_effect=lambda folder, part: self.fake_result(part)) as capture:
+                result = batch.execute(output, batch.load_seeds()[:3],
+                                       workers=2, capture_format='paged_v2')
+            self.assertTrue(result['all_queries_reconciled'])
+            self.assertEqual(result['capture_format'], 'paged_v2')
+            self.assertEqual(capture.call_count, 3)
+
+    def test_invalid_capture_format_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'not_created'
+            with self.assertRaisesRegex(ValueError, 'capture format'):
+                batch.execute(target, batch.load_seeds()[:1],
+                              capture_format='unexpected')
+            self.assertFalse(target.exists())
+
     def test_two_session_batch_preserves_replay_seed_order(self):
         parts = batch.load_seeds()[:10]
         with tempfile.TemporaryDirectory() as temp:

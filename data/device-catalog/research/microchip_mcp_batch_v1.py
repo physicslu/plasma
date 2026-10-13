@@ -14,6 +14,7 @@ from pathlib import Path
 import sys
 
 import microchip_mcp_probe_v1 as probe
+import microchip_mcp_paged_probe_v2 as paged
 
 HERE = Path(__file__).resolve().parent
 SEEDS = HERE / 'microchip-pic10-pic12-mcp-batch-seeds-v1.json'
@@ -46,9 +47,10 @@ def load_seeds(path=SEEDS):
     return parts
 
 
-def execute(output, parts, offline=False, workers=1):
+def execute(output, parts, offline=False, workers=1, capture_format='v1'):
     """Run independent read-only queries with bounded optional concurrency."""
     require(type(workers) is int and 1 <= workers <= 2, 'worker count out of range')
+    require(capture_format in ('v1', 'paged_v2'), 'unsupported live capture format')
     require(isinstance(parts, list) and 1 <= len(parts) <= MAX_SEEDS and
             len(set(parts)) == len(parts) and
             all(isinstance(part, str) and probe.BASE_QUERY.fullmatch(part)
@@ -64,7 +66,14 @@ def execute(output, parts, offline=False, workers=1):
         if offline and not (folder / 'manifest.json').exists():
             return {'base_device_query': part, 'state': 'not_archived'}
         try:
-            result = probe.replay(folder, part) if offline else probe.run(folder, part)
+            if offline:
+                manifest = json.loads((folder / 'manifest.json').read_text())
+                version = manifest.get('schema_version', 1)
+                require(type(version) is int and version in (1, 2),
+                        'unknown archived capture schema')
+                result = (probe if version == 1 else paged).replay(folder, part)
+            else:
+                result = (probe if capture_format == 'v1' else paged).run(folder, part)
             require(result.get('query') == part and
                     result.get('population_boundary_validated') is False and
                     result.get('global_active_denominator') is None and
@@ -96,6 +105,7 @@ def execute(output, parts, offline=False, workers=1):
         'manufacturer': 'Microchip',
         'scope': 'candidate PIC10/PIC12 DFP base-device text-search queries',
         'mode': 'offline_replay' if offline else 'live_read_only',
+        'capture_format': 'archive_auto_detect' if offline else capture_format,
         'generated_at_utc': datetime.now(timezone.utc).isoformat(),
         'selected_device_names': len(parts),
         'bounded_reconciled_queries': sum(
@@ -118,6 +128,8 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--replay', action='store_true',
                         help='verify archived per-query bytes without network')
+    parser.add_argument('--capture-format', choices=('v1', 'paged_v2'),
+                        default='v1', help='v2 verifies full 20- and 60-row walks')
     parser.add_argument('--workers', type=int, default=1,
                         help='independent concurrent MCP sessions, 1 or 2')
     parser.add_argument('--max-queries', type=int, default=MAX_SEEDS,
@@ -125,7 +137,8 @@ def main():
     args = parser.parse_args()
     require(1 <= args.max_queries <= MAX_SEEDS, 'query count out of range')
     result = execute(args.output_dir, load_seeds()[:args.max_queries],
-                     offline=args.replay, workers=args.workers)
+                     offline=args.replay, workers=args.workers,
+                     capture_format=args.capture_format)
     print(json.dumps(result, indent=2, sort_keys=True))
     if not result['all_queries_reconciled']:
         sys.exit(1)

@@ -15,6 +15,7 @@ from pathlib import Path
 import sys
 
 import microchip_mcp_probe_v1 as probe
+import microchip_mcp_paged_probe_v2 as paged
 from microchip_mcp_batch_v1 import load_seeds
 
 
@@ -35,20 +36,24 @@ def build(root: Path, parts: list[str]) -> dict:
                 'invalid device query')
         folder = root / part
         try:
-            check = probe.replay(folder, part)
             manifest = json.loads((folder / 'manifest.json').read_text())
+            version = manifest.get('schema_version', 1)
+            require(type(version) is int and version in (1, 2),
+                    'unknown archived capture schema')
+            check = (probe if version == 1 else paged).replay(folder, part)
+            primary_limit = 2 if version == 1 else paged.PRIMARY_LIMIT
             local_observations = []
             for event in manifest['responses']:
                 req = event['request']
                 if req.get('method') != 'tools/call':
                     continue
                 args = req['params']['arguments']
-                if args['limit'] != 2:
+                if args['limit'] != primary_limit:
                     continue
                 raw = (folder / event['file']).read_bytes()
                 data = probe.product_data(probe.decode(raw, req['id']))
-                _, rows = probe.validate_page(data, args['offset'], args['limit'],
-                                              query=part)
+                validator = probe.validate_page if version == 1 else paged.validate_page
+                _, rows = validator(data, args['offset'], args['limit'], query=part)
                 for row in rows:
                     part_number = row['partNumber']
                     if not probe.exact_ordering_prefix(part_number, part):

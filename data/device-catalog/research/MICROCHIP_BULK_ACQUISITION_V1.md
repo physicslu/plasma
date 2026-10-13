@@ -129,6 +129,26 @@ python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
   --query PIC10F202 --output-dir /tmp/microchip-v2-single-query --replay
 ```
 
+## Gate 2c — Pilot batch/ledger v2 integration
+
+The original 27-name PIC10/PIC12 batch driver can now explicitly use
+`--capture-format paged_v2` to collect both complete pagination walks for
+queries reporting 61–600 rows. The default remains `v1` for backward
+compatibility. Offline batch replay and the source-linked ledger detect the
+archived schema (v1 or v2), preserve the original response-byte digest for
+each SKU candidate, and reject unrecognized formats. V2 ledger rows are
+derived from the primary 20-row capture only, after independent 60-row
+reconciliation succeeds. Tests use synthetic 75-result archives; **no live
+>60-result manufacturer observations have yet been claimed**.
+
+```bash
+python data/device-catalog/research/microchip_mcp_batch_v1.py \
+  --output-dir /tmp/microchip-mcp-v2-capture --max-queries 3 \
+  --workers 1 --capture-format paged_v2
+python data/device-catalog/research/microchip_mcp_batch_v1.py \
+  --output-dir /tmp/microchip-mcp-v2-capture --max-queries 3 --replay
+```
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
