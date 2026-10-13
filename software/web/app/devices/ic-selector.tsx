@@ -360,6 +360,18 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     : "—"}</dd>
                 </div>
                 <div>
+                  <dt>I/O Supply</dt>
+                  <dd>{selected.manufacturer_device_basic_profile?.io_supply_v
+                    ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
+                    : "—"}</dd>
+                </div>
+                <div>
+                  <dt>VDDA</dt>
+                  <dd>{selected.manufacturer_device_basic_profile?.vdda_v
+                    ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
+                    : "—"}</dd>
+                </div>
+                <div>
                   <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
                   <dd>{selected.manufacturer_device_basic_profile
                     ? `${selected.manufacturer_device_basic_profile.operating_temperature_c.min}–${selected.manufacturer_device_basic_profile.operating_temperature_c.max} °C`
