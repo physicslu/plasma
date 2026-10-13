@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 ENDPOINT = 'https://api.microchip.com/mcp/resources'
 QUERY = 'PIC10F202'
 MAX_ROWS = 60
-BASE_QUERY = re.compile(r'[A-Za-z][A-Za-z0-9]{4,39}\\Z')
+BASE_QUERY = re.compile(r'[A-Za-z][A-Za-z0-9]{4,39}')
 
 
 def require(condition, message):
