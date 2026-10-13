@@ -207,3 +207,30 @@ Phase 1 does not:
 - make the IC Selector a Product Mode;
 - change PPU, Site, Batch, programming, or hardware execution behavior;
 - define Production eligibility policy inside the Selector.
+
+
+## Manufacturer Device Basic Profile
+
+IC Information consumes an additive `manufacturer_device_basic_profile` projection independent
+from the manufacturer-derived Programming Profile.
+
+For STM32F1 v1, operator-facing basic data is limited to:
+
+```text
+ICPN
+Base Device
+Package
+Pin Count
+Flash
+RAM
+Operating VDD
+Operating Temperature
+```
+
+Official ST Product Selector, official product pages, and ST eStore metadata are accepted
+manufacturer surfaces for these basic product fields. Programming Guide evidence is not used.
+Memory Map, I/O supply, VDDA and Flash-controller semantics are intentionally excluded from the
+IC Information panel.
+
+Missing basic enrichment remains explicit; the browser must not infer RAM/VDD from OpenOCD or
+family naming. A Programming Profile remains a separate evidence layer.
