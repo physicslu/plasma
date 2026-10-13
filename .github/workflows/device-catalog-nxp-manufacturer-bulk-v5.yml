@@ -73,7 +73,7 @@ jobs:
               subset=[x for x in rows if x["family"]==family]
               assert len(subset)==n
               out=io.StringIO(newline="")
-              w=csv.DictWriter(out,fieldnames=list(rows[0]),lineterminator="\\n")
+              w=csv.DictWriter(out,fieldnames=list(rows[0]),lineterminator="\n")
               w.writeheader();w.writerows(subset)
               encoded=out.getvalue().encode("utf-8")
               assert retained.read_bytes()==encoded, "source family split differs from manufacturer replay"
