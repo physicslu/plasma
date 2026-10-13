@@ -1,8 +1,8 @@
 # Manufacturer Enrichment Coverage Framework v1
 
-Status: research architecture baseline  
-Scope: coverage measurement and reusable manufacturer-fact composition only  
-Runtime authority: none  
+Status: research architecture baseline
+Scope: coverage measurement and reusable manufacturer-fact composition only
+Runtime authority: none
 Hardware authority: none
 
 ## 1. Purpose
