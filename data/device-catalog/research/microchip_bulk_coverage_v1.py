@@ -68,7 +68,7 @@ def verify_source_bytes(root: Path, filename: str, expected_sha256: str) -> None
     """Verify actual local source bytes, not merely a 64-character digest field."""
     require(isinstance(filename, str) and filename not in (".", "..") and
             Path(filename).name == filename and "/" not in filename and
-            "\\\\" not in filename, "invalid evidence capture filename")
+            chr(92) not in filename, "invalid evidence capture filename")
     require(isinstance(expected_sha256, str) and bool(DIGEST.fullmatch(expected_sha256)),
             "missing source bytes digest")
     evidence = root / filename
