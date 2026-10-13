@@ -131,6 +131,24 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(basic["programming_profile_authority"])
                 self.assertIsNone(result["selected_profile"])
 
+    def test_g4_basic_profile_exposes_direct_vdda_without_io_supply_inference(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32G474VCH3TR&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32G474VCH3TR")
+        self.assertEqual(result["family"], "STM32G4")
+        basic = result["manufacturer_device_basic_profile"]
+        self.assertIsNotNone(basic)
+        assert basic is not None
+        self.assertEqual(basic["profile_id"], "stm32g4-device-basic-v1")
+        self.assertEqual(basic["ram_size"], "128 KiB")
+        self.assertEqual(basic["operating_vdd_v"], {"min": 1.71, "max": 3.6})
+        self.assertIsNone(basic["io_supply_v"])
+        self.assertEqual(basic["vdda_v"], {"min": 1.71, "max": 3.6})
+        self.assertFalse(basic["programming_profile_authority"])
+        self.assertIsNone(result["selected_profile"])
+
     def test_admitted_icpn_without_manufacturer_selected_profile_returns_null(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F407VGT6&limit=1")
         self.assertEqual(status, 200)
