@@ -350,6 +350,20 @@ python data/device-catalog/research/microchip_mcp_query_gap_v1.py \
   --output /tmp/microchip-query-gap.json
 ```
 
+## Partial-batch replay for scalable Research capture
+
+`microchip_mcp_partial_rollup_v2.py` is a Research-only alternative to
+the original all-or-nothing rollup. It first validates the **entire** batch
+against its immutable original DFP source attestation. Each independently
+successful query can then contribute its verified, original-byte-linked
+ordering candidates even when another query in the same ten-name batch
+returns fuzzy-only, NOT_FOUND, or a broken transcript. A missing, corrupt
+or zero-prefix query is not reclassified as EOL and is still marked
+**unreplayed**. A forged batch attestation or unexpected batch file quarantines
+the entire batch; raw lifecycle conflicts quarantine exact ordering identities.
+No Production admission or full SKU denominator is inferred. This makes the
+bulk research process recoverable without weakening any per-query source proof.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
