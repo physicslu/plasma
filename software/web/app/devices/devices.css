@@ -6,13 +6,14 @@
 
 .icSelector {
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(300px, .8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 
 .icSelectorSearchPanel,
 .icSelectorDetail {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: linear-gradient(145deg, var(--panel), var(--panel-2));
@@ -86,9 +87,9 @@
 .icSelectorResult {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(190px, .9fr) minmax(190px, 1fr) minmax(250px, 1.1fr);
+  grid-template-columns: minmax(150px, .85fr) minmax(0, 1.15fr);
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -108,8 +109,15 @@
 .icSelectorTaxonomy b { display: block; font-size: 11px; }
 .icSelectorTaxonomy span + span::before { content: " · "; color: var(--line-strong); }
 
-.icSelectorStatusStack { display: grid; gap: 5px; justify-items: end; }
-.icSelectorStatusRow { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.icSelectorStatusStack {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  align-items: start;
+}
+.icSelectorStatusRow { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 5px; }
+.icSelectorStatusEvidence { justify-content: flex-end; }
 .icSelectorStatusRow span {
   border: 1px solid var(--line);
   border-radius: 99px;
@@ -211,8 +219,8 @@
   .icSelector { grid-template-columns: 1fr; }
   .icSelectorDetail { position: static; }
   .icSelectorResult { grid-template-columns: minmax(180px, .8fr) minmax(180px, 1fr); }
-  .icSelectorStatusStack { grid-column: 1 / -1; justify-items: start; }
   .icSelectorStatusRow { justify-content: flex-start; }
+  .icSelectorStatusEvidence { justify-content: flex-end; }
 }
 
 @media (max-width: 650px) {
@@ -223,8 +231,9 @@
   .icSelectorSearchBox { grid-template-columns: 1fr; gap: 2px; }
   .icSelectorSearchBox em { justify-self: start; }
   .icSelectorResult { grid-template-columns: 1fr; }
-  .icSelectorStatusStack { grid-column: auto; justify-items: start; }
-  .icSelectorStatusRow { justify-content: flex-start; }
+  .icSelectorStatusStack { grid-column: auto; grid-template-columns: 1fr; }
+  .icSelectorStatusRow,
+  .icSelectorStatusEvidence { justify-content: flex-start; }
 }
 
 
