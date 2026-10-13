@@ -79,6 +79,7 @@ class PagedProbeTests(unittest.TestCase):
         outcome = v2.reconcile(first, second, 'dsPIC33CK128MP506')
         self.assertEqual(outcome['exact_prefix_ordering_count'], 2)
         self.assertEqual(outcome['fuzzy_foreign_ordering_count'], 0)
+        self.assertEqual(outcome['vendor_base_part_alias_count'], 0)
         self.assertEqual(outcome['exact_query_ordering_parts'], [
             'DSPIC33CK128MP506-I/MR', 'DSPIC33CK128MP506T-E/MR'])
 

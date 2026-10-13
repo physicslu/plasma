@@ -92,7 +92,7 @@ def reconcile(primary, comparison, query=v1.QUERY):
             'pagination identity or lifecycle reconciliation mismatch')
     targets = [r for r in left if v1.exact_ordering_prefix(r['partNumber'], query)]
     foreign = [r for r in left if not v1.exact_ordering_prefix(r['partNumber'], query)]
-    aliases = [r for r in targets if r['basePartNumber'] != query]
+    aliases = [r for r in targets if r['basePartNumber'].upper() != query.upper()]
     return {
         'query': query, 'reported_total': left_total,
         'unique_ordering_count': len(left),
