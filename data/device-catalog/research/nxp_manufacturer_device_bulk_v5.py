@@ -133,9 +133,9 @@ def build(root:Path)->tuple[list[dict],list[dict],dict]:
             "original Production 4629 ST + 12 KL25 prestate drift")
     old_doc=json.loads(json.dumps(existing))
     old_doc["sources"]=previous
-    old_raw=(json.dumps(old_doc,indent=2)+"\\n").encode("utf-8")
+    old_raw=(json.dumps(old_doc,indent=2)+"\n").encode("utf-8")
     old_blob=hashlib.sha1(b"blob "+str(len(old_raw)).encode("ascii")+
-                          b"\\0"+old_raw).hexdigest()
+                          b"\0"+old_raw).hexdigest()
     require(old_blob=="02affa52402a23628c971e58b5bb2e5b3528c511",
             "previous verified 4641-ICPN Production manifest prestate changed")
     if len(source_rows)==31:
@@ -241,7 +241,7 @@ def build(root:Path)->tuple[list[dict],list[dict],dict]:
             require(canonical_file==raw and
                     digest(raw)==x["sha256"] and
                     hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+
-                                 b"\\0"+raw).hexdigest()==x["git_blob_sha"],
+                                 b"\0"+raw).hexdigest()==x["git_blob_sha"],
                     f"{name}: proposed production file is not byte-for-byte official HTML replay")
     require(set(x["icpn"] for x in out).isdisjoint(blocked) and
             set(x["icpn"] for x in out).isdisjoint(
