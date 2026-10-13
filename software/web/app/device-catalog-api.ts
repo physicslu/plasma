@@ -242,6 +242,7 @@ export type DeviceSearchResponse = {
   query: string;
   catalog_size: number;
   count: number;
+  total_count: number;
   results: DeviceSearchResult[];
 };
 
