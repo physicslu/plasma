@@ -17,10 +17,13 @@ Production Device Catalog
         v
 IC Support binding
         |
-        +--> Manufacturer Device knowledge
-        |       - identity characteristics
-        |       - operating electrical characteristics
-        |       - memory map
+        +--> Manufacturer Device Basic Profile
+        |       - exact ICPN / Base Device / package / pin count
+        |       - Flash / RAM
+        |       - operating VDD / operating temperature
+        |
+        +--> Manufacturer Device detail (internal / future UI use)
+        |       - memory map and other address-space detail
         |
         +--> Manufacturer Programming knowledge
         |       - interface/pins
@@ -54,14 +57,26 @@ Owns commercial identity admission:
 
 Catalog admission does not prove electrical safety or physical programming support.
 
-### Manufacturer Device Profile
+### Manufacturer Device Basic Profile
 
-Owns intrinsic IC characteristics:
+The Basic Profile is the operator-facing IC Information contract. For v1 it owns exactly:
 
-- operating VDD and I/O supply characteristics;
-- package/device characteristics;
-- Flash/SRAM/system-memory map;
-- main-Flash address range and page organization.
+- exact ICPN;
+- Base Device;
+- package;
+- pin count;
+- Flash capacity;
+- RAM capacity;
+- operating VDD;
+- operating temperature.
+
+For the STM32F1 expansion these facts are composed from Production Catalog exact identity
+plus official ST Product Selector / Product Page metadata. The Basic Profile is independent
+from Programming Profile authority. It cannot authorize erase/program/verify or hardware use.
+
+Detailed memory-map/address-range data may remain available in deeper manufacturer models for
+execution research, but **Memory Map is not part of the IC Information v1 display contract**.
+Likewise I/O supply and VDDA are deferred until an explicit electrical-detail transaction.
 
 Absolute maximum ratings, when later added, must remain distinct from valid operating
 ranges and must never become power setpoints.
@@ -108,8 +123,14 @@ physical qualification.
 
 ## API
 
-`GET /api/devices/search` remains the stable route. Results may include an additive
-`selected_profile` field.
+`GET /api/devices/search` remains the stable route. Results may include two independent
+additive projections:
+
+- `manufacturer_device_basic_profile` — basic IC Information facts; currently STM32F1 v1.
+- `selected_profile` — the deeper manufacturer/programming composition used only when
+  Programming Profile evidence exists.
+
+A Basic Profile does not imply that `selected_profile` exists.
 
 For an exact ICPN with an admitted manufacturer profile, the projection includes:
 
@@ -132,14 +153,16 @@ selected_profile
 └── ic_support
 ```
 
-An admitted ICPN without manufacturer enrichment returns `selected_profile=null`; the
-service does not invent family-derived values.
+An admitted ICPN without Programming Profile enrichment may still return a
+`manufacturer_device_basic_profile`. Targets outside the explicitly bound Basic Profile set
+return that field as null; the service does not infer applicability from family names or
+OpenOCD routing.
 
 ## UI
 
 The IC Selector presents the selected ICPN in three primary sections:
 
-1. **IC Information** — identity, operating electrical characteristics and memory map.
+1. **IC Information** — ICPN, Base Device, Package, Pin Count, Flash, RAM, Operating VDD and Operating Temperature.
 2. **Programming** — programming interface/electrical conditions/Flash geometry/flow.
 3. **PLASMA Compatibility** — Site/Socket/hardware/physical readiness.
 
