@@ -53,7 +53,7 @@ class NxpPilotEvidenceTests(unittest.TestCase):
             root = Path(d)
             self.setup_pilot(root)
             result = mod.reconcile(root)
-            self.assertEqual(result["observed_active_exact"], 18)
+            self.assertEqual(result["observed_active_exact"], len(cfg["products"]) + 11)
             self.assertEqual(result["locked_kl25_exact_pilot"], 12)
             self.assertIsNone(result["global_active_denominator"])
             self.assertFalse(result["global_portfolio_complete"])
@@ -69,7 +69,7 @@ class NxpPilotEvidenceTests(unittest.TestCase):
             x["qualification_exact_count"] = 1
             p.write_text(json.dumps(x))
             result = mod.reconcile(root)
-            self.assertEqual(result["observed_active_exact"], 17)
+            self.assertEqual(result["observed_active_exact"], len(cfg["products"]) + 10)
             self.assertEqual(result["observed_qualification_exact"], 1)
 
     def test_raw_html_hash_mismatch_blocks(self):

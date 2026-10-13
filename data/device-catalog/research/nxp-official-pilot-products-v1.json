@@ -52,6 +52,90 @@
       "url": "https://www.nxp.com/products/KW45?tab=Package_Quality_Tab",
       "prefix": "KW45",
       "must_include": "KW45Z41083AFTBT"
+    },
+    {
+      "id": "mcx-a13x",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A13X-A14X-A15X?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA156VPJ"
+    },
+    {
+      "id": "mcx-a17",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A17?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA176VPN"
+    },
+    {
+      "id": "mcx-a18",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A18?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA186VPN"
+    },
+    {
+      "id": "mcx-a25",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A25?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA256VPN"
+    },
+    {
+      "id": "mcx-a26",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A26?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA266VPN"
+    },
+    {
+      "id": "mcx-a34",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A34?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA346VPN"
+    },
+    {
+      "id": "mcx-a35",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A35?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA356VPN"
+    },
+    {
+      "id": "mcx-a36",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-A36?tab=Package_Quality_Tab",
+      "prefix": "MCXA",
+      "must_include": "MCXA366VPN"
+    },
+    {
+      "id": "mcx-c14x",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-C14x-24x-44x?tab=Package_Quality_Tab",
+      "prefix": "MCXC",
+      "must_include": "MCXC444VMP"
+    },
+    {
+      "id": "mcx-e31",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-E31?tab=Package_Quality_Tab",
+      "prefix": "MCXE",
+      "must_include": "MCXE31BMPB"
+    },
+    {
+      "id": "mcx-e24",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-E24?tab=Package_Quality_Tab",
+      "prefix": "MCXE",
+      "must_include": "MCXE247VLQ"
+    },
+    {
+      "id": "mcx-n94",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-N94-N54-N53-N52-N24?tab=Package_Quality_Tab",
+      "prefix": "MCXN",
+      "must_include": "MCXN947VPBT"
     }
   ]
 }

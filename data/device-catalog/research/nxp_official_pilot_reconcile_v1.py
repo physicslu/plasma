@@ -54,8 +54,10 @@ def reconcile(root: Path) -> dict:
             and registry["production_write_authorized"] is False,
             "research-only scope changed")
     products = registry["products"]
-    require(len(products) == 7 and len({p["id"] for p in products}) == 7,
+    require(len(products) >= 7 and len({p["id"] for p in products}) == len(products),
             "fixed official product set drift")
+    require({"mcx-c04x", "mcx-n23x", "kl25", "lpc55s6x", "k32-l2", "imx-rt1060", "kw45"}.issubset({p["id"] for p in products}),
+            "retained seven-page manufacturer pilot changed")
     production = load(PRODUCTION_MANIFEST)
     require(production.get("status") == "production", "bad Production manifest")
     require(all(s["manufacturer"] != "NXP" for s in production["sources"]),

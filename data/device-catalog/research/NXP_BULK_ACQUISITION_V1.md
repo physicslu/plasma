@@ -88,3 +88,25 @@ enumeration; all seven remain `source_population_complete=false`.
 Retain `Active`, `Qualification` and `No Longer Manufactured` as
 different literal official lifecycle states. No unmapped NXP device gains
 a Programming Profile merely by appearing in this report.
+
+## Gate 1d — MCX A/C/E/N official-source batch
+
+An additional **12 pinned official MCX product pages** were admitted into the
+read-only research acquisition manifest after confirming the manufacturer's
+Package/Quality source surface. Together with the original seven, the bounded
+matrix now contains **19 product pages** across six broader research lanes.
+The run is throttled to four concurrent product-page captures to reduce
+unnecessary load on NXP and on Actions runners.
+
+- MCX A: A13x/A14x/A15x, A17, A18, A25, A26, A34, A35, A36
+- MCX C: C14x/C24x/C44x
+- MCX E: E24, E31
+- MCX N: N94/N54/N53/N52/N24
+- Prior pinned pages: MCX C04x/N23x, KL25, LPC55S6x, K32 L2,
+  i.MX RT1060, KW45.
+
+These are individually corroborated product page leads, **not** manufacturer
+total-family enumerations. Every official page must be captured successfully
+and remain `source_population_complete=false`, with NXP-wide denominator
+and percentage `null`. Cross-page repeated commercial identities are
+deduplicated by exact identity and contradictory lifecycle blocks the gate.

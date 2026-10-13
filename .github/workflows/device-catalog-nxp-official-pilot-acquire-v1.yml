@@ -30,8 +30,9 @@ jobs:
     timeout-minutes: 25
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
-        product: [mcx-c04x, mcx-n23x, kl25, lpc55s6x, k32-l2, imx-rt1060, kw45]
+        product: [mcx-c04x, mcx-n23x, kl25, lpc55s6x, k32-l2, imx-rt1060, kw45, mcx-a13x, mcx-a17, mcx-a18, mcx-a25, mcx-a26, mcx-a34, mcx-a35, mcx-a36, mcx-c14x, mcx-e31, mcx-e24, mcx-n94]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -63,7 +64,7 @@ jobs:
         with:
           pattern: nxp-official-v1-*
           path: /tmp/nxp-pilot
-      - name: Reconcile 3 manufacturer pages with strict evidence digests
+      - name: Reconcile pinned manufacturer pages with strict evidence digests
         run: |
           python -m unittest discover -s data/device-catalog/research -p 'test_nxp_official_pilot_reconcile_v1.py' -v
           python data/device-catalog/research/nxp_official_pilot_reconcile_v1.py \
