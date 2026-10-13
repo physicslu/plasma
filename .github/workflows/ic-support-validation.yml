@@ -140,7 +140,9 @@ jobs:
         run: python data/ic-support/test_ic_support.py
       - name: Validate manufacturer enrichment scope and coverage
         run: |
-          python -m py_compile             data/ic-support/manufacturer_enrichment_scope.py             data/ic-support/coverage_inventory.py
+          python -m py_compile \
+            data/ic-support/manufacturer_enrichment_scope.py \
+            data/ic-support/coverage_inventory.py
           python data/ic-support/test_manufacturer_enrichment_scope.py
           python data/ic-support/coverage_inventory.py --manufacturer-summary
           python data/ic-support/coverage_inventory.py --icpn STM32F103C8T6
