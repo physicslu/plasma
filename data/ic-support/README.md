@@ -17,6 +17,7 @@ Manufacturer evidence
 AI IC Support research
         |
         +-- Programming Profile candidate
+        +-- Programming Route Profile candidate
         +-- Memory Geometry Profile candidate
         +-- Package / Minimum Hardware candidate
         +-- Option Profile candidate
@@ -36,7 +37,9 @@ Device Catalog -------------------------------> User-selectable ICPN
 
 Research output is not automatically promoted into production software. A future runtime capability/driver promotion must have its own explicit contract, implementation and validation boundary.
 
-The Phase A target is `STM32F103C8T6` + `STM32F103CBT6`. The pair is deliberately chosen to test profile reuse: they share the programming behavior under test while their Flash geometries differ.
+The Phase A target is `STM32F103C8T6` + `STM32F103CBT6`. The pair is deliberately chosen to test profile reuse: they share the programming behavior and Programming Route profile under test while their Flash geometries differ.
+
+Programming Route v1 separates **context** from **transport**. The only context keys are `icp` and `offline_socket`; vendor-specific signal names such as STM32 `BOOT0` / `BOOT1` appear only inside a manufacturer route instance, never in the generic schema. A route that requires strap control is not admitted for the ICP context in v1. Route knowledge does not imply a runtime implementation.
 
 ## Layout
 
@@ -58,6 +61,7 @@ data/ic-support/
 │   └── rules-v0.json
 ├── profiles/
 │   ├── programming/
+│   ├── programming-route/
 │   ├── memory-geometry/
 │   ├── package-hardware/
 │   ├── option/
