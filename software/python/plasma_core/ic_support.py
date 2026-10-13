@@ -15,12 +15,13 @@ IC_SUPPORT_ROOT_ENV = "PLASMA_IC_SUPPORT_ROOT"
 IC_SUPPORT_RELATIVE_ROOT = Path("data/ic-support")
 EXPECTED_PROFILE_KINDS = (
     "programming",
-    "programming_route",
     "memory_geometry",
     "package_hardware",
     "option",
     "security",
 )
+SELECTED_PROFILE_KINDS = EXPECTED_PROFILE_KINDS + ("programming_route",)
+PROGRAMMING_ROUTE_BINDING_DIRNAME = "programming-route"
 PROFILE_DIRECTORY_KIND = {
     "programming": "programming",
     "programming-route": "programming_route",
@@ -401,7 +402,8 @@ class ResolvedICSupport:
             "binding_status": self.binding_status,
             "profiles": {
                 kind: self.profiles[kind].to_summary()
-                for kind in EXPECTED_PROFILE_KINDS
+                for kind in SELECTED_PROFILE_KINDS
+                if kind in self.profiles
             },
         }
         return payload
@@ -418,7 +420,8 @@ class ResolvedICSupport:
             "flash_size": self.expected_catalog["flash_size"],
             "profiles": {
                 kind: self.profiles[kind].to_summary()
-                for kind in EXPECTED_PROFILE_KINDS
+                for kind in SELECTED_PROFILE_KINDS
+                if kind in self.profiles
             },
             "backends": {
                 "openocd": {
@@ -581,6 +584,82 @@ class ICSupportResolver:
                 )
 
         _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
+
+        route_bindings_root = bindings_root / PROGRAMMING_ROUTE_BINDING_DIRNAME
+        seen_route_bindings: set[str] = set()
+        if route_bindings_root.exists():
+            for path in sorted(route_bindings_root.glob("*.json")):
+                payload = _load_object(path)
+                binding_set_id = payload.get("binding_set_id")
+                binding_status = payload.get("status")
+                bindings = payload.get("bindings")
+                _require(
+                    isinstance(binding_set_id, str) and binding_set_id,
+                    f"{path}: route binding_set_id is required",
+                )
+                _require(
+                    isinstance(binding_status, str) and binding_status,
+                    f"{path}: route binding status is required",
+                )
+                _require(
+                    isinstance(bindings, list) and bindings,
+                    f"{path}: route bindings must be a non-empty array",
+                )
+                for index, entry in enumerate(bindings):
+                    _require(
+                        isinstance(entry, dict),
+                        f"{path}: bindings[{index}] must be an object",
+                    )
+                    icpn = entry.get("icpn")
+                    profile_id = entry.get("programming_route")
+                    _require(
+                        isinstance(icpn, str) and icpn.strip(),
+                        f"{path}: route binding ICPN is required",
+                    )
+                    canonical_icpn = icpn.strip()
+                    key = canonical_icpn.casefold()
+                    _require(
+                        key in records,
+                        f"{canonical_icpn}: route binding has no base IC Support binding",
+                    )
+                    _require(
+                        key not in seen_route_bindings,
+                        f"duplicate Programming Route binding for exact ICPN: {canonical_icpn}",
+                    )
+                    _require(
+                        isinstance(profile_id, str) and profile_id,
+                        f"{canonical_icpn}: programming_route profile_id is required",
+                    )
+                    _require(
+                        profile_id in profiles,
+                        f"{canonical_icpn}: dangling Programming Route profile {profile_id!r}",
+                    )
+                    profile = profiles[profile_id]
+                    _require(
+                        profile.kind == "programming_route",
+                        f"{canonical_icpn}: profile {profile_id!r} is not a Programming Route profile",
+                    )
+                    record = records[key]
+                    selected = dict(record.profiles)
+                    selected["programming_route"] = profile
+                    records[key] = ResolvedICSupport(
+                        icpn=record.icpn,
+                        binding_set_id=record.binding_set_id,
+                        binding_status=record.binding_status,
+                        expected_catalog=record.expected_catalog,
+                        profiles=selected,
+                        revision_overrides=record.revision_overrides,
+                        manufacturer_profile=record.manufacturer_profile,
+                    )
+                    seen_route_bindings.add(key)
+
+        for record in records.values():
+            if record.manufacturer_profile is not None:
+                _require(
+                    "programming_route" in record.profiles,
+                    f"{record.icpn}: manufacturer-selected profile requires a Programming Route binding",
+                )
+
         return cls(records, root=resolved_root)
 
     def resolve_exact(self, icpn: str) -> ResolvedICSupport | None:
@@ -599,7 +678,11 @@ class ICSupportResolver:
             {record.programming_profile.profile_id for record in self._records.values()}
         )
         programming_route_profiles = sorted(
-            {record.profile("programming_route").profile_id for record in self._records.values()}
+            {
+                record.profiles["programming_route"].profile_id
+                for record in self._records.values()
+                if "programming_route" in record.profiles
+            }
         )
         return {
             "resolved_exact_icpns": self.size,
