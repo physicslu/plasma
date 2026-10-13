@@ -109,17 +109,21 @@ def validate()->dict:
     # from the in-memory replay. Never rewrite the historical receipt.
     live_manifest=json.loads(MANIFEST.read_bytes())
     live_sources=live_manifest["sources"]
-    req(len(live_sources)==29 and sum(int(s["row_count"]) for s in live_sources)==4641,
-        "current Production scope must be exactly ST 4629 + KL25 12")
-    req(live_sources[-1]=={
-        "manufacturer":"NXP","family":"KL25",
-        "path":"../research/nxp-kl25-commercial-icpn.csv",
-        "row_count":12,
-        "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
-        "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
-    },"unexpected new Production vendor/identity scope")
+    req(len(live_sources)==31 and sum(int(s["row_count"]) for s in live_sources)==4853,
+        "current Production scope must be ST 4629 + KL25 12 + MCX 196 + K32L2 16")
+    req(live_sources[28:]==[
+        {
+            "manufacturer":"NXP","family":"KL25",
+            "path":"../research/nxp-kl25-commercial-icpn.csv",
+            "row_count":12,
+            "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
+            "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+        },
+        {"manufacturer": "NXP","family": "MCX","path": "../research/nxp-mcx-196-commercial-v5.csv","row_count": 196,"git_blob_sha": "688ce427e2b7cf0189d7216884d897734aba49e0","sha256": "0a8986096b8c2c1db4b731c07d4ea4aee313505dd480f7fcda4a73dca8ba6639"},
+        {"manufacturer": "NXP","family": "K32L2","path": "../research/nxp-k32l2-16-commercial-v5.csv","row_count": 16,"git_blob_sha": "6413149e6be0e9af504b644ccceb030d4d851582","sha256": "0228c6a077ea02d868ca53c6f82a8df81cf96d6f6306724852c3614b0b9727e5"},
+    ],"unexpected new NXP source/identity scope in historical ST replay")
     manifest=deepcopy(live_manifest)
-    manifest["sources"].pop()
+    manifest["sources"]=live_sources[:28]
     manifest_raw=(json.dumps(manifest,indent=2)+"\n").encode("utf-8")
     req(len(manifest["sources"])==28,"historical ST source-count drift")
     req(sum(int(s["row_count"]) for s in manifest["sources"])==4629,
