@@ -34,6 +34,7 @@ def build(plan, inventory, digest, batch_root):
     unexpected = sorted(x.name for x in root.iterdir()
                         if x.is_symlink() or x.is_dir() and x.name not in expected_ids)
     reports, rows, conflicts, reconciled = [], {}, {}, set()
+    zero_prefix = set()
     for item in source['batches']:
         batch_id = item['batch_id']
         folder = root / batch_id
@@ -43,7 +44,8 @@ def build(plan, inventory, digest, batch_root):
             continue
         record = {'batch_id': batch_id, 'planned_queries': len(item['queries']),
                   'fully_replayed_queries': 0, 'unverified_queries': [],
-                  'not_archived_queries': []}
+                  'not_archived_queries': [],
+                  'replayed_zero_exact_prefix_queries': []}
         try:
             require(folder.is_dir() and not folder.is_symlink(),
                     'unsafe batch evidence path')
@@ -79,8 +81,20 @@ def build(plan, inventory, digest, batch_root):
                         'query evidence did not fully replay')
                 candidates = evidence.get('ordering_candidates')
                 require(isinstance(candidates, list) and
-                        len(candidates) == evidence.get('unique_exact_ordering_candidates') and
-                        len(candidates) > 0, 'empty or inconsistent query identity results')
+                        len(candidates) == evidence.get('unique_exact_ordering_candidates'),
+                        'inconsistent source-linked identity result')
+                if not candidates:
+                    require(evidence.get('replayed_zero_exact_prefix_queries') == 1 and
+                            evidence['queries'][0]['state'] ==
+                            'fully_replayed_zero_exact_prefix',
+                            'zero candidate count lacks complete replay proof')
+                    record['replayed_zero_exact_prefix_queries'].append(query)
+                    zero_prefix.add(query)
+                    reconciled.add(query)
+                    record['fully_replayed_queries'] += 1
+                    continue
+                require(evidence.get('positive_exact_prefix_queries') == 1,
+                        'positive candidate count lacks replay proof')
                 local = {}
                 for row in candidates:
                     icpn, lifecycle = row.get('icpn'), row.get('rawLifecycleStatus')
@@ -135,6 +149,9 @@ def build(plan, inventory, digest, batch_root):
             'planned_batches': len(source['batches']),
             'planned_query_names': planned_queries,
             'independently_replayed_queries': len(reconciled),
+            'independently_replayed_positive_queries': len(reconciled-zero_prefix),
+            'replayed_zero_exact_prefix_queries': len(zero_prefix),
+            'replayed_zero_exact_prefix_query_names': sorted(zero_prefix),
             'unreplayed_or_unattempted_queries': planned_queries-len(reconciled),
             'query_progress_percent': round(100*len(reconciled)/planned_queries,4)
                                       if planned_queries else None,

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from test_microchip_mcp_probe_v1 import ProbeTests
 from test_microchip_mcp_paged_probe_v2 import make_archive
@@ -45,6 +46,26 @@ class LedgerTests(unittest.TestCase):
                               for x in result['ordering_candidates']},
                              {'response-03.txt', 'response-04.txt',
                               'response-05.txt', 'response-06.txt'})
+
+    def test_complete_fuzzy_only_pages_are_validated_but_not_product_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / 'PIC10F202'
+            folder.mkdir()
+            make_archive(folder)
+            # Synthetic representative of Microchip fuzzy searches where every
+            # vendor ordering code differs from the DFP name.
+            with patch.object(ledger.probe, 'exact_ordering_prefix', return_value=False):
+                result = ledger.build(root, ['PIC10F202'])
+            self.assertTrue(result['all_queries_reconciled'])
+            self.assertEqual(result['fully_replayed_queries'], 1)
+            self.assertEqual(result['positive_exact_prefix_queries'], 0)
+            self.assertEqual(result['replayed_zero_exact_prefix_queries'], 1)
+            self.assertEqual(result['ordering_candidates'], [])
+            self.assertEqual(result['queries'][0]['state'],
+                             'fully_replayed_zero_exact_prefix')
+            self.assertIsNone(result['global_active_denominator'])
+            self.assertFalse(result['production_write_authorized'])
 
     def test_v2_mutated_original_bytes_drop_entire_query(self):
         with tempfile.TemporaryDirectory() as temp:

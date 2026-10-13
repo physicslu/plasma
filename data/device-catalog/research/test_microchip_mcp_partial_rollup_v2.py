@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import microchip_mcp_partial_rollup_v2 as partial
 import microchip_mcp_plan_capture_v1 as capture
@@ -40,6 +41,32 @@ class PartialRollupTests(unittest.TestCase):
                              'partial_independent_queries_only')
             self.assertIn('PIC12F529T48A',
                           output['batch_reports'][0]['not_archived_queries'])
+            self.assertFalse(output['production_write_authorized'])
+
+    def test_complete_zero_prefix_query_counts_replay_without_admitting_sku(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            batch = self.source_batch(root)
+            (batch / 'PIC10F202').mkdir()
+            empty = {'fully_replayed_queries': 1, 'all_queries_reconciled': True,
+                     'selected_queries': 1, 'production_write_authorized': False,
+                     'global_active_denominator': None,
+                     'manufacturer_population_complete': False,
+                     'unique_exact_ordering_candidates': 0,
+                     'replayed_zero_exact_prefix_queries': 1,
+                     'positive_exact_prefix_queries': 0,
+                     'queries': [{'query':'PIC10F202','state':'fully_replayed_zero_exact_prefix'}],
+                     'ordering_candidates': []}
+            with patch.object(partial.ledger, 'build', return_value=empty):
+                output = partial.build(self.plan, self.inventory, 'a'*64, root)
+            self.assertEqual(output['independently_replayed_queries'], 1)
+            self.assertEqual(output['independently_replayed_positive_queries'], 0)
+            self.assertEqual(output['replayed_zero_exact_prefix_queries'], 1)
+            self.assertEqual(output['replayed_zero_exact_prefix_query_names'],
+                             ['PIC10F202'])
+            self.assertEqual(output['validated_exact_prefix_candidates'], 0)
+            self.assertEqual(output['batch_reports'][0]['state'],
+                             'partial_independent_queries_only')
             self.assertFalse(output['production_write_authorized'])
 
     def test_source_manifest_tamper_blocks_all_query_rows(self):

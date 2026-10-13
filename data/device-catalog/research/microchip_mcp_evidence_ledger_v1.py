@@ -73,7 +73,9 @@ def build(root: Path, parts: list[str]) -> dict:
             require({r['icpn'] for r in local_observations} ==
                     set(check['exact_query_ordering_parts']),
                     'exact orderables mismatch replay summary')
-            require(len(local_observations) > 0, 'no exact orderable evidence')
+            # A full 20-vs-60 replay with zero exact-prefix candidates is
+            # meaningful NEGATIVE SEARCH EVIDENCE, never a failed transcript,
+            # an EOL determination, or proof of commercial SKU absence.
             # Check every cross-query conflict before mutating the ledger:
             # a rejected query must never leak partially accepted SKU rows.
             for row in local_observations:
@@ -97,15 +99,21 @@ def build(root: Path, parts: list[str]) -> dict:
                                   'error_type': type(exc).__name__,
                                   'error': str(exc)[:240]})
         else:
-            query_reports.append({'query': part, 'state': 'fully_replayed_bounded_query',
-                                  'raw_result_count': check['unique_ordering_count'],
-                                  'exact_ordering_count': len(local_observations),
-                                  'fuzzy_foreign_count': check['fuzzy_foreign_ordering_count'],
-                                  'vendor_base_alias_count': check['vendor_base_part_alias_count']})
+            query_reports.append({
+                'query': part,
+                'state': ('fully_replayed_bounded_query' if local_observations
+                          else 'fully_replayed_zero_exact_prefix'),
+                'raw_result_count': check['unique_ordering_count'],
+                'exact_ordering_count': len(local_observations),
+                'fuzzy_foreign_count': check['fuzzy_foreign_ordering_count'],
+                'vendor_base_alias_count': check['vendor_base_part_alias_count']})
 
     ordered = [observations[k] for k in sorted(observations)]
-    reconciled_count = sum(r['state'] == 'fully_replayed_bounded_query'
-                           for r in query_reports)
+    positive_count = sum(r['state'] == 'fully_replayed_bounded_query'
+                         for r in query_reports)
+    zero_count = sum(r['state'] == 'fully_replayed_zero_exact_prefix'
+                     for r in query_reports)
+    reconciled_count = positive_count + zero_count
     return {
         'schema_version': 1,
         'type': 'microchip-mcp-bounded-search-research-ledger',
@@ -114,6 +122,8 @@ def build(root: Path, parts: list[str]) -> dict:
         'generated_at_utc': datetime.now(timezone.utc).isoformat(),
         'selected_queries': len(parts),
         'fully_replayed_queries': reconciled_count,
+        'positive_exact_prefix_queries': positive_count,
+        'replayed_zero_exact_prefix_queries': zero_count,
         'all_queries_reconciled': reconciled_count == len(parts),
         'unique_exact_ordering_candidates': len(ordered),
         'raw_lifecycle_values': sorted({r['rawLifecycleStatus'] for r in ordered}),

@@ -384,6 +384,26 @@ prove the service can return more than 60 or that it will ever provide an
 exhaustive product population through substring searches; the 50-row
 boundary itself warrants investigation.
 
+## 2026-10-13 — verified fuzzy-only query observations are not capture failures
+
+A byte-for-byte audit of the completed 16-batch vendor sweep (GitHub
+Actions run 38348043707, original Artifact 11790626653) distinguished
+**137** queries with positive strict-prefix ICPN observations, **9** queries
+with complete independent original-byte 20-vs-60 replay but **zero** strict
+prefix candidates, and **14** unreconciled MCP `NOT_FOUND` queries.
+The original rollup quarantined all 23 non-positive queries, falsely
+conflating the nine valid negative-search observations with acquisition errors.
+The revised ledger preserves a new `fully_replayed_zero_exact_prefix`
+state, records the original fuzzy response total and prohibits SKU admission.
+The rollup now counts a zero-prefix observation as a **replayed query** while
+keeping the candidate count at zero; exact-prefix-positive coverage is always
+reported separately.
+
+Important: a zero-prefix result is neither proof that the DFP supported
+name is a noncommercial product nor proof that a SKU is absent, inactive or
+EOL. Suffix-adjacent wireless modules (`WBZ*`, `WFI32E*`) and AVR
+variants must be reviewed against independent manufacturer ordering tables.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
