@@ -8,6 +8,8 @@ on:
       - 'data/device-catalog/research/NXP_MANUFACTURER_DEVICE_BULK_V5.md'
       - 'data/device-catalog/research/nxp-212-manufacturer-device-evidence-v5.csv'
       - 'data/device-catalog/research/nxp-212-source-verified-commercial-v5.csv'
+      - 'data/device-catalog/research/nxp-mcx-196-commercial-v5.csv'
+      - 'data/device-catalog/research/nxp-k32l2-16-commercial-v5.csv'
       - 'data/device-catalog/production/icpn-v1-manifest.json'
       - '.github/workflows/device-catalog-nxp-manufacturer-bulk-v5.yml'
   workflow_dispatch:
@@ -58,6 +60,23 @@ jobs:
           print("NXP_212_CANONICAL_SHA256="+hashlib.sha256(canonical.read_bytes()).hexdigest())
           print("NXP_212_DEVICE_SHA256="+hashlib.sha256(device.read_bytes()).hexdigest())
           print("NXP_212_CANONICAL_GIT_BLOB="+subprocess.check_output(["git","hash-object",str(committed_canonical)],text=True).strip())
+          import io
+          from collections import Counter
+          for family, n, name in (
+              ("MCX",196,"nxp-mcx-196-commercial-v5.csv"),
+              ("K32L2",16,"nxp-k32l2-16-commercial-v5.csv")
+          ):
+              retained=Path("data/device-catalog/research")/name
+              subset=[x for x in rows if x["family"]==family]
+              assert len(subset)==n
+              out=io.StringIO(newline="")
+              w=csv.DictWriter(out,fieldnames=list(rows[0]),lineterminator="\\n")
+              w.writeheader();w.writerows(subset)
+              encoded=out.getvalue().encode("utf-8")
+              assert retained.read_bytes()==encoded, "source family split differs from manufacturer replay"
+              print("NXP_V5_SOURCE_"+family+"_SHA256="+hashlib.sha256(encoded).hexdigest())
+              print("NXP_V5_SOURCE_"+family+"_GIT_BLOB="+subprocess.check_output(
+                  ["git","hash-object",str(retained)],text=True).strip())
           assert summary["full_bounded_active_exact"]==353
           assert summary["new_source_bound_four_field_candidates"]==len(rows)==212
           assert summary["unresolved_source_or_metadata_exact"]==129
