@@ -14,15 +14,18 @@ BINDING_FILE = HERE / "bindings" / "stm32f103c-pilot-v0.json"
 SOURCE_FILE = HERE / "evidence" / "sources.json"
 SCHEMA_FILE = HERE / "schema" / "ic-support-v0.schema.json"
 
-EXPECTED_KINDS = {
+LEGACY_BINDING_KINDS = {
     "programming",
     "memory_geometry",
     "package_hardware",
     "option",
     "security",
 }
+SUPPORTED_PROFILE_KINDS = LEGACY_BINDING_KINDS | {"programming_route"}
+PROGRAMMING_ROUTE_BINDING_DIR = HERE / "bindings" / "programming-route"
 PROFILE_DIR_KIND = {
     "programming": "programming",
+    "programming-route": "programming_route",
     "memory-geometry": "memory_geometry",
     "package-hardware": "package_hardware",
     "option": "option",
@@ -125,7 +128,7 @@ def load_profiles(known_sources: set[str]) -> dict[str, dict[str, Any]]:
             require(pid not in profiles, f"duplicate profile_id: {pid}")
             kind = profile.get("kind")
             require(kind == expected_kind, f"{path}: kind {kind!r} does not match directory {dirname!r}")
-            require(kind in EXPECTED_KINDS, f"{path}: unsupported profile kind {kind!r}")
+            require(kind in SUPPORTED_PROFILE_KINDS, f"{path}: unsupported profile kind {kind!r}")
             status = profile.get("status")
             require(isinstance(status, str) and status.startswith("pilot"), f"{path}: pilot status required")
             validate_evidence(profile, known_sources, pid)
@@ -172,6 +175,41 @@ def validate_programming(profile: dict[str, Any]) -> None:
     require(registers["FLASH_KEYR"] == "0x40022004", "unexpected FLASH_KEYR")
     require(registers["FLASH_SR"] == "0x4002200C", "unexpected FLASH_SR")
     require(registers["FLASH_CR"] == "0x40022010", "unexpected FLASH_CR")
+
+
+def validate_programming_route(profile: dict[str, Any]) -> None:
+    data = profile["data"]
+    require(
+        set(data["context_vocabulary"]) == {"icp", "offline_socket"},
+        "programming route contexts must remain ICP / Offline Socket",
+    )
+    routes = data["routes"]
+    require(isinstance(routes, list) and len(routes) >= 2, "programming route profile must contain at least two routes")
+    by_id = {route["route_id"]: route for route in routes}
+    require(len(by_id) == len(routes), "programming route IDs must be unique")
+
+    swd = by_id.get("swd_debug")
+    require(isinstance(swd, dict), "SWD programming route is required")
+    require(swd["contexts"]["icp"]["supported"] is True, "SWD route must support ICP")
+    require(swd["contexts"]["offline_socket"]["supported"] is True, "SWD route must support Offline Socket")
+    require(swd["transport"]["type"] == "SWD", "SWD route transport mismatch")
+    require(swd["entry_requirements"]["strap_states"] == [], "SWD route must not require boot straps")
+    require(
+        not any(signal.startswith("BOOT") for signal in swd["entry_requirements"]["required_signals"]),
+        "SWD route must not require BOOT signals",
+    )
+    require(swd["runtime_implemented"] is False, "SWD route must remain knowledge-only")
+
+    rom = by_id.get("system_rom_bootloader_usart1")
+    require(isinstance(rom, dict), "System ROM bootloader route is required")
+    require(rom["contexts"]["icp"]["supported"] is False, "boot-strap ROM route must not be ICP-supported")
+    require(rom["contexts"]["offline_socket"]["supported"] is True, "ROM route must support Offline Socket")
+    require(rom["transport"]["type"] == "USART" and rom["transport"]["instance"] == "USART1", "ROM route must use USART1")
+    straps = {item["signal"]: item["state"] for item in rom["entry_requirements"]["strap_states"]}
+    require(straps == {"BOOT0": "high", "BOOT1": "low"}, "STM32F10xxx System Memory route requires BOOT0=1 / BOOT1=0")
+    require(rom["entry_requirements"]["reset_sequence"]["required"] is True, "ROM route must require a reset event")
+    require(rom["entry_requirements"]["power_cycle_required"] is False, "ROM route must not require a power cycle")
+    require(rom["runtime_implemented"] is False, "ROM route must remain knowledge-only")
 
 
 def validate_option(profile: dict[str, Any]) -> None:
@@ -236,7 +274,10 @@ def main() -> int:
 
         refs = entry.get("profiles")
         require(isinstance(refs, dict), f"{icpn}: profiles object is required")
-        require(set(refs) == EXPECTED_KINDS, f"{icpn}: profile kinds must be exactly {sorted(EXPECTED_KINDS)}")
+        require(
+            set(refs) == LEGACY_BINDING_KINDS,
+            f"{icpn}: frozen base profile kinds must be exactly {sorted(LEGACY_BINDING_KINDS)}",
+        )
         selected: dict[str, dict[str, Any]] = {}
         for kind, pid in refs.items():
             require(pid in profiles, f"{icpn}: dangling profile reference {pid!r}")
@@ -255,16 +296,55 @@ def main() -> int:
         require(str(package_data["pin_count"]) == row["pin_count"], f"{icpn}: pin-count profile mismatch")
         minimum_hw = package_data["pin_level_minimum_programming_hardware"]
         require(
-            minimum_hw == {"status": "pending_evidence", "required_before_runtime_use": True},
-            f"{icpn}: Phase A must remain fail-closed on minimum pin-level hardware",
+            minimum_hw.get("status") == "partial_manufacturer_evidence"
+            and minimum_hw.get("required_before_runtime_use") is True
+            and minimum_hw.get("runtime_qualified") is False,
+            f"{icpn}: package hardware must remain partial and fail-closed for runtime use",
         )
+        signal_map = package_data.get("logical_signal_map")
+        require(isinstance(signal_map, dict), f"{icpn}: logical signal map is required")
+        for logical_signal in ("SWDIO", "SWCLK", "NRST", "BOOT0", "BOOT1", "USART1_TX", "USART1_RX"):
+            mapped = signal_map.get(logical_signal)
+            require(isinstance(mapped, dict), f"{icpn}: missing package mapping for {logical_signal}")
+            require(isinstance(mapped.get("mcu_signal"), str) and mapped["mcu_signal"], f"{icpn}: missing MCU signal for {logical_signal}")
+            require(isinstance(mapped.get("package_pin"), int) and mapped["package_pin"] > 0, f"{icpn}: missing package pin for {logical_signal}")
         resolved[icpn] = selected
 
     require(set(seen) == {"STM32F103C8T6", "STM32F103CBT6"}, "pilot target set drifted")
 
+    route_targets: set[str] = set()
+    require(PROGRAMMING_ROUTE_BINDING_DIR.is_dir(), "Programming Route binding directory is required")
+    for path in sorted(PROGRAMMING_ROUTE_BINDING_DIR.glob("*.json")):
+        route_binding_set = load_json(path)
+        validate_evidence(
+            route_binding_set,
+            known_sources,
+            route_binding_set.get("binding_set_id", "programming-route-bindings"),
+        )
+        require(route_binding_set.get("status") == "pilot", f"{path}: Programming Route binding set must remain pilot")
+        route_bindings = route_binding_set.get("bindings")
+        require(isinstance(route_bindings, list) and route_bindings, f"{path}: Programming Route bindings must be non-empty")
+        for entry in route_bindings:
+            require(isinstance(entry, dict), f"{path}: Programming Route binding entries must be objects")
+            icpn = entry.get("icpn")
+            profile_id = entry.get("programming_route")
+            require(isinstance(icpn, str) and icpn, f"{path}: Programming Route ICPN is required")
+            require(icpn in resolved, f"{icpn}: Programming Route binding has no frozen base binding")
+            require(icpn not in route_targets, f"{icpn}: duplicate Programming Route binding")
+            require(isinstance(profile_id, str) and profile_id in profiles, f"{icpn}: dangling Programming Route profile")
+            profile = profiles[profile_id]
+            require(profile["kind"] == "programming_route", f"{icpn}: Programming Route profile kind mismatch")
+            resolved[icpn]["programming_route"] = profile
+            route_targets.add(icpn)
+
+    require(
+        route_targets == {"STM32F103C8T6", "STM32F103CBT6"},
+        "Programming Route pilot target set drifted",
+    )
+
     c8 = resolved["STM32F103C8T6"]
     cb = resolved["STM32F103CBT6"]
-    for shared_kind in {"programming", "package_hardware", "option", "security"}:
+    for shared_kind in {"programming", "programming_route", "package_hardware", "option", "security"}:
         require(c8[shared_kind]["profile_id"] == cb[shared_kind]["profile_id"], f"{shared_kind} should be shared")
     require(
         c8["memory_geometry"]["profile_id"] != cb["memory_geometry"]["profile_id"],
@@ -272,6 +352,7 @@ def main() -> int:
     )
 
     validate_programming(c8["programming"])
+    validate_programming_route(c8["programming_route"])
     validate_option(c8["option"])
     validate_security(c8["security"])
     print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles")

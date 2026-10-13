@@ -29,6 +29,12 @@ IC Support binding
         |       - Flash geometry
         |       - machine-readable programming semantics
         |
+        +--> Programming Route knowledge
+        |       - ICP / Offline Socket context
+        |       - transport
+        |       - entry signals / straps / reset sequence
+        |       - entry / exit sequence
+        |
         +--> Programmer Backend
         |       - OpenOCD mapping/provider/runtime evidence
         |
@@ -81,6 +87,22 @@ Owns how the target is programmed:
 An interface clock value from OpenOCD or another programmer is not a manufacturer limit.
 Missing manufacturer speed evidence remains explicit `unknown`.
 
+### Programming Route Profile
+
+Owns **how a programming path is entered**, not the Flash algorithm itself. Context and
+transport are independent dimensions:
+
+- `icp` = in-circuit programming with the IC mounted on the application PCB;
+- `offline_socket` = bare-IC programming through a programmer Socket/Adapter;
+- transport may be SWD, JTAG, USART, SPI, I2C or another manufacturer-defined route;
+- vendor-specific strap names belong only to route instances;
+- BOOT/MODE straps are not generic schema fields.
+
+For the STM32F103 medium-density pilot, the SWD route supports both ICP and Offline
+Socket and requires no BOOT strap. The System Memory USART1 route is admitted only for
+Offline Socket in Programming Route v1 and models BOOT0=HIGH / BOOT1=LOW plus a reset
+event. Both routes remain `runtime_implemented=false`.
+
 ### Programmer Backend
 
 OpenOCD is implementation evidence, not device-specification authority. Backend defaults,
@@ -123,6 +145,10 @@ selected_profile
 │   └── memory_map
 ├── programming
 │   ├── interfaces
+│   ├── programming_route_profile
+│   ├── context_vocabulary
+│   ├── routes
+│   ├── package_signal_map
 │   ├── electrical
 │   ├── flash_geometry
 │   ├── flash_controller
@@ -140,7 +166,7 @@ service does not invent family-derived values.
 The IC Selector presents the selected ICPN in three primary sections:
 
 1. **IC Information** — identity, operating electrical characteristics and memory map.
-2. **Programming** — programming interface/electrical conditions/Flash geometry/flow.
+2. **Programming** — programming interface/electrical conditions/Flash geometry/flow plus available ICP / Offline Socket routes and their entry requirements.
 3. **PLASMA Compatibility** — Site/Socket/hardware/physical readiness.
 
 Backend build/provenance detail remains available under Advanced Backend / Evidence so
@@ -152,5 +178,7 @@ normal operator information hierarchy is not dominated by CI and runtime metadat
   resolution closed.
 - Exact ICPN Flash capacity must agree with the admitted catalog identity.
 - Backend-derived speed/default values cannot fill manufacturer-unknown fields.
+- Programming Route data is knowledge-only and cannot authorize execution.
+- A strap-controlled route cannot be promoted to ICP support in Programming Route v1.
 - Selected IC Profile is read-only and cannot enable DUT power or programming.
 - No Mock/CI/software evidence may set hardware or physical qualification true.

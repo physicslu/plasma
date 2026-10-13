@@ -83,17 +83,27 @@ test("selected IC profile presents device, programming, and Plasma compatibility
   const api = await source("../app/device-catalog-api.ts");
 
   assert.match(api, /SelectedICProfile/);
+  assert.match(api, /ProgrammingRoute/);
+  assert.match(api, /programming_route_profile/);
+  assert.match(api, /offline_socket/);
   assert.match(api, /selected_profile\?:\s*SelectedICProfile\s*\|\s*null/);
   assert.match(selector, /data-profile-section="device"/);
   assert.match(selector, /data-profile-section="programming"/);
   assert.match(selector, /data-profile-section="compatibility"/);
   assert.match(selector, /IC Information/);
   assert.match(selector, /Programming VDD/);
+  assert.match(selector, /Programming Route/);
+  assert.match(selector, /route\.contexts\.icp\.supported/);
+  assert.match(selector, /route\.contexts\.offline_socket\.supported/);
+  assert.match(selector, /route\.entry_requirements\.strap_states/);
+  assert.match(selector, /Offline Socket/);
+  assert.match(selector, /Knowledge only; not implemented/);
   assert.match(selector, /PLASMA Compatibility/);
   assert.match(selector, /原廠文件未明確指定/);
   assert.match(selector, /manufacturer_baseline\.sha256/);
   assert.match(selector, /hardware_runtime_ready/);
   assert.match(selector, /physical_programming_qualified/);
   assert.match(styles, /\.icSelectorProfileSection\s*\{/);
+  assert.match(styles, /\.icSelectorProgrammingRoute\s+dd\s*\{/);
   assert.match(styles, /\.icSelectorEvidenceDetails\s*\{/);
 });

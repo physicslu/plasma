@@ -80,6 +80,11 @@ Pilot evidence / model status (STM32F103C8T6):
   interface behavior and Flash operations are owned by the Programming Profile;
 - manufacturer-unknown SWD/JTAG clock limits remain explicitly unknown rather than being
   populated from backend defaults;
+- Programming Route v1 now separates `icp` from `offline_socket`: SWD is admitted for
+  both contexts without BOOT straps, while the STM32F10xxx System Memory USART1 route is
+  modeled as Offline Socket only with BOOT0=HIGH / BOOT1=LOW plus a reset event;
+- vendor-specific BOOT names remain instance data rather than generic schema fields, and all
+  pilot routes remain `runtime_implemented=false`;
 - the machine-readable manufacturer Flash sequence is compared only after freeze against
   the pinned OpenOCD implementation;
 - the pilot comparison explicitly prevents the OpenOCD Blue Pill 128-KiB convenience

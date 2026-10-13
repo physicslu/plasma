@@ -1,6 +1,6 @@
 # IC Support Reusable Profile Architecture
 
-Status: **Plan / Phase A source-locked pilot implemented as research data only**
+Status: **Current read-only IC Support resolver with source-backed pilot profiles; execution remains unqualified**
 
 ## 1. Decision
 
@@ -28,15 +28,9 @@ An exact commercial part number binds to reusable technical behavior; it does no
 
 ## 2. Why this is needed now
 
-Repository inspection at the start of Phase A found a deliberate gap between catalog resolution and programming execution:
+The repository now has a read-only `ResolvedICSupport` resolver and Selected IC Profile composition for admitted exact ICPNs. That closes the knowledge-resolution gap but does **not** close the programming-execution gap.
 
-- `plasma_web/device_catalog.py` resolves part-number-first catalog records.
-- the Gateway resolves an Engineering `target_device` against that catalog.
-- `SiteManager` still constructs `STM32F103Handler` for every enabled Site.
-- `STM32F103Handler` still names `STM32F103C8T6` directly.
-- `OpenOCDInterface.erase()` still contains one fixed Flash erase address/range, while Program/Verify/Read remain hardware-specific placeholders.
-
-Therefore the correct next boundary is not to patch more part numbers into the Handler. It is to establish a deterministic IC Support knowledge model first, prove it on a known target, then introduce a resolver in a later approved phase.
+The remaining boundary is deliberate: Device/Programming/Route knowledge may be resolved and displayed without claiming that a Plasma Native driver, PPU electrical capability, Socket routing or physical target has been qualified. The next execution work must consume these resolved contracts rather than introduce new commercial-part branches.
 
 ## 3. Relationship to existing contracts
 
@@ -63,6 +57,7 @@ Device Catalog exact ICPN
 IC Support binding
         |
         +-- Programming Profile
+        +-- Programming Route Profile
         +-- Memory Geometry Profile
         +-- Package / Minimum Hardware Profile
         +-- Option / Configuration Profile
@@ -76,23 +71,33 @@ Owns only algorithmic Flash behavior: controller registers, unlock sequence, pro
 
 It must not own package pins or commercial suffixes.
 
-### 4.2 Memory Geometry Profile
+### 4.2 Programming Route Profile
+
+Owns programming **context + entry path** independently from the Flash algorithm:
+
+- context keys are `icp` and `offline_socket`;
+- transport is a separate field and may be SWD/JTAG/USART/SPI/I2C/vendor-specific;
+- required logical signals, strap states, reset/power-cycle requirements and entry/exit sequence are route data;
+- vendor-specific names such as STM32 `BOOT0` / `BOOT1` are instance data, not schema vocabulary;
+- route presence never means runtime implementation or physical qualification.
+
+### 4.3 Memory Geometry Profile
 
 Owns address ranges, sizes, page/sector geometry, bank topology and erase/program granularity that vary independently from the programming algorithm.
 
-### 4.3 Package / Minimum Hardware Profile
+### 4.4 Package / Minimum Hardware Profile
 
-Owns package-dependent physical requirements and programming interfaces. Phase A intentionally stops before pin-level minimum hardware because the pilot has not yet retained/pinned the required pin/electrical evidence. That field is fail-closed as `pending_evidence`.
+Owns package-dependent physical mappings. The STM32F103 LQFP48 pilot now maps the logical route signals needed by SWD and the System Memory USART1 route from DS5319. This remains partial manufacturer evidence: Site drive capability, Socket/Adapter routing and signal integrity are unresolved, so runtime use remains fail-closed.
 
-### 4.4 Option Profile
+### 4.5 Option Profile
 
 Owns option/configuration storage, encoding, unlock/program/reload semantics and reserved-bit preservation rules.
 
-### 4.5 Security Profile
+### 4.6 Security Profile
 
 Owns read/write protection and destructive security transitions. Security behavior is not inferred from the main-Flash profile.
 
-### 4.6 Revision Overrides
+### 4.7 Revision Overrides
 
 Revision changes are sparse overrides on an exact binding, not another duplicated complete profile. The Phase A pilot has an empty override list because no silicon-revision/errata comparison has yet been admitted into the pilot evidence.
 
@@ -184,18 +189,16 @@ This session is not treated as a valid blind extraction run because the existing
 
 ## 8. Runtime boundary
 
-Phase A intentionally stops before:
+The read-only knowledge path is now Current:
 
 ```text
 ICPN
   -> IC Support Resolver
   -> ResolvedICSupport
-  -> Programming Handler
+  -> Selected IC Profile / API / UI
 ```
 
-A future runtime phase may introduce `ResolvedICSupport` as the only programming-facing aggregate. The Handler should then consume resolved technical behavior instead of commercial part-number branches.
-
-That phase must separately address the current fixed `STM32F103Handler` ownership and fixed OpenOCD erase template. Phase A does not change either.
+Execution still stops before a Plasma Native programming driver. The future Handler/Executor must consume resolved Programming + Programming Route behavior instead of commercial part-number branches. Route presence, OpenOCD mapping and package signal mapping remain insufficient to set `hardware_runtime_ready=true` or `physical_programming_qualified=true`.
 
 ## 9. Scale-out gates
 
@@ -211,8 +214,7 @@ The next scientific step is therefore **not** bulk STM32F1 expansion. It is one 
 
 ## 10. Non-goals of Phase A
 
-- no production `ResolvedICSupport` code;
-- no IC Selector behavior change;
+- no Plasma Native programming execution;
 - no PMode/EMode behavior change;
 - no Handler/OpenOCD execution change;
 - no Z2/PPU/Socket/real-IC test claim;

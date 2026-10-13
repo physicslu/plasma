@@ -89,6 +89,47 @@ export type VersionedOpenOCDProvider = {
 
 export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
+export type ProgrammingContextAvailability = {
+  supported: boolean;
+  reason?: string;
+};
+
+export type ProgrammingRoute = {
+  route_id: string;
+  purpose: string;
+  contexts: {
+    icp: ProgrammingContextAvailability;
+    offline_socket: ProgrammingContextAvailability;
+  };
+  transport: {
+    type: string;
+    instance: string | null;
+    protocol: string;
+  };
+  entry_requirements: {
+    required_signals: string[];
+    optional_control_signals: string[];
+    strap_states: Array<{ signal: string; state: "high" | "low" }>;
+    reset_sequence: {
+      required: boolean;
+      strategy?: string;
+      accepted_reset_sources?: string[];
+      straps_stable_before_reset_release?: boolean;
+    };
+    power_cycle_required: boolean;
+    timing_requirements: Record<string, unknown>;
+  };
+  entry_sequence: string[];
+  exit_sequence: string[];
+  programming_algorithm_profile: string | null;
+  runtime_implemented: false;
+};
+
+export type PackageSignalMap = Record<string, {
+  mcu_signal: string;
+  package_pin: number;
+}>;
+
 export type SelectedICProfile = {
   schema_version: "1.0.0";
   status: "manufacturer_profile_available";
@@ -153,6 +194,17 @@ export type SelectedICProfile = {
       recommended_support_signals?: string[];
       special_requirements?: string[];
     }>;
+    programming_route_profile: {
+      profile_id: string;
+      kind: "programming_route";
+      status: string;
+    };
+    context_vocabulary: {
+      icp: { label: "ICP"; meaning: string };
+      offline_socket: { label: "Offline Socket"; meaning: string };
+    };
+    routes: ProgrammingRoute[];
+    package_signal_map: PackageSignalMap;
     electrical: {
       vdd_programming_v: { min: number; max: number; basis?: string };
       recommended_vdd_v?: { status: string; value: number | null };

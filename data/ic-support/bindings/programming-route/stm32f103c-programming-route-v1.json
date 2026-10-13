@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "binding_set_id": "stm32f103c-programming-route-v1",
+  "status": "pilot",
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20"
+    },
+    {
+      "source_id": "st_rm0008_rev21"
+    },
+    {
+      "source_id": "st_an2606_rev70"
+    }
+  ],
+  "bindings": [
+    {
+      "icpn": "STM32F103C8T6",
+      "programming_route": "stm32f103-medium-density-programming-routes-v1"
+    },
+    {
+      "icpn": "STM32F103CBT6",
+      "programming_route": "stm32f103-medium-density-programming-routes-v1"
+    }
+  ]
+}

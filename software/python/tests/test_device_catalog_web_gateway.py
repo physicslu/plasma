@@ -77,6 +77,21 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             selected["programming"]["interfaces"]["SWD"]["clock_hz"]["status"],
             "not_specified_by_locked_manufacturer_sources",
         )
+        routes = {route["route_id"]: route for route in selected["programming"]["routes"]}
+        self.assertTrue(routes["swd_debug"]["contexts"]["icp"]["supported"])
+        self.assertTrue(routes["swd_debug"]["contexts"]["offline_socket"]["supported"])
+        self.assertEqual(routes["swd_debug"]["entry_requirements"]["strap_states"], [])
+        rom = routes["system_rom_bootloader_usart1"]
+        self.assertFalse(rom["contexts"]["icp"]["supported"])
+        self.assertTrue(rom["contexts"]["offline_socket"]["supported"])
+        self.assertEqual(rom["transport"]["type"], "USART")
+        self.assertEqual(rom["transport"]["instance"], "USART1")
+        self.assertEqual(
+            rom["entry_requirements"]["strap_states"],
+            [{"signal": "BOOT0", "state": "high"}, {"signal": "BOOT1", "state": "low"}],
+        )
+        self.assertEqual(selected["programming"]["package_signal_map"]["BOOT0"]["package_pin"], 44)
+        self.assertEqual(selected["programming"]["package_signal_map"]["BOOT1"]["package_pin"], 20)
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
 

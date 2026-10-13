@@ -43,6 +43,43 @@
       ]
     },
     {
+      "source_id": "st_rm0008_rev21",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "RM0008",
+      "revision": "21",
+      "document_date": "2021-02",
+      "title": "STM32F101xx, STM32F102xx, STM32F103xx, STM32F105xx and STM32F107xx advanced Arm-based 32-bit MCUs reference manual",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/reference_manual/cd00171190-stm32f101-103-105-107-stm32f100-series-armbased-32bit-mcus-stmicroelectronics.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "boot_mode_truth_table",
+        "system_memory_boot_selection"
+      ]
+    },
+    {
+      "source_id": "st_an2606_rev70",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "AN2606",
+      "revision": "70",
+      "document_date": "2026-02",
+      "title": "Introduction to system memory boot mode on STM32 MCUs",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/application_note/an2606-introduction-to-system-memory-boot-mode-on-stm32-mcus-stmicroelectronics.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "system_bootloader_activation",
+        "stm32f10xxx_usart1_bootloader",
+        "system_bootloader_entry_sequence"
+      ]
+    },
+    {
       "source_id": "plasma_stm32f1_catalog_main",
       "manufacturer": "Plasma",
       "document_number": "stm32f1-commercial-icpn.csv",
