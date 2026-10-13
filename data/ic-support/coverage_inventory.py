@@ -142,6 +142,9 @@ def load_manufacturer_enrichment_evidence(
     for icpn, evidence in sorted(raw_targets.items()):
         require(icpn in production_icpns, f"{icpn}: enrichment target is not a Production ICPN")
         require(isinstance(evidence, dict), f"{icpn}: enrichment evidence must be an object")
+        dimensions = {name: name == "catalog_identity" for name in ENRICHMENT_DIMENSIONS}
+        evidence_paths: dict[str, str | None] = {}
+        highest_level = "M0"
 
         baseline_ref = evidence.get("manufacturer_baseline")
         require(isinstance(baseline_ref, dict), f"{icpn}: manufacturer_baseline evidence is required")
@@ -167,75 +170,103 @@ def load_manufacturer_enrichment_evidence(
             lock.get("canonical_file_sha256") == baseline_digest,
             f"{icpn}: baseline lock digest drift",
         )
+        evidence_paths["manufacturer_baseline"] = str(baseline_path.relative_to(REPO_ROOT))
 
         device_profile = baseline.get("device_profile")
         require(isinstance(device_profile, dict), f"{icpn}: device_profile is required")
         require(
             isinstance(device_profile.get("operating_electrical"), dict)
-            and isinstance(device_profile.get("memory_map"), dict),
+            and bool(device_profile["operating_electrical"])
+            and isinstance(device_profile.get("memory_map"), dict)
+            and bool(device_profile["memory_map"]),
             f"{icpn}: M1 requires operating electrical and memory map",
         )
+        dimensions["manufacturer_device_profile"] = True
+        dimensions["operating_electrical"] = True
+        dimensions["memory_map"] = True
+        highest_level = "M1"
 
         programming_profile = baseline.get("programming_profile")
-        require(isinstance(programming_profile, dict), f"{icpn}: programming_profile is required")
-        for key in ("interfaces", "programming_electrical", "flash_geometry"):
-            require(
-                isinstance(programming_profile.get(key), dict) and programming_profile[key],
-                f"{icpn}: M2 requires programming_profile.{key}",
-            )
+        if programming_profile is not None:
+            require(isinstance(programming_profile, dict), f"{icpn}: programming_profile must be an object")
+            for key in ("interfaces", "programming_electrical", "flash_geometry"):
+                require(
+                    isinstance(programming_profile.get(key), dict) and programming_profile[key],
+                    f"{icpn}: M2 requires programming_profile.{key}",
+                )
+            dimensions["manufacturer_programming_profile"] = True
+            dimensions["programming_electrical"] = True
+            dimensions["programming_interfaces"] = True
+            dimensions["flash_geometry"] = True
+            highest_level = "M2"
 
         execution = evidence.get("execution")
-        require(isinstance(execution, dict), f"{icpn}: execution evidence is required")
-        execution_ir_path = repo_file(str(execution.get("execution_ir_path", "")))
-        execution_ir = load_json(execution_ir_path)
-        require(
-            execution_ir.get("ir_id") == execution.get("execution_ir_id"),
-            f"{icpn}: Execution IR identity mismatch",
-        )
-        ir_targets = execution_ir.get("targets")
-        require(
-            isinstance(ir_targets, list)
-            and any(isinstance(item, dict) and item.get("icpn") == icpn for item in ir_targets),
-            f"{icpn}: Execution IR does not bind the exact ICPN",
-        )
-        require(
-            isinstance(baseline.get("program_model"), dict)
-            and isinstance(baseline["program_model"].get("operations"), dict)
-            and baseline["program_model"]["operations"],
-            f"{icpn}: executable manufacturer program_model operations are required",
-        )
-        generator_path = repo_file(str(execution.get("generator_path", "")))
-        behavior_test_path = repo_file(str(execution.get("behavior_test_path", "")))
+        if execution is not None:
+            require(highest_level == "M2", f"{icpn}: M3 execution evidence requires complete M2")
+            require(isinstance(execution, dict), f"{icpn}: execution evidence must be an object")
+            execution_ir_path = repo_file(str(execution.get("execution_ir_path", "")))
+            execution_ir = load_json(execution_ir_path)
+            require(
+                execution_ir.get("ir_id") == execution.get("execution_ir_id"),
+                f"{icpn}: Execution IR identity mismatch",
+            )
+            ir_targets = execution_ir.get("targets")
+            require(
+                isinstance(ir_targets, list)
+                and any(isinstance(item, dict) and item.get("icpn") == icpn for item in ir_targets),
+                f"{icpn}: Execution IR does not bind the exact ICPN",
+            )
+            require(
+                isinstance(baseline.get("program_model"), dict)
+                and isinstance(baseline["program_model"].get("operations"), dict)
+                and baseline["program_model"]["operations"],
+                f"{icpn}: executable manufacturer program_model operations are required",
+            )
+            generator_path = repo_file(str(execution.get("generator_path", "")))
+            behavior_test_path = repo_file(str(execution.get("behavior_test_path", "")))
+            dimensions["execution_ir"] = True
+            dimensions["generated_programmer"] = True
+            highest_level = "M3"
+            evidence_paths["execution_ir"] = str(execution_ir_path.relative_to(REPO_ROOT))
+            evidence_paths["generator"] = str(generator_path.relative_to(REPO_ROOT))
+            evidence_paths["generator_test"] = str(behavior_test_path.relative_to(REPO_ROOT))
 
         differential = evidence.get("independent_software_differential")
-        require(isinstance(differential, dict), f"{icpn}: independent software differential evidence is required")
-        comparison_path = repo_file(str(differential.get("openocd_comparison_path", "")))
-        comparison = load_json(comparison_path)
-        require(comparison.get("status") == "post_freeze_comparison", f"{icpn}: OpenOCD comparison is not post-freeze")
-        require(comparison.get("target", {}).get("icpn") == icpn, f"{icpn}: OpenOCD comparison target mismatch")
-        manufacturer_control = comparison.get("manufacturer_control")
-        require(isinstance(manufacturer_control, dict), f"{icpn}: comparison manufacturer_control is required")
-        require(manufacturer_control.get("baseline_id") == baseline_id, f"{icpn}: comparison baseline identity mismatch")
-        require(
-            manufacturer_control.get("baseline_sha256") == baseline_digest,
-            f"{icpn}: comparison baseline digest mismatch",
-        )
-        conclusions = comparison.get("conclusions")
-        require(
-            isinstance(conclusions, dict)
-            and conclusions.get("same_core_flash_programming_semantics") is True
-            and conclusions.get("manufacturer_baseline_remains_immutable") is True
-            and conclusions.get("hardware_runtime_ready") is False
-            and conclusions.get("physical_programming_qualified") is False,
-            f"{icpn}: independent comparison conclusions are incomplete",
-        )
-        real_binary_validator_path = repo_file(str(differential.get("real_binary_validator_path", "")))
-        real_binary_test_path = repo_file(str(differential.get("real_binary_test_path", "")))
+        if differential is not None:
+            require(highest_level == "M3", f"{icpn}: M4 differential evidence requires complete M3")
+            require(isinstance(differential, dict), f"{icpn}: independent software differential must be an object")
+            comparison_path = repo_file(str(differential.get("openocd_comparison_path", "")))
+            comparison = load_json(comparison_path)
+            require(comparison.get("status") == "post_freeze_comparison", f"{icpn}: OpenOCD comparison is not post-freeze")
+            require(comparison.get("target", {}).get("icpn") == icpn, f"{icpn}: OpenOCD comparison target mismatch")
+            manufacturer_control = comparison.get("manufacturer_control")
+            require(isinstance(manufacturer_control, dict), f"{icpn}: comparison manufacturer_control is required")
+            require(manufacturer_control.get("baseline_id") == baseline_id, f"{icpn}: comparison baseline identity mismatch")
+            require(
+                manufacturer_control.get("baseline_sha256") == baseline_digest,
+                f"{icpn}: comparison baseline digest mismatch",
+            )
+            conclusions = comparison.get("conclusions")
+            require(
+                isinstance(conclusions, dict)
+                and conclusions.get("same_core_flash_programming_semantics") is True
+                and conclusions.get("manufacturer_baseline_remains_immutable") is True
+                and conclusions.get("hardware_runtime_ready") is False
+                and conclusions.get("physical_programming_qualified") is False,
+                f"{icpn}: independent comparison conclusions are incomplete",
+            )
+            real_binary_validator_path = repo_file(str(differential.get("real_binary_validator_path", "")))
+            real_binary_test_path = repo_file(str(differential.get("real_binary_test_path", "")))
+            dimensions["independent_software_differential"] = True
+            highest_level = "M4"
+            evidence_paths["openocd_comparison"] = str(comparison_path.relative_to(REPO_ROOT))
+            evidence_paths["real_openocd_validator"] = str(real_binary_validator_path.relative_to(REPO_ROOT))
+            evidence_paths["real_openocd_test"] = str(real_binary_test_path.relative_to(REPO_ROOT))
 
         physical_hil = evidence.get("physical_hil")
-        m5 = False
-        hil_path: str | None = None
+        evidence_paths["physical_hil"] = None
         if physical_hil is not None:
+            require(highest_level == "M4", f"{icpn}: M5 HIL evidence requires complete M4")
             require(isinstance(physical_hil, dict), f"{icpn}: physical_hil must be null or an object")
             hil_path = str(physical_hil.get("evidence_path", ""))
             hil = load_json(repo_file(hil_path))
@@ -244,39 +275,17 @@ def load_manufacturer_enrichment_evidence(
                 hil.get("physical_programming_qualified") is True,
                 f"{icpn}: M5 requires explicit physical_programming_qualified=true",
             )
-            m5 = True
+            dimensions["physical_hil"] = True
+            highest_level = "M5"
+            evidence_paths["physical_hil"] = hil_path
 
-        dimensions = {
-            "catalog_identity": True,
-            "manufacturer_device_profile": True,
-            "operating_electrical": True,
-            "memory_map": True,
-            "manufacturer_programming_profile": True,
-            "programming_electrical": True,
-            "programming_interfaces": True,
-            "flash_geometry": True,
-            "execution_ir": True,
-            "generated_programmer": True,
-            "independent_software_differential": True,
-            "physical_hil": m5,
-        }
         resolved[icpn] = {
-            "highest_level": "M5" if m5 else "M4",
+            "highest_level": highest_level,
             "dimensions": dimensions,
             "missing_dimensions": [name for name in ENRICHMENT_DIMENSIONS if not dimensions[name]],
-            "evidence": {
-                "manufacturer_baseline": str(baseline_path.relative_to(REPO_ROOT)),
-                "execution_ir": str(execution_ir_path.relative_to(REPO_ROOT)),
-                "generator": str(generator_path.relative_to(REPO_ROOT)),
-                "generator_test": str(behavior_test_path.relative_to(REPO_ROOT)),
-                "openocd_comparison": str(comparison_path.relative_to(REPO_ROOT)),
-                "real_openocd_validator": str(real_binary_validator_path.relative_to(REPO_ROOT)),
-                "real_openocd_test": str(real_binary_test_path.relative_to(REPO_ROOT)),
-                "physical_hil": hil_path,
-            },
+            "evidence": evidence_paths,
         }
     return resolved
-
 
 def empty_manufacturer_enrichment() -> dict[str, Any]:
     dimensions = {name: name == "catalog_identity" for name in ENRICHMENT_DIMENSIONS}
