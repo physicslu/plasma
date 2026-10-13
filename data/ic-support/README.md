@@ -160,11 +160,14 @@ python data/ic-support/test_manufacturer_enrichment_scope.py
 The coverage registry is research-only and cannot grant runtime or hardware authority.
 
 
-STM32F1 Device Basic Profile v1 is stored separately under
-`device-basic/stm32f1-device-basic-v1.json`. It explicitly binds all 280 Production
-STM32F1 exact ICPNs and supplies the operator-facing RAM / Operating VDD facts while
-cross-checking exact identity, Base Device, Package, Pin Count, Flash and Operating
-Temperature against the Production Catalog. It does not grant Programming Profile authority.
+Manufacturer Device Basic Profile v1 is stored as one explicit family profile per admitted
+family under `device-basic/*-device-basic-v1.json`. The current registry covers all
+**912** Production exact ICPNs in STM32F1 (280), STM32C0 (226) and STM32G0 (406).
+Every profile uses the fixed IC Information contract:
+ICPN / Base Device / Package / Pin Count / Flash / RAM / Operating VDD /
+I/O Supply / VDDA / Operating Temperature. I/O Supply and VDDA are present but null
+until directly established by the allowed Product Selector/eStore evidence; they are never
+copied from VDD. Basic Profile admission does not grant Programming Profile authority.
 
 The Basic Profile deliberately uses a lighter official-product-metadata provenance class
 than the programming baseline: ST Product Selector / eStore observations are retained
