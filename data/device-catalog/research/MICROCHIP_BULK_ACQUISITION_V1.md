@@ -404,6 +404,23 @@ name is a noncommercial product nor proof that a SKU is absent, inactive or
 EOL. Suffix-adjacent wireless modules (`WBZ*`, `WFI32E*`) and AVR
 variants must be reviewed against independent manufacturer ordering tables.
 
+## Source-pinned full Research queue (all mapped DFP search names)
+
+The next large sweep is a **single research execution plan**, not a promise
+that Microchip's complete commercial Active SKU population has been enumerated.
+The full **3,198** auto-queryable DFP support-name plan contains **321**
+ten-name batches. The first live 16 batches (GitHub run 38348043707,
+Artifact 11790626653) are already archived; the remainder is divided into
+**12 immutable shards**, at most **8 concurrent research jobs**, with one
+vendor query session per job, bounded per-batch timeout and explicit
+two-second research audit gaps. Every job re-derives its work queue from the
+original DFP index SHA-256 and refuses to overwrite prior archives. Each
+batch retains its own original response bytes, query hashes and attestation.
+Partial source-bound reports quarantine failed responses and conflicting raw
+SKU lifecycles; complete fuzzy-only queries are counted as validated searches
+with **zero admitted part numbers**. All results are Research only; the
+separate manufacturer ordering-SKU population denominator stays null.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.

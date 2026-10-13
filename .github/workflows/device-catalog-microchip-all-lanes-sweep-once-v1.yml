@@ -1,0 +1,74 @@
+name: Microchip pinned DFP all-lanes bulk research sweep (sharded)
+on:
+  push:
+    branches:
+      - agent/microchip-bulk-coverage-discovery-v1
+    paths:
+      - '.github/workflows/device-catalog-microchip-all-lanes-sweep-once-v1.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: microchip-dfp-all-lanes-12-shards-once
+  cancel-in-progress: false
+jobs:
+  capture-and-reconcile:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 165
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/microchip-source
+      - name: Re-derive 321 exact source-pinned research batches
+        run: |
+          set -euo pipefail
+          echo '9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/microchip-source/index.html' | sha256sum --check
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_sweep_shard_v1.py' -v
+          python data/device-catalog/research/microchip_mcp_batch_plan_v1.py \
+            --evidence-root /tmp/microchip-source \
+            --output /tmp/microchip-all-shards-plan.json --batch-size 10
+      - name: Execute assigned source-pinned Research batches serially, skip prior 16
+        timeout-minutes: 151
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_sweep_shard_v1.py \
+            --evidence-root /tmp/microchip-source \
+            --plan /tmp/microchip-all-shards-plan.json \
+            --output-root /tmp/microchip-live-shard \
+            --log-root /tmp/microchip-shard-logs \
+            --shard ${{ matrix.shard }} --shard-count 12 --batch-timeout 180
+      - name: Independent offline replay of each source-attested query
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          test -d /tmp/microchip-live-shard
+          python data/device-catalog/research/microchip_mcp_partial_rollup_v2.py \
+            --evidence-root /tmp/microchip-source \
+            --plan /tmp/microchip-all-shards-plan.json \
+            --batch-root /tmp/microchip-live-shard \
+            --output /tmp/microchip-shard-partial-ledger.json
+      - name: Retain all raw source bytes, replayed identities, and failed attempt diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-dfp-shard-${{ matrix.shard }}-raw-20261013
+          path: |
+            /tmp/microchip-live-shard/
+            /tmp/microchip-shard-logs/
+            /tmp/microchip-shard-partial-ledger.json
+            /tmp/microchip-all-shards-plan.json
+          if-no-files-found: warn
+          retention-days: 90
