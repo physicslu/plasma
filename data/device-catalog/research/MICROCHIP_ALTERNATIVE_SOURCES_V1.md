@@ -248,3 +248,35 @@ SAM and wireless packs) while filtering non-MCU, module and MPU entries.
 Find an independent official orderable-product chart/feed to validate that
 MCP text search returns all relevant commercial suffixes; recheck raw
 Lifecycle per commercial SKU with PCN/EOL evidence.
+
+### PIC12F529T48A reconciliation and replayable ledger evidence
+
+The official [PIC12F529T48A product page](https://www.microchip.com/en-us/product/pic12f529t48a),
+inspected on 2026-10-13, displays **"Status: End of Life"**. Thus the device
+is a manufacturer-documented historical part, not an invented name or proof
+of absence. Microchip's current public MCP `search_products` nevertheless
+returned `success=false` with `error=NOT_FOUND` for this exact base query
+on two separate 27-query runs. Its DFP supported-device presence documents
+tool support, not commercial-ordering availability or active lifecycle.
+The current product-page status is a **device-level EOL observation**, not
+SKU-by-SKU EOL evidence; no ordering-code set is fabricated from naming rules.
+
+A real offline ledger replay from
+[run 38338627747](https://github.com/physicslu/plasma/actions/runs/38338627747)
+produced [artifact 11786520772](https://github.com/physicslu/plasma/actions/runs/38338627747/artifacts/11786520772):
+26/27 source queries independently replayed from captured original HTTP
+bytes, yielding **347 distinct exact commercial-ordering candidates**, each
+with the source query, original raw `lifecycleStatus`, raw response file
+and SHA-256. All 347 observed raw statuses in this bounded sample were
+`Active`. **This does not certify a complete Active denominator**; the
+one EOL device's missing MCP results are a concrete example of why a text
+search cannot be an exhaustive source.
+
+The ledger step intentionally exits nonzero for the incomplete 27th query,
+while still emitting the 347 source-linked research records with
+`production_write_authorized=false`,
+`manufacturer_population_complete=false`, and
+`global_active_denominator=null`. No Production admission or runtime
+programmer support is inferred. Resolve the missing historical ordering
+parts from official PCN/EOL and manufacturer product tables, then scale
+family discovery across the other DFPs.
