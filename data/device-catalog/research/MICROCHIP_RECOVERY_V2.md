@@ -25,3 +25,39 @@ not authoritative manufacturer life-cycle classification.
 ICPN catalogs, flash firmware, OpenOCD mappings or global Active coverage
 claims. A separate owner approval will be required for PR merge and for
 any later Production data promotion.
+
+## Completed original-source recovery audit (2026-10-13)
+
+The real read-only GitHub Actions [recovery run #38373429583](https://github.com/physicslu/plasma/actions/runs/38373429583)
+finished **8/8** batches successfully. All **80/80** targeted 8-bit
+device-support queries completed exact raw-response replay. Each original
+batch source attestation was written and fsynced before its vendor requests.
+The previous eight quarantined timeout ZIPs remain unaltered.
+
+An additional byte-level offline reconciliation checked **423** archived
+recovery response files against their manifest SHA-256, rederived each
+positive ordering identity from Microchip's original 20-row pagination walk,
+verified original DFP identity/plan hashes, and checked raw lifecycle
+consistency with the first-pass source-linked research ledger. Results:
+- **775** new distinct exact-prefix candidate ordering identities.
+- **23,276 -> 24,051** unique *Research* candidate identities in total.
+- Raw vendor lifecycle observations: **23,801 Active** and
+  **250 Not Recommended For New Design**; **0** cross-source conflicts.
+- First-pass original **80** incomplete query slots are now all replayed.
+  Remaining **297 NOT_FOUND** observations are verified negative searches,
+  NOT verified EOL SKU identities.
+- The manufacturer global orderable-SKU/Active denominator remains **unknown**.
+
+Each of the eight immutable raw recovery ZIPs is preserved in the existing
+[Microchip evidence folder](https://drive.google.com/drive/folders/1sJHR73lEjJeAgLt7pa4nJgpAr4Wrj50f).
+Exact ZIP SHA-256 and Research count invariants are frozen in
+`microchip-mcp-recovery-v2-observation-20261013.json`; CI rejects
+Production promotion and inflated coverage claims. The standalone external
+reconciliation SHA-256 is recorded in that snapshot.
+
+**Approval boundary:** this PR can only merge Research acquisition/replay,
+source evidence tests and the Research snapshot. It must not import or
+publish Production ICPNs, infer that `Active` raw text-search rows are
+independently certified current ordering SKUs, or mark any PLASMA flashing
+backend supported. Independent manufacturer ordering-code and lifecycle
+verification is separate future work.
