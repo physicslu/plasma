@@ -6,6 +6,8 @@ on:
       - 'data/device-catalog/research/nxp-bulk-source-registry-v1.json'
       - 'data/device-catalog/research/nxp_bulk_coverage_v1.py'
       - 'data/device-catalog/research/test_nxp_bulk_coverage_v1.py'
+      - 'data/device-catalog/research/test_nxp_official_bounded_snapshot_v1.py'
+      - 'data/device-catalog/research/nxp-official-bounded-snapshot-2026-10-13-v1.json'
       - 'data/device-catalog/research/NXP_BULK_ACQUISITION_V1.md'
       - '.github/workflows/device-catalog-nxp-bulk-coverage-v1.yml'
   push:
@@ -14,6 +16,8 @@ on:
       - 'data/device-catalog/research/nxp-bulk-source-registry-v1.json'
       - 'data/device-catalog/research/nxp_bulk_coverage_v1.py'
       - 'data/device-catalog/research/test_nxp_bulk_coverage_v1.py'
+      - 'data/device-catalog/research/test_nxp_official_bounded_snapshot_v1.py'
+      - 'data/device-catalog/research/nxp-official-bounded-snapshot-2026-10-13-v1.json'
       - 'data/device-catalog/research/NXP_BULK_ACQUISITION_V1.md'
       - '.github/workflows/device-catalog-nxp-bulk-coverage-v1.yml'
 
@@ -33,6 +37,7 @@ jobs:
         run: |
           python -m py_compile data/device-catalog/research/nxp_bulk_coverage_v1.py data/device-catalog/research/test_nxp_bulk_coverage_v1.py
           python -m unittest discover -s data/device-catalog/research -p 'test_nxp_bulk_coverage_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_official_bounded_snapshot_v1.py' -v
           python data/device-catalog/research/nxp_bulk_coverage_v1.py > /tmp/nxp-bulk-summary.json
           python - <<'PY'
           import json
