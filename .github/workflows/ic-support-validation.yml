@@ -7,12 +7,14 @@ on:
     paths:
       - "data/ic-support/**"
       - "data/device-catalog/production/**"
+      - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/*commercial-icpn.csv"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
       - "data/ic-support/**"
       - "data/device-catalog/production/**"
+      - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/*commercial-icpn.csv"
       - ".github/workflows/ic-support-validation.yml"
   workflow_dispatch:
