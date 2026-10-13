@@ -22,6 +22,15 @@ _REQUIRED_FIELDS = (
     "operating_vdd",
     "operating_temperature",
 )
+_CATALOG_OWNED_FIELDS = (
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "operating_temperature",
+)
+_PROFILE_OWNED_FIELDS = ("ram", "operating_vdd")
 _TEMPERATURE_RE = re.compile(r"^(-?\d+)\s+to\s+(-?\d+)\s+C$")
 
 
@@ -87,13 +96,26 @@ class ResolvedDeviceBasicProfile:
 
 
 class ManufacturerDeviceBasicResolver:
-    def __init__(self, records: dict[str, ResolvedDeviceBasicProfile], *, path: Path) -> None:
-        self._records = dict(records)
+    def __init__(
+        self,
+        *,
+        profile_id: str,
+        manufacturer: str,
+        family: str,
+        groups: dict[str, dict[str, Any]],
+        bindings: dict[str, str],
+        path: Path,
+    ) -> None:
+        self.profile_id = profile_id
+        self.manufacturer = manufacturer
+        self.family = family
+        self._groups = copy.deepcopy(groups)
+        self._bindings = {key.casefold(): value for key, value in bindings.items()}
         self.path = path
 
     @property
     def size(self) -> int:
-        return len(self._records)
+        return len(self._bindings)
 
     @classmethod
     def from_file(cls, path: Path) -> "ManufacturerDeviceBasicResolver":
@@ -126,10 +148,21 @@ class ManufacturerDeviceBasicResolver:
             "device basic profile: prohibited derivation boundary drift",
         )
 
+        composition = payload.get("composition")
+        _require(isinstance(composition, dict), "device basic profile: composition contract is required")
+        _require(
+            tuple(composition.get("catalog_owned_fields", [])) == _CATALOG_OWNED_FIELDS,
+            "device basic profile: catalog-owned field contract drift",
+        )
+        _require(
+            tuple(composition.get("profile_owned_fields", [])) == _PROFILE_OWNED_FIELDS,
+            "device basic profile: profile-owned field contract drift",
+        )
+
         groups = payload.get("groups")
         bindings = payload.get("bindings")
         _require(isinstance(groups, dict) and groups, "device basic profile: groups are required")
-        _require(isinstance(bindings, list) and bindings, "device basic profile: bindings are required")
+        _require(isinstance(bindings, dict) and bindings, "device basic profile: bindings are required")
 
         validated_groups: dict[str, dict[str, Any]] = {}
         for group_id, group in groups.items():
@@ -169,44 +202,26 @@ class ManufacturerDeviceBasicResolver:
             _require(evidence.get("content_lock") is None, f"{group_id}: v1 observation must not fake a content lock")
             validated_groups[group_id] = copy.deepcopy(group)
 
-        profile_id = str(payload["profile_id"])
-        manufacturer = str(payload["manufacturer"])
-        family = str(payload["family"])
-        records: dict[str, ResolvedDeviceBasicProfile] = {}
-        for index, binding in enumerate(bindings):
-            _require(isinstance(binding, dict), f"bindings[{index}]: object required")
-            icpn = binding.get("icpn")
-            group_id = binding.get("group_id")
-            expected = binding.get("expected_catalog")
-            _require(isinstance(icpn, str) and icpn, f"bindings[{index}]: exact ICPN required")
+        validated_bindings: dict[str, str] = {}
+        for icpn, group_id in bindings.items():
+            _require(isinstance(icpn, str) and icpn, "device basic binding exact ICPN required")
             _require(isinstance(group_id, str) and group_id in validated_groups, f"{icpn}: dangling group_id")
-            _require(isinstance(expected, dict), f"{icpn}: expected_catalog is required")
-            _require(expected.get("manufacturer") == manufacturer, f"{icpn}: manufacturer mismatch")
-            _require(expected.get("family") == family, f"{icpn}: family mismatch")
-            group = validated_groups[group_id]
-            _require(expected.get("series") == group["series"], f"{icpn}: series/group mismatch")
-            _require(expected.get("flash_size") == group["flash_size"], f"{icpn}: Flash/group mismatch")
-            for key in ("base_device", "package", "pin_count", "operating_temperature"):
-                _require(isinstance(expected.get(key), str) and expected[key], f"{icpn}: expected_catalog.{key} required")
             key = icpn.casefold()
-            _require(key not in records, f"duplicate device basic binding: {icpn}")
-            records[key] = ResolvedDeviceBasicProfile(
-                profile_id=profile_id,
-                icpn=icpn,
-                manufacturer=manufacturer,
-                family=family,
-                series=str(expected["series"]),
-                base_device=str(expected["base_device"]),
-                package=str(expected["package"]),
-                pin_count=str(expected["pin_count"]),
-                flash_size=str(expected["flash_size"]),
-                ram_size=str(group["ram_size"]),
-                operating_vdd_v={"min": float(group["operating_vdd_v"]["min"]), "max": float(group["operating_vdd_v"]["max"])},
-                operating_temperature_c=_temperature_range(str(expected["operating_temperature"]), icpn),
-                evidence=copy.deepcopy(group["evidence"]),
-            )
-        _require(len(records) == 280, f"STM32F1 Device Basic Profile must bind 280 exact ICPNs, got {len(records)}")
-        return cls(records, path=path)
+            _require(key not in validated_bindings, f"duplicate device basic binding: {icpn}")
+            validated_bindings[icpn] = group_id
+
+        _require(
+            len(validated_bindings) == 280,
+            f"STM32F1 Device Basic Profile must bind 280 exact ICPNs, got {len(validated_bindings)}",
+        )
+        return cls(
+            profile_id=str(payload["profile_id"]),
+            manufacturer=str(payload["manufacturer"]),
+            family=str(payload["family"]),
+            groups=validated_groups,
+            bindings=validated_bindings,
+            path=path,
+        )
 
     def resolve_exact(
         self,
@@ -223,35 +238,46 @@ class ManufacturerDeviceBasicResolver:
     ) -> ResolvedDeviceBasicProfile | None:
         if not isinstance(icpn, str) or not icpn.strip():
             return None
-        resolved = self._records.get(icpn.strip().casefold())
-        if resolved is None:
+        group_id = self._bindings.get(icpn.strip().casefold())
+        if group_id is None:
             return None
-        observed = {
-            "manufacturer": manufacturer,
-            "family": family,
-            "series": series,
-            "base_device": base_device,
-            "package": package,
-            "pin_count": pin_count,
-            "flash_size": flash_size,
-            "temperature_grade": temperature_grade,
-        }
-        expected = {
-            "manufacturer": resolved.manufacturer,
-            "family": resolved.family,
-            "series": resolved.series,
-            "base_device": resolved.base_device,
-            "package": resolved.package,
-            "pin_count": resolved.pin_count,
-            "flash_size": resolved.flash_size,
-            "temperature_grade": f"{resolved.operating_temperature_c['min']} to {resolved.operating_temperature_c['max']} C",
-        }
-        for field, expected_value in expected.items():
-            _require(
-                str(observed[field]) == str(expected_value),
-                f"{resolved.icpn}: Production Catalog {field} drift: expected {expected_value!r}, got {observed[field]!r}",
-            )
-        return resolved
+        owner = icpn.strip()
+        group = self._groups[group_id]
+        _require(manufacturer == self.manufacturer, f"{owner}: Production Catalog manufacturer drift")
+        _require(family == self.family, f"{owner}: Production Catalog family drift")
+        _require(series == group["series"], f"{owner}: Production Catalog series drift")
+        _require(flash_size == group["flash_size"], f"{owner}: Production Catalog Flash drift")
+        for label, value in (
+            ("base_device", base_device),
+            ("package", package),
+            ("pin_count", pin_count),
+            ("temperature_grade", temperature_grade),
+        ):
+            _require(isinstance(value, str) and value, f"{owner}: Production Catalog {label} missing")
+        assert series is not None
+        assert base_device is not None
+        assert package is not None
+        assert pin_count is not None
+        assert flash_size is not None
+        assert temperature_grade is not None
+        return ResolvedDeviceBasicProfile(
+            profile_id=self.profile_id,
+            icpn=owner,
+            manufacturer=self.manufacturer,
+            family=self.family,
+            series=series,
+            base_device=base_device,
+            package=package,
+            pin_count=pin_count,
+            flash_size=flash_size,
+            ram_size=str(group["ram_size"]),
+            operating_vdd_v={
+                "min": float(group["operating_vdd_v"]["min"]),
+                "max": float(group["operating_vdd_v"]["max"]),
+            },
+            operating_temperature_c=_temperature_range(temperature_grade, owner),
+            evidence=copy.deepcopy(group["evidence"]),
+        )
 
 
 @lru_cache(maxsize=4)
