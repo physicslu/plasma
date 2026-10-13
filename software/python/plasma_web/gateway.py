@@ -76,9 +76,9 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
+def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str, Any]:
     catalog = get_default_device_catalog()
-    matches, total_count = catalog.search_with_total(query, limit=limit)
+    matches, total_count = catalog.search_with_total(query, limit=limit, offset=offset)
     # Candidate evidence is an independent, read-only display projection.
     # It never modifies the authoritative backend mapping or Job resolution.
     candidates = get_default_backend_candidate_registry()
@@ -109,6 +109,8 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
         "catalog_size": catalog.size,
         "count": len(matches),
         "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
         "results": results,
     }
 
@@ -577,10 +579,14 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 params = parse_qs(parsed.query, keep_blank_values=True)
                 query = params.get("q", [""])[0]
                 raw_limit = params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0]
+                raw_offset = params.get("offset", ["0"])[0]
                 limit = int(raw_limit)
+                offset = int(raw_offset)
                 if limit < 1 or limit > MAX_SEARCH_LIMIT:
                     raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
-                self._json(HTTPStatus.OK, _device_search_payload(query, limit))
+                if offset < 0:
+                    raise ValueError("offset must be a non-negative integer")
+                self._json(HTTPStatus.OK, _device_search_payload(query, limit, offset))
             except (TypeError, ValueError) as exc:
                 self._json(
                     HTTPStatus.BAD_REQUEST,
