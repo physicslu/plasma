@@ -82,3 +82,21 @@ missing on-chip Flash (kB). Complete family metadata and build **one
 non-destructive dry-run Proposal** over whichever rows independently
 pass canonical metadata review; request owner approval **before any
 Production write**, not for each individual part.
+
+## Permanent per-SKU review-state baseline
+
+The `nxp-bulk-353-status-map-v2.json` companion provides a compact,
+SHA-256-protected, **per-SKU index** (not only counts), keyed by the
+position of each exact ordering identity in the sorted and immutable
+`nxp-active-353-bulk-candidates-v1.csv` list. It permanently retains
+every status (K/C/P/B) and every blocked root cause (H/F).
+
+`nxp_metadata_status_index_v2.py` reconstructs the complete
+`nxp-353-review-status-index.csv` **without any live website or
+expiring Actions artifact**. It rejects changes to the 353 identity
+set, status SHA-256, blocked reason SHA-256, source-pair consistency
+or unauthorized production/vendor-coverage claims.
+
+The original manufacturer HTML still remains necessary for
+**canonical metadata admission**. The permanent status map is an
+auditable triage index, **not a replacement for raw source proof**.
