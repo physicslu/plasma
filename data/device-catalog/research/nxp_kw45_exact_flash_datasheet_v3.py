@@ -23,6 +23,7 @@ SNAPSHOT = HERE / "nxp-official-bounded-snapshot-2026-10-13-v1.json"
 MAP = HERE / "nxp-bulk-353-status-map-v2.json"
 CANDIDATES = HERE / "nxp-active-353-bulk-candidates-v1.csv"
 PDF_URL = "https://www.nxp.com/docs/en/data-sheet/KW45.pdf"
+ALTERNATE_OFFICIAL_PDF_URL = "https://www.nxp.jp/docs/en/data-sheet/KW45.pdf"
 # Independently transcribed and verified against page 4 of official KW45
 # Rev 9 Table 1: memory cells spanning distinct rows of exact radio SKUs.
 EXACT = {
@@ -59,7 +60,7 @@ def from_blocked_source() -> set[str]:
     return x
 
 
-def pdf_table(source: bytes) -> dict:
+def pdf_table(source: bytes, source_url: str = PDF_URL) -> dict:
     require(source.startswith(b"%PDF") and len(source) >= 1000,
             "official KW45 PDF invalid")
     doc = fitz.open(stream=source, filetype="pdf")
@@ -93,7 +94,7 @@ def pdf_table(source: bytes) -> dict:
                 second_y-12 <= groups[1024][0].y0 <= last_y+12,
                 "NXP KW45 PDF flash cells do not align with exact row groups")
         return {
-            "source_url":PDF_URL,
+            "source_url":source_url,
             "source_pdf_sha256":hashlib.sha256(source).hexdigest(),
             "source_pdf_page_count":doc.page_count,
             "source_pdf_zero_index_page":3,
@@ -123,14 +124,31 @@ def main() -> None:
     if args.pdf_file:
         content=args.pdf_file.read_bytes()
     else:
-        require(urlsplit(PDF_URL).hostname=="www.nxp.com", "source URL drift")
-        request=urllib.request.Request(PDF_URL,headers={
-            "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) NXP-ICPN-Research/3"})
-        with urllib.request.urlopen(request,timeout=70) as reply:
-            require(reply.status==200 and urlsplit(reply.url).hostname in
-                    {"nxp.com","www.nxp.com"}, "manufacturer PDF unavailable")
-            content=reply.read(12_000_000)
-    result=pdf_table(content)
+        content = None
+        actual_url = None
+        errors = []
+        for url in (PDF_URL, ALTERNATE_OFFICIAL_PDF_URL):
+            require(urlsplit(url).scheme == "https" and
+                    urlsplit(url).hostname in {"www.nxp.com", "www.nxp.jp"},
+                    "non-manufacturer datasheet URL rejected")
+            try:
+                request=urllib.request.Request(url,headers={
+                    "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                    "Accept":"application/pdf,*/*;q=0.5"})
+                with urllib.request.urlopen(request,timeout=70) as reply:
+                    require(reply.status==200 and urlsplit(reply.url).hostname in
+                            {"nxp.com","www.nxp.com","nxp.jp","www.nxp.jp"},
+                            "manufacturer PDF redirected to nonofficial source")
+                    data=reply.read(12_000_000)
+                    require(data.startswith(b"%PDF"), "returned content not PDF")
+                    content=data
+                    actual_url=reply.url
+                break
+            except (OSError,ValueError) as exc:
+                errors.append(url+":"+type(exc).__name__+":"+str(exc)[:150])
+        require(content is not None, "both official NXP regional PDF URLs unavailable: " +
+                "; ".join(errors))
+    result=pdf_table(content, actual_url or PDF_URL)
     args.output.mkdir(parents=True,exist_ok=True)
     (args.output/"kw45-official-datasheet.pdf").write_bytes(content)
     (args.output/"kw45-eight-exact-flash-datasheet-evidence-v3.json").write_text(
