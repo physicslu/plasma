@@ -222,8 +222,8 @@ def audit(root: Path) -> tuple[list[dict], list[dict], dict]:
     require(joined_states == frozen_states["status_map"] and
             joined_reasons == frozen_states["blocked_reason_map"],
             "per-SKU manufacturer metadata qualification map drift")
-    require(digest((joined_states+"\\n").encode()) == frozen_states["status_map_sha256"] and
-            digest((joined_reasons+"\\n").encode()) ==
+    require(digest((joined_states+"\n").encode()) == frozen_states["status_map_sha256"] and
+            digest((joined_reasons+"\n").encode()) ==
                 frozen_states["blocked_reason_map_sha256"],
             "per-SKU manufacturer metadata map SHA-256 mismatch")
 
