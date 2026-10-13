@@ -175,6 +175,8 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
         "manufacturer_device_basic_profile": True,
         "ram": True,
         "operating_vdd": True,
+        "io_supply": False,
+        "vdda": False,
         "operating_temperature": True,
         "manufacturer_device_profile": True,
         "operating_electrical": True,
@@ -188,7 +190,7 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
         "independent_software_differential": True,
         "physical_hil": False,
     }
-    assert enrichment["missing_dimensions"] == ["physical_hil"]
+    assert enrichment["missing_dimensions"] == ["io_supply", "vdda", "physical_hil"]
     assert enrichment["evidence"]["manufacturer_baseline"].endswith(
         "stm32f103c8t6-manufacturer-only-v1.json"
     )
@@ -204,6 +206,8 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert basic["dimensions"]["manufacturer_device_basic_profile"] is True
     assert basic["dimensions"]["ram"] is True
     assert basic["dimensions"]["operating_vdd"] is True
+    assert basic["dimensions"]["io_supply"] is False
+    assert basic["dimensions"]["vdda"] is False
     assert basic["dimensions"]["operating_temperature"] is True
     assert basic["dimensions"]["manufacturer_device_profile"] is False
     assert basic["dimensions"]["memory_map"] is False
@@ -217,6 +221,8 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert c0_basic["dimensions"]["manufacturer_device_basic_profile"] is True
     assert c0_basic["dimensions"]["ram"] is True
     assert c0_basic["dimensions"]["operating_vdd"] is True
+    assert c0_basic["dimensions"]["io_supply"] is False
+    assert c0_basic["dimensions"]["vdda"] is False
     assert c0_basic["evidence"]["device_basic_profile"].endswith(
         "stm32c0-device-basic-v1.json"
     )
@@ -227,6 +233,8 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert g0_basic["dimensions"]["manufacturer_device_basic_profile"] is True
     assert g0_basic["dimensions"]["ram"] is True
     assert g0_basic["dimensions"]["operating_vdd"] is True
+    assert g0_basic["dimensions"]["io_supply"] is False
+    assert g0_basic["dimensions"]["vdda"] is False
     assert g0_basic["evidence"]["device_basic_profile"].endswith(
         "stm32g0-device-basic-v1.json"
     )
