@@ -1,0 +1,94 @@
+name: NXP 353 exact metadata gap resolution v3
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_metadata_gap_resolution_v3.py'
+      - 'data/device-catalog/research/nxp-metadata-bump-evidence-v3.json'
+      - 'data/device-catalog/research/test_nxp_metadata_gap_resolution_v3.py'
+      - 'data/device-catalog/research/nxp_metadata_gap_queue_v3.py'
+      - 'data/device-catalog/research/test_nxp_metadata_gap_queue_v3.py'
+      - 'data/device-catalog/research/nxp-353-metadata-gap-review-queue-v3.csv'
+      - 'data/device-catalog/research/nxp_kw45_exact_flash_datasheet_v3.py'
+      - 'data/device-catalog/research/test_nxp_kw45_exact_flash_datasheet_v3.py'
+      - 'data/device-catalog/research/NXP_BULK_METADATA_GAP_RESOLUTION_V3.md'
+      - '.github/workflows/device-catalog-nxp-bulk-metadata-gap-resolution-v3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  offline-bga-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'beautifulsoup4==4.14.2'
+      - name: Fail-closed eleven-exact-BGA contract tests
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_gap_resolution_v3.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38337377867
+          github-token: ${{ github.token }}
+          pattern: nxp-part-metadata-shard-*
+          path: /tmp/nxp-353-original-sources
+      - name: Re-qualify all 353 exact identities using original manufacturer SHA-locked HTML
+        run: |
+          python data/device-catalog/research/nxp_metadata_gap_resolution_v3.py \
+            --root /tmp/nxp-353-original-sources \
+            --output /tmp/nxp-bulk-353-gap-resolution-v3
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('/tmp/nxp-bulk-353-gap-resolution-v3/nxp-353-metadata-gap-resolution-v3.json')
+          x=json.loads(p.read_text())
+          assert x['original_353_identity_count']==353
+          assert x['bump_contact_evidence_upgraded_count']==11
+          assert x['four_source_field_combined_review_queue_count']==212
+          assert x['partial_source_evidence_remaining']==36
+          assert x['blocked_source_evidence_remaining']==93
+          assert x['production_write_authorized'] is False
+          print('NXP all 353 and eleven original LFBGA64 bump evidence: PASS')
+          PY
+      - name: Verify all 129 remaining exact commercial review routes in one pass
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_gap_queue_v3.py' -v
+          python data/device-catalog/research/nxp_metadata_gap_queue_v3.py \
+            --output /tmp/nxp-bulk-353-gap-resolution-v3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-353-bga-contact-verified-research-v3
+          path: /tmp/nxp-bulk-353-gap-resolution-v3/
+          if-no-files-found: warn
+          retention-days: 30
+
+  kw45-datasheet-source-gap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'PyMuPDF==1.26.4'
+      - name: Test exact KW45 PDF Table 1 parser with synthetic rows (live PDF still blocked)
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_kw45_exact_flash_datasheet_v3.py' -v
+      - name: Report eight officially listed KW45 SKUs pending independent PDF binary replay
+        run: |
+          python data/device-catalog/research/nxp_kw45_exact_flash_datasheet_v3.py \
+            --offline-source-gap \
+            --output /tmp/nxp-kw45-exact-datasheet-v3
+          cat /tmp/nxp-kw45-exact-datasheet-v3/kw45-eight-source-gap-v3.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-kw45-eight-pdf-replay-pending-review-v3
+          path: /tmp/nxp-kw45-exact-datasheet-v3/
+          if-no-files-found: warn
+          retention-days: 30
