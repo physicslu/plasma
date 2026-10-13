@@ -280,3 +280,47 @@ while still emitting the 347 source-linked research records with
 programmer support is inferred. Resolve the missing historical ordering
 parts from official PCN/EOL and manufacturer product tables, then scale
 family discovery across the other DFPs.
+
+### Full official Packs Repository index replay (2026-10-13)
+
+The official source index was captured as original HTML with
+[artifact 11786276380](https://github.com/physicslu/plasma/actions/runs/38338847345/artifacts/11786276380).
+The 3,450,795 original bytes have SHA-256
+`9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0`.
+The offline stdlib HTML parser `microchip_dfp_index_inventory_v1.py`
+validates this hash and each manufacturer's declared per-pack device count.
+It also recognizes multi-badge Device Packs (`Device Pack` with `ARM Sync`),
+which otherwise caused a non-obvious 46-pack omission.
+
+The corrected, successful
+[replay artifact 11786677494](https://github.com/physicslu/plasma/actions/runs/38339710359/artifacts/11786677494)
+contains **133 Microchip Device Family Packs** and **3,717 distinct
+pack-supported device names**, plus one separate ARM-publisher Cortex DFP.
+Five research-lane *candidate device-name* slices are:
+
+| Conservative research lane | Official DFP packs | Observed device names |
+| --- | ---: | ---: |
+| 8-bit PIC / AVR | 23 | 1,519 |
+| 16-bit PIC24 / dsPIC | 22 | 899 |
+| 32-bit PIC32 / SAM | 53 | 796 |
+| 32-bit AVR / RISC | 0 mapped | 0 mapped |
+| Wireless candidate | 13 | 53 |
+| MPU candidate, excluded pending scope review | 6 | 56 |
+| Other non-MCU or unclassified | 16 | 394 |
+| **Microchip total** | **133** | **3,717** |
+
+The 3,267 names mapped to MCU/DSC/wireless research lanes are neither
+proof of exact orderable SKU population nor a verified Active denominator.
+Zero mapped 32-bit AVR/RISC names only indicates pack-name taxonomy does not
+discover that historical lane. Excluded/unclassified support packs include
+non-MCU memory and control devices, and may include embedded controllers
+that require additional classification. Historical/EOL parts can remain in
+DFP support lists; `PIC12F529T48A` is a concrete example.
+
+The full parsed inventory preserves pack name/version, manufacturer,
+manufacturer download filename and all observed supported device names.
+It is **read-only discovery evidence**, never a Production admission.
+Next step: bounded multi-family MCP acquisition using these frozen candidate
+device names, with lifecycle and exact SKU provenance per query; avoid
+unbounded querying until rate limits, query cap, ambiguity and independent
+manufacturer product population boundaries are characterized.
