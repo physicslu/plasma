@@ -68,35 +68,3 @@ jobs:
           assert len(x['segments']) == 5
           print('Research-only Microchip baseline PASS; no ungrounded portfolio claim')
           PY
-
-  offline-replay-official-dfp-index-once:
-    needs: research-contract
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
-    continue-on-error: true
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Restore captured official Microchip Packs HTML
-        uses: actions/download-artifact@v4
-        with:
-          name: microchip-official-packs-index-raw
-          run-id: 38338847345
-          github-token: ${{ github.token }}
-          path: /tmp/microchip-packs-source
-      - name: Parse manufacturer-indexed supported device names into audit lanes
-        run: python data/device-catalog/research/microchip_dfp_index_inventory_v1.py --evidence-root /tmp/microchip-packs-source --output /tmp/microchip-dfp-inventory/discovery.json
-      - name: Archive parsed DFP evidence inventory
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: microchip-dfp-manufacturer-source-5-lane-inventory
-          path: /tmp/microchip-dfp-inventory/
-          if-no-files-found: warn
-          retention-days: 30
