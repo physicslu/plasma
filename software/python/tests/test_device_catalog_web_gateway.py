@@ -40,6 +40,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
         self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["total_count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103C8T6")
         self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
@@ -110,6 +112,17 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=stm32f103c8t6")
         self.assertEqual(status, 200)
         self.assertEqual(payload["results"][0]["identifier"], "STM32F103C8T6")
+
+    def test_search_total_count_is_independent_of_return_limit(self) -> None:
+        status, limited = self.request("/api/devices/search?q=STM32&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(limited["count"], 5)
+        self.assertGreater(limited["total_count"], limited["count"])
+
+        status, wider = self.request("/api/devices/search?q=STM32&limit=10")
+        self.assertEqual(status, 200)
+        self.assertEqual(wider["count"], 10)
+        self.assertEqual(wider["total_count"], limited["total_count"])
 
     def test_family_and_vendor_queries_return_only_admitted_rows(self) -> None:
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
@@ -330,6 +343,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["total_count"], 0)
         self.assertEqual(payload["results"], [])
 
     def test_empty_query_is_valid_for_catalog_metadata_idle_state(self) -> None:
