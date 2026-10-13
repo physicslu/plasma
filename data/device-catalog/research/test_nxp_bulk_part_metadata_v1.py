@@ -50,7 +50,7 @@ class NxpBulkPartMetadataContracts(unittest.TestCase):
 
     def test_redirect_to_family_or_parent_does_not_inherit_metadata(self):
         with self.assertRaisesRegex(ValueError, "heading"):
-            mod.parse_official_part(BODY, TABLE, "MCXA156VFTR", ["MCXA156VFT"])
+            mod.parse_official_part(BODY + "\nMCXA156VFTR\n", TABLE, "MCXA156VFTR", ["MCXA156VFT"])
 
     def test_missing_flash_is_unknown_not_zero(self):
         row = mod.parse_official_part(BODY, TABLE[1:], "MCXA156VFT", ["MCXA156VFT"])
