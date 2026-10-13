@@ -69,12 +69,17 @@ def build(root: Path, parts: list[str]) -> dict:
                     set(check['exact_query_ordering_parts']),
                     'exact orderables mismatch replay summary')
             require(len(local_observations) > 0, 'no exact orderable evidence')
+            # Check every cross-query conflict before mutating the ledger:
+            # a rejected query must never leak partially accepted SKU rows.
+            for row in local_observations:
+                previous = observations.get(row['icpn'])
+                if previous is not None:
+                    require(previous['rawLifecycleStatus'] == row['rawLifecycleStatus'],
+                            'cross-query raw lifecycle conflict')
             for row in local_observations:
                 key = row['icpn']
                 previous = observations.get(key)
                 if previous is not None:
-                    require(previous['rawLifecycleStatus'] == row['rawLifecycleStatus'],
-                            'cross-query raw lifecycle conflict')
                     previous['sources'].append(row)
                 else:
                     observations[key] = {
