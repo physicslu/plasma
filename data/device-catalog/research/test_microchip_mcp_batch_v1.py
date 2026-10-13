@@ -38,7 +38,10 @@ class BatchTests(unittest.TestCase):
         return {'query': part, 'population_boundary_validated': False,
                 'global_active_denominator': None,
                 'production_write_authorized': False,
-                'unique_ordering_count': 3}
+                'unique_ordering_count': 3,
+                'exact_prefix_ordering_count': 3,
+                'fuzzy_foreign_ordering_count': 0,
+                'vendor_base_part_alias_count': 0}
 
     def test_synthetic_batch_success_is_never_population_proof(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -70,6 +73,20 @@ class BatchTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'worker count'):
                 batch.execute(target, batch.load_seeds()[:2], workers=3)
             self.assertFalse(target.exists())
+
+    def test_fuzzy_only_query_not_reported_as_success(self):
+        with tempfile.TemporaryDirectory() as temp:
+            def fuzzy(path, part):
+                result = self.fake_result(part)
+                result['exact_prefix_ordering_count'] = 0
+                result['fuzzy_foreign_ordering_count'] = 3
+                return result
+            with patch.object(batch.probe, 'run', side_effect=fuzzy):
+                report = batch.execute(Path(temp) / 'fuzzy', batch.load_seeds()[:2])
+            self.assertFalse(report['all_queries_reconciled'])
+            self.assertEqual(report['bounded_reconciled_queries'], 0)
+            self.assertTrue(all(r['state'] == 'no_exact_ordering_prefix_found'
+                                for r in report['results']))
 
     def test_a_failed_query_is_reported_without_false_success(self):
         with tempfile.TemporaryDirectory() as temp:
