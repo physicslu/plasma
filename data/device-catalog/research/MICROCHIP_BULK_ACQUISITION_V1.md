@@ -47,6 +47,18 @@ The source registry now records evidence-backed family labels to seed later API 
 
 This closes only the surface review. The observed family names are discovery seeds, not an exhaustive inventory; no live Product Data API response fixture or reconciled per-family API page totals are committed. Keep `population_boundary_validated=false` and `global_active_denominator=null`. Next, obtain the official Product Selector/MAPS export or another complete manufacturer family listing, freeze the base-part query set with source hashes, then capture every API page per base part and compare returned `totalRecords`/`totalPages` against fetched rows and unique exact `part_number` values. Preserve raw lifecycle codes until their official mapping is established.
 
+## Alternative source continuation — 2026-10-13
+
+The [alternative source audit](MICROCHIP_ALTERNATIVE_SOURCES_V1.md) records
+four complementary official routes: public no-authentication MCP, Parametric
+Search XLSX export, versioned Device Family Packs, and PCN/EOL attachments.
+It includes a bounded list of 27 distinct PIC10/PIC12 DFP discovery names and
+ten indexed PIC10F206 catalog-part candidates. Direct page retrieval omitted
+the latter table, so the ten strings remain unverified candidates. Neither
+list is an Active denominator or an admission snapshot. MCP tool discovery
+and live product responses remain unvalidated because the current execution
+environment does not provide direct access to that endpoint.
+
 ## Gate 0 — implemented
 
 microchip_bulk_coverage_v1.py validates the segment registry and optional manufacturer evidence snapshots. It verifies exact part identifiers, allowed lifecycle vocabulary, official Microchip hostnames, per-row evidence SHA-256, duplicate rows, and cross-lane lifecycle conflicts. A snapshot can be marked complete only with matching official row count and a source-content digest. Even that does not establish a Microchip-wide denominator: the registry keeps population_boundary_validated=false, so global denominator and coverage remain null.
