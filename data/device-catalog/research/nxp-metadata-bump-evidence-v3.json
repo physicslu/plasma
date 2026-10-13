@@ -21,5 +21,106 @@
   "original_missing_package_terminals_count": 11,
   "original_missing_exact_active_count": 353,
   "production_write_authorized": false,
-  "runtime_programming_qualified": false
+  "runtime_programming_qualified": false,
+  "qualified_source_evidence": [
+    {
+      "icpn": "K32L2B11VMP0A",
+      "manufacturer_part_url": "https://www.nxp.com/part/K32L2B11VMP0A",
+      "original_rendered_html_sha256": "7e1dcfba638534028485231d3bd8b2862432861ab1005c433363ae04d7bf2c1f",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "K32L2B21VMP0A",
+      "manufacturer_part_url": "https://www.nxp.com/part/K32L2B21VMP0A",
+      "original_rendered_html_sha256": "5fca0de8918a0ed2ef4eee685b4122a0419bf4d2bdd7d634191e7f5efd25185e",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "K32L2B31VMP0A",
+      "manufacturer_part_url": "https://www.nxp.com/part/K32L2B31VMP0A",
+      "original_rendered_html_sha256": "3516c8ccee87b6545191207867bf9da26dd9ba6faccd9f651e96d5a8b5cc5698",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA144VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA144VMP",
+      "original_rendered_html_sha256": "41ca0c14fddf010f59f21549ae758ef728a5324bd08d611714f75551bbc8886b",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA145VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA145VMP",
+      "original_rendered_html_sha256": "d0b3de255437dd661d6dcce68edb59773e6845537e3e1d6114f607928190a95b",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA146VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA146VMP",
+      "original_rendered_html_sha256": "b04546d5a74994ea51a2043b6e9d5e1479e2c71ac6ed48bd717a3fcef9dd37b2",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA154VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA154VMP",
+      "original_rendered_html_sha256": "37be86df4bd8390b676eed344015964283a7482a5b43126ca22096a19fa24a32",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA155VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA155VMP",
+      "original_rendered_html_sha256": "fe9c6477cde104a49c73058d60dc3be018a2224d4e6c13aad03c5b9889cd0247",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXA156VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXA156VMP",
+      "original_rendered_html_sha256": "56d458baaa5f624bedd0a66197bc208b69eb0d578bd04615a641f01fb214afb0",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXC443VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXC443VMP",
+      "original_rendered_html_sha256": "f4fa7105437286af0bb0b09a530502cbe987105fd8db76f967aca21938efa37e",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    },
+    {
+      "icpn": "MCXC444VMP",
+      "manufacturer_part_url": "https://www.nxp.com/part/MCXC444VMP",
+      "original_rendered_html_sha256": "7eeb4109ebeb47c5abff6a71b19c6ef9f8e271486619422c43f00b9d2e3fe329",
+      "original_package_name": "LFBGA64",
+      "explicit_original_package_contact": "64 bumps",
+      "official_source_sha_locked": true,
+      "canonical_production_admission_authorized": false
+    }
+  ]
 }
