@@ -60,6 +60,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(basic["icpn"], "STM32F103C8T6")
         self.assertEqual(basic["ram_size"], "20 KiB")
         self.assertEqual(basic["operating_vdd_v"], {"min": 2.0, "max": 3.6})
+        self.assertIsNone(basic["io_supply_v"])
+        self.assertIsNone(basic["vdda_v"])
         self.assertEqual(basic["operating_temperature_c"], {"min": -40, "max": 85})
         self.assertFalse(basic["programming_profile_authority"])
 
@@ -105,6 +107,29 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(basic["operating_vdd_v"], {"min": 2.0, "max": 3.6})
         self.assertFalse(basic["programming_profile_authority"])
         self.assertIsNone(result["selected_profile"])
+
+    def test_c0_and_g0_bulk_basic_profiles_are_exposed_without_programming_authority(self) -> None:
+        cases = (
+            ("STM32C011F4P6", "STM32C0", "6 KiB", {"min": 2.0, "max": 3.6}),
+            ("STM32G031K8T3", "STM32G0", "8 KiB", {"min": 1.7, "max": 3.6}),
+        )
+        for icpn, family, ram, vdd in cases:
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                result = payload["results"][0]
+                self.assertEqual(result["icpn"], icpn)
+                self.assertEqual(result["family"], family)
+                basic = result["manufacturer_device_basic_profile"]
+                self.assertIsNotNone(basic)
+                assert basic is not None
+                self.assertEqual(basic["ram_size"], ram)
+                self.assertEqual(basic["operating_vdd_v"], vdd)
+                self.assertIsNone(basic["io_supply_v"])
+                self.assertIsNone(basic["vdda_v"])
+                self.assertFalse(basic["programming_profile_authority"])
+                self.assertIsNone(result["selected_profile"])
 
     def test_admitted_icpn_without_manufacturer_selected_profile_returns_null(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F407VGT6&limit=1")

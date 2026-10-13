@@ -87,15 +87,15 @@ def test_current_production_metrics() -> None:
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
-    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 280
+    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 912
     assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
     assert metrics["manufacturer_enrichment_m5_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
 
     enrichment = inventory["manufacturer_enrichment"]
     assert enrichment["highest_level_counts"] == {
-        "M0": expected_exact_icpns - 280,
-        "M1": 279,
+        "M0": expected_exact_icpns - 912,
+        "M1": 911,
         "M2": 0,
         "M3": 0,
         "M4": 1,
@@ -103,7 +103,7 @@ def test_current_production_metrics() -> None:
     }
     assert enrichment["at_least_level_counts"] == {
         "M0": expected_exact_icpns,
-        "M1": 280,
+        "M1": 912,
         "M2": 1,
         "M3": 1,
         "M4": 1,
@@ -112,6 +112,10 @@ def test_current_production_metrics() -> None:
     assert enrichment["by_family_highest_level"]["STM32F1"]["M4"] == 1
     assert enrichment["by_family_highest_level"]["STM32F1"]["M1"] == 279
     assert enrichment["by_family_highest_level"]["STM32F1"]["M0"] == 0
+    assert enrichment["by_family_highest_level"]["STM32C0"]["M1"] == 226
+    assert enrichment["by_family_highest_level"]["STM32C0"]["M0"] == 0
+    assert enrichment["by_family_highest_level"]["STM32G0"]["M1"] == 406
+    assert enrichment["by_family_highest_level"]["STM32G0"]["M0"] == 0
 
 
 def test_exact_icpn_to_base_device_to_profile_projection() -> None:
@@ -171,6 +175,8 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
         "manufacturer_device_basic_profile": True,
         "ram": True,
         "operating_vdd": True,
+        "io_supply": False,
+        "vdda": False,
         "operating_temperature": True,
         "manufacturer_device_profile": True,
         "operating_electrical": True,
@@ -184,7 +190,7 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
         "independent_software_differential": True,
         "physical_hil": False,
     }
-    assert enrichment["missing_dimensions"] == ["physical_hil"]
+    assert enrichment["missing_dimensions"] == ["io_supply", "vdda", "physical_hil"]
     assert enrichment["evidence"]["manufacturer_baseline"].endswith(
         "stm32f103c8t6-manufacturer-only-v1.json"
     )
@@ -200,12 +206,38 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert basic["dimensions"]["manufacturer_device_basic_profile"] is True
     assert basic["dimensions"]["ram"] is True
     assert basic["dimensions"]["operating_vdd"] is True
+    assert basic["dimensions"]["io_supply"] is False
+    assert basic["dimensions"]["vdda"] is False
     assert basic["dimensions"]["operating_temperature"] is True
     assert basic["dimensions"]["manufacturer_device_profile"] is False
     assert basic["dimensions"]["memory_map"] is False
     assert basic["dimensions"]["manufacturer_programming_profile"] is False
     assert basic["dimensions"]["execution_ir"] is False
     assert basic["dimensions"]["physical_hil"] is False
+
+    c0 = find_exact(inventory, "STM32C011F4P6")
+    c0_basic = c0["manufacturer_enrichment"]
+    assert c0_basic["highest_level"] == "M1"
+    assert c0_basic["dimensions"]["manufacturer_device_basic_profile"] is True
+    assert c0_basic["dimensions"]["ram"] is True
+    assert c0_basic["dimensions"]["operating_vdd"] is True
+    assert c0_basic["dimensions"]["io_supply"] is False
+    assert c0_basic["dimensions"]["vdda"] is False
+    assert c0_basic["evidence"]["device_basic_profile"].endswith(
+        "stm32c0-device-basic-v1.json"
+    )
+
+    g0 = find_exact(inventory, "STM32G031K8T3")
+    g0_basic = g0["manufacturer_enrichment"]
+    assert g0_basic["highest_level"] == "M1"
+    assert g0_basic["dimensions"]["manufacturer_device_basic_profile"] is True
+    assert g0_basic["dimensions"]["ram"] is True
+    assert g0_basic["dimensions"]["operating_vdd"] is True
+    assert g0_basic["dimensions"]["io_supply"] is False
+    assert g0_basic["dimensions"]["vdda"] is False
+    assert g0_basic["evidence"]["device_basic_profile"].endswith(
+        "stm32g0-device-basic-v1.json"
+    )
 
     outside_family = find_exact(inventory, "STM32F407VGT6")
     missing = outside_family["manufacturer_enrichment"]

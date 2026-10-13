@@ -57,14 +57,14 @@ The executable coverage inventory is derived from the current Production manifes
 At the Manufacturer Enrichment Coverage v1 baseline:
 
 ```text
-Exact ICPNs:                            4,641
-Families:                                  29
+Exact ICPNs:                            4,853
+Families:                                  31
 Deterministic OpenOCD-mapped ICPNs:     4,176
-OpenOCD-unmapped ICPNs:                   465
+OpenOCD-unmapped ICPNs:                   677
 Direct IC Support-bound ICPNs:              2
 Evidence-backed Programming Profiles:       1
 Native PPU runtime-ready ICPNs:              0
-Manufacturer Enrichment M1+:               280
+Manufacturer Enrichment M1+:               912
 Manufacturer Enrichment M4+:                 1
 Manufacturer Enrichment M5:                  0
 ```
@@ -72,8 +72,9 @@ Manufacturer Enrichment M5:                  0
 Base-device cardinality and per-family counts remain deterministic outputs of
 `coverage_inventory.py --summary`; they are not duplicated here as a hand-maintained constant.
 
-STM32F1 Device Basic Profile v1 raises all 280 STM32F1 Production ICPNs to M1 without
-changing the two existing IC Support Programming bindings or any hardware/runtime readiness.
+The current STM32F1 + STM32C0 + STM32G0 Device Basic batch raises 912 ST Production
+exact ICPNs to M1 without changing the two existing IC Support Programming bindings or
+any hardware/runtime readiness.
 
 The counts describe different maturity layers and must not be collapsed into a single
 `supported=true` claim. In particular, `4,176 deterministic OpenOCD-mapped ICPNs`

@@ -16,7 +16,8 @@ PRODUCTION_MANIFEST = REPO_ROOT / "data" / "device-catalog" / "production" / "ic
 BINDINGS_ROOT = HERE / "bindings"
 PROFILE_ROOT = HERE / "profiles"
 ENRICHMENT_EVIDENCE_FILE = HERE / "enrichment-coverage" / "evidence-v1.json"
-DEVICE_BASIC_FILE = HERE / "device-basic" / "stm32f1-device-basic-v1.json"
+DEVICE_BASIC_ROOT = HERE / "device-basic"
+DEVICE_BASIC_GLOB = "*-device-basic-v1.json"
 
 ENRICHMENT_LEVELS = ("M0", "M1", "M2", "M3", "M4", "M5")
 ENRICHMENT_DIMENSIONS = (
@@ -24,6 +25,8 @@ ENRICHMENT_DIMENSIONS = (
     "manufacturer_device_basic_profile",
     "ram",
     "operating_vdd",
+    "io_supply",
+    "vdda",
     "operating_temperature",
     "manufacturer_device_profile",
     "operating_electrical",
@@ -130,88 +133,191 @@ def file_sha256(path: Path) -> str:
 def load_device_basic_coverage(
     production_rows: list[dict[str, str]],
 ) -> dict[str, dict[str, Any]]:
-    payload = load_json(DEVICE_BASIC_FILE)
-    require(payload.get("schema_version") == "1.0.0", "device basic coverage schema drift")
-    require(payload.get("profile_id") == "stm32f1-device-basic-v1", "device basic profile identity drift")
-    require(
-        payload.get("status") == "manufacturer_device_basic_available",
-        "device basic profile status drift",
-    )
-    require(payload.get("manufacturer") == "STMicroelectronics", "device basic manufacturer drift")
-    require(payload.get("family") == "STM32F1", "device basic family drift")
-    require(
-        payload.get("fields") == [
-            "icpn", "base_device", "package", "pin_count", "flash",
-            "ram", "operating_vdd", "operating_temperature",
-        ],
-        "device basic field contract drift",
-    )
-    composition = payload.get("composition")
-    require(isinstance(composition, dict), "device basic composition contract is required")
-    require(
-        composition.get("catalog_owned_fields")
-        == ["icpn", "base_device", "package", "pin_count", "flash", "operating_temperature"],
-        "device basic catalog-owned field contract drift",
-    )
-    require(
-        composition.get("profile_owned_fields") == ["ram", "operating_vdd"],
-        "device basic profile-owned field contract drift",
-    )
-
-    groups = payload.get("groups")
-    bindings = payload.get("bindings")
-    require(isinstance(groups, dict) and groups, "device basic groups are required")
-    require(isinstance(bindings, dict) and bindings, "device basic bindings are required")
-
+    required_fields = [
+        "icpn", "base_device", "package", "pin_count", "flash",
+        "ram", "operating_vdd", "io_supply", "vdda", "operating_temperature",
+    ]
+    catalog_owned_fields = [
+        "icpn", "base_device", "package", "pin_count", "flash",
+        "operating_temperature",
+    ]
     catalog_by_icpn = {row["icpn"]: row for row in production_rows}
-    expected_f1 = {
-        row["icpn"]
-        for row in production_rows
-        if row["manufacturer"] == "STMicroelectronics" and row["family"] == "STM32F1"
-    }
-    require(len(expected_f1) == 280, f"Production STM32F1 baseline drift: {len(expected_f1)}")
-    require(set(bindings) == expected_f1, "device basic exact-ICPN applicability set drift")
+    paths = sorted(DEVICE_BASIC_ROOT.glob(DEVICE_BASIC_GLOB))
+    require(paths, "no Manufacturer Device Basic Profile files found")
 
     result: dict[str, dict[str, Any]] = {}
-    for icpn, group_id in sorted(bindings.items()):
-        require(isinstance(group_id, str) and group_id in groups, f"{icpn}: dangling device basic group")
-        row = catalog_by_icpn[icpn]
-        group = groups[group_id]
-        require(isinstance(group, dict), f"{icpn}: device basic group must be an object")
-        require(group.get("series") == row["series"], f"{icpn}: device basic series mismatch")
-        require(group.get("flash_size") == row["flash_size"], f"{icpn}: device basic Flash mismatch")
-        require(isinstance(group.get("ram_size"), str) and group["ram_size"].endswith(" KiB"), f"{icpn}: RAM missing")
-        vdd = group.get("operating_vdd_v")
+    profile_ids: set[str] = set()
+    family_keys: set[tuple[str, str]] = set()
+    for path in paths:
+        payload = load_json(path)
         require(
-            isinstance(vdd, dict)
-            and isinstance(vdd.get("min"), (int, float))
-            and isinstance(vdd.get("max"), (int, float))
-            and vdd["min"] < vdd["max"],
-            f"{icpn}: operating VDD missing",
+            payload.get("schema_version") == "1.0.0",
+            f"{path}: device basic coverage schema drift",
         )
-        for field in ("base_device", "package", "pin_count", "temperature_grade"):
-            require(isinstance(row.get(field), str) and row[field], f"{icpn}: Production Catalog {field} missing")
-        evidence = group.get("evidence")
+        profile_id = payload.get("profile_id")
+        manufacturer = payload.get("manufacturer")
+        family = payload.get("family")
         require(
-            isinstance(evidence, dict)
-            and evidence.get("authority") == "STMicroelectronics official"
-            and evidence.get("source_surface") == "st_product_selector"
-            and isinstance(evidence.get("selector_url"), str)
-            and evidence["selector_url"].startswith("https://www.st.com/")
-            and "/products.html" in evidence["selector_url"]
-            and evidence.get("evidence_strength") == "official_product_selector_observation"
-            and evidence.get("content_lock") is None,
-            f"{icpn}: device basic evidence boundary invalid",
+            isinstance(profile_id, str) and profile_id.endswith("-device-basic-v1"),
+            f"{path}: device basic profile identity drift",
         )
-        result[icpn] = {
-            "profile_id": payload["profile_id"],
-            "group_id": group_id,
-            "ram_size": group["ram_size"],
-            "operating_vdd_v": copy.deepcopy(vdd),
-            "operating_temperature": row["temperature_grade"],
-            "evidence": copy.deepcopy(evidence),
+        require(profile_id not in profile_ids, f"duplicate device basic profile_id: {profile_id}")
+        profile_ids.add(profile_id)
+        require(
+            payload.get("status") == "manufacturer_device_basic_available",
+            f"{profile_id}: device basic profile status drift",
+        )
+        require(
+            manufacturer == "STMicroelectronics",
+            f"{profile_id}: device basic manufacturer drift",
+        )
+        require(
+            isinstance(family, str) and family.startswith("STM32"),
+            f"{profile_id}: device basic family drift",
+        )
+        family_key = (manufacturer, family)
+        require(
+            family_key not in family_keys,
+            f"{profile_id}: duplicate Manufacturer Device Basic family profile",
+        )
+        family_keys.add(family_key)
+        require(
+            payload.get("fields") == required_fields,
+            f"{profile_id}: device basic ten-field contract drift",
+        )
+        composition = payload.get("composition")
+        require(
+            isinstance(composition, dict),
+            f"{profile_id}: device basic composition contract is required",
+        )
+        require(
+            composition.get("catalog_owned_fields") == catalog_owned_fields,
+            f"{profile_id}: device basic catalog-owned field contract drift",
+        )
+        require(
+            composition.get("profile_owned_fields") == ["ram", "operating_vdd"],
+            f"{profile_id}: device basic profile-owned field contract drift",
+        )
+        require(
+            composition.get("nullable_unenriched_fields") == ["io_supply", "vdda"],
+            f"{profile_id}: nullable field contract drift",
+        )
+
+        groups = payload.get("groups")
+        bindings = payload.get("bindings")
+        binding_count = payload.get("binding_count")
+        require(
+            isinstance(groups, dict) and groups,
+            f"{profile_id}: device basic groups are required",
+        )
+        require(
+            isinstance(bindings, dict) and bindings,
+            f"{profile_id}: device basic bindings are required",
+        )
+        require(
+            isinstance(binding_count, int) and binding_count == len(bindings),
+            f"{profile_id}: binding_count drift",
+        )
+
+        expected = {
+            row["icpn"]
+            for row in production_rows
+            if row["manufacturer"] == manufacturer and row["family"] == family
         }
+        require(
+            expected,
+            f"{profile_id}: family has no Production exact ICPNs",
+        )
+        require(
+            len(expected) == binding_count,
+            f"{profile_id}: Production family count {len(expected)} != profile binding_count {binding_count}",
+        )
+        require(
+            set(bindings) == expected,
+            f"{profile_id}: device basic exact-ICPN applicability set drift",
+        )
+
+        for icpn, group_id in sorted(bindings.items()):
+            require(icpn not in result, f"duplicate device basic exact ICPN: {icpn}")
+            require(
+                isinstance(group_id, str) and group_id in groups,
+                f"{icpn}: dangling device basic group",
+            )
+            row = catalog_by_icpn[icpn]
+            group = groups[group_id]
+            require(
+                isinstance(group, dict),
+                f"{icpn}: device basic group must be an object",
+            )
+            require(
+                group.get("series") == row["series"],
+                f"{icpn}: device basic series mismatch",
+            )
+            require(
+                group.get("flash_size") == row["flash_size"],
+                f"{icpn}: device basic Flash mismatch",
+            )
+            require(
+                isinstance(group.get("ram_size"), str)
+                and group["ram_size"].endswith(" KiB"),
+                f"{icpn}: RAM missing",
+            )
+            vdd = group.get("operating_vdd_v")
+            require(
+                isinstance(vdd, dict)
+                and isinstance(vdd.get("min"), (int, float))
+                and isinstance(vdd.get("max"), (int, float))
+                and vdd["min"] < vdd["max"],
+                f"{icpn}: operating VDD missing",
+            )
+            for field in ("base_device", "package", "pin_count", "temperature_grade"):
+                require(
+                    isinstance(row.get(field), str) and row[field],
+                    f"{icpn}: Production Catalog {field} missing",
+                )
+            evidence = group.get("evidence")
+            require(isinstance(evidence, dict), f"{icpn}: device basic evidence missing")
+            require(
+                evidence.get("authority") == "STMicroelectronics official",
+                f"{icpn}: device basic authority invalid",
+            )
+            surface = evidence.get("source_surface")
+            source_url = evidence.get("selector_url")
+            if surface == "st_product_selector":
+                require(
+                    isinstance(source_url, str)
+                    and source_url.startswith("https://www.st.com/")
+                    and "/products.html" in source_url
+                    and evidence.get("evidence_strength")
+                    == "official_product_selector_observation",
+                    f"{icpn}: Product Selector evidence boundary invalid",
+                )
+            elif surface == "st_estore":
+                require(
+                    isinstance(source_url, str)
+                    and source_url.startswith("https://estore.st.com/")
+                    and evidence.get("evidence_strength") == "official_estore_observation",
+                    f"{icpn}: eStore evidence boundary invalid",
+                )
+            else:
+                raise CoverageError(f"{icpn}: unsupported device basic evidence surface")
+            require(
+                evidence.get("content_lock") is None,
+                f"{icpn}: dynamic source must not fabricate a content lock",
+            )
+            result[icpn] = {
+                "profile_id": profile_id,
+                "profile_path": str(path.relative_to(REPO_ROOT)),
+                "group_id": group_id,
+                "ram_size": group["ram_size"],
+                "operating_vdd_v": copy.deepcopy(vdd),
+                "io_supply_v": None,
+                "vdda_v": None,
+                "operating_temperature": row["temperature_grade"],
+                "evidence": copy.deepcopy(evidence),
+            }
     return result
+
 
 def load_manufacturer_enrichment_evidence(
     production_icpns: set[str],
@@ -592,9 +698,7 @@ def build_inventory() -> dict[str, Any]:
             enrichment["dimensions"]["operating_temperature"] = True
             if enrichment["highest_level"] == "M0":
                 enrichment["highest_level"] = "M1"
-            enrichment["evidence"]["device_basic_profile"] = str(
-                DEVICE_BASIC_FILE.relative_to(REPO_ROOT)
-            )
+            enrichment["evidence"]["device_basic_profile"] = basic["profile_path"]
             enrichment["evidence"]["device_basic_group_id"] = basic["group_id"]
             enrichment["missing_dimensions"] = [
                 name for name in ENRICHMENT_DIMENSIONS

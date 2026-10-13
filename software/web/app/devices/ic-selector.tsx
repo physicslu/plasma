@@ -362,6 +362,22 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     : voltageRange(selected.nxp_manufacturer_device_profile?.operating_vdd_v ?? undefined)}</dd>
                 </div>
                 <div>
+                  <dt>I/O Supply</dt>
+                  <dd>{selected.manufacturer_device_basic_profile?.io_supply_v
+                    ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
+                    : selected.nxp_manufacturer_device_profile
+                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                      : "—"}</dd>
+                </div>
+                <div>
+                  <dt>VDDA</dt>
+                  <dd>{selected.manufacturer_device_basic_profile?.vdda_v
+                    ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
+                    : selected.nxp_manufacturer_device_profile
+                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                      : "—"}</dd>
+                </div>
+                <div>
                   <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
                   <dd>{selected.manufacturer_device_basic_profile
                     ? `${selected.manufacturer_device_basic_profile.operating_temperature_c.min}–${selected.manufacturer_device_basic_profile.operating_temperature_c.max} °C`
@@ -369,12 +385,6 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       ? `${selected.nxp_manufacturer_device_profile.operating_temperature_c.min}–${selected.nxp_manufacturer_device_profile.operating_temperature_c.max} °C`
                       : (selected.temperature_grade ?? "—")}</dd>
                 </div>
-                {selected.nxp_manufacturer_device_profile && (
-                  <>
-                    <div><dt>I/O Supply</dt><dd>{zh ? "未有個別原廠證據" : "Not independently sourced"}</dd></div>
-                    <div><dt>VDDA</dt><dd>{zh ? "未有個別原廠證據" : "Not independently sourced"}</dd></div>
-                  </>
-                )}
               </dl>
             </section>
 
@@ -404,7 +414,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.program_unit} · {selected.selected_profile.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "燒錄程序" : "Programming flow"}</dt><dd className="icSelectorProgramFlow">{selected.selected_profile.programming.program_model.normal_write_flow.join(" → ")}</dd></div>
-                  <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
+                  {selected.nxp_manufacturer_device_profile && (
+                <>
+                  <div><dt>NXP Manufacturer Device</dt><dd>{selected.nxp_manufacturer_device_profile.profile_id} · {zh ? "部分證據" : "Partial evidence"}</dd></div>
+                  <div><dt>{zh ? "原廠 Exact 來源" : "Exact manufacturer source"}</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.exact_url}</code></dd></div>
+                  <div><dt>HTML SHA-256</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.source_html_sha256}</code></dd></div>
+                </>
+              )}
+              <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
                 </dl>
               ) : (
                 <div className="icSelectorProfileUnavailable">
@@ -445,13 +462,6 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <>
                   <div><dt>Device Basic Profile</dt><dd>{selected.manufacturer_device_basic_profile.profile_id}</dd></div>
                   <div><dt>{zh ? "Device Basic 來源" : "Device Basic source"}</dt><dd>ST official · {selected.manufacturer_device_basic_profile.evidence.observed_at_utc}</dd></div>
-                </>
-              )}
-              {selected.nxp_manufacturer_device_profile && (
-                <>
-                  <div><dt>NXP Manufacturer Device</dt><dd>{selected.nxp_manufacturer_device_profile.profile_id} · {zh ? "部分證據" : "Partial evidence"}</dd></div>
-                  <div><dt>{zh ? "原廠 Exact 來源" : "Exact manufacturer source"}</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.exact_url}</code></dd></div>
-                  <div><dt>HTML SHA-256</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.source_html_sha256}</code></dd></div>
                 </>
               )}
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
