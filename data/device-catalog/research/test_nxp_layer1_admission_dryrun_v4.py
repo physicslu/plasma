@@ -101,7 +101,10 @@ class NxpLayer1DryRunTests(unittest.TestCase):
                  r["candidate_class"]=="RESEARCH_SOURCE_OR_METADATA_GAP_NOT_ADMISSIBLE"]
         self.assertEqual(len(blocked),129)
         self.assertTrue(all(catalog.resolve("NXP",sku) is None for sku in blocked))
-        self.assertEqual({r.identifier for r in catalog.search("NXP", limit=400)},
+        pages=[catalog.search_with_total("NXP",limit=100,offset=o)
+               for o in (0,100,200)]
+        self.assertTrue(all(total==224 for _,total in pages))
+        self.assertEqual({r.identifier for results,_ in pages for r in results},
                          {r.identifier for r in nxp})
 
     def test_control_station_api_is_bounded_to_224_nxp_exact_records(self):
@@ -111,12 +114,12 @@ class NxpLayer1DryRunTests(unittest.TestCase):
         from plasma_web.device_catalog import get_default_device_catalog
 
         get_default_device_catalog.cache_clear()
-        payload = _device_search_payload("NXP", 400)
-        self.assertTrue(payload["ok"])
-        self.assertEqual(payload["catalog_size"], 4853)
-        self.assertEqual(payload["total_count"], 224)
-        self.assertEqual(len(payload["results"]), 224)
-        for row in payload["results"]:
+        pages=[_device_search_payload("NXP",100,offset=o)
+               for o in (0,100,200)]
+        self.assertTrue(all(p["ok"] and p["catalog_size"]==4853 and
+                            p["total_count"]==224 for p in pages))
+        self.assertEqual([len(p["results"]) for p in pages],[100,100,24])
+        for row in [item for p in pages for item in p["results"]]:
             self.assertEqual(row["vendor"], "NXP")
             self.assertIn(row["family"], {"KL25","MCX","K32L2"})
             self.assertEqual(row["physical_validation"]["ppu_status"], "no_evidence")
