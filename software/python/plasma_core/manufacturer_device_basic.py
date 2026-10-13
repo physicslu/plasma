@@ -139,12 +139,12 @@ class ManufacturerDeviceBasicResolver:
         allowed_surfaces = source_policy.get("allowed_surfaces")
         _require(
             isinstance(allowed_surfaces, list)
-            and set(allowed_surfaces) == {"st_product_selector", "st_product_page", "st_estore"},
+            and set(allowed_surfaces) == {"st_product_selector", "st_estore"},
             "device basic profile: source surface contract drift",
         )
         prohibited = set(source_policy.get("prohibited_derivation_sources", []))
         _require(
-            {"OpenOCD", "family_name_inference", "programming_guide"} <= prohibited,
+            {"OpenOCD", "family_name_inference", "programming_guide", "datasheet"} <= prohibited,
             "device basic profile: prohibited derivation boundary drift",
         )
 
@@ -186,17 +186,18 @@ class ManufacturerDeviceBasicResolver:
             _require(isinstance(evidence, dict), f"{group_id}: evidence is required")
             _require(evidence.get("authority") == "STMicroelectronics official", f"{group_id}: non-ST authority")
             _require(
-                evidence.get("source_surface") == "st_product_selector_or_product_page",
+                evidence.get("source_surface") == "st_product_selector",
                 f"{group_id}: unsupported source surface",
             )
-            for url_key in ("series_selector_url", "representative_product_url"):
-                url = evidence.get(url_key)
-                _require(
-                    isinstance(url, str) and url.startswith("https://www.st.com/"),
-                    f"{group_id}: {url_key} must be an official ST URL",
-                )
+            url = evidence.get("selector_url")
             _require(
-                evidence.get("evidence_strength") == "official_product_metadata_observation",
+                isinstance(url, str)
+                and url.startswith("https://www.st.com/")
+                and "/products.html" in url,
+                f"{group_id}: selector_url must be an official ST Product Selector URL",
+            )
+            _require(
+                evidence.get("evidence_strength") == "official_product_selector_observation",
                 f"{group_id}: evidence strength drift",
             )
             _require(evidence.get("content_lock") is None, f"{group_id}: v1 observation must not fake a content lock")
