@@ -139,3 +139,48 @@ The LPC55S6x pilot sentinel was also corrected from the package/group label
 `LPC55S69JEV98` to the observed orderable SKU `LPC55S69JEV98E`.
 The former makes a valid live product acquisition fail when the scraper
 correctly distinguishes group labels from ordering SKUs.
+
+## Gate 1f — frozen research-only Exact ICPN observation (2026-10-13)
+
+**Bounded official evidence complete for the 23 selected product pages; not for
+the NXP portfolio.** The official live matrix, source rows and cross-page
+reconciliation passed in multiple independent GitHub Actions runs.
+
+- 23 official NXP product pages, covering the six research acquisition lanes.
+- 368 distinct orderable identifiers: **353 Active**, **2 Qualification**,
+  **12 NRND**, and **1 No Longer Manufactured**.
+- Frozen exact Active set digest:
+  `8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24`.
+- Research snapshot:
+  `nxp-official-bounded-snapshot-2026-10-13-v1.json` contains the full
+  **353 Active** and **2 Qualification** exact-code lists, plus the exact **13**
+  non-Active identifiers with their *individual* lifecycle classifications,
+  23 source-page DOM SHA-256 digests, source run provenance and policy flags.
+- Successful acquisition and reconciliation:
+  [Run 38333219588](https://github.com/physicslu/plasma/actions/runs/38333219588),
+  [Run 38333240148](https://github.com/physicslu/plasma/actions/runs/38333240148),
+  [Run 38334514193](https://github.com/physicslu/plasma/actions/runs/38334514193).
+  All retained the same observed **353 Active exact identity set**.
+- The latest report artifact includes `bounded-pilot-gap.json`,
+  `observed-active-icpns.txt`, `observed-qualification-icpns.txt`,
+  `observed-other-lifecycle-icpns.json`; historical raw DOM artifacts are
+  temporary. The frozen research snapshot is **not a substitute for**
+  original row-level evidence at Production Admission. Reacquire and retain
+  official source HTML/normalized rows with an evidence-locked promotion
+  proposal, then review manufacturer metadata independently.
+- Current Production includes **no NXP catalog sources**, therefore all
+  353 observed Active IDs are only a **bounded research-to-Production gap**.
+  Existing KL25 metadata/readiness covers 12 research candidates; **341**
+  other observed Active IDs do not yet have this bounded readiness gate.
+- Neither manufacturer-wide `global_active_denominator` nor global
+  `global_active_coverage` may be inferred from these 23 pages. Keep `null`.
+  Software/back-end programming and HIL are **not qualified** by this work.
+
+### Owner approval boundary
+
+The PR is ready for a **research-only merge review** once the latest
+contracts and CI finish. An owner-approved research PR merge does **not**
+approve Production publication. Each later bounded admission must have
+manufacturer-source-backed package/flash/pin metadata, immutable evidence,
+exact row-set validation and **separate explicit owner approval**. No
+runtime programming is enabled by catalog admission.
