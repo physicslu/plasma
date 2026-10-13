@@ -17,12 +17,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 REGISTRY = HERE / "microchip-bulk-source-registry-v1.json"
 PRODUCTION = ROOT / "data/device-catalog/production/icpn-v1-manifest.json"
-STATES = {
-    "Active", "NRND", "Not Recommended for New Designs", "Obsolete",
-    "Discontinued", "Preproduction", "Qualification", "Unknown",
+SOURCE_STATES = {
+    "Active", "In Production", "NRND", "Not Recommended for New Designs",
+    "Obsolete", "Discontinued", "Preproduction", "Qualification", "Unknown",
 }
-PART = re.compile(r"[A-Z0-9][A-Z0-9._/-]{3,63}\Z")
-DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+PART = re.compile(r"[A-Z0-9][A-Z0-9._/-]{3,63}\\Z")
+DIGEST = re.compile(r"[0-9a-f]{64}\\Z")
 
 
 def require(test: bool, reason: str) -> None:
@@ -37,13 +37,29 @@ def read_json(path: Path) -> dict:
 
 
 def digest_set(values: set[str]) -> str:
-    payload = "".join(value + "\n" for value in sorted(values))
+    payload = "".join(value + "\\n" for value in sorted(values))
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def official_url(url: str) -> bool:
     parsed = urlsplit(url)
     return parsed.scheme == "https" and parsed.hostname in {"microchip.com", "www.microchip.com"}
+
+
+def canonical_lifecycle(source_state: str) -> str:
+    """Map Microchip's official product-page status into the catalog vocabulary."""
+    normalized = source_state.strip().casefold()
+    if normalized in {"active", "in production"}:
+        return "Active"
+    if normalized in {"nrnd", "not recommended for new designs"}:
+        return "NRND"
+    return {
+        "obsolete": "Obsolete",
+        "discontinued": "Discontinued",
+        "preproduction": "Preproduction",
+        "qualification": "Qualification",
+        "unknown": "Unknown",
+    }.get(normalized, "")
 
 
 def production_microchip() -> set[str]:
@@ -97,9 +113,10 @@ def summarize(evidence_root: Path | None = None) -> dict:
                         "complete snapshot requires source content digest")
             lane_seen: set[str] = set()
             for row in rows:
-                part, state = row.get("icpn", ""), row.get("lifecycle", "")
+                part, raw_state = row.get("icpn", ""), row.get("lifecycle", "")
                 require(bool(PART.fullmatch(part)), "invalid exact Microchip ordering code")
-                require(state in STATES, "unreviewed lifecycle token")
+                state = canonical_lifecycle(raw_state)
+                require(raw_state in SOURCE_STATES and state, "unreviewed lifecycle token")
                 require(part not in lane_seen, "duplicate exact part within segment")
                 require(bool(DIGEST.fullmatch(row.get("evidence_sha256", ""))),
                         "manufacturer row evidence missing")
@@ -151,7 +168,7 @@ def main() -> None:
     parser.add_argument("--evidence-root", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    rendered = json.dumps(summarize(args.evidence_root), indent=2, sort_keys=True) + "\n"
+    rendered = json.dumps(summarize(args.evidence_root), indent=2, sort_keys=True) + "\\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
