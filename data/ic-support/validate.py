@@ -14,14 +14,15 @@ BINDING_FILE = HERE / "bindings" / "stm32f103c-pilot-v0.json"
 SOURCE_FILE = HERE / "evidence" / "sources.json"
 SCHEMA_FILE = HERE / "schema" / "ic-support-v0.schema.json"
 
-EXPECTED_KINDS = {
+LEGACY_BINDING_KINDS = {
     "programming",
-    "programming_route",
     "memory_geometry",
     "package_hardware",
     "option",
     "security",
 }
+SUPPORTED_PROFILE_KINDS = LEGACY_BINDING_KINDS | {"programming_route"}
+PROGRAMMING_ROUTE_BINDING_DIR = HERE / "bindings" / "programming-route"
 PROFILE_DIR_KIND = {
     "programming": "programming",
     "programming-route": "programming_route",
@@ -127,7 +128,7 @@ def load_profiles(known_sources: set[str]) -> dict[str, dict[str, Any]]:
             require(pid not in profiles, f"duplicate profile_id: {pid}")
             kind = profile.get("kind")
             require(kind == expected_kind, f"{path}: kind {kind!r} does not match directory {dirname!r}")
-            require(kind in EXPECTED_KINDS, f"{path}: unsupported profile kind {kind!r}")
+            require(kind in SUPPORTED_PROFILE_KINDS, f"{path}: unsupported profile kind {kind!r}")
             status = profile.get("status")
             require(isinstance(status, str) and status.startswith("pilot"), f"{path}: pilot status required")
             validate_evidence(profile, known_sources, pid)
@@ -273,7 +274,10 @@ def main() -> int:
 
         refs = entry.get("profiles")
         require(isinstance(refs, dict), f"{icpn}: profiles object is required")
-        require(set(refs) == EXPECTED_KINDS, f"{icpn}: profile kinds must be exactly {sorted(EXPECTED_KINDS)}")
+        require(
+            set(refs) == LEGACY_BINDING_KINDS,
+            f"{icpn}: frozen base profile kinds must be exactly {sorted(LEGACY_BINDING_KINDS)}",
+        )
         selected: dict[str, dict[str, Any]] = {}
         for kind, pid in refs.items():
             require(pid in profiles, f"{icpn}: dangling profile reference {pid!r}")
@@ -307,6 +311,36 @@ def main() -> int:
         resolved[icpn] = selected
 
     require(set(seen) == {"STM32F103C8T6", "STM32F103CBT6"}, "pilot target set drifted")
+
+    route_targets: set[str] = set()
+    require(PROGRAMMING_ROUTE_BINDING_DIR.is_dir(), "Programming Route binding directory is required")
+    for path in sorted(PROGRAMMING_ROUTE_BINDING_DIR.glob("*.json")):
+        route_binding_set = load_json(path)
+        validate_evidence(
+            route_binding_set,
+            known_sources,
+            route_binding_set.get("binding_set_id", "programming-route-bindings"),
+        )
+        require(route_binding_set.get("status") == "pilot", f"{path}: Programming Route binding set must remain pilot")
+        route_bindings = route_binding_set.get("bindings")
+        require(isinstance(route_bindings, list) and route_bindings, f"{path}: Programming Route bindings must be non-empty")
+        for entry in route_bindings:
+            require(isinstance(entry, dict), f"{path}: Programming Route binding entries must be objects")
+            icpn = entry.get("icpn")
+            profile_id = entry.get("programming_route")
+            require(isinstance(icpn, str) and icpn, f"{path}: Programming Route ICPN is required")
+            require(icpn in resolved, f"{icpn}: Programming Route binding has no frozen base binding")
+            require(icpn not in route_targets, f"{icpn}: duplicate Programming Route binding")
+            require(isinstance(profile_id, str) and profile_id in profiles, f"{icpn}: dangling Programming Route profile")
+            profile = profiles[profile_id]
+            require(profile["kind"] == "programming_route", f"{icpn}: Programming Route profile kind mismatch")
+            resolved[icpn]["programming_route"] = profile
+            route_targets.add(icpn)
+
+    require(
+        route_targets == {"STM32F103C8T6", "STM32F103CBT6"},
+        "Programming Route pilot target set drifted",
+    )
 
     c8 = resolved["STM32F103C8T6"]
     cb = resolved["STM32F103CBT6"]
