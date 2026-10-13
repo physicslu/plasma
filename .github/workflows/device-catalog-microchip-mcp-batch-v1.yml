@@ -1,17 +1,25 @@
-name: Microchip MCP PIC10-PIC12 bounded research capture v1
+name: Microchip MCP PIC10-PIC12 bounded research capture v1/v2
 
 on:
   workflow_dispatch:
     inputs:
       max_queries:
-        description: "Number of DFP-supported device names to query, up to 27"
+        description: "Read-only device search queries (paged-v2: 3 or 10 only)"
         required: true
-        default: "27"
+        default: "3"
         type: choice
         options:
           - "3"
           - "10"
           - "27"
+      capture_format:
+        description: "v1 historical 2/60 or v2 full independent 20/60 pagination"
+        required: true
+        default: "paged_v2"
+        type: choice
+        options:
+          - "paged_v2"
+          - "v1"
 
 permissions:
   contents: read
@@ -27,12 +35,17 @@ jobs:
           python-version: '3.12'
       - name: Verify offline research contracts
         run: |
-          python -m py_compile data/device-catalog/research/microchip_mcp_probe_v1.py data/device-catalog/research/microchip_mcp_batch_v1.py
+          python -m py_compile data/device-catalog/research/microchip_mcp_probe_v1.py data/device-catalog/research/microchip_mcp_batch_v1.py data/device-catalog/research/microchip_mcp_paged_probe_v2.py data/device-catalog/research/test_microchip_mcp_paged_probe_v2.py
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_probe_v1.py' -v
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_batch_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_paged_probe_v2.py' -v
       - name: Capture bounded official MCP text-search observations
         run: |
-          python data/device-catalog/research/microchip_mcp_batch_v1.py --output-dir /tmp/microchip-mcp-batch --max-queries ${{ inputs.max_queries }} --workers 2
+          if [ "${{ inputs.capture_format }}" = "paged_v2" ] && [ "${{ inputs.max_queries }}" = "27" ]; then
+            echo 'Paged-v2 live capture is limited to 3 or 10 queries per manual run' >&2
+            exit 2
+          fi
+          python data/device-catalog/research/microchip_mcp_batch_v1.py --output-dir /tmp/microchip-mcp-batch --max-queries ${{ inputs.max_queries }} --workers 1 --capture-format ${{ inputs.capture_format }}
       - name: Retain original response bytes, hashes, and per-query summaries
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

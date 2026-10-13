@@ -178,10 +178,21 @@ python data/device-catalog/research/microchip_mcp_plan_capture_v1.py \
 Offline unit tests exercise the gate with synthetic source inventories;
 they are not confirmation of a completed real-source bulk run.
 
+## Manual GitHub Actions capture limits
+
+`.github/workflows/device-catalog-microchip-mcp-batch-v1.yml` remains
+`workflow_dispatch` **only** (never runs vendor API calls from a PR check).
+It exposes a `capture_format` choice. `paged_v2` defaults to **3**
+queries, allows at most **10**, uses one MCP session at a time, and uploads
+raw bytes even when any query fails. The historical `v1` path retains
+the old 27-query option. The workflow may need default-branch registration
+before GitHub exposes Run Workflow. Workflows alone do not prove a live
+successful capture; inspect the resulting archive and replay summary.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
-2. **Gate 2a: API behavior probe.** The manual workflow currently receives HTTP 200 HTML instead of JSON and fails closed; no records or pagination evidence were captured. Diagnose the official endpoint access/response behavior, then rerun the fixed-source PIC10F202 sample query at page size 2 and verify count, pagination, and exact-part consistency. **Gate 2b: bounded family acquisition.** After the full family/base-part inventory is frozen and query matching behavior is reviewed, capture all pages per base part and reconcile segment overlaps. Keep lifecycle codes raw until their mapping is independently established.
+2. **Gate 2a/2b: authoritative product API and MCP coverage.** The separately documented official Product Data API route returned HTTP 200 HTML rather than JSON; it is still not a validated bulk population source. The independent Microchip MCP route did establish a 26/27 PIC10/PIC12 bounded pilot, with one official device-level EOL/NOT_FOUND exception. Offline-tested v2 now reconciles complete 20- and 60-row pagination walks for at most 600 matches; obtain original live >60-result fixtures and review exact query semantics before promoting coverage claims. Keep all raw lifecycle values. **Gate 2c/2d: staged batch execution.** The manual workflow supports v1 or v2; v2 only permits 3 or 10 pilot queries and does not grant automatic bulk capture.
 3. **Gate 3: exact-set gap report.** Compute observed Active identities against Production with exact set arithmetic. Keep partial families explicitly partial whenever an official denominator cannot be proven.
 4. **Gate 4: metadata and admission proposals.** Replay official orderable tables and datasheets for package, temperature range, memory and other required fields. Preserve existing Production rows byte-for-byte. Freeze a small family-wise postimage and validator.
 5. **Gate 5: Production publication.** Requires separate explicit owner approval, deterministic postimage, all catalog/API/UI CI and reviewed final diff. Runtime mappings, electrical profiles and physical qualification remain separate claims.
