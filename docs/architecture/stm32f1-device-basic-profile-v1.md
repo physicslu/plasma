@@ -1,8 +1,8 @@
 # STM32F1 Manufacturer Device Basic Profile v1
 
-Status: Current read-only manufacturer metadata profile  
-Scope: 280 Production STM32F1 exact ICPNs  
-Programming authority: none  
+Status: Current read-only manufacturer metadata profile
+Scope: 280 Production STM32F1 exact ICPNs
+Programming authority: none
 Hardware authority: none
 
 ## Purpose
