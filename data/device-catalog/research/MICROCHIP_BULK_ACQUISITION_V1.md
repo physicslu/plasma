@@ -189,6 +189,32 @@ the old 27-query option. The workflow may need default-branch registration
 before GitHub exposes Run Workflow. Workflows alone do not prove a live
 successful capture; inspect the resulting archive and replay summary.
 
+## Gate 2e — source-attested multi-batch offline rollup
+
+`microchip_mcp_batch_rollup_v1.py` independently rebuilds the DFP batch plan
+from the pinned original index and replays **each present batch** using the
+original MCP evidence bytes, not cached batch summaries. A missing batch is
+`not_captured`; missing/tampered attestations, query failures, source-byte
+mismatches or incomplete archives quarantine the **entire batch**.
+Candidates from complete batches are deduplicated by exact ordering part
+number, retaining all source SHA-256 links. Cross-batch raw lifecycle
+disagreements quarantine the **identity** and surface a conflict report.
+All candidate and batch totals remain Research-only; even a fully replayed DFP
+queue cannot establish Microchip's commercial Active SKU denominator.
+
+```bash
+python data/device-catalog/research/microchip_mcp_batch_rollup_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --plan /tmp/microchip-dfp-research-batch-plan.json \
+  --batch-root /tmp/microchip-research-batches \
+  --output /tmp/microchip-research-rollup.json
+```
+
+Use `--require-all` only when the entire planned research queue has been
+captured. CI covers synthetic successful 75-record archives, missing/tampered
+archives, forged plans, and conflicts. No live vendor bulk dataset was
+acquired by this offline rollup.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
