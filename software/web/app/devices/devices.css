@@ -131,6 +131,38 @@
 .icSelectorStatusRow .pending { border-color: color-mix(in srgb, var(--amber) 40%, var(--line)); color: var(--amber); }
 .icSelectorStatusRow .unmapped { border-color: var(--line); color: var(--muted); }
 
+.icSelectorPagination {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.icSelectorPagination span {
+  justify-self: center;
+  color: var(--muted);
+  font: 650 10px var(--font-mono);
+}
+.icSelectorPagination button {
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text-soft);
+  padding: 7px 10px;
+  font: 650 10px var(--font-mono);
+  cursor: pointer;
+}
+.icSelectorPagination button:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.icSelectorPagination button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
 .icSelectorKind {
   display: inline-block;
   margin-top: 8px;
@@ -234,6 +266,9 @@
   .icSelectorStatusStack { grid-column: auto; grid-template-columns: 1fr; }
   .icSelectorStatusRow,
   .icSelectorStatusEvidence { justify-content: flex-start; }
+  .icSelectorPagination { grid-template-columns: 1fr 1fr; }
+  .icSelectorPagination span { grid-column: 1 / -1; grid-row: 1; }
+  .icSelectorPagination button { width: 100%; }
 }
 
 
