@@ -105,9 +105,10 @@ function voltageRange(value?: { min: number; max: number }): string {
 }
 
 function formatClock(
-  value: { manufacturer_min: number | null; manufacturer_max: number | null; manufacturer_recommended: number | null; status: string },
+  value: { manufacturer_min: number | null; manufacturer_max: number | null; manufacturer_recommended: number | null; status: string } | undefined,
   zh: boolean,
 ): string {
+  if (!value) return zh ? "此介面未定義 Debug Clock" : "No debug clock defined for this interface";
   if (
     value.manufacturer_min === null
     && value.manufacturer_max === null
@@ -122,12 +123,15 @@ function formatClock(
   return parts.join(" · ");
 }
 
+const SEARCH_PAGE_SIZE = 30;
+
 export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorProps) {
   const { locale } = useI18n();
   const zh = locale === "zh-TW";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [pageOffset, setPageOffset] = useState(0);
   const [selected, setSelected] = useState<DeviceSearchResult | null>(null);
   const [catalogSize, setCatalogSize] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -152,7 +156,8 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       try {
         const payload = await searchDevices(normalized, {
           apiBase,
-          limit: 30,
+          limit: SEARCH_PAGE_SIZE,
+          offset: pageOffset,
           signal: controller.signal,
         });
         setResults(payload.results);
@@ -172,15 +177,16 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, query]);
+  }, [apiBase, pageOffset, query]);
 
   function updateQuery(value: string) {
     setQuery(value);
     setResults([]);
     setTotalCount(0);
+    setPageOffset(0);
+    setSelected(null);
     setError(null);
     setLoading(false);
-    if (!value.trim()) setSelected(null);
   }
 
   function choose(device: DeviceSearchResult) {
@@ -222,8 +228,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             {loading
               ? (zh ? "搜尋中…" : "Searching…")
               : (zh
-                  ? `顯示 ${results.length.toLocaleString()} / 共 ${totalCount.toLocaleString()} 筆`
-                  : `Showing ${results.length.toLocaleString()} / ${totalCount.toLocaleString()}`)}
+                  ? (totalCount > 0
+                      ? `顯示 ${(pageOffset + 1).toLocaleString()}–${(pageOffset + results.length).toLocaleString()} / 共 ${totalCount.toLocaleString()} 筆`
+                      : "顯示 0 / 共 0 筆")
+                  : (totalCount > 0
+                      ? `Showing ${(pageOffset + 1).toLocaleString()}–${(pageOffset + results.length).toLocaleString()} / ${totalCount.toLocaleString()}`
+                      : "Showing 0 / 0"))}
           </em>
         </label>
 
@@ -285,6 +295,36 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             );
           })}
         </div>
+
+        {totalCount > SEARCH_PAGE_SIZE && (
+          <nav className="icSelectorPagination" aria-label={zh ? "ICPN 搜尋分頁" : "ICPN search pagination"}>
+            <button
+              type="button"
+              disabled={loading || pageOffset === 0}
+              onClick={() => {
+                setSelected(null);
+                setPageOffset(Math.max(0, pageOffset - SEARCH_PAGE_SIZE));
+              }}
+            >
+              {zh ? "← 上一頁" : "← Previous"}
+            </button>
+            <span>
+              {zh
+                ? `第 ${Math.floor(pageOffset / SEARCH_PAGE_SIZE) + 1} / ${Math.ceil(totalCount / SEARCH_PAGE_SIZE)} 頁`
+                : `Page ${Math.floor(pageOffset / SEARCH_PAGE_SIZE) + 1} / ${Math.ceil(totalCount / SEARCH_PAGE_SIZE)}`}
+            </span>
+            <button
+              type="button"
+              disabled={loading || pageOffset + results.length >= totalCount}
+              onClick={() => {
+                setSelected(null);
+                setPageOffset(pageOffset + SEARCH_PAGE_SIZE);
+              }}
+            >
+              {zh ? "下一頁 →" : "Next →"}
+            </button>
+          </nav>
+        )}
       </div>
 
       <aside className="icSelectorDetail" aria-live="polite">
@@ -363,7 +403,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     <div key={name}>
                       <dt>{name}</dt>
                       <dd>
-                        <strong>{formatClock(iface.clock_hz, zh)}</strong>
+                        <strong>{iface.clock_hz ? formatClock(iface.clock_hz, zh) : humanizeStatus(iface.status ?? null)}</strong>
                         {iface.required_signal_pins?.length ? (
                           <div>{zh ? "Pins" : "Pins"}: {iface.required_signal_pins.map(pin => `${pin.signal}(${pin.mcu_pin})`).join(", ")}</div>
                         ) : null}
