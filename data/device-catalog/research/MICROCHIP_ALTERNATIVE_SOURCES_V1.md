@@ -174,3 +174,31 @@ responses; it cannot establish exhaustive suffix coverage, historical/EOL
 coverage, or the Microchip-wide Active denominator. Preserve unknown and
 conflicting lifecycle values. Review exported manufacturer charts/feeds and
 original PCN/EOL attachments before promoting any such claim.
+
+### GitHub Runner live MCP canary — 2026-10-13
+
+A three-device, read-only PR Runner probe finished successfully:
+[GitHub Actions run 38337033289](https://github.com/physicslu/plasma/actions/runs/38337033289)
+and [raw-response artifact 11784924015](https://github.com/physicslu/plasma/actions/runs/38337033289/artifacts/11784924015).
+The artifact is a 23,551-byte ZIP, originally configured with 7-day retention,
+containing 34 files including original MCP response bytes, per-response hashes,
+and per-device manifests/reconciliation summaries.
+
+| Candidate base-device query | MCP returned distinct ordering candidates | Bounded reconciliation |
+| --- | ---: | --- |
+| PIC10F200 | 11 | pass |
+| PIC10F202 | 8 | pass |
+| PIC10F204 | 9 | pass |
+
+All three query results passed the strict two-row pagination and 60-row
+identity/lifecycle comparison. Their summed **28 observed hits** are not a
+verified manufacturer-complete active SKU set or Production admission list.
+This also confirms GitHub Runner connectivity; the separate assistant-local
+shell container did not resolve `api.microchip.com`.
+
+The batch driver supports at most **two independent read-only MCP sessions**
+(`--workers 2`) for larger captures. Each session stores its own response
+bytes and manifest; the manifest order is the frozen DFP query order. The
+27-query source-observation run must still be independently audited for
+per-query failures, raw lifecycle values, chart/export cross-checks and
+false-negative search behavior before coverage claims.
