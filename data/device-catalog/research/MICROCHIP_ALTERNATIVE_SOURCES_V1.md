@@ -127,3 +127,50 @@ python -m unittest discover -s data/device-catalog/research -p 'test_microchip_m
 ```
 
 Keep the PR Draft while the full capture and family inventory remain open.
+
+## Bounded PIC10/PIC12 MCP batch implementation (research only)
+
+The 27 device names observed in the PIC10-12Fxxx Device Family Pack are frozen
+as **candidate search terms**, not proven orderable-SKU populations, in
+`microchip-pic10-pic12-mcp-batch-seeds-v1.json`. The file explicitly retains
+`population_boundary_validated=false` and `global_active_denominator=null`.
+It is a transcribed discovery list; source pack archive bytes have not yet
+been captured or independently hashed.
+
+`microchip_mcp_probe_v1.py` now accepts a validated alphanumeric `--query`
+(default `PIC10F202`) while preserving the two-row pagination, 60-row hard
+bound, cross-page identity/lifecycle comparison, original response bytes and
+SHA-256 evidence. Its offline replay checks the complete archived JSON-RPC
+handshake and exact request order, not just the product-page totals.
+
+`microchip_mcp_batch_v1.py` runs the 27 queries sequentially (or a bounded
+prefix of 3/10 for transport canaries). Every device has its own
+`manifest.json`, captured responses and `summary.json` where successful.
+The batch writes `batch-summary.json` even when some queries fail; failures
+are explicit and the command exits nonzero unless every selected bounded
+search reconciles. It never writes a Production catalog.
+
+Example, when a permitted network execution environment is available:
+
+```bash
+python data/device-catalog/research/microchip_mcp_batch_v1.py \
+  --output-dir /tmp/microchip-mcp-batch --max-queries 27
+python data/device-catalog/research/microchip_mcp_batch_v1.py \
+  --output-dir /tmp/microchip-mcp-batch --max-queries 27 --replay
+```
+
+A separate workflow `.github/workflows/device-catalog-microchip-mcp-batch-v1.yml`
+provides manual, read-only 3/10/27-query capture with short-lived raw evidence
+artifacts once that workflow is available on the repository's default branch.
+The research CI executes offline contract tests automatically; those passing
+tests must not be described as a successful live capture. A temporary
+3-query PR canary may validate Runner connectivity without importing its
+observations into Production.
+
+**Crucial limitation:** `search_products` is text search, not a proven
+manufacturer-complete enumeration API. Even successful reconciliation of all
+27 queries only confirms internal consistency of these bounded search
+responses; it cannot establish exhaustive suffix coverage, historical/EOL
+coverage, or the Microchip-wide Active denominator. Preserve unknown and
+conflicting lifecycle values. Review exported manufacturer charts/feeds and
+original PCN/EOL attachments before promoting any such claim.
