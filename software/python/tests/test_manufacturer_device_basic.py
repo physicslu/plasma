@@ -154,13 +154,26 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
             {"min": -40, "max": 105},
         )
 
-    def test_non_st_evidence_or_fake_content_lock_is_rejected(self) -> None:
+    def test_non_st_or_non_selector_evidence_and_fake_content_lock_are_rejected(self) -> None:
         for mutation, pattern in (
             (
                 lambda p: p["groups"]["stm32f103-64k"]["evidence"].__setitem__(
                     "authority", "OpenOCD"
                 ),
                 "non-ST authority",
+            ),
+            (
+                lambda p: p["groups"]["stm32f103-64k"]["evidence"].__setitem__(
+                    "source_surface", "st_product_page"
+                ),
+                "unsupported source surface",
+            ),
+            (
+                lambda p: p["groups"]["stm32f103-64k"]["evidence"].__setitem__(
+                    "selector_url",
+                    "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html",
+                ),
+                "Product Selector URL",
             ),
             (
                 lambda p: p["groups"]["stm32f103-64k"]["evidence"].__setitem__(
