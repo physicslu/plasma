@@ -135,6 +135,14 @@ def reconcile(root: Path) -> dict:
               if records[0]["lifecycle"] == "Active"}
     qualification = {name for name, records in observations.items()
                      if records[0]["lifecycle"] == "Qualification"}
+    other = sorted(
+        ({"icpn": name, "lifecycle": records[0]["lifecycle"]}
+         for name, records in observations.items()
+         if records[0]["lifecycle"] not in {"Active", "Qualification"}),
+        key=lambda row: row["icpn"],
+    )
+    require(len(active) + len(qualification) + len(other) == len(observations),
+            "NXP lifecycle partition incomplete")
     return {
         "schema_version": 1,
         "status": "bounded_official_pilot_reconciled",
@@ -143,7 +151,8 @@ def reconcile(root: Path) -> dict:
         "observed_unique_exact": len(observations),
         "observed_active_exact": len(active),
         "observed_qualification_exact": len(qualification),
-        "observed_other_lifecycle_exact": len(observations)-len(active)-len(qualification),
+        "observed_other_lifecycle_exact": len(other),
+        "observed_other_lifecycle_icpns": other,
         "observed_active_missing_from_production": len(active - production_nxp),
         "observed_active_exact_set_sha256": set_hash(active),
         "locked_kl25_exact_pilot": len(frozen_kl25),
@@ -172,8 +181,12 @@ def main() -> None:
         "".join(x+"\n" for x in result["observed_active_icpns"]), encoding="utf-8")
     (args.output / "observed-qualification-icpns.txt").write_text(
         "".join(x+"\n" for x in result["observed_qualification_icpns"]), encoding="utf-8")
+    (args.output / "observed-other-lifecycle-icpns.json").write_text(
+        json.dumps(result["observed_other_lifecycle_icpns"], indent=2, sort_keys=True)+"\n",
+        encoding="utf-8")
     print(json.dumps({k:v for k,v in result.items() if k not in {
-        "observed_active_icpns","observed_qualification_icpns","source_pages"}},
+        "observed_active_icpns","observed_qualification_icpns",
+        "observed_other_lifecycle_icpns","source_pages"}},
         sort_keys=True))
 
 
