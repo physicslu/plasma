@@ -147,7 +147,7 @@ The same search result can carry two independent additive manufacturer projectio
 - `selected_profile` — deeper manufacturer/programming composition, only where the
   Programming Profile evidence chain exists.
 
-For STM32F1 Device Basic Profile v1, IC Information is deliberately limited to:
+For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
 ```text
 ICPN
@@ -157,6 +157,8 @@ Pin Count
 Flash
 RAM
 Operating VDD
+I/O Supply
+VDDA
 Operating Temperature
 ```
 
@@ -171,9 +173,13 @@ The browser presents three primary information layers:
    electrical conditions, Flash geometry and programming-flow semantics.
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
 
-A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1
-target may have `manufacturer_device_basic_profile != null` while
-`selected_profile == null`. OpenOCD mapping also cannot promote Basic Device information
+A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1,
+STM32C0, or STM32G0 target may have `manufacturer_device_basic_profile != null` while
+`selected_profile == null`. I/O Supply and VDDA remain visible in the contract but render as `—` when the
+allowed ST Product Selector/eStore sources do not directly establish them. They are never
+copied from VDD or inferred from family/OpenOCD data.
+
+OpenOCD mapping also cannot promote Basic Device information
 into Programming support.
 
 Manufacturer programming interfaces remain heterogeneous. A debug transport such as
