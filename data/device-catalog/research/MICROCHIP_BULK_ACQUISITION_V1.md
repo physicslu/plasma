@@ -40,6 +40,11 @@ A second inspection checked the manufacturer landing surfaces rather than treati
 
 The 16-bit page also links an official [PIC24 MCU Peripheral Integration Quick Reference Guide](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/Brochures/30010109.pdf) (DS30010109L, 2022). Its selector table provides useful PIC24 base-pattern discovery seeds (for example PIC24F and PIC24EP rows), but it is a feature quick-reference, not a current lifecycle inventory, and it does not close the dsPIC lane. Record guide revision/date and use it only to seed the official API family query matrix.
 
+
+### Family query seeds recorded (not an exhaustive inventory)
+
+The source registry now records evidence-backed family labels to seed later API queries. Microchip Developer Help groups 8-bit PICs by baseline/mid-range/enhanced/high-end architecture and documents the 10F/12F/16F, 12F1/16F1 and PIC18 structures; current AVR discovery seeds include tinyAVR/ATtiny, megaAVR/ATmega, XMEGA and DA/DB/DD/EA/EB/SD. The current DSC surface identifies dsPIC33A/C/E and related dsPIC33EV material; older dsPIC30 and dsPIC33F official product records remain discovery seeds. For 32-bit devices, Microchip identifies PIC32MM/MX/MK/MZ and separately PIC32C/CX; SAM pages expose several SAM letter/number families. The legacy AVR/RISC page explicitly lists AVR32, Arm7 and SAM3. Wireless candidates include PIC32-BZ6, PIC32CX-BZ2/WBZ451, PIC32CX-BZ3/WBZ351, PIC32-BW1 and WFI32. These labels and source links are stored under `family_query_seeds` in the JSON registry; they are not exact SKUs, do not establish query-string semantics, and may overlap lanes.
+
 This closes only the surface review. The observed family names are discovery seeds, not an exhaustive inventory; no live Product Data API response fixture or reconciled per-family API page totals are committed. Keep `population_boundary_validated=false` and `global_active_denominator=null`. Next, obtain the official Product Selector/MAPS export or another complete manufacturer family listing, freeze the base-part query set with source hashes, then capture every API page per base part and compare returned `totalRecords`/`totalPages` against fetched rows and unique exact `part_number` values. Preserve raw lifecycle codes until their official mapping is established.
 
 ## Gate 0 — implemented
