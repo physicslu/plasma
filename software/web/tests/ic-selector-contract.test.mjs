@@ -136,7 +136,15 @@ test("IC Information uses the independent Manufacturer Device Basic Profile", as
   assert.match(selector, /工作 VDD/);
   assert.match(selector, /工作溫度/);
   assert.doesNotMatch(selector, /I\/O 供應電壓/);
-  assert.doesNotMatch(selector, /<dt>VDDA<\/dt>/);
+  // Unknown NXP supply domains may be shown, but only as unsourced.
+  // A visible label is not a permission to infer VDDA = VDD.
+  assert.match(selector, /<dt>VDDA<\/dt>/);
+  assert.match(selector, /<dt>I\/O Supply<\/dt>/);
+  assert.match(selector, /selected\.nxp_manufacturer_device_profile/);
+  assert.match(selector, /Not independently sourced/);
+  assert.match(api, /NXPManufacturerDeviceProfile/);
+  assert.match(api, /manufacturer_device_full_profile_complete:\s*false/);
+  assert.match(api, /programming_profile_authority:\s*false/);
   assert.doesNotMatch(selector, /<dt>Main Flash Map<\/dt>/);
   assert.doesNotMatch(selector, /<dt>Memory Map<\/dt>/);
 });
