@@ -24,6 +24,7 @@ ROUTES = {
     "http_non200": "official_datasheet_exact_ordering_table_required",
     "flash_multi_value": "official_KW45_datasheet_exact_table_pdf_binary_replay_required",
     "imx_rt_flash_temperature": "imx_RT_internal_external_flash_and_ambient_semantics_review_required",
+    "mcx_flash_ambient": "official_MCX_flash_and_ambient_source_review_required",
     "wireless_ambient": "official_KW45_ambient_temperature_document_needed",
 }
 
@@ -49,6 +50,8 @@ def queue() -> tuple[list[dict],dict]:
         if state=="PARTIAL_SOURCE_FIELDS_REVIEW_REQUIRED":
             if row["segment"]=="imx-rt":
                 kind="imx_rt_flash_temperature"
+            elif row["segment"]=="mcx":
+                kind="mcx_flash_ambient"
             elif row["segment"]=="wireless":
                 kind="wireless_ambient"
             else:
@@ -76,7 +79,8 @@ def queue() -> tuple[list[dict],dict]:
             dict(counts)=={
                 "http_non200":85,
                 "flash_multi_value":8,
-                "imx_rt_flash_temperature":28,
+                "imx_rt_flash_temperature":23,
+                "mcx_flash_ambient":5,
                 "wireless_ambient":8,
             }, "reconciled 129 metadata exceptions do not match original evidence")
     require(all(x["catalog_admission_authorized"]=="false" for x in results),
