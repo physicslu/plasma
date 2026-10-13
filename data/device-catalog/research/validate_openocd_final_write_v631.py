@@ -104,11 +104,26 @@ def validate()->dict:
         req(sha(raw)==cfg["sha256"],f"{family}: inverse preimage SHA drift")
         req(len(rewound)==cfg["row_count"],f"{family}: inverse row-count drift")
 
-    manifest_raw=MANIFEST.read_bytes()
-    manifest=json.loads(manifest_raw)
-    req(len(manifest["sources"])==28,"Production source-count drift")
+    # v6.31 is a *historical ST-only* postimage proof. The sole new
+    # vendor admission must be independently locked, then removed solely
+    # from the in-memory replay. Never rewrite the historical receipt.
+    live_manifest=json.loads(MANIFEST.read_bytes())
+    live_sources=live_manifest["sources"]
+    req(len(live_sources)==29 and sum(int(s["row_count"]) for s in live_sources)==4641,
+        "current Production scope must be exactly ST 4629 + KL25 12")
+    req(live_sources[-1]=={
+        "manufacturer":"NXP","family":"KL25",
+        "path":"../research/nxp-kl25-commercial-icpn.csv",
+        "row_count":12,
+        "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
+        "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+    },"unexpected new Production vendor/identity scope")
+    manifest=deepcopy(live_manifest)
+    manifest["sources"].pop()
+    manifest_raw=(json.dumps(manifest,indent=2)+"\n").encode("utf-8")
+    req(len(manifest["sources"])==28,"historical ST source-count drift")
     req(sum(int(s["row_count"]) for s in manifest["sources"])==4629,
-        "Production exact-total drift")
+        "historical ST exact-total drift")
 
     route_pre_raw=ROUTE_PRE.read_bytes()
     req(blob(route_pre_raw)==pre["ROUTE_INVENTORY"]["git_blob_sha"],

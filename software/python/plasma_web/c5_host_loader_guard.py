@@ -28,7 +28,9 @@ class C5HostLoaderGuard:
     """Inspect an exact C5 research candidate, never generate a flash plan."""
 
     def __init__(self, catalog: DeviceCatalog, registry: BackendCandidateRegistry):
-        if (catalog.status != "production" or catalog.size != 4629 or
+        if (catalog.status != "production" or catalog.size != 4641 or
+                sum(r.vendor == "STMicroelectronics" for r in catalog.records) != 4629 or
+                sum(r.vendor == "NXP" and r.family == "KL25" for r in catalog.records) != 12 or
                 not registry.evidence_available or registry.size != 362 or
                 catalog.revision_sha256 != registry.catalog_revision_sha256):
             raise DeviceCatalogIntegrityError(

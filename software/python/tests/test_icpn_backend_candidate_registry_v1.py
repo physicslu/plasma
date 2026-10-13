@@ -29,7 +29,9 @@ class BackendCandidateRegistryTests(unittest.TestCase):
         return row
 
     def test_total_partition_no_duplicate_or_extra_icpn(self):
-        self.assertEqual(self.catalog.size, 4629)
+        self.assertEqual(self.catalog.size, 4641)
+        self.assertEqual(sum(r.vendor == "STMicroelectronics" for r in self.catalog.records), 4629)
+        self.assertEqual(sum(r.vendor == "NXP" and r.family == "KL25" for r in self.catalog.records), 12)
         self.assertEqual(self.registry.size, 362)
         all_candidates = [
             (row.identifier, self.registry.lookup(row))

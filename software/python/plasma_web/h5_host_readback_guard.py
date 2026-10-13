@@ -35,7 +35,9 @@ class H5HostReadbackGuard:
     """
 
     def __init__(self, catalog: DeviceCatalog, candidates: BackendCandidateRegistry):
-        if (catalog.status != "production" or catalog.size != 4629 or
+        if (catalog.status != "production" or catalog.size != 4641 or
+                sum(r.vendor == "STMicroelectronics" for r in catalog.records) != 4629 or
+                sum(r.vendor == "NXP" and r.family == "KL25" for r in catalog.records) != 12 or
                 candidates.catalog_revision_sha256 != catalog.revision_sha256 or
                 candidates.size != 362 or not candidates.evidence_available):
             raise DeviceCatalogIntegrityError(

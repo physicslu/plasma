@@ -59,8 +59,16 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
     ensure(manifest.get("schema_version") == 1 and manifest.get("status") == "production",
            "Production manifest must remain schema 1")
     sources = manifest["sources"]
-    ensure(len(sources) == 28 and sum(s["row_count"] for s in sources) == 4629,
-           "Production exact catalog baseline drift")
+    # Historical ST C5 evidence remains bound to the original 28 ST
+    # sources. One separately vetted KL25 source may be appended without
+    # changing the ST C5 identity/loader matrix.
+    st_sources = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"]
+    nxp_sources = [s for s in sources if s.get("manufacturer") == "NXP"]
+    ensure(len(st_sources) == 28 and sum(s["row_count"] for s in st_sources) == 4629
+           and len(nxp_sources) == 1 and nxp_sources[0]["family"] == "KL25"
+           and nxp_sources[0]["row_count"] == 12 and len(sources) == 29
+           and sum(s["row_count"] for s in sources) == 4641,
+           "Production ST+C5 and bounded NXP KL25 source baseline drift")
     c5 = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"
           and s.get("family") == "STM32C5"]
     ensure(len(c5) == 1 and c5[0]["path"] == CSV_REL and c5[0]["row_count"] == 172,
