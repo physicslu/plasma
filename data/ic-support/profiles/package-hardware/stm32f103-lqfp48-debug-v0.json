@@ -10,15 +10,61 @@
     "pin_count": 48
   },
   "evidence": [
-    {"source_id": "st_ds5319_rev20", "sections": ["Features", "Package illustrations", "Debug mode"]}
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "Figure 8. STM32F103xx performance line LQFP48 pinout",
+        "Table 5. Medium-density STM32F103xx pin definitions",
+        "Debug mode"
+      ]
+    }
   ],
   "data": {
     "package": "LQFP",
     "pin_count": 48,
-    "debug_programming_interfaces": ["SWD", "JTAG"],
+    "debug_programming_interfaces": [
+      "SWD",
+      "JTAG"
+    ],
     "pin_level_minimum_programming_hardware": {
-      "status": "pending_evidence",
-      "required_before_runtime_use": true
+      "status": "partial_manufacturer_evidence",
+      "required_before_runtime_use": true,
+      "runtime_qualified": false,
+      "unresolved": [
+        "site_drive_capability",
+        "socket_or_adapter_routing",
+        "signal_integrity"
+      ]
+    },
+    "logical_signal_map": {
+      "SWDIO": {
+        "mcu_signal": "PA13",
+        "package_pin": 34
+      },
+      "SWCLK": {
+        "mcu_signal": "PA14",
+        "package_pin": 37
+      },
+      "NRST": {
+        "mcu_signal": "NRST",
+        "package_pin": 7
+      },
+      "BOOT0": {
+        "mcu_signal": "BOOT0",
+        "package_pin": 44
+      },
+      "BOOT1": {
+        "mcu_signal": "PB2/BOOT1",
+        "package_pin": 20
+      },
+      "USART1_TX": {
+        "mcu_signal": "PA9",
+        "package_pin": 30
+      },
+      "USART1_RX": {
+        "mcu_signal": "PA10",
+        "package_pin": 31
+      }
     }
   }
 }
