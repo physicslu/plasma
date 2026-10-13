@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Regression tests for the research-only Microchip coverage contract."""
 import importlib.util
+import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -14,6 +16,8 @@ spec.loader.exec_module(microchip_bulk)
 
 
 class MicrochipBulkCoverageTest(unittest.TestCase):
+    SYNTHETIC_SOURCE_BYTES = b'{"count":1,"part":"PIC16F18855-I/SS","state":"In Production"}'
+
     def test_registry_keeps_five_lanes_and_no_global_denominator(self):
         result = microchip_bulk.summarize()
         self.assertEqual(len(result["segments"]), 5)
@@ -29,18 +33,26 @@ class MicrochipBulkCoverageTest(unittest.TestCase):
             "source_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus",
             "source_population_complete": complete,
             "official_count": 1 if complete else None,
-            "source_content_sha256": "a" * 64 if complete else None,
+            "source_content_sha256": hashlib.sha256(
+                MicrochipBulkCoverageTest.SYNTHETIC_SOURCE_BYTES).hexdigest()
+                if complete else None,
+            "source_capture_file": "8bit-source.raw" if complete else None,
             "rows": [{
                 "icpn": "PIC16F18855-I/SS",
                 "lifecycle": status,
                 "source_url": "https://www.microchip.com/en-us/product/PIC16F18855",
-                "evidence_sha256": "b" * 64,
+                "evidence_sha256": hashlib.sha256(
+                    MicrochipBulkCoverageTest.SYNTHETIC_SOURCE_BYTES).hexdigest()
+                    if complete else "b" * 64,
+                "evidence_file": "8bit-source.raw" if complete else None,
             }],
         }
 
     def run_snapshot(self, value):
         with tempfile.TemporaryDirectory() as temp:
             (Path(temp) / "8bit.json").write_text(json.dumps(value), encoding="utf-8")
+            if value.get("source_population_complete"):
+                (Path(temp) / "8bit-source.raw").write_bytes(self.SYNTHETIC_SOURCE_BYTES)
             return microchip_bulk.summarize(Path(temp))
 
     def test_in_production_maps_to_active(self):
@@ -55,8 +67,30 @@ class MicrochipBulkCoverageTest(unittest.TestCase):
 
     def test_source_count_alone_cannot_forge_global_completeness(self):
         result = self.run_snapshot(self.sample(complete=True))
-        self.assertEqual(result["segments"][0]["state"], "verified_snapshot")
+        self.assertEqual(result["segments"][0]["state"], "bytes_verified_scope_unreviewed")
         self.assertIsNone(result["complete_global_active_denominator"])
+
+    def test_complete_snapshot_requires_matching_captured_source_bytes(self):
+        value = self.sample(complete=True)
+        value["source_content_sha256"] = "a" * 64
+        with self.assertRaisesRegex(ValueError, "source capture digest mismatch"):
+            self.run_snapshot(value)
+
+    def test_complete_snapshot_requires_original_row_evidence_file(self):
+        value = self.sample(complete=True)
+        value["rows"][0]["evidence_file"] = "nonexistent.bin"
+        with self.assertRaisesRegex(ValueError, "missing or symlinked"):
+            self.run_snapshot(value)
+
+    def test_global_denominator_requires_explicit_code_review_not_registry_flag(self):
+        with tempfile.TemporaryDirectory() as temp:
+            override = Path(temp) / "registry.json"
+            registry = json.loads(microchip_bulk.REGISTRY.read_text())
+            registry["population_boundary_validated"] = True
+            override.write_text(json.dumps(registry))
+            with patch.object(microchip_bulk, "REGISTRY", override):
+                with self.assertRaisesRegex(ValueError, "unreviewed global coverage"):
+                    microchip_bulk.summarize()
 
     def test_unreviewed_lifecycle_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "lifecycle"):
