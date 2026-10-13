@@ -53,7 +53,9 @@ def product_data(result):
 
 def exact_ordering_prefix(part, query):
     """Match a commercial SKU, not an arbitrary substring or vendor family alias."""
-    if not part.startswith(query):
+    # DFP names may use dsPIC while Microchip ordering numbers use DSPIC.
+    # Compare ASCII case-insensitively; preserve raw SKU spelling in the ledger.
+    if not part.upper().startswith(query.upper()):
         return False
     tail = part[len(query):]
     return not tail or tail.startswith(('-', '/', 'T-', 'T/'))

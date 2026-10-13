@@ -64,6 +64,24 @@ def make_archive(folder):
 
 
 class PagedProbeTests(unittest.TestCase):
+    def test_dspic_dfp_case_differs_from_vendor_ordering_case(self):
+        first = [{'searchTerm': 'dsPIC33CK128MP506',
+                  'pagination': {'total': 2, 'offset': 0, 'limit': 20, 'hasMore': False},
+                  'products': [
+                      {'partNumber': 'DSPIC33CK128MP506-I/MR',
+                       'basePartNumber': 'DSPIC33CK128MP506',
+                       'lifecycleStatus': 'Active'},
+                      {'partNumber': 'DSPIC33CK128MP506T-E/MR',
+                       'basePartNumber': 'DSPIC33CK128MP506',
+                       'lifecycleStatus': 'Active'}]}]
+        second = json.loads(json.dumps(first))
+        second[0]['pagination']['limit'] = 60
+        outcome = v2.reconcile(first, second, 'dsPIC33CK128MP506')
+        self.assertEqual(outcome['exact_prefix_ordering_count'], 2)
+        self.assertEqual(outcome['fuzzy_foreign_ordering_count'], 0)
+        self.assertEqual(outcome['exact_query_ordering_parts'], [
+            'DSPIC33CK128MP506-I/MR', 'DSPIC33CK128MP506T-E/MR'])
+
     def test_over_sixty_both_full_walks(self):
         a, b = captures()
         result = v2.reconcile(a, b)

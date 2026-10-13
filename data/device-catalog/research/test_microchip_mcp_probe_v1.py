@@ -78,6 +78,15 @@ class ProbeTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     reconcile([page(0), last], page(0, 60))
 
+    def test_dspic_case_variant_matches_real_ordering_prefix_not_fuzzy_names(self):
+        from microchip_mcp_probe_v1 import exact_ordering_prefix
+        query = 'dsPIC33CK128MP506'
+        self.assertTrue(exact_ordering_prefix('DSPIC33CK128MP506-I/MR', query))
+        self.assertTrue(exact_ordering_prefix('DSPIC33CK128MP506T-I/MR', query))
+        self.assertFalse(exact_ordering_prefix('DSPIC33CK128MP507-I/MR', query))
+        self.assertFalse(exact_ordering_prefix('DSPIC33CK128MP506A-I/MR', query))
+        self.assertFalse(exact_ordering_prefix('OTHER-DSPIC33CK128MP506', query))
+
     def test_vendor_base_part_alias_does_not_discard_valid_ordering(self):
         first, last, comparison = page(0), page(2), page(0, 60)
         first['products'][0]['basePartNumber'] = 'PIC10F200'
