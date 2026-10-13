@@ -77,6 +77,32 @@ test("shared PMode and EMode picker is constrained to admitted exact ICPNs", asy
   assert.doesNotMatch(picker, /IC identifier/);
 });
 
+test("IC Selector reports total filtered matches and uses a balanced desktop detail layout", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const styles = await source("../app/devices/devices.css");
+  const api = await source("../app/device-catalog-api.ts");
+
+  assert.match(api, /total_count:\s*number/);
+  assert.match(selector, /setTotalCount\(payload\.total_count\)/);
+  assert.match(selector, /顯示/);
+  assert.match(selector, /共/);
+  assert.match(styles, /\.icSelector\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+  assert.match(styles, /\.icSelectorResult\s*\{[\s\S]*?grid-template-columns:\s*minmax\(150px, \.85fr\) minmax\(0, 1\.15fr\)/);
+  assert.match(styles, /\.icSelectorStatusStack\s*\{[\s\S]*?grid-column:\s*1 \/ -1/);
+  assert.match(styles, /@media \(max-width: 1050px\)[\s\S]*?\.icSelector\s*\{\s*grid-template-columns:\s*1fr/);
+});
+
+test("IC Information fails closed when manufacturer electrical enrichment is missing", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+
+  assert.match(selector, /Catalog 溫度等級/);
+  assert.match(selector, /I\/O 供應電壓/);
+  assert.match(selector, /原廠工作溫度/);
+  assert.match(selector, /工作電氣特性與 Memory Map 尚未完成原廠 enrichment/);
+  assert.match(selector, /尚未建立 manufacturer enrichment；不以 Family 或 OpenOCD 推論/);
+  assert.match(selector, /尚未建立 manufacturer-derived Memory Map/);
+});
+
 test("selected IC profile presents device, programming, and Plasma compatibility as separate layers", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
   const styles = await source("../app/devices/devices.css");
