@@ -58,3 +58,24 @@ jobs:
           assert len(x['segments']) == 5
           print('Research-only Microchip baseline PASS; no ungrounded portfolio claim')
           PY
+
+  mcp-three-query-canary:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe three official PIC10 device names without credentials
+        run: python data/device-catalog/research/microchip_mcp_batch_v1.py --output-dir /tmp/microchip-mcp-canary --max-queries 3
+      - name: Preserve the full raw response trail (including failures)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-mcp-pic10-three-query-canary
+          path: /tmp/microchip-mcp-canary/
+          if-no-files-found: warn
+          retention-days: 7
