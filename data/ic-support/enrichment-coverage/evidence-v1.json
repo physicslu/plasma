@@ -6,7 +6,7 @@
   "hardware_authority": false,
   "level_contract": {
     "M0": "Production Catalog exact identity only",
-    "M1": "Manufacturer Device Basic Profile available: exact identity + package/pins + Flash/RAM + operating VDD + operating temperature",
+    "M1": "Manufacturer Device Basic Profile available: fixed 10-field IC Information contract; exact identity/package/pins/Flash/temperature plus manufacturer RAM and operating VDD, with I/O Supply and VDDA nullable until directly evidenced",
     "M2": "Manufacturer Programming Profile available: interface + programming electrical + flash geometry",
     "M3": "Manufacturer-derived executable semantics available: Execution IR + deterministic code-generation path",
     "M4": "Independent software differential available: OpenOCD semantic comparison and real-binary software acceptance",
