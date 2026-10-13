@@ -28,6 +28,8 @@
     "flash",
     "ram",
     "operating_vdd",
+    "io_supply",
+    "vdda",
     "operating_temperature"
   ],
   "groups": {
@@ -905,6 +907,11 @@
       "ram",
       "operating_vdd"
     ],
-    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog exact identity/eStore evidence, while RAM and Operating VDD come only from ST Product Selector observations. No Datasheet or Programming Guide fallback is permitted."
-  }
+    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog exact identity/eStore evidence, RAM and Operating VDD come only from ST Product Selector/eStore observations, and I/O Supply plus VDDA remain null until directly evidenced by those allowed surfaces. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted.",
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ]
+  },
+  "binding_count": 280
 }

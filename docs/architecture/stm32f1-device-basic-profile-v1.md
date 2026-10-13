@@ -20,11 +20,14 @@ Pin Count
 Flash
 RAM
 Operating VDD
+I/O Supply
+VDDA
 Operating Temperature
 ```
 
-Memory Map, I/O supply, VDDA, Flash-controller registers, erase/program geometry and
-programming sequences are deliberately outside this Basic Profile.
+Memory Map, Flash-controller registers, erase/program geometry and programming sequences
+are deliberately outside this Basic Profile. I/O Supply and VDDA remain in the fixed
+operator contract but are null until direct ST Product Selector/eStore evidence is admitted.
 
 ## Composition
 
@@ -101,11 +104,12 @@ physical_programming_qualified = false
 At this baseline:
 
 ```text
-Production ICPNs       4,641
+Production ICPNs       4,853
 STM32F1 exact ICPNs      280
+C0 + G0 exact ICPNs      632
 
-M0+                    4,641
-M1+                      280
+M0+                    4,853
+M1+                      912
 M2+                        1
 M3+                        1
 M4+                        1
@@ -115,8 +119,8 @@ M5                         0
 Highest-level distribution is:
 
 ```text
-M0  4,361
-M1    279
+M0  3,941
+M1    911
 M2      0
 M3      0
 M4      1
@@ -128,13 +132,13 @@ ICPNs stop at M1.
 
 ## UI boundary
 
-The IC Information section shows the eight Basic Profile fields only.
+The IC Information section always shows the ten-field contract. For this profile,
+I/O Supply and VDDA currently render as `—` because no direct allowed-source value has
+been admitted.
 
 It does not display:
 
 - Memory Map or address ranges;
-- I/O supply;
-- VDDA;
 - Flash page geometry;
 - Flash-controller registers.
 
@@ -151,8 +155,9 @@ The deterministic controls prove:
 - non-ST authority is rejected;
 - a fake content lock is rejected;
 - removing an exact binding does not fall back to family inference;
-- non-STM32F1 targets do not gain Basic Profile applicability;
-- M1 coverage rises to 280 while M2+ remains unchanged.
+- non-STM32F1 targets do not gain applicability from the STM32F1 profile itself;
+- separate C0/G0 family profiles are required for their 632 exact bindings;
+- registry-wide M1 coverage is 912 while M2+ remains unchanged.
 
 No deployment, PPU runtime, Socket or physical programming state changes are part of this
 profile.

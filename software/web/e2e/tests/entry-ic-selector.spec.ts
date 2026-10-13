@@ -88,6 +88,8 @@ test("IC Selector first enriched result renders without page error and paginatio
       flash_size: "64 KiB",
       ram_size: "20 KiB",
       operating_vdd_v: { min: 2, max: 3.6 },
+      io_supply_v: null,
+      vdda_v: null,
       operating_temperature_c: { min: -40, max: 85 },
       evidence: {
         authority: "STMicroelectronics official",
@@ -254,8 +256,11 @@ test("IC Selector first enriched result renders without page error and paginatio
   await expect(deviceInfo.getByText("2–3.6 V", { exact: true })).toBeVisible();
   await expect(deviceInfo.getByText("-40–85 °C", { exact: true })).toBeVisible();
   await expect(deviceInfo.getByText("Memory Map", { exact: true })).toHaveCount(0);
-  await expect(deviceInfo.getByText("I/O supply", { exact: true })).toHaveCount(0);
-  await expect(deviceInfo.getByText("VDDA", { exact: true })).toHaveCount(0);
+  await expect(deviceInfo.getByText("I/O Supply", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("VDDA", { exact: true })).toBeVisible();
+  const unavailableBasicFields = deviceInfo.locator("div").filter({ has: page.getByText(/^(I\/O Supply|VDDA)$/) });
+  await expect(unavailableBasicFields).toHaveCount(2);
+  await expect(unavailableBasicFields.filter({ hasText: "—" })).toHaveCount(2);
   await expect(page.getByText("Known Interface Not Expanded In V1")).toBeVisible();
   expect(pageErrors).toEqual([]);
 

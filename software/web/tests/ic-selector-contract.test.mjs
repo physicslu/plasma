@@ -134,9 +134,11 @@ test("IC Information uses the independent Manufacturer Device Basic Profile", as
   assert.match(selector, /<dt>Flash<\/dt>/);
   assert.match(selector, /<dt>RAM<\/dt>/);
   assert.match(selector, /工作 VDD/);
+  assert.match(api, /io_supply_v:\s*\{ min: number; max: number \}\s*\|\s*null/);
+  assert.match(api, /vdda_v:\s*\{ min: number; max: number \}\s*\|\s*null/);
+  assert.match(selector, /<dt>I\/O Supply<\/dt>/);
+  assert.match(selector, /<dt>VDDA<\/dt>/);
   assert.match(selector, /工作溫度/);
-  assert.doesNotMatch(selector, /I\/O 供應電壓/);
-  assert.doesNotMatch(selector, /<dt>VDDA<\/dt>/);
   assert.doesNotMatch(selector, /<dt>Main Flash Map<\/dt>/);
   assert.doesNotMatch(selector, /<dt>Memory Map<\/dt>/);
 });
