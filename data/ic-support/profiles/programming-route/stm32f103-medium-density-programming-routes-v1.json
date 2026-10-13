@@ -1,0 +1,167 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103-medium-density-programming-routes-v1",
+  "kind": "programming_route",
+  "status": "pilot_manufacturer_evidence",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "medium"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "Figure 8. STM32F103xx performance line LQFP48 pinout",
+        "Table 5. Medium-density STM32F103xx pin definitions"
+      ]
+    },
+    {
+      "source_id": "st_rm0008_rev21",
+      "sections": [
+        "3.4 Boot configuration",
+        "Table 9. Boot modes"
+      ]
+    },
+    {
+      "source_id": "st_an2606_rev70",
+      "sections": [
+        "4.1 Bootloader activation",
+        "21 STM32F10xxx devices",
+        "21.1 Bootloader configuration",
+        "Table 45. STM32F10xxx configuration in system memory boot mode",
+        "21.2 Bootloader selection"
+      ]
+    }
+  ],
+  "data": {
+    "context_vocabulary": {
+      "icp": {
+        "label": "ICP",
+        "meaning": "In-circuit programming with the target IC mounted on its application PCB"
+      },
+      "offline_socket": {
+        "label": "Offline Socket",
+        "meaning": "Offline programming of a bare IC through a programmer socket or adapter"
+      }
+    },
+    "routes": [
+      {
+        "route_id": "swd_debug",
+        "purpose": "direct_debug_flash_programming",
+        "contexts": {
+          "icp": {
+            "supported": true
+          },
+          "offline_socket": {
+            "supported": true
+          }
+        },
+        "transport": {
+          "type": "SWD",
+          "instance": null,
+          "protocol": "Arm Serial Wire Debug"
+        },
+        "entry_requirements": {
+          "required_signals": [
+            "SWDIO",
+            "SWCLK"
+          ],
+          "optional_control_signals": [
+            "NRST"
+          ],
+          "strap_states": [],
+          "reset_sequence": {
+            "required": false,
+            "strategy": "normal_attach_or_optional_connect_under_reset"
+          },
+          "power_cycle_required": false,
+          "timing_requirements": {
+            "clock_hz": {
+              "manufacturer_min": null,
+              "manufacturer_max": null,
+              "manufacturer_recommended": null,
+              "status": "not_specified_by_locked_manufacturer_sources"
+            }
+          }
+        },
+        "entry_sequence": [
+          "establish_target_electrical_reference",
+          "attach_swd_debug_port"
+        ],
+        "exit_sequence": [
+          "release_debug_session"
+        ],
+        "programming_algorithm_profile": "stm32f1-medium-density-flash-v0",
+        "runtime_implemented": false
+      },
+      {
+        "route_id": "system_rom_bootloader_usart1",
+        "purpose": "rom_bootloader_flash_programming",
+        "contexts": {
+          "icp": {
+            "supported": false,
+            "reason": "PLASMA v1 ICP policy does not require boot-strap control on the application board"
+          },
+          "offline_socket": {
+            "supported": true
+          }
+        },
+        "transport": {
+          "type": "USART",
+          "instance": "USART1",
+          "protocol": "ST USART bootloader V2.2"
+        },
+        "entry_requirements": {
+          "required_signals": [
+            "BOOT0",
+            "BOOT1",
+            "USART1_RX",
+            "USART1_TX"
+          ],
+          "optional_control_signals": [
+            "NRST"
+          ],
+          "strap_states": [
+            {
+              "signal": "BOOT0",
+              "state": "high"
+            },
+            {
+              "signal": "BOOT1",
+              "state": "low"
+            }
+          ],
+          "reset_sequence": {
+            "required": true,
+            "accepted_reset_sources": [
+              "nrst",
+              "power_on_reset"
+            ],
+            "straps_stable_before_reset_release": true
+          },
+          "power_cycle_required": false,
+          "timing_requirements": {
+            "uart_framing": "8E1",
+            "synchronization_byte": "0x7F",
+            "baud_rate": "auto_detected_by_system_bootloader"
+          }
+        },
+        "entry_sequence": [
+          "drive_BOOT0_high",
+          "drive_BOOT1_low",
+          "generate_system_reset",
+          "wait_for_system_memory_bootloader",
+          "synchronize_USART1_with_0x7F"
+        ],
+        "exit_sequence": [
+          "restore_normal_boot_straps",
+          "generate_system_reset"
+        ],
+        "programming_algorithm_profile": null,
+        "runtime_implemented": false
+      }
+    ]
+  }
+}
