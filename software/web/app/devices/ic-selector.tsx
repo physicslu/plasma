@@ -369,8 +369,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       ? `${selected.nxp_manufacturer_device_profile.operating_temperature_c.min}–${selected.nxp_manufacturer_device_profile.operating_temperature_c.max} °C`
                       : (selected.temperature_grade ?? "—")}</dd>
                 </div>
-                <div><dt>I/O Supply</dt><dd>{selected.nxp_manufacturer_device_profile ? (zh ? "未有個別原廠證據" : "Not independently sourced") : "—"}</dd></div>
-                <div><dt>VDDA</dt><dd>{selected.nxp_manufacturer_device_profile ? (zh ? "未有個別原廠證據" : "Not independently sourced") : "—"}</dd></div>
+                {selected.nxp_manufacturer_device_profile && (
+                  <>
+                    <div><dt>I/O Supply</dt><dd>{zh ? "未有個別原廠證據" : "Not independently sourced"}</dd></div>
+                    <div><dt>VDDA</dt><dd>{zh ? "未有個別原廠證據" : "Not independently sourced"}</dd></div>
+                  </>
+                )}
               </dl>
             </section>
 
