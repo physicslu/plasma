@@ -28,9 +28,11 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         return self.provider.describe("STMicroelectronics", part)
 
     def test_all_4629_exact_icpns_and_independent_states(self):
-        self.assertEqual(self.catalog.size, 4629)
+        self.assertEqual(self.catalog.size, 4641)
+        self.assertEqual(sum(row.vendor == "STMicroelectronics" for row in self.catalog.records), 4629)
+        self.assertEqual(sum(row.vendor == "NXP" and row.family == "KL25" for row in self.catalog.records), 12)
         self.assertEqual(self.provider.inventory, {
-            "openocd-upstream": 4164,
+            "openocd-upstream": 4176,
             "openocd-st-h5-research": 190,
             "openocd-st-c5-stldr-research": 172,
         })
