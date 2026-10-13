@@ -106,6 +106,29 @@ exception and the current MCP probe stops for any query reporting more than 60
 results. Scaling capture requires explicit bounded scheduling, retry and
 high-result-count reconciliation before network execution.
 
+## Gate 2b — bounded over-60 result reconciliation (v2)
+
+`microchip_mcp_paged_probe_v2.py` introduces an independent and fully
+replayable **20-per-page vs 60-per-page** double walk, supporting 1–600 reported
+text-search matches per query. Both walks must cover every page and report the
+same exact `partNumber`, `basePartNumber` and **raw** `lifecycleStatus`
+for each record; missing, duplicated, reordered or drifting pages fail closed.
+Every source byte and exact handshake/request sequence is SHA-256 archived.
+A query reporting more than 600 matches is intentionally rejected for manual
+re-scoping. No zero-result or NOT_FOUND response is admitted as proof of EOL.
+
+The v1 2-vs-60 pilot format remains available and is not reinterpreted as v2.
+This is an **offline contract-tested implementation**, not evidence that the
+live Microchip service supports such wide queries consistently. Live execution
+must be staged and raw artifacts retained before making source claims.
+
+```bash
+python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+  --query PIC10F202 --output-dir /tmp/microchip-v2-single-query
+python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+  --query PIC10F202 --output-dir /tmp/microchip-v2-single-query --replay
+```
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
