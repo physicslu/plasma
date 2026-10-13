@@ -342,29 +342,35 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <p>
                     {selected.manufacturer_device_basic_profile
                       ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
-                      : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
+                      : selected.nxp_manufacturer_device_profile
+                        ? (zh ? "NXP 官方單料號規格；未知欄位不推估，不代表燒錄資格" : "NXP exact-part evidence; unknown fields are not inferred or programming-qualified")
+                        : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
                   </p>
                 </div>
               </div>
               <dl>
                 <div><dt>ICPN</dt><dd>{selected.icpn ?? selected.identifier}</dd></div>
-                <div><dt>Base Device</dt><dd>{selected.base_device ?? "—"}</dd></div>
+                <div><dt>Base Device</dt><dd>{selected.base_device ?? "—"}{selected.nxp_manufacturer_device_profile ? (zh ? "（單料號暫代，未驗證共用 Base）" : " (exact SKU placeholder; common base unverified)") : ""}</dd></div>
                 <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
                 <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
                 <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
-                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? "—"}</dd></div>
+                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? selected.nxp_manufacturer_device_profile?.ram_size ?? "—"}</dd></div>
                 <div>
                   <dt>{zh ? "工作 VDD" : "Operating VDD"}</dt>
                   <dd>{selected.manufacturer_device_basic_profile
                     ? voltageRange(selected.manufacturer_device_basic_profile.operating_vdd_v)
-                    : "—"}</dd>
+                    : voltageRange(selected.nxp_manufacturer_device_profile?.operating_vdd_v ?? undefined)}</dd>
                 </div>
                 <div>
                   <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
                   <dd>{selected.manufacturer_device_basic_profile
                     ? `${selected.manufacturer_device_basic_profile.operating_temperature_c.min}–${selected.manufacturer_device_basic_profile.operating_temperature_c.max} °C`
-                    : (selected.temperature_grade ?? "—")}</dd>
+                    : selected.nxp_manufacturer_device_profile
+                      ? `${selected.nxp_manufacturer_device_profile.operating_temperature_c.min}–${selected.nxp_manufacturer_device_profile.operating_temperature_c.max} °C`
+                      : (selected.temperature_grade ?? "—")}</dd>
                 </div>
+                <div><dt>I/O Supply</dt><dd>{selected.nxp_manufacturer_device_profile ? (zh ? "未有個別原廠證據" : "Not independently sourced") : "—"}</dd></div>
+                <div><dt>VDDA</dt><dd>{selected.nxp_manufacturer_device_profile ? (zh ? "未有個別原廠證據" : "Not independently sourced") : "—"}</dd></div>
               </dl>
             </section>
 
@@ -435,6 +441,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <>
                   <div><dt>Device Basic Profile</dt><dd>{selected.manufacturer_device_basic_profile.profile_id}</dd></div>
                   <div><dt>{zh ? "Device Basic 來源" : "Device Basic source"}</dt><dd>ST official · {selected.manufacturer_device_basic_profile.evidence.observed_at_utc}</dd></div>
+                </>
+              )}
+              {selected.nxp_manufacturer_device_profile && (
+                <>
+                  <div><dt>NXP Manufacturer Device</dt><dd>{selected.nxp_manufacturer_device_profile.profile_id} · {zh ? "部分證據" : "Partial evidence"}</dd></div>
+                  <div><dt>{zh ? "原廠 Exact 來源" : "Exact manufacturer source"}</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.exact_url}</code></dd></div>
+                  <div><dt>HTML SHA-256</dt><dd><code>{selected.nxp_manufacturer_device_profile.evidence.source_html_sha256}</code></dd></div>
                 </>
               )}
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
