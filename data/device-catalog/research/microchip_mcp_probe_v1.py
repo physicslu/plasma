@@ -5,12 +5,14 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
 ENDPOINT = 'https://api.microchip.com/mcp/resources'
 QUERY = 'PIC10F202'
 MAX_ROWS = 60
+BASE_QUERY = re.compile(r'[A-Za-z][A-Za-z0-9]{4,39}\\Z')
 
 
 def require(condition, message):
@@ -48,8 +50,8 @@ def product_data(result):
     return payload['data']
 
 
-def validate_page(data, offset, limit, total=None):
-    require(data.get('searchTerm') == QUERY, 'query mismatch')
+def validate_page(data, offset, limit, total=None, query=QUERY):
+    require(data.get('searchTerm') == query, 'query mismatch')
     pagination = data.get('pagination', {})
     count = pagination.get('total')
     require(type(count) is int and 0 < count <= MAX_ROWS, 'total outside bounded probe')
@@ -68,27 +70,27 @@ def validate_page(data, offset, limit, total=None):
             require(isinstance(row.get(field), str) and bool(row[field].strip()),
                     'missing identity/lifecycle')
         require(row['partNumber'] == row['partNumber'].strip(), 'padded identity')
-        require(row['basePartNumber'] == QUERY, 'fuzzy search returned another base part')
+        require(row['basePartNumber'] == query, 'fuzzy search returned another base part')
     return count, rows
 
 
-def reconcile(pages, comparison):
+def reconcile(pages, comparison, query=QUERY):
     rows = []
     total = None
     for index, page in enumerate(pages):
-        total, batch = validate_page(page, index*2, 2, total)
+        total, batch = validate_page(page, index*2, 2, total, query)
         rows.extend(batch)
     require(total is not None and len(rows) == total, 'incomplete paginated capture')
     ids = [row['partNumber'] for row in rows]
     require(len(set(ids)) == total, 'duplicate ordering identities')
-    _, other = validate_page(comparison, 0, MAX_ROWS, total)
+    _, other = validate_page(comparison, 0, MAX_ROWS, total, query)
     other_ids = [row['partNumber'] for row in other]
     require(len(set(other_ids)) == total and set(ids) == set(other_ids),
             'page-size comparison identity mismatch')
     key = lambda r: (r['basePartNumber'], r['lifecycleStatus'])
     require({r['partNumber']: key(r) for r in rows} ==
             {r['partNumber']: key(r) for r in other}, 'lifecycle changed during capture')
-    return {'query': QUERY, 'reported_total': total, 'unique_ordering_count': len(set(ids)),
+    return {'query': query, 'reported_total': total, 'unique_ordering_count': len(set(ids)),
             'page_size_2_count': len(pages), 'page_size_60_same_identity_and_lifecycle': True,
             'raw_lifecycle_values': sorted({r['lifecycleStatus'] for r in rows}),
             'ordering_parts': sorted(ids), 'population_boundary_validated': False,
@@ -127,7 +129,7 @@ class Client:
         return decode(raw, request_id) if request_id is not None else None
 
 
-def verify_transcript(manifest, output):
+def verify_transcript(manifest, output, query=QUERY):
     """Validate the archived MCP handshake and exact bounded request sequence."""
     responses = manifest.get('responses')
     require(isinstance(responses, list) and 5 <= len(responses) <= 4 + MAX_ROWS // 2,
@@ -179,7 +181,7 @@ def verify_transcript(manifest, output):
                     and {'searchTerm', 'limit', 'offset'} <= set(schema['properties']),
                     'archived product search schema changed')
         else:
-            expected_args = {'searchTerm': QUERY,
+            expected_args = {'searchTerm': query,
                              'limit': MAX_ROWS if index == len(responses) - 1 else 2,
                              'offset': 0 if index == len(responses) - 1 else (index - 3) * 2}
             require(request.get('params') == {'name': 'search_products',
@@ -187,9 +189,10 @@ def verify_transcript(manifest, output):
                     'unexpected product search request')
 
 
-def replay(output):
+def replay(output, query=QUERY):
     manifest = json.loads((output / 'manifest.json').read_text())
-    verify_transcript(manifest, output)
+    require(manifest.get('query', QUERY) == query, 'archived query mismatch')
+    verify_transcript(manifest, output, query)
     pages, comparison = [], None
     for evidence in manifest['responses']:
         filename = evidence['file']
@@ -200,9 +203,9 @@ def replay(output):
         if request['method'] == 'tools/call':
             require(request['params']['name'] == 'search_products', 'unexpected tool')
             args = request['params']['arguments']
-            require(args['searchTerm'] == QUERY, 'unexpected query')
+            require(args['searchTerm'] == query, 'unexpected query')
             data = product_data(decode(raw, request['id']))
-            validate_page(data, args['offset'], args['limit'])
+            validate_page(data, args['offset'], args['limit'], query=query)
             if args['limit'] == MAX_ROWS:
                 require(comparison is None, 'duplicate comparison')
                 comparison = data
@@ -211,10 +214,12 @@ def replay(output):
                         'unexpected page order')
                 pages.append(data)
     require(comparison is not None, 'missing comparison capture')
-    return reconcile(pages, comparison)
+    return reconcile(pages, comparison, query)
 
 
-def run(output):
+def run(output, query=QUERY):
+    require(isinstance(query, str) and bool(BASE_QUERY.fullmatch(query)),
+            'query must be an exact alphanumeric base-device identifier')
     output.mkdir(parents=True, exist_ok=False)
     client = Client(output)
     try:
@@ -233,16 +238,16 @@ def run(output):
         offset, total, request_id = 0, None, 3
         while total is None or offset < total:
             result = client.call('tools/call', {'name': 'search_products', 'arguments':
-                                 {'searchTerm': QUERY, 'limit': 2, 'offset': offset}}, request_id)
-            total, rows = validate_page(product_data(result), offset, 2, total)
+                                 {'searchTerm': query, 'limit': 2, 'offset': offset}}, request_id)
+            total, rows = validate_page(product_data(result), offset, 2, total, query)
             offset += len(rows)
             request_id += 1
         client.call('tools/call', {'name': 'search_products', 'arguments':
-                    {'searchTerm': QUERY, 'limit': MAX_ROWS, 'offset': 0}}, request_id)
+                    {'searchTerm': query, 'limit': MAX_ROWS, 'offset': 0}}, request_id)
     finally:
         (output / 'manifest.json').write_text(json.dumps(
-            {'endpoint': ENDPOINT, 'responses': client.evidence}, indent=2)+'\n')
-    summary = replay(output)
+            {'endpoint': ENDPOINT, 'query': query, 'responses': client.evidence}, indent=2)+'\n')
+    summary = replay(output, query)
     (output / 'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
     return summary
 
@@ -250,6 +255,7 @@ def run(output):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', required=True, type=Path)
+    parser.add_argument('--query', default=QUERY, help='single exact base-device search term')
     parser.add_argument('--replay', action='store_true', help='verify archived bytes without network')
     args = parser.parse_args()
-    print(json.dumps(replay(args.output_dir) if args.replay else run(args.output_dir), indent=2))
+    print(json.dumps(replay(args.output_dir, args.query) if args.replay else run(args.output_dir, args.query), indent=2))
