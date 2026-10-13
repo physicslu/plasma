@@ -270,6 +270,23 @@ def load_device_basic_coverage(
                 and vdd["min"] < vdd["max"],
                 f"{icpn}: operating VDD missing",
             )
+            optional_voltages: dict[str, dict[str, float] | None] = {}
+            for optional_name, label in (
+                ("io_supply_v", "I/O Supply"),
+                ("vdda_v", "VDDA"),
+            ):
+                optional_voltage = group.get(optional_name)
+                if optional_voltage is None:
+                    optional_voltages[optional_name] = None
+                else:
+                    require(
+                        isinstance(optional_voltage, dict)
+                        and isinstance(optional_voltage.get("min"), (int, float))
+                        and isinstance(optional_voltage.get("max"), (int, float))
+                        and optional_voltage["min"] < optional_voltage["max"],
+                        f"{icpn}: invalid {label}",
+                    )
+                    optional_voltages[optional_name] = copy.deepcopy(optional_voltage)
             for field in ("base_device", "package", "pin_count", "temperature_grade"):
                 require(
                     isinstance(row.get(field), str) and row[field],
@@ -311,8 +328,8 @@ def load_device_basic_coverage(
                 "group_id": group_id,
                 "ram_size": group["ram_size"],
                 "operating_vdd_v": copy.deepcopy(vdd),
-                "io_supply_v": None,
-                "vdda_v": None,
+                "io_supply_v": optional_voltages["io_supply_v"],
+                "vdda_v": optional_voltages["vdda_v"],
                 "operating_temperature": row["temperature_grade"],
                 "evidence": copy.deepcopy(evidence),
             }
@@ -695,6 +712,8 @@ def build_inventory() -> dict[str, Any]:
             enrichment["dimensions"]["manufacturer_device_basic_profile"] = True
             enrichment["dimensions"]["ram"] = True
             enrichment["dimensions"]["operating_vdd"] = True
+            enrichment["dimensions"]["io_supply"] = basic["io_supply_v"] is not None
+            enrichment["dimensions"]["vdda"] = basic["vdda_v"] is not None
             enrichment["dimensions"]["operating_temperature"] = True
             if enrichment["highest_level"] == "M0":
                 enrichment["highest_level"] = "M1"
