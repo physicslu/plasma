@@ -22,7 +22,7 @@ class MicrochipBulkCoverageTest(unittest.TestCase):
         self.assertFalse(result["claims"]["production_write_authorized"])
 
     @staticmethod
-    def sample(segment="8bit", status="Active", complete=False):
+    def sample(segment="8bit", status="In Production", complete=False):
         return {
             "manufacturer": "Microchip",
             "segment": segment,
@@ -33,7 +33,7 @@ class MicrochipBulkCoverageTest(unittest.TestCase):
             "rows": [{
                 "icpn": "PIC16F18855-I/SS",
                 "lifecycle": status,
-                "source_url": "https://www.microchip.com/en-us/product/PIC16F18855-I/SS",
+                "source_url": "https://www.microchip.com/en-us/product/PIC16F18855",
                 "evidence_sha256": "b" * 64,
             }],
         }
@@ -43,10 +43,15 @@ class MicrochipBulkCoverageTest(unittest.TestCase):
             (Path(temp) / "8bit.json").write_text(json.dumps(value), encoding="utf-8")
             return microchip_bulk.summarize(Path(temp))
 
-    def test_partial_snapshot_is_observed_not_global_coverage(self):
+    def test_in_production_maps_to_active(self):
         result = self.run_snapshot(self.sample())
         self.assertEqual(result["observed_active_exact"], 1)
         self.assertIsNone(result["complete_global_active_denominator"])
+
+    def test_not_recommended_maps_to_nrnd(self):
+        result = self.run_snapshot(self.sample(status="Not Recommended for new designs"))
+        self.assertEqual(result["observed_active_exact"], 0)
+        self.assertEqual(result["observed_unique_exact"], 1)
 
     def test_source_count_alone_cannot_forge_global_completeness(self):
         result = self.run_snapshot(self.sample(complete=True))
