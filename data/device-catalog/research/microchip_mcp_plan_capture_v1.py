@@ -43,7 +43,7 @@ def attestation(plan, selected):
             'batch_id': selected['batch_id'],
             'dfp_index_sha256': plan['original_dfp_index_sha256'],
             'query_list_sha256': selected['query_list_sha256'],
-            'ordered_queries': selected['queries'],
+            'ordered_queries': list(selected['queries']),
             'capture_format': 'paged_v2',
             'search_results_are_complete_manufacturer_population': False,
             'population_boundary_validated': False,
