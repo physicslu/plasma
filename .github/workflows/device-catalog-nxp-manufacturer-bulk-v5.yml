@@ -10,6 +10,9 @@ on:
       - 'data/device-catalog/research/nxp-212-source-verified-commercial-v5.csv'
       - 'data/device-catalog/research/nxp-mcx-196-commercial-v5.csv'
       - 'data/device-catalog/research/nxp-k32l2-16-commercial-v5.csv'
+      - 'data/device-catalog/research/nxp_official_expansion_v5.py'
+      - 'data/device-catalog/research/nxp-official-expansion-pages-v5.json'
+      - 'data/device-catalog/research/nxp-five-page-expanded-active-evidence-v5.csv'
       - 'data/device-catalog/production/icpn-v1-manifest.json'
       - '.github/workflows/device-catalog-nxp-manufacturer-bulk-v5.yml'
   workflow_dispatch:
@@ -91,5 +94,38 @@ jobs:
         with:
           name: nxp-353-source-212-exact-manufacturer-v5-NOT-YET-PRODUCTION
           path: /tmp/nxp-353-manufacturer-v5/
+          if-no-files-found: warn
+          retention-days: 30
+
+  expanded-official-exact-discovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install 'playwright==1.56.0'
+          python -m playwright install --with-deps chromium
+      - name: Official exact lifecycle and package material declaration, five new NXP product pages
+        run: |
+          python data/device-catalog/research/nxp_official_expansion_v5.py --output /tmp/nxp-expanded-official-v5
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("/tmp/nxp-expanded-official-v5/nxp-five-page-discovery-summary-v5.json").read_text())
+          assert report["source_pages_requested"]==5
+          assert report["source_pages_verified"]+report["source_pages_blocked"]==5
+          assert report["manufacturer_wide_population_complete"] is False
+          assert report["manufacturer_wide_active_denominator"] is None
+          assert report["production_publication_authorized"] is False
+          print("NXP official 5-page exact Active Discovery batch checked")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-five-new-product-pages-active-exact-discovery-v5
+          path: /tmp/nxp-expanded-official-v5/
           if-no-files-found: warn
           retention-days: 30
