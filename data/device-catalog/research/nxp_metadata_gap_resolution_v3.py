@@ -69,6 +69,14 @@ def resolve(root: Path) -> tuple[list[dict], dict]:
             gate["runtime_programming_qualified"] is False and
             len(expected) == len(set(expected)) == 11,
             "11-bump manufacturer evidence gate changed")
+    locked={x["icpn"]:x for x in gate["qualified_source_evidence"]}
+    require(set(locked)==set(expected) and
+            all(x["original_package_name"]=="LFBGA64" and
+                x["explicit_original_package_contact"]=="64 bumps" and
+                x["official_source_sha_locked"] is True and
+                x["canonical_production_admission_authorized"] is False
+                for x in locked.values()),
+            "per-SKU manufacturer BGA evidence lock drift")
     recovered = []
     output = []
     counts = Counter()
@@ -91,8 +99,11 @@ def resolve(root: Path) -> tuple[list[dict], dict]:
                     f"wrong raw official BGA source state: {sku}")
             raw = gzip.decompress((folder / f"{sku}.html.gz").read_bytes())
             require(sha_bytes(raw) == rawrow["source_sha256"] ==
-                    record["official_part_html_sha256"],
+                    record["official_part_html_sha256"] ==
+                    locked[sku]["original_rendered_html_sha256"],
                     f"original manufacturer HTML SHA drift: {sku}")
+            require(locked[sku]["manufacturer_part_url"] == rawrow["source_url"],
+                    f"official NXP exact source route drift: {sku}")
             n = read_bga_contacts(sku, raw, rawrow["package_raw"])
             require(n == 64, f"unexpected manufacturer BGA count: {sku}")
             item["pin_count_observed"] = str(n)
