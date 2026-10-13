@@ -431,6 +431,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
               <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
               <div><dt>Temperature</dt><dd>{selected.temperature_grade ?? "—"}</dd></div>
+              {selected.manufacturer_device_basic_profile && (
+                <>
+                  <div><dt>Device Basic Profile</dt><dd>{selected.manufacturer_device_basic_profile.profile_id}</dd></div>
+                  <div><dt>{zh ? "Device Basic 來源" : "Device Basic source"}</dt><dd>ST official · {selected.manufacturer_device_basic_profile.evidence.observed_at_utc}</dd></div>
+                </>
+              )}
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
