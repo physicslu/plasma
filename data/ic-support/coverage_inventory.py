@@ -139,46 +139,43 @@ def load_device_basic_coverage(
     )
     require(payload.get("manufacturer") == "STMicroelectronics", "device basic manufacturer drift")
     require(payload.get("family") == "STM32F1", "device basic family drift")
-    fields = payload.get("fields")
     require(
-        fields == [
+        payload.get("fields") == [
             "icpn", "base_device", "package", "pin_count", "flash",
             "ram", "operating_vdd", "operating_temperature",
         ],
         "device basic field contract drift",
     )
+    composition = payload.get("composition")
+    require(isinstance(composition, dict), "device basic composition contract is required")
+    require(
+        composition.get("catalog_owned_fields")
+        == ["icpn", "base_device", "package", "pin_count", "flash", "operating_temperature"],
+        "device basic catalog-owned field contract drift",
+    )
+    require(
+        composition.get("profile_owned_fields") == ["ram", "operating_vdd"],
+        "device basic profile-owned field contract drift",
+    )
+
     groups = payload.get("groups")
     bindings = payload.get("bindings")
     require(isinstance(groups, dict) and groups, "device basic groups are required")
-    require(isinstance(bindings, list) and bindings, "device basic bindings are required")
+    require(isinstance(bindings, dict) and bindings, "device basic bindings are required")
 
     catalog_by_icpn = {row["icpn"]: row for row in production_rows}
+    expected_f1 = {
+        row["icpn"]
+        for row in production_rows
+        if row["manufacturer"] == "STMicroelectronics" and row["family"] == "STM32F1"
+    }
+    require(len(expected_f1) == 280, f"Production STM32F1 baseline drift: {len(expected_f1)}")
+    require(set(bindings) == expected_f1, "device basic exact-ICPN applicability set drift")
+
     result: dict[str, dict[str, Any]] = {}
-    for binding in bindings:
-        require(isinstance(binding, dict), "device basic binding must be an object")
-        icpn = binding.get("icpn")
-        group_id = binding.get("group_id")
-        expected = binding.get("expected_catalog")
-        require(isinstance(icpn, str) and icpn in catalog_by_icpn, f"{icpn}: device basic target not in Production")
-        require(icpn not in result, f"{icpn}: duplicate device basic binding")
+    for icpn, group_id in sorted(bindings.items()):
         require(isinstance(group_id, str) and group_id in groups, f"{icpn}: dangling device basic group")
-        require(isinstance(expected, dict), f"{icpn}: expected_catalog required")
         row = catalog_by_icpn[icpn]
-        checks = {
-            "manufacturer": "manufacturer",
-            "family": "family",
-            "series": "series",
-            "base_device": "base_device",
-            "package": "package",
-            "pin_count": "pin_count",
-            "flash_size": "flash_size",
-            "operating_temperature": "temperature_grade",
-        }
-        for expected_key, row_key in checks.items():
-            require(
-                str(expected.get(expected_key)) == str(row.get(row_key)),
-                f"{icpn}: device basic catalog drift for {row_key}",
-            )
         group = groups[group_id]
         require(isinstance(group, dict), f"{icpn}: device basic group must be an object")
         require(group.get("series") == row["series"], f"{icpn}: device basic series mismatch")
@@ -192,6 +189,8 @@ def load_device_basic_coverage(
             and vdd["min"] < vdd["max"],
             f"{icpn}: operating VDD missing",
         )
+        for field in ("base_device", "package", "pin_count", "temperature_grade"):
+            require(isinstance(row.get(field), str) and row[field], f"{icpn}: Production Catalog {field} missing")
         evidence = group.get("evidence")
         require(
             isinstance(evidence, dict)
@@ -208,9 +207,7 @@ def load_device_basic_coverage(
             "operating_temperature": row["temperature_grade"],
             "evidence": copy.deepcopy(evidence),
         }
-    require(len(result) == 280, f"STM32F1 device basic coverage must be exactly 280, got {len(result)}")
     return result
-
 
 def load_manufacturer_enrichment_evidence(
     production_icpns: set[str],
