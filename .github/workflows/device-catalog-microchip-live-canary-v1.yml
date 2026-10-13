@@ -18,7 +18,7 @@ concurrency:
 jobs:
   capture-and-replay:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 32
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,29 +37,55 @@ jobs:
           set -euo pipefail
           echo "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/microchip-original-dfp-index/index.html" | sha256sum --check
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_crosslane_canary_v1.py' -v
-      - name: Read-only live three-query crosslane capture
+      - name: Read-only live ten-query crosslane capture
         id: capture
-        timeout-minutes: 12
+        timeout-minutes: 16
         run: |
           set -euo pipefail
           python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
             --evidence-root /tmp/microchip-original-dfp-index \
             --target-root /tmp/microchip-dfp-canary \
-            --max-queries 3 \
+            --max-queries 10 \
             --capture
-      - name: Replay archived source evidence independently
-        if: ${{ success() }}
+      - name: Replay archived crosslane source evidence independently
+        if: ${{ always() }}
         run: |
           set -euo pipefail
+          test -f /tmp/microchip-dfp-canary/crosslane-10/crosslane-source.json || exit 2
           python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
             --evidence-root /tmp/microchip-original-dfp-index \
             --target-root /tmp/microchip-dfp-canary \
-            --max-queries 3
-      - name: Upload all raw response and negative HTTP diagnostic evidence
+            --max-queries 10
+      - name: Bounded broad-prefix pagination probe (not exact device population)
+        if: ${{ always() }}
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query PIC16F188 \
+            --output-dir /tmp/microchip-broad-prefix/PIC16F188
+      - name: Independent replay of broad prefix response bytes
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          test -f /tmp/microchip-broad-prefix/PIC16F188/manifest.json || exit 2
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query PIC16F188 \
+            --output-dir /tmp/microchip-broad-prefix/PIC16F188 \
+            --replay
+      - name: Upload all raw crosslane response and negative HTTP diagnostic evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: microchip-source-pinned-crosslane-3-raw-canary-v1
+          name: microchip-source-pinned-crosslane-10-raw-canary-v1
           path: /tmp/microchip-dfp-canary/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Upload bounded broad-prefix source observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-broad-prefix-PIC16F188-research-only
+          path: /tmp/microchip-broad-prefix/
           if-no-files-found: warn
           retention-days: 90
