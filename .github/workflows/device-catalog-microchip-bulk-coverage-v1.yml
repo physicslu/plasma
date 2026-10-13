@@ -58,25 +58,3 @@ jobs:
           assert len(x['segments']) == 5
           print('Research-only Microchip baseline PASS; no ungrounded portfolio claim')
           PY
-
-  mcp-second-27-batch-observation:
-    needs: research-contract
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Capture 27 DFP candidate queries with exact SKU-prefix reconciliation
-        run: python data/device-catalog/research/microchip_mcp_batch_v1.py --output-dir /tmp/microchip-mcp-27-r2 --max-queries 27 --workers 2
-      - name: Archive raw vendor replies, hashes and evidence for all queries
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: microchip-mcp-pic10-pic12-27-query-r2-evidence
-          path: /tmp/microchip-mcp-27-r2/
-          if-no-files-found: warn
-          retention-days: 30
