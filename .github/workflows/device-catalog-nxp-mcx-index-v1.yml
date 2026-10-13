@@ -1,0 +1,77 @@
+name: NXP MCX official series index audit v1
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-mcx-series-index-sources-v1.json'
+      - 'data/device-catalog/research/nxp_mcx_series_index_v1.py'
+      - 'data/device-catalog/research/nxp_mcx_series_reconcile_v1.py'
+      - 'data/device-catalog/research/test_nxp_mcx_series_index_v1.py'
+      - '.github/workflows/device-catalog-nxp-mcx-index-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_mcx_series_index_v1.py' -v
+  acquire-index:
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        series: [A, C, E, L, N, W]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m playwright install chromium --with-deps
+      - name: Acquire NXP official MCX series product-page links
+        run: |
+          python data/device-catalog/research/nxp_mcx_series_index_v1.py \
+            --series "${{ matrix.series }}" \
+            --output "/tmp/nxp-mcx-index-${{ matrix.series }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-mcx-index-${{ matrix.series }}
+          path: /tmp/nxp-mcx-index-${{ matrix.series }}/
+          if-no-files-found: error
+          retention-days: 30
+  reconcile-index:
+    needs: acquire-index
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nxp-mcx-index-*
+          path: /tmp/mcx-official-index
+      - name: Research-only official index candidate gap
+        run: |
+          python data/device-catalog/research/nxp_mcx_series_reconcile_v1.py \
+            --root /tmp/mcx-official-index \
+            --output /tmp/nxp-mcx-index-gap
+          cat /tmp/nxp-mcx-index-gap/mcx-index-gap.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-mcx-index-gap-v1
+          path: /tmp/nxp-mcx-index-gap/
+          if-no-files-found: warn
+          retention-days: 30
