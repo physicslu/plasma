@@ -16,7 +16,8 @@ PRODUCTION_MANIFEST = REPO_ROOT / "data" / "device-catalog" / "production" / "ic
 BINDINGS_ROOT = HERE / "bindings"
 PROFILE_ROOT = HERE / "profiles"
 ENRICHMENT_EVIDENCE_FILE = HERE / "enrichment-coverage" / "evidence-v1.json"
-DEVICE_BASIC_ROOT = HERE / "device-basic"\nDEVICE_BASIC_GLOB = "*-device-basic-v1.json"
+DEVICE_BASIC_ROOT = HERE / "device-basic"
+DEVICE_BASIC_GLOB = "*-device-basic-v1.json"
 
 ENRICHMENT_LEVELS = ("M0", "M1", "M2", "M3", "M4", "M5")
 ENRICHMENT_DIMENSIONS = (
