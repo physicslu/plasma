@@ -74,6 +74,34 @@ test("IC Selector first enriched result renders without page error and paginatio
     backend_candidate: null,
     backend_source_reference: null,
     backend_providers: [],
+    manufacturer_device_basic_profile: {
+      schema_version: "1.0.0",
+      status: "manufacturer_device_basic_available",
+      profile_id: "stm32f1-device-basic-v1",
+      icpn: identifier,
+      manufacturer: "STMicroelectronics",
+      family: "STM32F1",
+      series: "STM32F103",
+      base_device: "STM32F103C8",
+      package: "LQFP",
+      pin_count: "48",
+      flash_size: "64 KiB",
+      ram_size: "20 KiB",
+      operating_vdd_v: { min: 2, max: 3.6 },
+      operating_temperature_c: { min: -40, max: 85 },
+      evidence: {
+        authority: "STMicroelectronics official",
+        source_surface: "st_product_selector_or_product_page",
+        series_selector_url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        representative_product_url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html",
+        observed_at_utc: "2026-10-13",
+        content_lock: null,
+        evidence_strength: "official_product_metadata_observation",
+      },
+      programming_profile_authority: false,
+      hardware_runtime_ready: false,
+      physical_programming_qualified: false,
+    },
     selected_profile: enriched ? {
       schema_version: "1.0.0",
       status: "manufacturer_profile_available",
@@ -217,6 +245,18 @@ test("IC Selector first enriched result renders without page error and paginatio
   await expect(page.getByText("顯示 1–30 / 共 31 筆")).toBeVisible();
   await page.getByRole("listitem").first().click();
   await expect(page.getByRole("heading", { name: "STM32F103C8T6" })).toBeVisible();
+  const deviceInfo = page.locator('[data-profile-section="device"]');
+  await expect(deviceInfo.getByText("STM32F103C8T6", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("STM32F103C8", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("LQFP", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("48", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("64 KiB", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("20 KiB", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("2–3.6 V", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("-40–85 °C", { exact: true })).toBeVisible();
+  await expect(deviceInfo.getByText("Memory Map", { exact: true })).toHaveCount(0);
+  await expect(deviceInfo.getByText("I/O supply", { exact: true })).toHaveCount(0);
+  await expect(deviceInfo.getByText("VDDA", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Known Interface Not Expanded In V1")).toBeVisible();
   expect(pageErrors).toEqual([]);
 
