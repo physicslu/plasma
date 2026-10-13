@@ -146,11 +146,18 @@ class OpenOCDProviderRegistry:
         self.catalog_revision_sha256 = catalog.revision_sha256
         st = [r for r in catalog.records if r.vendor == "STMicroelectronics"]
         nxp = [r for r in catalog.records if r.vendor == "NXP"]
-        _require(catalog.status == "production" and catalog.size == 4641 and
-                 len(st) == 4629 and len(nxp) == 12 and
-                 all(r.family == "KL25" and r.production_admitted and
-                     r.target_config == "tcl/target/kl25.cfg" for r in nxp),
-                 "canonical 4629 ST + 12 NXP KL25 source-only catalog required")
+        _require(catalog.status == "production" and catalog.size == 4853 and
+                 len(st) == 4629 and len(nxp) == 224 and
+                 Counter((r.family,r.mapping_status) for r in nxp) == {
+                     ("KL25","mapped"):12,
+                     ("MCX","no_mapping"):196,
+                     ("K32L2","no_mapping"):16,
+                 } and
+                 all(r.production_admitted and
+                     (r.target_config=="tcl/target/kl25.cfg"
+                      if r.family=="KL25" else not r.target_config)
+                     for r in nxp),
+                 "canonical ST 4629 + NXP KL25 12 + MCX 196 + K32L2 16 required")
         upstream, gap = load_source_authorities(root)
         fork = gap["candidate_st_fork"]
         _require(fork["commit"] == ST_COMMIT and upstream["source_commit"] == UPSTREAM_COMMIT
@@ -201,9 +208,9 @@ class OpenOCDProviderRegistry:
                     cnt["no_candidate"] += 1
             self._routes[key] = self._guard_distinct_providers(entries)
         _require(cnt == {"mapped": 4176, "STM32H5": 190,
-                         "STM32C5": 172, "no_candidate": 103},
+                         "STM32C5": 172, "no_candidate": 315},
                  f"Unexpected catalog/backend baseline {dict(cnt)}")
-        _require(len(self._routes) == 4641, "full exact-ICPN graph incomplete")
+        _require(len(self._routes) == 4853, "full exact-ICPN graph incomplete")
 
     @staticmethod
     def _guard_distinct_providers(values: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:

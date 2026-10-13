@@ -53,7 +53,7 @@ def test_current_production_metrics() -> None:
     assert metrics["family_exact_icpns"] == expected_family_counts
     assert metrics["base_devices"] == len(expected_base_devices)
     assert metrics["deterministic_openocd_exact_icpns"] == 4176
-    assert metrics["openocd_unmapped_exact_icpns"] == 465
+    assert metrics["openocd_unmapped_exact_icpns"] == 677
     assert (
         metrics["deterministic_openocd_exact_icpns"]
         + metrics["openocd_unmapped_exact_icpns"]
@@ -65,6 +65,16 @@ def test_current_production_metrics() -> None:
     kl25 = [row for row in inventory["exact_icpns"]
             if row["manufacturer"] == "NXP" and row["family"] == "KL25"]
     assert len(kl25) == 12
+    new_nxp = [row for row in inventory["exact_icpns"] if
+               row["manufacturer"] == "NXP" and
+               row["family"] in {"MCX","K32L2"}]
+    assert len(new_nxp)==212
+    assert Counter(row["family"] for row in new_nxp)=={"MCX":196,"K32L2":16}
+    assert all(row["openocd"]["mapping_status"]=="no_mapping" and
+               row["programming_profile"]["state"]=="unresolved" and
+               row["native_ppu"]["runtime_ready"] is False and
+               row["manufacturer_enrichment"]["highest_level"]=="M0"
+               for row in new_nxp)
     assert sum(row["manufacturer"] == "STMicroelectronics"
                for row in inventory["exact_icpns"]) == 4629
     assert all(row["programming_profile"]["state"] == "unresolved"

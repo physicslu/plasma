@@ -1,0 +1,80 @@
+name: NXP 148 newly discovered Active exact /part manufacturer metadata v5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_new_148_part_metadata_v5.py'
+      - 'data/device-catalog/research/nxp-new-148-active-discovery-v5.csv'
+      - 'data/device-catalog/research/nxp-148-new-official-metadata-review-v5.csv'
+      - '.github/workflows/device-catalog-nxp-new-148-exact-metadata-v5.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  original-official-part-shards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install 'playwright==1.56.0' 'beautifulsoup4==4.14.2'
+          python -m playwright install --with-deps chromium
+      - name: Source 148 exact Active SKUs in eight manufacturer HTML batches
+        run: |
+          python data/device-catalog/research/nxp_new_148_part_metadata_v5.py \
+            --shard ${{ matrix.shard }} \
+            --output /tmp/nxp-new-148-part-metadata-shard-${{ matrix.shard }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-new-148-part-metadata-shard-${{ matrix.shard }}
+          path: /tmp/nxp-new-148-part-metadata-shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  exact-148-official-evidence-reconciliation:
+    needs: original-official-part-shards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'beautifulsoup4==4.14.2'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nxp-new-148-part-metadata-shard-*
+          path: /tmp/nxp-new-148-all-source-shards
+      - name: Reconcile exact 148 newly Active per-SKU manufacturer states, do not infer missing
+        run: |
+          python data/device-catalog/research/nxp_new_148_part_metadata_v5.py \
+            --aggregate-root /tmp/nxp-new-148-all-source-shards \
+            --output /tmp/nxp-new-148-exact-metadata-v5
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("/tmp/nxp-new-148-exact-metadata-v5/nxp-148-metadata-summary-v5.json").read_text())
+          assert r["new_exact_active_qualified_lifecycle"]==148
+          assert sum(r["metadata_state_counts"].values())==148
+          assert r["production_publication_authorized"] is False
+          assert r["global_nxp_active_denominator"] is None
+          print("NXP new 148 complete official exact-state reconciliation PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-new-148-original-source-metadata-reconciled-v5
+          path: /tmp/nxp-new-148-exact-metadata-v5/
+          if-no-files-found: warn
+          retention-days: 30

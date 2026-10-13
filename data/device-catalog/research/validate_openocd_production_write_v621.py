@@ -53,25 +53,28 @@ def main()->int:
     # Historical v6.21 ST source-only postimage remains exactly frozen.
     # The new NXP KL25 source is independently validated and intentionally
     # omitted from the historical ST-specific route partition.
-    req(len(manifest["sources"])==29,"Production source count drift")
-    req(sum(int(s["row_count"]) for s in manifest["sources"])==4641,
+    req(len(manifest["sources"])==31,"Production source count drift")
+    req(sum(int(s["row_count"]) for s in manifest["sources"])==4853,
         "Production exact total drift")
-    nxp=manifest["sources"][-1]
-    req(nxp=={
-        "manufacturer":"NXP","family":"KL25",
-        "path":"../research/nxp-kl25-commercial-icpn.csv",
-        "row_count":12,
-        "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
-        "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
-    },"unexpected NXP source change in historical ST replay")
-    req(len(manifest["sources"][:-1])==28 and
-        all(s["manufacturer"]=="STMicroelectronics" for s in manifest["sources"][:-1]),
+    req(manifest["sources"][28:]==[
+        {
+            "manufacturer":"NXP","family":"KL25",
+            "path":"../research/nxp-kl25-commercial-icpn.csv",
+            "row_count":12,
+            "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
+            "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+        },
+        {"manufacturer": "NXP","family": "MCX","path": "../research/nxp-mcx-196-commercial-v5.csv","row_count": 196,"git_blob_sha": "688ce427e2b7cf0189d7216884d897734aba49e0","sha256": "0a8986096b8c2c1db4b731c07d4ea4aee313505dd480f7fcda4a73dca8ba6639"},
+        {"manufacturer": "NXP","family": "K32L2","path": "../research/nxp-k32l2-16-commercial-v5.csv","row_count": 16,"git_blob_sha": "6413149e6be0e9af504b644ccceb030d4d851582","sha256": "0228c6a077ea02d868ca53c6f82a8df81cf96d6f6306724852c3614b0b9727e5"},
+    ],"unexpected NXP source change in historical ST replay")
+    req(len(manifest["sources"][:28])==28 and
+        all(s["manufacturer"]=="STMicroelectronics" for s in manifest["sources"][:28]),
         "historical ST 28-source contract drift")
 
     rows_by_icpn={}
     rows_by_family={}
     mapped=no_mapping=0
-    for source in manifest["sources"][:-1]:
+    for source in manifest["sources"][:28]:
         path=(MANIFEST.parent/source["path"]).resolve()
         raw=path.read_bytes()
         req(source["sha256"]==sha256(raw),f"{source['family']}: current manifest SHA binding drift")

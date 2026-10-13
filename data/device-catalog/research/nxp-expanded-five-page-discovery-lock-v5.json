@@ -1,0 +1,47 @@
+{
+  "schema_version": 5,
+  "manufacturer": "NXP",
+  "source_workflow_run_id": 38351800783,
+  "verified_new_pages": 5,
+  "active_exact_from_new_pages": 148,
+  "non_active_source_rows_excluded": 39,
+  "original_353_sha256": "8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24",
+  "new_active_exact_set_sha256": "0482f72e69bb68dd0cb05cae796637834b27a4d2e87c0eb269d61d153816ce7f",
+  "new_exact_discovery_csv_git_blob": "6dd73128a55cf1fef70c75fdb02059d0d6429cfa",
+  "overall_bounded_active_exact_after_union": 501,
+  "pages": [
+    {
+      "id": "lpc-80x",
+      "part_rows": 22,
+      "active_exact": 18,
+      "rendered_dom_sha256": "b45d7daa346ab03322c9867d1211d34e4ac7cb49d5bd7e8e3c6fb5b47c77a390"
+    },
+    {
+      "id": "lpc-550x",
+      "part_rows": 48,
+      "active_exact": 33,
+      "rendered_dom_sha256": "1bb150b91c3ea14cbac2ee1d222ac9a821f0e19267b0164e8c68414232ce0e03"
+    },
+    {
+      "id": "lpc-84x",
+      "part_rows": 15,
+      "active_exact": 15,
+      "rendered_dom_sha256": "f3baa353f50cfcf307ef3375b464b6d5dfe1945ef90b25b6ddd88b4a5e3de5d7"
+    },
+    {
+      "id": "lpc-551x-s1x",
+      "part_rows": 43,
+      "active_exact": 42,
+      "rendered_dom_sha256": "dd385b9e52b0973f643347b5438d522aa3fe07d805f472f0a041cffe41e6cff0"
+    },
+    {
+      "id": "imx-rt1170",
+      "part_rows": 59,
+      "active_exact": 40,
+      "rendered_dom_sha256": "a4b911a31fd351db302e3cc29b599ff2394a85bebfbf0c00b674647af9395fcb"
+    }
+  ],
+  "full_vendor_active_denominator": null,
+  "production_admission_authorized_for_new_148": false,
+  "programming_profile_qualified": false
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 5,
+  "manufacturer": "NXP",
+  "scope": "five additional official manufacturer MCU/RT product Package/Quality pages beyond existing 23",
+  "full_vendor_denominator_claimed": false,
+  "production_publication_authorized": false,
+  "programming_profile_qualified": false,
+  "products": [
+    {
+      "id": "lpc-80x",
+      "segment": "lpc",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/lpc800-arm-cortex-m0-plus-/lpc800-32-bit-arm-cortex-m0-plus-based-low-cost-mcu:LPC80X?tab=Package_Quality_Tab",
+      "prefix": "LPC",
+      "must_include": "LPC804UKAZ"
+    },
+    {
+      "id": "lpc-550x",
+      "segment": "lpc",
+      "url": "https://www.nxp.com/products/LPC550x?tab=Package_Quality_Tab",
+      "prefix": "LPC",
+      "must_include": "LPC55S06JHI48E"
+    },
+    {
+      "id": "lpc-84x",
+      "segment": "lpc",
+      "url": "https://www.nxp.com/products/LPC84X?tab=Package_Quality_Tab",
+      "prefix": "LPC",
+      "must_include": "LPC845M301JHI48E"
+    },
+    {
+      "id": "lpc-551x-s1x",
+      "segment": "lpc",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/lpc5500-arm-cortex-m33/lpc551x-s1x-baseline-arm-cortex-m33-based-microcontroller-family:LPC551X-S1X?tab=Package_Quality_Tab",
+      "prefix": "LPC",
+      "must_include": "LPC55S16JEV98E"
+    },
+    {
+      "id": "imx-rt1170",
+      "segment": "imx-rt",
+      "url": "https://www.nxp.com/products/i.MX-RT1170?tab=Package_Quality_Tab",
+      "prefix": "MIMXRT",
+      "must_include": "MIMXRT117TDVMAB"
+    }
+  ]
+}

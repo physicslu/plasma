@@ -162,14 +162,21 @@ def main() -> int:
     req(current_total>=4314,"Production exact total regressed below F2 publication poststate")
 
     backend=Counter()
+    # This historical F2 gate evaluates the original ST population only.
+    # The 212 new manufacturer-only NXP identities are legitimately unbound,
+    # and must not be mistaken for a regression of ST backend admission.
     for source in sources:
+        if source["manufacturer"]!="STMicroelectronics":
+            continue
         path=(MANIFEST.parent/source["path"]).resolve()
         for row in read_rows(path):
             backend["no_mapping" if row["mapping_status"]=="no_mapping" else "mapped"]+=1
     req(backend["mapped"]>=3673 and backend["no_mapping"]<=641,
         f"Production backend partition regressed below F2 publication poststate: {dict(backend)}")
-    req(backend["mapped"]+backend["no_mapping"]==current_total,
-        "current Production backend partition does not equal current exact total")
+    st_exact_total=sum(int(s["row_count"]) for s in sources
+                       if s["manufacturer"]=="STMicroelectronics")
+    req(backend["mapped"]+backend["no_mapping"]==st_exact_total==4629,
+        "historical ST backend partition differs from exact ST-only current total")
 
     req(audit["production_prestate"]=={"exact_total":4242,"source_count":24,"stm32f2_exact":33},"prestate audit drift")
     req(audit["production_poststate"]["exact_total"]==4314 and

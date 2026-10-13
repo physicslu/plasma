@@ -110,7 +110,16 @@ class BackendCandidateRegistry:
         _ensure(
             (not nxp and catalog.size == 4629) or
             (catalog.size == 4641 and len(nxp) == 12 and
-             all(r.family == "KL25" and r.production_admitted for r in nxp)),
+             all(r.family == "KL25" and r.production_admitted for r in nxp)) or
+            (catalog.size == 4853 and len(nxp) == 224 and
+             Counter((r.family,r.mapping_status) for r in nxp) == {
+                 ("KL25","mapped"):12,
+                 ("MCX","no_mapping"):196,
+                 ("K32L2","no_mapping"):16,
+             } and
+             all(r.production_admitted and
+                 (r.target_config if r.family=="KL25" else not r.target_config)
+                 for r in nxp)),
             "unexpected Production Catalog size or unreviewed NXP family",
         )
         # Packaged PPU runtimes may include the official Production Catalog but
