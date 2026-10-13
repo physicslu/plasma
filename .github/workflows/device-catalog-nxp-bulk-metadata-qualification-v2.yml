@@ -1,0 +1,65 @@
+name: NXP bulk 353 frozen metadata qualification v2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-bulk-353-metadata-evidence-lock-v2.json'
+      - 'data/device-catalog/research/nxp-bulk-353-status-map-v2.json'
+      - 'data/device-catalog/research/nxp_metadata_status_index_v2.py'
+      - 'data/device-catalog/research/test_nxp_metadata_status_index_v2.py'
+      - 'data/device-catalog/research/nxp_metadata_qualification_v2.py'
+      - 'data/device-catalog/research/test_nxp_metadata_qualification_v2.py'
+      - '.github/workflows/device-catalog-nxp-bulk-metadata-qualification-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deterministic HTML replay parser
+        run: python -m pip install 'beautifulsoup4==4.14.2'
+      - name: Verify blocked aliases, contradictory fields and source authority
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_qualification_v2.py' -v
+      - name: Replay permanent all-353 metadata status index without expired artifacts
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_status_index_v2.py' -v
+          python data/device-catalog/research/nxp_metadata_status_index_v2.py --output /tmp/nxp-353-qualified-v2
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38337377867
+          github-token: ${{ github.token }}
+          pattern: nxp-part-metadata-shard-*
+          path: /tmp/nxp-353-frozen-source
+      - name: Qualify full 353-SKU manufacturer metadata evidence from eight SHA-locked shards
+        run: |
+          python data/device-catalog/research/nxp_metadata_qualification_v2.py \
+            --root /tmp/nxp-353-frozen-source \
+            --output /tmp/nxp-353-qualified-v2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          v=json.loads(Path('/tmp/nxp-353-qualified-v2/nxp-metadata-qualification-v2.json').read_text())
+          assert v['official_active_exact_count']==353
+          assert v['metadata_state_counts']['FOUR_FIELDS_HTML_REPLAY_VERIFIED_REVIEW_REQUIRED']==201
+          assert v['metadata_state_counts']['PARTIAL_HTML_REPLAY_VERIFIED_REVIEW_REQUIRED']==47
+          assert v['metadata_state_counts']['SOURCE_BLOCKED_REVIEW_REQUIRED']==93
+          assert v['canonical_catalog_admission_authorized'] is False
+          assert v['production_write_authorized'] is False
+          print('NXP all-353 offline manufacturer metadata HTML replay PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-353-metadata-qualification-v2
+          path: /tmp/nxp-353-qualified-v2/
+          if-no-files-found: warn
+          retention-days: 30

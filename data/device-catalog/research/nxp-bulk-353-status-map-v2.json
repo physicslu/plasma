@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "id": "nxp-353-exact-metadata-qualification-state-map-2026-10-13",
+  "scope": "One bounded 353-Active Exact ICPN snapshot; not all NXP Active devices",
+  "source_run_id": 38337377867,
+  "source_artifact_id": 11785174834,
+  "source_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38337377867/artifacts/11785174834",
+  "active_set_sha256": "8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24",
+  "index_policy": "zero-based position in sorted nxp-active-353-bulk-candidates-v1.csv",
+  "status_legend": {
+    "K": "KL25 previously independently metadata-reviewed research-only",
+    "C": "all four official /part fields observed and replay-verified; review required",
+    "P": "official /part evidence partial; review required",
+    "B": "official /part metadata blocked; review required"
+  },
+  "blocked_reason_legend": {
+    "-": "not blocked",
+    "H": "exact /part HTTP non-200",
+    "F": "non-numeric Flash (kB) parsing blocked"
+  },
+  "status_map": "CCCCCCBCPBCCBCBPCCCPBBBBBBBBBBBBBBBPBPBPBPBPBPBPBPBBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCBPCPCCPCPCCPCPCCCCCCCCCCBCCPCCPCPCCCCPCCBCCCCCCCCCCCCCCCCCCCCCCCCPCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCBCBCCCCCCCCCCCCCCCCCCCCCCPCPCBCBCBCBCBCBCBCBCCCCCCCBCCCBCCCCCCCCCCCCCCCCCCCCCCCBCCCCCBBBBBBBBBBBBBBBCBCBCBCBBBBBBPBPPPBPPBPBPPPPPPBPPPPPPPPPPKKKKKKKKKKKK",
+  "blocked_reason_map": "------H--H--H-H-----FHFFHFHFHFHFHFH-H-H-H-H-H-H-H-HHHHHHHHHHHHHHHHHHHHHH---------------H-----------------------H---------------H------------------------------------------------------------------------H-H--------------------------H-H-H-H-H-H-H-H-------H---H-----------------------H-----HHHHHHHHHHHHHHH-H-H-H-HHHHHH-H---H--H-H------H----------------------",
+  "status_map_sha256": "5a892d58e370a1e582fab01bfd4fa812b901f63e5a8d736538e15eed1babeb29",
+  "blocked_reason_map_sha256": "c06544f33d634862adec5b2dba48d305cd94ff316568e37989b47896676573c7",
+  "counts": {
+    "status": {
+      "C": 201,
+      "B": 93,
+      "P": 47,
+      "K": 12
+    },
+    "blocked_reason": {
+      "-": 260,
+      "H": 85,
+      "F": 8
+    }
+  },
+  "claims": {
+    "production_write_authorized": false,
+    "canonical_metadata_admission_authorized": false,
+    "global_nxp_active_denominator": null
+  }
+}
