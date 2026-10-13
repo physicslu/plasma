@@ -91,12 +91,11 @@ test("IC Selector first enriched result renders without page error and paginatio
       operating_temperature_c: { min: -40, max: 85 },
       evidence: {
         authority: "STMicroelectronics official",
-        source_surface: "st_product_selector_or_product_page",
-        series_selector_url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        representative_product_url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html",
+        source_surface: "st_product_selector",
+        selector_url: "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         observed_at_utc: "2026-10-13",
         content_lock: null,
-        evidence_strength: "official_product_metadata_observation",
+        evidence_strength: "official_product_selector_observation",
       },
       programming_profile_authority: false,
       hardware_runtime_ready: false,
@@ -209,7 +208,7 @@ test("IC Selector first enriched result renders without page error and paginatio
         body: JSON.stringify({
           ok: true,
           query,
-          catalog_size: 4629,
+          catalog_size: 4641,
           count: 0,
           total_count: 0,
           limit,
@@ -228,7 +227,7 @@ test("IC Selector first enriched result renders without page error and paginatio
       body: JSON.stringify({
         ok: true,
         query,
-        catalog_size: 4629,
+        catalog_size: 4641,
         count: results.length,
         total_count: all.length,
         limit,
