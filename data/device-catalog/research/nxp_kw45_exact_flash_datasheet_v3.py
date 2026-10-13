@@ -60,7 +60,7 @@ def from_blocked_source() -> set[str]:
 
 
 def pdf_table(source: bytes) -> dict:
-    require(source.startswith(b"%PDF") and len(source) >= 10000,
+    require(source.startswith(b"%PDF") and len(source) >= 1000,
             "official KW45 PDF invalid")
     doc = fitz.open(stream=source, filetype="pdf")
     try:
