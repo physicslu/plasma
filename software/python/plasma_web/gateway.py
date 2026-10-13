@@ -88,7 +88,6 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
     versioned_providers = get_default_openocd_provider_registry()
     ic_support = get_default_ic_support_resolver()
     device_basic = get_default_manufacturer_device_basic_resolver()
-    nxp_device_evidence = get_default_nxp_manufacturer_device_evidence()
     results = []
     for record in matches:
         item = record.to_payload()
@@ -116,7 +115,11 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
         )
         # Read-only per-exact-NXP manufacturer data; this is NOT a Programming
         # Profile and must never change backend routes or job admission.
-        item["nxp_manufacturer_device_profile"] = nxp_device_evidence.resolve_exact(record)
+        item["nxp_manufacturer_device_profile"] = (
+            get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
+            if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
+            else None
+        )
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()
