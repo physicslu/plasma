@@ -1,0 +1,149 @@
+manufacturer,icpn,segment,marketing_lifecycle,metadata_state,package,pin_count,flash_kb,ram_kb,operating_vdd,ambient_temperature,source_url,source_html_sha256,ram_evidence_state,vdd_evidence_state,canonical_admission_qualified,production_publication_authorized,programming_profile_qualified
+NXP,LPC5502JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JBD64E,,,,false,false,false
+NXP,LPC5502JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JBD64K,,,,false,false,false
+NXP,LPC5502JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JBD64Y,,,,false,false,false
+NXP,LPC5502JHI48,lpc,Active,FOUR_BASIC_FIELDS_OBSERVED_REVIEW_REQUIRED,H-PQFN48,48,64,,1.8 to 3.6,-40 to 105,https://www.nxp.com/part/LPC5502JHI48,222de285e41b7379ec01757ba854c842a31d9b9792deda83d8afb9950439efad,not_on_exact_product_page,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,LPC5502JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JHI48E,,,,false,false,false
+NXP,LPC5502JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JHI48K,,,,false,false,false
+NXP,LPC5502JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5502JHI48Y,,,,false,false,false
+NXP,LPC5504JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JBD64E,,,,false,false,false
+NXP,LPC5504JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JBD64K,,,,false,false,false
+NXP,LPC5504JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JBD64Y,,,,false,false,false
+NXP,LPC5504JHI48,lpc,Active,FOUR_BASIC_FIELDS_OBSERVED_REVIEW_REQUIRED,H-PQFN48,48,128,,1.8 to 3.6,-40 to 105,https://www.nxp.com/part/LPC5504JHI48,99ee54eda709a45b4d7e1d68fc5e8905f779bf4327f97b2841b9ee767198c9fb,not_on_exact_product_page,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,LPC5504JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JHI48E,,,,false,false,false
+NXP,LPC5504JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JHI48K,,,,false,false,false
+NXP,LPC5504JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5504JHI48Y,,,,false,false,false
+NXP,LPC5506JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JBD64E,,,,false,false,false
+NXP,LPC5506JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JBD64K,,,,false,false,false
+NXP,LPC5506JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JBD64Y,,,,false,false,false
+NXP,LPC5506JHI48,lpc,Active,FOUR_BASIC_FIELDS_OBSERVED_REVIEW_REQUIRED,H-PQFN48,48,256,,1.8 to 3.6,-40 to 105,https://www.nxp.com/part/LPC5506JHI48,1e565a34f2d35828f92b57eb188cbafa915ea6c611849e5dfe7dd39085d24c4a,not_on_exact_product_page,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,LPC5506JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JHI48E,,,,false,false,false
+NXP,LPC5506JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JHI48K,,,,false,false,false
+NXP,LPC5506JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5506JHI48Y,,,,false,false,false
+NXP,LPC5512JBD100E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD100E,,,,false,false,false
+NXP,LPC5512JBD100K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD100K,,,,false,false,false
+NXP,LPC5512JBD100Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD100Y,,,,false,false,false
+NXP,LPC5512JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD64E,,,,false,false,false
+NXP,LPC5512JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD64K,,,,false,false,false
+NXP,LPC5512JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5512JBD64Y,,,,false,false,false
+NXP,LPC5514JBD100E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD100E,,,,false,false,false
+NXP,LPC5514JBD100K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD100K,,,,false,false,false
+NXP,LPC5514JBD100Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD100Y,,,,false,false,false
+NXP,LPC5514JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD64E,,,,false,false,false
+NXP,LPC5514JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD64K,,,,false,false,false
+NXP,LPC5514JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JBD64Y,,,,false,false,false
+NXP,LPC5514JEV59E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JEV59E,,,,false,false,false
+NXP,LPC5514JEV59Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5514JEV59Y,,,,false,false,false
+NXP,LPC5516JBD100E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD100E,,,,false,false,false
+NXP,LPC5516JBD100K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD100K,,,,false,false,false
+NXP,LPC5516JBD100Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD100Y,,,,false,false,false
+NXP,LPC5516JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD64E,,,,false,false,false
+NXP,LPC5516JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD64K,,,,false,false,false
+NXP,LPC5516JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JBD64Y,,,,false,false,false
+NXP,LPC5516JEV59E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JEV59E,,,,false,false,false
+NXP,LPC5516JEV59Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JEV59Y,,,,false,false,false
+NXP,LPC5516JEV98E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JEV98E,,,,false,false,false
+NXP,LPC5516JEV98K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JEV98K,,,,false,false,false
+NXP,LPC5516JEV98Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC5516JEV98Y,,,,false,false,false
+NXP,LPC55S04JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JBD64E,,,,false,false,false
+NXP,LPC55S04JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JBD64K,,,,false,false,false
+NXP,LPC55S04JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JBD64Y,,,,false,false,false
+NXP,LPC55S04JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JHI48E,,,,false,false,false
+NXP,LPC55S04JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JHI48K,,,,false,false,false
+NXP,LPC55S04JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S04JHI48Y,,,,false,false,false
+NXP,LPC55S06JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JBD64E,,,,false,false,false
+NXP,LPC55S06JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JBD64K,,,,false,false,false
+NXP,LPC55S06JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JBD64Y,,,,false,false,false
+NXP,LPC55S06JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JHI48E,,,,false,false,false
+NXP,LPC55S06JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JHI48K,,,,false,false,false
+NXP,LPC55S06JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S06JHI48Y,,,,false,false,false
+NXP,LPC55S14JBD100E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD100E,,,,false,false,false
+NXP,LPC55S14JBD100K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD100K,,,,false,false,false
+NXP,LPC55S14JBD100Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD100Y,,,,false,false,false
+NXP,LPC55S14JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD64E,,,,false,false,false
+NXP,LPC55S14JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD64K,,,,false,false,false
+NXP,LPC55S14JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S14JBD64Y,,,,false,false,false
+NXP,LPC55S16JBD100E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD100E,,,,false,false,false
+NXP,LPC55S16JBD100K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD100K,,,,false,false,false
+NXP,LPC55S16JBD100Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD100Y,,,,false,false,false
+NXP,LPC55S16JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD64E,,,,false,false,false
+NXP,LPC55S16JBD64K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD64K,,,,false,false,false
+NXP,LPC55S16JBD64Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JBD64Y,,,,false,false,false
+NXP,LPC55S16JEV59E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JEV59E,,,,false,false,false
+NXP,LPC55S16JEV59Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JEV59Y,,,,false,false,false
+NXP,LPC55S16JEV98E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JEV98E,,,,false,false,false
+NXP,LPC55S16JEV98K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JEV98K,,,,false,false,false
+NXP,LPC55S16JEV98Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC55S16JEV98Y,,,,false,false,false
+NXP,LPC802M001JDH16FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JDH16FP,,,,false,false,false
+NXP,LPC802M001JDH16J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JDH16J,,,,false,false,false
+NXP,LPC802M001JDH20FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JDH20FP,,,,false,false,false
+NXP,LPC802M001JDH20J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JDH20J,,,,false,false,false
+NXP,LPC802M001JHI33E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JHI33E,,,,false,false,false
+NXP,LPC802M001JHI33Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M001JHI33Y,,,,false,false,false
+NXP,LPC802M011JDH20FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M011JDH20FP,,,,false,false,false
+NXP,LPC802M011JDH20J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802M011JDH20J,,,,false,false,false
+NXP,LPC802UKZ,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC802UKZ,,,,false,false,false
+NXP,LPC804M101JDH20FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JDH20FP,,,,false,false,false
+NXP,LPC804M101JDH20J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JDH20J,,,,false,false,false
+NXP,LPC804M101JDH24FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JDH24FP,,,,false,false,false
+NXP,LPC804M101JDH24J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JDH24J,,,,false,false,false
+NXP,LPC804M101JHI33E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JHI33E,,,,false,false,false
+NXP,LPC804M101JHI33Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M101JHI33Y,,,,false,false,false
+NXP,LPC804M111JDH24FP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M111JDH24FP,,,,false,false,false
+NXP,LPC804M111JDH24J,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804M111JDH24J,,,,false,false,false
+NXP,LPC804UKAZ,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC804UKAZ,,,,false,false,false
+NXP,LPC844M201JBD48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JBD48E,,,,false,false,false
+NXP,LPC844M201JBD48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JBD48K,,,,false,false,false
+NXP,LPC844M201JBD48MP,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JBD48MP,,,,false,false,false
+NXP,LPC844M201JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JBD64E,,,,false,false,false
+NXP,LPC844M201JHI33E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JHI33E,,,,false,false,false
+NXP,LPC844M201JHI33Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JHI33Y,,,,false,false,false
+NXP,LPC844M201JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC844M201JHI48E,,,,false,false,false
+NXP,LPC845M301JBD48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JBD48E,,,,false,false,false
+NXP,LPC845M301JBD64E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JBD64E,,,,false,false,false
+NXP,LPC845M301JHI33E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI33E,,,,false,false,false
+NXP,LPC845M301JHI33K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI33K,,,,false,false,false
+NXP,LPC845M301JHI33Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI33Y,,,,false,false,false
+NXP,LPC845M301JHI48E,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI48E,,,,false,false,false
+NXP,LPC845M301JHI48K,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI48K,,,,false,false,false
+NXP,LPC845M301JHI48Y,lpc,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/LPC845M301JHI48Y,,,,false,false,false
+NXP,MIMXRT1171AVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1171AVM8A,812f302c8f3313bab5579bacb183cc2ad6080f757fad8edfabc5239639e9962b,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1171AVM8AR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1171AVM8AR,,,,false,false,false
+NXP,MIMXRT1171AVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1171AVM8B,9cb95db9279a4ae1c47a0607742ce7867cf6145f5d70e65f134782fc4d63fd99,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1171AVM8BR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1171AVM8BR,,,,false,false,false
+NXP,MIMXRT1171CVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1171CVM8B,1ab08b15e11243ef4684f5d00d105ea1a73f7a0ab1136d60f2f1341bc8cbd5e3,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1171DVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1171DVMAB,08bb21288c9a90ad3250fbc0d9afd2c9271dbcaae77abba8383909f88d17d236,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1171DVMABR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1171DVMABR,,,,false,false,false
+NXP,MIMXRT1172AVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1172AVM8A,52937ad3478bc0b00e189f9f57569d39bc1ccb54976e5f53a0adee95038d5b49,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1172AVM8AR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1172AVM8AR,,,,false,false,false
+NXP,MIMXRT1172AVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1172AVM8B,e35e6ffcef1698f26beee371ef7acd60cbbf4c2a57fb6bc84e00b1b4a7573f93,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1172AVM8BR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1172AVM8BR,,,,false,false,false
+NXP,MIMXRT1172CVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1172CVM8B,fd3ef4496d0e36c3eaf9ec72c1d9366cc7738eafadcd404aa212397b93bcb0b3,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1172CVM8BR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1172CVM8BR,,,,false,false,false
+NXP,MIMXRT1172DVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1172DVMAB,0dd4bbe4f241496357a6e10e3aa452e89edf433b245d222576442e9eeea03481,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1173CVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1173CVM8B,977c1d54a113d3c4321e626822d64ee1afbbdc987306759864c6601a0924aa61,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1175AVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1175AVM8A,caab02214f7a3d4e1604277fda252665ce5c6cf4b8eda55c95b3b4277cfb8f05,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1175AVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1175AVM8B,45e73e431ee882ca30c2afc8e89289288586806ee3a317963a9b064d54ea05b3,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1175CVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1175CVM8B,d90bf1ac7ec573c5e31079366e80eb623a6d6ffff5f98a033d1f44662582789e,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1175DVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1175DVMAB,d26025b9fcca3937750b3e5945eafbc72546e0ea1902d846a99f36b349a8531e,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1176AVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1176AVM8A,160b464ebcb5eecaebdb25009be572ab9920b79903989130dcdbf0bc169d2139,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1176AVM8AR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1176AVM8AR,,,,false,false,false
+NXP,MIMXRT1176AVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1176AVM8B,d7ac9be4cba4b7e2c1fb7b770ad17f555141ded8ee9ff57d76e86e45fd70dd08,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1176AVM8BR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1176AVM8BR,,,,false,false,false
+NXP,MIMXRT1176CVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1176CVM8B,7e06cc75f3559d0a60b02d096af6087032e4202c38a5a3cece57a7c0df1ad19e,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT1176CVM8BR,imx-rt,Active,OFFICIAL_EXACT_PART_PAGE_BLOCKED,,,,,,,https://www.nxp.com/part/MIMXRT1176CVM8BR,,,,false,false,false
+NXP,MIMXRT1176DVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT1176DVMAB,f8aa730fb44a69b1994870050482667f4b8f5e58b697ec5474528c42fc5d4f91,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117CAVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117CAVM8A,23be1ddb62d051dfd9620e7327340c05aa4a95a119280f00dfb9282341265867,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117CAVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117CAVM8B,772982d8721b95fa09ed7b04abf495ef6a321a7f9e8f4fab6193987860f7cbd6,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117CCVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117CCVM8B,276f0666909c69382caa63a3476de1170c26f4eadf59d5bda45c53349777df01,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117CDVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117CDVMAB,99d4ff2224568887bcae5eb87194c21015a1645a96ba6ef377cc303976bfc2a2,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117FAVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117FAVM8B,14a0e92f4c20a2f8c564b49256c734ce5188808fbb015edc50078ef0001cca2e,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117FCVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117FCVM8B,b0cf6af533b34082822ab05011778c477a7f3f9336740a2bb2031e809781d53a,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117FDVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117FDVMAB,b9e9cb3c7c2ed5d13b16e83d161e21df7cafa19b0bad645e30982701875b8c6b,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117HAVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117HAVM8B,13b8152fa804e74ead939cdf7e4e8c4c8af619d79fc78dd9a2dbcaa592f26116,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117HCVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117HCVM8B,c9f37662f303b65d34714fd213427540d76325d4445d546a77187cd97abc3ad5,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117HDVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117HDVMAB,0ad31f3ba8eb669a81714c41a2248d04253c3750dd2fd55f2621270711bdff96,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117TAVM8A,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117TAVM8A,db0061b663f8add7bdf21f40d3099c1b49a1c09f8f4bd8c3e7c1edad860c6b11,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117TAVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117TAVM8B,5777f39e6291e8c72360aaf3b38f8f37ac36d0068fa4398fcc5776582b43bd15,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117TCVM8B,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117TCVM8B,65657d7156b3a7cda78fb40f716a7d95ab5118becf789f84f5291446620860de,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
+NXP,MIMXRT117TDVMAB,imx-rt,Active,PARTIAL_EXACT_PAGE_FIELDS_REVIEW_REQUIRED,LFBGA289,289,,2048,3 to 3.6,,https://www.nxp.com/part/MIMXRT117TDVMAB,724bd73d1fee97d819238df589628fcb83be34822ebe26f22cd48bef483eb5eb,independently_replayed_exact_manufacturer_html,independently_replayed_exact_manufacturer_html,false,false,false
