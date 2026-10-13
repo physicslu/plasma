@@ -69,8 +69,9 @@ def parse_official_part(body: str, table_rows: list[list[str]], sku: str,
     """Extraction only; never infer flash/temperature from ordering suffix."""
     require(sku in HEADING.findall(body), "exact NXP commercial part absent from page")
     matched = any(h.strip().upper() == sku for h in headings)
-    # If a variant URL resolves to a different parent's H1, its package may
-    # describe that parent instead of this suffix. Leave it unqualified.
+    # A suffix URL can redirect to a parent part. Parent specs must NOT
+    # masquerade as evidence for the requested exact commercial SKU.
+    require(matched, "official part heading does not match requested exact SKU")
     package_code = package_pins = None
     if matched:
         m = re.search(r"(?m)^Package\s*$([\s\S]*?)(?=^Buy Options\s*$|^Operating Features\s*$)", body, re.M)
