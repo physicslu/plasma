@@ -30,7 +30,7 @@
       "segment": "lpc",
       "url": "https://www.nxp.com/products/LPC55S6x?tab=Package_Quality_Tab",
       "prefix": "LPC55",
-      "must_include": "LPC55S69JEV98"
+      "must_include": "LPC55S69JEV98E"
     },
     {
       "id": "k32-l2",
