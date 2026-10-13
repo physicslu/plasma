@@ -120,15 +120,25 @@ test("heterogeneous manufacturer interfaces cannot crash selected-profile render
   assert.match(selector, /No debug clock defined for this interface/);
 });
 
-test("IC Information fails closed when manufacturer electrical enrichment is missing", async () => {
+test("IC Information uses the independent Manufacturer Device Basic Profile", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
+  const api = await source("../app/device-catalog-api.ts");
 
-  assert.match(selector, /Catalog 溫度等級/);
-  assert.match(selector, /I\/O 供應電壓/);
-  assert.match(selector, /原廠工作溫度/);
-  assert.match(selector, /工作電氣特性與 Memory Map 尚未完成原廠 enrichment/);
-  assert.match(selector, /尚未建立 manufacturer enrichment；不以 Family 或 OpenOCD 推論/);
-  assert.match(selector, /尚未建立 manufacturer-derived Memory Map/);
+  assert.match(api, /ManufacturerDeviceBasicProfile/);
+  assert.match(api, /manufacturer_device_basic_profile\?:\s*ManufacturerDeviceBasicProfile\s*\|\s*null/);
+  assert.match(selector, /selected\.manufacturer_device_basic_profile/);
+  assert.match(selector, /<dt>ICPN<\/dt>/);
+  assert.match(selector, /<dt>Base Device<\/dt>/);
+  assert.match(selector, /<dt>Package<\/dt>/);
+  assert.match(selector, /<dt>Pin Count<\/dt>/);
+  assert.match(selector, /<dt>Flash<\/dt>/);
+  assert.match(selector, /<dt>RAM<\/dt>/);
+  assert.match(selector, /工作 VDD/);
+  assert.match(selector, /工作溫度/);
+  assert.doesNotMatch(selector, /I\/O 供應電壓/);
+  assert.doesNotMatch(selector, /<dt>VDDA<\/dt>/);
+  assert.doesNotMatch(selector, /<dt>Main Flash Map<\/dt>/);
+  assert.doesNotMatch(selector, /<dt>Memory Map<\/dt>/);
 });
 
 test("selected IC profile presents device, programming, and Plasma compatibility as separate layers", async () => {
@@ -137,7 +147,9 @@ test("selected IC profile presents device, programming, and Plasma compatibility
   const api = await source("../app/device-catalog-api.ts");
 
   assert.match(api, /SelectedICProfile/);
+  assert.match(api, /ManufacturerDeviceBasicProfile/);
   assert.match(api, /selected_profile\?:\s*SelectedICProfile\s*\|\s*null/);
+  assert.match(api, /manufacturer_device_basic_profile\?:\s*ManufacturerDeviceBasicProfile\s*\|\s*null/);
   assert.match(selector, /data-profile-section="device"/);
   assert.match(selector, /data-profile-section="programming"/);
   assert.match(selector, /data-profile-section="compatibility"/);
