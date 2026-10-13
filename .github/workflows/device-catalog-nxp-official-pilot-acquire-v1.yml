@@ -6,6 +6,8 @@ on:
       - 'data/device-catalog/research/nxp-official-pilot-products-v1.json'
       - 'data/device-catalog/research/nxp_official_pilot_acquire_v1.py'
       - 'data/device-catalog/research/test_nxp_official_pilot_acquire_v1.py'
+      - 'data/device-catalog/research/nxp_official_pilot_reconcile_v1.py'
+      - 'data/device-catalog/research/test_nxp_official_pilot_reconcile_v1.py'
       - '.github/workflows/device-catalog-nxp-official-pilot-acquire-v1.yml'
   workflow_dispatch:
 
