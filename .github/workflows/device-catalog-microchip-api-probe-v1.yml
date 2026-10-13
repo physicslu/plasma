@@ -1,13 +1,6 @@
 name: Microchip official Product Data API bounded probe v1
 
 on:
-  pull_request:
-    paths:
-      - 'data/device-catalog/research/microchip_product_api_probe_v1.py'
-      - 'data/device-catalog/research/test_microchip_product_api_probe_v1.py'
-      - '.github/workflows/device-catalog-microchip-api-probe-v1.yml'
-      - 'data/device-catalog/research/MICROCHIP_BULK_ACQUISITION_V1.md'
-      - 'data/device-catalog/research/microchip-bulk-source-registry-v1.json'
   workflow_dispatch:
 
 permissions:
