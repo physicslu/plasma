@@ -58,7 +58,7 @@ class LivePilotParserTest(unittest.TestCase):
         workflow = (module.HERE.parents[2] / ".github/workflows/"
                     "device-catalog-nxp-official-pilot-acquire-v1.yml"
                     ).read_text(encoding="utf-8")
-        match = re.search(r"^\\s*product:\\s*\\[([^]]+)\\]\\s*$", workflow, re.M)
+        match = re.search(r"^\s*product:\s*\[([^]]+)\]\s*$", workflow, re.M)
         self.assertIsNotNone(match, "fixed product matrix missing")
         matrix = [item.strip() for item in match.group(1).split(",")]
         self.assertEqual(len(matrix), len(set(matrix)), "duplicate CI product IDs")
