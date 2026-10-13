@@ -1,0 +1,74 @@
+{
+  "schema_version": 2,
+  "scope": "research-only manufacturer exact-SKU metadata replay; does not authorize Production",
+  "manufacturer": "NXP",
+  "prior_pull_request": 832,
+  "source_workflow_run_id": 38337377867,
+  "source_workflow_url": "https://github.com/physicslu/plasma/actions/runs/38337377867",
+  "artifact_expires_utc": "2026-11-12T02:40:17Z",
+  "official_page_scope": 23,
+  "active_exact": 353,
+  "non_active_excluded": 15,
+  "reviewed_KL25": 12,
+  "metadata_source_exact_skus": 341,
+  "observed_part_pages": 248,
+  "source_blocked": 93,
+  "raw_metadata_matrix_csv_sha256": "cf09f8162576ed5f80b09c33bc740ea2b0bfd664ecc6ac70f006c602bf53b660",
+  "frozen_active_exact_set_sha256": "8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24",
+  "source_shards": [
+    {
+      "shard": 0,
+      "artifact_id": 11784773980,
+      "artifact_name": "nxp-part-metadata-shard-0",
+      "metadata_json_sha256": "6f4ae18be06d66f92c90928f1f4eb3850fbdee8937865883302317d7cadfa875"
+    },
+    {
+      "shard": 1,
+      "artifact_id": 11784828784,
+      "artifact_name": "nxp-part-metadata-shard-1",
+      "metadata_json_sha256": "9cfbdf9dd694694561ff85a5cbc69b7938323547a9f0ef9450f03746af533219"
+    },
+    {
+      "shard": 2,
+      "artifact_id": 11785248904,
+      "artifact_name": "nxp-part-metadata-shard-2",
+      "metadata_json_sha256": "12591c99c2ba0784197d4a782a237df74ba7b56aab989f00c1e2f45ae68182b0"
+    },
+    {
+      "shard": 3,
+      "artifact_id": 11785249249,
+      "artifact_name": "nxp-part-metadata-shard-3",
+      "metadata_json_sha256": "677d53779db4ef79f7d3aff7158b2d055b3d784d0eca6a1b41617451435f826c"
+    },
+    {
+      "shard": 4,
+      "artifact_id": 11784374784,
+      "artifact_name": "nxp-part-metadata-shard-4",
+      "metadata_json_sha256": "12b82359a3cf6fe065a7d45f1526f989c04d6fcfff498187fc2502e205ee03ba"
+    },
+    {
+      "shard": 5,
+      "artifact_id": 11785558468,
+      "artifact_name": "nxp-part-metadata-shard-5",
+      "metadata_json_sha256": "f9ae98149b9bc0628ad712a061e6c19deb5306ddc4b87fda81e8d1ea656a6f35"
+    },
+    {
+      "shard": 6,
+      "artifact_id": 11785630695,
+      "artifact_name": "nxp-part-metadata-shard-6",
+      "metadata_json_sha256": "a5f59b9a6ee9f46ac9fd800118e033feab983383f71bc950bebb9aee8f3de0f4"
+    },
+    {
+      "shard": 7,
+      "artifact_id": 11785494250,
+      "artifact_name": "nxp-part-metadata-shard-7",
+      "metadata_json_sha256": "0fb59168842a495b2e8578c60ced48360be32f25c91c1f0d64228223340eee09"
+    }
+  ],
+  "claims": {
+    "all_353_canonical_metadata_admitted": false,
+    "production_write_authorized": false,
+    "runtime_programming_qualified": false,
+    "global_nxp_active_denominator": null
+  }
+}
