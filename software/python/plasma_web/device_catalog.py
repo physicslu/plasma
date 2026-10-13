@@ -364,13 +364,16 @@ class DeviceCatalog:
         query: str,
         *,
         limit: int = DEFAULT_SEARCH_LIMIT,
+        offset: int = 0,
     ) -> tuple[list[DeviceCatalogRecord], int]:
-        """Return the ranked page plus the full filtered match count."""
+        """Return one deterministic ranked page plus the full filtered match count."""
         normalized = query.strip().casefold()
         if not normalized:
             return [], 0
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > MAX_SEARCH_LIMIT:
             raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
         tokens = normalized.split()
         ranked: list[tuple[int, int, int, str, str, DeviceCatalogRecord]] = []
         for record in self._records:
@@ -411,7 +414,8 @@ class DeviceCatalog:
             )
         ranked.sort(key=lambda item: item[:-1])
         total_count = len(ranked)
-        return [item[-1] for item in ranked[:limit]], total_count
+        page = ranked[offset:offset + limit]
+        return [item[-1] for item in page], total_count
 
     def search(self, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT) -> list[DeviceCatalogRecord]:
         matches, _ = self.search_with_total(query, limit=limit)

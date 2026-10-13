@@ -53,11 +53,13 @@ The service reports the canonical catalog size with each search response. The br
 
 Search responses also distinguish pagination from filtered cardinality:
 
-- `count` = number of rows returned in this response after applying `limit`;
-- `total_count` = number of admitted rows matching the query before `limit`;
+- `count` = number of rows returned in this response after applying `offset` and `limit`;
+- `total_count` = number of admitted rows matching the query before pagination;
+- `offset` = zero-based position of the first requested row in the deterministic ranked result set;
+- `limit` = maximum rows requested for this page;
 - `catalog_size` = total number of admitted rows in the Production Catalog.
 
-The browser must present returned and total matches separately. A UI showing only `results.length` or `count` as "results" is incorrect for any query whose full match set exceeds the page limit.
+The browser must present the visible range and total matches separately, for example `1–30 / 1,400`, and provide explicit previous/next navigation when `total_count > limit`. Changing the query resets `offset=0`; changing pages clears a prior selection so the detail panel never implies that an off-page row is still selected. The ranked ordering contract is stable across pages, so repeated `query + offset + limit` requests must return the same identifiers while the underlying catalog revision is unchanged.
 
 The research CSV is an import/source artifact, not a permanent storage contract. A future database-backed catalog may replace it without changing Selector semantics.
 
@@ -148,6 +150,8 @@ three primary information layers:
 2. Programming — programming interface, manufacturer speed evidence, programming
    electrical conditions, Flash geometry and programming-flow semantics.
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
+
+Manufacturer programming interfaces are intentionally heterogeneous. A debug transport such as SWD/JTAG can carry a `clock_hz` object, while a documented-but-not-expanded interface such as a system bootloader can carry only status/boot-source metadata. Browser rendering must treat `clock_hz` as optional and must never crash the selected-IC detail pane merely because an interface is not a debug-clock interface.
 
 An admitted ICPN without manufacturer enrichment returns `selected_profile=null`.
 Neither OpenOCD defaults nor family similarity may fill missing manufacturer facts. The UI must therefore distinguish Catalog identity fields that are already authoritative (for example package, pin count, Flash size or catalog temperature grade) from unavailable manufacturer-derived operating-electrical and Memory Map fields. Missing enrichment is displayed explicitly rather than replaced with inferred family values.

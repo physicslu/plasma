@@ -92,6 +92,34 @@ test("IC Selector reports total filtered matches and uses a balanced desktop det
   assert.match(styles, /@media \(max-width: 1050px\)[\s\S]*?\.icSelector\s*\{\s*grid-template-columns:\s*1fr/);
 });
 
+test("IC Selector paginates server-side and resets selection across result pages", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const styles = await source("../app/devices/devices.css");
+  const api = await source("../app/device-catalog-api.ts");
+
+  assert.match(api, /offset:\s*number/);
+  assert.match(api, /offset\?:\s*number/);
+  assert.match(api, /offset:\s*String\(offset\)/);
+  assert.match(selector, /SEARCH_PAGE_SIZE\s*=\s*30/);
+  assert.match(selector, /offset:\s*pageOffset/);
+  assert.match(selector, /setPageOffset\(0\)/);
+  assert.match(selector, /setSelected\(null\)/);
+  assert.match(selector, /上一頁/);
+  assert.match(selector, /下一頁/);
+  assert.match(selector, /Math\.ceil\(totalCount \/ SEARCH_PAGE_SIZE\)/);
+  assert.match(styles, /\.icSelectorPagination\s*\{/);
+});
+
+test("heterogeneous manufacturer interfaces cannot crash selected-profile rendering", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const api = await source("../app/device-catalog-api.ts");
+
+  assert.match(api, /clock_hz\?:/);
+  assert.match(api, /status\?:\s*string/);
+  assert.match(selector, /iface\.clock_hz \? formatClock\(iface\.clock_hz, zh\) : humanizeStatus\(iface\.status \?\? null\)/);
+  assert.match(selector, /No debug clock defined for this interface/);
+});
+
 test("IC Information fails closed when manufacturer electrical enrichment is missing", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
 

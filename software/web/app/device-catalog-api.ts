@@ -143,12 +143,15 @@ export type SelectedICProfile = {
   };
   programming: {
     interfaces: Record<string, {
-      clock_hz: {
+      clock_hz?: {
         manufacturer_min: number | null;
         manufacturer_max: number | null;
         manufacturer_recommended: number | null;
         status: string;
       };
+      status?: string;
+      boot_source?: string;
+      transport_detail?: string;
       required_signal_pins?: Array<{ signal: string; mcu_pin: string; io_level?: string }>;
       recommended_support_signals?: string[];
       special_requirements?: string[];
@@ -243,12 +246,15 @@ export type DeviceSearchResponse = {
   catalog_size: number;
   count: number;
   total_count: number;
+  limit: number;
+  offset: number;
   results: DeviceSearchResult[];
 };
 
 export type DeviceSearchOptions = {
   apiBase: string;
   limit?: number;
+  offset?: number;
   signal?: AbortSignal;
 };
 
@@ -258,7 +264,8 @@ export async function searchDevices(
 ): Promise<DeviceSearchResponse> {
   const apiBase = normalizeApiBase(options.apiBase);
   const limit = options.limit ?? 20;
-  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  const offset = options.offset ?? 0;
+  const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
   const response = await fetch(`${apiBase}/api/devices/search?${params.toString()}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },

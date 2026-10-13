@@ -124,6 +124,44 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(wider["count"], 10)
         self.assertEqual(wider["total_count"], limited["total_count"])
 
+    def test_search_offset_pages_are_deterministic_and_preserve_total_count(self) -> None:
+        status, first = self.request("/api/devices/search?q=STM32F&limit=5&offset=0")
+        self.assertEqual(status, 200)
+        self.assertEqual(first["limit"], 5)
+        self.assertEqual(first["offset"], 0)
+        self.assertEqual(first["count"], 5)
+        self.assertGreater(first["total_count"], 5)
+
+        status, second = self.request("/api/devices/search?q=STM32F&limit=5&offset=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(second["limit"], 5)
+        self.assertEqual(second["offset"], 5)
+        self.assertEqual(second["count"], 5)
+        self.assertEqual(second["total_count"], first["total_count"])
+        self.assertTrue(
+            {item["identifier"] for item in first["results"]}.isdisjoint(
+                {item["identifier"] for item in second["results"]}
+            )
+        )
+
+        status, repeated = self.request("/api/devices/search?q=STM32F&limit=5&offset=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            [item["identifier"] for item in repeated["results"]],
+            [item["identifier"] for item in second["results"]],
+        )
+
+    def test_search_offset_beyond_end_returns_empty_page_with_total(self) -> None:
+        status, first = self.request("/api/devices/search?q=STM32F&limit=5&offset=0")
+        self.assertEqual(status, 200)
+        status, beyond = self.request(
+            f"/api/devices/search?q=STM32F&limit=5&offset={first['total_count'] + 10}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(beyond["count"], 0)
+        self.assertEqual(beyond["total_count"], first["total_count"])
+        self.assertEqual(beyond["results"], [])
+
     def test_family_and_vendor_queries_return_only_admitted_rows(self) -> None:
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
         self.assertEqual(status, 200)
@@ -356,6 +394,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_invalid_limit_fails_closed(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32&limit=101")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
+
+    def test_invalid_offset_fails_closed(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32&limit=30&offset=-1")
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
 
