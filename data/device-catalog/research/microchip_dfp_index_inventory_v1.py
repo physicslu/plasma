@@ -71,7 +71,7 @@ class DevicePackParser(HTMLParser):
         field = None
         if tag in ('div', 'span') and 'pack-subtitle' in classes:
             field = 'subtitle'
-        elif tag == 'span' and 'pack-badge' in classes:
+        elif tag == 'span' and 'pack-badge' in classes and self.pack['badge'] is None:
             field = 'badge'
         elif tag == 'span' and 'device-name' in classes:
             field = 'device_name'
