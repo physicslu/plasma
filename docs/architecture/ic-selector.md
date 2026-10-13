@@ -174,10 +174,12 @@ The browser presents three primary information layers:
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
 
 A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1,
-STM32C0, or STM32G0 target may have `manufacturer_device_basic_profile != null` while
+STM32C0, STM32G0, or STM32G4 target may have `manufacturer_device_basic_profile != null` while
 `selected_profile == null`. I/O Supply and VDDA remain visible in the contract but render as `—` when the
 allowed ST Product Selector/eStore sources do not directly establish them. They are never
-copied from VDD or inferred from family/OpenOCD data.
+copied from VDD or inferred from family/OpenOCD data. STM32G4 demonstrates the positive
+case: ST eStore directly states a VDD/VDDA range, so VDDA is populated while I/O Supply
+continues to render as unavailable.
 
 OpenOCD mapping also cannot promote Basic Device information
 into Programming support.
