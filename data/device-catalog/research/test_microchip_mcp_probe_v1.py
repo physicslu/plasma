@@ -1,7 +1,10 @@
 import copy
+import hashlib
 import json
+from pathlib import Path
+import tempfile
 import unittest
-from microchip_mcp_probe_v1 import decode, product_data, reconcile
+from microchip_mcp_probe_v1 import decode, product_data, reconcile, replay
 
 
 def page(offset, limit=2):
@@ -64,6 +67,88 @@ class ProbeTests(unittest.TestCase):
         other['products'][0]['partNumber'] = 'PIC10F202T-I/MC'
         with self.assertRaises(ValueError):
             reconcile([page(0), page(2)], other)
+
+
+    @staticmethod
+    def archived_capture(folder):
+        """Create fully synthetic MCP evidence; never present it as live vendor data."""
+        init_params = {'protocolVersion': '2025-03-26', 'capabilities': {},
+                       'clientInfo': {'name': 'plasma-microchip-research', 'version': '1.0'}}
+        search_schema = {'tools': [{'name': 'search_products', 'inputSchema': {
+            'properties': {'searchTerm': {}, 'limit': {}, 'offset': {}}}}]}
+        def product_result(value):
+            return {'content': [{'type': 'text', 'text': json.dumps({
+                'success': True, 'data': value})}]}
+        events = [
+            ({'jsonrpc': '2.0', 'method': 'initialize', 'id': 1,
+              'params': init_params}, {'protocolVersion': '2025-03-26'}),
+            ({'jsonrpc': '2.0', 'method': 'notifications/initialized'}, None),
+            ({'jsonrpc': '2.0', 'method': 'tools/list', 'id': 2,
+              'params': {}}, search_schema),
+        ]
+        for index, (offset, limit) in enumerate(((0, 2), (2, 2), (0, 60)), start=3):
+            events.append((
+                {'jsonrpc': '2.0', 'method': 'tools/call', 'id': index, 'params': {
+                    'name': 'search_products', 'arguments': {
+                        'searchTerm': 'PIC10F202', 'limit': limit, 'offset': offset}}},
+                product_result(page(offset, limit))))
+        records = []
+        for index, (request, result) in enumerate(events):
+            raw = (json.dumps({'jsonrpc': '2.0', 'id': request['id'],
+                               'result': result}).encode()
+                   if result is not None else b'')
+            filename = f'response-{index:02d}.txt'
+            (folder / filename).write_bytes(raw)
+            records.append({'file': filename, 'request': request,
+                            'http_status': 202 if index == 1 else 200,
+                            'sha256': hashlib.sha256(raw).hexdigest()})
+        manifest = {'endpoint': 'https://api.microchip.com/mcp/resources',
+                    'responses': records}
+        (folder / 'manifest.json').write_text(json.dumps(manifest))
+        return manifest
+
+    def test_offline_transcript_replay(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            self.archived_capture(folder)
+            result = replay(folder)
+            self.assertEqual(result['unique_ordering_count'], 3)
+            self.assertFalse(result['population_boundary_validated'])
+
+    def test_offline_replay_rejects_corrupt_handshake_requests_and_bytes(self):
+        cases = ('missing_init', 'reordered', 'wrong_id', 'wrong_http_status',
+                 'wrong_query', 'extra_call', 'missing_tool', 'changed_raw_body')
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temp:
+                folder = Path(temp)
+                manifest = self.archived_capture(folder)
+                records = manifest['responses']
+                if case == 'missing_init':
+                    records.pop(0)
+                elif case == 'reordered':
+                    records[3], records[4] = records[4], records[3]
+                elif case == 'wrong_id':
+                    records[3]['request']['id'] = 99
+                elif case == 'wrong_http_status':
+                    records[1]['http_status'] = 204
+                elif case == 'wrong_query':
+                    records[3]['request']['params']['arguments']['searchTerm'] = 'PIC10F200'
+                elif case == 'extra_call':
+                    extra = copy.deepcopy(records[-1])
+                    extra['file'] = 'response-06.txt'
+                    (folder / extra['file']).write_bytes(
+                        (folder / records[-1]['file']).read_bytes())
+                    records.append(extra)
+                elif case == 'missing_tool':
+                    raw = json.dumps({'jsonrpc': '2.0', 'id': 2,
+                                      'result': {'tools': []}}).encode()
+                    (folder / 'response-02.txt').write_bytes(raw)
+                    records[2]['sha256'] = hashlib.sha256(raw).hexdigest()
+                elif case == 'changed_raw_body':
+                    (folder / 'response-03.txt').write_bytes(b'altered')
+                (folder / 'manifest.json').write_text(json.dumps(manifest))
+                with self.assertRaises((ValueError, KeyError)):
+                    replay(folder)
 
 
 if __name__ == '__main__':
