@@ -51,6 +51,27 @@ class PlanTests(unittest.TestCase):
         self.assertIsNone(plan['global_active_denominator'])
         self.assertTrue(plan['no_live_capture_performed'])
 
+    def test_accessory_device_pack_names_are_not_automatically_queried(self):
+        value = copy.deepcopy(fixture())
+        accessory = {'publisher': 'Microchip', 'pack_name': 'PIC-8bitAC_DFP',
+                     'discovery_lane': '8bit',
+                     'device_names': ['AC162050', 'AC244023'],
+                     'supported_name_count': 2}
+        value['device_packs'].append(accessory)
+        value['manufacturer_device_pack_count'] += 1
+        value['observed_manufacturer_device_support_names'] += 2
+        value['lanes']['8bit']['candidate_device_name_count'] += 2
+        value['lanes']['8bit']['pack_count'] += 1
+        plan = plan_inventory(value, 'a'*64, batch_size=3)
+        self.assertEqual(plan['supported_text_search_seeds'], 4)
+        self.assertEqual(plan['mapped_discovery_lane_names'], 7)
+        self.assertEqual(plan['lanes']['8bit']['accessory_pack_names_held_for_review'], 2)
+        self.assertEqual([x['device_name'] for x in plan['needs_manual_query_mapping']
+                          if x['reason'] == 'accessory_pack_requires_type_review'],
+                         ['AC162050', 'AC244023'])
+        self.assertNotIn('AC162050', str(plan['batches']))
+        self.assertNotIn('AC244023', str(plan['batches']))
+
     def test_deterministic_batch_hash_and_no_made_up_skus(self):
         left = plan_inventory(fixture(), 'a'*64)
         right = plan_inventory(fixture(), 'a'*64)

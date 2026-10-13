@@ -269,6 +269,26 @@ planned batch ID is **unverified evidence**, never an absent but harmless
 batch. Either case prevents `all_planned_batches_fully_replayed=true`,
 without silently interpreting extra files as vendor identities.
 
+## Gate 1d — prevent accessory pack names from becoming MCU queries
+
+The frozen official 2026-10-13 DFP index includes **51** names in
+`PIC-8bitAC_DFP` and **5** names in `PIC-16bitAC_DFP`. Microchip's
+[AC162050 / AC162058 developer documentation](https://developerhelp.microchip.com/xwiki/bin/view/software-tools/programmers-and-debuggers/archive/pep-start/required-debug-header-list/ac162050-58/)
+identifies AC162050 as a **Processor Extension Pak / debug header**
+ordering number, not a standalone MCU. Consequently neither of these
+two accessory-named DFPs may enter the automated MCU/DSC MCP search
+queue merely because their names pass the alphanumeric syntax test.
+
+The source-pinned batch planner now places **all 56 names** into
+`needs_manual_query_mapping` with reason
+`accessory_pack_requires_type_review`. This is a conservative hold
+pending individual part-type verification, **not** proof that every
+AC-prefixed identifier represents the same type. The original DFP
+3,717-name universe remains intact and all 56 remain fully traceable
+through their exact pack identifiers. Preexisting plan JSON generated
+by the earlier algorithm must be **regenerated**, as the deterministic
+batch hashes and ordinal membership will change.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.

@@ -18,6 +18,10 @@ from microchip_mcp_probe_v1 import BASE_QUERY
 HERE = Path(__file__).resolve().parent
 REGISTRY = HERE / 'microchip-bulk-source-registry-v1.json'
 EXCLUDED = ('excluded_mpu_candidate', 'unclassified_or_non_mcu_pack')
+# These DFPs include AC-number debug headers/extension accessories, NOT a
+# verified catalog of standalone MCU/DSC ICs. Retain the source names, but
+# require explicit part-type review before any automated MCP text searches.
+ACCESSORY_REVIEW_PACKS = frozenset(('PIC-8bitAC_DFP', 'PIC-16bitAC_DFP'))
 BATCH_SIZES = (3, 10)
 
 
@@ -81,15 +85,24 @@ def plan_inventory(inventory, pinned_digest, batch_size=10):
     per_lane = {}
     for lane in LANES:
         entries = sorted(lanes[lane])
-        safe = sorted(device for device, _ in entries if BASE_QUERY.fullmatch(device))
+        safe = sorted(device for device, pack in entries
+                      if pack not in ACCESSORY_REVIEW_PACKS and
+                      BASE_QUERY.fullmatch(device))
         unsupported = [(device, pack) for device, pack in entries
-                       if not BASE_QUERY.fullmatch(device)]
+                       if pack not in ACCESSORY_REVIEW_PACKS and
+                       not BASE_QUERY.fullmatch(device)]
+        accessories = [(device, pack) for device, pack in entries
+                       if pack in ACCESSORY_REVIEW_PACKS]
         manual.extend({'lane': lane, 'device_name': device, 'pack_name': pack,
                        'reason': 'unsupported_exact_query_syntax'}
                       for device, pack in unsupported)
+        manual.extend({'lane': lane, 'device_name': device, 'pack_name': pack,
+                       'reason': 'accessory_pack_requires_type_review'}
+                      for device, pack in accessories)
         per_lane[lane] = {'dfp_device_names': len(entries),
                           'safe_text_search_seeds': len(safe),
-                          'requires_manual_query_mapping': len(unsupported)}
+                          'requires_manual_query_mapping': len(unsupported)+len(accessories),
+                          'accessory_pack_names_held_for_review': len(accessories)}
         for start in range(0, len(safe), batch_size):
             query_names = safe[start:start + batch_size]
             serial = json.dumps(query_names, separators=(',', ':'), ensure_ascii=True)
