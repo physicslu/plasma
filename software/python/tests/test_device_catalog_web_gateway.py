@@ -351,6 +351,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
         self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["total_count"], 0)
         self.assertEqual(payload["results"], [])
 
     def test_invalid_limit_fails_closed(self) -> None:
