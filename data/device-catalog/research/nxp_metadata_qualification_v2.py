@@ -24,6 +24,7 @@ from nxp_bulk_admission_matrix_v1 import ACTIVE_HASH, exact_set_hash
 
 HERE = Path(__file__).resolve().parent
 LOCK = HERE / "nxp-bulk-353-metadata-evidence-lock-v2.json"
+STATE_MAP = HERE / "nxp-bulk-353-status-map-v2.json"
 HEX = re.compile(r"[a-f0-9]{64}\Z")
 PKG_TERM = re.compile(r"\b(\d{2,4})\s+(terminals?|pins?|balls?|leads?)\b", re.I)
 EVIDENCE_FIELDS = ("package_raw", "package_terminals", "flash_kb_raw",
@@ -195,6 +196,37 @@ def audit(root: Path) -> tuple[list[dict], list[dict], dict]:
     require(reasons["official_exact_part_http_non200"] == 85 and
             reasons["manufacturer_flash_format_requires_review"] == 8,
             "blocked root-cause partition drift")
+    # Persist per-SKU classification, not merely aggregate counts.
+    # Indexed by the frozen sorted 353-identity matrix, it remains useful
+    # after the original GitHub Actions raw HTML artifacts expire.
+    state_code = {
+        "PRIOR_KL25_REVIEWED": "K",
+        "FOUR_FIELDS_HTML_REPLAY_VERIFIED_REVIEW_REQUIRED": "C",
+        "PARTIAL_HTML_REPLAY_VERIFIED_REVIEW_REQUIRED": "P",
+        "SOURCE_BLOCKED_REVIEW_REQUIRED": "B",
+    }
+    reason_code = {
+        "official_exact_part_http_non200": "H",
+        "manufacturer_flash_format_requires_review": "F",
+    }
+    joined_states = "".join(state_code[r["independent_html_replay_state"]]
+                            for r in annotated)
+    joined_reasons = "".join(reason_code.get(r["gap_or_review_reason"], "-")
+                             for r in annotated)
+    frozen_states = json.loads(STATE_MAP.read_text(encoding="utf-8"))
+    require(frozen_states["active_set_sha256"] == ACTIVE_HASH and
+            frozen_states["claims"]["production_write_authorized"] is False and
+            frozen_states["claims"]["canonical_metadata_admission_authorized"] is False and
+            frozen_states["claims"]["global_nxp_active_denominator"] is None,
+            "frozen per-SKU metadata map authority drift")
+    require(joined_states == frozen_states["status_map"] and
+            joined_reasons == frozen_states["blocked_reason_map"],
+            "per-SKU manufacturer metadata qualification map drift")
+    require(digest((joined_states+"\\n").encode()) == frozen_states["status_map_sha256"] and
+            digest((joined_reasons+"\\n").encode()) ==
+                frozen_states["blocked_reason_map_sha256"],
+            "per-SKU manufacturer metadata map SHA-256 mismatch")
+
     summary = {
         "schema_version": 2,
         "manufacturer": "NXP",
