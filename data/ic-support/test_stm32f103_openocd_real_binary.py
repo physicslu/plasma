@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "data/ic-support/validate_stm32f103_openocd_real_binary.py"
+Z2_WORKFLOW = ROOT / ".github/workflows/z2-ps-release.yml"
 spec = importlib.util.spec_from_file_location("stm32f103_openocd_real_binary", MODULE_PATH)
 assert spec and spec.loader
 acceptance = importlib.util.module_from_spec(spec)
@@ -102,6 +103,22 @@ class STM32F103RealOpenOCDSoftwareAcceptanceTests(unittest.TestCase):
         contract = acceptance.load_contract()
         with self.assertRaises(acceptance.OpenOCDSoftwareAcceptanceError):
             acceptance.validate_markers(_marker_output(driver="not-stm32f1x"), contract)
+
+    def test_z2_release_runs_real_binary_acceptance_on_both_runtime_architectures(self) -> None:
+        workflow = Z2_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("          - x86_64\n          - armv7l", workflow)
+        self.assertIn(
+            "python3 /repo/data/ic-support/validate_stm32f103_openocd_real_binary.py",
+            workflow,
+        )
+        self.assertIn(
+            "stm32f103-real-openocd-software-${{ matrix.architecture }}-${{ github.sha }}",
+            workflow,
+        )
+        self.assertIn(
+            '"data/ic-support/validate_stm32f103_openocd_real_binary.py"',
+            workflow,
+        )
 
     def test_acceptance_evidence_keeps_process_and_hardware_boundaries_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
