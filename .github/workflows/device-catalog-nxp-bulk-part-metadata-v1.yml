@@ -1,0 +1,86 @@
+name: NXP bulk 341 official per-part metadata research v1
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_bulk_part_metadata_v1.py'
+      - 'data/device-catalog/research/nxp_bulk_part_metadata_reconcile_v1.py'
+      - 'data/device-catalog/research/test_nxp_bulk_part_metadata_v1.py'
+      - 'data/device-catalog/research/test_nxp_bulk_part_metadata_reconcile_v1.py'
+      - 'data/device-catalog/research/nxp-active-353-bulk-candidates-v1.csv'
+      - '.github/workflows/device-catalog-nxp-bulk-part-metadata-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify full 341-SKU read-only metadata extraction contract
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_bulk_part_metadata_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_bulk_part_metadata_reconcile_v1.py' -v
+
+  manufacturer-part-shards:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m playwright install chromium --with-deps
+      - name: Capture official NXP part-page raw HTML and explicit datasheet fields
+        run: |
+          python data/device-catalog/research/nxp_bulk_part_metadata_v1.py \
+            --shard "${{ matrix.shard }}" --shards 8 \
+            --output "/tmp/nxp-part-metadata-shard-${{ matrix.shard }}"
+      - name: Preserve manufacturer HTML evidence, even when part pages are blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxp-part-metadata-shard-${{ matrix.shard }}
+          path: /tmp/nxp-part-metadata-shard-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  reconcile-metadata:
+    needs: manufacturer-part-shards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nxp-part-metadata-shard-*
+          path: /tmp/nxp-part-metadata
+      - name: Reconcile all 341 SKU states and manufacturer HTML source hashes
+        run: |
+          python data/device-catalog/research/nxp_bulk_part_metadata_reconcile_v1.py \
+            --root /tmp/nxp-part-metadata \
+            --output /tmp/nxp-bulk-part-metadata-summary
+          cat /tmp/nxp-bulk-part-metadata-summary/nxp-bulk-341-part-metadata-coverage.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-official-353-bulk-metadata-coverage
+          path: /tmp/nxp-bulk-part-metadata-summary/
+          if-no-files-found: warn
+          retention-days: 30

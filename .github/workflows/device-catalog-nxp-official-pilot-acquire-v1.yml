@@ -8,6 +8,9 @@ on:
       - 'data/device-catalog/research/test_nxp_official_pilot_acquire_v1.py'
       - 'data/device-catalog/research/nxp_official_pilot_reconcile_v1.py'
       - 'data/device-catalog/research/test_nxp_official_pilot_reconcile_v1.py'
+      - 'data/device-catalog/research/nxp_bulk_admission_matrix_v1.py'
+      - 'data/device-catalog/research/test_nxp_bulk_admission_matrix_v1.py'
+      - 'data/device-catalog/research/nxp-active-353-bulk-candidates-v1.csv'
       - '.github/workflows/device-catalog-nxp-official-pilot-acquire-v1.yml'
   workflow_dispatch:
 
@@ -73,6 +76,31 @@ jobs:
             --evidence-root /tmp/nxp-pilot \
             --output /tmp/nxp-bounded-gap
           cat /tmp/nxp-bounded-gap/bounded-pilot-gap.json
+      - name: Preflight all 353 Active exact NXP SKUs with manufacturer row evidence
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_bulk_admission_matrix_v1.py' -v
+          python data/device-catalog/research/nxp_bulk_admission_matrix_v1.py \
+            --evidence-root /tmp/nxp-pilot \
+            --require-row-evidence \
+            --output /tmp/nxp-bulk-353
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path('/tmp/nxp-bulk-353/nxp-bulk-353-admission-preflight.json').read_text())
+          assert result['active_candidates_exact']==353
+          assert result['active_metadata_reviewed_kl25']==12
+          assert result['active_metadata_missing']==341
+          assert result['per_sku_raw_source_evidence_locked'] is True
+          assert result['production_write_authorized'] is False
+          print('NXP bulk 353 identity/row-evidence preflight PASS; 341 metadata gaps retained')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-official-v1-bulk-353-admission-preflight
+          path: /tmp/nxp-bulk-353/
+          if-no-files-found: warn
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
