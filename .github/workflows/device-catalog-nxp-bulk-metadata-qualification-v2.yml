@@ -5,6 +5,8 @@ on:
     paths:
       - 'data/device-catalog/research/nxp-bulk-353-metadata-evidence-lock-v2.json'
       - 'data/device-catalog/research/nxp-bulk-353-status-map-v2.json'
+      - 'data/device-catalog/research/nxp_metadata_status_index_v2.py'
+      - 'data/device-catalog/research/test_nxp_metadata_status_index_v2.py'
       - 'data/device-catalog/research/nxp_metadata_qualification_v2.py'
       - 'data/device-catalog/research/test_nxp_metadata_qualification_v2.py'
       - '.github/workflows/device-catalog-nxp-bulk-metadata-qualification-v2.yml'
@@ -27,6 +29,10 @@ jobs:
         run: python -m pip install 'beautifulsoup4==4.14.2'
       - name: Verify blocked aliases, contradictory fields and source authority
         run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_qualification_v2.py' -v
+      - name: Replay permanent all-353 metadata status index without expired artifacts
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_metadata_status_index_v2.py' -v
+          python data/device-catalog/research/nxp_metadata_status_index_v2.py --output /tmp/nxp-353-qualified-v2
       - uses: actions/download-artifact@v4
         with:
           run-id: 38337377867
