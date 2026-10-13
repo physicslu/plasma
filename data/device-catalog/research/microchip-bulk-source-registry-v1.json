@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "id": "microchip-bulk-mcu-segment-registry-v1",
+  "manufacturer": "Microchip",
+  "scope": "Microchip microcontrollers and digital signal controllers across official 8-bit, 16-bit, 32-bit and wireless MCU product surfaces",
+  "population_boundary_validated": false,
+  "production_write_authorized": false,
+  "global_active_denominator": null,
+  "source_policy": "Official Microchip product-family indexes are discovery surfaces; exact ordering codes and lifecycle must be captured from manufacturer product records. CMSIS packs, OpenOCD identifiers, parametric-search snippets and family names are discovery seeds only.",
+  "segments": [
+    {
+      "id": "8bit",
+      "label": "8-bit PIC and AVR MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "16bit",
+      "label": "16-bit PIC24 MCUs and dsPIC DSCs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "32bit-pic-sam",
+      "label": "32-bit PIC32 and SAM Arm MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "32bit-avr-risc",
+      "label": "32-bit AVR and RISC MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "wireless",
+      "label": "Wireless MCUs and SoCs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless",
+      "inventory_status": "pending",
+      "population_complete": false
+    }
+  ],
+  "excluded_or_separate_surfaces": [
+    "Microprocessors and application processors",
+    "FPGAs and programmable logic",
+    "Analog, power, memory, interface and timing products",
+    "Wireless modules and connectivity controllers not identified as MCUs or MCU SoCs"
+  ],
+  "reconciliation_policy": {
+    "identity_key": "exact manufacturer ordering part number",
+    "cross_segment_duplicates": "deduplicate by exact ordering part number; conflicting lifecycle evidence is an error",
+    "coverage_boundary": "no Microchip-wide denominator until official family inventory and lifecycle/count semantics are independently audited"
+  },
+  "bulk_product_api": {
+    "endpoint": "https://www.microchip.com/designresources/product-catalog/api/productInfo",
+    "method": "GET",
+    "discovery_documentation": "https://www.microchip.com/designresources/PartnerDataExchange/ProductAPI-user-guide.html",
+    "query_parameter": "part",
+    "pagination_parameters": {
+      "page_size": "pagesize",
+      "page_number": "pagenumber"
+    },
+    "pagination_response_fields": [
+      "totalRecords",
+      "totalPages",
+      "pagenumber",
+      "pagesize"
+    ],
+    "exact_orderable_identity_field": "part_number",
+    "family_identity_field": "base_part_number",
+    "raw_lifecycle_field": "lifecycle_status",
+    "raw_lifecycle_semantics": "pending_official_code_mapping_review",
+    "population_boundary": "per-query response only; complete MCU/DSC family inventory is not established",
+    "documentation_example_status": "inconsistent_illustrative_counts_do_not_treat_as_expected_population",
+    "probe_workflow": ".github/workflows/device-catalog-microchip-api-probe-v1.yml",
+    "probe_script": "data/device-catalog/research/microchip_product_api_probe_v1.py",
+    "sample_query": {
+      "part": "PIC10F202",
+      "pagesize": 2,
+      "pagenumber": "1..totalPages"
+    },
+    "live_probe_status": "http_200_html_no_product_rows",
+    "lifecycle_mapping": "raw_only_no_mapping"
+  },
+  "gate_1b_surface_audit": {
+    "audit_date": "2026-10-13",
+    "status": "partial_surface_audit",
+    "exhaustive_family_inventory": false,
+    "live_product_api_response_captured": false,
+    "findings": [
+      {
+        "segment": "8bit",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/pic-mcus",
+          "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        ],
+        "result": "Rendered landing pages are narrative/featured-family surfaces and do not provide a complete family table or auditable total. Product-family examples found elsewhere remain discovery seeds only."
+      },
+      {
+        "segment": "16bit",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus"
+        ],
+        "result": "The page presents PIC24F GA and GB product-family links and mentions GC and DA in application groupings; it does not enumerate a complete PIC24 plus dsPIC family population."
+      },
+      {
+        "segment": "32bit-pic-sam",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam"
+        ],
+        "result": "The page groups PIC32C and SAM devices, with links to PIC32CX and SAM collateral; it is not a complete leaf-family or exact ordering-code table. PIC32M needs a separate family inventory."
+      },
+      {
+        "segment": "32bit-avr-risc",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        ],
+        "result": "The official page is a discovery surface and does not establish complete family membership or counts; legacy overlap with SAM remains to be reconciled."
+      },
+      {
+        "segment": "wireless",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        ],
+        "result": "The family surface combines wireless MCU ICs/SoCs and modules, requiring exact-part classification and de-duplication against the 32-bit lanes."
+      }
+    ],
+    "consequence": "Keep population_boundary_validated false and global_active_denominator null. The API is documented as a promising source, but no live page-response fixture or independently reconciled per-family page totals is committed yet.",
+    "dfp_index_observation": {
+      "observed_at": "2026-10-13",
+      "index_url": "https://packs.download.microchip.com/",
+      "raw_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+      "source_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38338847345/artifacts/11786276380",
+      "parsed_inventory_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38339710359/artifacts/11786677494",
+      "microchip_dfp_pack_count": 133,
+      "supported_device_name_count": 3717,
+      "observed_lane_candidate_names": {
+        "8bit": 1519,
+        "16bit": 899,
+        "32bit-pic-sam": 796,
+        "32bit-avr-risc": 0,
+        "wireless": 53
+      },
+      "excluded_mpu_candidate_names": 56,
+      "unclassified_or_non_mcu_pack_names": 394,
+      "scope": "Device Family Pack supported device-name discovery only, not exact commercial SKU or lifecycle universe",
+      "population_complete": false
+    }
+  },
+  "family_query_seeds": {
+    "status": "candidate_seeds_only_not_exhaustive",
+    "query_execution_status": "PIC10-12Fxxx_DFP: 27 seed device names, 26 bounded exact-SKU queries reconciled, one EOL device returns MCP NOT_FOUND",
+    "meaning": "Family labels used to prepare a future per-family Product Data API query matrix. These labels are not exact ordering parts, API query semantics remain to be tested, and this set is not an exhaustive population.",
+    "lanes": {
+      "8bit": [
+        {
+          "family_seed": "PIC10F / PIC12F / PIC16F",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip describes recognized part-number structures across 10Fxxx, 12Fxxx and 16Fxxx."
+        },
+        {
+          "family_seed": "PIC16F1",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip identifies 12F1xxx and 16F1xxx as Enhanced Mid-Range structures."
+        },
+        {
+          "family_seed": "PIC18",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip identifies PIC18 as the High-End 8-bit family."
+        },
+        {
+          "family_seed": "tinyAVR / ATtiny",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        },
+        {
+          "family_seed": "megaAVR / ATmega",
+          "source_url": "https://www.microchip.com/en-us/about/corporate-overview/acquisitions/atmel/atmega"
+        },
+        {
+          "family_seed": "XMEGA / ATxmega",
+          "source_url": "https://www.microchip.com/en-us/about/corporate-overview/acquisitions/atmel/atxmega"
+        },
+        {
+          "family_seed": "AVR DA, DB, DD, EA, EB, SD",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        }
+      ],
+      "16bit": [
+        {
+          "family_seed": "PIC24F / PIC24E",
+          "source_url": "https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/Brochures/30010109.pdf",
+          "evidence": "2022 PIC24 quick reference includes PIC24F and PIC24EP product-family base patterns; discovery seed only."
+        },
+        {
+          "family_seed": "dsPIC33A / dsPIC33C / dsPIC33E / dsPIC33EV",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/dspic-dscs",
+          "evidence": "Current DSC landing lists dsPIC33A/C/E; dsPIC33EV appears among application-family links and the dsPIC33E page."
+        },
+        {
+          "family_seed": "dsPIC30",
+          "source_url": "https://www.microchip.com/en-us/product/dspic30f5015",
+          "evidence": "Official product record remains discoverable; lifecycle and family completeness require API review."
+        },
+        {
+          "family_seed": "dsPIC33F",
+          "source_url": "https://www.microchip.com/en-us/product/dspic33fj64gp206a",
+          "evidence": "Official product record remains discoverable; lifecycle and family completeness require API review."
+        }
+      ],
+      "32bit-pic-sam": [
+        {
+          "family_seed": "PIC32MM / PIC32MX / PIC32MK / PIC32MZ",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/32bit-mcu/PIC32/",
+          "evidence": "Microchip identifies these four PIC32M MIPS32 family groups."
+        },
+        {
+          "family_seed": "PIC32C / PIC32CM / PIC32CX",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+          "evidence": "Official Arm MCU surface groups PIC32C and SAM and links PIC32CX."
+        },
+        {
+          "family_seed": "SAM3 / SAM4 / SAM C / SAM D / SAM E / SAM G / SAM L / SAM S",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+          "evidence": "Candidate subfamilies found across official SAM family pages and the 32-bit AVR/RISC legacy page; not an exhaustive enumeration."
+        }
+      ],
+      "32bit-avr-risc": [
+        {
+          "family_seed": "AVR32",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        },
+        {
+          "family_seed": "Arm7",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        },
+        {
+          "family_seed": "SAM3",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus",
+          "evidence": "The official legacy AVR/RISC page explicitly lists AVR32, Arm7 and SAM 3 device families; SAM3 overlaps the PIC32/SAM lane."
+        }
+      ],
+      "wireless": [
+        {
+          "family_seed": "PIC32-BZ6",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32CX-BZ2 / WBZ451",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32CX-BZ3 / WBZ351",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32-BW1",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "WFI32",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless",
+          "evidence": "Wireless landing page includes these family/board labels; exact MCU IC versus module/SOM classification is unresolved."
+        }
+      ]
+    }
+  },
+  "mcp_product_probe": {
+    "endpoint": "https://api.microchip.com/mcp/resources",
+    "script": "data/device-catalog/research/microchip_mcp_probe_v1.py",
+    "observed_tools_count": 6,
+    "sample_query": "PIC10F202",
+    "observed_reported_total": 8,
+    "observed_returned_rows": 2,
+    "observed_raw_lifecycle_values": [
+      "Active"
+    ],
+    "full_pagination_validated": true,
+    "replayable_live_fixture_captured": true,
+    "latest_capture_status": "PIC10-12Fxxx_DFP: 26 of 27 bounded searches reconciled, 347 distinct exact-prefix SKU candidates; NOT_FOUND is EOL PIC12F529T48A",
+    "population_boundary": "bounded text-search query only; not complete MCU/DSC inventory",
+    "evidence_ledger_url": "https://github.com/physicslu/plasma/actions/runs/38338627747/artifacts/11786520772",
+    "exact_prefix_candidates_observed": 347,
+    "reconciled_seed_queries": 26,
+    "attempted_seed_queries": 27,
+    "global_active_denominator": null,
+    "production_write_authorized": false
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "type": "offline-source-audited-microchip-dfp-first-pass-2026-10-13",
+  "manufacturer": "Microchip",
+  "original_dfp_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+  "plan_sha256": "54f2e3eeb6982f19c234b390534262da540d61c5944e71a39c5a0a7257824c96",
+  "full_external_report_sha256": "14c7abe7f9cac4bd0f272d46b6847f7b605f0fc06d9299362b3fb53ae4445b95",
+  "source_runs": [
+    38348043707,
+    38357451545,
+    38338627747,
+    38348398967
+  ],
+  "planned_dfp_queries": 3198,
+  "planned_batches": 321,
+  "batch_archives_with_valid_capture_attestation": 313,
+  "batches_quarantined_due_to_missing_attestation_after_worker_timeouts": 8,
+  "complete_positive_exact_prefix_queries": 2753,
+  "fully_replayed_zero_exact_prefix_queries": 68,
+  "manufacturer_not_found_failed_queries": 297,
+  "timeout_missing_batch_query_results": 80,
+  "exact_prefix_query_replay_percent": 88.2114,
+  "verified_original_source_response_links": 23427,
+  "verified_original_distinct_source_files": 3009,
+  "source_linked_candidate_observations": 23427,
+  "unique_exact_prefix_candidates_without_conflicts": 23276,
+  "raw_lifecycle_counts_nonconflicted": {
+    "Active": 23047,
+    "Not Recommended For New Design": 229
+  },
+  "raw_lifecycle_conflicts": 0,
+  "lanes": {
+    "8bit": {
+      "positive": 1328,
+      "fuzzy_only": 2,
+      "not_found": 58,
+      "missing": 80
+    },
+    "16bit": {
+      "positive": 792,
+      "fuzzy_only": 3,
+      "not_found": 99,
+      "missing": 0
+    },
+    "32bit-pic-sam": {
+      "positive": 605,
+      "fuzzy_only": 55,
+      "not_found": 136,
+      "missing": 0
+    },
+    "32bit-avr-risc": {
+      "positive": 0,
+      "fuzzy_only": 0,
+      "not_found": 0,
+      "missing": 0
+    },
+    "wireless": {
+      "positive": 28,
+      "fuzzy_only": 8,
+      "not_found": 4,
+      "missing": 0
+    }
+  },
+  "audit_method": "Archived ZIP CRC, identical original DFP source-pinned plans, 321 unique planned batch assignments, per-candidate raw SHA-256 equality and raw partNumber/lifecycle row content equality, cross-query exact partNumber deduplication, cross-source lifecycle conflict quarantine.",
+  "raw_archive_available": "https://drive.google.com/drive/folders/1sJHR73lEjJeAgLt7pa4nJgpAr4Wrj50f",
+  "raw_artifact_workflow_run": "https://github.com/physicslu/plasma/actions/runs/38357451545",
+  "original_vendor_active_population_complete": false,
+  "unknown_global_active_denominator": null,
+  "production_write_authorized": false,
+  "programming_support_claimed": false,
+  "scope": "Research search-evidence tooling and frozen DFP name query progress ONLY. Not full manufacturer commercial SKU coverage, lifecycle acceptance or flash backend support.",
+  "approval_boundary": "Approval authorizes merging research-only validation / snapshot into main, not publishing any Production ICPN or global Active coverage ratio."
+}

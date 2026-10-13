@@ -1,0 +1,76 @@
+name: Microchip source-preserving recovery of single incomplete crosslane query
+on:
+  push:
+    branches:
+      - agent/microchip-bulk-coverage-discovery-v1
+    paths:
+      - '.github/workflows/device-catalog-microchip-crosslane-recovery-v1.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover-and-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/official
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-source-pinned-crosslane-10-raw-canary-v1
+          repository: physicslu/plasma
+          run-id: 38347572588
+          github-token: ${{ github.token }}
+          path: /tmp/earlier-vendor-originals
+      - name: Rebuild new nonoverwriting evidence workspace, preserving all 9 proven queries
+        run: |
+          set -euo pipefail
+          echo '9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/official/index.html' | sha256sum --check
+          mkdir -p /tmp/recovered
+          cp -a /tmp/earlier-vendor-originals/crosslane-10 /tmp/recovered/crosslane-10
+          test -f /tmp/recovered/crosslane-10/ATSAMD21G18A/manifest.json
+          rm -rf /tmp/recovered/crosslane-10/ATSAMD21G18A
+      - name: Capture only the previously incomplete SAMD query with corrected source validator
+        timeout-minutes: 5
+        run: |
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A \
+            --output-dir /tmp/recovered/crosslane-10/ATSAMD21G18A
+      - name: Independently replay the new 10-query combined archive and source ledger
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+            --evidence-root /tmp/official --target-root /tmp/recovered \
+            --max-queries 10 > /tmp/recovered/replay-summary.json
+          python - <<'PY'
+          import json,sys
+          sys.path.insert(0,'data/device-catalog/research')
+          import microchip_mcp_crosslane_canary_v1 as canary
+          import microchip_mcp_evidence_ledger_v1 as ledger
+          frozen=json.load(open(canary.CANARY))
+          seeds=[r['device_name'] for r in frozen['ordered_queries']]
+          report=ledger.build('/tmp/recovered/crosslane-10',seeds)
+          assert report['fully_replayed_queries']==10 and report['all_queries_reconciled']
+          assert not report['production_write_authorized'] and report['global_active_denominator'] is None
+          with open('/tmp/recovered/exact-source-ledger.json','w') as f:
+            json.dump(report,f,indent=2,sort_keys=True)
+          print('Source-backed queries:', report['fully_replayed_queries'])
+          print('Distinct exact prefix research orderings:', report['unique_exact_ordering_candidates'])
+          PY
+      - name: Archive fresh evidence, SHA-256 manifest and original source diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-crosslane-ten-recovered-complete-raw-evidence
+          path: /tmp/recovered/
+          if-no-files-found: warn
+          retention-days: 90

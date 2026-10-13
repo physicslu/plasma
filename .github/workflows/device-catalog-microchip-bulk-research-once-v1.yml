@@ -1,0 +1,94 @@
+name: Microchip source-pinned bounded multi-lane read-only research sweep
+on:
+  push:
+    branches:
+      - agent/microchip-bulk-coverage-discovery-v1
+    paths:
+      - '.github/workflows/device-catalog-microchip-bulk-research-once-v1.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: microchip-dfp-research-sweep-once
+  cancel-in-progress: false
+jobs:
+  archived-manufacturer-sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore archived original official DFP index
+        uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/microchip-official-dfp
+      - name: Verify exact official source and derive fresh approved 10-query batches
+        run: |
+          set -euo pipefail
+          echo '9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/microchip-official-dfp/index.html' | sha256sum --check
+          python data/device-catalog/research/microchip_mcp_batch_plan_v1.py \
+            --evidence-root /tmp/microchip-official-dfp \
+            --output /tmp/microchip-batch-plan-10.json \
+            --batch-size 10
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_partial_rollup_v2.py' -v
+      - name: Capture 16 bounded DFP batches (read-only, serial, no Production)
+        id: sweep
+        timeout-minutes: 38
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p /tmp/microchip-live-research
+          batches=(
+            8bit-0001 8bit-0037 8bit-0074 8bit-0111
+            16bit-0001 16bit-0023 16bit-0046 16bit-0068
+            32bit-pic-sam-0001 32bit-pic-sam-0021
+            32bit-pic-sam-0041 32bit-pic-sam-0061
+            wireless-0001 wireless-0002 wireless-0003 wireless-0004
+          )
+          failed=0
+          for batch_id in "${batches[@]}"; do
+            echo "::group::Microchip read-only source-attested batch ${batch_id}"
+            if timeout 160s python data/device-catalog/research/microchip_mcp_plan_capture_v1.py \
+              --evidence-root /tmp/microchip-official-dfp \
+              --plan /tmp/microchip-batch-plan-10.json \
+              --batch-id "${batch_id}" \
+              --output-root /tmp/microchip-live-research \
+              --workers 1 --capture; then
+              echo "QUERY_BATCH_REPLAYABLE ${batch_id}"
+            else
+              echo "QUERY_BATCH_PARTIAL_OR_UNVERIFIED ${batch_id}"
+              failed=$((failed+1))
+            fi
+            echo "::endgroup::"
+            sleep 2
+          done
+          echo "PARTIAL_OR_FAILED_BATCHES=${failed} out of ${#batches[@]}"
+          # The partial rollup checks each exact byte source and never
+          # converts a fuzzy-only or failed query into an Active product.
+      - name: Reconcile all independently valid ordering identities from raw bytes
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          test -f /tmp/microchip-batch-plan-10.json
+          python data/device-catalog/research/microchip_mcp_partial_rollup_v2.py \
+            --evidence-root /tmp/microchip-official-dfp \
+            --plan /tmp/microchip-batch-plan-10.json \
+            --batch-root /tmp/microchip-live-research \
+            --output /tmp/microchip-research-partial-rollup.json
+      - name: Preserve original HTTP response bytes and manufacturer source audit
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-multilane-16-batch-raw-research-20261013
+          path: |
+            /tmp/microchip-live-research/
+            /tmp/microchip-batch-plan-10.json
+            /tmp/microchip-research-partial-rollup.json
+          if-no-files-found: warn
+          retention-days: 90

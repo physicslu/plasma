@@ -1,0 +1,31 @@
+name: Microchip official Product Data API bounded probe v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-public-api-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate probe contract
+        run: |
+          python -m py_compile data/device-catalog/research/microchip_product_api_probe_v1.py data/device-catalog/research/test_microchip_product_api_probe_v1.py
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_product_api_probe_v1.py' -v
+      - name: Capture fixed official PIC10F202 query and all reported pages
+        run: python data/device-catalog/research/microchip_product_api_probe_v1.py --output-dir /tmp/microchip-api-probe
+      - name: Upload raw response pages and reconciliation summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-product-api-probe
+          path: /tmp/microchip-api-probe/
+          if-no-files-found: warn
+          retention-days: 90
