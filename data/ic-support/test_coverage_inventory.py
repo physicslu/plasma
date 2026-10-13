@@ -87,15 +87,15 @@ def test_current_production_metrics() -> None:
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
-    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1
+    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 280
     assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
     assert metrics["manufacturer_enrichment_m5_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
 
     enrichment = inventory["manufacturer_enrichment"]
     assert enrichment["highest_level_counts"] == {
-        "M0": expected_exact_icpns - 1,
-        "M1": 0,
+        "M0": expected_exact_icpns - 280,
+        "M1": 279,
         "M2": 0,
         "M3": 0,
         "M4": 1,
@@ -103,16 +103,15 @@ def test_current_production_metrics() -> None:
     }
     assert enrichment["at_least_level_counts"] == {
         "M0": expected_exact_icpns,
-        "M1": 1,
+        "M1": 280,
         "M2": 1,
         "M3": 1,
         "M4": 1,
         "M5": 0,
     }
     assert enrichment["by_family_highest_level"]["STM32F1"]["M4"] == 1
-    assert enrichment["by_family_highest_level"]["STM32F1"]["M0"] == (
-        expected_family_counts["STM32F1"] - 1
-    )
+    assert enrichment["by_family_highest_level"]["STM32F1"]["M1"] == 279
+    assert enrichment["by_family_highest_level"]["STM32F1"]["M0"] == 0
 
 
 def test_exact_icpn_to_base_device_to_profile_projection() -> None:
@@ -169,6 +168,10 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert enrichment["highest_level"] == "M4"
     assert enrichment["dimensions"] == {
         "catalog_identity": True,
+        "manufacturer_device_basic_profile": True,
+        "ram": True,
+        "operating_vdd": True,
+        "operating_temperature": True,
         "manufacturer_device_profile": True,
         "operating_electrical": True,
         "memory_map": True,
@@ -190,18 +193,26 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     )
     assert enrichment["evidence"]["physical_hil"] is None
 
-    same_family_unproven = find_exact(inventory, "STM32F103R8T6")
-    missing = same_family_unproven["manufacturer_enrichment"]
+    same_family_basic = find_exact(inventory, "STM32F103R8T6")
+    basic = same_family_basic["manufacturer_enrichment"]
+    assert basic["highest_level"] == "M1"
+    assert basic["dimensions"]["catalog_identity"] is True
+    assert basic["dimensions"]["manufacturer_device_basic_profile"] is True
+    assert basic["dimensions"]["ram"] is True
+    assert basic["dimensions"]["operating_vdd"] is True
+    assert basic["dimensions"]["operating_temperature"] is True
+    assert basic["dimensions"]["manufacturer_device_profile"] is False
+    assert basic["dimensions"]["memory_map"] is False
+    assert basic["dimensions"]["manufacturer_programming_profile"] is False
+    assert basic["dimensions"]["execution_ir"] is False
+    assert basic["dimensions"]["physical_hil"] is False
+
+    outside_family = find_exact(inventory, "STM32F407VGT6")
+    missing = outside_family["manufacturer_enrichment"]
     assert missing["highest_level"] == "M0"
-    assert missing["dimensions"]["catalog_identity"] is True
-    assert missing["dimensions"]["manufacturer_device_profile"] is False
-    assert missing["dimensions"]["manufacturer_programming_profile"] is False
-    assert missing["dimensions"]["execution_ir"] is False
-    assert missing["dimensions"]["independent_software_differential"] is False
-    assert missing["dimensions"]["physical_hil"] is False
-    assert "operating_electrical" in missing["missing_dimensions"]
-    assert "memory_map" in missing["missing_dimensions"]
-    assert "flash_geometry" in missing["missing_dimensions"]
+    assert missing["dimensions"]["manufacturer_device_basic_profile"] is False
+    assert "ram" in missing["missing_dimensions"]
+    assert "operating_vdd" in missing["missing_dimensions"]
 
 
 def test_manufacturer_enrichment_registry_is_research_only() -> None:

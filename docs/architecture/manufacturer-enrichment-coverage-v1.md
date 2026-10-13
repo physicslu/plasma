@@ -14,8 +14,8 @@ Device Catalog
   -> exact admitted ICPN identity
 
 Manufacturer Enrichment
-  -> operating electrical facts
-  -> memory map
+  -> Device Basic Profile (identity/package/Flash/RAM/VDD/temperature)
+  -> optional deeper device detail (for example memory map)
   -> programming electrical facts
   -> programming interfaces
   -> Flash geometry / controller semantics
@@ -38,7 +38,7 @@ Coverage is monotonic. A target cannot claim a higher level unless all lower lev
 | Level | Meaning |
 |---|---|
 | M0 | Production Catalog exact identity only |
-| M1 | Manufacturer Device Profile: operating electrical + memory map |
+| M1 | Manufacturer Device Basic Profile: ICPN + Base Device + Package + Pin Count + Flash + RAM + Operating VDD + Operating Temperature |
 | M2 | Manufacturer Programming Profile: interfaces + programming electrical + Flash geometry |
 | M3 | Manufacturer-derived executable semantics: Execution IR + deterministic code-generation path |
 | M4 | Independent software differential: OpenOCD semantic comparison + real-binary software acceptance |
@@ -48,14 +48,15 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-At Framework v1 creation, Production contains **4,629 exact ICPNs** across 28 STM32 families.
+After STM32F1 Device Basic Profile v1, Production contains **4,641 exact ICPNs** and
+all **280 STM32F1 Production ICPNs** have an explicitly bound M1 Basic Profile.
 
 Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 4,628 |
-| M1 | 0 |
+| M0 | 4,361 |
+| M1 | 279 |
 | M2 | 0 |
 | M3 | 0 |
 | M4 | 1 |
@@ -65,16 +66,16 @@ Cumulative coverage:
 
 | At least level | Exact ICPNs |
 |---|---:|
-| M0 | 4,629 |
-| M1 | 1 |
+| M0 | 4,641 |
+| M1 | 280 |
 | M2 | 1 |
 | M3 | 1 |
 | M4 | 1 |
 | M5 | 0 |
 
-The single M4 golden reference is `STM32F103C8T6`.
-
-This does **not** mean STM32F103-family siblings are enriched. For example, `STM32F103R8T6` remains M0 until manufacturer evidence explicitly establishes applicability.
+The M4 golden reference remains `STM32F103C8T6`. The other 279 STM32F1 exact ICPNs
+gain only M1; they do **not** gain Programming Profile, Execution IR, OpenOCD differential,
+or physical qualification.
 
 ## 4. Coverage dimensions
 
@@ -82,6 +83,10 @@ Each exact ICPN exposes independent dimensions in the deterministic coverage inv
 
 ```text
 catalog_identity
+manufacturer_device_basic_profile
+ram
+operating_vdd
+operating_temperature
 manufacturer_device_profile
 operating_electrical
 memory_map
@@ -95,7 +100,9 @@ independent_software_differential
 physical_hil
 ```
 
-The highest M-level is derived from these evidence-backed dimensions.
+The highest M-level is derived from evidence-backed dimensions. M1 requires the Basic
+Profile fields above; a detailed memory map is **not** an M1 prerequisite. Memory-map and
+deeper electrical dimensions remain separately measurable for execution-oriented research.
 
 Missing dimensions remain explicit.
 
@@ -163,6 +170,23 @@ The critical rule is:
 
 Exact applicability must be evidenced and listed.
 
+### M1 Basic-product-metadata exception
+
+The generic scoped-fact contract above is designed for technical manufacturer facts that can
+be source-locked. M1 Basic Device metadata is deliberately lighter: dynamic ST Product
+Selector / eStore observations may not have stable downloadable bytes to SHA-256 lock.
+
+Therefore STM32F1 Device Basic Profile v1 uses:
+
+- official ST URLs and observation date;
+- reusable series + Flash-density metadata groups;
+- **explicit exact-ICPN bindings**;
+- full cross-check against Production Catalog identity/package/pin/Flash/temperature fields;
+- no fabricated content digest.
+
+This exception applies only to M1 basic product metadata. It cannot establish M2
+Programming Profile facts or any runtime/hardware authority.
+
 ## 7. Composition contract
 
 The v1 composer is:
@@ -195,8 +219,8 @@ Therefore:
 
 ```text
 OpenOCD target mapping
-!= manufacturer VDD evidence
-!= manufacturer memory-map evidence
+!= Manufacturer Device Basic Profile
+!= manufacturer VDD/RAM evidence
 != manufacturer Flash-controller applicability
 ```
 
@@ -251,16 +275,12 @@ Framework v1 permanently tests that:
 
 ## 12. Next transaction
 
-The next intended transaction is **STM32F1 Manufacturer Enrichment Expansion v1**.
+The next intended transaction is **STM32F1 Manufacturer Programming Profile Expansion v1**.
 
-It should:
+It should keep the 280 M1 Basic Profiles unchanged and separately establish the exact
+manufacturer applicability of programming interfaces, programming electrical constraints,
+Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
+M2 merely because an OpenOCD target mapping exists.
 
-1. select bounded STM32F1 scope(s);
-2. establish official manufacturer source locks;
-3. prove applicability to explicit exact ICPNs;
-4. create reusable scoped facts;
-5. compose exact-target profiles;
-6. update coverage deterministically;
-7. leave execution/HIL claims unchanged unless separately evidenced.
-
-Bulk portfolio enrichment should not begin until this scoped-reuse model proves correct on STM32F1 and then on a second Flash-controller architecture such as STM32G0 or STM32C0.
+After STM32F1 M2 proves the separation, the same Device Basic Profile pattern can be applied
+to another family without coupling basic catalog information to programming-algorithm maturity.

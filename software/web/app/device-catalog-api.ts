@@ -194,6 +194,34 @@ export type SelectedICProfile = {
   };
 };
 
+export type ManufacturerDeviceBasicProfile = {
+  schema_version: "1.0.0";
+  status: "manufacturer_device_basic_available";
+  profile_id: string;
+  icpn: string;
+  manufacturer: "STMicroelectronics";
+  family: string;
+  series: string;
+  base_device: string;
+  package: string;
+  pin_count: string;
+  flash_size: string;
+  ram_size: string;
+  operating_vdd_v: { min: number; max: number };
+  operating_temperature_c: { min: number; max: number };
+  evidence: {
+    authority: "STMicroelectronics official";
+    source_surface: "st_product_selector";
+    selector_url: string;
+    observed_at_utc: string;
+    content_lock: null;
+    evidence_strength: "official_product_selector_observation";
+  };
+  programming_profile_authority: false;
+  hardware_runtime_ready: false;
+  physical_programming_qualified: false;
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -236,6 +264,7 @@ export type DeviceSearchResult = {
   backend_candidate?: BackendCandidateEvidence | null;
   backend_source_reference?: BackendSourceReference | null;
   backend_providers?: VersionedOpenOCDProvider[];
+  manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   selected_profile?: SelectedICProfile | null;
 };
 

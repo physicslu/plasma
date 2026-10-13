@@ -9,6 +9,8 @@ on:
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/*commercial-icpn.csv"
+      - "software/python/plasma_core/manufacturer_device_basic.py"
+      - "software/python/tests/test_manufacturer_device_basic.py"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/*commercial-icpn.csv"
+      - "software/python/plasma_core/manufacturer_device_basic.py"
+      - "software/python/tests/test_manufacturer_device_basic.py"
       - ".github/workflows/ic-support-validation.yml"
   workflow_dispatch:
 
@@ -140,6 +144,12 @@ jobs:
           python data/ic-support/test_stm32f103_openocd_real_binary.py
       - name: Run IC Support research regression
         run: python data/ic-support/test_ic_support.py
+      - name: Validate manufacturer device basic profile
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m py_compile software/python/plasma_core/manufacturer_device_basic.py
+          python software/python/tests/test_manufacturer_device_basic.py
       - name: Validate manufacturer enrichment scope and coverage
         run: |
           python -m py_compile \
@@ -148,6 +158,7 @@ jobs:
           python data/ic-support/test_manufacturer_enrichment_scope.py
           python data/ic-support/coverage_inventory.py --manufacturer-summary
           python data/ic-support/coverage_inventory.py --icpn STM32F103C8T6
+          python data/ic-support/coverage_inventory.py --icpn STM32F103R8T6
       - name: Report research coverage projection against current catalog
         run: python data/ic-support/coverage_inventory.py --summary
       - name: Test research coverage normalization

@@ -137,7 +137,7 @@ Coverage levels are monotonic:
 
 ```text
 M0 Production exact identity
-M1 Manufacturer Device Profile
+M1 Manufacturer Device Basic Profile
 M2 Manufacturer Programming Profile
 M3 Manufacturer-derived executable semantics
 M4 Independent software differential
@@ -158,6 +158,19 @@ python data/ic-support/test_manufacturer_enrichment_scope.py
 ```
 
 The coverage registry is research-only and cannot grant runtime or hardware authority.
+
+
+STM32F1 Device Basic Profile v1 is stored separately under
+`device-basic/stm32f1-device-basic-v1.json`. It explicitly binds all 280 Production
+STM32F1 exact ICPNs and supplies the operator-facing RAM / Operating VDD facts while
+cross-checking exact identity, Base Device, Package, Pin Count, Flash and Operating
+Temperature against the Production Catalog. It does not grant Programming Profile authority.
+
+The Basic Profile deliberately uses a lighter official-product-metadata provenance class
+than the programming baseline: ST Product Selector / eStore observations are retained
+with official URLs and observation date, but no SHA-256 content lock is fabricated for
+dynamic web content. Programming semantics continue to require the stronger manufacturer
+evidence chain.
 
 ## Validation
 
