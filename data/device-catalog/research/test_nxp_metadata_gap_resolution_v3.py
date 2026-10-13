@@ -49,8 +49,15 @@ class ManufacturerBumpSourceTests(unittest.TestCase):
         x=json.loads(mod.GATE.read_text())
         self.assertEqual(len(x["original_missing_bump_exact_skus"]),11)
         self.assertEqual(len(set(x["original_missing_bump_exact_skus"])),11)
-        self.assertTrue(all(x["production_write_authorized"] is False
-                            for _ in x["original_missing_bump_exact_skus"]))
+        self.assertTrue(x["production_write_authorized"] is False)
+        locked=x["qualified_source_evidence"]
+        self.assertEqual({r["icpn"] for r in locked},
+                         set(x["original_missing_bump_exact_skus"]))
+        self.assertEqual(len({r["original_rendered_html_sha256"] for r in locked}),11)
+        self.assertTrue(all(len(r["original_rendered_html_sha256"])==64 and
+                            r["explicit_original_package_contact"]=="64 bumps" and
+                            r["canonical_production_admission_authorized"] is False
+                            for r in locked))
 
 
 if __name__=="__main__":
