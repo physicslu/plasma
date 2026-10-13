@@ -55,6 +55,28 @@ class BoundedSnapshotContract(unittest.TestCase):
         self.assertEqual(p["observed_active_exact"], 353)
         self.assertEqual(p["observed_qualification_exact"], 2)
         self.assertEqual(p["observed_other_lifecycle_exact"], 13)
+        other = p["observed_other_lifecycle_icpns"]
+        self.assertEqual(len(other), 13)
+        self.assertEqual([r["icpn"] for r in other],
+                         sorted(r["icpn"] for r in other))
+        self.assertEqual(len({r["icpn"] for r in other}), 13)
+        self.assertEqual(
+            {r["lifecycle"] for r in other},
+            {"NRND", "No Longer Manufactured"},
+        )
+        self.assertEqual(
+            sum(r["lifecycle"] == "NRND" for r in other), 12,
+        )
+        self.assertEqual(
+            sum(r["lifecycle"] == "No Longer Manufactured" for r in other), 1,
+        )
+        self.assertTrue(set(active).isdisjoint(r["icpn"] for r in other))
+        self.assertTrue(set(qualification).isdisjoint(r["icpn"] for r in other))
+        self.assertEqual(
+            len(set(active) | set(qualification) |
+                {r["icpn"] for r in other}), 368,
+        )
+
         self.assertEqual(p["observed_active_missing_from_production"], 353)
         self.assertTrue(all(re.fullmatch(r"[A-Z0-9][A-Z0-9._/-]{3,63}", x) for x in active))
         self.assertEqual(
@@ -106,6 +128,12 @@ class BoundedSnapshotContract(unittest.TestCase):
                          self.report["observed_active_exact_set_sha256"])
         self.assertTrue(second["all_product_acquisition_jobs_passed"])
         self.assertTrue(second["bounded_reconciliation_passed"])
+        first_prior = self.s["prior_replay"]
+        self.assertNotEqual(first_prior["workflow_run_id"], first["workflow_run_id"])
+        self.assertNotEqual(first_prior["workflow_run_id"], second["workflow_run_id"])
+        self.assertEqual(first_prior["workflow_run_id"], 38333219588)
+        self.assertEqual(first["workflow_run_id"], 38334514193)
+
 
 
 if __name__ == "__main__":
