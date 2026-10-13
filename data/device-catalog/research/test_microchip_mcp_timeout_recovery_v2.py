@@ -14,6 +14,14 @@ from test_microchip_mcp_batch_plan_v1 import fixture
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
         self.inventory=fixture()
+        # This tiny synthetic fixture only has two 8-bit safe seeds;
+        # grow its source-attested support universe to one genuine 10-slot
+        # batch, without loosening the production batch-size contract.
+        extras=[f'PIC10F{n}' for n in range(210,218)]
+        self.inventory['device_packs'][0]['device_names'].extend(extras)
+        self.inventory['device_packs'][0]['supported_name_count']+=len(extras)
+        self.inventory['lanes']['8bit']['candidate_device_name_count']+=len(extras)
+        self.inventory['observed_manufacturer_device_support_names']+=len(extras)
         self.plan=plan_inventory(self.inventory,'a'*64,batch_size=10)
         self.seed=self.plan['batches'][0]['batch_id']
         self.assertEqual(self.plan['batches'][0]['lane'],'8bit')
