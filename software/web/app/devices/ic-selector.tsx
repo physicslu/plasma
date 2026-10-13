@@ -341,7 +341,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <h3>{zh ? "IC Information" : "IC Information"}</h3>
                   <p>
                     {selected.manufacturer_device_basic_profile
-                      ? (zh ? "ST 官方 Product Selector / Product Page 基本規格" : "Basic specifications from official ST product metadata")
+                      ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
                       : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
                   </p>
                 </div>
