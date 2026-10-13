@@ -241,6 +241,26 @@ archived source bytes. Do not mark a Research Gate, a global coverage
 denominator, or any Production row as supported by missing or expired
 original evidence. This PR does not contain a full raw manufacturer archive.
 
+## Gate 2f — offline retry diagnostics; preserve immutable evidence
+
+`microchip_mcp_retry_audit_v1.py` validates a single batch against the
+source-pinned original DFP plan and exact batch attestation, then independently
+replays each v1/v2 source archive. It distinguishes `fully_replayed`,
+`not_archived`, `unverified_archive` and
+`zero_exact_prefix_candidates`. **NOT_FOUND or zero exact-prefix matches
+are not an EOL finding.** Damaged source archives must be preserved and
+reviewed before any *separate-directory* recapture; this tool performs no
+network retries or overwrites.
+
+```bash
+python data/device-catalog/research/microchip_mcp_retry_audit_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --plan /tmp/microchip-dfp-research-batch-plan.json \
+  --batch-root /tmp/microchip-research-batches \
+  --batch-id 8bit-0001 \
+  --output /tmp/microchip-research-retry-audit.json
+```
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
