@@ -74,7 +74,17 @@
     "family_identity_field": "base_part_number",
     "raw_lifecycle_field": "lifecycle_status",
     "raw_lifecycle_semantics": "pending_official_code_mapping_review",
-    "population_boundary": "per-query response only; complete MCU/DSC family inventory is not established"
+    "population_boundary": "per-query response only; complete MCU/DSC family inventory is not established",
+    "documentation_example_status": "inconsistent_illustrative_counts_do_not_treat_as_expected_population",
+    "probe_workflow": ".github/workflows/device-catalog-microchip-api-probe-v1.yml",
+    "probe_script": "data/device-catalog/research/microchip_product_api_probe_v1.py",
+    "sample_query": {
+      "part": "PIC10F202",
+      "pagesize": 2,
+      "pagenumber": "1..totalPages"
+    },
+    "live_probe_status": "awaiting_ci_capture",
+    "lifecycle_mapping": "raw_only_no_mapping"
   },
   "gate_1b_surface_audit": {
     "audit_date": "2026-10-13",
@@ -123,7 +133,7 @@
   },
   "family_query_seeds": {
     "status": "candidate_seeds_only_not_exhaustive",
-    "query_execution_status": "not_run",
+    "query_execution_status": "sample_transport_probe_pending",
     "meaning": "Family labels used to prepare a future per-family Product Data API query matrix. These labels are not exact ordering parts, API query semantics remain to be tested, and this set is not an exhaustive population.",
     "lanes": {
       "8bit": [
