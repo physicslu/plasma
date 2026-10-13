@@ -23,6 +23,7 @@ from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
 from .openocd_provider_registry import get_default_openocd_provider_registry
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
+from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
 from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
@@ -111,6 +112,13 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
         )
         item["manufacturer_device_basic_profile"] = (
             basic.to_payload() if basic is not None else None
+        )
+        # Read-only per-exact-NXP manufacturer data; this is NOT a Programming
+        # Profile and must never change backend routes or job admission.
+        item["nxp_manufacturer_device_profile"] = (
+            get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
+            if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
+            else None
         )
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (

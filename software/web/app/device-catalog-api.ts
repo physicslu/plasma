@@ -224,6 +224,38 @@ export type ManufacturerDeviceBasicProfile = {
   physical_programming_qualified: false;
 };
 
+export type NXPManufacturerDeviceProfile = {
+  schema_version: "1.0.0";
+  status: "manufacturer_device_partial_evidence";
+  profile_id: "nxp-exact-manufacturer-device-v5";
+  icpn: string;
+  manufacturer: "NXP";
+  family: "MCX" | "K32L2";
+  base_device: string;
+  base_device_evidence_state: "exact_sku_singleton_not_manufacturer_base_verified";
+  package: string;
+  pin_count: string;
+  flash_size: string;
+  ram_size: string;
+  operating_vdd_v: { min: number; max: number } | null;
+  io_supply_v: null;
+  vdda_v: null;
+  operating_temperature_c: { min: number; max: number };
+  unknown_fields: Array<"io_supply" | "vdda" | "operating_vdd">;
+  manufacturer_device_full_profile_complete: false;
+  evidence: {
+    authority: "NXP official";
+    source_surface: "nxp_exact_part_html";
+    exact_url: string;
+    source_html_sha256: string;
+    ram_evidence_state: string;
+    vdd_evidence_state: string;
+  };
+  programming_profile_authority: false;
+  hardware_runtime_ready: false;
+  physical_programming_qualified: false;
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -267,6 +299,7 @@ export type DeviceSearchResult = {
   backend_source_reference?: BackendSourceReference | null;
   backend_providers?: VersionedOpenOCDProvider[];
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
+  nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
   selected_profile?: SelectedICProfile | null;
 };
 

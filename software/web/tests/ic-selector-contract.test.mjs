@@ -138,6 +138,13 @@ test("IC Information uses the independent Manufacturer Device Basic Profile", as
   assert.match(api, /vdda_v:\s*\{ min: number; max: number \}\s*\|\s*null/);
   assert.match(selector, /<dt>I\/O Supply<\/dt>/);
   assert.match(selector, /<dt>VDDA<\/dt>/);
+  // NXP exact manufacturer evidence is distinct from ST Basic Profiles.
+  assert.match(api, /NXPManufacturerDeviceProfile/);
+  assert.match(api, /nxp_manufacturer_device_profile\?:\s*NXPManufacturerDeviceProfile\s*\|\s*null/);
+  assert.match(api, /manufacturer_device_full_profile_complete:\s*false/);
+  assert.match(api, /programming_profile_authority:\s*false/);
+  assert.match(selector, /selected\.nxp_manufacturer_device_profile/);
+  assert.match(selector, /Not independently sourced/);
   assert.match(selector, /工作溫度/);
   assert.doesNotMatch(selector, /<dt>Main Flash Map<\/dt>/);
   assert.doesNotMatch(selector, /<dt>Memory Map<\/dt>/);
