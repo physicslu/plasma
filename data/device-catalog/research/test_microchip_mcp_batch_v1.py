@@ -54,6 +54,23 @@ class BatchTests(unittest.TestCase):
             self.assertEqual(json.loads((output / 'batch-summary.json').read_text())
                              ['bounded_reconciled_queries'], 3)
 
+    def test_two_session_batch_preserves_replay_seed_order(self):
+        parts = batch.load_seeds()[:10]
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / 'parallel'
+            with patch.object(batch.probe, 'run',
+                              side_effect=lambda folder, part: self.fake_result(part)):
+                report = batch.execute(output, parts, workers=2)
+            self.assertTrue(report['all_queries_reconciled'])
+            self.assertEqual([x['base_device_query'] for x in report['results']], parts)
+
+    def test_parallelism_above_two_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'not_created'
+            with self.assertRaisesRegex(ValueError, 'worker count'):
+                batch.execute(target, batch.load_seeds()[:2], workers=3)
+            self.assertFalse(target.exists())
+
     def test_a_failed_query_is_reported_without_false_success(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / 'research'
