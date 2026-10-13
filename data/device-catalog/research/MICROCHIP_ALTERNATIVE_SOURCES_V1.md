@@ -202,3 +202,49 @@ bytes and manifest; the manifest order is the frozen DFP query order. The
 27-query source-observation run must still be independently audited for
 per-query failures, raw lifecycle values, chart/export cross-checks and
 false-negative search behavior before coverage claims.
+
+### Full PIC10/PIC12 DFP 27-query MCP results (2026-10-13)
+
+Run #1 ([source artifact 11785323931](https://github.com/physicslu/plasma/actions/runs/38337429249/artifacts/11785323931))
+reconciled 20/27 base-device searches under an overly restrictive
+`basePartNumber == searchTerm` requirement. Its 20 passing queries contained
+327 raw search results in total. Six other searches returned orderable part
+numbers whose manufacturer `basePartNumber` was a related family, or contained
+fuzzy matches; the seventh search, `PIC12F529T48A`, returned
+`success=false` with `error=NOT_FOUND`. Neither mismatch nor absence means
+that the corresponding commercial MCU is obsolete.
+
+The probe now validates **every** raw result across page sizes 2 and 60,
+but counts a query's exact-SKU candidates using a delimiter-aware part-number
+prefix (commercial order strings such as `PIC12HV615-E/MF` remain attributed
+to `PIC12HV615` even when raw basePartNumber is `PIC12F615`).
+Every fuzzy foreign part is archived and counted separately. Overlap
+reconciliation uses full ordering part numbers, not vendor base aliases.
+
+Run #2 ([source artifact 11786145395](https://github.com/physicslu/plasma/actions/runs/38338256516/artifacts/11786145395))
+completed 26/27 bounded queries and archived 366 files, with 397 raw hits,
+50 foreign-device fuzzy hits, 347 exact-prefix ordering hits and 48
+vendor-base aliases among those target hits. The 347 exact-prefix strings
+were **all distinct across the 26 successful queries** in an independent
+offline cross-query check of each `summary.json` in the captured ZIP.
+The remaining `PIC12F529T48A` returned `NOT_FOUND` again.
+This is a scoped empirical search result, not a full family enumeration,
+manufacturer Active SKU denominator, or Production publication authorization.
+
+A separately tested `microchip_mcp_evidence_ledger_v1.py` replays each
+complete original-byte MCP transcript, then emits source-linked exact-SKU
+research observations (original raw lifecycle and SHA-256 for each source
+response, query, device identity and observed provenance). Incomplete or
+tampered queries are excluded. That ledger is **research-only** and does not
+write `data/device-catalog/production/`. A reproducible complete set still
+depends on independent manufacturer source/export coverage and lifecycle
+scope review.
+
+**Outstanding:** Recover product evidence for `PIC12F529T48A` via
+manufacturer-specific document/product lookup; do not fabricate its SKU list.
+Expand frozen Device Family Pack discovery inventory beyond this single
+27-device pack (there are separate PIC16/PIC18, AVR, dsPIC, PIC24, PIC32,
+SAM and wireless packs) while filtering non-MCU, module and MPU entries.
+Find an independent official orderable-product chart/feed to validate that
+MCP text search returns all relevant commercial suffixes; recheck raw
+Lifecycle per commercial SKU with PCN/EOL evidence.
