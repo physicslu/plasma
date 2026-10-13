@@ -126,10 +126,14 @@ ordering SKUs in the read-only matrix, now **23 bounded product pages**:
 - MCX W71 — `MCXW716CMFTAR`
 - MCX W72 — `MCXW727DMFTBR`
 
-The remaining indexed pages `MCX-A5`, `MCX-L14`, and `MCX-L25` are
-**discovered but not yet anchored to verified exact SKUs**. Do not fabricate
-`must_include` sentinels for them. Reconciliation must continue to report
-manufacturer-wide Active identity counts and coverage as `null`.
+The remaining indexed pages `MCX-A5`, `MCX-L14`, and `MCX-L25` were
+observed on NXP's official pages as **Preproduction** (2026-10-13), not
+Active. Their accessible official pages do not currently provide the same
+Package/Quality ordering-code Status surface. Retain these as dated
+**preproduction source leads**, rather than treating them as missing Active
+SKU pages or fabricating `must_include` sentinels. Re-verify manufacturer
+marketing status before any later promotion. Reconciliation must continue
+to report manufacturer-wide Active identity counts and coverage as `null`.
 
 The LPC55S6x pilot sentinel was also corrected from the package/group label
 `LPC55S69JEV98` to the observed orderable SKU `LPC55S69JEV98E`.
