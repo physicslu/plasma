@@ -1,6 +1,6 @@
-# NXP 353 Exact Active — Bounded Layer-1 Admission Dry-run v4
+# NXP 353 Exact Active — Owner-gated 12 KL25 Layer-1 Production Transaction v4
 
-Date: 2026-10-13. **Research-only, unpublished proposal.** One bulk 353-ICPN
+Date: 2026-10-13. **Owner-gated PR staging: NOT merged into main, NOT deployed, NO physical programming qualification.** One bulk 353-ICPN
 assessment, not a vendor-wide Active denominator or a programming-ready list.
 
 ## Decision framing
@@ -39,7 +39,7 @@ Production prestate; v4 intentionally uses the **live 4,629-row
 manifest blob** and fails closed on any subsequent drift rather than
 copying old projection counts.
 
-Dry-run emits only transient GitHub Actions review artifacts:
+The same PR now **stages one proposed 12-row KL25 Production manifest source on its branch**, while dry-run outputs only transient GitHub Actions review artifacts:
 
 1. A byte-for-byte copy of the locked canonical 12-row KL25 CSV.
 2. A **hypothetical** manifest with one appended NXP KL25 source,
@@ -52,9 +52,14 @@ ST + 12 KL25 catalog would have **4,641** exact ICPNs and 29 source
 entries; these numbers are projections only. No additional NXP
 families are implied, no Deployment authority is implied.
 
-The hypothetical manifest is NOT written to
-`data/device-catalog/production/`, not referenced by
-the runtime, and not merged into the repository.
+**Main and deployed Production remain unchanged until a single explicit owner
+merge approval.** In the Draft PR branch, the proposed
+`data/device-catalog/production/icpn-v1-manifest.json` contains one extra
+NXP KL25 source pinned to the reviewed 12-row canonical CSV. The
+existing 28 ST source entries remain byte-for-byte reproducible from
+the former Production Git blob. The hypothetical manifest in CI is
+a separate review artifact and cannot be mistaken for deployment.
+No automatic merge or release/deployment is authorized.
 
 ## Remaining 129-source bulk triage
 
@@ -107,6 +112,19 @@ All 129 remain unresolved; none are automatically promoted.
   security-unlock behavior or PLASMA HIL validation.
 - No NXP-global Active denominator or coverage percentage is claimed.
 
-**Owner merge approval for this research PR** and **owner Production
-publication approval** are distinct gates. Neither permits a runtime
+**One final owner approval may authorize merging this staged KL25 Production
+source and its updated integrity regressions**; release/deployment and
+physical programming approval remain independent domains. Neither permits a runtime
 programming job without its separate execution/physical validations.
+
+## Consolidated approval boundary
+
+This change updates **only the Draft PR branch**, not main. The final
+approval request will explicitly include the proposed addition of **12 NXP
+KL25 exact ICPNs to the Production Catalog** (4629 → 4641, sources 28 → 29).
+It will NOT authorize the other 341 research identities, software executor
+or device operations, backend binary installation, PPU/SWD/HIL, or deployment.
+
+The existing 4629 ST ICPNs and 28 original source bindings must replay
+exactly as before; the 12 KL25 additions are separately manifest-pinned.
+All catalog/API tests must show NXP KL25 12 and reject NXP 341.
