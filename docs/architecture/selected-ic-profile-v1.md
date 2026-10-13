@@ -71,7 +71,7 @@ The Basic Profile is the operator-facing IC Information contract. For v1 it owns
 - operating temperature.
 
 For the STM32F1 expansion these facts are composed from Production Catalog exact identity
-plus official ST Product Selector / Product Page metadata. The Basic Profile is independent
+plus official ST Product Selector / eStore metadata. The Basic Profile is independent
 from Programming Profile authority. It cannot authorize erase/program/verify or hardware use.
 
 Detailed memory-map/address-range data may remain available in deeper manufacturer models for
