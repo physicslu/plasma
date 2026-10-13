@@ -79,7 +79,7 @@ def execute(output, parts, offline=False):
         'scope': 'candidate PIC10/PIC12 DFP base-device text-search queries',
         'mode': 'offline_replay' if offline else 'live_read_only',
         'generated_at_utc': datetime.now(timezone.utc).isoformat(),
-        'queried_device_names': len(parts),
+        'selected_device_names': len(parts),
         'bounded_reconciled_queries': sum(
             r['state'] == 'bounded_search_reconciled' for r in reports),
         'all_queries_reconciled': all(
