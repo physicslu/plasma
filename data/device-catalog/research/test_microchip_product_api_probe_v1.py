@@ -5,7 +5,7 @@ import unittest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from microchip_product_api_probe_v1 import ProbeError, validate_page
+from microchip_product_api_probe_v1 import ProbeError, parse_json_response, validate_page
 
 
 def valid_page(page=1):
@@ -23,6 +23,15 @@ def valid_page(page=1):
 
 
 class MicrochipProductApiProbeTests(unittest.TestCase):
+    def test_parses_json_response(self):
+        self.assertEqual(parse_json_response(b'{"ok": true}'), {"ok": True})
+
+    def test_reports_bounded_diagnostics_for_html_response(self):
+        with self.assertRaisesRegex(ProbeError, "response is not valid JSON") as caught:
+            parse_json_response(b"<!DOCTYPE html><html>blocked</html>")
+        self.assertIn("bytes=", str(caught.exception))
+        self.assertIn("prefix=", str(caught.exception))
+
     def test_accepts_valid_page_envelope_and_preserves_raw_status(self):
         page = validate_page(valid_page(), 1, 2)
         self.assertEqual(page["data"][0]["lifecycle_status"], "REL")
