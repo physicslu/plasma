@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "manufacturer": "NXP",
+  "scope": "MCX six official series landing-page link-candidate inventory, not full manufacturer SKU denominator",
+  "globally_complete": false,
+  "production_write_authorized": false,
+  "series": [
+    {
+      "series": "A",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-a-series-microcontrollers:MCX-A-SERIES",
+      "heading": "MCX A Series Products"
+    },
+    {
+      "series": "C",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-c-series-microcontrollers:MCX-C-SERIES",
+      "heading": "MCX C Series Products"
+    },
+    {
+      "series": "E",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-e-series-microcontrollers:MCX-E-SERIES",
+      "heading": "MCX E Series Products"
+    },
+    {
+      "series": "L",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-l-series-microcontrollers:MCX-L-SERIES",
+      "heading": "MCX L Series Products"
+    },
+    {
+      "series": "N",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-n-series-microcontrollers:MCX-N-SERIES",
+      "heading": "MCX N Series Products"
+    },
+    {
+      "series": "W",
+      "url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/mcx-arm-cortex-m/mcx-w-series-microcontrollers:MCX-W-SERIES",
+      "heading": "MCX W Series Products"
+    }
+  ]
+}
