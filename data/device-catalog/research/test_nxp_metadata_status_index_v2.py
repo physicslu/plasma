@@ -27,7 +27,7 @@ class NxpMetadataIndexTests(unittest.TestCase):
 
     def test_broken_per_sku_state_hash_fails_closed(self):
         x=json.loads(mod.STATUS_MAP.read_text())
-        x["status_map"]="C"+x["status_map"][1:]
+        x["status_map"]="B"+x["status_map"][1:]
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"bad.json"
             path.write_text(json.dumps(x))
