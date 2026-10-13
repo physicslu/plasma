@@ -119,6 +119,17 @@ jobs:
         run: |
           python data/ic-support/compare_manufacturer_openocd.py
           python data/ic-support/test_manufacturer_openocd_comparison.py
+      - name: Generate STM32F103 manufacturer-derived programmer
+        run: |
+          out="$RUNNER_TEMP/stm32f103_programmer.py"
+          python data/ic-support/generate_stm32f103_programmer.py --output "$out"
+          python -m py_compile "$out"
+      - name: Test generated STM32F103 programmer behavior
+        run: python data/ic-support/test_stm32f103_programmer_codegen.py
+      - name: Compare generated STM32F103 programmer with OpenOCD
+        run: |
+          python data/ic-support/compare_generated_programmer_openocd.py
+          python data/ic-support/test_generated_programmer_openocd.py
       - name: Run IC Support research regression
         run: python data/ic-support/test_ic_support.py
       - name: Report research coverage projection against current catalog
