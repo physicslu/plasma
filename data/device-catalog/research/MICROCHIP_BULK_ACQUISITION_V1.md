@@ -289,6 +289,37 @@ through their exact pack identifiers. Preexisting plan JSON generated
 by the earlier algorithm must be **regenerated**, as the deterministic
 batch hashes and ordinal membership will change.
 
+## Gate 2f — cross-lane DFP-pinned MCP canary (not executed live)
+
+The original official DFP index and pack names have now identified ten
+explicit *device-support query seeds* across 8-bit PIC/AVR, 16-bit
+PIC24/dsPIC, 32-bit PIC32/SAM and wireless PIC32CX/SAMR. The frozen
+`microchip-mcp-crosslane-canary-v1.json` captures each exact pack/lane,
+ordered query and original index SHA-256, with no manufacturer completeness
+or Production claims. `microchip_mcp_crosslane_canary_v1.py` validates
+every candidate against the **original archived source** before contacting
+the vendor. The default three-query canary spans 8-, 16- and 32-bit; the
+ten-query option includes wireless. Both use v2 full 20/60 pagination
+and one worker. Only explicit `--capture` makes live calls; the default
+replays a source-attested prior capture and fails closed on tampering.
+
+```bash
+# The original index.html + manifest.json archive must be extracted first.
+python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --target-root /tmp/microchip-crosslane --max-queries 3 --capture
+
+python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --target-root /tmp/microchip-crosslane --max-queries 3
+```
+
+This is **code plus synthetic CI contract tests only**; none of the ten
+cross-lane searches was newly executed against the live vendor API by this PR.
+There is no authenticated claim that any of these queries returns more
+than 60 results. The official DFP index must remain available as bytes,
+not merely a digest, for source-bound replay and capture.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
