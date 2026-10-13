@@ -135,13 +135,24 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
             )
         )
 
-    def test_catalog_drift_fails_closed(self) -> None:
+    def test_group_owned_constraints_fail_closed_but_catalog_owned_fields_compose(self) -> None:
         with self.assertRaisesRegex(ICSupportIntegrityError, "Flash"):
             self.resolve(flash_size="128 KiB")
-        with self.assertRaisesRegex(ICSupportIntegrityError, "package"):
-            self.resolve(package="UFQFPN")
-        with self.assertRaisesRegex(ICSupportIntegrityError, "temperature_grade"):
-            self.resolve(temperature_grade="-40 to 105 C")
+        with self.assertRaisesRegex(ICSupportIntegrityError, "series"):
+            self.resolve(series="STM32F101")
+
+        package_variant = self.resolve(package="UFQFPN")
+        self.assertIsNotNone(package_variant)
+        assert package_variant is not None
+        self.assertEqual(package_variant.package, "UFQFPN")
+
+        temperature_variant = self.resolve(temperature_grade="-40 to 105 C")
+        self.assertIsNotNone(temperature_variant)
+        assert temperature_variant is not None
+        self.assertEqual(
+            temperature_variant.operating_temperature_c,
+            {"min": -40, "max": 105},
+        )
 
     def test_non_st_evidence_or_fake_content_lock_is_rejected(self) -> None:
         for mutation, pattern in (
