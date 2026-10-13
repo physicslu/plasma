@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from time import sleep
 
 import microchip_mcp_batch_plan_v1 as planner
 from microchip_dfp_index_inventory_v1 import archived_inventory
@@ -110,6 +111,8 @@ def execute(plan, inventory, digest, shard, shard_count,
             file.write(json.dumps(record,sort_keys=True)+'\n')
             file.flush()
         print(json.dumps(record,sort_keys=True),flush=True)
+        # Conservative inter-batch pacing even when a query returns quickly.
+        sleep(2)
     summary={'schema_version':1,'manufacturer':'Microchip',
              'original_dfp_index_sha256':digest,
              'shard':shard,'shard_count':shard_count,

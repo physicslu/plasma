@@ -50,10 +50,13 @@ class SweepTests(unittest.TestCase):
                 sweep.execute(self.plan,self.inventory,'a'*64,0,2,
                               tmp,Path(tmp)/'plan.json',
                               Path(tmp)/'safe',Path(tmp)/'logs',1)
-            with self.assertRaisesRegex(ValueError,'Production'):
-                sweep.execute(self.plan,self.inventory,'a'*64,0,2,
-                              tmp,Path(tmp)/'plan.json',
-                              Path(tmp)/'Production',Path(tmp)/'logs',180)
+            # This specific test validates output-path policy, not whether
+            # a synthetic tiny DFP fixture includes historic captured IDs.
+            with patch.object(sweep,'PREVIOUS_CAPTURED_IDS',frozenset()):
+                with self.assertRaisesRegex(ValueError,'Production'):
+                    sweep.execute(self.plan,self.inventory,'a'*64,0,2,
+                                  tmp,Path(tmp)/'plan.json',
+                                  Path(tmp)/'Production',Path(tmp)/'logs',180)
 
 if __name__=='__main__':
     unittest.main()

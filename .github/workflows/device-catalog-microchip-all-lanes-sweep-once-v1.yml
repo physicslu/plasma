@@ -10,6 +10,7 @@ permissions:
   actions: read
 concurrency:
   group: microchip-dfp-all-lanes-12-shards-once
+  # Rerun after isolating the offline synthetic fixture from previous run IDs.
   cancel-in-progress: false
 jobs:
   capture-and-reconcile:
