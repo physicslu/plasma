@@ -11,6 +11,7 @@ from plasma_core.manufacturer_device_basic import (
     DEVICE_BASIC_RELATIVE_PATH,
     ICSupportIntegrityError,
     ManufacturerDeviceBasicResolver,
+    get_default_manufacturer_device_basic_resolver,
 )
 
 
@@ -53,6 +54,8 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         self.assertEqual(payload["status"], "manufacturer_device_basic_available")
         self.assertEqual(payload["ram_size"], "20 KiB")
         self.assertEqual(payload["operating_vdd_v"], {"min": 2.0, "max": 3.6})
+        self.assertIsNone(payload["io_supply_v"])
+        self.assertIsNone(payload["vdda_v"])
         self.assertEqual(payload["operating_temperature_c"], {"min": -40, "max": 85})
         self.assertFalse(payload["programming_profile_authority"])
         self.assertFalse(payload["hardware_runtime_ready"])
@@ -119,6 +122,54 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 self.assertIsNotNone(resolved)
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
+
+    def test_default_registry_bulk_profiles_cover_f1_c0_and_g0(self) -> None:
+        registry = get_default_manufacturer_device_basic_resolver()
+        self.assertEqual(registry.size, 912)
+        self.assertEqual(
+            registry.profile_ids,
+            (
+                "stm32c0-device-basic-v1",
+                "stm32f1-device-basic-v1",
+                "stm32g0-device-basic-v1",
+            ),
+        )
+
+        c0 = registry.resolve_exact(
+            "STM32C011F4P6",
+            manufacturer="STMicroelectronics",
+            family="STM32C0",
+            series="STM32C011",
+            base_device="STM32C011F4",
+            package="TSSOP",
+            pin_count="20",
+            flash_size="16 KiB",
+            temperature_grade="-40 to 85 C",
+        )
+        self.assertIsNotNone(c0)
+        assert c0 is not None
+        self.assertEqual(c0.ram_size, "6 KiB")
+        self.assertEqual(c0.operating_vdd_v, {"min": 2.0, "max": 3.6})
+        self.assertIsNone(c0.io_supply_v)
+        self.assertIsNone(c0.vdda_v)
+
+        g0 = registry.resolve_exact(
+            "STM32G031K8T3",
+            manufacturer="STMicroelectronics",
+            family="STM32G0",
+            series="STM32G031",
+            base_device="STM32G031K8",
+            package="LQFP",
+            pin_count="32",
+            flash_size="64 KiB",
+            temperature_grade="-40 to 125 C",
+        )
+        self.assertIsNotNone(g0)
+        assert g0 is not None
+        self.assertEqual(g0.ram_size, "8 KiB")
+        self.assertEqual(g0.operating_vdd_v, {"min": 1.7, "max": 3.6})
+        self.assertIsNone(g0.io_supply_v)
+        self.assertIsNone(g0.vdda_v)
 
     def test_other_family_does_not_gain_implicit_applicability(self) -> None:
         self.assertIsNone(
