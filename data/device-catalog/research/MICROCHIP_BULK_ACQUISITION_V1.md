@@ -320,6 +320,36 @@ There is no authenticated claim that any of these queries returns more
 than 60 results. The official DFP index must remain available as bytes,
 not merely a digest, for source-bound replay and capture.
 
+## Gate 2g — actual archived pilot vs source-pinned query gap
+
+The original **3,717-name** DFP index (SHA-256
+`9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0`)
+was replayed against the existing 27-query PIC10/PIC12 raw-evidence archive,
+not through new vendor calls. After holding 56 potential AC accessories
+and 13 unsupported-syntax wireless names for manual review, the revised
+DFP-derived query plan contains **3,198** eligible text-search names split
+into **321 ten-name batches** or **1,068 three-name batches**. Of those,
+**26/3,198** prior query observations fully replay (0.813%), **1** prior
+query (`PIC12F529T48A`) is unverified, and **3,171** have not been
+attempted. The existing source-linked ledger contains **347** distinct
+exact-prefix ordering *candidates*; this continuation independently checked
+all 347 source-response SHA-256 links against the saved original evidence.
+
+`microchip_mcp_query_gap_v1.py` makes this partition reproducible by
+regenerating the exact frozen DFP plan and calling the established replay
+ledger. Only the *search-query execution denominator* is frozen here:
+**0.813% is not MCU portfolio coverage, Active SKU coverage or flash support**.
+The report must keep global Active denominator null and Production writes
+disabled. No live vendor queries were executed by the offline gap study.
+
+```bash
+python data/device-catalog/research/microchip_mcp_query_gap_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --plan /path/to/source-pinned-batch-plan-10.json \
+  --pilot-root /path/to/archived-27-query-raw-evidence \
+  --output /tmp/microchip-query-gap.json
+```
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
