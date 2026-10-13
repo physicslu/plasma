@@ -46,7 +46,6 @@ class ProbeTests(unittest.TestCase):
             lambda x: x['pagination'].update(offset=0),
             lambda x: x['pagination'].update(hasMore=True),
             lambda x: x['products'][0].update(partNumber='PIC10F202-I/MC'),
-            lambda x: x['products'][0].update(basePartNumber='PIC10F200'),
             lambda x: x['products'][0].update(lifecycleStatus=''),
         ]
         for mutate in mutations:
@@ -55,6 +54,39 @@ class ProbeTests(unittest.TestCase):
                 mutate(last)
                 with self.assertRaises(ValueError):
                     reconcile([page(0), last], page(0, 60))
+
+    def test_vendor_base_part_alias_does_not_discard_valid_ordering(self):
+        first, last, comparison = page(0), page(2), page(0, 60)
+        first['products'][0]['basePartNumber'] = 'PIC10F200'
+        comparison['products'][0]['basePartNumber'] = 'PIC10F200'
+        result = reconcile([first, last], comparison)
+        self.assertEqual(result['exact_prefix_ordering_count'], 3)
+        self.assertEqual(result['vendor_base_part_alias_count'], 1)
+        self.assertEqual(result['fuzzy_foreign_ordering_count'], 0)
+
+    def test_fuzzy_foreign_device_is_archived_but_not_counted_as_target(self):
+        first, last, comparison = page(0), page(2), page(0, 60)
+        for record in (last['products'][0], comparison['products'][2]):
+            record['partNumber'] = 'RFPIC12F675H-I/SS'
+            record['basePartNumber'] = 'RFPIC12F675H'
+            record['lifecycleStatus'] = 'Not Recommended For New Design'
+        result = reconcile([first, last], comparison)
+        self.assertEqual(result['reported_total'], 3)
+        self.assertEqual(result['exact_prefix_ordering_count'], 2)
+        self.assertEqual(result['fuzzy_foreign_ordering_count'], 1)
+        self.assertEqual(result['foreign_ordering_parts'], ['RFPIC12F675H-I/SS'])
+        self.assertIsNone(result['global_active_denominator'])
+
+    def test_all_fuzzy_foreign_devices_cannot_inflate_target_count(self):
+        pages = [page(0), page(2)]
+        comparison = page(0, 60)
+        for data in [*pages, comparison]:
+            for row in data['products']:
+                row['partNumber'] = row['partNumber'].replace('PIC10F202', 'PIC10F200')
+                row['basePartNumber'] = 'PIC10F200'
+        result = reconcile(pages, comparison)
+        self.assertEqual(result['exact_prefix_ordering_count'], 0)
+        self.assertEqual(result['fuzzy_foreign_ordering_count'], 3)
 
     def test_comparison_lifecycle_drift(self):
         other = page(0, 60)
