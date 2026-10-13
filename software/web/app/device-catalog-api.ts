@@ -208,10 +208,12 @@ export type ManufacturerDeviceBasicProfile = {
   flash_size: string;
   ram_size: string;
   operating_vdd_v: { min: number; max: number };
+  io_supply_v: { min: number; max: number } | null;
+  vdda_v: { min: number; max: number } | null;
   operating_temperature_c: { min: number; max: number };
   evidence: {
     authority: "STMicroelectronics official";
-    source_surface: "st_product_selector";
+    source_surface: "st_product_selector" | "st_estore";
     selector_url: string;
     observed_at_utc: string;
     content_lock: null;
