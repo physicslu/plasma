@@ -49,14 +49,23 @@ radio ordering table, `KW45B41Z5...` group gives application Flash
 1 MB / RAM 128 kB. This is a different hardware memory claim than the
 radio-core 256 kB Flash disclosed elsewhere in the data sheet.
 
-`nxp_kw45_exact_flash_datasheet_v3.py` verifies the eight blocked
-identities against the frozen #835 blocked reason map, downloads
-the **official PDF**, saves its SHA-256 and original bytes, checks the
-**exact visible SKU rows** and **memory row-span geometry** on PDF page
-4, then writes eight explicitly source-bound Flash candidates.
-**A successful v3 PDF validation qualifies research evidence only.**
-It does not merge application and radio Flash, invent a writable
-address map or enable OpenOCD programming.
+`nxp_kw45_exact_flash_datasheet_v3.py` first verifies the eight
+blocked identities against the frozen #835 blocked reason map. Its
+**PDF binary replay code and negative-tests are implemented**, but the
+original live acquisition using the NXP global and NXP Japan official
+PDF routes both returned **HTTP 404 from GitHub Actions** (despite
+the manufacturer PDF being browser-visible). Therefore the v3 CI
+currently runs `--offline-source-gap` and saves **eight specifically
+identified *unqualified* Flash candidates**, plus source URL and
+failed acquisition status, without falsely claiming a vendor PDF
+SHA-256 or machine-verified memory row-span.
+
+The original table was separately visually inspected on the NXP
+official PDF (Rev 9, p.4). That alone is **not automated source
+retention/replay**, so the eight remain in the canonical review queue
+until original binary evidence can be acquired and its exact table
+cells can be independently verified. No application/radio Flash
+merging, invented address map or OpenOCD permission.
 
 ### Remaining source exceptions
 
@@ -68,12 +77,22 @@ resolvable product pages. Their metadata stays **unknown** until
 manufacturer datasheet/order-table exact-SKU metadata can be
 substantiated; do **not** erase or mark them Obsolete.
 
-Other remaining partial cases include 28 i.MX RT source pages with
-no on-chip Flash scalar and no ambient temperature field. Do not
-assign a fake zero-kB internal Flash or confuse junction-temperature
-limits with ambient operating range. A separate memory architecture
-and algorithm applicability review is needed for these crossover
-parts before a Production Catalog schema can safely represent them.
+Other remaining partial cases include **23 i.MX RT** source pages with
+no on-chip Flash scalar and no ambient temperature field, plus
+**5 MCX** source pages missing Flash and ambient, and **8 KW45**
+source pages missing ambient. Do not assign a fake zero-kB internal
+Flash or confuse junction-temperature limits with ambient operating
+range. A separate memory architecture and algorithm applicability
+review is needed for crossover parts before a Production Catalog
+schema can safely represent them.
+
+The `nxp_metadata_gap_queue_v3.py` generator permanently derives a
+single **129 exact-SKU** exception CSV and fails if its checked-in
+rows differ. The queue is divided into **85 official /part HTTP
+non-200**, **8 KW45 flash multi-value needing PDF replay**,
+**23 i.MX RT flash/ambient**, **5 MCX flash/ambient**,
+and **8 KW45 ambient**. These are metadata-evidence routes, not
+backend mappings or presumed datasheet equivalences.
 
 ## Admission boundaries
 
