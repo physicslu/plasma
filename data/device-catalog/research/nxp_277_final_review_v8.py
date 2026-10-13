@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import urllib.request
+import urllib.error
 from collections import Counter
 from pathlib import Path
 
@@ -54,17 +55,41 @@ def pdf_table(s):
     return extracted
 
 def download_pdf(out):
-    req=urllib.request.Request(PDF_URL,headers={"User-Agent":"Mozilla/5.0","Accept":"application/pdf"})
-    with urllib.request.urlopen(req,timeout=90) as r:
-        require(r.geturl()==PDF_URL,"official NXP PDF redirect unexpected")
-        raw=r.read(10000001)
-    require(raw.startswith(b"%PDF-") and 100000<len(raw)<10000000,"bad NXP PDF")
-    digest=hashlib.sha256(raw).hexdigest()
-    path=out/"LPC55S0x_LPC550x_Rev1.4_original.pdf"
-    path.write_bytes(raw)
-    text=subprocess.run(["pdftotext","-f","6","-l","6","-layout",str(path),"-"],check=True,capture_output=True,text=True).stdout
-    require("Rev. 1.4" in text and "14 April 2023" in text,"NXP PDF revision unexpected")
-    return digest,pdf_table(text)
+    # Official host fallback, not an untrusted PDF mirror or inferred RAM.
+    urls=[
+        "https://www.nxp.jp/docs/en/data-sheet/LPC55S0x_LPC550x.pdf",
+        "https://www.nxp.com.cn/docs/en/data-sheet/LPC55S0x_LPC550x.pdf",
+        "https://www.nxp.com/docs/en/data-sheet/LPC55S0x_LPC550x.pdf",
+    ]
+    failures=[]
+    for url in urls:
+        try:
+            req=urllib.request.Request(url,headers={
+                "User-Agent":"Mozilla/5.0", "Accept":"application/pdf"})
+            with urllib.request.urlopen(req,timeout=30) as r:
+                require(r.geturl() in urls,"NXP datasheet redirected to unexpected URL")
+                raw=r.read(10000001)
+            require(raw.startswith(b"%PDF-") and 100000<len(raw)<10000000,
+                    "official NXP host returned invalid PDF bytes")
+            digest=hashlib.sha256(raw).hexdigest()
+            path=out/"LPC55S0x_LPC550x_Rev1.4_original.pdf"
+            path.write_bytes(raw)
+            text=subprocess.run(["pdftotext","-f","6","-l","6","-layout",
+                                 str(path),"-"],check=True,capture_output=True,text=True).stdout
+            require("Rev. 1.4" in text and "14 April 2023" in text,
+                    "manufacturer PDF revision changed")
+            return digest,pdf_table(text)
+        except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError) as e:
+            failures.append({"url":url,"error_type":type(e).__name__,
+                             "code":getattr(e,"code",None),
+                             "message":str(e)[:180]})
+    # Negative decision only. A web index/snippet is not immutable source bytes.
+    (out/"official-pdf-access-blockers-v8.json").write_text(
+        json.dumps({"official_host_attempts":failures,
+                    "source_bytes_available":False,
+                    "production_authorized":False},indent=2)+"\n")
+    print("NXP_OFFICIAL_PDF_ORIGINAL_UNAVAILABLE="+json.dumps(failures),flush=True)
+    return "",{}
 
 def csv_text(rows,columns):
     b=io.StringIO(newline="")
@@ -89,14 +114,19 @@ def audit(v7,sha,pdf):
         if sku in LPC:
             require(state=="FOUR_BASIC_FIELDS_RAM_NOT_VERIFIED" and
                 x["package"]=="H-PQFN48" and x["pin_count"]=="48"
-                and x["flash_kb"]==str(pdf[sku][0])
+                and x["flash_kb"]==str(LPC[sku][0])
                 and x["ambient_temperature"]=="-40 to 105"
                 and bool(x["operating_vdd"]) and not x["ram_kb"] and validsha,
                 "HTML/PDF field evidence conflict "+sku)
-            pdf_ram=str(pdf[sku][1])
-            decision="LAYER1_SOURCE_QUALIFIED_UNPUBLISHED"
-            needed="owner_approval_after_full_ci"
-            candidate.append({
+            if not sha:
+                decision="OFFICIAL_PDF_BYTES_NOT_LOCKED"
+                needed="durable_original_NXP_Rev1.4_PDF_bytes_and_sha256"
+            else:
+                require(sku in pdf and pdf[sku] == LPC[sku], "PDF source row mismatch")
+                pdf_ram=str(pdf[sku][1])
+                decision="LAYER1_SOURCE_QUALIFIED_UNPUBLISHED"
+                needed="owner_approval_after_full_ci"
+                candidate.append({
                 "manufacturer":"NXP","icpn":sku,"family":"LPC550x","series":"LPC550x",
                 "base_device":sku,"package":x["package"],"pin_count":"48",
                 "flash_size":x["flash_kb"]+" kB","temperature_grade":"-40 to 105 C",
@@ -107,7 +137,7 @@ def audit(v7,sha,pdf):
                 "source_reference":f"HTML SHA256 {validsha}; exact /part/{sku}; PDF Table2 Rev1.4 SHA256 {sha}; run 38366666349",
                 "source_authority":f"https://www.nxp.com/part/{sku}",
                 "verification_status":"verified_nxp_exact_html_plus_datasheet_flash_ram"
-            })
+                })
         decisions[decision]+=1
         output.append({"icpn":sku,"discovery_cohort":old["discovery_cohort"],
             "prior_exception":old["source_exception_class"],"replayed_state":state,
@@ -118,12 +148,12 @@ def audit(v7,sha,pdf):
             "review_decision":decision,"next_evidence":needed,
             "production_authorized":"false","programming_qualified":"false"})
     require(states=={"SOURCE_BLOCKED_OR_SCHEMA":207,"PARTIAL_EXACT_HTML_REPLAYED":67,"FOUR_BASIC_FIELDS_RAM_NOT_VERIFIED":3},"v7 source distribution drift")
-    require(len(candidate)==3 and {r["icpn"] for r in candidate}==set(LPC),"LPC candidate source drift")
+    require(len(candidate)==(3 if sha else 0) and (not sha or {r["icpn"] for r in candidate}==set(LPC)),"LPC candidate source drift")
     report={"schema_version":8,"manufacturer":"NXP","reviewed_active_exact":277,
         "observed_active_bounded":501,"production_existing_nxp":224,
-        "new_layer1_source_candidates":3,"unadmitted_after_candidate_admission":274,
+        "new_layer1_source_candidates":len(candidate),"remaining_unadmitted_exact":277-len(candidate),
         "source_states":dict(sorted(states.items())),"decisions":dict(sorted(decisions.items())),
-        "manufacturer_pdf_url":PDF_URL,"manufacturer_pdf_sha256":sha,
+        "manufacturer_pdf_url":PDF_URL,"manufacturer_pdf_sha256":sha or None, "pdf_original_bytes_verified":bool(sha),
         "original_277_queue_blob":QUEUE_SHA,"original_manifest_blob":MANIFEST_SHA,
         "global_nxp_active_denominator":None,"production_write_authorized":False,
         "programming_profile_qualified":False,"hardware_runtime_qualified":False}
