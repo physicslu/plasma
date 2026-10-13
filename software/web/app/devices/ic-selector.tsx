@@ -340,50 +340,31 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <div>
                   <h3>{zh ? "IC Information" : "IC Information"}</h3>
                   <p>
-                    {selected.selected_profile
-                      ? (zh ? "IC 身分、工作電氣特性與 Memory Map" : "Identity, operating electrical characteristics, and memory map")
-                      : (zh ? "IC 身分；工作電氣特性與 Memory Map 尚未完成原廠 enrichment" : "Identity; manufacturer electrical and memory-map enrichment is not available yet")}
+                    {selected.manufacturer_device_basic_profile
+                      ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
+                      : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
                   </p>
                 </div>
               </div>
               <dl>
-                <div><dt>Vendor</dt><dd>{selected.vendor}</dd></div>
-                <div><dt>Family</dt><dd>{selected.family}</dd></div>
-                <div><dt>Series</dt><dd>{selected.subfamily ?? "—"}</dd></div>
+                <div><dt>ICPN</dt><dd>{selected.icpn ?? selected.identifier}</dd></div>
                 <div><dt>Base Device</dt><dd>{selected.base_device ?? "—"}</dd></div>
                 <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
                 <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
                 <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
-                <div><dt>{zh ? "Catalog 溫度等級" : "Catalog temperature"}</dt><dd>{selected.temperature_grade ?? "—"}</dd></div>
-                {selected.selected_profile ? (
-                  <>
-                    <div><dt>SRAM</dt><dd>{selected.selected_profile.device.memory_map.sram ? `${selected.selected_profile.device.memory_map.sram.size_bytes / 1024} KiB` : "—"}</dd></div>
-                    <div><dt>{zh ? "工作 VDD" : "Operating VDD"}</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.vdd_v)}</dd></div>
-                    <div><dt>{zh ? "I/O 供應電壓" : "I/O supply"}</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.io_supply_v)}</dd></div>
-                    <div><dt>VDDA</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.vdda_v)}</dd></div>
-                    <div>
-                      <dt>{zh ? "原廠工作溫度" : "Operating temperature"}</dt>
-                      <dd>
-                        {selected.selected_profile.device.identity.ambient_temperature_c
-                          ? `${selected.selected_profile.device.identity.ambient_temperature_c.min}–${selected.selected_profile.device.identity.ambient_temperature_c.max} °C`
-                          : "—"}
-                      </dd>
-                    </div>
-                    <div><dt>Main Flash Map</dt><dd><code>{selected.selected_profile.device.memory_map.main_flash.start}–{selected.selected_profile.device.memory_map.main_flash.end}</code></dd></div>
-                    <div><dt>{zh ? "Flash Page" : "Flash page"}</dt><dd>{selected.selected_profile.device.memory_map.main_flash.page_size_bytes} bytes × {selected.selected_profile.device.memory_map.main_flash.page_count}</dd></div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <dt>{zh ? "工作電氣特性" : "Operating electrical"}</dt>
-                      <dd>{zh ? "尚未建立 manufacturer enrichment；不以 Family 或 OpenOCD 推論" : "Manufacturer enrichment not available; family or OpenOCD values are not inferred"}</dd>
-                    </div>
-                    <div>
-                      <dt>Memory Map</dt>
-                      <dd>{zh ? "尚未建立 manufacturer-derived Memory Map" : "Manufacturer-derived memory map not available"}</dd>
-                    </div>
-                  </>
-                )}
+                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? "—"}</dd></div>
+                <div>
+                  <dt>{zh ? "工作 VDD" : "Operating VDD"}</dt>
+                  <dd>{selected.manufacturer_device_basic_profile
+                    ? voltageRange(selected.manufacturer_device_basic_profile.operating_vdd_v)
+                    : "—"}</dd>
+                </div>
+                <div>
+                  <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
+                  <dd>{selected.manufacturer_device_basic_profile
+                    ? `${selected.manufacturer_device_basic_profile.operating_temperature_c.min}–${selected.manufacturer_device_basic_profile.operating_temperature_c.max} °C`
+                    : (selected.temperature_grade ?? "—")}</dd>
+                </div>
               </dl>
             </section>
 
@@ -450,6 +431,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
               <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
               <div><dt>Temperature</dt><dd>{selected.temperature_grade ?? "—"}</dd></div>
+              {selected.manufacturer_device_basic_profile && (
+                <>
+                  <div><dt>Device Basic Profile</dt><dd>{selected.manufacturer_device_basic_profile.profile_id}</dd></div>
+                  <div><dt>{zh ? "Device Basic 來源" : "Device Basic source"}</dt><dd>ST official · {selected.manufacturer_device_basic_profile.evidence.observed_at_utc}</dd></div>
+                </>
+              )}
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>

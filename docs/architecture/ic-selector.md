@@ -139,22 +139,47 @@ Package is part of the target domain model because Socket compatibility depends 
 
 Package enrichment is a separate authoritative-data task.
 
-## Selected IC composed profile
+## Selected IC information layers
 
-For exact ICPNs with an admitted manufacturer-derived profile, the same search result may
-carry an additive `selected_profile` projection. The browser presents that projection in
-three primary information layers:
+The same search result can carry two independent additive manufacturer projections:
 
-1. IC Information — intrinsic device identity, operating electrical characteristics and
-   memory map.
+- `manufacturer_device_basic_profile` — operator-facing Basic Device information.
+- `selected_profile` — deeper manufacturer/programming composition, only where the
+  Programming Profile evidence chain exists.
+
+For STM32F1 Device Basic Profile v1, IC Information is deliberately limited to:
+
+```text
+ICPN
+Base Device
+Package
+Pin Count
+Flash
+RAM
+Operating VDD
+Operating Temperature
+```
+
+Memory Map, I/O supply, VDDA, Flash-controller registers and programming algorithms are not
+part of this Basic IC Information surface. Detailed address maps may still exist internally
+for execution-oriented research.
+
+The browser presents three primary information layers:
+
+1. IC Information — the Basic Device Profile above.
 2. Programming — programming interface, manufacturer speed evidence, programming
    electrical conditions, Flash geometry and programming-flow semantics.
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
 
-Manufacturer programming interfaces are intentionally heterogeneous. A debug transport such as SWD/JTAG can carry a `clock_hz` object, while a documented-but-not-expanded interface such as a system bootloader can carry only status/boot-source metadata. Browser rendering must treat `clock_hz` as optional and must never crash the selected-IC detail pane merely because an interface is not a debug-clock interface.
+A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1
+target may have `manufacturer_device_basic_profile != null` while
+`selected_profile == null`. OpenOCD mapping also cannot promote Basic Device information
+into Programming support.
 
-An admitted ICPN without manufacturer enrichment returns `selected_profile=null`.
-Neither OpenOCD defaults nor family similarity may fill missing manufacturer facts. The UI must therefore distinguish Catalog identity fields that are already authoritative (for example package, pin count, Flash size or catalog temperature grade) from unavailable manufacturer-derived operating-electrical and Memory Map fields. Missing enrichment is displayed explicitly rather than replaced with inferred family values.
+Manufacturer programming interfaces remain heterogeneous. A debug transport such as
+SWD/JTAG can carry a `clock_hz` object, while a documented-but-not-expanded interface such
+as a system bootloader can carry only status/boot-source metadata. Browser rendering must
+treat `clock_hz` as optional.
 
 Advanced Backend / Evidence remains available separately so provider runtime/build
 provenance is not confused with IC characteristics or physical qualification.

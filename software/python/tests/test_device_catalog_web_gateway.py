@@ -54,6 +54,15 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["physical_validation"]["ppu_status"], "no_evidence")
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
+        basic = result["manufacturer_device_basic_profile"]
+        self.assertIsNotNone(basic)
+        self.assertEqual(basic["status"], "manufacturer_device_basic_available")
+        self.assertEqual(basic["icpn"], "STM32F103C8T6")
+        self.assertEqual(basic["ram_size"], "20 KiB")
+        self.assertEqual(basic["operating_vdd_v"], {"min": 2.0, "max": 3.6})
+        self.assertEqual(basic["operating_temperature_c"], {"min": -40, "max": 85})
+        self.assertFalse(basic["programming_profile_authority"])
+
         selected = result["selected_profile"]
         self.assertIsNotNone(selected)
         self.assertEqual(selected["status"], "manufacturer_profile_available")
@@ -82,10 +91,26 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
 
+    def test_stm32f1_basic_profile_does_not_claim_programming_profile(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103R8T6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F103R8T6")
+        basic = result["manufacturer_device_basic_profile"]
+        self.assertIsNotNone(basic)
+        self.assertEqual(basic["base_device"], "STM32F103R8")
+        self.assertEqual(basic["flash_size"], "64 KiB")
+        self.assertEqual(basic["ram_size"], "20 KiB")
+        self.assertEqual(basic["operating_vdd_v"], {"min": 2.0, "max": 3.6})
+        self.assertFalse(basic["programming_profile_authority"])
+        self.assertIsNone(result["selected_profile"])
+
     def test_admitted_icpn_without_manufacturer_selected_profile_returns_null(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F407VGT6&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
+        self.assertIsNone(payload["results"][0]["manufacturer_device_basic_profile"])
         self.assertIsNone(payload["results"][0]["selected_profile"])
 
     def test_c8_selected_profile_does_not_use_blue_pill_128k_override(self) -> None:
