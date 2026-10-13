@@ -170,6 +170,23 @@ The critical rule is:
 
 Exact applicability must be evidenced and listed.
 
+### M1 Basic-product-metadata exception
+
+The generic scoped-fact contract above is designed for technical manufacturer facts that can
+be source-locked. M1 Basic Device metadata is deliberately lighter: dynamic ST Product
+Selector / eStore observations may not have stable downloadable bytes to SHA-256 lock.
+
+Therefore STM32F1 Device Basic Profile v1 uses:
+
+- official ST URLs and observation date;
+- reusable series + Flash-density metadata groups;
+- **explicit exact-ICPN bindings**;
+- full cross-check against Production Catalog identity/package/pin/Flash/temperature fields;
+- no fabricated content digest.
+
+This exception applies only to M1 basic product metadata. It cannot establish M2
+Programming Profile facts or any runtime/hardware authority.
+
 ## 7. Composition contract
 
 The v1 composer is:
