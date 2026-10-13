@@ -126,8 +126,9 @@ def capture(page, sku: str, out: Path) -> dict:
     require(official(url), "source URL non-manufacturer")
     response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
     require(response is not None and response.status == 200, "NXP exact part not HTTP 200")
-    require(official(page.url) and urlsplit(page.url).path.lower().startswith("/part/"),
-            "NXP part source redirected to unauthorized route")
+    require(official(page.url) and
+            urlsplit(page.url).path.lower() == f"/part/{sku}".lower(),
+            "NXP exact part redirected to another identity or unauthorized route")
     page.wait_for_timeout(2400)
     html = page.content()
     body = page.locator("body").inner_text(timeout=15000)
