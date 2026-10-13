@@ -9,13 +9,13 @@
     "allowed_authority": "STMicroelectronics official",
     "allowed_surfaces": [
       "st_product_selector",
-      "st_product_page",
       "st_estore"
     ],
     "prohibited_derivation_sources": [
       "OpenOCD",
       "family_name_inference",
-      "programming_guide"
+      "programming_guide",
+      "datasheet"
     ],
     "observation_date_utc": "2026-10-13",
     "content_lock_required": false
@@ -41,12 +41,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-16k": {
@@ -59,12 +58,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c4.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-256k": {
@@ -77,12 +75,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100rc.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-32k": {
@@ -95,12 +92,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c6.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-384k": {
@@ -113,12 +109,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100rd.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-512k": {
@@ -131,12 +126,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100re.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f100-64k": {
@@ -149,12 +143,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c8.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-1024k": {
@@ -167,12 +160,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rg.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-128k": {
@@ -185,12 +177,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101cb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-16k": {
@@ -203,12 +194,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c4.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-256k": {
@@ -221,12 +211,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rc.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-32k": {
@@ -239,12 +228,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c6.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-384k": {
@@ -257,12 +245,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rd.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-512k": {
@@ -275,12 +262,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-64k": {
@@ -293,12 +279,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c8.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f101-768k": {
@@ -311,12 +296,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rf.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f102-128k": {
@@ -329,12 +313,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f102-16k": {
@@ -347,12 +330,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c4.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f102-32k": {
@@ -365,12 +347,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c6.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f102-64k": {
@@ -383,12 +364,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c8.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-1024k": {
@@ -401,12 +381,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rg.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-128k": {
@@ -419,12 +398,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103cb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-16k": {
@@ -437,12 +415,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c4.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-256k": {
@@ -455,12 +432,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-32k": {
@@ -473,12 +449,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c6.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-384k": {
@@ -491,12 +466,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rd.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-512k": {
@@ -509,12 +483,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103re.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-64k": {
@@ -527,12 +500,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f103-768k": {
@@ -545,12 +517,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rf.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f105-128k": {
@@ -563,12 +534,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105rb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f105-256k": {
@@ -581,12 +551,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105rc.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f105-64k": {
@@ -599,12 +568,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105r8.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f107-128k": {
@@ -617,12 +585,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rb.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     },
     "stm32f107-256k": {
@@ -635,12 +602,11 @@
       },
       "evidence": {
         "authority": "STMicroelectronics official",
-        "source_surface": "st_product_selector_or_product_page",
-        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107.html",
-        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107/products.html",
         "observed_at_utc": "2026-10-13",
         "content_lock": null,
-        "evidence_strength": "official_product_metadata_observation"
+        "evidence_strength": "official_product_selector_observation"
       }
     }
   },
@@ -939,6 +905,6 @@
       "ram",
       "operating_vdd"
     ],
-    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog and are not duplicated in this profile."
+    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog exact identity/eStore evidence, while RAM and Operating VDD come only from ST Product Selector observations. No Datasheet or Programming Guide fallback is permitted."
   }
 }
