@@ -1,0 +1,62 @@
+name: NXP 353 exact Layer-1 admission dry-run v4
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_layer1_admission_dryrun_v4.py'
+      - 'data/device-catalog/research/test_nxp_layer1_admission_dryrun_v4.py'
+      - 'data/device-catalog/research/NXP_353_LAYER1_ADMISSION_DRYRUN_V4.md'
+      - '.github/workflows/device-catalog-nxp-353-layer1-admission-dryrun-v4.yml'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - 'data/device-catalog/research/nxp-kl25-commercial-icpn.csv'
+      - 'data/device-catalog/research/nxp-353-metadata-gap-review-queue-v3.csv'
+      - 'data/device-catalog/research/nxp-bulk-353-status-map-v2.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npx-entire-353-readonly-gate:
+    name: NXP full 353 Exact and 12 KL25 production dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test full exact identity membership, vendor-coverage caveats and no-production mutation
+        run: |
+          python -m unittest discover -s data/device-catalog/research -p 'test_nxp_layer1_admission_dryrun_v4.py' -v
+      - name: Prepare temporary review-only Layer-1 12 KL25 proposal and all-353 bounded exception map
+        run: |
+          python data/device-catalog/research/nxp_layer1_admission_dryrun_v4.py \
+            --output /tmp/nxp-353-layer1-review-v4
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          base = Path("/tmp/nxp-353-layer1-review-v4")
+          x = json.loads((base/"nxp-353-layer1-admission-dryrun-v4.json").read_text())
+          with (base/"nxp-353-bounded-layer1-qualification-review-v4.csv").open() as f:
+              rows=list(csv.DictReader(f))
+          with (base/"nxp-kl25-12-proposed-canonical-rows-v4.csv").open() as f:
+              kl25=list(csv.DictReader(f))
+          assert len(rows)==353 and len(kl25)==12
+          assert x["research_partition"]=={
+              "FOUR_FIELD_HTML_EVIDENCE_ONLY_REVIEW_REQUIRED":212,
+              "KL25_BOUNDED_LAYER1_PROPOSAL_REQUIRES_OWNER_APPROVAL":12,
+              "RESEARCH_SOURCE_OR_METADATA_GAP_NOT_ADMISSIBLE":129}
+          assert x["production_nxp_exact_prestate"]==0
+          assert x["hypothetical_production_exact_after_if_approved"]==4641
+          assert x["production_write_authorized"] is False
+          assert x["runtime_programming_qualified"] is False
+          print("NXP 353 read-only owner-gated Layer-1 admission DRY-RUN PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-353-layer1-12-KL25-dryrun-v4-NOT-PRODUCTION
+          path: /tmp/nxp-353-layer1-review-v4/
+          if-no-files-found: warn
+          retention-days: 30
