@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "microchip-bulk-mcu-segment-registry-v1",
+  "manufacturer": "Microchip",
+  "scope": "Microchip microcontrollers and digital signal controllers across official 8-bit, 16-bit, 32-bit and wireless MCU product surfaces",
+  "population_boundary_validated": false,
+  "production_write_authorized": false,
+  "global_active_denominator": null,
+  "source_policy": "Official Microchip product-family indexes are discovery surfaces; exact ordering codes and lifecycle must be captured from manufacturer product records. CMSIS packs, OpenOCD identifiers, parametric-search snippets and family names are discovery seeds only.",
+  "segments": [
+    {"id":"8bit","label":"8-bit PIC and AVR MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus","inventory_status":"pending","population_complete":false},
+    {"id":"16bit","label":"16-bit PIC24 MCUs and dsPIC DSCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers-and-microprocessors/16-bit-mcus","inventory_status":"pending","population_complete":false},
+    {"id":"32bit-pic-sam","label":"32-bit PIC32 and SAM Arm MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam","inventory_status":"pending","population_complete":false},
+    {"id":"32bit-avr-risc","label":"32-bit AVR and RISC MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus","inventory_status":"pending","population_complete":false},
+    {"id":"wireless","label":"Wireless MCUs and SoCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/wireless","inventory_status":"pending","population_complete":false}
+  ],
+  "excluded_or_separate_surfaces": [
+    "Microprocessors and application processors",
+    "FPGAs and programmable logic",
+    "Analog, power, memory, interface and timing products",
+    "Wireless modules and connectivity controllers not identified as MCUs or MCU SoCs"
+  ],
+  "reconciliation_policy": {
+    "identity_key":"exact manufacturer ordering part number",
+    "cross_segment_duplicates":"deduplicate by exact ordering part number; conflicting lifecycle evidence is an error",
+    "coverage_boundary":"no Microchip-wide denominator until official family inventory and lifecycle/count semantics are independently audited"
+  }
+}
