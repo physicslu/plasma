@@ -129,11 +129,31 @@
         "result": "The family surface combines wireless MCU ICs/SoCs and modules, requiring exact-part classification and de-duplication against the 32-bit lanes."
       }
     ],
-    "consequence": "Keep population_boundary_validated false and global_active_denominator null. The API is documented as a promising source, but no live page-response fixture or independently reconciled per-family page totals is committed yet."
+    "consequence": "Keep population_boundary_validated false and global_active_denominator null. The API is documented as a promising source, but no live page-response fixture or independently reconciled per-family page totals is committed yet.",
+    "dfp_index_observation": {
+      "observed_at": "2026-10-13",
+      "index_url": "https://packs.download.microchip.com/",
+      "raw_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+      "source_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38338847345/artifacts/11786276380",
+      "parsed_inventory_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38339710359/artifacts/11786677494",
+      "microchip_dfp_pack_count": 133,
+      "supported_device_name_count": 3717,
+      "observed_lane_candidate_names": {
+        "8bit": 1519,
+        "16bit": 899,
+        "32bit-pic-sam": 796,
+        "32bit-avr-risc": 0,
+        "wireless": 53
+      },
+      "excluded_mpu_candidate_names": 56,
+      "unclassified_or_non_mcu_pack_names": 394,
+      "scope": "Device Family Pack supported device-name discovery only, not exact commercial SKU or lifecycle universe",
+      "population_complete": false
+    }
   },
   "family_query_seeds": {
     "status": "candidate_seeds_only_not_exhaustive",
-    "query_execution_status": "sample_transport_probe_pending",
+    "query_execution_status": "PIC10-12Fxxx_DFP: 27 seed device names, 26 bounded exact-SKU queries reconciled, one EOL device returns MCP NOT_FOUND",
     "meaning": "Family labels used to prepare a future per-family Product Data API query matrix. These labels are not exact ordering parts, API query semantics remain to be tested, and this set is not an exhaustive population.",
     "lanes": {
       "8bit": [
@@ -258,9 +278,15 @@
     "observed_raw_lifecycle_values": [
       "Active"
     ],
-    "full_pagination_validated": false,
-    "replayable_live_fixture_captured": false,
-    "latest_capture_status": "execution_network_approval_cancelled_before_decision",
-    "population_boundary": "bounded text-search query only; not complete MCU/DSC inventory"
+    "full_pagination_validated": true,
+    "replayable_live_fixture_captured": true,
+    "latest_capture_status": "PIC10-12Fxxx_DFP: 26 of 27 bounded searches reconciled, 347 distinct exact-prefix SKU candidates; NOT_FOUND is EOL PIC12F529T48A",
+    "population_boundary": "bounded text-search query only; not complete MCU/DSC inventory",
+    "evidence_ledger_url": "https://github.com/physicslu/plasma/actions/runs/38338627747/artifacts/11786520772",
+    "exact_prefix_candidates_observed": 347,
+    "reconciled_seed_queries": 26,
+    "attempted_seed_queries": 27,
+    "global_active_denominator": null,
+    "production_write_authorized": false
   }
 }
