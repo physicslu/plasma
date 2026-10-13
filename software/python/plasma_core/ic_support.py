@@ -15,6 +15,7 @@ IC_SUPPORT_ROOT_ENV = "PLASMA_IC_SUPPORT_ROOT"
 IC_SUPPORT_RELATIVE_ROOT = Path("data/ic-support")
 EXPECTED_PROFILE_KINDS = (
     "programming",
+    "programming_route",
     "memory_geometry",
     "package_hardware",
     "option",
@@ -22,6 +23,7 @@ EXPECTED_PROFILE_KINDS = (
 )
 PROFILE_DIRECTORY_KIND = {
     "programming": "programming",
+    "programming-route": "programming_route",
     "memory-geometry": "memory_geometry",
     "package-hardware": "package_hardware",
     "option": "option",
@@ -76,6 +78,102 @@ def _load_object(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _validate_programming_route_data(profile_id: str, data: dict[str, Any]) -> None:
+    vocabulary = data.get("context_vocabulary")
+    routes = data.get("routes")
+    _require(
+        isinstance(vocabulary, dict) and set(vocabulary) == {"icp", "offline_socket"},
+        f"{profile_id}: programming context vocabulary must be exactly icp/offline_socket",
+    )
+    _require(isinstance(routes, list) and routes, f"{profile_id}: routes must be a non-empty array")
+
+    route_ids: set[str] = set()
+    for index, route in enumerate(routes):
+        owner = f"{profile_id}: routes[{index}]"
+        _require(isinstance(route, dict), f"{owner} must be an object")
+        route_id = route.get("route_id")
+        _require(isinstance(route_id, str) and route_id, f"{owner}.route_id is required")
+        _require(route_id not in route_ids, f"{profile_id}: duplicate route_id {route_id!r}")
+        route_ids.add(route_id)
+
+        contexts = route.get("contexts")
+        _require(
+            isinstance(contexts, dict) and set(contexts) == {"icp", "offline_socket"},
+            f"{route_id}: contexts must be exactly icp/offline_socket",
+        )
+        for context_name, context in contexts.items():
+            _require(isinstance(context, dict), f"{route_id}: {context_name} context must be an object")
+            _require(
+                isinstance(context.get("supported"), bool),
+                f"{route_id}: {context_name}.supported must be boolean",
+            )
+
+        transport = route.get("transport")
+        _require(isinstance(transport, dict), f"{route_id}: transport must be an object")
+        _require(
+            isinstance(transport.get("type"), str) and transport["type"],
+            f"{route_id}: transport.type is required",
+        )
+
+        entry = route.get("entry_requirements")
+        _require(isinstance(entry, dict), f"{route_id}: entry_requirements must be an object")
+        required_signals = entry.get("required_signals")
+        optional_signals = entry.get("optional_control_signals")
+        strap_states = entry.get("strap_states")
+        reset_sequence = entry.get("reset_sequence")
+        timing = entry.get("timing_requirements")
+        _require(
+            isinstance(required_signals, list) and all(isinstance(item, str) and item for item in required_signals),
+            f"{route_id}: required_signals must be an array of logical signal names",
+        )
+        _require(
+            isinstance(optional_signals, list) and all(isinstance(item, str) and item for item in optional_signals),
+            f"{route_id}: optional_control_signals must be an array",
+        )
+        _require(isinstance(strap_states, list), f"{route_id}: strap_states must be an array")
+        seen_straps: set[str] = set()
+        for strap_index, strap in enumerate(strap_states):
+            _require(isinstance(strap, dict), f"{route_id}: strap_states[{strap_index}] must be an object")
+            signal = strap.get("signal")
+            state = strap.get("state")
+            _require(isinstance(signal, str) and signal, f"{route_id}: strap signal is required")
+            _require(signal not in seen_straps, f"{route_id}: duplicate strap signal {signal!r}")
+            seen_straps.add(signal)
+            _require(state in {"high", "low"}, f"{route_id}: strap state must be high or low")
+            _require(signal in required_signals, f"{route_id}: strap signal {signal!r} must also be required")
+        _require(isinstance(reset_sequence, dict), f"{route_id}: reset_sequence must be an object")
+        _require(
+            isinstance(reset_sequence.get("required"), bool),
+            f"{route_id}: reset_sequence.required must be boolean",
+        )
+        _require(
+            isinstance(entry.get("power_cycle_required"), bool),
+            f"{route_id}: power_cycle_required must be boolean",
+        )
+        _require(isinstance(timing, dict), f"{route_id}: timing_requirements must be an object")
+        _require(
+            isinstance(route.get("entry_sequence"), list) and route["entry_sequence"],
+            f"{route_id}: entry_sequence must be non-empty",
+        )
+        _require(
+            isinstance(route.get("exit_sequence"), list) and route["exit_sequence"],
+            f"{route_id}: exit_sequence must be non-empty",
+        )
+        _require(
+            route.get("runtime_implemented") is False,
+            f"{route_id}: pilot route must not claim runtime implementation",
+        )
+        if strap_states:
+            _require(
+                contexts["offline_socket"]["supported"] is True,
+                f"{route_id}: strap-controlled route must support offline_socket",
+            )
+            _require(
+                contexts["icp"]["supported"] is False,
+                f"{route_id}: strap-controlled route cannot be ICP-supported in Programming Route v1",
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedProfile:
     profile_id: str
@@ -98,6 +196,8 @@ class ResolvedProfile:
         _require(isinstance(status, str) and status, f"{path}: profile status is required")
         _require(isinstance(scope, dict), f"{profile_id}: scope must be an object")
         _require(isinstance(data, dict), f"{profile_id}: data must be an object")
+        if expected_kind == "programming_route":
+            _validate_programming_route_data(profile_id, data)
         _require(isinstance(evidence, list) and evidence, f"{profile_id}: evidence must be non-empty")
         normalized_evidence: list[dict[str, Any]] = []
         for index, item in enumerate(evidence):
@@ -286,6 +386,16 @@ class ResolvedICSupport:
             "pin_count": self.expected_catalog["pin_count"],
             "flash_size": self.expected_catalog["flash_size"],
         }
+        route_profile = self.profile("programming_route")
+        package_profile = self.profile("package_hardware")
+        payload["programming"]["programming_route_profile"] = route_profile.to_summary()
+        payload["programming"]["context_vocabulary"] = copy.deepcopy(
+            route_profile.data["context_vocabulary"]
+        )
+        payload["programming"]["routes"] = copy.deepcopy(route_profile.data["routes"])
+        payload["programming"]["package_signal_map"] = copy.deepcopy(
+            package_profile.data.get("logical_signal_map", {})
+        )
         payload["ic_support"] = {
             "binding_set_id": self.binding_set_id,
             "binding_status": self.binding_status,
@@ -488,10 +598,15 @@ class ICSupportResolver:
         programming_profiles = sorted(
             {record.programming_profile.profile_id for record in self._records.values()}
         )
+        programming_route_profiles = sorted(
+            {record.profile("programming_route").profile_id for record in self._records.values()}
+        )
         return {
             "resolved_exact_icpns": self.size,
             "programming_profiles": len(programming_profiles),
             "programming_profile_ids": programming_profiles,
+            "programming_route_profiles": len(programming_route_profiles),
+            "programming_route_profile_ids": programming_route_profiles,
             "manufacturer_selected_profiles": sum(
                 1 for record in self._records.values()
                 if record.manufacturer_profile is not None
