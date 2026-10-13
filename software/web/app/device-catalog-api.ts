@@ -211,12 +211,11 @@ export type ManufacturerDeviceBasicProfile = {
   operating_temperature_c: { min: number; max: number };
   evidence: {
     authority: "STMicroelectronics official";
-    source_surface: "st_product_selector_or_product_page";
-    series_selector_url: string;
-    representative_product_url: string;
+    source_surface: "st_product_selector";
+    selector_url: string;
     observed_at_utc: string;
     content_lock: null;
-    evidence_strength: "official_product_metadata_observation";
+    evidence_strength: "official_product_selector_observation";
   };
   programming_profile_authority: false;
   hardware_runtime_ready: false;
