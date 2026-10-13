@@ -33,7 +33,10 @@ def hash_text(raw: str) -> str:
 def normalize_leads(urls: list[str], series: str) -> list[str]:
     links: set[str] = set()
     for value in urls:
-        insist(official(value), "non-official discovered product URL")
+        # NXP indexes also link to community, partners and documents.
+        # Ignore foreign navigation links; they are not MCU product leads.
+        if not official(value):
+            continue
         parts = urlsplit(value)
         m = URL_RE.fullmatch(parts.path)
         if m and m.group(1).upper() == series:

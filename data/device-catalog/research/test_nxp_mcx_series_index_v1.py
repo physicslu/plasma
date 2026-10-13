@@ -13,9 +13,11 @@ class MCXIndexTests(unittest.TestCase):
         self.assertEqual(x.normalize_leads(pages,"A"),["https://www.nxp.com/products/MCX-A17"])
     def test_other_series_excluded(self):
         self.assertEqual(x.normalize_leads(["https://www.nxp.com/products/MCX-W23"],"A"),[])
-    def test_offdomain_rejected(self):
-        with self.assertRaisesRegex(ValueError,"non-official"):
-            x.normalize_leads(["https://www.nxp.com.evil.invalid/products/MCX-A17"],"A")
+    def test_offdomain_navigation_is_not_product_evidence(self):
+        self.assertEqual(x.normalize_leads([
+            "https://community.nxp.com", "https://www.nxp.com.evil.invalid/products/MCX-A17",
+            "https://www.nxp.com/products/MCX-A17"
+        ],"A"), ["https://www.nxp.com/products/MCX-A17"])
     def test_no_sku_claim_from_link(self):
         self.assertEqual(x.normalize_leads(["https://www.nxp.com/products/MCX-A17"],"A"),
                          ["https://www.nxp.com/products/MCX-A17"])
