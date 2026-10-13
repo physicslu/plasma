@@ -110,3 +110,28 @@ total-family enumerations. Every official page must be captured successfully
 and remain `source_population_complete=false`, with NXP-wide denominator
 and percentage `null`. Cross-page repeated commercial identities are
 deduplicated by exact identity and contradictory lifecycle blocks the gate.
+
+## Gate 1e — manufacturer-verified MCX C/W follow-on pages
+
+The live six-series MCX index audit completed with **21 observed product-page
+leads** and **7 not represented in the original 19-page research pilot**.
+These are observed navigation leads, not evidence of complete NXP inventory.
+
+Four of the seven were checked against their official NXP Package/Quality
+Environmental Information rows and pinned to exact *material-declaration*
+ordering SKUs in the read-only matrix, now **23 bounded product pages**:
+
+- MCX C15/C16 — `MCXC162VLF`
+- MCX W23 — `MCXW236BIUKAR`
+- MCX W71 — `MCXW716CMFTAR`
+- MCX W72 — `MCXW727DMFTBR`
+
+The remaining indexed pages `MCX-A5`, `MCX-L14`, and `MCX-L25` are
+**discovered but not yet anchored to verified exact SKUs**. Do not fabricate
+`must_include` sentinels for them. Reconciliation must continue to report
+manufacturer-wide Active identity counts and coverage as `null`.
+
+The LPC55S6x pilot sentinel was also corrected from the package/group label
+`LPC55S69JEV98` to the observed orderable SKU `LPC55S69JEV98E`.
+The former makes a valid live product acquisition fail when the scraper
+correctly distinguishes group labels from ordering SKUs.
