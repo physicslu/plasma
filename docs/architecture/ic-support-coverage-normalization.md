@@ -52,24 +52,33 @@ ICPN != Programming Algorithm
 
 ## 3. Current production baseline
 
-The executable coverage inventory on the current production Device Catalog is:
+The executable coverage inventory is derived from the current Production manifest rather than a historical fixed family subset.
+
+At the Manufacturer Enrichment Coverage v1 baseline:
 
 ```text
-Exact ICPNs:                           286
-Families:                                2
-  STM32F1:                              75
-  STM32F4:                             211
-Base Devices:                           91
-Deterministic OpenOCD-mapped ICPNs:    286
-Direct IC Support-bound ICPNs:           2
-Unresolved Programming Profile ICPNs:  284
-Evidence-backed Programming Profiles:    1
-Native PPU runtime-ready ICPNs:           0
+Exact ICPNs:                            4,629
+Families:                                  28
+Deterministic OpenOCD-mapped ICPNs:     4,164
+OpenOCD-unmapped ICPNs:                   465
+Direct IC Support-bound ICPNs:              2
+Evidence-backed Programming Profiles:       1
+Native PPU runtime-ready ICPNs:              0
+Manufacturer Enrichment M1+:                 1
+Manufacturer Enrichment M4+:                 1
+Manufacturer Enrichment M5:                  0
 ```
 
-These values are enforced by `data/ic-support/test_coverage_inventory.py` and are derived from the production Device Catalog manifest plus its admitted STM32F1/STM32F4 commercial ICPN sources.
+Base-device cardinality and per-family counts remain deterministic outputs of
+`coverage_inventory.py --summary`; they are not duplicated here as a hand-maintained constant.
 
-The counts describe different maturity layers and must not be collapsed into a single `supported=true` claim. In particular, `286 deterministic OpenOCD-mapped ICPNs` does **not** mean Plasma has 286 evidence-backed Programming Profiles or 286 hardware-validated programming targets.
+The counts describe different maturity layers and must not be collapsed into a single
+`supported=true` claim. In particular, `4,164 deterministic OpenOCD-mapped ICPNs`
+does **not** mean Plasma has 4,164 manufacturer-enriched profiles or 4,164
+hardware-qualified programming targets.
+
+Manufacturer Enrichment M0-M5 is defined separately in
+`manufacturer-enrichment-coverage-v1.md`.
 
 ## 4. Example: commercial variants are not new algorithms
 
@@ -162,9 +171,8 @@ IC Support coverage depends on production Device Catalog inputs, not only on `da
 `IC Support validation` must therefore run when any of the directly consumed production inputs change:
 
 ```text
-data/device-catalog/production/icpn-v1-manifest.json
-data/device-catalog/research/stm32f1-commercial-icpn.csv
-data/device-catalog/research/stm32f4-commercial-icpn.csv
+data/device-catalog/production/**
+data/device-catalog/research/*commercial-icpn.csv
 ```
 
 This dependency is intentional. A Device Catalog admission that changes production coverage must re-run IC Support coverage normalization in the same PR so the derived inventory cannot silently drift behind the catalog.
@@ -176,6 +184,8 @@ From repository root:
 ```bash
 python data/ic-support/coverage_inventory.py
 python data/ic-support/coverage_inventory.py --summary
+python data/ic-support/coverage_inventory.py --manufacturer-summary
+python data/ic-support/coverage_inventory.py --icpn STM32F103C8T6
 python data/ic-support/coverage_inventory.py --json
 python data/ic-support/test_coverage_inventory.py
 ```
@@ -194,6 +204,8 @@ Direct IC Support-bound exact ICPNs
 Unresolved Programming Profile exact ICPNs
 Deterministic OpenOCD-mapped exact ICPNs
 Native PPU runtime-ready exact ICPNs
+Manufacturer Enrichment highest/at-least M0-M5
+Manufacturer Enrichment missing dimensions
 PPU-verified support
 Socket-verified support
 ```
