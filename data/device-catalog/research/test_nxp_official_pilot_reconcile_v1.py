@@ -72,6 +72,23 @@ class NxpPilotEvidenceTests(unittest.TestCase):
             self.assertEqual(result["observed_active_exact"], len(cfg["products"]) + 10)
             self.assertEqual(result["observed_qualification_exact"], 1)
 
+    def test_other_lifecycle_sku_and_state_are_retained(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self.setup_pilot(root)
+            path = root / "nxp-official-v1-mcx-n23x" / "acquisition.json"
+            evidence = json.loads(path.read_text())
+            exact = evidence["rows"][0]["icpn"]
+            evidence["rows"][0]["lifecycle"] = "No Longer Manufactured"
+            evidence["active_exact_count"] = 0
+            path.write_text(json.dumps(evidence))
+            report = mod.reconcile(root)
+            self.assertEqual(report["observed_other_lifecycle_exact"], 1)
+            self.assertEqual(report["observed_other_lifecycle_icpns"], [
+                {"icpn": exact, "lifecycle": "No Longer Manufactured"}
+            ])
+            self.assertNotIn(exact, report["observed_active_icpns"])
+
     def test_raw_html_hash_mismatch_blocks(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
