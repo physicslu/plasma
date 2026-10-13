@@ -136,6 +136,34 @@
       "url": "https://www.nxp.com/products/MCX-N94-N54-N53-N52-N24?tab=Package_Quality_Tab",
       "prefix": "MCXN",
       "must_include": "MCXN947VPBT"
+    },
+    {
+      "id": "mcx-c15-c16",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-C15-C16?tab=Package_Quality_Tab",
+      "prefix": "MCXC",
+      "must_include": "MCXC162VLF"
+    },
+    {
+      "id": "mcx-w23",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-W23?tab=Package_Quality_Tab",
+      "prefix": "MCXW",
+      "must_include": "MCXW236BIUKAR"
+    },
+    {
+      "id": "mcx-w71",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-W71?tab=Package_Quality_Tab",
+      "prefix": "MCXW",
+      "must_include": "MCXW716CMFTAR"
+    },
+    {
+      "id": "mcx-w72",
+      "segment": "mcx",
+      "url": "https://www.nxp.com/products/MCX-W72?tab=Package_Quality_Tab",
+      "prefix": "MCXW",
+      "must_include": "MCXW727DMFTBR"
     }
   ]
 }
