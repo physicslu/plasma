@@ -50,6 +50,14 @@ def product_data(result):
     return payload['data']
 
 
+def exact_ordering_prefix(part, query):
+    """Match a commercial SKU, not an arbitrary substring or vendor family alias."""
+    if not part.startswith(query):
+        return False
+    tail = part[len(query):]
+    return not tail or tail.startswith(('-', '/', 'T-', 'T/'))
+
+
 def validate_page(data, offset, limit, total=None, query=QUERY):
     require(data.get('searchTerm') == query, 'query mismatch')
     pagination = data.get('pagination', {})
@@ -70,7 +78,6 @@ def validate_page(data, offset, limit, total=None, query=QUERY):
             require(isinstance(row.get(field), str) and bool(row[field].strip()),
                     'missing identity/lifecycle')
         require(row['partNumber'] == row['partNumber'].strip(), 'padded identity')
-        require(row['basePartNumber'] == query, 'fuzzy search returned another base part')
     return count, rows
 
 
@@ -90,7 +97,15 @@ def reconcile(pages, comparison, query=QUERY):
     key = lambda r: (r['basePartNumber'], r['lifecycleStatus'])
     require({r['partNumber']: key(r) for r in rows} ==
             {r['partNumber']: key(r) for r in other}, 'lifecycle changed during capture')
+    targets = [r for r in rows if exact_ordering_prefix(r['partNumber'], query)]
+    foreign = [r for r in rows if not exact_ordering_prefix(r['partNumber'], query)]
+    aliases = [r for r in targets if r['basePartNumber'] != query]
     return {'query': query, 'reported_total': total, 'unique_ordering_count': len(set(ids)),
+            'exact_prefix_ordering_count': len(targets),
+            'fuzzy_foreign_ordering_count': len(foreign),
+            'vendor_base_part_alias_count': len(aliases),
+            'foreign_ordering_parts': sorted(r['partNumber'] for r in foreign),
+            'exact_query_ordering_parts': sorted(r['partNumber'] for r in targets),
             'page_size_2_count': len(pages), 'page_size_60_same_identity_and_lifecycle': True,
             'raw_lifecycle_values': sorted({r['lifecycleStatus'] for r in rows}),
             'ordering_parts': sorted(ids), 'population_boundary_validated': False,
