@@ -78,7 +78,7 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
 
 def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
     catalog = get_default_device_catalog()
-    matches = catalog.search(query, limit=limit)
+    matches, total_count = catalog.search_with_total(query, limit=limit)
     # Candidate evidence is an independent, read-only display projection.
     # It never modifies the authoritative backend mapping or Job resolution.
     candidates = get_default_backend_candidate_registry()
@@ -108,6 +108,7 @@ def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
         "query": query,
         "catalog_size": catalog.size,
         "count": len(matches),
+        "total_count": total_count,
         "results": results,
     }
 

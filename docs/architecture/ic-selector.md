@@ -51,6 +51,14 @@ GET /api/devices/search?q=<identifier>&limit=<1..100>
 
 The service reports the canonical catalog size with each search response. The browser must not hard-code that count.
 
+Search responses also distinguish pagination from filtered cardinality:
+
+- `count` = number of rows returned in this response after applying `limit`;
+- `total_count` = number of admitted rows matching the query before `limit`;
+- `catalog_size` = total number of admitted rows in the Production Catalog.
+
+The browser must present returned and total matches separately. A UI showing only `results.length` or `count` as "results" is incorrect for any query whose full match set exceeds the page limit.
+
 The research CSV is an import/source artifact, not a permanent storage contract. A future database-backed catalog may replace it without changing Selector semantics.
 
 ## ICPN semantics
@@ -142,7 +150,7 @@ three primary information layers:
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
 
 An admitted ICPN without manufacturer enrichment returns `selected_profile=null`.
-Neither OpenOCD defaults nor family similarity may fill missing manufacturer facts.
+Neither OpenOCD defaults nor family similarity may fill missing manufacturer facts. The UI must therefore distinguish Catalog identity fields that are already authoritative (for example package, pin count, Flash size or catalog temperature grade) from unavailable manufacturer-derived operating-electrical and Memory Map fields. Missing enrichment is displayed explicitly rather than replaced with inferred family values.
 
 Advanced Backend / Evidence remains available separately so provider runtime/build
 provenance is not confused with IC characteristics or physical qualification.
