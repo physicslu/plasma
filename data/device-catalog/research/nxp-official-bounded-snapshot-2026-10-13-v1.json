@@ -4,13 +4,13 @@
   "authority": "read_only_manufacturer_evidence_observation",
   "captured_from": {
     "source": "GitHub Actions reconcile-bounded-gap output",
-    "workflow_run_id": 38333219588,
-    "workflow_job_id": 115088841197,
-    "evidence_artifact_id": 11783902049,
-    "evidence_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38333219588/artifacts/11783902049",
+    "workflow_run_id": 38334514193,
+    "workflow_job_id": 115092853300,
+    "evidence_artifact_id": 11784640523,
+    "evidence_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38334514193/artifacts/11784640523",
     "artifact_retention_days": 30,
-    "generated_at_utc": "2026-10-13T01:45:53Z",
-    "producing_commit_sha": "53922fa7431c14e4d00dccb4a4ef7fcf5dce4ae6"
+    "generated_at_utc": "2026-10-13T02:02:10Z",
+    "producing_commit_sha": "9dc4b8a89a65e6081eef72bddaec0c5a00f8a5f2"
   },
   "scope_limits": {
     "source_population_complete": false,
@@ -19,7 +19,7 @@
     "production_admission_ready": false,
     "production_publication_authorized": false,
     "runtime_programming_qualified": false,
-    "notes": "Manufacturer-official pages observed across 23 pinned bounded sources; no exhaustive NXP MCU denominator. Rows are exact orderable SKUs; no hardware/flash qualification."
+    "notes": "Bounded 23 pinned official NXP source pages, partitioned into 353 Active + 2 Qualification + 13 other exact lifecycle identities; no global denominator, Production admission, or flash qualification."
   },
   "reconciliation": {
     "claims": {
@@ -391,6 +391,60 @@
     ],
     "observed_active_missing_from_production": 353,
     "observed_other_lifecycle_exact": 13,
+    "observed_other_lifecycle_icpns": [
+      {
+        "icpn": "LPC55S69JEV59K",
+        "lifecycle": "No Longer Manufactured"
+      },
+      {
+        "icpn": "MIMXRT1061CVJ5A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1061CVL5A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1061DVJ6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1061DVL6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1062CVJ5A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1062CVL5A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1062DVJ6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT1062DVL6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT106ADVL6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT106ADVL6AR",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT106FDVL6A",
+        "lifecycle": "NRND"
+      },
+      {
+        "icpn": "MIMXRT106LDVL6A",
+        "lifecycle": "NRND"
+      }
+    ],
     "observed_qualification_exact": 2,
     "observed_qualification_icpns": [
       "MCXN235VNLT",
@@ -406,7 +460,7 @@
         "page_exact_count": 4,
         "page_qualification_count": 0,
         "product": "mcx-c04x",
-        "raw_dom_sha256": "cb5fab616455eb2d7c1c27c7402bdb8976425ebbd6ce7f0b774010ccd64c2bf5",
+        "raw_dom_sha256": "c6fbec1a5584f5ce0ec9c16a17bbf453c52616be78e830245e37a7a9439854e9",
         "segment": "mcx"
       },
       {
@@ -415,7 +469,7 @@
         "page_exact_count": 10,
         "page_qualification_count": 2,
         "product": "mcx-n23x",
-        "raw_dom_sha256": "e45f9e2cb9c5d85e3297cc69b1d5e866d55a26a19c54490c3ca88ffcb34a89e7",
+        "raw_dom_sha256": "f8a70d64df66e5f4b360b132b4d9398e21409e4dc1bbef1a87845d2f34bcdbd0",
         "segment": "mcx"
       },
       {
@@ -424,7 +478,7 @@
         "page_exact_count": 12,
         "page_qualification_count": 0,
         "product": "kl25",
-        "raw_dom_sha256": "33affb2bdc182fe02ed44f40374eb1301ea0e24eb2d779ac04ee41b4297bc718",
+        "raw_dom_sha256": "6687db5de6272b77da28240e4305b4b9b6413672f15fa5ce324b57755285de6a",
         "segment": "kinetis"
       },
       {
@@ -433,7 +487,7 @@
         "page_exact_count": 23,
         "page_qualification_count": 0,
         "product": "lpc55s6x",
-        "raw_dom_sha256": "ab809b1a2b65bb96d4128a3b509d54f0abf2ff0c7afd3f615317355b19be993d",
+        "raw_dom_sha256": "f086f4af1a643ef26d26c0b6369c449481c12bfeec56245f8a3601eb09fdf714",
         "segment": "lpc"
       },
       {
@@ -442,7 +496,7 @@
         "page_exact_count": 20,
         "page_qualification_count": 0,
         "product": "k32-l2",
-        "raw_dom_sha256": "33f6757b8eab516188fa4b2acb2719e2a6a334e0a9a2fbda23039e882b0f1930",
+        "raw_dom_sha256": "f047a4ee81dddca7d3133c48ebf034037ef9673cae6059ccf19217400556fe38",
         "segment": "k32"
       },
       {
@@ -451,7 +505,7 @@
         "page_exact_count": 40,
         "page_qualification_count": 0,
         "product": "imx-rt1060",
-        "raw_dom_sha256": "871b04c5e59ba0e223443781e531f0c2fa670b7301f443e1f498edc877158eef",
+        "raw_dom_sha256": "13a96517c7b49b78a309b3fb321afcaccc7cd6e02d9175c0c01b0d950581581e",
         "segment": "imx-rt"
       },
       {
@@ -460,7 +514,7 @@
         "page_exact_count": 30,
         "page_qualification_count": 0,
         "product": "kw45",
-        "raw_dom_sha256": "7587c044175c2d64a5e7c10847e6e2f598cc8b4eacee12764d63a75efbb4ba1d",
+        "raw_dom_sha256": "e4e7a9e644cb69e52bd96d0d3a653d1df750e8a5a0da0c4decfb7c9c35388ca0",
         "segment": "wireless"
       },
       {
@@ -469,7 +523,7 @@
         "page_exact_count": 54,
         "page_qualification_count": 0,
         "product": "mcx-a13x",
-        "raw_dom_sha256": "9313ac16350d399c4098339a6ae59a14218982d000ba0c67a043c8e82766fde1",
+        "raw_dom_sha256": "e5c6b254fc22d5643424d45ade0c42e433565b9e72eee522d8acca2cd3c750af",
         "segment": "mcx"
       },
       {
@@ -478,7 +532,7 @@
         "page_exact_count": 17,
         "page_qualification_count": 0,
         "product": "mcx-a17",
-        "raw_dom_sha256": "e07dccfec3bedd79304605ad86aba0475459ccf2808c520d06acdb40233eff6d",
+        "raw_dom_sha256": "65dddb5f9222b35dca029f398798ac8eb14b14e6af3206f37db14d7283681739",
         "segment": "mcx"
       },
       {
@@ -487,7 +541,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-a18",
-        "raw_dom_sha256": "ea10cc5caaeb0beb6b19f13a0cf3c112f5f8ec8d49765f03137ae1ac99deb667",
+        "raw_dom_sha256": "2aae2cd77c53939d54db9f0091f152d4eae98dea0c3533c7d9330f1f21056ce0",
         "segment": "mcx"
       },
       {
@@ -496,7 +550,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-a25",
-        "raw_dom_sha256": "5951eb51ccdaaba0439b556a1db964acbb7a8750cbda14123b9ae41634573710",
+        "raw_dom_sha256": "8d055f251908ea9a8680554d12b853e67899a05d9181ea8061e582c5c68e712a",
         "segment": "mcx"
       },
       {
@@ -505,7 +559,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-a26",
-        "raw_dom_sha256": "c5c7bd8c32fd16f2740dbd9723ee2df425045d8c81825dd6fb06596f13c3c9a0",
+        "raw_dom_sha256": "767e6dbe2318aba1b1ec0e44510b089eb7397b2d94228f9437951f4a259453e6",
         "segment": "mcx"
       },
       {
@@ -514,7 +568,7 @@
         "page_exact_count": 16,
         "page_qualification_count": 0,
         "product": "mcx-a34",
-        "raw_dom_sha256": "c343cfe907ab281b22ee5b950cac18b4b8952dd0e90d30751200dcce77d0b292",
+        "raw_dom_sha256": "73381bf0c91a44d9e9b2950f42c2b793e8295630eb62709ec074a353ae9a067b",
         "segment": "mcx"
       },
       {
@@ -523,7 +577,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-a35",
-        "raw_dom_sha256": "186a2f7608b0606d9d7342fb6c327dfc3ce41b03ad13144c58b4f97991e05d15",
+        "raw_dom_sha256": "5b0a1e9e72044bd0abc44418e08721c61a426ea518ed0b830ef9ccba8aad7afd",
         "segment": "mcx"
       },
       {
@@ -532,7 +586,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-a36",
-        "raw_dom_sha256": "fb981cdb1e846fb065040c5ec3219183ad77c5e9809663e9d0c6b6c440eff3cb",
+        "raw_dom_sha256": "e0bf7f2b479ad1f8473a39448132f72a877b74f5ba783b899462b37d96072030",
         "segment": "mcx"
       },
       {
@@ -541,7 +595,7 @@
         "page_exact_count": 16,
         "page_qualification_count": 0,
         "product": "mcx-c14x",
-        "raw_dom_sha256": "44ad8edc6671506d94893265c94c8c9d06b5b5240c8341f962ed3231531c1f86",
+        "raw_dom_sha256": "4a3e58fb59c46b66e3ba65270656b3f2174776fb311358056af64471de7b5b5e",
         "segment": "mcx"
       },
       {
@@ -550,7 +604,7 @@
         "page_exact_count": 7,
         "page_qualification_count": 0,
         "product": "mcx-e31",
-        "raw_dom_sha256": "fc8f9719bc8a5a7f4ad015dcb9937668cae2eaacaae7aff3b877b5b9bd9307f3",
+        "raw_dom_sha256": "f2e8142b2cdd6d31ac691ec19781c5de39640dc8cf75fb051d05ee996e4933be",
         "segment": "mcx"
       },
       {
@@ -559,7 +613,7 @@
         "page_exact_count": 16,
         "page_qualification_count": 0,
         "product": "mcx-e24",
-        "raw_dom_sha256": "dc694a3c8db2716e7ee2d0e3c55bb2e20d574a9e3ca24cb65d6970e1d42a38af",
+        "raw_dom_sha256": "403a2862fed76633532ce50ded7fe2c23049637c01eed15fe81b9d94c3be64e6",
         "segment": "mcx"
       },
       {
@@ -568,7 +622,7 @@
         "page_exact_count": 26,
         "page_qualification_count": 0,
         "product": "mcx-n94",
-        "raw_dom_sha256": "9a37475e1a4ea35052acacea7fd339547df0e432f505b67c48ebdc8c7cc2c321",
+        "raw_dom_sha256": "12165110e4fdd7fe0bd57cb4116a45f6f3bde28578392d1c9deb5c84894a187a",
         "segment": "mcx"
       },
       {
@@ -577,7 +631,7 @@
         "page_exact_count": 9,
         "page_qualification_count": 0,
         "product": "mcx-c15-c16",
-        "raw_dom_sha256": "193ecb389a717672b81844ed90f5f9ebd1f9fe17326348a7075c1afa8816101e",
+        "raw_dom_sha256": "871e38903e9f50c9117d57c6fe23182e16b9b57b52b1a1106134061f24c0b742",
         "segment": "mcx"
       },
       {
@@ -586,7 +640,7 @@
         "page_exact_count": 14,
         "page_qualification_count": 0,
         "product": "mcx-w23",
-        "raw_dom_sha256": "3a2b5b5a4931e084639841f78284b755a57c2faefd7d2f9ee32a44988ea9fe97",
+        "raw_dom_sha256": "e6729589fa0ebd298a520260b458aa6662e564cb2d9075060ffb230cfd72a272",
         "segment": "mcx"
       },
       {
@@ -595,7 +649,7 @@
         "page_exact_count": 8,
         "page_qualification_count": 0,
         "product": "mcx-w71",
-        "raw_dom_sha256": "90ca03ae5a42a86c02e010294ddbfc2492cea0025fae60cd20375020f7e078e2",
+        "raw_dom_sha256": "9f10d72a729c07185c3cfcfd87cfe38b2ba22aa33f47798c29d8ef225645a32d",
         "segment": "mcx"
       },
       {
@@ -604,7 +658,7 @@
         "page_exact_count": 6,
         "page_qualification_count": 0,
         "product": "mcx-w72",
-        "raw_dom_sha256": "6dcfc7a77958e4162c1c027917957a70e1a7ab0af88551c6062830626b6188f5",
+        "raw_dom_sha256": "b325919fb663032c357a5369ac6b07b41450db58c6cbdc9f1296fbf996e59f9d",
         "segment": "mcx"
       }
     ],
@@ -620,5 +674,15 @@
     "observed_active_exact_set_sha256": "8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24",
     "all_product_acquisition_jobs_passed": true,
     "bounded_reconciliation_passed": true
+  },
+  "prior_replay": {
+    "source": "GitHub Actions reconcile-bounded-gap output",
+    "workflow_run_id": 38333219588,
+    "workflow_job_id": 115088841197,
+    "evidence_artifact_id": 11783902049,
+    "evidence_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38333219588/artifacts/11783902049",
+    "artifact_retention_days": 30,
+    "generated_at_utc": "2026-10-13T01:45:53Z",
+    "producing_commit_sha": "53922fa7431c14e4d00dccb4a4ef7fcf5dce4ae6"
   }
 }
