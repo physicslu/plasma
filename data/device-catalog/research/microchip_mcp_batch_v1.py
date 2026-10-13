@@ -71,8 +71,16 @@ def execute(output, parts, offline=False, workers=1):
         except Exception as error:
             return {'base_device_query': part, 'state': 'failed_or_unverified',
                     'error_type': type(error).__name__, 'error': str(error)[:240]}
+        target_count = result['exact_prefix_ordering_count']
+        if target_count == 0:
+            return {'base_device_query': part,
+                    'state': 'no_exact_ordering_prefix_found',
+                    'raw_fuzzy_results': result['unique_ordering_count']}
         return {'base_device_query': part, 'state': 'bounded_search_reconciled',
-                'observed_unique_ordering_candidates': result['unique_ordering_count']}
+                'observed_unique_ordering_candidates': target_count,
+                'raw_fuzzy_results': result['unique_ordering_count'],
+                'foreign_result_count': result['fuzzy_foreign_ordering_count'],
+                'vendor_base_alias_count': result['vendor_base_part_alias_count']}
 
     if workers == 1:
         reports = [capture(part) for part in parts]
