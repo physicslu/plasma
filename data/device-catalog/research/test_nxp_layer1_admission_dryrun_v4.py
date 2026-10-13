@@ -126,7 +126,7 @@ class NxpLayer1DryRunTests(unittest.TestCase):
             self.assertIsNone(row["backend_candidate"])
             self.assertIsNone(row["selected_profile"])
             if row["family"]!="KL25":
-                self.assertEqual(row["mapping_status"],"no_mapping")
+                self.assertEqual(row["backend"]["mapping_status"],"no_mapping")
 
     def test_original_manifest_mutation_blocks_proposal(self):
         with tempfile.TemporaryDirectory() as td:
