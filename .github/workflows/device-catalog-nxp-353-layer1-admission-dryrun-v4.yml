@@ -7,7 +7,6 @@ on:
       - 'data/device-catalog/research/test_nxp_layer1_admission_dryrun_v4.py'
       - 'data/device-catalog/research/NXP_353_LAYER1_ADMISSION_DRYRUN_V4.md'
       - '.github/workflows/device-catalog-nxp-353-layer1-admission-dryrun-v4.yml'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/nxp-kl25-commercial-icpn.csv'
       - 'data/device-catalog/research/nxp-353-metadata-gap-review-queue-v3.csv'
       - 'data/device-catalog/research/nxp-bulk-353-status-map-v2.json'
