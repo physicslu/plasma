@@ -1,0 +1,95 @@
+name: NXP bounded 277 exact Active source reacquisition v7
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_277_refresh_v7.py'
+      - 'data/device-catalog/research/test_nxp_277_refresh_v7.py'
+      - 'data/device-catalog/research/nxp-277-manufacturer-gap-review-v6.csv'
+      - '.github/workflows/device-catalog-nxp-277-refresh-v7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lock-and-source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'beautifulsoup4==4.14.2'
+      - run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_277_refresh_v7.py' -v
+      - run: python data/device-catalog/research/test_nxp_277_gap_review_v6.py
+
+  official-source-shards:
+    needs: lock-and-source-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install 'playwright==1.56.0' 'beautifulsoup4==4.14.2'
+          python -m playwright install --with-deps chromium
+      - name: Reacquire bounded 277 official NXP exact part pages
+        run: |
+          python data/device-catalog/research/nxp_277_refresh_v7.py \
+            --shard ${{ matrix.shard }} \
+            --output /tmp/nxp-277-refresh-shard-${{ matrix.shard }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-277-refresh-shard-${{ matrix.shard }}
+          path: /tmp/nxp-277-refresh-shard-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  independent-exact-replay:
+    needs: official-source-shards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'beautifulsoup4==4.14.2'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nxp-277-refresh-shard-*
+          path: /tmp/nxp-277-refresh-all
+      - name: Verify all 277 source SHA, exact h1 and all negative decisions
+        run: |
+          python data/device-catalog/research/nxp_277_refresh_v7.py \
+            --aggregate-root /tmp/nxp-277-refresh-all \
+            --output /tmp/nxp-277-refresh-reconciled
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('/tmp/nxp-277-refresh-reconciled/nxp-277-refreshed-source-summary-v7.json').read_text())
+          assert s['refreshed_exact_active_277']==277
+          assert sum(s['refresh_states'].values())==277
+          assert s['global_active_denominator'] is None
+          assert not s['catalog_admission_qualified']
+          assert not s['production_publication_authorized']
+          assert not s['programming_profile_qualified']
+          assert not s['physical_programming_qualified']
+          print('NXP bounded source replay PASS; Production unchanged')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-277-reconciled-exact-evidence-v7
+          path: /tmp/nxp-277-refresh-reconciled/
+          if-no-files-found: error
+          retention-days: 30
