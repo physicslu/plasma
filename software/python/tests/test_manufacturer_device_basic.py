@@ -169,10 +169,7 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
 
     def test_implicit_binding_expansion_is_not_allowed(self) -> None:
         payload = copy.deepcopy(self.payload)
-        payload["bindings"] = [
-            binding for binding in payload["bindings"]
-            if binding["icpn"] != "STM32F103C8T6"
-        ]
+        payload["bindings"].pop("STM32F103C8T6")
         path = self.write_payload(payload)
         try:
             with self.assertRaisesRegex(ICSupportIntegrityError, "must bind 280"):
