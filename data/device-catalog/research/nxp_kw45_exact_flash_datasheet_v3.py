@@ -119,8 +119,35 @@ def main() -> None:
     ap=argparse.ArgumentParser()
     ap.add_argument("--output",type=Path,required=True)
     ap.add_argument("--pdf-file",type=Path)
+    ap.add_argument("--offline-source-gap",action="store_true")
     args=ap.parse_args()
     from_blocked_source()
+    if args.offline_source_gap:
+        args.output.mkdir(parents=True, exist_ok=True)
+        review = {
+            "schema_version": 3,
+            "manufacturer": "NXP",
+            "status": "OFFICIAL_KW45_PDF_VISUALLY_LOCATED_BINARY_NOT_RETAINED_REVIEW_REQUIRED",
+            "manufacturer_datasheet_source": PDF_URL,
+            "manufacturer_datasheet_alternate": ALTERNATE_OFFICIAL_PDF_URL,
+            "manufacturer_table": "KW45 Rev 9 Table 1, PDF page 4",
+            "exact_source_flash_candidates_not_qualified": [
+                {"icpn": sku, "datasheet_flash_candidate_kb": amount,
+                 "source_row_verified_by_automated_pdf_replay": False,
+                 "catalog_admission_authorized": False}
+                for sku, amount in sorted(EXACT.items())
+            ],
+            "exact_count": len(EXACT),
+            "source_binary_acquisition_status": "HTTP_404_BOTH_NXP_DOMAINS_IN_GITHUB_RUNNER",
+            "source_pdf_sha256": None,
+            "production_write_authorized": False,
+            "runtime_programming_qualified": False,
+        }
+        (args.output / "kw45-eight-source-gap-v3.json").write_text(
+            json.dumps(review, sort_keys=True, indent=2)+"\n",encoding="utf-8")
+        print(json.dumps({k:v for k,v in review.items()
+                          if k!="exact_source_flash_candidates_not_qualified"},sort_keys=True))
+        return
     if args.pdf_file:
         content=args.pdf_file.read_bytes()
     else:
