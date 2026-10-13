@@ -75,5 +75,50 @@
     "raw_lifecycle_field": "lifecycle_status",
     "raw_lifecycle_semantics": "pending_official_code_mapping_review",
     "population_boundary": "per-query response only; complete MCU/DSC family inventory is not established"
+  },
+  "gate_1b_surface_audit": {
+    "audit_date": "2026-10-13",
+    "status": "partial_surface_audit",
+    "exhaustive_family_inventory": false,
+    "live_product_api_response_captured": false,
+    "findings": [
+      {
+        "segment": "8bit",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/pic-mcus",
+          "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        ],
+        "result": "Rendered landing pages are narrative/featured-family surfaces and do not provide a complete family table or auditable total. Product-family examples found elsewhere remain discovery seeds only."
+      },
+      {
+        "segment": "16bit",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus"
+        ],
+        "result": "The page presents PIC24F GA and GB product-family links and mentions GC and DA in application groupings; it does not enumerate a complete PIC24 plus dsPIC family population."
+      },
+      {
+        "segment": "32bit-pic-sam",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam"
+        ],
+        "result": "The page groups PIC32C and SAM devices, with links to PIC32CX and SAM collateral; it is not a complete leaf-family or exact ordering-code table. PIC32M needs a separate family inventory."
+      },
+      {
+        "segment": "32bit-avr-risc",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        ],
+        "result": "The official page is a discovery surface and does not establish complete family membership or counts; legacy overlap with SAM remains to be reconciled."
+      },
+      {
+        "segment": "wireless",
+        "inspected_urls": [
+          "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        ],
+        "result": "The family surface combines wireless MCU ICs/SoCs and modules, requiring exact-part classification and de-duplication against the 32-bit lanes."
+      }
+    ],
+    "consequence": "Keep population_boundary_validated false and global_active_denominator null. The API is documented as a promising source, but no live page-response fixture or independently reconciled per-family page totals is committed yet."
   }
 }
