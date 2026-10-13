@@ -1,0 +1,65 @@
+name: Microchip read-only DFP-pinned crosslane source canary v1
+on:
+  push:
+    branches:
+      - agent/microchip-bulk-coverage-discovery-v1
+    paths:
+      - '.github/workflows/device-catalog-microchip-live-canary-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: microchip-dfp-live-canary-v1
+  cancel-in-progress: false
+
+jobs:
+  capture-and-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore exact original manufacturer DFP index archived 2026-10-13
+        uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: /tmp/microchip-original-dfp-index
+      - name: Verify official index original bytes and canary contract
+        run: |
+          set -euo pipefail
+          echo "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0  /tmp/microchip-original-dfp-index/index.html" | sha256sum --check
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_crosslane_canary_v1.py' -v
+      - name: Read-only live three-query crosslane capture
+        id: capture
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+            --evidence-root /tmp/microchip-original-dfp-index \
+            --target-root /tmp/microchip-dfp-canary \
+            --max-queries 3 \
+            --capture
+      - name: Replay archived source evidence independently
+        if: ${{ success() }}
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_crosslane_canary_v1.py \
+            --evidence-root /tmp/microchip-original-dfp-index \
+            --target-root /tmp/microchip-dfp-canary \
+            --max-queries 3
+      - name: Upload all raw response and negative HTTP diagnostic evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-source-pinned-crosslane-3-raw-canary-v1
+          path: /tmp/microchip-dfp-canary/
+          if-no-files-found: warn
+          retention-days: 90
