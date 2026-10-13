@@ -68,34 +68,3 @@ jobs:
           assert len(x['segments']) == 5
           print('Research-only Microchip baseline PASS; no ungrounded portfolio claim')
           PY
-
-  replay-full-official-dfp-after-arm-badge-fix:
-    needs: research-contract
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
-    continue-on-error: true
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          name: microchip-official-packs-index-raw
-          run-id: 38338847345
-          github-token: ${{ github.token }}
-          path: /tmp/microchip-packs-source
-      - name: Reconcile all Microchip DFP cards including ARM Sync variants
-        run: python data/device-catalog/research/microchip_dfp_index_inventory_v1.py --evidence-root /tmp/microchip-packs-source --output /tmp/microchip-dfp-inventory/discovery.json
-      - name: Store source-hashed manufacturer discovery
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: microchip-dfp-full-manufacturer-index-replay-r3
-          path: /tmp/microchip-dfp-inventory/
-          if-no-files-found: warn
-          retention-days: 30
