@@ -336,6 +336,34 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       </dd>
                     </div>
                   ))}
+                  {selected.selected_profile.programming.routes.map(route => {
+                    const signalMap = selected.selected_profile!.programming.package_signal_map;
+                    const signals = route.entry_requirements.required_signals.map(signal => {
+                      const mapped = signalMap[signal];
+                      return mapped ? `${signal}→${mapped.mcu_signal}(Pin ${mapped.package_pin})` : signal;
+                    }).join(", ");
+                    const straps = route.entry_requirements.strap_states
+                      .map(strap => `${strap.signal}=${strap.state.toUpperCase()}`)
+                      .join(", ");
+                    return (
+                      <div key={route.route_id} className="icSelectorProgrammingRoute">
+                        <dt>{zh ? "Programming Route" : "Programming Route"}</dt>
+                        <dd>
+                          <strong>{humanizeStatus(route.route_id)}</strong>
+                          <div>
+                            ICP: {route.contexts.icp.supported ? (zh ? "支援" : "Supported") : (zh ? "不使用" : "Not used")}
+                            {" · "}
+                            Offline Socket: {route.contexts.offline_socket.supported ? (zh ? "支援" : "Supported") : (zh ? "不支援" : "Not supported")}
+                          </div>
+                          <div>Transport: {route.transport.type}{route.transport.instance ? ` · ${route.transport.instance}` : ""}</div>
+                          <div>{zh ? "必要訊號" : "Required signals"}: {signals || "—"}</div>
+                          <div>{zh ? "Boot / Mode Strap" : "Boot / mode straps"}: {straps || (zh ? "不需要" : "Not required")}</div>
+                          <div>{zh ? "Reset" : "Reset"}: {route.entry_requirements.reset_sequence.required ? (zh ? "進入此 Route 時需要 Reset event" : "Reset event required for route entry") : (zh ? "正常進入不強制 Reset" : "No mandatory reset for normal entry")}</div>
+                          <div>{zh ? "Runtime" : "Runtime"}: {route.runtime_implemented ? (zh ? "已實作" : "Implemented") : (zh ? "僅知識模型，尚未實作" : "Knowledge only; not implemented")}</div>
+                        </dd>
+                      </div>
+                    );
+                  })}
                   <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.program_unit} · {selected.selected_profile.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "燒錄程序" : "Programming flow"}</dt><dd className="icSelectorProgramFlow">{selected.selected_profile.programming.program_model.normal_write_flow.join(" → ")}</dd></div>
