@@ -76,6 +76,55 @@ class NxpLayer1DryRunTests(unittest.TestCase):
             "PARTIAL_SOURCE_FIELDS_REVIEW_REQUIRED",
         } for r in paired))
 
+    def test_runtime_catalog_includes_only_the_twelve_exact_kl25_skus(self):
+        import sys
+        sys.path.insert(0, str(m.ROOT / "software/python"))
+        from plasma_web.device_catalog import DeviceCatalog
+
+        catalog = DeviceCatalog.from_manifest(m.MANIFEST)
+        self.assertEqual(catalog.size, 4641)
+        self.assertEqual(catalog.source_count, 29)
+        self.assertEqual(sum(r.vendor == "STMicroelectronics" for r in catalog.records), 4629)
+        nxp = [r for r in catalog.records if r.vendor == "NXP"]
+        self.assertEqual({r.identifier for r in nxp},
+                         {r["icpn"] for r in m.kl25_rows()[0]})
+        self.assertEqual(len(nxp), 12)
+        self.assertTrue(all(r.production_admitted and
+                            r.family == "KL25" and r.mapping_status == "mapped" and
+                            r.target_config == "tcl/target/kl25.cfg"
+                            for r in nxp))
+        self.assertTrue(all(r.to_payload()["physical_validation"]["ppu_status"] == "no_evidence" and
+                            r.to_payload()["physical_validation"]["socket_status"] == "no_evidence"
+                            for r in nxp))
+
+        # The remaining 341 identity candidates must stay invisible to
+        # real Catalog resolution, regardless of official Active status.
+        other = [r["icpn"] for r in self.records
+                 if r["icpn"] not in {x.identifier for x in nxp}]
+        self.assertEqual(len(other), 341)
+        self.assertTrue(all(catalog.resolve("NXP", sku) is None for sku in other))
+        names = {r.identifier for r in catalog.search("NXP", limit=100)}
+        self.assertEqual(names, {x.identifier for x in nxp})
+
+    def test_control_station_api_is_bounded_to_twelve_kl25_exact_records(self):
+        import sys
+        sys.path.insert(0, str(m.ROOT / "software/python"))
+        from plasma_web.gateway import _device_search_payload
+        from plasma_web.device_catalog import get_default_device_catalog
+
+        get_default_device_catalog.cache_clear()
+        payload = _device_search_payload("NXP", 100)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["catalog_size"], 4641)
+        self.assertEqual(payload["total_count"], 12)
+        self.assertEqual(len(payload["results"]), 12)
+        for row in payload["results"]:
+            self.assertEqual(row["vendor"], "NXP")
+            self.assertEqual(row["family"], "KL25")
+            self.assertEqual(row["physical_validation"]["ppu_status"], "no_evidence")
+            self.assertIsNone(row["backend_candidate"])
+            self.assertEqual(row["selected_profile"], None)
+
     def test_original_manifest_mutation_blocks_proposal(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"manifest.json"
