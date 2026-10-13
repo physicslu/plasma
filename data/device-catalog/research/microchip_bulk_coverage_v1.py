@@ -63,6 +63,27 @@ def canonical_lifecycle(source_state: str) -> str:
     }.get(normalized, "")
 
 
+
+def verify_source_bytes(root: Path, filename: str, expected_sha256: str) -> None:
+    """Verify actual local source bytes, not merely a 64-character digest field."""
+    require(isinstance(filename, str) and filename not in (".", "..") and
+            Path(filename).name == filename and "/" not in filename and
+            "\\\\" not in filename, "invalid evidence capture filename")
+    require(isinstance(expected_sha256, str) and bool(DIGEST.fullmatch(expected_sha256)),
+            "missing source bytes digest")
+    evidence = root / filename
+    require(evidence.is_file() and not evidence.is_symlink(),
+            "missing or symlinked source capture")
+    hasher = hashlib.sha256()
+    nbytes = 0
+    with evidence.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            nbytes += len(chunk)
+            hasher.update(chunk)
+    require(nbytes > 0 and hasher.hexdigest() == expected_sha256,
+            "source capture digest mismatch")
+
+
 def production_microchip() -> set[str]:
     manifest = read_json(PRODUCTION)
     found: set[str] = set()
@@ -83,6 +104,10 @@ def summarize(evidence_root: Path | None = None) -> dict:
     registry = read_json(REGISTRY)
     require(registry.get("schema_version") == 1 and registry.get("manufacturer") == "Microchip",
             "registry identity")
+    require(registry.get("population_boundary_validated") is False and
+            registry.get("production_write_authorized") is False and
+            registry.get("global_active_denominator") is None,
+            "unreviewed global coverage or publication claim")
     segments = registry.get("segments", [])
     ids = [segment.get("id") for segment in segments]
     require(len(ids) == len(set(ids)) and len(ids) == 5, "segment IDs must be five unique lanes")
@@ -110,8 +135,8 @@ def summarize(evidence_root: Path | None = None) -> dict:
             if complete:
                 require(snapshot.get("official_count") == len(rows),
                         "complete snapshot requires matching official count")
-                require(bool(DIGEST.fullmatch(snapshot.get("source_content_sha256", ""))),
-                        "complete snapshot requires source content digest")
+                verify_source_bytes(evidence_root, snapshot.get("source_capture_file"),
+                                    snapshot.get("source_content_sha256"))
             lane_seen: set[str] = set()
             for row in rows:
                 part, raw_state = row.get("icpn", ""), row.get("lifecycle", "")
@@ -122,6 +147,9 @@ def summarize(evidence_root: Path | None = None) -> dict:
                 require(part not in lane_seen, "duplicate exact part within segment")
                 require(bool(DIGEST.fullmatch(row.get("evidence_sha256", ""))),
                         "manufacturer row evidence missing")
+                if complete:
+                    verify_source_bytes(evidence_root, row.get("evidence_file"),
+                                        row.get("evidence_sha256"))
                 require(official_url(row.get("source_url", "")), "row evidence is not Microchip")
                 lane_seen.add(part)
                 prior = found.get(part)
@@ -129,7 +157,7 @@ def summarize(evidence_root: Path | None = None) -> dict:
                         "conflicting Microchip lifecycle across segments")
                 found[part] = state
             lane_reports.append({"segment": segment["id"],
-                                 "state": "verified_snapshot" if complete else "partial_snapshot",
+                                 "state": "bytes_verified_scope_unreviewed" if complete else "partial_snapshot",
                                  "exact_rows": len(rows), "complete": complete})
 
     active = {part for part, state in found.items() if state == "Active"}
