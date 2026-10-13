@@ -68,9 +68,11 @@ The Basic Profile is the operator-facing IC Information contract. For v1 it owns
 - Flash capacity;
 - RAM capacity;
 - operating VDD;
+- I/O supply (nullable without direct Product Selector/eStore evidence);
+- VDDA (nullable without direct Product Selector/eStore evidence);
 - operating temperature.
 
-For the STM32F1 expansion these facts are composed from Production Catalog exact identity
+For the current STM32F1/STM32C0/STM32G0 expansion these facts are composed from Production Catalog exact identity
 plus official ST Product Selector / eStore metadata. The Basic Profile is independent
 from Programming Profile authority. It cannot authorize erase/program/verify or hardware use.
 
