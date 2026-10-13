@@ -1,3 +1,35 @@
+## Approved merger scope to review — Microchip Research only
+
+The complete source-pinned DFP first-pass search queue (321 batches, 3,198
+research queries) completed across [the 16-batch pilot](https://github.com/physicslu/plasma/actions/runs/38348043707)
+and [the 12-shard full sweep](https://github.com/physicslu/plasma/actions/runs/38357451545).
+All twelve shard jobs passed, original response archives retained for
+90 days and durably copied to [the Microchip Drive archive](https://drive.google.com/drive/folders/1sJHR73lEjJeAgLt7pa4nJgpAr4Wrj50f).
+An independent offline validation checked 23,427 original candidate response
+SHA-256 links and exact original partNumber/lifecycle JSON-RPC records:
+no invalid links and no lifecycle conflicts.
+
+Source-verified query partition: **2,753** positive strict-prefix,
+**68** full-replay fuzzy-only, **297** original MCP NOT_FOUND (NOT an EOL
+verdict), **80** unverified due to eight timeout-interrupted batch archives.
+313 batch archives carried exact source attestations; 8 are quarantined.
+Unique observed exact-prefix **Research-only candidates**: **23,276**
+(raw statuses: 23,047 `Active` and 229 `Not Recommended For New Design`).
+These values are not manufacturer-wide commercial MCU SKUs or a validated
+global Active SKU denominator, and are not flash/programmer support.
+
+The original timeout proof race is fixed: every new source-attested batch
+writes the immutable batch claim before vendor requests; old untrusted
+files remain untouched. A permanent audit record is stored in
+`microchip-dfp-full-first-pass-audit-20261013.json` and protected by tests.
+
+**Merger approval authorizes ONLY the Research toolchain, source-attested
+offline evidence/contract tests, and audit snapshot.** It does not authorize
+Production ICPN ingestion, lifecycle authority claims, programming support,
+global coverage percentages or data promotion. Definitive commercial
+population, SKU type/module boundary, PCN/EOL checks and hardware programming
+qualifications remain explicitly separate future work.
+
 # Microchip ICPN Bulk Acquisition — ST-style Segmented Plan v1
 
 **Status:** research-only foundation. **Date:** 2026-10-13. **Authority:** no Production admission or Programming Backend authorization.
