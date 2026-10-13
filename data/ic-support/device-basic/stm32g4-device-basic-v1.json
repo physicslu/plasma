@@ -1,0 +1,737 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32g4-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32G4",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 273,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-13",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32g431-128k": {
+      "series": "STM32G431",
+      "flash_size": "128 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g431r6i6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G431x6/x8/xB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g431-32k": {
+      "series": "STM32G431",
+      "flash_size": "32 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g431r6i6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G431x6/x8/xB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g431-64k": {
+      "series": "STM32G431",
+      "flash_size": "64 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g431r6i6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G431x6/x8/xB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g441-128k": {
+      "series": "STM32G441",
+      "flash_size": "128 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g441cby6tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G441xB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g473-128k": {
+      "series": "STM32G473",
+      "flash_size": "128 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g473cbu6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G473xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g473-256k": {
+      "series": "STM32G473",
+      "flash_size": "256 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g473cbu6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G473xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g473-512k": {
+      "series": "STM32G473",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g473cbu6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G473xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g474-128k": {
+      "series": "STM32G474",
+      "flash_size": "128 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g474vch3tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G474xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g474-256k": {
+      "series": "STM32G474",
+      "flash_size": "256 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g474vch3tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G474xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g474-512k": {
+      "series": "STM32G474",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g474vch3tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G474xB/xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g483-512k": {
+      "series": "STM32G483",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g483ret6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G483xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g484-512k": {
+      "series": "STM32G484",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g484veh6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G484xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g491-256k": {
+      "series": "STM32G491",
+      "flash_size": "256 KiB",
+      "ram_size": "112 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g491cct6tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G491xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g491-512k": {
+      "series": "STM32G491",
+      "flash_size": "512 KiB",
+      "ram_size": "112 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g491cct6tr-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G491xC/xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    },
+    "stm32g4a1-512k": {
+      "series": "STM32G4A1",
+      "flash_size": "512 KiB",
+      "ram_size": "112 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "vdda_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32g4a1rei6-cpn.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32G4A1xE",
+        "observed_fields": [
+          "ram",
+          "operating_vdd",
+          "vdda"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32G431C6T6": "stm32g431-32k",
+    "STM32G431C6U6": "stm32g431-32k",
+    "STM32G431C8T3": "stm32g431-64k",
+    "STM32G431C8T3TR": "stm32g431-64k",
+    "STM32G431C8T6": "stm32g431-64k",
+    "STM32G431C8T6TR": "stm32g431-64k",
+    "STM32G431C8U3": "stm32g431-64k",
+    "STM32G431C8U6": "stm32g431-64k",
+    "STM32G431CBT3": "stm32g431-128k",
+    "STM32G431CBT3TR": "stm32g431-128k",
+    "STM32G431CBT6": "stm32g431-128k",
+    "STM32G431CBT6TR": "stm32g431-128k",
+    "STM32G431CBU3": "stm32g431-128k",
+    "STM32G431CBU3TR": "stm32g431-128k",
+    "STM32G431CBU6": "stm32g431-128k",
+    "STM32G431CBU6TR": "stm32g431-128k",
+    "STM32G431CBY3TR": "stm32g431-128k",
+    "STM32G431CBY6TR": "stm32g431-128k",
+    "STM32G431K6T6": "stm32g431-32k",
+    "STM32G431K6U3": "stm32g431-32k",
+    "STM32G431K6U6": "stm32g431-32k",
+    "STM32G431K8T3": "stm32g431-64k",
+    "STM32G431K8T3TR": "stm32g431-64k",
+    "STM32G431K8T6": "stm32g431-64k",
+    "STM32G431K8T6TR": "stm32g431-64k",
+    "STM32G431K8U6": "stm32g431-64k",
+    "STM32G431K8U6TR": "stm32g431-64k",
+    "STM32G431KBT3": "stm32g431-128k",
+    "STM32G431KBT3TR": "stm32g431-128k",
+    "STM32G431KBT6": "stm32g431-128k",
+    "STM32G431KBT6TR": "stm32g431-128k",
+    "STM32G431KBU3": "stm32g431-128k",
+    "STM32G431KBU3TR": "stm32g431-128k",
+    "STM32G431KBU6": "stm32g431-128k",
+    "STM32G431KBU6TR": "stm32g431-128k",
+    "STM32G431M6T6": "stm32g431-32k",
+    "STM32G431M8T6": "stm32g431-64k",
+    "STM32G431MBT3": "stm32g431-128k",
+    "STM32G431MBT6": "stm32g431-128k",
+    "STM32G431R6I6": "stm32g431-32k",
+    "STM32G431R6T6": "stm32g431-32k",
+    "STM32G431R8I6": "stm32g431-64k",
+    "STM32G431R8T3": "stm32g431-64k",
+    "STM32G431R8T6": "stm32g431-64k",
+    "STM32G431R8T6TR": "stm32g431-64k",
+    "STM32G431RBI3": "stm32g431-128k",
+    "STM32G431RBI3TR": "stm32g431-128k",
+    "STM32G431RBI6": "stm32g431-128k",
+    "STM32G431RBI6TR": "stm32g431-128k",
+    "STM32G431RBT3": "stm32g431-128k",
+    "STM32G431RBT3TR": "stm32g431-128k",
+    "STM32G431RBT6": "stm32g431-128k",
+    "STM32G431RBT6TR": "stm32g431-128k",
+    "STM32G431V6T6": "stm32g431-32k",
+    "STM32G431V8T6": "stm32g431-64k",
+    "STM32G431VBT6": "stm32g431-128k",
+    "STM32G441CBT6": "stm32g441-128k",
+    "STM32G441CBU6": "stm32g441-128k",
+    "STM32G441CBY6TR": "stm32g441-128k",
+    "STM32G441KBT6": "stm32g441-128k",
+    "STM32G441KBU6": "stm32g441-128k",
+    "STM32G441MBT6": "stm32g441-128k",
+    "STM32G441RBI6": "stm32g441-128k",
+    "STM32G441RBI6TR": "stm32g441-128k",
+    "STM32G441RBT6": "stm32g441-128k",
+    "STM32G441VBT6": "stm32g441-128k",
+    "STM32G473CBT3": "stm32g473-128k",
+    "STM32G473CBT6": "stm32g473-128k",
+    "STM32G473CBU6": "stm32g473-128k",
+    "STM32G473CCT3": "stm32g473-256k",
+    "STM32G473CCT3TR": "stm32g473-256k",
+    "STM32G473CCT6TR": "stm32g473-256k",
+    "STM32G473CCU3": "stm32g473-256k",
+    "STM32G473CCU3TR": "stm32g473-256k",
+    "STM32G473CCU6": "stm32g473-256k",
+    "STM32G473CCU6TR": "stm32g473-256k",
+    "STM32G473CET3": "stm32g473-512k",
+    "STM32G473CET3TR": "stm32g473-512k",
+    "STM32G473CET6": "stm32g473-512k",
+    "STM32G473CEU3": "stm32g473-512k",
+    "STM32G473CEU3TR": "stm32g473-512k",
+    "STM32G473CEU6": "stm32g473-512k",
+    "STM32G473CEU6TR": "stm32g473-512k",
+    "STM32G473MBT3": "stm32g473-128k",
+    "STM32G473MBT3TR": "stm32g473-128k",
+    "STM32G473MBT6": "stm32g473-128k",
+    "STM32G473MCT3": "stm32g473-256k",
+    "STM32G473MCT3TR": "stm32g473-256k",
+    "STM32G473MCT6": "stm32g473-256k",
+    "STM32G473MCT6TR": "stm32g473-256k",
+    "STM32G473MET3": "stm32g473-512k",
+    "STM32G473MET6": "stm32g473-512k",
+    "STM32G473MEY3TR": "stm32g473-512k",
+    "STM32G473MEY6TR": "stm32g473-512k",
+    "STM32G473PBI6": "stm32g473-128k",
+    "STM32G473PCI6": "stm32g473-256k",
+    "STM32G473PEI6": "stm32g473-512k",
+    "STM32G473QBT6": "stm32g473-128k",
+    "STM32G473QCT3": "stm32g473-256k",
+    "STM32G473QCT3TR": "stm32g473-256k",
+    "STM32G473QCT6": "stm32g473-256k",
+    "STM32G473QET6": "stm32g473-512k",
+    "STM32G473QET6TR": "stm32g473-512k",
+    "STM32G473RBT6": "stm32g473-128k",
+    "STM32G473RBT6TR": "stm32g473-128k",
+    "STM32G473RCT6": "stm32g473-256k",
+    "STM32G473RCT6TR": "stm32g473-256k",
+    "STM32G473RET3": "stm32g473-512k",
+    "STM32G473RET3TR": "stm32g473-512k",
+    "STM32G473RET6": "stm32g473-512k",
+    "STM32G473RET6TR": "stm32g473-512k",
+    "STM32G473VBH3": "stm32g473-128k",
+    "STM32G473VBH6": "stm32g473-128k",
+    "STM32G473VBT6": "stm32g473-128k",
+    "STM32G473VCH3": "stm32g473-256k",
+    "STM32G473VCH3TR": "stm32g473-256k",
+    "STM32G473VCH6": "stm32g473-256k",
+    "STM32G473VCT3": "stm32g473-256k",
+    "STM32G473VCT3TR": "stm32g473-256k",
+    "STM32G473VCT6": "stm32g473-256k",
+    "STM32G473VCT6TR": "stm32g473-256k",
+    "STM32G473VEH3": "stm32g473-512k",
+    "STM32G473VEH6": "stm32g473-512k",
+    "STM32G473VEH6TR": "stm32g473-512k",
+    "STM32G473VET3": "stm32g473-512k",
+    "STM32G473VET6": "stm32g473-512k",
+    "STM32G473VET6TR": "stm32g473-512k",
+    "STM32G474CBT3": "stm32g474-128k",
+    "STM32G474CBT3TR": "stm32g474-128k",
+    "STM32G474CBT6TR": "stm32g474-128k",
+    "STM32G474CBU6": "stm32g474-128k",
+    "STM32G474CCT3": "stm32g474-256k",
+    "STM32G474CCT3TR": "stm32g474-256k",
+    "STM32G474CCT6": "stm32g474-256k",
+    "STM32G474CCT6TR": "stm32g474-256k",
+    "STM32G474CCU3": "stm32g474-256k",
+    "STM32G474CCU6": "stm32g474-256k",
+    "STM32G474CET3": "stm32g474-512k",
+    "STM32G474CET3TR": "stm32g474-512k",
+    "STM32G474CET6": "stm32g474-512k",
+    "STM32G474CEU3": "stm32g474-512k",
+    "STM32G474CEU3TR": "stm32g474-512k",
+    "STM32G474CEU6": "stm32g474-512k",
+    "STM32G474CEU6TR": "stm32g474-512k",
+    "STM32G474MBT3": "stm32g474-128k",
+    "STM32G474MBT3TR": "stm32g474-128k",
+    "STM32G474MBT6": "stm32g474-128k",
+    "STM32G474MBT6TR": "stm32g474-128k",
+    "STM32G474MCT3": "stm32g474-256k",
+    "STM32G474MCT3TR": "stm32g474-256k",
+    "STM32G474MCT6": "stm32g474-256k",
+    "STM32G474MCT6TR": "stm32g474-256k",
+    "STM32G474MET3": "stm32g474-512k",
+    "STM32G474MET3TR": "stm32g474-512k",
+    "STM32G474MET6": "stm32g474-512k",
+    "STM32G474MET6TR": "stm32g474-512k",
+    "STM32G474MEY3TR": "stm32g474-512k",
+    "STM32G474MEY6TR": "stm32g474-512k",
+    "STM32G474PBI6": "stm32g474-128k",
+    "STM32G474PCI6": "stm32g474-256k",
+    "STM32G474PEI6": "stm32g474-512k",
+    "STM32G474PEI6TR": "stm32g474-512k",
+    "STM32G474QBT6": "stm32g474-128k",
+    "STM32G474QCT6": "stm32g474-256k",
+    "STM32G474QET6": "stm32g474-512k",
+    "STM32G474QET6TR": "stm32g474-512k",
+    "STM32G474RBT3": "stm32g474-128k",
+    "STM32G474RBT3TR": "stm32g474-128k",
+    "STM32G474RBT6": "stm32g474-128k",
+    "STM32G474RBT6TR": "stm32g474-128k",
+    "STM32G474RCT3": "stm32g474-256k",
+    "STM32G474RCT3TR": "stm32g474-256k",
+    "STM32G474RCT6": "stm32g474-256k",
+    "STM32G474RCT6TR": "stm32g474-256k",
+    "STM32G474RET3": "stm32g474-512k",
+    "STM32G474RET3TR": "stm32g474-512k",
+    "STM32G474RET6": "stm32g474-512k",
+    "STM32G474RET6TR": "stm32g474-512k",
+    "STM32G474VBH6": "stm32g474-128k",
+    "STM32G474VBT3": "stm32g474-128k",
+    "STM32G474VBT3TR": "stm32g474-128k",
+    "STM32G474VBT6": "stm32g474-128k",
+    "STM32G474VCH3": "stm32g474-256k",
+    "STM32G474VCH3TR": "stm32g474-256k",
+    "STM32G474VCH6": "stm32g474-256k",
+    "STM32G474VCT3TR": "stm32g474-256k",
+    "STM32G474VCT6": "stm32g474-256k",
+    "STM32G474VCT6TR": "stm32g474-256k",
+    "STM32G474VEH3": "stm32g474-512k",
+    "STM32G474VEH6": "stm32g474-512k",
+    "STM32G474VET3": "stm32g474-512k",
+    "STM32G474VET3TR": "stm32g474-512k",
+    "STM32G474VET6": "stm32g474-512k",
+    "STM32G474VET6TR": "stm32g474-512k",
+    "STM32G483CET3": "stm32g483-512k",
+    "STM32G483CET6": "stm32g483-512k",
+    "STM32G483CEU6": "stm32g483-512k",
+    "STM32G483MET6": "stm32g483-512k",
+    "STM32G483MEY6TR": "stm32g483-512k",
+    "STM32G483PEI6": "stm32g483-512k",
+    "STM32G483QET6": "stm32g483-512k",
+    "STM32G483RET6": "stm32g483-512k",
+    "STM32G483VEH6": "stm32g483-512k",
+    "STM32G483VET3": "stm32g483-512k",
+    "STM32G483VET3TR": "stm32g483-512k",
+    "STM32G483VET6": "stm32g483-512k",
+    "STM32G484CET6": "stm32g484-512k",
+    "STM32G484CEU3": "stm32g484-512k",
+    "STM32G484CEU6": "stm32g484-512k",
+    "STM32G484MET6": "stm32g484-512k",
+    "STM32G484MEY3TR": "stm32g484-512k",
+    "STM32G484MEY6TR": "stm32g484-512k",
+    "STM32G484PEI6": "stm32g484-512k",
+    "STM32G484QET3": "stm32g484-512k",
+    "STM32G484QET6": "stm32g484-512k",
+    "STM32G484QET6TR": "stm32g484-512k",
+    "STM32G484RET3": "stm32g484-512k",
+    "STM32G484RET6": "stm32g484-512k",
+    "STM32G484VEH6": "stm32g484-512k",
+    "STM32G484VET3": "stm32g484-512k",
+    "STM32G484VET3TR": "stm32g484-512k",
+    "STM32G484VET6": "stm32g484-512k",
+    "STM32G484VET6TR": "stm32g484-512k",
+    "STM32G491CCT3": "stm32g491-256k",
+    "STM32G491CCT6": "stm32g491-256k",
+    "STM32G491CCT6TR": "stm32g491-256k",
+    "STM32G491CCU6": "stm32g491-256k",
+    "STM32G491CCU6TR": "stm32g491-256k",
+    "STM32G491CET3": "stm32g491-512k",
+    "STM32G491CET6": "stm32g491-512k",
+    "STM32G491CEU3": "stm32g491-512k",
+    "STM32G491CEU3TR": "stm32g491-512k",
+    "STM32G491CEU6": "stm32g491-512k",
+    "STM32G491KCU3": "stm32g491-256k",
+    "STM32G491KCU6": "stm32g491-256k",
+    "STM32G491KEU3": "stm32g491-512k",
+    "STM32G491KEU3TR": "stm32g491-512k",
+    "STM32G491KEU6": "stm32g491-512k",
+    "STM32G491MCS6": "stm32g491-256k",
+    "STM32G491MCT6": "stm32g491-256k",
+    "STM32G491MES6": "stm32g491-512k",
+    "STM32G491MET3": "stm32g491-512k",
+    "STM32G491MET6": "stm32g491-512k",
+    "STM32G491MET6TR": "stm32g491-512k",
+    "STM32G491RCI6": "stm32g491-256k",
+    "STM32G491RCT3": "stm32g491-256k",
+    "STM32G491RCT3TR": "stm32g491-256k",
+    "STM32G491RCT6": "stm32g491-256k",
+    "STM32G491RCT6TR": "stm32g491-256k",
+    "STM32G491RCY6TR": "stm32g491-256k",
+    "STM32G491REI3": "stm32g491-512k",
+    "STM32G491REI6": "stm32g491-512k",
+    "STM32G491RET3": "stm32g491-512k",
+    "STM32G491RET3TR": "stm32g491-512k",
+    "STM32G491RET6": "stm32g491-512k",
+    "STM32G491RET6TR": "stm32g491-512k",
+    "STM32G491REY6TR": "stm32g491-512k",
+    "STM32G491VCT6": "stm32g491-256k",
+    "STM32G491VET6": "stm32g491-512k",
+    "STM32G491VET6TR": "stm32g491-512k",
+    "STM32G4A1CET6": "stm32g4a1-512k",
+    "STM32G4A1CEU6": "stm32g4a1-512k",
+    "STM32G4A1KEU6": "stm32g4a1-512k",
+    "STM32G4A1KEU6TR": "stm32g4a1-512k",
+    "STM32G4A1MES6": "stm32g4a1-512k",
+    "STM32G4A1MET3": "stm32g4a1-512k",
+    "STM32G4A1MET6": "stm32g4a1-512k",
+    "STM32G4A1MET6TR": "stm32g4a1-512k",
+    "STM32G4A1REI3": "stm32g4a1-512k",
+    "STM32G4A1REI6": "stm32g4a1-512k",
+    "STM32G4A1RET6": "stm32g4a1-512k",
+    "STM32G4A1REY6TR": "stm32g4a1-512k",
+    "STM32G4A1VET6": "stm32g4a1-512k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog exact identity/eStore evidence. RAM, Operating VDD, and VDDA are admitted only from the cited ST eStore series-scoped observations. I/O Supply remains null because no separate direct allowed-source value is admitted. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
