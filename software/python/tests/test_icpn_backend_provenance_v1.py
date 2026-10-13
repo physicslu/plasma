@@ -24,12 +24,24 @@ class BackendProvenanceAuditV1Tests(unittest.TestCase):
         cls.by_icpn = {row["icpn"]: row for row in cls.rows}
 
     def test_exact_catalog_partition_and_candidate_counts(self) -> None:
-        self.assertEqual(self.summary["total_exact_icpns"], 4629)
-        self.assertEqual(self.summary["production_mapped"], 4164)
+        self.assertEqual(self.summary["total_exact_icpns"], 4641)
+        self.assertEqual(self.summary["production_mapped"], 4176)
         self.assertEqual(self.summary["production_no_mapping"], 465)
         self.assertEqual(self.summary["research_candidates_not_mapped"], {"STM32C5": 172, "STM32H5": 190})
-        self.assertEqual(len(self.by_icpn), 4629)
+        self.assertEqual(len(self.by_icpn), 4641)
         self.assertEqual(self.summary["catalog_revision_sha256"], self.catalog.revision_sha256)
+        # Existing ST exposure is invariant; this controlled publication adds
+        # exactly twelve NXP KL25 metadata-plus-route catalog records.
+        st = [row for row in self.rows if row["manufacturer"] == "STMicroelectronics"]
+        nxp = [row for row in self.rows if row["manufacturer"] == "NXP"]
+        self.assertEqual(len(st), 4629)
+        self.assertEqual(len(nxp), 12)
+        self.assertEqual({row["family"] for row in nxp}, {"KL25"})
+        self.assertEqual({row["mapping_status"] for row in nxp}, {"mapped"})
+        self.assertTrue(all(row["production_binding"]["target_config"] ==
+            "tcl/target/kl25.cfg" for row in nxp))
+        self.assertTrue(all(row["physical_programming_qualified"] is False for row in nxp))
+
 
     def test_every_mapped_ic_cites_same_pinned_upstream_source_not_st_fork(self) -> None:
         for row in self.rows:
@@ -99,7 +111,7 @@ class BackendProvenanceAuditV1Tests(unittest.TestCase):
         self.assertEqual(self.summary, summary_again)
         self.assertEqual(self.jsonl, blob_again)
         self.assertEqual(hashlib.sha256(self.jsonl).hexdigest(), self.summary["records_jsonl_sha256"])
-        self.assertEqual(len(self.jsonl.splitlines()), 4629)
+        self.assertEqual(len(self.jsonl.splitlines()), 4641)
         self.assertEqual(json.loads(self.jsonl.splitlines()[0]), self.rows[0])
 
     def test_source_commit_mismatch_must_fail_closed(self) -> None:
