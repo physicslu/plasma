@@ -48,14 +48,14 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After STM32F1 Device Basic Profile v1, Production contains **4,629 exact ICPNs** and
+After STM32F1 Device Basic Profile v1, Production contains **4,641 exact ICPNs** and
 all **280 STM32F1 Production ICPNs** have an explicitly bound M1 Basic Profile.
 
 Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 4,349 |
+| M0 | 4,361 |
 | M1 | 279 |
 | M2 | 0 |
 | M3 | 0 |
@@ -66,7 +66,7 @@ Cumulative coverage:
 
 | At least level | Exact ICPNs |
 |---|---:|
-| M0 | 4,629 |
+| M0 | 4,641 |
 | M1 | 280 |
 | M2 | 1 |
 | M3 | 1 |
