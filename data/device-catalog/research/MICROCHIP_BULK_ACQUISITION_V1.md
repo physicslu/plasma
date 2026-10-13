@@ -80,6 +80,32 @@ python data/device-catalog/research/microchip_bulk_coverage_v1.py
 python -m unittest discover -s data/device-catalog/research -p 'test_microchip_bulk_coverage_v1.py'
 ```
 
+## Gate 1c — deterministic DFP batching plan (offline only)
+
+`microchip_mcp_batch_plan_v1.py` replays the archived original Microchip DFP
+index through `archived_inventory()`, checks its source digest against the frozen
+registry fingerprint, validates per-pack and per-lane totals, and emits stable
+3- or 10-name **query plans** with SHA-256 query-list digests. It explicitly
+separates syntactically unsupported device names (manual mapping required) and
+excluded/unclassified packs; none are silently turned into made-up orderable
+SKUs. An empty discovery lane is **not** proof that the product category is
+empty. No MCP traffic, lifecycle inference or Production writes are performed.
+
+Once the original DFP artifact is available locally:
+
+```bash
+python data/device-catalog/research/microchip_mcp_batch_plan_v1.py \
+  --evidence-root /path/to/official-dfp-index-archive \
+  --output /tmp/microchip-dfp-research-batch-plan.json \
+  --batch-size 10
+```
+
+This plan is a staged research queue, not permission to launch all vendor
+queries. The separate 27-query pilot still has one official EOL/NOT_FOUND
+exception and the current MCP probe stops for any query reporting more than 60
+results. Scaling capture requires explicit bounded scheduling, retry and
+high-result-count reconciliation before network execution.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
