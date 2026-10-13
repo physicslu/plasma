@@ -1,0 +1,4569 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32f1-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32F1",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_product_page",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide"
+    ],
+    "observation_date_utc": "2026-10-13",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32f100-128k": {
+      "series": "STM32F100",
+      "flash_size": "128 KiB",
+      "ram_size": "8 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-16k": {
+      "series": "STM32F100",
+      "flash_size": "16 KiB",
+      "ram_size": "4 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c4.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-256k": {
+      "series": "STM32F100",
+      "flash_size": "256 KiB",
+      "ram_size": "24 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100rc.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-32k": {
+      "series": "STM32F100",
+      "flash_size": "32 KiB",
+      "ram_size": "6 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c6.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-384k": {
+      "series": "STM32F100",
+      "flash_size": "384 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100rd.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-512k": {
+      "series": "STM32F100",
+      "flash_size": "512 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100re.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f100-64k": {
+      "series": "STM32F100",
+      "flash_size": "64 KiB",
+      "ram_size": "8 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c8.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-1024k": {
+      "series": "STM32F101",
+      "flash_size": "1024 KiB",
+      "ram_size": "80 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rg.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-128k": {
+      "series": "STM32F101",
+      "flash_size": "128 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101cb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-16k": {
+      "series": "STM32F101",
+      "flash_size": "16 KiB",
+      "ram_size": "4 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c4.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-256k": {
+      "series": "STM32F101",
+      "flash_size": "256 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rc.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-32k": {
+      "series": "STM32F101",
+      "flash_size": "32 KiB",
+      "ram_size": "6 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c6.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-384k": {
+      "series": "STM32F101",
+      "flash_size": "384 KiB",
+      "ram_size": "48 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rd.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-512k": {
+      "series": "STM32F101",
+      "flash_size": "512 KiB",
+      "ram_size": "48 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-64k": {
+      "series": "STM32F101",
+      "flash_size": "64 KiB",
+      "ram_size": "10 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c8.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f101-768k": {
+      "series": "STM32F101",
+      "flash_size": "768 KiB",
+      "ram_size": "80 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101rf.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f102-128k": {
+      "series": "STM32F102",
+      "flash_size": "128 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f102-16k": {
+      "series": "STM32F102",
+      "flash_size": "16 KiB",
+      "ram_size": "4 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c4.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f102-32k": {
+      "series": "STM32F102",
+      "flash_size": "32 KiB",
+      "ram_size": "6 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c6.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f102-64k": {
+      "series": "STM32F102",
+      "flash_size": "64 KiB",
+      "ram_size": "10 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c8.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-1024k": {
+      "series": "STM32F103",
+      "flash_size": "1024 KiB",
+      "ram_size": "96 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rg.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-128k": {
+      "series": "STM32F103",
+      "flash_size": "128 KiB",
+      "ram_size": "20 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103cb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-16k": {
+      "series": "STM32F103",
+      "flash_size": "16 KiB",
+      "ram_size": "6 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c4.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-256k": {
+      "series": "STM32F103",
+      "flash_size": "256 KiB",
+      "ram_size": "48 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-32k": {
+      "series": "STM32F103",
+      "flash_size": "32 KiB",
+      "ram_size": "10 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c6.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-384k": {
+      "series": "STM32F103",
+      "flash_size": "384 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rd.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-512k": {
+      "series": "STM32F103",
+      "flash_size": "512 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103re.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-64k": {
+      "series": "STM32F103",
+      "flash_size": "64 KiB",
+      "ram_size": "20 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103c8.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f103-768k": {
+      "series": "STM32F103",
+      "flash_size": "768 KiB",
+      "ram_size": "96 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rf.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f105-128k": {
+      "series": "STM32F105",
+      "flash_size": "128 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105rb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f105-256k": {
+      "series": "STM32F105",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105rc.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f105-64k": {
+      "series": "STM32F105",
+      "flash_size": "64 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105r8.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f107-128k": {
+      "series": "STM32F107",
+      "flash_size": "128 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rb.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    },
+    "stm32f107-256k": {
+      "series": "STM32F107",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector_or_product_page",
+        "series_selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107.html",
+        "representative_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html",
+        "observed_at_utc": "2026-10-13",
+        "content_lock": null,
+        "evidence_strength": "official_product_metadata_observation"
+      }
+    }
+  },
+  "bindings": [
+    {
+      "icpn": "STM32F100C4T6B",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C4T6BTR",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C4T7B",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C6T6B",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C6T6BTR",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C6T7B",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C6T7BTR",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C8T6B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C8T6BTR",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C8T7B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100C8T7BTR",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100CBT6B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100CBT6BTR",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100CBT7B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100CBT7BTR",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R4H6B",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R4",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R4T6B",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R4",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R4T6BTR",
+      "group_id": "stm32f100-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R4",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R6H6B",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R6",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R6T6B",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R6T6BTR",
+      "group_id": "stm32f100-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8H6B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8H7B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8T6B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8T6BTR",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8T7B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100R8T7BTR",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RBH6B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RBH6BTR",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RBT6B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RBT6BTR",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RCT6B",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RCT6BTR",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RCT7B",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RDT6B",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RDT6BTR",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RDT7B",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RET6B",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RET6BTR",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100RET7BTR",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100V8T6B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100V8T6BTR",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100V8T7B",
+      "group_id": "stm32f100-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VBT6B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VBT6BTR",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VBT7B",
+      "group_id": "stm32f100-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VCT6B",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VCT6BTR",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VDT6B",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VDT6BTR",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VDT7B",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VET6",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VET6B",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VET6BTR",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100VET7B",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZCT6B",
+      "group_id": "stm32f100-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZDT6B",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZD",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZDT6BTR",
+      "group_id": "stm32f100-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZD",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZET6B",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZET6BTR",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F100ZET7B",
+      "group_id": "stm32f100-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F100",
+        "base_device": "STM32F100ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C4T6A",
+      "group_id": "stm32f101-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C6T6A",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C6T6ATR",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C8T6",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C8T6TR",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C8U6",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C8",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101C8U6TR",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101C8",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101CBT6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101CBT6TR",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101CBU6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101CB",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101CBU6TR",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101CB",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101R4T6A",
+      "group_id": "stm32f101-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101R4",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101R6T6A",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101R6T6ATR",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101R8T6",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101R8T6TR",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RBH6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RBT6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RBT6TR",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RCT6",
+      "group_id": "stm32f101-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RCT6TR",
+      "group_id": "stm32f101-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RDT6",
+      "group_id": "stm32f101-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RDT6TR",
+      "group_id": "stm32f101-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RET6",
+      "group_id": "stm32f101-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RET6TR",
+      "group_id": "stm32f101-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RFT6",
+      "group_id": "stm32f101-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RF",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RFT6TR",
+      "group_id": "stm32f101-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RF",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RGT6",
+      "group_id": "stm32f101-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RG",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101RGT6TR",
+      "group_id": "stm32f101-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101RG",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T4U6A",
+      "group_id": "stm32f101-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T4",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T4U6ATR",
+      "group_id": "stm32f101-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T4",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T6U6A",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T6",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T6U6ATR",
+      "group_id": "stm32f101-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T6",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T8U6",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101T8U6TR",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101TBU6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101TB",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101TBU6TR",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101TB",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101V8T6",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101V8T6TR",
+      "group_id": "stm32f101-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VBT6",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VBT6TR",
+      "group_id": "stm32f101-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VCT6",
+      "group_id": "stm32f101-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VCT6TR",
+      "group_id": "stm32f101-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VDT6",
+      "group_id": "stm32f101-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VDT6TR",
+      "group_id": "stm32f101-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VET6",
+      "group_id": "stm32f101-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VET6TR",
+      "group_id": "stm32f101-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VFT6",
+      "group_id": "stm32f101-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VF",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VFT6TR",
+      "group_id": "stm32f101-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VF",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101VGT6",
+      "group_id": "stm32f101-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101VG",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101ZCT6",
+      "group_id": "stm32f101-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101ZDT6",
+      "group_id": "stm32f101-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101ZD",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101ZET6",
+      "group_id": "stm32f101-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101ZFT6",
+      "group_id": "stm32f101-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101ZF",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F101ZGT6",
+      "group_id": "stm32f101-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F101",
+        "base_device": "STM32F101ZG",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C4T6A",
+      "group_id": "stm32f102-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C4T6ATR",
+      "group_id": "stm32f102-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C6T6A",
+      "group_id": "stm32f102-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C6T6ATR",
+      "group_id": "stm32f102-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C8T6",
+      "group_id": "stm32f102-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102C8T6TR",
+      "group_id": "stm32f102-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102CBT6",
+      "group_id": "stm32f102-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102CBT6TR",
+      "group_id": "stm32f102-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102R4T6A",
+      "group_id": "stm32f102-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102R4",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102R6T6A",
+      "group_id": "stm32f102-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102R8T6",
+      "group_id": "stm32f102-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102RBT6",
+      "group_id": "stm32f102-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F102RBT6TR",
+      "group_id": "stm32f102-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F102",
+        "base_device": "STM32F102RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C4T6A",
+      "group_id": "stm32f103-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C4",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C6T6A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C6T6ATR",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C6T7A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C6T7ATR",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C6",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C6U6A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C6",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C8T6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C8T6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C8T7",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103C8T7TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103C8",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBT6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBT6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBT7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBT7TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "LQFP",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBU6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103CBU6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103CB",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R4H6A",
+      "group_id": "stm32f103-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R4",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R4T6A",
+      "group_id": "stm32f103-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R4",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R6H6A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R6",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R6T6A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R6T6ATR",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R6T7A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R6",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8H6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8H6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8H7",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8T6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8T6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8T7",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103R8T7TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBH6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBH6R",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBH6RTR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBH6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBH7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "TFBGA",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBT6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBT6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBT7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RBT7TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RCT6",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RCT6TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RCT7",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RCT7TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RCY6TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RC",
+        "package": "WLCSP64",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RDT6",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RDT6TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RD",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RDY6TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RD",
+        "package": "WLCSP64",
+        "pin_count": "64",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RET6",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RET6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RET7",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RE",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103REY6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RE",
+        "package": "WLCSP64",
+        "pin_count": "64",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RFT6",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RF",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RFT6TR",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RF",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RGT6",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RG",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RGT6TR",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RG",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103RGT7",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103RG",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T4U6A",
+      "group_id": "stm32f103-16k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T4",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "16 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T6U6A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T6",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T6U7A",
+      "group_id": "stm32f103-32k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T6",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "32 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T8U6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T8U6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T8U7",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103T8U7TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103T8",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103TBU6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103TB",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103TBU6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103TB",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103TBU7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103TB",
+        "package": "UFQFPN",
+        "pin_count": "36",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103V8H6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103V8",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103V8H6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103V8",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103V8T6",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103V8T6TR",
+      "group_id": "stm32f103-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBH6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBH7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBT6",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBT6TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBT7",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VBT7TR",
+      "group_id": "stm32f103-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VCH6",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VC",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VCT6",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VCT6TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDH6",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDH6TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDT6",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDT6TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDT7",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VDT7TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VD",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VEH6",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VEH6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VEH7",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VET6",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VET6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VET7",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VET7TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VE",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VFT6",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VF",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VFT6TR",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VF",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VFT7",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VF",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VGT6",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VG",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VGT6TR",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VG",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VGT7",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VG",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103VGT7TR",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103VG",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZCH6",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZC",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZCT6",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZCT6TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZCT7",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZCT7TR",
+      "group_id": "stm32f103-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZC",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZDH6",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZD",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZDH6TR",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZD",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZDT6",
+      "group_id": "stm32f103-384k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZD",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "384 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZEH6",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZEH6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZEH7",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZEH7TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZET6",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZET6TR",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZET7",
+      "group_id": "stm32f103-512k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZE",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "512 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZFH6",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZF",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZFH6TR",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZF",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZFT6",
+      "group_id": "stm32f103-768k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZF",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "768 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZGH6",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZG",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZGH6TR",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZG",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZGH7",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZG",
+        "package": "LFBGA",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZGT6",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZG",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F103ZGT6TR",
+      "group_id": "stm32f103-1024k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F103",
+        "base_device": "STM32F103ZG",
+        "package": "LQFP",
+        "pin_count": "144",
+        "flash_size": "1024 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105R8T6",
+      "group_id": "stm32f105-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105R8T6TR",
+      "group_id": "stm32f105-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105R8T7",
+      "group_id": "stm32f105-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105R8",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RBT6",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RBT6TR",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RCT6",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RCT6TR",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RCT6V",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RCT6W",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105RCT7",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F105V8T6",
+      "group_id": "stm32f105-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105V8T6TR",
+      "group_id": "stm32f105-64k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105V8",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "64 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VBH6",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VB",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VBH6TR",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VB",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VBH7",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VB",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VBT6",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VBT7",
+      "group_id": "stm32f105-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VCT6",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VCT6TR",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F105VCT7",
+      "group_id": "stm32f105-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F105",
+        "base_device": "STM32F105VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F107RBT6",
+      "group_id": "stm32f107-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107RBT6TR",
+      "group_id": "stm32f107-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107RB",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107RCT6",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107RCT6TR",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107RCT7",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107RC",
+        "package": "LQFP",
+        "pin_count": "64",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    },
+    {
+      "icpn": "STM32F107VBT6",
+      "group_id": "stm32f107-128k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107VB",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "128 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107VCH6",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107VC",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107VCT6",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107VCT6TR",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 85 C"
+      }
+    },
+    {
+      "icpn": "STM32F107VCT7",
+      "group_id": "stm32f107-256k",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32F1",
+        "series": "STM32F107",
+        "base_device": "STM32F107VC",
+        "package": "LQFP",
+        "pin_count": "100",
+        "flash_size": "256 KiB",
+        "operating_temperature": "-40 to 105 C"
+      }
+    }
+  ]
+}
