@@ -1,10 +1,13 @@
 import copy
 import hashlib
+from io import BytesIO
+from urllib.error import HTTPError
+from unittest.mock import patch
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from microchip_mcp_probe_v1 import decode, product_data, reconcile, replay, run
+from microchip_mcp_probe_v1 import Client, decode, product_data, reconcile, replay, run
 
 
 def page(offset, limit=2):
@@ -25,6 +28,26 @@ class ProbeTests(unittest.TestCase):
                       {'jsonrpc': '2.0', 'id': 4, 'result': {}}):
             with self.assertRaises(ValueError):
                 decode(json.dumps(value).encode(), 3)
+
+    def test_http_failure_bytes_are_archived_but_never_reconciled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            raw = b'{"error":{"code":"NOT_FOUND","message":"not found"}}'
+            response = HTTPError('https://api.microchip.com/mcp/resources',
+                                 404, 'Not Found', {}, BytesIO(raw))
+            client = Client(root)
+            with patch('microchip_mcp_probe_v1.urlopen', side_effect=response):
+                with self.assertRaisesRegex(ValueError, 'MCP HTTP 404'):
+                    client.call('tools/call', {'name': 'search_products',
+                                'arguments': {'searchTerm': 'PIC12F529T48A',
+                                              'limit': 2, 'offset': 0}}, 3)
+            self.assertEqual(len(client.evidence), 1)
+            saved = client.evidence[0]
+            self.assertEqual(saved['http_status'], 404)
+            self.assertEqual(saved['request']['method'], 'tools/call')
+            self.assertEqual((root / saved['file']).read_bytes(), raw)
+            self.assertEqual(saved['sha256'], hashlib.sha256(raw).hexdigest())
+            self.assertNotIn('lifecycleStatus', saved)
 
     def test_tool_failure(self):
         with self.assertRaises(ValueError):

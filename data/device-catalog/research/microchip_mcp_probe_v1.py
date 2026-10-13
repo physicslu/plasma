@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ENDPOINT = 'https://api.microchip.com/mcp/resources'
@@ -119,6 +120,15 @@ class Client:
                         'Accept': 'application/json, text/event-stream'}
         self.evidence = []
 
+    def archive_response(self, payload, status, raw):
+        require(len(raw) <= 4*1024*1024, 'response exceeds capture bound')
+        filename = f'response-{len(self.evidence):02d}.txt'
+        (self.output / filename).write_bytes(raw)
+        self.evidence.append({'file': filename, 'request': payload,
+                              'http_status': status,
+                              'retrieved_at_utc': datetime.now(timezone.utc).isoformat(),
+                              'sha256': hashlib.sha256(raw).hexdigest()})
+
     def call(self, method, params=None, request_id=None):
         payload = {'jsonrpc': '2.0', 'method': method}
         if request_id is not None:
@@ -127,20 +137,25 @@ class Client:
             payload['params'] = params
         request = Request(ENDPOINT, data=json.dumps(payload).encode(),
                           headers=self.headers, method='POST')
-        with urlopen(request, timeout=45) as response:
-            raw = response.read(4*1024*1024+1)
-            require(len(raw) <= 4*1024*1024, 'response exceeds capture bound')
-            filename = f'response-{len(self.evidence):02d}.txt'
-            (self.output / filename).write_bytes(raw)
-            self.evidence.append({'file': filename, 'request': payload,
-                                  'http_status': response.status,
-                                  'retrieved_at_utc': datetime.now(timezone.utc).isoformat(),
-                                  'sha256': hashlib.sha256(raw).hexdigest()})
-            session = response.headers.get('Mcp-Session-Id')
-            if session:
-                self.headers['Mcp-Session-Id'] = session
-            require(response.status == (202 if request_id is None else 200),
-                    'unexpected HTTP status')
+        try:
+            with urlopen(request, timeout=45) as response:
+                raw = response.read(4*1024*1024+1)
+                self.archive_response(payload, response.status, raw)
+                session = response.headers.get('Mcp-Session-Id')
+                if session:
+                    self.headers['Mcp-Session-Id'] = session
+                require(response.status == (202 if request_id is None else 200),
+                        'unexpected HTTP status')
+        except HTTPError as error:
+            # urllib raises before the normal context body for HTTP 4xx/5xx.
+            # Preserve the *original* negative response bytes as evidence,
+            # then fail closed. Never interpret NOT_FOUND as EOL or an empty
+            # but successful product population.
+            with error:
+                raw = error.read(4*1024*1024+1)
+            self.archive_response(payload, error.code, raw)
+            raise ValueError(f'MCP HTTP {error.code}: negative response archived, '
+                             'query NOT reconciled') from error
         return decode(raw, request_id) if request_id is not None else None
 
 

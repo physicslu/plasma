@@ -215,6 +215,17 @@ captured. CI covers synthetic successful 75-record archives, missing/tampered
 archives, forged plans, and conflicts. No live vendor bulk dataset was
 acquired by this offline rollup.
 
+## Negative MCP HTTP response retention
+
+The shared v1/v2 MCP HTTP client now preserves bounded original **4xx/5xx**
+response bytes and SHA-256 alongside the attempted request, even when
+`urllib` raises `HTTPError`. The query still fails closed: a failed
+capture lacks a complete transcript and cannot enter the evidence ledger,
+rollup or Production. The original error body is diagnostic evidence only;
+HTTP 404, MCP `NOT_FOUND`, and an EOL **device page** do not independently
+prove a particular ordering SKU is EOL. Unit tests use a synthetic HTTP 404
+body, not a newly captured live error response.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
