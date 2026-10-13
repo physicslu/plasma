@@ -226,6 +226,21 @@ HTTP 404, MCP `NOT_FOUND`, and an EOL **device page** do not independently
 prove a particular ordering SKU is EOL. Unit tests use a synthetic HTTP 404
 body, not a newly captured live error response.
 
+## Evidence artifact retention and permanent archival gap
+
+Future GitHub Actions uploads from the two Microchip manual API/MCP probe
+workflows now request **90-day** Artifact retention rather than 7 days,
+subject to GitHub repository policy limits. This setting is **not retroactive**
+and does not rescue earlier one-time captures; the DFP HTML index and PIC10/
+PIC12 raw pilot evidence currently referenced only by Actions artifact URLs
+must be independently copied to an approved durable evidence store with
+original byte hashes **before those historical artifacts expire**.
+
+An SHA-256 printed in PR documentation is not a replacement for the original
+archived source bytes. Do not mark a Research Gate, a global coverage
+denominator, or any Production row as supported by missing or expired
+original evidence. This PR does not contain a full raw manufacturer archive.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.

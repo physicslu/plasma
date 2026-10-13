@@ -28,4 +28,4 @@ jobs:
           name: microchip-product-api-probe
           path: /tmp/microchip-api-probe/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 90
