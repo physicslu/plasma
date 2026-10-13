@@ -143,12 +143,15 @@ export type SelectedICProfile = {
   };
   programming: {
     interfaces: Record<string, {
-      clock_hz: {
+      clock_hz?: {
         manufacturer_min: number | null;
         manufacturer_max: number | null;
         manufacturer_recommended: number | null;
         status: string;
       };
+      status?: string;
+      boot_source?: string;
+      transport_detail?: string;
       required_signal_pins?: Array<{ signal: string; mcu_pin: string; io_level?: string }>;
       recommended_support_signals?: string[];
       special_requirements?: string[];
