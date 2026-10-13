@@ -256,6 +256,19 @@ class ManufacturerDeviceBasicResolver:
                 and float(vdd["min"]) < float(vdd["max"]),
                 f"{group_id}: invalid operating VDD",
             )
+            for optional_name, label in (
+                ("io_supply_v", "I/O Supply"),
+                ("vdda_v", "VDDA"),
+            ):
+                optional_voltage = group.get(optional_name)
+                if optional_voltage is not None:
+                    _require(
+                        isinstance(optional_voltage, dict)
+                        and isinstance(optional_voltage.get("min"), (int, float))
+                        and isinstance(optional_voltage.get("max"), (int, float))
+                        and float(optional_voltage["min"]) < float(optional_voltage["max"]),
+                        f"{group_id}: invalid {label}",
+                    )
             _require(isinstance(evidence, dict), f"{group_id}: evidence is required")
             _require(
                 evidence.get("authority") == "STMicroelectronics official",
@@ -394,8 +407,22 @@ class ManufacturerDeviceBasicResolver:
                 "min": float(group["operating_vdd_v"]["min"]),
                 "max": float(group["operating_vdd_v"]["max"]),
             },
-            io_supply_v=None,
-            vdda_v=None,
+            io_supply_v=(
+                None
+                if group.get("io_supply_v") is None
+                else {
+                    "min": float(group["io_supply_v"]["min"]),
+                    "max": float(group["io_supply_v"]["max"]),
+                }
+            ),
+            vdda_v=(
+                None
+                if group.get("vdda_v") is None
+                else {
+                    "min": float(group["vdda_v"]["min"]),
+                    "max": float(group["vdda_v"]["max"]),
+                }
+            ),
             operating_temperature_c=_temperature_range(temperature_grade, owner),
             evidence=copy.deepcopy(group["evidence"]),
         )
