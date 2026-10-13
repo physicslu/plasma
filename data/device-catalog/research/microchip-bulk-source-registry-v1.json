@@ -83,7 +83,7 @@
       "pagesize": 2,
       "pagenumber": "1..totalPages"
     },
-    "live_probe_status": "awaiting_ci_capture",
+    "live_probe_status": "http_200_html_no_product_rows",
     "lifecycle_mapping": "raw_only_no_mapping"
   },
   "gate_1b_surface_audit": {
@@ -247,5 +247,20 @@
         }
       ]
     }
+  },
+  "mcp_product_probe": {
+    "endpoint": "https://api.microchip.com/mcp/resources",
+    "script": "data/device-catalog/research/microchip_mcp_probe_v1.py",
+    "observed_tools_count": 6,
+    "sample_query": "PIC10F202",
+    "observed_reported_total": 8,
+    "observed_returned_rows": 2,
+    "observed_raw_lifecycle_values": [
+      "Active"
+    ],
+    "full_pagination_validated": false,
+    "replayable_live_fixture_captured": false,
+    "latest_capture_status": "execution_network_approval_cancelled_before_decision",
+    "population_boundary": "bounded text-search query only; not complete MCU/DSC inventory"
   }
 }

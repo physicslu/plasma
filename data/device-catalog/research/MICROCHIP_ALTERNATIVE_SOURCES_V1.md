@@ -9,7 +9,7 @@ SHA-256 is claimed.
 
 | Source | Observed capability | Evidence boundary |
 | --- | --- | --- |
-| [Microchip MCP documentation](https://www.microchip.com/en-us/resources/model-context-protocol-server) | Documents a public, no-authentication Streamable HTTP service at https://api.microchip.com/mcp/resources with product identity, package, specification and document data. | Documentation read; initialization, tool discovery, pagination and exact-SKU lifecycle fields have not been validated. Direct network access to this host is unavailable in the current execution environment. A browser GET failure is not evidence of MCP service failure. |
+| [Microchip MCP documentation](https://www.microchip.com/en-us/resources/model-context-protocol-server) | Documents a public, no-authentication Streamable HTTP service at https://api.microchip.com/mcp/resources with product identity, package, specification and document data. | On 2026-10-13 the execution environment successfully performed initialize (HTTP 200), initialized (202), tools/list (200, six tools), and search_products for PIC10F202 at limit 2 / offset 0 (200). The query reported eight matches and returned two rows with explicit lifecycleStatus=Active. A later full-capture attempt was cancelled by the execution tool before a network approval decision and captured no response bytes. Full pagination remains unvalidated. A browser GET failure is not evidence of MCP service failure. |
 | [Parametric Search guide](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/MarketCommunication/Promotions/Parametric-Search-User-Guide-00004852.pdf) | DS00004852A documents XLSX Download Chart / All Data, with all products and columns in the selected chart. | No workbook captured. Chart scope must be recorded; an export does not by itself prove manufacturer-wide coverage or full ordering suffixes. |
 | [Official packs repository](https://packs.download.microchip.com/) | Lists versioned Device Family Packs and supported device names; the PIC10-12Fxxx group is readable. | Tool-support names are discovery candidates, not commercial order codes or lifecycle authority. Pack archives have not been downloaded or hashed. |
 | [PCN/EOL portal](https://www.microchip.com/en-us/support/product-change-notification) and [CPN FAQ](https://ww1.microchip.com/downloads/en/Market_Communication/PCN%20FAQ_revision.pdf) | Public notification access; affected CPN attachments identify ordering part numbers, sometimes in spreadsheet form. | Check revisions, cancellations and effective dates. Absence of an EOL match does not prove Active status. |
@@ -98,3 +98,32 @@ manufacturer-verified records.
 
 This audit provides a public-source continuation path; it does not require
 the owner to supply credentials merely to continue source discovery.
+
+## MCP probe continuation
+
+`microchip_mcp_probe_v1.py` implements the observed MCP schema with a fixed
+PIC10F202 query. It initializes the session, discovers the tool, fetches pages
+of two (at most 60 rows), and compares the identity/lifecycle set against a
+limit-60 response. Raw response bytes, timestamps, request arguments and SHA-256
+digests are retained. `--replay` validates an existing capture offline.
+
+The earlier successful query returned `PIC10F202T-I/MC` and `PIC10F202-I/MC`,
+both with raw `lifecycleStatus=Active`; its reported total was eight. That
+interactive result was not archived by this probe and is not a replayable
+fixture. Do not reconstruct original bytes from the displayed text.
+
+The new full-capture attempt produced no responses because the execution tool
+reported: `network approval was cancelled before a decision was returned`.
+This is an execution/access limitation for that attempt, not a vendor failure,
+and does not negate the prior successful MCP calls. No full-capture success,
+complete family population, or Production admission is claimed.
+
+Run from the repository root with a new output directory:
+
+```bash
+python data/device-catalog/research/microchip_mcp_probe_v1.py --output-dir /tmp/microchip-mcp-capture
+python data/device-catalog/research/microchip_mcp_probe_v1.py --output-dir /tmp/microchip-mcp-capture --replay
+python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_probe_v1.py' -v
+```
+
+Keep the PR Draft while the full capture and family inventory remain open.

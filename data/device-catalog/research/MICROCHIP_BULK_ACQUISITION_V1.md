@@ -55,9 +55,12 @@ Search XLSX export, versioned Device Family Packs, and PCN/EOL attachments.
 It includes a bounded list of 27 distinct PIC10/PIC12 DFP discovery names and
 ten indexed PIC10F206 catalog-part candidates. Direct page retrieval omitted
 the latter table, so the ten strings remain unverified candidates. Neither
-list is an Active denominator or an admission snapshot. MCP tool discovery
-and live product responses remain unvalidated because the current execution
-environment does not provide direct access to that endpoint.
+list is an Active denominator or an admission snapshot. MCP initialization, six-tool discovery and one two-row PIC10F202 response
+have now succeeded from the execution environment. A subsequent complete
+capture was blocked by a cancelled network approval before any response bytes
+were obtained. The new `microchip_mcp_probe_v1.py` and offline contract tests
+are ready; full pagination remains unvalidated. See the alternative audit for
+commands and the exact evidence boundary.
 
 ## Gate 0 — implemented
 
