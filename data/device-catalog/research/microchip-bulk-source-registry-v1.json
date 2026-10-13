@@ -120,5 +120,122 @@
       }
     ],
     "consequence": "Keep population_boundary_validated false and global_active_denominator null. The API is documented as a promising source, but no live page-response fixture or independently reconciled per-family page totals is committed yet."
+  },
+  "family_query_seeds": {
+    "status": "candidate_seeds_only_not_exhaustive",
+    "query_execution_status": "not_run",
+    "meaning": "Family labels used to prepare a future per-family Product Data API query matrix. These labels are not exact ordering parts, API query semantics remain to be tested, and this set is not an exhaustive population.",
+    "lanes": {
+      "8bit": [
+        {
+          "family_seed": "PIC10F / PIC12F / PIC16F",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip describes recognized part-number structures across 10Fxxx, 12Fxxx and 16Fxxx."
+        },
+        {
+          "family_seed": "PIC16F1",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip identifies 12F1xxx and 16F1xxx as Enhanced Mid-Range structures."
+        },
+        {
+          "family_seed": "PIC18",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/8bit-pic/",
+          "evidence": "Microchip identifies PIC18 as the High-End 8-bit family."
+        },
+        {
+          "family_seed": "tinyAVR / ATtiny",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        },
+        {
+          "family_seed": "megaAVR / ATmega",
+          "source_url": "https://www.microchip.com/en-us/about/corporate-overview/acquisitions/atmel/atmega"
+        },
+        {
+          "family_seed": "XMEGA / ATxmega",
+          "source_url": "https://www.microchip.com/en-us/about/corporate-overview/acquisitions/atmel/atxmega"
+        },
+        {
+          "family_seed": "AVR DA, DB, DD, EA, EB, SD",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus"
+        }
+      ],
+      "16bit": [
+        {
+          "family_seed": "PIC24F / PIC24E",
+          "source_url": "https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/Brochures/30010109.pdf",
+          "evidence": "2022 PIC24 quick reference includes PIC24F and PIC24EP product-family base patterns; discovery seed only."
+        },
+        {
+          "family_seed": "dsPIC33A / dsPIC33C / dsPIC33E / dsPIC33EV",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/dspic-dscs",
+          "evidence": "Current DSC landing lists dsPIC33A/C/E; dsPIC33EV appears among application-family links and the dsPIC33E page."
+        },
+        {
+          "family_seed": "dsPIC30",
+          "source_url": "https://www.microchip.com/en-us/product/dspic30f5015",
+          "evidence": "Official product record remains discoverable; lifecycle and family completeness require API review."
+        },
+        {
+          "family_seed": "dsPIC33F",
+          "source_url": "https://www.microchip.com/en-us/product/dspic33fj64gp206a",
+          "evidence": "Official product record remains discoverable; lifecycle and family completeness require API review."
+        }
+      ],
+      "32bit-pic-sam": [
+        {
+          "family_seed": "PIC32MM / PIC32MX / PIC32MK / PIC32MZ",
+          "source_url": "https://developerhelp.microchip.com/xwiki/bin/view/products/mcu-mpu/32bit-mcu/PIC32/",
+          "evidence": "Microchip identifies these four PIC32M MIPS32 family groups."
+        },
+        {
+          "family_seed": "PIC32C / PIC32CM / PIC32CX",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+          "evidence": "Official Arm MCU surface groups PIC32C and SAM and links PIC32CX."
+        },
+        {
+          "family_seed": "SAM3 / SAM4 / SAM C / SAM D / SAM E / SAM G / SAM L / SAM S",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+          "evidence": "Candidate subfamilies found across official SAM family pages and the 32-bit AVR/RISC legacy page; not an exhaustive enumeration."
+        }
+      ],
+      "32bit-avr-risc": [
+        {
+          "family_seed": "AVR32",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        },
+        {
+          "family_seed": "Arm7",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus"
+        },
+        {
+          "family_seed": "SAM3",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus",
+          "evidence": "The official legacy AVR/RISC page explicitly lists AVR32, Arm7 and SAM 3 device families; SAM3 overlaps the PIC32/SAM lane."
+        }
+      ],
+      "wireless": [
+        {
+          "family_seed": "PIC32-BZ6",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32CX-BZ2 / WBZ451",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32CX-BZ3 / WBZ351",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "PIC32-BW1",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless"
+        },
+        {
+          "family_seed": "WFI32",
+          "source_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless",
+          "evidence": "Wireless landing page includes these family/board labels; exact MCU IC versus module/SOM classification is unresolved."
+        }
+      ]
+    }
   }
 }
