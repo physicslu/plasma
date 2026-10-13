@@ -1,0 +1,51 @@
+name: NXP one-gate 277 full independent review v8
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_277_final_review_v8.py'
+      - 'data/device-catalog/research/test_nxp_277_final_review_v8.py'
+      - '.github/workflows/device-catalog-nxp-277-final-v8.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-evidence-full-batch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install beautifulsoup4==4.14.2
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+      - run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_277_final_review_v8.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38366666349
+          github-token: ${{ github.token }}
+          pattern: nxp-277-refresh-shard-*
+          path: /tmp/nxp-277-original
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38366666349
+          github-token: ${{ github.token }}
+          name: nxp-277-reconciled-exact-evidence-v7
+          path: /tmp/nxp-277-reconciled
+      - name: Replay each original HTML SHA-256 and exact NXP h1 across all 277 records
+        run: |
+          python data/device-catalog/research/nxp_277_refresh_v7.py --aggregate-root /tmp/nxp-277-original --output /tmp/nxp-277-replayed
+          cmp /tmp/nxp-277-replayed/nxp-277-refreshed-source-review-v7.csv /tmp/nxp-277-reconciled/nxp-277-refreshed-source-review-v7.csv
+      - name: Full exact review plus NXP original PDF source and RAM proof
+        run: |
+          python data/device-catalog/research/nxp_277_final_review_v8.py --v7 /tmp/nxp-277-replayed/nxp-277-refreshed-source-review-v7.csv --out /tmp/nxp-277-v8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-277-final-reviewed-original-pdf-v8
+          path: /tmp/nxp-277-v8/
+          if-no-files-found: error
+          retention-days: 30
