@@ -1,0 +1,43 @@
+name: Microchip MCP PIC10-PIC12 bounded research capture v1
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_queries:
+        description: "Number of DFP-supported device names to query, up to 27"
+        required: true
+        default: "27"
+        type: choice
+        options:
+          - "3"
+          - "10"
+          - "27"
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-bounded-capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify offline research contracts
+        run: |
+          python -m py_compile data/device-catalog/research/microchip_mcp_probe_v1.py data/device-catalog/research/microchip_mcp_batch_v1.py
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_probe_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_batch_v1.py' -v
+      - name: Capture bounded official MCP text-search observations
+        run: |
+          python data/device-catalog/research/microchip_mcp_batch_v1.py --output-dir /tmp/microchip-mcp-batch --max-queries ${{ inputs.max_queries }}
+      - name: Retain original response bytes, hashes, and per-query summaries
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-mcp-pic10-pic12-raw-evidence
+          path: /tmp/microchip-mcp-batch/
+          if-no-files-found: warn
+          retention-days: 7
