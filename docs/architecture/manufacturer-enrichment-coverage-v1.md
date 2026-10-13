@@ -38,7 +38,7 @@ Coverage is monotonic. A target cannot claim a higher level unless all lower lev
 | Level | Meaning |
 |---|---|
 | M0 | Production Catalog exact identity only |
-| M1 | Manufacturer Device Basic Profile: ICPN + Base Device + Package + Pin Count + Flash + RAM + Operating VDD + Operating Temperature |
+| M1 | Manufacturer Device Basic Profile: fixed ten-field IC Information contract; ICPN + Base Device + Package + Pin Count + Flash + RAM + Operating VDD + I/O Supply + VDDA + Operating Temperature. I/O Supply and VDDA may be null until directly evidenced. |
 | M2 | Manufacturer Programming Profile: interfaces + programming electrical + Flash geometry |
 | M3 | Manufacturer-derived executable semantics: Execution IR + deterministic code-generation path |
 | M4 | Independent software differential: OpenOCD semantic comparison + real-binary software acceptance |
@@ -48,8 +48,9 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After STM32F1 Device Basic Profile v1, Production contains **4,641 exact ICPNs** and
-all **280 STM32F1 Production ICPNs** have an explicitly bound M1 Basic Profile.
+After the STM32F1 + STM32C0 + STM32G0 Device Basic Profile v1 batch, Production contains
+**4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly **912 ST Production ICPNs**
+(280 F1 + 226 C0 + 406 G0) have an explicitly bound M1 Basic Profile.
 
 Highest achieved level:
 
@@ -275,9 +276,9 @@ Framework v1 permanently tests that:
 
 ## 12. Next transaction
 
-The next intended transaction is **STM32F1 Manufacturer Programming Profile Expansion v1**.
+Manufacturer Device enrichment remains a separate track from Programming Profile expansion.
 
-It should keep the 280 M1 Basic Profiles unchanged and separately establish the exact
+Any Programming Profile transaction must keep the 912 M1 Basic Profiles independent and separately establish the exact
 manufacturer applicability of programming interfaces, programming electrical constraints,
 Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
 M2 merely because an OpenOCD target mapping exists.
