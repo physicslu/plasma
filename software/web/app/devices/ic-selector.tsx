@@ -127,6 +127,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
   const zh = locale === "zh-TW";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState<DeviceSearchResult | null>(null);
   const [catalogSize, setCatalogSize] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -155,10 +156,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
           signal: controller.signal,
         });
         setResults(payload.results);
+        setTotalCount(payload.total_count);
         setCatalogSize(payload.catalog_size);
       } catch (searchError) {
         if (controller.signal.aborted) return;
         setResults([]);
+        setTotalCount(0);
         setError(searchError instanceof Error ? searchError.message : "Device search failed");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -174,6 +177,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
   function updateQuery(value: string) {
     setQuery(value);
     setResults([]);
+    setTotalCount(0);
     setError(null);
     setLoading(false);
     if (!value.trim()) setSelected(null);
@@ -214,7 +218,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             placeholder="STM32F103C8T6 / STM32F4 / STMicroelectronics ..."
             aria-label="Search admitted ICPN"
           />
-          <em>{loading ? (zh ? "搜尋中…" : "Searching…") : `${results.length} ${zh ? "筆結果" : "results"}`}</em>
+          <em>
+            {loading
+              ? (zh ? "搜尋中…" : "Searching…")
+              : (zh
+                  ? `顯示 ${results.length.toLocaleString()} / 共 ${totalCount.toLocaleString()} 筆`
+                  : `Showing ${results.length.toLocaleString()} / ${totalCount.toLocaleString()}`)}
+          </em>
         </label>
 
         {error && <div className="icSelectorError" role="alert">{error}</div>}
@@ -289,7 +299,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <span>01</span>
                 <div>
                   <h3>{zh ? "IC Information" : "IC Information"}</h3>
-                  <p>{zh ? "IC 身分、工作電氣特性與 Memory Map" : "Identity, operating electrical characteristics, and memory map"}</p>
+                  <p>
+                    {selected.selected_profile
+                      ? (zh ? "IC 身分、工作電氣特性與 Memory Map" : "Identity, operating electrical characteristics, and memory map")
+                      : (zh ? "IC 身分；工作電氣特性與 Memory Map 尚未完成原廠 enrichment" : "Identity; manufacturer electrical and memory-map enrichment is not available yet")}
+                  </p>
                 </div>
               </div>
               <dl>
@@ -300,15 +314,35 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
                 <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
                 <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
+                <div><dt>{zh ? "Catalog 溫度等級" : "Catalog temperature"}</dt><dd>{selected.temperature_grade ?? "—"}</dd></div>
                 {selected.selected_profile ? (
                   <>
                     <div><dt>SRAM</dt><dd>{selected.selected_profile.device.memory_map.sram ? `${selected.selected_profile.device.memory_map.sram.size_bytes / 1024} KiB` : "—"}</dd></div>
                     <div><dt>{zh ? "工作 VDD" : "Operating VDD"}</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.vdd_v)}</dd></div>
+                    <div><dt>{zh ? "I/O 供應電壓" : "I/O supply"}</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.io_supply_v)}</dd></div>
+                    <div><dt>VDDA</dt><dd>{voltageRange(selected.selected_profile.device.operating_electrical.vdda_v)}</dd></div>
+                    <div>
+                      <dt>{zh ? "原廠工作溫度" : "Operating temperature"}</dt>
+                      <dd>
+                        {selected.selected_profile.device.identity.ambient_temperature_c
+                          ? `${selected.selected_profile.device.identity.ambient_temperature_c.min}–${selected.selected_profile.device.identity.ambient_temperature_c.max} °C`
+                          : "—"}
+                      </dd>
+                    </div>
                     <div><dt>Main Flash Map</dt><dd><code>{selected.selected_profile.device.memory_map.main_flash.start}–{selected.selected_profile.device.memory_map.main_flash.end}</code></dd></div>
                     <div><dt>{zh ? "Flash Page" : "Flash page"}</dt><dd>{selected.selected_profile.device.memory_map.main_flash.page_size_bytes} bytes × {selected.selected_profile.device.memory_map.main_flash.page_count}</dd></div>
                   </>
                 ) : (
-                  <div><dt>{zh ? "Device Profile" : "Device profile"}</dt><dd>{zh ? "尚未建立 manufacturer enrichment" : "Manufacturer enrichment not available"}</dd></div>
+                  <>
+                    <div>
+                      <dt>{zh ? "工作電氣特性" : "Operating electrical"}</dt>
+                      <dd>{zh ? "尚未建立 manufacturer enrichment；不以 Family 或 OpenOCD 推論" : "Manufacturer enrichment not available; family or OpenOCD values are not inferred"}</dd>
+                    </div>
+                    <div>
+                      <dt>Memory Map</dt>
+                      <dd>{zh ? "尚未建立 manufacturer-derived Memory Map" : "Manufacturer-derived memory map not available"}</dd>
+                    </div>
+                  </>
                 )}
               </dl>
             </section>
