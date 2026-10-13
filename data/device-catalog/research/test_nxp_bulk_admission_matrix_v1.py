@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import json
 import tempfile
 import unittest
@@ -42,6 +43,16 @@ class Full353AdmissionPreflight(unittest.TestCase):
             for r in rows))
         self.assertIsNone(report["full_portfolio_active_denominator"])
         self.assertIsNone(report["full_portfolio_active_coverage"])
+
+    def test_frozen_353_csv_replays_the_single_generator(self):
+        expected, _ = mod.build()
+        path = HERE / "nxp-active-353-bulk-candidates-v1.csv"
+        with path.open(encoding="utf-8", newline="") as stream:
+            reader = csv.DictReader(stream)
+            self.assertEqual(reader.fieldnames, mod.FIELDS)
+            stored = list(reader)
+        self.assertEqual(stored, expected)
+        self.assertEqual(len(stored), 353)
 
     def test_metadata_never_guessed_for_other_341(self):
         rows, report = mod.build()
