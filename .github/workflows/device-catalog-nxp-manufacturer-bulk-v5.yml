@@ -13,7 +13,6 @@ on:
       - 'data/device-catalog/research/nxp_official_expansion_v5.py'
       - 'data/device-catalog/research/nxp-official-expansion-pages-v5.json'
       - 'data/device-catalog/research/nxp-five-page-expanded-active-evidence-v5.csv'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - '.github/workflows/device-catalog-nxp-manufacturer-bulk-v5.yml'
   workflow_dispatch:
 
