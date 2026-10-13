@@ -17,7 +17,7 @@ jobs:
       matrix:
         batch: [8bit-0004,8bit-0005,8bit-0013,8bit-0048,8bit-0071,8bit-0072,8bit-0082,8bit-0105]
     runs-on: ubuntu-24.04
-    timeout-minutes: 22
+    timeout-minutes: 24
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
