@@ -12,8 +12,12 @@ from microchip_mcp_batch_plan_v1 import plan_inventory
 from test_microchip_mcp_batch_plan_v1 import fixture
 
 
-def fake_report(target, parts, offline, workers, capture_format):
+def fake_report(target, parts, offline, workers, capture_format,
+                source_attestation=None):
     target.mkdir(parents=True, exist_ok=True)
+    if source_attestation is not None:
+        (target / 'batch-source.json').write_text(
+            json.dumps(source_attestation), encoding='utf-8')
     return {'selected_device_names': len(parts), 'all_queries_reconciled': True,
             'population_boundary_validated': False,
             'global_active_denominator': None,
@@ -33,6 +37,9 @@ class CaptureTests(unittest.TestCase):
                 result = capture.execute(self.plan, self.inventory, 'a'*64,
                                          self.batch_id, root, offline=False)
             self.assertEqual(patched.call_count, 1)
+            self.assertEqual(
+                patched.call_args.kwargs['source_attestation'],
+                capture.attestation(self.plan, self.plan['batches'][0]))
             self.assertEqual(patched.call_args.kwargs['capture_format'], 'paged_v2')
             self.assertEqual(len(patched.call_args.args[1]), 2)
             self.assertTrue((root / self.batch_id / 'batch-source.json').is_file())

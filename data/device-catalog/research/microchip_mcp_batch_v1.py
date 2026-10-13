@@ -10,6 +10,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -47,7 +48,8 @@ def load_seeds(path=SEEDS):
     return parts
 
 
-def execute(output, parts, offline=False, workers=1, capture_format='v1'):
+def execute(output, parts, offline=False, workers=1, capture_format='v1',
+            source_attestation=None):
     """Run independent read-only queries with bounded optional concurrency."""
     require(type(workers) is int and 1 <= workers <= 2, 'worker count out of range')
     require(capture_format in ('v1', 'paged_v2'), 'unsupported live capture format')
@@ -56,8 +58,21 @@ def execute(output, parts, offline=False, workers=1, capture_format='v1'):
             all(isinstance(part, str) and probe.BASE_QUERY.fullmatch(part)
                 for part in parts), 'invalid selected query set')
     output = Path(output)
+    require(source_attestation is None or
+            (not offline and isinstance(source_attestation, dict) and
+             source_attestation.get('production_write_authorized') is False and
+             source_attestation.get('global_active_denominator') is None and
+             source_attestation.get('ordered_queries') == parts),
+            'unsafe or mismatched pre-capture attestation')
     if not offline:
         output.mkdir(parents=True, exist_ok=False)
+        if source_attestation is not None:
+            # Source evidence must exist BEFORE the first vendor call; hard
+            # timeout kills an entire worker process without running finally.
+            with (output / 'batch-source.json').open('x', encoding='utf-8') as f:
+                f.write(json.dumps(source_attestation, indent=2, sort_keys=True)+'\n')
+                f.flush()
+                os.fsync(f.fileno())
     else:
         require(output.is_dir(), 'missing archived batch folder')
 

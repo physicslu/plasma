@@ -69,11 +69,14 @@ def execute(plan, inventory, source_digest, batch_id, output_root,
         require(not target.exists(), 'batch folder already exists; refuse overwrite')
         root.mkdir(parents=True, exist_ok=True)
 
-    report = batch.execute(target, selected['queries'], offline=offline,
-                           workers=workers, capture_format='paged_v2')
+    report = batch.execute(
+        target, selected['queries'], offline=offline,
+        workers=workers, capture_format='paged_v2',
+        source_attestation=expected if not offline else None)
     if not offline:
-        provenance.write_text(json.dumps(expected, indent=2, sort_keys=True)+'\n',
-                              encoding='utf-8')
+        require(provenance.is_file() and
+                json.loads(provenance.read_text(encoding='utf-8')) == expected,
+                'pre-network attestation missing or corrupt')
     require(report['selected_device_names'] == len(selected['queries']) and
             report['population_boundary_validated'] is False and
             report['global_active_denominator'] is None and

@@ -116,6 +116,28 @@ class BatchTests(unittest.TestCase):
             self.assertTrue(all(r['state'] == 'no_exact_ordering_prefix_found'
                                 for r in report['results']))
 
+    def test_source_attestation_is_fsynced_before_vendor_activity(self):
+        parts = batch.load_seeds()[:2]
+        proof = {'manufacturer': 'Microchip',
+                 'ordered_queries': parts,
+                 'production_write_authorized': False,
+                 'global_active_denominator': None}
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'live'
+            def interrupt(path, part):
+                saved = folder / 'batch-source.json'
+                self.assertTrue(saved.is_file())
+                self.assertEqual(json.loads(saved.read_text()), proof)
+                raise SystemExit('hard process abort simulation')
+            with patch.object(batch.probe, 'run', side_effect=interrupt):
+                with self.assertRaises(SystemExit):
+                    batch.execute(folder, parts, source_attestation=proof)
+            self.assertEqual(json.loads((folder/'batch-source.json').read_text()),proof)
+            with self.assertRaisesRegex(ValueError, 'unsafe or mismatched'):
+                batch.execute(Path(tmp)/'unsafe', parts,
+                              source_attestation=dict(proof, production_write_authorized=True))
+            self.assertFalse((Path(tmp)/'unsafe').exists())
+
     def test_a_failed_query_is_reported_without_false_success(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / 'research'
