@@ -50,13 +50,28 @@ def main()->int:
     evidence=json.loads(EVIDENCE.read_text(encoding="utf-8"))
     manifest=json.loads(MANIFEST.read_text(encoding="utf-8"))
     req(manifest.get("status")=="production","manifest status drift")
-    req(len(manifest["sources"])==28,"Production source count drift")
-    req(sum(int(s["row_count"]) for s in manifest["sources"])==4629,"Production exact total drift")
+    # Historical v6.21 ST source-only postimage remains exactly frozen.
+    # The new NXP KL25 source is independently validated and intentionally
+    # omitted from the historical ST-specific route partition.
+    req(len(manifest["sources"])==29,"Production source count drift")
+    req(sum(int(s["row_count"]) for s in manifest["sources"])==4641,
+        "Production exact total drift")
+    nxp=manifest["sources"][-1]
+    req(nxp=={
+        "manufacturer":"NXP","family":"KL25",
+        "path":"../research/nxp-kl25-commercial-icpn.csv",
+        "row_count":12,
+        "git_blob_sha":"53087e9082445e7948f88e688ecd890b0454d788",
+        "sha256":"73876af1a6344c298dd98559f2ea824362b8ce4935308e7b598d842d537bab95",
+    },"unexpected NXP source change in historical ST replay")
+    req(len(manifest["sources"][:-1])==28 and
+        all(s["manufacturer"]=="STMicroelectronics" for s in manifest["sources"][:-1]),
+        "historical ST 28-source contract drift")
 
     rows_by_icpn={}
     rows_by_family={}
     mapped=no_mapping=0
-    for source in manifest["sources"]:
+    for source in manifest["sources"][:-1]:
         path=(MANIFEST.parent/source["path"]).resolve()
         raw=path.read_bytes()
         req(source["sha256"]==sha256(raw),f"{source['family']}: current manifest SHA binding drift")
