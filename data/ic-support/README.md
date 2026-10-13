@@ -123,6 +123,42 @@ The subsequent OpenOCD comparison lives under `openocd-comparison/` and is analy
 only. Backend defaults and optimizations cannot mutate the manufacturer baseline. This is
 the reference method for future Plasma-native programmer knowledge extraction.
 
+## Manufacturer Enrichment Coverage
+
+Manufacturer Enrichment Coverage is measured independently from Device Catalog identity and runtime/hardware qualification.
+
+The v1 framework is documented in:
+
+```text
+docs/architecture/manufacturer-enrichment-coverage-v1.md
+```
+
+Coverage levels are monotonic:
+
+```text
+M0 Production exact identity
+M1 Manufacturer Device Profile
+M2 Manufacturer Programming Profile
+M3 Manufacturer-derived executable semantics
+M4 Independent software differential
+M5 Physical HIL qualification
+```
+
+Reusable manufacturer facts must use explicit exact-ICPN applicability through
+`manufacturer_enrichment_scope.py`. Family-name similarity, OpenOCD mapping, or a shared
+Flash-controller label never grants applicability by itself.
+
+Current deterministic reporting:
+
+```bash
+python data/ic-support/coverage_inventory.py --manufacturer-summary
+python data/ic-support/coverage_inventory.py --icpn STM32F103C8T6
+python data/ic-support/coverage_inventory.py --icpn STM32F103R8T6
+python data/ic-support/test_manufacturer_enrichment_scope.py
+```
+
+The coverage registry is research-only and cannot grant runtime or hardware authority.
+
 ## Validation
 
 Run the deterministic/offline checks from the repository root:

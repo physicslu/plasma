@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import hashlib
 import json
@@ -14,6 +15,23 @@ REPO_ROOT = HERE.parents[1]
 PRODUCTION_MANIFEST = REPO_ROOT / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
 BINDINGS_ROOT = HERE / "bindings"
 PROFILE_ROOT = HERE / "profiles"
+ENRICHMENT_EVIDENCE_FILE = HERE / "enrichment-coverage" / "evidence-v1.json"
+
+ENRICHMENT_LEVELS = ("M0", "M1", "M2", "M3", "M4", "M5")
+ENRICHMENT_DIMENSIONS = (
+    "catalog_identity",
+    "manufacturer_device_profile",
+    "operating_electrical",
+    "memory_map",
+    "manufacturer_programming_profile",
+    "programming_electrical",
+    "programming_interfaces",
+    "flash_geometry",
+    "execution_ir",
+    "generated_programmer",
+    "independent_software_differential",
+    "physical_hil",
+)
 
 
 class CoverageError(RuntimeError):
@@ -88,6 +106,227 @@ def load_json(path: Path) -> dict[str, Any]:
 def git_blob_sha_bytes(payload: bytes) -> str:
     header = f"blob {len(payload)}\0".encode("ascii")
     return hashlib.sha1(header + payload).hexdigest()
+
+
+def repo_file(relative_path: str) -> Path:
+    path = (REPO_ROOT / relative_path).resolve()
+    require(path.is_file(), f"coverage evidence path not found: {relative_path}")
+    require(
+        REPO_ROOT.resolve() in path.parents,
+        f"coverage evidence path escapes repository: {relative_path}",
+    )
+    return path
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_manufacturer_enrichment_evidence(
+    production_icpns: set[str],
+) -> dict[str, dict[str, Any]]:
+    registry = load_json(ENRICHMENT_EVIDENCE_FILE)
+    require(registry.get("schema_version") == "1.0.0", "unsupported manufacturer enrichment coverage schema")
+    require(registry.get("coverage_id") == "manufacturer-enrichment-coverage-v1", "unexpected coverage_id")
+    require(registry.get("status") == "research_coverage_only", "coverage registry must remain research-only")
+    require(registry.get("runtime_authority") is False, "coverage registry must not grant runtime authority")
+    require(registry.get("hardware_authority") is False, "coverage registry must not grant hardware authority")
+    level_contract = registry.get("level_contract")
+    require(isinstance(level_contract, dict), "coverage registry level_contract is required")
+    require(set(level_contract) == set(ENRICHMENT_LEVELS), "coverage level contract drifted")
+
+    raw_targets = registry.get("targets")
+    require(isinstance(raw_targets, dict), "coverage registry targets must be an object")
+    resolved: dict[str, dict[str, Any]] = {}
+
+    for icpn, evidence in sorted(raw_targets.items()):
+        require(icpn in production_icpns, f"{icpn}: enrichment target is not a Production ICPN")
+        require(isinstance(evidence, dict), f"{icpn}: enrichment evidence must be an object")
+        dimensions = {name: name == "catalog_identity" for name in ENRICHMENT_DIMENSIONS}
+        evidence_paths: dict[str, str | None] = {}
+        highest_level = "M0"
+
+        baseline_ref = evidence.get("manufacturer_baseline")
+        require(isinstance(baseline_ref, dict), f"{icpn}: manufacturer_baseline evidence is required")
+        baseline_path = repo_file(str(baseline_ref.get("path", "")))
+        lock_path = repo_file(str(baseline_ref.get("lock_path", "")))
+        baseline_bytes = baseline_path.read_bytes()
+        baseline = load_json(baseline_path)
+        lock = load_json(lock_path)
+        baseline_id = baseline_ref.get("baseline_id")
+        require(baseline.get("baseline_id") == baseline_id, f"{icpn}: baseline identity mismatch")
+        require(baseline.get("status") == "frozen_manufacturer_only", f"{icpn}: baseline is not manufacturer-only frozen")
+        require(
+            baseline.get("target", {}).get("icpn") == icpn,
+            f"{icpn}: manufacturer baseline exact-target mismatch",
+        )
+        require(
+            baseline.get("source_policy", {}).get("derivation_authority") == "manufacturer_official_only",
+            f"{icpn}: manufacturer-only derivation authority is required",
+        )
+        baseline_digest = hashlib.sha256(baseline_bytes).hexdigest()
+        require(lock.get("baseline_id") == baseline_id, f"{icpn}: baseline lock identity mismatch")
+        require(
+            lock.get("canonical_file_sha256") == baseline_digest,
+            f"{icpn}: baseline lock digest drift",
+        )
+        evidence_paths["manufacturer_baseline"] = str(baseline_path.relative_to(REPO_ROOT))
+
+        device_profile = baseline.get("device_profile")
+        require(isinstance(device_profile, dict), f"{icpn}: device_profile is required")
+        require(
+            isinstance(device_profile.get("operating_electrical"), dict)
+            and bool(device_profile["operating_electrical"])
+            and isinstance(device_profile.get("memory_map"), dict)
+            and bool(device_profile["memory_map"]),
+            f"{icpn}: M1 requires operating electrical and memory map",
+        )
+        dimensions["manufacturer_device_profile"] = True
+        dimensions["operating_electrical"] = True
+        dimensions["memory_map"] = True
+        highest_level = "M1"
+
+        programming_profile = baseline.get("programming_profile")
+        if programming_profile is not None:
+            require(isinstance(programming_profile, dict), f"{icpn}: programming_profile must be an object")
+            for key in ("interfaces", "programming_electrical", "flash_geometry"):
+                require(
+                    isinstance(programming_profile.get(key), dict) and programming_profile[key],
+                    f"{icpn}: M2 requires programming_profile.{key}",
+                )
+            dimensions["manufacturer_programming_profile"] = True
+            dimensions["programming_electrical"] = True
+            dimensions["programming_interfaces"] = True
+            dimensions["flash_geometry"] = True
+            highest_level = "M2"
+
+        execution = evidence.get("execution")
+        if execution is not None:
+            require(highest_level == "M2", f"{icpn}: M3 execution evidence requires complete M2")
+            require(isinstance(execution, dict), f"{icpn}: execution evidence must be an object")
+            execution_ir_path = repo_file(str(execution.get("execution_ir_path", "")))
+            execution_ir = load_json(execution_ir_path)
+            require(
+                execution_ir.get("ir_id") == execution.get("execution_ir_id"),
+                f"{icpn}: Execution IR identity mismatch",
+            )
+            ir_targets = execution_ir.get("targets")
+            require(
+                isinstance(ir_targets, list)
+                and any(isinstance(item, dict) and item.get("icpn") == icpn for item in ir_targets),
+                f"{icpn}: Execution IR does not bind the exact ICPN",
+            )
+            require(
+                isinstance(baseline.get("program_model"), dict)
+                and isinstance(baseline["program_model"].get("operations"), dict)
+                and baseline["program_model"]["operations"],
+                f"{icpn}: executable manufacturer program_model operations are required",
+            )
+            generator_path = repo_file(str(execution.get("generator_path", "")))
+            behavior_test_path = repo_file(str(execution.get("behavior_test_path", "")))
+            dimensions["execution_ir"] = True
+            dimensions["generated_programmer"] = True
+            highest_level = "M3"
+            evidence_paths["execution_ir"] = str(execution_ir_path.relative_to(REPO_ROOT))
+            evidence_paths["generator"] = str(generator_path.relative_to(REPO_ROOT))
+            evidence_paths["generator_test"] = str(behavior_test_path.relative_to(REPO_ROOT))
+
+        differential = evidence.get("independent_software_differential")
+        if differential is not None:
+            require(highest_level == "M3", f"{icpn}: M4 differential evidence requires complete M3")
+            require(isinstance(differential, dict), f"{icpn}: independent software differential must be an object")
+            comparison_path = repo_file(str(differential.get("openocd_comparison_path", "")))
+            comparison = load_json(comparison_path)
+            require(comparison.get("status") == "post_freeze_comparison", f"{icpn}: OpenOCD comparison is not post-freeze")
+            require(comparison.get("target", {}).get("icpn") == icpn, f"{icpn}: OpenOCD comparison target mismatch")
+            manufacturer_control = comparison.get("manufacturer_control")
+            require(isinstance(manufacturer_control, dict), f"{icpn}: comparison manufacturer_control is required")
+            require(manufacturer_control.get("baseline_id") == baseline_id, f"{icpn}: comparison baseline identity mismatch")
+            require(
+                manufacturer_control.get("baseline_sha256") == baseline_digest,
+                f"{icpn}: comparison baseline digest mismatch",
+            )
+            conclusions = comparison.get("conclusions")
+            require(
+                isinstance(conclusions, dict)
+                and conclusions.get("same_core_flash_programming_semantics") is True
+                and conclusions.get("manufacturer_baseline_remains_immutable") is True
+                and conclusions.get("hardware_runtime_ready") is False
+                and conclusions.get("physical_programming_qualified") is False,
+                f"{icpn}: independent comparison conclusions are incomplete",
+            )
+            real_binary_validator_path = repo_file(str(differential.get("real_binary_validator_path", "")))
+            real_binary_test_path = repo_file(str(differential.get("real_binary_test_path", "")))
+            dimensions["independent_software_differential"] = True
+            highest_level = "M4"
+            evidence_paths["openocd_comparison"] = str(comparison_path.relative_to(REPO_ROOT))
+            evidence_paths["real_openocd_validator"] = str(real_binary_validator_path.relative_to(REPO_ROOT))
+            evidence_paths["real_openocd_test"] = str(real_binary_test_path.relative_to(REPO_ROOT))
+
+        physical_hil = evidence.get("physical_hil")
+        evidence_paths["physical_hil"] = None
+        if physical_hil is not None:
+            require(highest_level == "M4", f"{icpn}: M5 HIL evidence requires complete M4")
+            require(isinstance(physical_hil, dict), f"{icpn}: physical_hil must be null or an object")
+            hil_path = str(physical_hil.get("evidence_path", ""))
+            hil = load_json(repo_file(hil_path))
+            require(hil.get("icpn") == icpn, f"{icpn}: HIL evidence target mismatch")
+            require(
+                hil.get("physical_programming_qualified") is True,
+                f"{icpn}: M5 requires explicit physical_programming_qualified=true",
+            )
+            dimensions["physical_hil"] = True
+            highest_level = "M5"
+            evidence_paths["physical_hil"] = hil_path
+
+        resolved[icpn] = {
+            "highest_level": highest_level,
+            "dimensions": dimensions,
+            "missing_dimensions": [name for name in ENRICHMENT_DIMENSIONS if not dimensions[name]],
+            "evidence": evidence_paths,
+        }
+    return resolved
+
+def empty_manufacturer_enrichment() -> dict[str, Any]:
+    dimensions = {name: name == "catalog_identity" for name in ENRICHMENT_DIMENSIONS}
+    return {
+        "highest_level": "M0",
+        "dimensions": dimensions,
+        "missing_dimensions": [name for name in ENRICHMENT_DIMENSIONS if not dimensions[name]],
+        "evidence": {},
+    }
+
+
+def summarize_manufacturer_enrichment(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    highest = Counter(row["manufacturer_enrichment"]["highest_level"] for row in rows)
+    at_least: dict[str, int] = {}
+    for level_index, level in enumerate(ENRICHMENT_LEVELS):
+        at_least[level] = sum(
+            1
+            for row in rows
+            if ENRICHMENT_LEVELS.index(row["manufacturer_enrichment"]["highest_level"]) >= level_index
+        )
+
+    by_vendor: dict[str, Counter[str]] = defaultdict(Counter)
+    by_family: dict[str, Counter[str]] = defaultdict(Counter)
+    for row in rows:
+        level = row["manufacturer_enrichment"]["highest_level"]
+        by_vendor[row["manufacturer"]][level] += 1
+        by_family[row["family"]][level] += 1
+
+    def normalized(counter: Counter[str]) -> dict[str, int]:
+        return {level: int(counter.get(level, 0)) for level in ENRICHMENT_LEVELS}
+
+    return {
+        "highest_level_counts": {level: int(highest.get(level, 0)) for level in ENRICHMENT_LEVELS},
+        "at_least_level_counts": at_least,
+        "by_vendor_highest_level": {
+            key: normalized(value) for key, value in sorted(by_vendor.items())
+        },
+        "by_family_highest_level": {
+            key: normalized(value) for key, value in sorted(by_family.items())
+        },
+    }
 
 
 def load_production_catalog() -> tuple[dict[str, Any], list[dict[str, str]]]:
@@ -225,6 +464,7 @@ def build_inventory() -> dict[str, Any]:
     production_icpns = {row["icpn"] for row in rows}
     profiles = load_profiles()
     bindings = load_programming_bindings(production_icpns, profiles)
+    manufacturer_enrichment = load_manufacturer_enrichment_evidence(production_icpns)
 
     base_rows: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     family_counts: Counter[str] = Counter()
@@ -250,6 +490,8 @@ def build_inventory() -> dict[str, Any]:
                 f"{row['icpn']}: non-deterministic backend state must be explicit no_mapping",
             )
             openocd_unmapped_count += 1
+
+        enrichment = copy.deepcopy(manufacturer_enrichment.get(row["icpn"], empty_manufacturer_enrichment()))
 
         binding = bindings.get(row["icpn"])
         if binding:
@@ -286,6 +528,7 @@ def build_inventory() -> dict[str, Any]:
                     "runtime_resolver": "not_implemented",
                     "runtime_ready": False,
                 },
+                "manufacturer_enrichment": enrichment,
             }
         )
 
@@ -296,6 +539,7 @@ def build_inventory() -> dict[str, Any]:
 
     programming_profile_ids = sorted({binding["programming_profile_id"] for binding in bindings.values()})
     inventory_rows.sort(key=lambda item: (item["family"], item["base_device"], item["icpn"]))
+    manufacturer_enrichment_summary = summarize_manufacturer_enrichment(inventory_rows)
 
     return {
         "schema_version": 1,
@@ -316,7 +560,11 @@ def build_inventory() -> dict[str, Any]:
             "unresolved_programming_profile_exact_icpns": len(rows) - len(bindings),
             "evidence_backed_programming_profiles": len(programming_profile_ids),
             "native_ppu_runtime_ready_exact_icpns": 0,
+            "manufacturer_enrichment_m1_or_higher_exact_icpns": manufacturer_enrichment_summary["at_least_level_counts"]["M1"],
+            "manufacturer_enrichment_m4_or_higher_exact_icpns": manufacturer_enrichment_summary["at_least_level_counts"]["M4"],
+            "manufacturer_enrichment_m5_exact_icpns": manufacturer_enrichment_summary["at_least_level_counts"]["M5"],
         },
+        "manufacturer_enrichment": manufacturer_enrichment_summary,
         "programming_profile_ids": programming_profile_ids,
         "base_devices": base_devices,
         "exact_icpns": inventory_rows,
@@ -327,11 +575,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build the derived production IC Support coverage inventory")
     parser.add_argument("--json", action="store_true", help="emit the complete deterministic inventory as JSON")
     parser.add_argument("--summary", action="store_true", help="emit only summary metrics as JSON")
+    parser.add_argument(
+        "--manufacturer-summary",
+        action="store_true",
+        help="emit Manufacturer Enrichment M0-M5 summary and vendor/family coverage",
+    )
+    parser.add_argument("--icpn", help="emit one exact ICPN coverage row")
     args = parser.parse_args()
 
     inventory = build_inventory()
-    payload: Any = inventory["metrics"] if args.summary else inventory
-    if args.json or args.summary:
+    if args.icpn:
+        matches = [row for row in inventory["exact_icpns"] if row["icpn"] == args.icpn]
+        require(len(matches) == 1, f"exact Production ICPN not found: {args.icpn}")
+        payload: Any = matches[0]
+    elif args.manufacturer_summary:
+        payload = inventory["manufacturer_enrichment"]
+    elif args.summary:
+        payload = inventory["metrics"]
+    else:
+        payload = inventory
+    if args.json or args.summary or args.manufacturer_summary or args.icpn:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         metrics = inventory["metrics"]

@@ -65,7 +65,32 @@ def test_current_production_metrics() -> None:
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
+    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1
+    assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
+    assert metrics["manufacturer_enrichment_m5_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
+
+    enrichment = inventory["manufacturer_enrichment"]
+    assert enrichment["highest_level_counts"] == {
+        "M0": expected_exact_icpns - 1,
+        "M1": 0,
+        "M2": 0,
+        "M3": 0,
+        "M4": 1,
+        "M5": 0,
+    }
+    assert enrichment["at_least_level_counts"] == {
+        "M0": expected_exact_icpns,
+        "M1": 1,
+        "M2": 1,
+        "M3": 1,
+        "M4": 1,
+        "M5": 0,
+    }
+    assert enrichment["by_family_highest_level"]["STM32F1"]["M4"] == 1
+    assert enrichment["by_family_highest_level"]["STM32F1"]["M0"] == (
+        expected_family_counts["STM32F1"] - 1
+    )
 
 
 def test_exact_icpn_to_base_device_to_profile_projection() -> None:
@@ -111,6 +136,59 @@ def test_exact_icpn_to_base_device_to_profile_projection() -> None:
     assert f100_new["base_device"] == "STM32F100C4"
     assert f100_new["programming_profile"]["state"] == "unresolved"
     assert f100_new["openocd"]["target_config"] == "tcl/target/stm32f1x.cfg"
+
+
+def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
+    module = load_module()
+    inventory = module.build_inventory()
+
+    c8 = find_exact(inventory, "STM32F103C8T6")
+    enrichment = c8["manufacturer_enrichment"]
+    assert enrichment["highest_level"] == "M4"
+    assert enrichment["dimensions"] == {
+        "catalog_identity": True,
+        "manufacturer_device_profile": True,
+        "operating_electrical": True,
+        "memory_map": True,
+        "manufacturer_programming_profile": True,
+        "programming_electrical": True,
+        "programming_interfaces": True,
+        "flash_geometry": True,
+        "execution_ir": True,
+        "generated_programmer": True,
+        "independent_software_differential": True,
+        "physical_hil": False,
+    }
+    assert enrichment["missing_dimensions"] == ["physical_hil"]
+    assert enrichment["evidence"]["manufacturer_baseline"].endswith(
+        "stm32f103c8t6-manufacturer-only-v1.json"
+    )
+    assert enrichment["evidence"]["openocd_comparison"].endswith(
+        "stm32f103c8t6-openocd-v0.12.0-v1.json"
+    )
+    assert enrichment["evidence"]["physical_hil"] is None
+
+    same_family_unproven = find_exact(inventory, "STM32F103R8T6")
+    missing = same_family_unproven["manufacturer_enrichment"]
+    assert missing["highest_level"] == "M0"
+    assert missing["dimensions"]["catalog_identity"] is True
+    assert missing["dimensions"]["manufacturer_device_profile"] is False
+    assert missing["dimensions"]["manufacturer_programming_profile"] is False
+    assert missing["dimensions"]["execution_ir"] is False
+    assert missing["dimensions"]["independent_software_differential"] is False
+    assert missing["dimensions"]["physical_hil"] is False
+    assert "operating_electrical" in missing["missing_dimensions"]
+    assert "memory_map" in missing["missing_dimensions"]
+    assert "flash_geometry" in missing["missing_dimensions"]
+
+
+def test_manufacturer_enrichment_registry_is_research_only() -> None:
+    module = load_module()
+    _manifest, rows = module.load_production_catalog()
+    evidence = module.load_manufacturer_enrichment_evidence({row["icpn"] for row in rows})
+    assert set(evidence) == {"STM32F103C8T6"}
+    assert evidence["STM32F103C8T6"]["highest_level"] == "M4"
+    assert evidence["STM32F103C8T6"]["dimensions"]["physical_hil"] is False
 
 
 def test_base_device_grouping_is_not_exact_icpn_counting() -> None:
@@ -196,6 +274,8 @@ def main() -> int:
     test_current_production_metrics()
     test_stm32h5_package_dependent_pin_count_resolution()
     test_exact_icpn_to_base_device_to_profile_projection()
+    test_manufacturer_enrichment_golden_reference_and_missing_layers()
+    test_manufacturer_enrichment_registry_is_research_only()
     test_base_device_grouping_is_not_exact_icpn_counting()
     test_conflicting_base_device_flash_or_openocd_mapping_fails_closed()
     test_conflicting_bound_programming_profiles_fail_closed()

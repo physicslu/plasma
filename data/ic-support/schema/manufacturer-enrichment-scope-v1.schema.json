@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plasma.local/schemas/manufacturer-enrichment-scope-v1.schema.json",
+  "title": "Plasma Manufacturer Enrichment Scope v1",
+  "description": "Research-only contract for reusable manufacturer-authoritative facts. Scope reuse is permitted only through explicit exact-ICPN applicability; family-name similarity never grants applicability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope_id",
+    "status",
+    "authority",
+    "scope_kind",
+    "applicability",
+    "catalog_constraints",
+    "source_locks",
+    "facts"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "scope_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "status": {"enum": ["research_candidate", "frozen_manufacturer_only"]},
+    "authority": {"const": "manufacturer_official_only"},
+    "scope_kind": {
+      "enum": ["exact_icpn", "base_device", "family", "package", "flash_controller"]
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "exact_icpns"],
+      "properties": {
+        "mode": {"const": "explicit_exact_icpns"},
+        "exact_icpns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "catalog_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manufacturer"],
+      "properties": {
+        "manufacturer": {"type": "string", "minLength": 1},
+        "family": {"type": "string", "minLength": 1},
+        "base_device": {"type": "string", "minLength": 1},
+        "package": {"type": "string", "minLength": 1},
+        "flash_size": {"type": "string", "minLength": 1}
+      }
+    },
+    "source_locks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "revision", "sha256", "source_kind"],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1},
+          "revision": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "source_kind": {"const": "manufacturer_official"}
+        }
+      }
+    },
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "value", "evidence_source_ids"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(device|programming)\\."
+          },
+          "value": {},
+          "evidence_source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}
