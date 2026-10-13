@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install retained HTML-evidence source schema dependency
-        run: python -m pip install 'beautifulsoup4==4.14.2'
+        run: python -m pip install -e software/python 'beautifulsoup4==4.14.2'
       - name: Test full exact identity membership, vendor-coverage caveats and no-production mutation
         run: |
           python -m unittest discover -s data/device-catalog/research -p 'test_nxp_layer1_admission_dryrun_v4.py' -v
