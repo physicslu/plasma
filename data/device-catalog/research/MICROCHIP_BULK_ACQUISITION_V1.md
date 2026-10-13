@@ -58,8 +58,13 @@ the latter table, so the ten strings remain unverified candidates. Neither
 list is an Active denominator or an admission snapshot. MCP initialization, six-tool discovery and one two-row PIC10F202 response
 have now succeeded from the execution environment. A subsequent complete
 capture was blocked by a cancelled network approval before any response bytes
-were obtained. The new `microchip_mcp_probe_v1.py` and offline contract tests
-are ready; full pagination remains unvalidated. See the alternative audit for
+were obtained. `microchip_mcp_probe_v1.py` now enforces source-byte digests, MCP method and
+request sequence, strict pagination and page-size 2 vs 60 reconciliation.
+The bounded PIC10/PIC12 batch reconciled 26 of 27 queries, producing 347
+unique exact-prefix SKU candidates. The missing `PIC12F529T48A` query returned
+MCP NOT_FOUND; its official product page separately labels the device End of Life.
+These bounded results do not establish manufacturer-wide completeness or
+readiness for Production. See the alternative audit for
 commands and the exact evidence boundary.
 
 ## Gate 0 — implemented

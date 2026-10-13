@@ -117,6 +117,13 @@ class ProbeTests(unittest.TestCase):
             reconcile([rename(page(0)), rename(page(2))], rename(page(0, 60)),
                       query='PIC10F202')
 
+    def test_replay_rejects_unsafe_query_before_reading_archive(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            self.archived_capture(folder)
+            with self.assertRaisesRegex(ValueError, 'alphanumeric'):
+                replay(folder, query='PIC10F202/../other')
+
     def test_query_rejects_punctuation_without_issuing_network_request(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaisesRegex(ValueError, 'alphanumeric'):
@@ -157,7 +164,7 @@ class ProbeTests(unittest.TestCase):
                             'http_status': 202 if index == 1 else 200,
                             'sha256': hashlib.sha256(raw).hexdigest()})
         manifest = {'endpoint': 'https://api.microchip.com/mcp/resources',
-                    'responses': records}
+                    'query': 'PIC10F202', 'responses': records}
         (folder / 'manifest.json').write_text(json.dumps(manifest))
         return manifest
 
@@ -171,7 +178,8 @@ class ProbeTests(unittest.TestCase):
 
     def test_offline_replay_rejects_corrupt_handshake_requests_and_bytes(self):
         cases = ('missing_init', 'reordered', 'wrong_id', 'wrong_http_status',
-                 'wrong_query', 'extra_call', 'missing_tool', 'changed_raw_body')
+                 'wrong_query', 'missing_manifest_query', 'extra_call',
+                 'missing_tool', 'changed_raw_body')
         for case in cases:
             with self.subTest(case=case), tempfile.TemporaryDirectory() as temp:
                 folder = Path(temp)
@@ -187,6 +195,8 @@ class ProbeTests(unittest.TestCase):
                     records[1]['http_status'] = 204
                 elif case == 'wrong_query':
                     records[3]['request']['params']['arguments']['searchTerm'] = 'PIC10F200'
+                elif case == 'missing_manifest_query':
+                    manifest.pop('query')
                 elif case == 'extra_call':
                     extra = copy.deepcopy(records[-1])
                     extra['file'] = 'response-06.txt'

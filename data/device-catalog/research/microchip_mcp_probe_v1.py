@@ -205,8 +205,10 @@ def verify_transcript(manifest, output, query=QUERY):
 
 
 def replay(output, query=QUERY):
+    require(isinstance(query, str) and bool(BASE_QUERY.fullmatch(query)),
+            'replay query must be an exact alphanumeric base-device identifier')
     manifest = json.loads((output / 'manifest.json').read_text())
-    require(manifest.get('query', QUERY) == query, 'archived query mismatch')
+    require(manifest.get('query') == query, 'archived query mismatch')
     verify_transcript(manifest, output, query)
     pages, comparison = [], None
     for evidence in manifest['responses']:

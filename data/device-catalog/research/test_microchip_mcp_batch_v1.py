@@ -67,6 +67,15 @@ class BatchTests(unittest.TestCase):
             self.assertTrue(report['all_queries_reconciled'])
             self.assertEqual([x['base_device_query'] for x in report['results']], parts)
 
+    def test_untrusted_batch_query_is_rejected_before_creating_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            for part in ('PIC10F202/../other', '', 'PIC10F202?limit=999'):
+                with self.subTest(part=part):
+                    output = Path(temp) / 'research'
+                    with self.assertRaisesRegex(ValueError, 'invalid selected query set'):
+                        batch.execute(output, [part])
+                    self.assertFalse(output.exists())
+
     def test_parallelism_above_two_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / 'not_created'

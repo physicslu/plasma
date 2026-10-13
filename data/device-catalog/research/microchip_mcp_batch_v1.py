@@ -50,7 +50,9 @@ def execute(output, parts, offline=False, workers=1):
     """Run independent read-only queries with bounded optional concurrency."""
     require(type(workers) is int and 1 <= workers <= 2, 'worker count out of range')
     require(isinstance(parts, list) and 1 <= len(parts) <= MAX_SEEDS and
-            len(set(parts)) == len(parts), 'invalid selected query set')
+            len(set(parts)) == len(parts) and
+            all(isinstance(part, str) and probe.BASE_QUERY.fullmatch(part)
+                for part in parts), 'invalid selected query set')
     output = Path(output)
     if not offline:
         output.mkdir(parents=True, exist_ok=False)
