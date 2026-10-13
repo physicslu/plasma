@@ -17,7 +17,7 @@ class PackInventoryTest(unittest.TestCase):
                               f'<span class="device-name">{part}</span></span>'
                               for part in chips)
             return f'<article class="pack-card" id="pack-{pack}">' + (
-                f'<span class="pack-subtitle">{publisher} • {pack}</span>'
+                f'<div class="pack-subtitle">{publisher} • {pack}</div>'
                 f'<span class="pack-badge">{badge}</span>'
                 f'<a class="pack-version" href="{publisher}.{pack}.1.0.0.atpack">v1.0.0</a>'
                 f'<h4>Supported Devices ({len(chips)})</h4>') + content + '</article>'
