@@ -1,0 +1,25 @@
+{
+  "schema_version": 3,
+  "manufacturer": "NXP",
+  "source_workflow_run_id": 38337377867,
+  "source_document": "original exact /part SKU manufacturer rendered HTML",
+  "original_missing_bump_exact_skus": [
+    "K32L2B11VMP0A",
+    "K32L2B21VMP0A",
+    "K32L2B31VMP0A",
+    "MCXA144VMP",
+    "MCXA145VMP",
+    "MCXA146VMP",
+    "MCXA154VMP",
+    "MCXA155VMP",
+    "MCXA156VMP",
+    "MCXC443VMP",
+    "MCXC444VMP"
+  ],
+  "source_evidence_rule": "Exact SKU H1 + original HTML SHA256 + official LFBGA64 package label + explicit '64 bumps' in official package description",
+  "qualified_result": "research_metadata_contact_count_only_no_canonical_admission",
+  "original_missing_package_terminals_count": 11,
+  "original_missing_exact_active_count": 353,
+  "production_write_authorized": false,
+  "runtime_programming_qualified": false
+}
