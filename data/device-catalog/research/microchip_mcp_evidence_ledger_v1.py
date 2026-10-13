@@ -110,7 +110,7 @@ def build(root: Path, parts: list[str]) -> dict:
         'schema_version': 1,
         'type': 'microchip-mcp-bounded-search-research-ledger',
         'source_endpoint': probe.ENDPOINT,
-        'source_scope': '27 PIC10/PIC12 DFP discovery candidates only',
+        'source_scope': 'bounded, independently replayed Microchip DFP device-support search queries only',
         'generated_at_utc': datetime.now(timezone.utc).isoformat(),
         'selected_queries': len(parts),
         'fully_replayed_queries': reconciled_count,
