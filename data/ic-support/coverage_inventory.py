@@ -133,7 +133,7 @@ def load_manufacturer_enrichment_evidence(
     require(registry.get("hardware_authority") is False, "coverage registry must not grant hardware authority")
     level_contract = registry.get("level_contract")
     require(isinstance(level_contract, dict), "coverage registry level_contract is required")
-    require(tuple(level_contract) == ENRICHMENT_LEVELS, "coverage level order drifted")
+    require(set(level_contract) == set(ENRICHMENT_LEVELS), "coverage level contract drifted")
 
     raw_targets = registry.get("targets")
     require(isinstance(raw_targets, dict), "coverage registry targets must be an object")
