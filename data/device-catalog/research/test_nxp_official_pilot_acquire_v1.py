@@ -19,6 +19,36 @@ class LivePilotParserTest(unittest.TestCase):
         self.assertNotEqual(module.lifecycle("MCXN236VNLT Qualification Yes"), "Active")
     def test_kl25_exact_code(self):
         self.assertEqual(module.exact_code("MKL25Z128VLK4 Package LQFP80", "MKL25Z"), "MKL25Z128VLK4")
+    def test_grouped_material_declaration_variant_is_not_lost(self):
+        # NXP MCX-C04x: group label MCXC041VFK, orderable variant MCXC041VFKR.
+        row = ["MCXC041VFK\\nPackage : HUQFN24", "MCXC041VFKR\\n(935463794528)",
+               "Active", "Yes", "Yes"]
+        self.assertEqual(module.orderable_from_environment_cells(row, "MCXC"),
+                         ("MCXC041VFKR", "Active"))
+
+    def test_continuation_row_without_group_cell(self):
+        row = ["MCXC041VFGR\\n(935463841528)", "Active", "Yes", "Yes"]
+        self.assertEqual(module.orderable_from_environment_cells(row, "MCXC"),
+                         ("MCXC041VFGR", "Active"))
+
+    def test_material_declaration_overrides_group_label(self):
+        # NXP MCX-N23x: VDFT package label also contains VDFR ordering variant.
+        row = ["MCXN236VDFT\\nPackage : VFBGA184",
+               "MCXN236VDFR\\n(935463512518)", "Active", "Yes"]
+        self.assertEqual(module.orderable_from_environment_cells(row, "MCXN"),
+                         ("MCXN236VDFR", "Active"))
+
+    def test_qualification_is_not_promoted_to_active(self):
+        row = ["MCXN236VNLT\\nPackage : HLQFP100",
+               "MCXN236VNLT\\n(935463587557)", "Qualification", "Yes"]
+        self.assertEqual(module.orderable_from_environment_cells(row, "MCXN"),
+                         ("MCXN236VNLT", "Qualification"))
+
+    def test_quality_table_does_not_yield_orderable_status(self):
+        row = ["MCXC041VFK\\nPackage : HUQFN24",
+               "MCXC041VFKR\\n(935463794528)", "No", "3", "260", "40 sec."]
+        self.assertIsNone(module.orderable_from_environment_cells(row, "MCXC"))
+
     def test_quality_rows_are_not_lifecycle(self):
         self.assertIsNone(module.lifecycle("MCXN236VNLT No 3 260 40 sec."))
     def test_bad_conflicting_status_is_rejected(self):
