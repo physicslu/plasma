@@ -5,7 +5,8 @@
   "description": "Pilot schema for reusable IC Support profiles and exact-ICPN bindings. Device Catalog remains the commercial identity source of truth.",
   "oneOf": [
     {"$ref": "#/$defs/profile"},
-    {"$ref": "#/$defs/binding_set"}
+    {"$ref": "#/$defs/binding_set"},
+    {"$ref": "#/$defs/programming_route_binding_set"}
   ],
   "$defs": {
     "evidence_ref": {
@@ -34,10 +35,9 @@
     "profile_refs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["programming", "programming_route", "memory_geometry", "package_hardware", "option", "security"],
+      "required": ["programming", "memory_geometry", "package_hardware", "option", "security"],
       "properties": {
         "programming": {"type": "string", "minLength": 1},
-        "programming_route": {"type": "string", "minLength": 1},
         "memory_geometry": {"type": "string", "minLength": 1},
         "package_hardware": {"type": "string", "minLength": 1},
         "option": {"type": "string", "minLength": 1},
@@ -76,6 +76,27 @@
         "catalog_source": {"type": "string", "minLength": 1},
         "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
         "bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}
+      }
+    },
+    "programming_route_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icpn", "programming_route"],
+      "properties": {
+        "icpn": {"type": "string", "minLength": 1},
+        "programming_route": {"type": "string", "minLength": 1}
+      }
+    },
+    "programming_route_binding_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "binding_set_id", "status", "evidence", "bindings"],
+      "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "binding_set_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "status": {"const": "pilot"},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
+        "bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/programming_route_binding"}}
       }
     }
   }
