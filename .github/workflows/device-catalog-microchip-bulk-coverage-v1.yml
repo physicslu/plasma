@@ -11,6 +11,8 @@ on:
       - 'data/device-catalog/research/test_microchip_mcp_batch_v1.py'
       - 'data/device-catalog/research/microchip_mcp_evidence_ledger_v1.py'
       - 'data/device-catalog/research/test_microchip_mcp_evidence_ledger_v1.py'
+      - 'data/device-catalog/research/microchip_dfp_index_inventory_v1.py'
+      - 'data/device-catalog/research/test_microchip_dfp_index_inventory_v1.py'
       - 'data/device-catalog/research/test_microchip_mcp_probe_v1.py'
       - 'data/device-catalog/research/microchip_product_api_probe_v1.py'
       - 'data/device-catalog/research/test_microchip_product_api_probe_v1.py'
@@ -28,6 +30,8 @@ on:
       - 'data/device-catalog/research/test_microchip_mcp_batch_v1.py'
       - 'data/device-catalog/research/microchip_mcp_evidence_ledger_v1.py'
       - 'data/device-catalog/research/test_microchip_mcp_evidence_ledger_v1.py'
+      - 'data/device-catalog/research/microchip_dfp_index_inventory_v1.py'
+      - 'data/device-catalog/research/test_microchip_dfp_index_inventory_v1.py'
       - 'data/device-catalog/research/test_microchip_mcp_probe_v1.py'
       - 'data/device-catalog/research/test_microchip_bulk_coverage_v1.py'
       - 'data/device-catalog/research/MICROCHIP_BULK_ACQUISITION_V1.md'
@@ -47,12 +51,13 @@ jobs:
           python-version: '3.12'
       - name: Verify bounded research-only Microchip policy
         run: |
-          python -m py_compile data/device-catalog/research/microchip_bulk_coverage_v1.py data/device-catalog/research/test_microchip_bulk_coverage_v1.py data/device-catalog/research/microchip_product_api_probe_v1.py data/device-catalog/research/test_microchip_product_api_probe_v1.py data/device-catalog/research/microchip_mcp_probe_v1.py data/device-catalog/research/microchip_mcp_batch_v1.py data/device-catalog/research/test_microchip_mcp_probe_v1.py data/device-catalog/research/test_microchip_mcp_batch_v1.py data/device-catalog/research/microchip_mcp_evidence_ledger_v1.py data/device-catalog/research/test_microchip_mcp_evidence_ledger_v1.py
+          python -m py_compile data/device-catalog/research/microchip_bulk_coverage_v1.py data/device-catalog/research/test_microchip_bulk_coverage_v1.py data/device-catalog/research/microchip_product_api_probe_v1.py data/device-catalog/research/test_microchip_product_api_probe_v1.py data/device-catalog/research/microchip_mcp_probe_v1.py data/device-catalog/research/microchip_mcp_batch_v1.py data/device-catalog/research/test_microchip_mcp_probe_v1.py data/device-catalog/research/test_microchip_mcp_batch_v1.py data/device-catalog/research/microchip_mcp_evidence_ledger_v1.py data/device-catalog/research/test_microchip_mcp_evidence_ledger_v1.py data/device-catalog/research/microchip_dfp_index_inventory_v1.py data/device-catalog/research/test_microchip_dfp_index_inventory_v1.py
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_bulk_coverage_v1.py' -v
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_product_api_probe_v1.py' -v
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_probe_v1.py' -v
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_batch_v1.py' -v
           python -m unittest discover -s data/device-catalog/research -p 'test_microchip_mcp_evidence_ledger_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research -p 'test_microchip_dfp_index_inventory_v1.py' -v
           python data/device-catalog/research/microchip_bulk_coverage_v1.py > /tmp/microchip-bulk-summary.json
           python - <<'PY'
           import json
