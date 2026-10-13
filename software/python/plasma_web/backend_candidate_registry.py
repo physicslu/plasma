@@ -101,7 +101,18 @@ class BackendCandidateRegistry:
         if not any(r.family in {"STM32H5", "STM32C5"} for r in catalog.records):
             return  # Alternate catalog without the candidate cohorts: no candidates.
         _ensure(catalog.status == "production", "requires a Production Catalog")
-        _ensure(catalog.size == 4629, "unexpected Production Catalog size")
+        # A new bounded vendor admission must not invalidate the independently
+        # frozen ST H5/C5 candidate inventory. The registry still exposes only
+        # the original 362 ST research candidates, never NXP programming routes.
+        st_count = sum(r.vendor == "STMicroelectronics" for r in catalog.records)
+        nxp = [r for r in catalog.records if r.vendor == "NXP"]
+        _ensure(st_count == 4629, "historical ST Production Catalog count drift")
+        _ensure(
+            (not nxp and catalog.size == 4629) or
+            (catalog.size == 4641 and len(nxp) == 12 and
+             all(r.family == "KL25" and r.production_admitted for r in nxp)),
+            "unexpected Production Catalog size or unreviewed NXP family",
+        )
         # Packaged PPU runtimes may include the official Production Catalog but
         # exclude research-only source evidence. They must keep the device search
         # operational, and must not fabricate or partially expose candidates.
