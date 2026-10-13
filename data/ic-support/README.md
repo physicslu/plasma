@@ -167,7 +167,7 @@ cross-checking exact identity, Base Device, Package, Pin Count, Flash and Operat
 Temperature against the Production Catalog. It does not grant Programming Profile authority.
 
 The Basic Profile deliberately uses a lighter official-product-metadata provenance class
-than the programming baseline: ST Product Selector / Product Page observations are retained
+than the programming baseline: ST Product Selector / eStore observations are retained
 with official URLs and observation date, but no SHA-256 content lock is fabricated for
 dynamic web content. Programming semantics continue to require the stronger manufacturer
 evidence chain.
