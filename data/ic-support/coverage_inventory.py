@@ -195,7 +195,11 @@ def load_device_basic_coverage(
         require(
             isinstance(evidence, dict)
             and evidence.get("authority") == "STMicroelectronics official"
-            and evidence.get("source_surface") == "st_product_selector_or_product_page"
+            and evidence.get("source_surface") == "st_product_selector"
+            and isinstance(evidence.get("selector_url"), str)
+            and evidence["selector_url"].startswith("https://www.st.com/")
+            and "/products.html" in evidence["selector_url"]
+            and evidence.get("evidence_strength") == "official_product_selector_observation"
             and evidence.get("content_lock") is None,
             f"{icpn}: device basic evidence boundary invalid",
         )
