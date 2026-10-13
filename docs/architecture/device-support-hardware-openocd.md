@@ -1,6 +1,6 @@
 # Plasma Device Support / Hardware Execution / OpenOCD 架構決策
 
-> 更新日期：2026-10-06
+> 更新日期：2026-10-13
 > 狀態：Plan
 > 核心原則：IC support 的擴充速度優先；硬體 hot path 才下沉到 C / PL；OpenOCD 保留 target / flash algorithm 價值並作為 Programming Engine；Python 是 Orchestrator / System Supervisor；Plasma HW API + PL 掌握 board-management 與 recovery authority。
 
@@ -87,6 +87,235 @@ Programming Plan 是 semantic plan，不代表所有 operation 都交給同一�
 - SWD/JTAG target/flash operation → OpenOCD Programming Plane。
 - POWER、BOOT/strap、Site mux、socket enable、voltage select、presence/status 與 recovery reset → Plasma Hardware Control Plane。
 - normal target reset 可由 OpenOCD 執行；physical recovery reset 必須保留不依賴 OpenOCD process 的獨立控制路徑。
+
+## 5.1 Programming Execution Strategy：Direct Register 與 Target RAM Loader
+
+Programming semantics 與 execution strategy 必須分離。
+
+Manufacturer documentation 定義的是 **device programming semantics**：哪些 register、bit、key、address、alignment、erase/program sequence、status/error condition 與 terminal observation 才能構成正確燒錄流程。這一層是 device truth，不應由 OpenOCD implementation、特定 adapter、RAM loader 或效能最佳化反向決定。
+
+對 STM32F103C8T6，目前 manufacturer-derived reference programmer 的核心模型是 direct register execution：
+
+```text
+Manufacturer Specification
+        ↓
+Canonical Programming Knowledge
+        ↓
+Programming Profile
+        ↓
+Programming Execution IR
+        ↓
+Generated Direct Programmer
+        ↓
+RegisterMemoryIO
+        ↓
+SWD/JTAG memory access
+        ↓
+FLASH_KEYR / FLASH_CR / FLASH_SR / FLASH_AR / Flash memory
+```
+
+例如 16-bit Flash programming 的核心語意仍是：
+
+```text
+unlock Flash
+→ wait BSY clear
+→ clear relevant status
+→ set PG
+→ write halfword to target Flash address
+→ wait BSY clear
+→ inspect PGERR / WRPRTERR / EOP
+→ leave PG mode
+→ read-back verify
+```
+
+這個 sequence 是 device programming semantics。它不要求一定由 host 每個 halfword 逐筆透過 SWD 執行，也不要求一定先載入 target RAM algorithm。
+
+因此 Production architecture 必須允許同一份 validated Execution IR 編譯成不同 execution strategy：
+
+```text
+                    Manufacturer-derived
+                     Programming Semantics
+                             |
+                             v
+                       Execution IR
+                     /              \
+                    /                \
+         Direct Register Engine   Target RAM Loader Engine
+                  |                       |
+          SWD/JTAG memory I/O      generated target code
+                  |                       |
+                  |                 target SRAM + CPU
+                  |                       |
+                  +-----------+-----------+
+                              |
+                              v
+                        Target Flash
+```
+
+### 5.1.1 Direct Register Engine
+
+Direct execution 由 programmer backend 透過 debug transport 直接執行 register / memory operation：
+
+```text
+PPU / Host
+   ↓
+SWD/JTAG
+   ↓
+target register / memory access
+   ↓
+Flash controller
+```
+
+優點：
+
+- execution path 最直接；
+- 最容易逐步對照 manufacturer documentation；
+- 適合 bring-up、semantic validation、fault localization 與第一版 HIL；
+- 不依賴 target SRAM working area；
+- 可作為 RAM Loader implementation 的 independent behavioral reference。
+
+缺點是大量 programming data 若逐 halfword 經 debug transport round-trip，throughput 可能很差。
+
+因此第一個 real-device qualification 應優先以 Direct Engine 驗證：
+
+```text
+identify
+→ unlock
+→ erase
+→ direct program
+→ read-back verify
+→ lock / reset
+```
+
+在這條最小鏈未通過 HIL 前，不應以 RAM Loader 的速度最佳化掩蓋基本 Flash semantics 或 transport 問題。
+
+### 5.1.2 Target RAM Loader Engine
+
+Target RAM Loader 是 **execution optimization**，不是 manufacturer programming truth，也不是 bootloader。
+
+其典型流程：
+
+```text
+debugger controls halted target
+        ↓
+allocate target SRAM working area
+        ↓
+load small Flash programming algorithm into SRAM
+        ↓
+load / stream programming data into SRAM buffer or FIFO
+        ↓
+set target CPU registers / PC
+        ↓
+run target CPU from SRAM
+        ↓
+target CPU performs local Flash writes and status polling
+        ↓
+BKPT / terminal status
+        ↓
+debugger regains control
+```
+
+它與 device ROM/system bootloader 不同：
+
+- 不要求 target reset 後從此 code 開機；
+- 不把 loader 永久寫入 Flash；
+- loader 只在 debug session 中暫存在 SRAM；
+- debugger 仍掌握 CPU halt/run/register state；
+- programming 完成後 working area 可被回收。
+
+它的效能優勢來自把高頻迴圈移到 target CPU 本地執行，而不是讓 host 為每個 halfword 往返 SWD/JTAG。
+
+### 5.1.3 OpenOCD STM32F1 的實際策略
+
+Pinned OpenOCD STM32F1 implementation 採混合策略：
+
+| Operation | OpenOCD STM32F1 strategy |
+|---|---|
+| Flash unlock | direct target register write |
+| Page erase | direct target register write + status polling |
+| Mass erase | direct target register write + status polling |
+| Flash program | preferential target RAM Flash loader |
+| Program fallback | direct halfword memory access |
+| Device ID / Flash size / status | direct target memory/register access |
+
+也就是 OpenOCD 的 programming control semantics 與 manufacturer sequence 高度重疊，但其大量 write path 會優先使用 SRAM working area 與 target algorithm，以降低 debug-transport round-trip overhead。
+
+若 target SRAM working area 不足，OpenOCD 可 fallback 到 direct halfword memory access。這再次證明 RAM loader 是 backend execution optimization，而不是 STM32F1 Flash programming 的必要語意。
+
+### 5.1.4 PLASMA Compiler / Backend 原則
+
+PLASMA 長期不應把 RAM Loader implementation 細節寫進 manufacturer canonical model。正確分層是：
+
+```text
+Manufacturer Evidence
+        ↓
+Canonical Programming Semantics
+        ↓
+Programming Profile
+        ↓
+Execution IR
+        ↓
+Execution Compiler / Backend Policy
+   ┌───────────────┴────────────────┐
+   ↓                                ↓
+Direct Register Backend      Target RAM Loader Backend
+   ↓                                ↓
+OpenOCD / Plasma Native      generated target algorithm
+   ↓                                ↓
+debug transport              target SRAM / CPU
+```
+
+核心 invariants：
+
+1. **Manufacturer semantics 是 truth。** OpenOCD、Direct SWD、RAM Loader 都只能是 execution implementation。
+2. **RAM Loader 不得反向污染 canonical device model。** Working-area size、FIFO layout、CPU register convention、OpenOCD timeout 等都屬 backend policy。
+3. **Direct Engine 保留為 reference path。** 即使 production 最終主要使用 RAM Loader，也應保留可驗證的 direct path 作 bring-up、diagnostics 與 differential reference。
+4. **RAM Loader 應由同一份 validated IR 派生。** 不應維護一份手寫 direct algorithm 與另一份彼此獨立的 loader semantics。
+5. **Performance optimization 在 correctness 之後。** HIL 先證明 direct erase/program/verify；再 qualification RAM Loader throughput。
+6. **Fallback 必須 fail-closed。** RAM Loader allocation/execute 失敗時，只有在 direct execution 已 qualification 且 operation state 可判定時，才允許 fallback；不得在 uncertain Flash state 中盲目重試。
+7. **Bootloader 與 RAM Loader 必須分開建模。** ROM bootloader／user bootloader 是另一種 transport/protocol backend，不等同 debug-controlled SRAM target algorithm。
+
+### 5.1.5 Differential Qualification Ladder
+
+建議 qualification 順序：
+
+```text
+Manufacturer-derived Execution IR
+        ↓
+Generated Direct Programmer
+        ↓
+Fake-controller behavioral tests
+        ↓
+Independent OpenOCD semantic differential
+        ↓
+Real OpenOCD binary/config/backend registration
+        ↓
+Real Direct SWD HIL
+  erase → program → verify
+        ↓
+Generated RAM Loader
+        ↓
+Real RAM Loader HIL
+        ↓
+Direct vs Generated RAM Loader differential
+        ↓
+Generated RAM Loader vs OpenOCD RAM Loader differential
+```
+
+最終應追求三條 implementation 對同一 image / target geometry 得到相同結果：
+
+```text
+Manufacturer-derived Direct Programmer
+                  |
+Manufacturer-derived RAM Loader
+                  |
+OpenOCD RAM Loader
+                  |
+                  v
+          equivalent Flash result
+```
+
+這種三方 differential 的目的不是證明 OpenOCD 為真理，而是利用 implementation diversity 降低共同錯誤的風險。
 
 ## 6. OpenOCD 定位
 
