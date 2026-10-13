@@ -1,0 +1,65 @@
+name: NXP manufacturer device 353 exact bulk qualification v5
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_manufacturer_device_bulk_v5.py'
+      - 'data/device-catalog/research/test_nxp_manufacturer_device_bulk_v5.py'
+      - 'data/device-catalog/research/NXP_MANUFACTURER_DEVICE_BULK_V5.md'
+      - 'data/device-catalog/research/nxp-212-manufacturer-device-evidence-v5.csv'
+      - 'data/device-catalog/research/nxp-212-source-verified-commercial-v5.csv'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
+      - '.github/workflows/device-catalog-nxp-manufacturer-bulk-v5.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  original-source-353-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'beautifulsoup4==4.14.2'
+      - name: Check NXP manufacturer-only exact-SKU metadata parsing
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_manufacturer_device_bulk_v5.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38337377867
+          github-token: ${{ github.token }}
+          pattern: nxp-part-metadata-shard-*
+          path: /tmp/nxp-353-original-source
+      - name: Replay 353 exact SKU and serialize source-backed 212 manufacturer candidates
+        run: |
+          python data/device-catalog/research/nxp_manufacturer_device_bulk_v5.py \
+            --root /tmp/nxp-353-original-source \
+            --output /tmp/nxp-353-manufacturer-v5 \
+            --emit-marked-csv-stdout
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          output=Path("/tmp/nxp-353-manufacturer-v5")
+          summary=json.loads((output/"nxp-212-evidence-summary-v5.json").read_text())
+          with (output/"nxp-212-canonical-source-unpublished-v5.csv").open() as f:
+              rows=list(csv.DictReader(f))
+          assert summary["full_bounded_active_exact"]==353
+          assert summary["new_source_bound_four_field_candidates"]==len(rows)==212
+          assert summary["unresolved_source_or_metadata_exact"]==129
+          assert all(x["manufacturer"]=="NXP" and x["mapping_status"]=="no_mapping"
+                     and not x["openocd_target_config"] for x in rows)
+          assert summary["programming_profile_qualified"] is False
+          assert summary["production_publication_authorized"] is False
+          print("NXP 353 manufacturer-only exact source replay PASS: 212 source-qualified M0 candidates")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nxp-353-source-212-exact-manufacturer-v5-NOT-YET-PRODUCTION
+          path: /tmp/nxp-353-manufacturer-v5/
+          if-no-files-found: warn
+          retention-days: 30
