@@ -123,11 +123,29 @@ def build(root:Path)->tuple[list[dict],list[dict],dict]:
     require(len(blocked)==129,"NXP metadata exceptions changed")
     existing=json.loads(PRODUCTION.read_text(encoding="utf-8"))
     source_rows=existing["sources"]
-    nxp=[x for x in source_rows if x["manufacturer"]=="NXP"]
-    require(len(nxp)==1 and nxp[0]["family"]=="KL25" and
-            nxp[0]["row_count"]==12 and len(source_rows)==29 and
-            sum(x["row_count"] for x in source_rows)==4641,
+    require(len(source_rows) in {29,31},"unexpected Production source count")
+    previous=source_rows[:29]
+    kl=[x for x in previous if x["manufacturer"]=="NXP"]
+    require(len(kl)==1 and kl[0]["family"]=="KL25" and
+            kl[0]["row_count"]==12 and
+            sum(x["row_count"] for x in previous)==4641 and
+            all(x["manufacturer"]=="STMicroelectronics" for x in previous[:28]),
             "original Production 4629 ST + 12 KL25 prestate drift")
+    old_doc=json.loads(json.dumps(existing))
+    old_doc["sources"]=previous
+    old_raw=(json.dumps(old_doc,indent=2)+"\\n").encode("utf-8")
+    old_blob=hashlib.sha1(b"blob "+str(len(old_raw)).encode("ascii")+
+                          b"\\0"+old_raw).hexdigest()
+    require(old_blob=="02affa52402a23628c971e58b5bb2e5b3528c511",
+            "previous verified 4641-ICPN Production manifest prestate changed")
+    if len(source_rows)==31:
+        require(sum(x["row_count"] for x in source_rows)==4853 and
+                [(x["manufacturer"],x["family"],x["row_count"],x["path"])
+                 for x in source_rows[29:]]==[
+                    ("NXP","MCX",196,"../research/nxp-mcx-196-commercial-v5.csv"),
+                    ("NXP","K32L2",16,"../research/nxp-k32l2-16-commercial-v5.csv"),
+                ],
+                "new Production scope must be strictly MCX 196 + K32L2 16")
     out=[]
     device=[]
     fields=Counter()
@@ -214,6 +232,17 @@ def build(root:Path)->tuple[list[dict],list[dict],dict]:
             "212 manufacturer HTML exact canonical candidates drift")
     require(all(r["mapping_status"]=="no_mapping" and not r["openocd_target_config"]
                 for r in out),"Programming Profile boundary crossed")
+    if len(source_rows)==31:
+        for x in source_rows[29:]:
+            name=x["family"]
+            family_rows=[r for r in out if r["family"]==name]
+            raw=render(family_rows,CANONICAL_FIELDS).encode("utf-8")
+            canonical_file=(PRODUCTION.parent/x["path"]).resolve().read_bytes()
+            require(canonical_file==raw and
+                    digest(raw)==x["sha256"] and
+                    hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+
+                                 b"\\0"+raw).hexdigest()==x["git_blob_sha"],
+                    f"{name}: proposed production file is not byte-for-byte official HTML replay")
     require(set(x["icpn"] for x in out).isdisjoint(blocked) and
             set(x["icpn"] for x in out).isdisjoint(
                 x["icpn"] for x in replay if x["independent_html_replay_state"]=="PRIOR_KL25_REVIEWED"),
