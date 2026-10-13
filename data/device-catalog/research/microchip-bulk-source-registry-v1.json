@@ -8,11 +8,41 @@
   "global_active_denominator": null,
   "source_policy": "Official Microchip product-family indexes are discovery surfaces; exact ordering codes and lifecycle must be captured from manufacturer product records. CMSIS packs, OpenOCD identifiers, parametric-search snippets and family names are discovery seeds only.",
   "segments": [
-    {"id":"8bit","label":"8-bit PIC and AVR MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus","inventory_status":"pending","population_complete":false},
-    {"id":"16bit","label":"16-bit PIC24 MCUs and dsPIC DSCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus","inventory_status":"pending","population_complete":false},
-    {"id":"32bit-pic-sam","label":"32-bit PIC32 and SAM Arm MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam","inventory_status":"pending","population_complete":false},
-    {"id":"32bit-avr-risc","label":"32-bit AVR and RISC MCUs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus","inventory_status":"pending","population_complete":false},
-    {"id":"wireless","label":"Wireless MCUs and SoCs","index_url":"https://www.microchip.com/en-us/products/microcontrollers/wireless","inventory_status":"pending","population_complete":false}
+    {
+      "id": "8bit",
+      "label": "8-bit PIC and AVR MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "16bit",
+      "label": "16-bit PIC24 MCUs and dsPIC DSCs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/16-bit-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "32bit-pic-sam",
+      "label": "32-bit PIC32 and SAM Arm MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/pic32-sam",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "32bit-avr-risc",
+      "label": "32-bit AVR and RISC MCUs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/32-bit-mcus/avr-risc-mcus",
+      "inventory_status": "pending",
+      "population_complete": false
+    },
+    {
+      "id": "wireless",
+      "label": "Wireless MCUs and SoCs",
+      "index_url": "https://www.microchip.com/en-us/products/microcontrollers/wireless",
+      "inventory_status": "pending",
+      "population_complete": false
+    }
   ],
   "excluded_or_separate_surfaces": [
     "Microprocessors and application processors",
@@ -21,8 +51,29 @@
     "Wireless modules and connectivity controllers not identified as MCUs or MCU SoCs"
   ],
   "reconciliation_policy": {
-    "identity_key":"exact manufacturer ordering part number",
-    "cross_segment_duplicates":"deduplicate by exact ordering part number; conflicting lifecycle evidence is an error",
-    "coverage_boundary":"no Microchip-wide denominator until official family inventory and lifecycle/count semantics are independently audited"
+    "identity_key": "exact manufacturer ordering part number",
+    "cross_segment_duplicates": "deduplicate by exact ordering part number; conflicting lifecycle evidence is an error",
+    "coverage_boundary": "no Microchip-wide denominator until official family inventory and lifecycle/count semantics are independently audited"
+  },
+  "bulk_product_api": {
+    "endpoint": "https://www.microchip.com/designresources/product-catalog/api/productInfo",
+    "method": "GET",
+    "discovery_documentation": "https://www.microchip.com/designresources/PartnerDataExchange/ProductAPI-user-guide.html",
+    "query_parameter": "part",
+    "pagination_parameters": {
+      "page_size": "pagesize",
+      "page_number": "pagenumber"
+    },
+    "pagination_response_fields": [
+      "totalRecords",
+      "totalPages",
+      "pagenumber",
+      "pagesize"
+    ],
+    "exact_orderable_identity_field": "part_number",
+    "family_identity_field": "base_part_number",
+    "raw_lifecycle_field": "lifecycle_status",
+    "raw_lifecycle_semantics": "pending_official_code_mapping_review",
+    "population_boundary": "per-query response only; complete MCU/DSC family inventory is not established"
   }
 }
