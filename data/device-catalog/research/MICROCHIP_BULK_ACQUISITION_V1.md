@@ -451,6 +451,21 @@ records intentionally keep `exact_ordering_code_verified=false`,
 Do not collapse module family names or secondary-core identifiers into
 manufacturing SKU counts merely to fill coverage gaps.
 
+## Aggregation of 12 disjoint original-byte evidence shards
+
+The offline `microchip_mcp_full_rollup_v1.py` accepts source-labelled,
+**disjoint original raw batch directories** (previous 16 batches plus the
+new shard directories), independently replays every source under the pinned
+DFP origin and rejects duplicated batch identities or unexpected
+directories. It aggregates exact ICPN identities with source-file hashes
+and quarantines any conflicting original lifecycle status. It reports
+separate counts for completed positive-prefix searches, completed
+zero-prefix fuzzy-only searches, and still-unverified query names.
+It is intentionally not a globally complete commercial ordering SKU
+denominator. PIC10/PIC12 historical and crosslane ad hoc captures must be
+handled as additional intersecting original evidence (rather than
+naively summing candidate or query counts) to avoid double counting.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
