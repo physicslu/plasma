@@ -89,7 +89,7 @@ class BackendProvenanceAuditV1Tests(unittest.TestCase):
                     self.assertEqual(candidate["qualification_boundary"], "source_and_tcl_static_only")
 
     def test_other_unmapped_st_families_have_no_invented_candidate(self) -> None:
-        blocked = Counter(r["family"] for r in self.rows if r["mapping_status"] == "no_mapping")
+        blocked = Counter(r["family"] for r in self.rows if r["manufacturer"] == "STMicroelectronics" and r["mapping_status"] == "no_mapping")
         self.assertEqual(blocked, {
             "STM32H5": 190, "STM32C5": 172, "STM32WL3": 47, "STM32N6": 32, "STM32WB0": 24
         })
