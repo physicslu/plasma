@@ -82,6 +82,31 @@ class PagedProbeTests(unittest.TestCase):
         self.assertEqual(outcome['exact_query_ordering_parts'], [
             'DSPIC33CK128MP506-I/MR', 'DSPIC33CK128MP506T-E/MR'])
 
+    def test_incomplete_foreign_fuzzy_metadata_does_not_drop_valid_target(self):
+        a = {'searchTerm': 'ATSAMD21G18A',
+             'pagination': {'total': 2, 'limit': 20, 'offset': 0,
+                            'hasMore': False},
+             'products': [
+                 {'partNumber': 'ATSAMD21G18A-AU',
+                  'basePartNumber': 'ATSAMD21G18', 'lifecycleStatus': 'Active'},
+                 {'partNumber': 'EV75S95A', 'basePartNumber': '',
+                  'lifecycleStatus': 'Active'}]}
+        b = copy.deepcopy(a)
+        b['pagination']['limit'] = 60
+        result = v2.reconcile([a], [b], 'ATSAMD21G18A')
+        self.assertEqual(result['exact_prefix_ordering_count'], 1)
+        self.assertEqual(result['fuzzy_foreign_ordering_count'], 1)
+        self.assertEqual(result['foreign_fuzzy_missing_base_count'], 1)
+        # Target SKU metadata is never relaxed.
+        a['products'][0]['basePartNumber'] = ''
+        with self.assertRaisesRegex(ValueError, 'exact target'):
+            v2.reconcile([a], [b], 'ATSAMD21G18A')
+        # A non-ASCII or padded foreign base is also rejected.
+        a['products'][0]['basePartNumber'] = 'ATSAMD21G18'
+        a['products'][1]['basePartNumber'] = ' padded '
+        with self.assertRaises(ValueError):
+            v2.reconcile([a], [b], 'ATSAMD21G18A')
+
     def test_over_sixty_both_full_walks(self):
         a, b = captures()
         result = v2.reconcile(a, b)

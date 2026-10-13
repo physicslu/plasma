@@ -364,6 +364,26 @@ the entire batch; raw lifecycle conflicts quarantine exact ordering identities.
 No Production admission or full SKU denominator is inferred. This makes the
 bulk research process recoverable without weakening any per-query source proof.
 
+## Live crosslane canary findings — exact observed vendor behavior
+
+The source-pinned 2026-10-13 **ten-query** GitHub Actions
+capture [38347572588](https://github.com/physicslu/plasma/actions/runs/38347572588)
+successfully replayed **9/10** queries. The remaining `ATSAMD21G18A`
+query returned an unrelated `EV75S95A` fuzzy row with an **empty**
+`basePartNumber`, which the original v2 validator rejected for the
+whole page. V2 now accepts empty/missing base only for **nonmatching
+fuzzy results** while retaining strict base/lifecycle identity checks
+for exact-target ordering candidates. The two independently sized
+pagination walks still have to agree on all returned ordering identities
+and raw statuses. Original response bytes are preserved without edits;
+the formerly failed query requires replay against the updated v2 code.
+
+The exploratory broad-prefix `PIC16F188` search returned only **50**
+results and successfully replayed 20-vs-60 page walks. That does **not**
+prove the service can return more than 60 or that it will ever provide an
+exhaustive product population through substring searches; the 50-row
+boundary itself warrants investigation.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.

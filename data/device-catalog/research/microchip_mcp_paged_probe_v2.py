@@ -48,9 +48,21 @@ def validate_page(data, offset, limit, total=None, query=v1.QUERY):
             'hasMore mismatch')
     for row in rows:
         require(isinstance(row, dict), 'invalid product row')
-        for field in ('partNumber', 'basePartNumber', 'lifecycleStatus'):
+        for field in ('partNumber', 'lifecycleStatus'):
             require(isinstance(row.get(field), str) and row[field] and
-                    row[field] == row[field].strip(), 'missing or padded identity/lifecycle')
+                    row[field] == row[field].strip(),
+                    'missing or padded exact identity/lifecycle')
+        base = row.get('basePartNumber')
+        if v1.exact_ordering_prefix(row['partNumber'], query):
+            require(isinstance(base, str) and base and base == base.strip(),
+                    'exact target ordering missing valid basePartNumber')
+        else:
+            # MCP fuzzy returns can include unrelated tools/boards with no
+            # basePartNumber. Keep them as diagnostic rows in BOTH walks;
+            # they are never admitted as MCU ordering candidates.
+            require(base is None or isinstance(base, str) and
+                    base == base.strip(),
+                    'invalid foreign fuzzy result basePartNumber')
     return count, rows
 
 
@@ -74,7 +86,7 @@ def reconcile(primary, comparison, query=v1.QUERY):
     right, right_total = walk(comparison, COMPARISON_LIMIT)
     require(left_total == right_total, 'total differs by page size')
     def identities(rows):
-        return {r['partNumber']: (r['basePartNumber'], r['lifecycleStatus'])
+        return {r['partNumber']: (r.get('basePartNumber'), r['lifecycleStatus'])
                 for r in rows}
     require(identities(left) == identities(right),
             'pagination identity or lifecycle reconciliation mismatch')
@@ -87,6 +99,8 @@ def reconcile(primary, comparison, query=v1.QUERY):
         'exact_prefix_ordering_count': len(targets),
         'fuzzy_foreign_ordering_count': len(foreign),
         'vendor_base_part_alias_count': len(aliases),
+        'foreign_fuzzy_missing_base_count': sum(
+            not r.get('basePartNumber') for r in foreign),
         'foreign_ordering_parts': sorted(r['partNumber'] for r in foreign),
         'exact_query_ordering_parts': sorted(r['partNumber'] for r in targets),
         'primary_page_size': PRIMARY_LIMIT, 'primary_page_count': len(primary),
