@@ -149,6 +149,35 @@ python data/device-catalog/research/microchip_mcp_batch_v1.py \
   --output-dir /tmp/microchip-mcp-v2-capture --max-queries 3 --replay
 ```
 
+## Gate 2d — one approved batch at a time
+
+`microchip_mcp_plan_capture_v1.py` independently regenerates the entire
+DFP query plan from the original archived official index, verifies the
+registry-pinned SHA-256 and exact plan equality, and selects exactly one
+3- or 10-query batch by its deterministic ID. It rejects forged/reordered
+plans, unsafe batch IDs, Production paths and existing live-capture targets.
+All new live calls explicitly require `--capture`, use v2 two-walk
+pagination, and write a batch source attestation. Without `--capture` it
+only replays an already attested archive and fails closed on tampering.
+
+```bash
+# Live capture is EXPLICIT and limited to the selected batch.
+python data/device-catalog/research/microchip_mcp_plan_capture_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --plan /tmp/microchip-dfp-research-batch-plan.json \
+  --batch-id 8bit-0001 --output-root /tmp/microchip-research-batches \
+  --workers 1 --capture
+
+# Default, safer mode: offline replay. No --capture flag.
+python data/device-catalog/research/microchip_mcp_plan_capture_v1.py \
+  --evidence-root /path/to/original-dfp-index \
+  --plan /tmp/microchip-dfp-research-batch-plan.json \
+  --batch-id 8bit-0001 --output-root /tmp/microchip-research-batches
+```
+
+Offline unit tests exercise the gate with synthetic source inventories;
+they are not confirmation of a completed real-source bulk run.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.
