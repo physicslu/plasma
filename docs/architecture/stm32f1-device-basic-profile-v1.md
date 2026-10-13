@@ -53,14 +53,14 @@ creates an implicit binding.
 
 ## Source policy
 
-This Basic Profile intentionally uses official ST **Product Selector / Product Page / eStore**
+This Basic Profile intentionally uses official ST **Product Selector / eStore**
 metadata rather than the stronger source-locked programming-evidence process.
 
-Dynamic ST product pages are recorded as an official metadata observation with:
+Dynamic ST Product Selector observations are recorded as official basic-product metadata with:
 
 - ST authority;
-- source surface;
-- official ST URL;
+- Product Selector source surface;
+- official ST Product Selector URL;
 - observation date;
 - explicit statement that no content lock exists.
 
@@ -101,10 +101,10 @@ physical_programming_qualified = false
 At this baseline:
 
 ```text
-Production ICPNs       4,629
+Production ICPNs       4,641
 STM32F1 exact ICPNs      280
 
-M0+                    4,629
+M0+                    4,641
 M1+                      280
 M2+                        1
 M3+                        1
@@ -115,7 +115,7 @@ M5                         0
 Highest-level distribution is:
 
 ```text
-M0  4,349
+M0  4,361
 M1    279
 M2      0
 M3      0
