@@ -25,6 +25,8 @@ ENRICHMENT_DIMENSIONS = (
     "manufacturer_device_basic_profile",
     "ram",
     "operating_vdd",
+    "io_supply",
+    "vdda",
     "operating_temperature",
     "manufacturer_device_profile",
     "operating_electrical",
