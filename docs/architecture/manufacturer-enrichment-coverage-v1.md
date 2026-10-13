@@ -88,6 +88,11 @@ ram
 operating_vdd
 operating_temperature
 manufacturer_device_profile
+manufacturer_device_basic_profile
+ram
+operating_vdd
+operating_temperature
+manufacturer_device_profile
 operating_electrical
 memory_map
 manufacturer_programming_profile
