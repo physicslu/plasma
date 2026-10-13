@@ -144,8 +144,13 @@ class OpenOCDProviderRegistry:
 
     def __init__(self, catalog: DeviceCatalog, root: Path = ROOT) -> None:
         self.catalog_revision_sha256 = catalog.revision_sha256
-        _require(catalog.status == "production" and catalog.size == 4629,
-                 "canonical 4,629-IC Production Catalog required")
+        st = [r for r in catalog.records if r.vendor == "STMicroelectronics"]
+        nxp = [r for r in catalog.records if r.vendor == "NXP"]
+        _require(catalog.status == "production" and catalog.size == 4641 and
+                 len(st) == 4629 and len(nxp) == 12 and
+                 all(r.family == "KL25" and r.production_admitted and
+                     r.target_config == "tcl/target/kl25.cfg" for r in nxp),
+                 "canonical 4629 ST + 12 NXP KL25 source-only catalog required")
         upstream, gap = load_source_authorities(root)
         fork = gap["candidate_st_fork"]
         _require(fork["commit"] == ST_COMMIT and upstream["source_commit"] == UPSTREAM_COMMIT
@@ -195,10 +200,10 @@ class OpenOCDProviderRegistry:
                 else:
                     cnt["no_candidate"] += 1
             self._routes[key] = self._guard_distinct_providers(entries)
-        _require(cnt == {"mapped": 4164, "STM32H5": 190,
+        _require(cnt == {"mapped": 4176, "STM32H5": 190,
                          "STM32C5": 172, "no_candidate": 103},
                  f"Unexpected catalog/backend baseline {dict(cnt)}")
-        _require(len(self._routes) == 4629, "full exact-ICPN graph incomplete")
+        _require(len(self._routes) == 4641, "full exact-ICPN graph incomplete")
 
     @staticmethod
     def _guard_distinct_providers(values: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:
