@@ -9,7 +9,8 @@
     "evidence_artifact_id": 11783902049,
     "evidence_artifact_url": "https://github.com/physicslu/plasma/actions/runs/38333219588/artifacts/11783902049",
     "artifact_retention_days": 30,
-    "generated_at_utc": "2026-10-13T01:45:53Z"
+    "generated_at_utc": "2026-10-13T01:45:53Z",
+    "producing_commit_sha": "53922fa7431c14e4d00dccb4a4ef7fcf5dce4ae6"
   },
   "scope_limits": {
     "source_population_complete": false,
@@ -608,5 +609,16 @@
       }
     ],
     "status": "bounded_official_pilot_reconciled"
+  },
+  "independent_replay": {
+    "workflow_run_id": 38333240148,
+    "workflow_job_id": 115088938969,
+    "producing_commit_sha": "355098a40900df2d33845d7b1f1fe25fb8076015",
+    "evidence_artifact_id": 11783907014,
+    "observed_active_exact": 353,
+    "observed_unique_exact": 368,
+    "observed_active_exact_set_sha256": "8d25ee58d833b69d9d6b6bc68bd20d11090c33c543e606507b95ce667267eb24",
+    "all_product_acquisition_jobs_passed": true,
+    "bounded_reconciliation_passed": true
   }
 }
