@@ -7,6 +7,7 @@ successful batch is NOT a complete or authoritative MCU/SKU population.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -45,19 +46,21 @@ def load_seeds(path=SEEDS):
     return parts
 
 
-def execute(output, parts, offline=False):
-    """Return a bounded research summary, preserving failures separately."""
+def execute(output, parts, offline=False, workers=1):
+    """Run independent read-only queries with bounded optional concurrency."""
+    require(type(workers) is int and 1 <= workers <= 2, 'worker count out of range')
+    require(isinstance(parts, list) and 1 <= len(parts) <= MAX_SEEDS and
+            len(set(parts)) == len(parts), 'invalid selected query set')
     output = Path(output)
     if not offline:
         output.mkdir(parents=True, exist_ok=False)
     else:
         require(output.is_dir(), 'missing archived batch folder')
-    reports = []
-    for part in parts:
+
+    def capture(part):
         folder = output / part
         if offline and not (folder / 'manifest.json').exists():
-            reports.append({'base_device_query': part, 'state': 'not_archived'})
-            continue
+            return {'base_device_query': part, 'state': 'not_archived'}
         try:
             result = probe.replay(folder, part) if offline else probe.run(folder, part)
             require(result.get('query') == part and
@@ -66,13 +69,18 @@ def execute(output, parts, offline=False):
                     result.get('production_write_authorized') is False,
                     'unsafe result scope')
         except Exception as error:
-            reports.append({'base_device_query': part, 'state': 'failed_or_unverified',
-                            'error_type': type(error).__name__,
-                            'error': str(error)[:240]})
-        else:
-            reports.append({'base_device_query': part, 'state': 'bounded_search_reconciled',
-                            'observed_unique_ordering_candidates':
-                            result['unique_ordering_count']})
+            return {'base_device_query': part, 'state': 'failed_or_unverified',
+                    'error_type': type(error).__name__, 'error': str(error)[:240]}
+        return {'base_device_query': part, 'state': 'bounded_search_reconciled',
+                'observed_unique_ordering_candidates': result['unique_ordering_count']}
+
+    if workers == 1:
+        reports = [capture(part) for part in parts]
+    else:
+        # Each call owns its MCP session and output directory; map preserves
+        # seed order. More than two concurrent sessions is deliberately barred.
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            reports = list(pool.map(capture, parts))
     report = {
         'schema_version': 1,
         'manufacturer': 'Microchip',
@@ -100,12 +108,14 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--replay', action='store_true',
                         help='verify archived per-query bytes without network')
+    parser.add_argument('--workers', type=int, default=1,
+                        help='independent concurrent MCP sessions, 1 or 2')
     parser.add_argument('--max-queries', type=int, default=MAX_SEEDS,
                         help='bounded prefix length for staged research, default all 27')
     args = parser.parse_args()
     require(1 <= args.max_queries <= MAX_SEEDS, 'query count out of range')
     result = execute(args.output_dir, load_seeds()[:args.max_queries],
-                     offline=args.replay)
+                     offline=args.replay, workers=args.workers)
     print(json.dumps(result, indent=2, sort_keys=True))
     if not result['all_queries_reconciled']:
         sys.exit(1)
