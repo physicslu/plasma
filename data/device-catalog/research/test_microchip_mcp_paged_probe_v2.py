@@ -57,7 +57,7 @@ def make_archive(folder):
                         'http_status': 202 if i == 1 else 200,
                         'sha256': hashlib.sha256(raw).hexdigest()})
     manifest = {'schema_version': 2, 'endpoint': v2.v1.ENDPOINT,
-                'query': 'PIC10F202', 'capture_policy': v2.POLICY,
+                'query': 'PIC10F202', 'capture_policy': dict(v2.POLICY),
                 'responses': records}
     (folder / 'manifest.json').write_text(json.dumps(manifest))
     return manifest
