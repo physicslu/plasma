@@ -25,4 +25,3 @@ not authoritative manufacturer life-cycle classification.
 ICPN catalogs, flash firmware, OpenOCD mappings or global Active coverage
 claims. A separate owner approval will be required for PR merge and for
 any later Production data promotion.
-
