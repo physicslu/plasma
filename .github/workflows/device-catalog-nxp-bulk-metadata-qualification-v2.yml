@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'data/device-catalog/research/nxp-bulk-353-metadata-evidence-lock-v2.json'
+      - 'data/device-catalog/research/nxp-bulk-353-status-map-v2.json'
       - 'data/device-catalog/research/nxp_metadata_qualification_v2.py'
       - 'data/device-catalog/research/test_nxp_metadata_qualification_v2.py'
       - '.github/workflows/device-catalog-nxp-bulk-metadata-qualification-v2.yml'
