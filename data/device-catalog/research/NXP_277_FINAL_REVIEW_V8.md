@@ -19,3 +19,21 @@ NO production manifest write, hardware operation, OpenOCD route, job admission
 or programming claims before independent CI and owner approval.
 Sources in temporary CI artifacts need durable archiving if retained longer than
 30 days; SHA alone does not preserve original bytes.
+
+## Verified batch status (CI on 2026-10-13)
+
+- Official 277 original-source HTML re-replay **PASS**. 207 blocked/schema,
+  67 incomplete four-field observations, 3 original HTML four-basic fields
+  with SRAM missing. **277/277 reviewed; 0 new Production admissions.**
+- HTTP 404 from all three official NXP PDF CDN host variants on the Linux
+  GitHub Runner: NXP Japan, NXP China and NXP global. Exact LPC5502/04/06
+  RAM values are confirmed by visible NXP Rev 1.4 Table 2, but the
+  unavailability of the **original PDF bytes** prohibits a new canonical
+  claim that the PDF binary SHA was verified.
+- A reproducible 277-row disposition ledger is generated; its committed
+  copy must compare byte-identically to a subsequent independent CI run.
+  Runtime, Production and programming claims remain unchanged. No hidden
+  catch or fallback may silently publish the three candidate identities.
+- CI artifact original HTML and PDF acquisition failure receipts retain
+  their temporary lifecycle. Future durable archival of the original NXP
+  binary must precede any gated LPC3 Production publication.
