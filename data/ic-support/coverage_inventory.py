@@ -16,10 +16,15 @@ PRODUCTION_MANIFEST = REPO_ROOT / "data" / "device-catalog" / "production" / "ic
 BINDINGS_ROOT = HERE / "bindings"
 PROFILE_ROOT = HERE / "profiles"
 ENRICHMENT_EVIDENCE_FILE = HERE / "enrichment-coverage" / "evidence-v1.json"
+DEVICE_BASIC_FILE = HERE / "device-basic" / "stm32f1-device-basic-v1.json"
 
 ENRICHMENT_LEVELS = ("M0", "M1", "M2", "M3", "M4", "M5")
 ENRICHMENT_DIMENSIONS = (
     "catalog_identity",
+    "manufacturer_device_basic_profile",
+    "ram",
+    "operating_vdd",
+    "operating_temperature",
     "manufacturer_device_profile",
     "operating_electrical",
     "memory_map",
@@ -120,6 +125,91 @@ def repo_file(relative_path: str) -> Path:
 
 def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_device_basic_coverage(
+    production_rows: list[dict[str, str]],
+) -> dict[str, dict[str, Any]]:
+    payload = load_json(DEVICE_BASIC_FILE)
+    require(payload.get("schema_version") == "1.0.0", "device basic coverage schema drift")
+    require(payload.get("profile_id") == "stm32f1-device-basic-v1", "device basic profile identity drift")
+    require(
+        payload.get("status") == "manufacturer_device_basic_available",
+        "device basic profile status drift",
+    )
+    require(payload.get("manufacturer") == "STMicroelectronics", "device basic manufacturer drift")
+    require(payload.get("family") == "STM32F1", "device basic family drift")
+    fields = payload.get("fields")
+    require(
+        fields == [
+            "icpn", "base_device", "package", "pin_count", "flash",
+            "ram", "operating_vdd", "operating_temperature",
+        ],
+        "device basic field contract drift",
+    )
+    groups = payload.get("groups")
+    bindings = payload.get("bindings")
+    require(isinstance(groups, dict) and groups, "device basic groups are required")
+    require(isinstance(bindings, list) and bindings, "device basic bindings are required")
+
+    catalog_by_icpn = {row["icpn"]: row for row in production_rows}
+    result: dict[str, dict[str, Any]] = {}
+    for binding in bindings:
+        require(isinstance(binding, dict), "device basic binding must be an object")
+        icpn = binding.get("icpn")
+        group_id = binding.get("group_id")
+        expected = binding.get("expected_catalog")
+        require(isinstance(icpn, str) and icpn in catalog_by_icpn, f"{icpn}: device basic target not in Production")
+        require(icpn not in result, f"{icpn}: duplicate device basic binding")
+        require(isinstance(group_id, str) and group_id in groups, f"{icpn}: dangling device basic group")
+        require(isinstance(expected, dict), f"{icpn}: expected_catalog required")
+        row = catalog_by_icpn[icpn]
+        checks = {
+            "manufacturer": "manufacturer",
+            "family": "family",
+            "series": "series",
+            "base_device": "base_device",
+            "package": "package",
+            "pin_count": "pin_count",
+            "flash_size": "flash_size",
+            "operating_temperature": "temperature_grade",
+        }
+        for expected_key, row_key in checks.items():
+            require(
+                str(expected.get(expected_key)) == str(row.get(row_key)),
+                f"{icpn}: device basic catalog drift for {row_key}",
+            )
+        group = groups[group_id]
+        require(isinstance(group, dict), f"{icpn}: device basic group must be an object")
+        require(group.get("series") == row["series"], f"{icpn}: device basic series mismatch")
+        require(group.get("flash_size") == row["flash_size"], f"{icpn}: device basic Flash mismatch")
+        require(isinstance(group.get("ram_size"), str) and group["ram_size"].endswith(" KiB"), f"{icpn}: RAM missing")
+        vdd = group.get("operating_vdd_v")
+        require(
+            isinstance(vdd, dict)
+            and isinstance(vdd.get("min"), (int, float))
+            and isinstance(vdd.get("max"), (int, float))
+            and vdd["min"] < vdd["max"],
+            f"{icpn}: operating VDD missing",
+        )
+        evidence = group.get("evidence")
+        require(
+            isinstance(evidence, dict)
+            and evidence.get("authority") == "STMicroelectronics official"
+            and evidence.get("source_surface") == "st_product_selector_or_product_page"
+            and evidence.get("content_lock") is None,
+            f"{icpn}: device basic evidence boundary invalid",
+        )
+        result[icpn] = {
+            "profile_id": payload["profile_id"],
+            "group_id": group_id,
+            "ram_size": group["ram_size"],
+            "operating_vdd_v": copy.deepcopy(vdd),
+            "operating_temperature": row["temperature_grade"],
+            "evidence": copy.deepcopy(evidence),
+        }
+    require(len(result) == 280, f"STM32F1 device basic coverage must be exactly 280, got {len(result)}")
+    return result
 
 
 def load_manufacturer_enrichment_evidence(
@@ -465,6 +555,7 @@ def build_inventory() -> dict[str, Any]:
     profiles = load_profiles()
     bindings = load_programming_bindings(production_icpns, profiles)
     manufacturer_enrichment = load_manufacturer_enrichment_evidence(production_icpns)
+    device_basic_coverage = load_device_basic_coverage(rows)
 
     base_rows: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     family_counts: Counter[str] = Counter()
@@ -492,6 +583,22 @@ def build_inventory() -> dict[str, Any]:
             openocd_unmapped_count += 1
 
         enrichment = copy.deepcopy(manufacturer_enrichment.get(row["icpn"], empty_manufacturer_enrichment()))
+        basic = device_basic_coverage.get(row["icpn"])
+        if basic is not None:
+            enrichment["dimensions"]["manufacturer_device_basic_profile"] = True
+            enrichment["dimensions"]["ram"] = True
+            enrichment["dimensions"]["operating_vdd"] = True
+            enrichment["dimensions"]["operating_temperature"] = True
+            if enrichment["highest_level"] == "M0":
+                enrichment["highest_level"] = "M1"
+            enrichment["evidence"]["device_basic_profile"] = str(
+                DEVICE_BASIC_FILE.relative_to(REPO_ROOT)
+            )
+            enrichment["evidence"]["device_basic_group_id"] = basic["group_id"]
+            enrichment["missing_dimensions"] = [
+                name for name in ENRICHMENT_DIMENSIONS
+                if not enrichment["dimensions"][name]
+            ]
 
         binding = bindings.get(row["icpn"])
         if binding:
