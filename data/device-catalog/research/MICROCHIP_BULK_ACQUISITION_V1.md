@@ -261,6 +261,14 @@ python data/device-catalog/research/microchip_mcp_retry_audit_v1.py \
   --output /tmp/microchip-research-retry-audit.json
 ```
 
+## Gate 2e additional completeness guards
+
+Rollup now detects unexpected archive directories/symlinks that were not
+declared by the exact source-pinned DFP plan. A dangling symlink using a
+planned batch ID is **unverified evidence**, never an absent but harmless
+batch. Either case prevents `all_planned_batches_fully_replayed=true`,
+without silently interpreting extra files as vendor identities.
+
 ## Next gates
 
 1. **Finish Gate 1b: family inventory.** Obtain a complete official Product Selector/MAPS family listing or equivalent, enumerate manufacturer family leaves within each lane, document overlaps/exclusions, and freeze the base-part query set with retrieval timestamps and hashes. Landing pages alone are not exhaustive.

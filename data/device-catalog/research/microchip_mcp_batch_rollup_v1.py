@@ -31,6 +31,10 @@ def build(plan, inventory, pinned_digest, batch_root):
     require('production' not in {part.lower() for part in root.parts},
             'Production evidence path is forbidden')
     require(root.is_dir(), 'missing offline batch evidence directory')
+    planned_ids = {entry['batch_id'] for entry in expected['batches']}
+    unplanned_entries = sorted(entry.name for entry in root.iterdir()
+                               if (entry.is_dir() or entry.is_symlink()) and
+                               entry.name not in planned_ids)
     reports, candidates, conflicted = [], {}, {}
     complete_batches = 0
     complete_queries = 0
@@ -41,7 +45,7 @@ def build(plan, inventory, pinned_digest, batch_root):
         record = {'batch_id': batch_id, 'lane': batch['lane'],
                   'planned_queries': len(batch['queries']),
                   'query_list_sha256': batch['query_list_sha256']}
-        if not location.exists():
+        if not location.exists() and not location.is_symlink():
             record['state'] = 'not_captured'
             reports.append(record)
             continue
@@ -125,6 +129,7 @@ def build(plan, inventory, pinned_digest, batch_root):
         'type': 'microchip-source-pinned-batch-research-rollup',
         'manufacturer': 'Microchip',
         'original_dfp_index_sha256': pinned_digest,
+        'unexpected_archive_directories_or_symlinks': unplanned_entries,
         'planned_batches': len(expected['batches']),
         'fully_replayed_batches': complete_batches,
         'not_captured_batches': sum(r['state'] == 'not_captured' for r in reports),
@@ -140,7 +145,8 @@ def build(plan, inventory, pinned_digest, batch_root):
             max(0, len(row['sources'])-1) for row in ordered),
         'lifecycle_conflict_identity_count': len(conflict_rows),
         'all_planned_batches_fully_replayed':
-            complete_batches == len(expected['batches']) and not conflicted,
+            complete_batches == len(expected['batches']) and not conflicted and
+            not unplanned_entries,
         'batch_reports': reports,
         'ordering_candidates': ordered,
         'conflicting_ordering_identities': conflict_rows,

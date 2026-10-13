@@ -125,6 +125,29 @@ class RollupTests(unittest.TestCase):
             self.assertEqual(result['source_linked_unique_exact_prefix_candidates'], 0)
             self.assertFalse(result['all_planned_batches_fully_replayed'])
 
+    def test_unplanned_batch_directory_blocks_complete_batch_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.install_archive(Path(tmp))
+            (Path(tmp) / 'injected-unplanned-batch').mkdir()
+            result = rollup.build(self.plan, self.inventory, 'a'*64, tmp)
+            self.assertEqual(result['fully_replayed_batches'], 1)
+            self.assertEqual(result['unexpected_archive_directories_or_symlinks'],
+                             ['injected-unplanned-batch'])
+            self.assertFalse(result['all_planned_batches_fully_replayed'])
+            self.assertFalse(result['manufacturer_population_complete'])
+
+    def test_dangling_planned_symlink_is_quarantined_not_marked_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name = self.item['batch_id']
+            try:
+                (Path(tmp) / name).symlink_to(Path(tmp) / 'missing-folder')
+            except (OSError, NotImplementedError):
+                self.skipTest('symlink unsupported')
+            result = rollup.build(self.plan, self.inventory, 'a'*64, tmp)
+            self.assertEqual(result['not_captured_batches'], 0)
+            self.assertEqual(result['unverified_or_partial_batches'], 1)
+            self.assertFalse(result['all_planned_batches_fully_replayed'])
+
     def test_production_input_folder_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp) / 'production'
