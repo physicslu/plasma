@@ -299,7 +299,7 @@ def _clear_status(io: RegisterMemoryIO) -> None:
 def _inspect_status(status: int) -> None:
     errors = status & ERROR_STATUS_MASK
     if errors:
-        raise FlashStatusError(f"Flash status error flags set: 0x{errors:08X}")
+        raise FlashStatusError(f"Flash status error flags set: 0x{{errors:08X}}")
     if status & STATUS_BITS["EOP"] == 0:
         raise FlashStatusError("Flash completion flag EOP was not observed")
 
@@ -318,11 +318,11 @@ def _validate_main_flash_range(address: int, size: int, *, alignment: int) -> No
     if size <= 0:
         raise AddressError("operation size must be positive")
     if address % alignment:
-        raise AddressError(f"address 0x{address:08X} is not {alignment}-byte aligned")
+        raise AddressError(f"address 0x{{address:08X}} is not {{alignment}}-byte aligned")
     end = address + size - 1
     if address < FLASH_START or end > FLASH_END:
         raise AddressError(
-            f"range 0x{address:08X}..0x{end:08X} is outside exact {ICPN} Main Flash"
+            f"range 0x{{address:08X}}..0x{{end:08X}} is outside exact {{ICPN}} Main Flash"
         )
 
 
@@ -351,7 +351,7 @@ def verify_halfword(io: RegisterMemoryIO, address: int, expected: int) -> None:
     actual = io.read16(address)
     if actual != expected:
         raise VerifyError(
-            f"verify mismatch at 0x{address:08X}: expected 0x{expected:04X}, got 0x{actual:04X}"
+            f"verify mismatch at 0x{{address:08X}}: expected 0x{{expected:04X}}, got 0x{{actual:04X}}"
         )
 
 
@@ -397,7 +397,7 @@ def erase_page(
     _clear_control_bit(io, "PER")
     for address in range(page_address, page_address + PAGE_SIZE, PROGRAM_UNIT_BYTES):
         if io.read16(address) != 0xFFFF:
-            raise VerifyError(f"page erase verify failed at 0x{address:08X}")
+            raise VerifyError(f"page erase verify failed at 0x{{address:08X}}")
 
 
 def mass_erase(
@@ -419,7 +419,7 @@ def mass_erase(
     _clear_control_bit(io, "MER")
     for address in range(FLASH_START, FLASH_START + FLASH_SIZE, PROGRAM_UNIT_BYTES):
         if io.read16(address) != 0xFFFF:
-            raise VerifyError(f"mass erase verify failed at 0x{address:08X}")
+            raise VerifyError(f"mass erase verify failed at 0x{{address:08X}}")
 '''
 
 
