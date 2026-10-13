@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Bounded source parser regression; does not simulate live acquisition."""
 import importlib.util
+import json
+import re
 import unittest
 from pathlib import Path
 
@@ -48,6 +50,21 @@ class LivePilotParserTest(unittest.TestCase):
         row = ["MCXC041VFK\nPackage : HUQFN24",
                "MCXC041VFKR\n(935463794528)", "No", "3", "260", "40 sec."]
         self.assertIsNone(module.orderable_from_environment_cells(row, "MCXC"))
+
+    def test_readonly_ci_product_matrix_matches_pinned_manifest(self):
+        registry = json.loads(module.MANIFEST.read_text(encoding="utf-8"))
+        ids = [row["id"] for row in registry["products"]]
+        self.assertEqual(len(ids), len(set(ids)), "duplicate acquisition IDs")
+        workflow = (module.HERE.parents[2] / ".github/workflows/"
+                    "device-catalog-nxp-official-pilot-acquire-v1.yml"
+                    ).read_text(encoding="utf-8")
+        match = re.search(r"^\\s*product:\\s*\\[([^]]+)\\]\\s*$", workflow, re.M)
+        self.assertIsNotNone(match, "fixed product matrix missing")
+        matrix = [item.strip() for item in match.group(1).split(",")]
+        self.assertEqual(len(matrix), len(set(matrix)), "duplicate CI product IDs")
+        self.assertEqual(set(matrix), set(ids), "matrix and official source pins drifted")
+        self.assertFalse(registry["global_active_denominator_claimed"])
+        self.assertFalse(registry["production_write_authorized"])
 
     def test_quality_rows_are_not_lifecycle(self):
         self.assertIsNone(module.lifecycle("MCXN236VNLT No 3 260 40 sec."))
