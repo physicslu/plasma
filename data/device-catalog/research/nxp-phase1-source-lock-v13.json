@@ -1,0 +1,231 @@
+{
+  "schema_version": 13,
+  "phase": 1,
+  "adr": "ADR-0002",
+  "manufacturer": "NXP",
+  "scope": "IC_INFORMATION_ONLY",
+  "input_sources": [
+    {
+      "path": "data/device-catalog/research/nxp-277-full-dispositions-v8.csv",
+      "blob": "c74025d92ca2bd014f22215787cc9563f199b582",
+      "expected_rows": 277
+    },
+    {
+      "path": "data/device-catalog/research/nxp-kl25-commercial-icpn.csv",
+      "blob": "53087e9082445e7948f88e688ecd890b0454d788",
+      "expected_rows": 12
+    },
+    {
+      "path": "data/device-catalog/research/nxp-mcx-196-commercial-v5.csv",
+      "blob": "688ce427e2b7cf0189d7216884d897734aba49e0",
+      "expected_rows": 196
+    },
+    {
+      "path": "data/device-catalog/research/nxp-k32l2-16-commercial-v5.csv",
+      "blob": "6413149e6be0e9af504b644ccceb030d4d851582",
+      "expected_rows": 16
+    }
+  ],
+  "original_active_bounded_exact_count": 501,
+  "production_identity_admitted_count": 224,
+  "research_pending_count": 277,
+  "source_interpretation": {
+    "admitted": "VERIFIED means existing independently admitted exact manufacturer identity + existing source-attested field; it is not a claim of new or complete datasheet verification",
+    "pending": "PARTIAL is an observed exact /part/ HTML field with source HTML SHA; UNKNOWN means no source-attested value, not zero",
+    "unit_conversion": "NO unit conversion or numeric extrapolation; v8 *_kb raw labels remain legacy_kb and production flash_size strings remain as sourced",
+    "original_bytes": "Source HTML may only be present in short-lived Actions artifacts; SHA without bytes is not an archived manufacturer document",
+    "selector": "Phase1 Research metadata does not grant visibility in default public IC Selector"
+  },
+  "prohibited": [
+    "flash_driver_auto_qualification",
+    "software_SUPPORTED_from_core_or_identity",
+    "hardware_PASSED_from_information",
+    "unknown_to_zero",
+    "family_default_as_exact_field",
+    "production_manifest_mutation",
+    "public_catalog_mutation"
+  ],
+  "stats": {
+    "existing_production_identity": {
+      "exact_icpn_records": 224,
+      "identity_admitted": 224,
+      "fields": {
+        "base_device": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 0,
+          "CONFLICT": 0
+        },
+        "package": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 0,
+          "CONFLICT": 0
+        },
+        "pin_count": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 0,
+          "CONFLICT": 0
+        },
+        "flash": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 0,
+          "CONFLICT": 0
+        },
+        "ram": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 224,
+          "CONFLICT": 0
+        },
+        "working_vdd": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 224,
+          "CONFLICT": 0
+        },
+        "io_supply": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 224,
+          "CONFLICT": 0
+        },
+        "vdda": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 224,
+          "CONFLICT": 0
+        },
+        "temperature": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 0,
+          "CONFLICT": 0
+        }
+      }
+    },
+    "pending_manufacturer_research": {
+      "exact_icpn_records": 277,
+      "identity_admitted": 0,
+      "fields": {
+        "base_device": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 277,
+          "CONFLICT": 0
+        },
+        "package": {
+          "VERIFIED": 0,
+          "PARTIAL": 70,
+          "UNKNOWN": 207,
+          "CONFLICT": 0
+        },
+        "pin_count": {
+          "VERIFIED": 0,
+          "PARTIAL": 70,
+          "UNKNOWN": 207,
+          "CONFLICT": 0
+        },
+        "flash": {
+          "VERIFIED": 0,
+          "PARTIAL": 11,
+          "UNKNOWN": 266,
+          "CONFLICT": 0
+        },
+        "ram": {
+          "VERIFIED": 0,
+          "PARTIAL": 48,
+          "UNKNOWN": 229,
+          "CONFLICT": 0
+        },
+        "working_vdd": {
+          "VERIFIED": 0,
+          "PARTIAL": 42,
+          "UNKNOWN": 235,
+          "CONFLICT": 0
+        },
+        "io_supply": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 277,
+          "CONFLICT": 0
+        },
+        "vdda": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 277,
+          "CONFLICT": 0
+        },
+        "temperature": {
+          "VERIFIED": 0,
+          "PARTIAL": 3,
+          "UNKNOWN": 274,
+          "CONFLICT": 0
+        }
+      }
+    },
+    "all": {
+      "exact_icpn_records": 501,
+      "identity_admitted": 224,
+      "fields": {
+        "base_device": {
+          "VERIFIED": 224,
+          "PARTIAL": 0,
+          "UNKNOWN": 277,
+          "CONFLICT": 0
+        },
+        "package": {
+          "VERIFIED": 224,
+          "PARTIAL": 70,
+          "UNKNOWN": 207,
+          "CONFLICT": 0
+        },
+        "pin_count": {
+          "VERIFIED": 224,
+          "PARTIAL": 70,
+          "UNKNOWN": 207,
+          "CONFLICT": 0
+        },
+        "flash": {
+          "VERIFIED": 224,
+          "PARTIAL": 11,
+          "UNKNOWN": 266,
+          "CONFLICT": 0
+        },
+        "ram": {
+          "VERIFIED": 0,
+          "PARTIAL": 48,
+          "UNKNOWN": 453,
+          "CONFLICT": 0
+        },
+        "working_vdd": {
+          "VERIFIED": 0,
+          "PARTIAL": 42,
+          "UNKNOWN": 459,
+          "CONFLICT": 0
+        },
+        "io_supply": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 501,
+          "CONFLICT": 0
+        },
+        "vdda": {
+          "VERIFIED": 0,
+          "PARTIAL": 0,
+          "UNKNOWN": 501,
+          "CONFLICT": 0
+        },
+        "temperature": {
+          "VERIFIED": 224,
+          "PARTIAL": 3,
+          "UNKNOWN": 274,
+          "CONFLICT": 0
+        }
+      }
+    }
+  },
+  "review_note": "The existing 277 were independently reviewed for manufacturer HTML, but 207 were blocked/schema; 67 partial and 3 original-PDF bytes inaccessible. Maintain historical decision, do not promote identity."
+}

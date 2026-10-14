@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "policy": "ADR-0002 Phase 1 - IC Information",
+  "manufacturer": "Microchip",
+  "scope": "research_only_bounded_phase1_information_pilot",
+  "phase": 1,
+  "study_population_note": "Two Microchip official catalog exact ordering rows, not the 24,051 Research candidate population and not a representative SKU coverage denominator",
+  "source_records": [
+    {
+      "id": "microchip-atsamd21g18-product-page",
+      "publisher": "Microchip Technology",
+      "url": "https://www.microchip.com/en-us/product/ATSAMD21G18",
+      "document_id": "ATSAMD21G18 official product page / Catalog Parts and Parametrics",
+      "source_version": null,
+      "research_review_date": "2026-10-14",
+      "raw_capture_sha256": null,
+      "raw_capture_retained": false,
+      "integrity_note": "Public manufacturer product page reviewed; original response bytes/hash not yet captured; re-check manufacturer page before irreversible admission.",
+      "scopes": [
+        "exact_part_catalog_row",
+        "base_device_family_parametrics"
+      ]
+    },
+    {
+      "id": "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+      "publisher": "Microchip Technology",
+      "url": "https://ww1.microchip.com/downloads/aemDocuments/documents/MCU32/ProductDocuments/DataSheets/SAM-D21-DA1-Family-Data-Sheet-DS40001882H.pdf",
+      "document_id": "SAM D21/DA1 Family Data Sheet, DS40001882H",
+      "source_version": "DS40001882H",
+      "research_review_date": "2026-10-14",
+      "raw_capture_sha256": "7d65431d4661122390cd05c350e940eb32ccfe55518dea4035194fa1a57643b7",
+      "raw_capture_retained": true,
+      "integrity_note": "Original official DS40001882H PDF bytes captured, SHA-256 replay PASS in GitHub Actions run #38504676852, artifact #11867871328; artifact expires 2027-01-12. Exact-ICPN PDF semantic applicability still PARTIAL; durable archive required before internal admission.",
+      "scopes": [
+        "base_device_family_parametrics"
+      ],
+      "capture_run_id": 38504676852,
+      "capture_artifact_id": 11867871328,
+      "raw_capture_artifact_expires_at_utc": "2027-01-12T03:08:13Z"
+    },
+    {
+      "id": "microchip-atsamd21g18a-mcp-exact-product-query",
+      "publisher": "Microchip Technology",
+      "url": "https://api.microchip.com/mcp/resources",
+      "document_id": "Microchip MCP search_products ATSAMD21G18A primary 20-row/independent 60-row replay",
+      "source_version": "MCP protocol 2025-03-26; 2026-10-14 captured manufacturer response",
+      "research_review_date": "2026-10-14",
+      "raw_capture_sha256": "8ad5dcf78c28394210675172b5636fa7fa54dd974ffd42647e97793e27417a08",
+      "raw_capture_retained": true,
+      "capture_run_id": 38504676852,
+      "capture_artifact_id": 11867771515,
+      "raw_capture_artifact_expires_at_utc": "2027-01-12T03:08:13Z",
+      "integrity_note": "Manufacturer MCP original response-03.txt captured and SHA-256 replayed after independent 20/60 result-set reconciliation in CI run 38504676852. Exact ICPN->basePartNumber row evidence only. 90-day GitHub artifact expires 2027-01-12; NOT permanent acceptance evidence and no Production admission.",
+      "scopes": [
+        "exact_mcp_response_row"
+      ]
+    }
+  ],
+  "field_contract": [
+    "manufacturer",
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "vdd",
+    "io_supply",
+    "vdda",
+    "temperature",
+    "core_architecture",
+    "core_model"
+  ],
+  "records": [
+    {
+      "manufacturer": "Microchip",
+      "icpn": "ATSAMD21G18A-MU",
+      "family": "SAMD21",
+      "record_scope": "phase1_ic_information_research_only",
+      "internal_identity_state": "SOURCE_LINKED_EXACT_PART_OBSERVED",
+      "internal_admission_state": "NOT_ADMITTED",
+      "all_specifications_qualified": false,
+      "raw_evidence_complete": false,
+      "source_ids": [
+        "microchip-atsamd21g18-product-page",
+        "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+        "microchip-atsamd21g18a-mcp-exact-product-query"
+      ],
+      "fields": {
+        "manufacturer": {
+          "status": "VERIFIED",
+          "value": "Microchip",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MU Catalog Parts row",
+          "notes": null
+        },
+        "icpn": {
+          "status": "VERIFIED",
+          "value": "ATSAMD21G18A-MU",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MU Catalog Parts row",
+          "notes": null
+        },
+        "base_device": {
+          "status": "VERIFIED",
+          "value": "ATSAMD21G18",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18a-mcp-exact-product-query",
+          "evidence_scope": "exact_mcp_response_row",
+          "source_locator": "ATSAMD21G18A-MU source response-03.txt search_products basePartNumber",
+          "notes": "Exact manufacturer MCP original-row basePartNumber observed and independently pagination-replayed. Artifact expires 2027-01-12; permanent evidence/identity admission review still pending."
+        },
+        "package": {
+          "status": "VERIFIED",
+          "value": "VQFN",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MU Package Type",
+          "notes": null
+        },
+        "pin_count": {
+          "status": "VERIFIED",
+          "value": 48,
+          "unit": "pins",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MU Lead Count (Pins)",
+          "notes": null
+        },
+        "flash": {
+          "status": "PARTIAL",
+          "value": 256,
+          "unit": "KB",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 Program Memory Size (KB)",
+          "notes": "Family-level parametrics, not independently proven for the exact ordering code."
+        },
+        "ram": {
+          "status": "PARTIAL",
+          "value": 32,
+          "unit": "KB",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 SRAM (KB)",
+          "notes": "Family-level parametrics, not independently proven for the exact ordering code."
+        },
+        "vdd": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 Operation Voltage Min/Max (V)",
+          "notes": "Exact SKU VDD must be reconciled against official electrical document; do not extrapolate across suffixes."
+        },
+        "io_supply": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "DS40001882H §8.2.1 Power Supplies — VDDIO: 1.62 V to 3.63 V",
+          "notes": "Original manufacturer supply pin VDDIO; family datasheet scope, not separately validated for this exact ordering code. VDDIN/VDDIO/VDDANA must have the same applied voltage per §8.2.1."
+        },
+        "vdda": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "DS40001882H §8.2.1 Power Supplies — VDDANA: 1.62 V to 3.63 V",
+          "notes": "UI field VDDA maps to manufacturer supply-pin name VDDANA, NOT regulated VDDCORE. Datasheet family scope; exact-ordering-code applicability and immutable source-byte evidence remain outstanding."
+        },
+        "temperature": {
+          "status": "VERIFIED",
+          "value": {
+            "min": -40,
+            "max": 85
+          },
+          "unit": "°C",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MU Temperature Range",
+          "notes": null
+        },
+        "core_architecture": {
+          "status": "PARTIAL",
+          "value": "ARM",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 CPU Type",
+          "notes": "Family-level CPU evidence, exact-part applicability requires confirmation."
+        },
+        "core_model": {
+          "status": "PARTIAL",
+          "value": "Cortex-M0+",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 CPU Type",
+          "notes": "Family-level CPU evidence; not proof of programming support."
+        }
+      }
+    },
+    {
+      "manufacturer": "Microchip",
+      "icpn": "ATSAMD21G18A-MF",
+      "family": "SAMD21",
+      "record_scope": "phase1_ic_information_research_only",
+      "internal_identity_state": "SOURCE_LINKED_EXACT_PART_OBSERVED",
+      "internal_admission_state": "NOT_ADMITTED",
+      "all_specifications_qualified": false,
+      "raw_evidence_complete": false,
+      "source_ids": [
+        "microchip-atsamd21g18-product-page",
+        "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+        "microchip-atsamd21g18a-mcp-exact-product-query"
+      ],
+      "fields": {
+        "manufacturer": {
+          "status": "VERIFIED",
+          "value": "Microchip",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MF Catalog Parts row",
+          "notes": null
+        },
+        "icpn": {
+          "status": "VERIFIED",
+          "value": "ATSAMD21G18A-MF",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MF Catalog Parts row",
+          "notes": null
+        },
+        "base_device": {
+          "status": "VERIFIED",
+          "value": "ATSAMD21G18",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18a-mcp-exact-product-query",
+          "evidence_scope": "exact_mcp_response_row",
+          "source_locator": "ATSAMD21G18A-MF source response-03.txt search_products basePartNumber",
+          "notes": "Exact manufacturer MCP original-row basePartNumber observed and independently pagination-replayed. Artifact expires 2027-01-12; permanent evidence/identity admission review still pending."
+        },
+        "package": {
+          "status": "VERIFIED",
+          "value": "VQFN",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MF Package Type",
+          "notes": null
+        },
+        "pin_count": {
+          "status": "VERIFIED",
+          "value": 48,
+          "unit": "pins",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MF Lead Count (Pins)",
+          "notes": null
+        },
+        "flash": {
+          "status": "PARTIAL",
+          "value": 256,
+          "unit": "KB",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 Program Memory Size (KB)",
+          "notes": "Family-level parametrics, not independently proven for the exact ordering code."
+        },
+        "ram": {
+          "status": "PARTIAL",
+          "value": 32,
+          "unit": "KB",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 SRAM (KB)",
+          "notes": "Family-level parametrics, not independently proven for the exact ordering code."
+        },
+        "vdd": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 Operation Voltage Min/Max (V)",
+          "notes": "Exact SKU VDD must be reconciled against official electrical document; do not extrapolate across suffixes."
+        },
+        "io_supply": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "DS40001882H §8.2.1 Power Supplies — VDDIO: 1.62 V to 3.63 V",
+          "notes": "Original manufacturer supply pin VDDIO; family datasheet scope, not separately validated for this exact ordering code. VDDIN/VDDIO/VDDANA must have the same applied voltage per §8.2.1."
+        },
+        "vdda": {
+          "status": "PARTIAL",
+          "value": {
+            "min": 1.62,
+            "max": 3.63
+          },
+          "unit": "V",
+          "source_id": "microchip-sam-d21-da1-family-datasheet-ds40001882h",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "DS40001882H §8.2.1 Power Supplies — VDDANA: 1.62 V to 3.63 V",
+          "notes": "UI field VDDA maps to manufacturer supply-pin name VDDANA, NOT regulated VDDCORE. Datasheet family scope; exact-ordering-code applicability and immutable source-byte evidence remain outstanding."
+        },
+        "temperature": {
+          "status": "VERIFIED",
+          "value": {
+            "min": -40,
+            "max": 125
+          },
+          "unit": "°C",
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "exact_part_catalog_row",
+          "source_locator": "ATSAMD21G18A-MF Temperature Range",
+          "notes": null
+        },
+        "core_architecture": {
+          "status": "PARTIAL",
+          "value": "ARM",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 CPU Type",
+          "notes": "Family-level CPU evidence, exact-part applicability requires confirmation."
+        },
+        "core_model": {
+          "status": "PARTIAL",
+          "value": "Cortex-M0+",
+          "unit": null,
+          "source_id": "microchip-atsamd21g18-product-page",
+          "evidence_scope": "base_device_family_parametrics",
+          "source_locator": "ATSAMD21G18 CPU Type",
+          "notes": "Family-level CPU evidence; not proof of programming support."
+        }
+      }
+    }
+  ],
+  "phase2_programming_authorized": false,
+  "phase3_compatibility_authorized": false,
+  "production_write_authorized": false,
+  "catalog_publication_authorized": false,
+  "software_supported_claimed": false,
+  "hardware_verified_claimed": false,
+  "follow_up": "Secure durable Microchip PDF+MCP source archives before Jan 12 2027 expiry; independently verify exact Catalog Parts package/temp rows (HTTP 403 in CI) and cross-check MCU Family memory/VDD variants before internal admission. Research only; no Phase2/3."
+}
