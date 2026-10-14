@@ -33,6 +33,7 @@ jobs:
           bash -n pl/projects/z2-swd-gpio/prepare-board-repository.sh
           bash -n pl/projects/z2-swd-gpio/rtl-lint.sh
           python3 -m py_compile pl/projects/z2-swd-gpio/artifact.py
+          python3 -m py_compile pl/projects/z2-swd-gpio/build-progress.py
       - name: Source layout and artifact unit tests (no Vivado or Z2)
         run: |
           python3 -m pip install pytest
