@@ -1,0 +1,84 @@
+{
+  "schema_version": 10,
+  "adr": "ADR-0002",
+  "adr_git_blob": "136cde0659f36a6ef742875d70961fafa94de55a",
+  "input_v9_git_blob": "19f61a1753bfd4293d340cdc7f19220ce3a79986",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "sources": [
+    {
+      "group": "KL25",
+      "reference": "https://www.nxp.com/products/KL2x",
+      "assertion": "Cortex-M0+",
+      "evidence_level": "NXP_FAMILY_PAGE"
+    },
+    {
+      "group": "LPC84x",
+      "reference": "https://www.nxp.com/products/LPC84X",
+      "assertion": "Cortex-M0+ SWD",
+      "evidence_level": "NXP_FAMILY_PAGE"
+    },
+    {
+      "group": "LPC80x",
+      "reference": "https://www.nxp.com/products/LPC80X",
+      "assertion": "Cortex-M0+ SWD",
+      "evidence_level": "NXP_FAMILY_PAGE"
+    },
+    {
+      "group": "K32L2",
+      "reference": "https://www.nxp.com/products/K32-L2",
+      "assertion": "Cortex-M0+",
+      "evidence_level": "NXP_FAMILY_PAGE"
+    }
+  ],
+  "upstream_blob_source": "data/device-catalog/research/nxp-adr0002-openocd-source-v9.json",
+  "group_rules": {
+    "KL25": {
+      "core": "Cortex-M0+",
+      "architecture": "ARM",
+      "transport": "UNKNOWN",
+      "transport_evidence": "SWJ_TARGET_DEFINITION_NOT_EXACT_TRANSPORT",
+      "vendor_url": "https://www.nxp.com/products/KL2x",
+      "target_model": "cortex_m",
+      "route": "PINNED_TARGET_FLASH_BANK_DRIVER_SOURCE",
+      "stop": "EXACT_SDID_GEOMETRY_SECURITY_PROGRAM_VERIFY_UNKNOWN"
+    },
+    "LPC84x": {
+      "core": "Cortex-M0+",
+      "architecture": "ARM",
+      "transport": "SWD",
+      "transport_evidence": "NXP_LPC84X_GROUP_AND_OPENOCD_TCL",
+      "vendor_url": "https://www.nxp.com/products/LPC84X",
+      "target_model": "cortex_m",
+      "route": "PINNED_TARGET_FLASH_BANK_DRIVER_SOURCE",
+      "stop": "EXACT_SILICON_ROM_IAP_FLASH_GEOMETRY_VERIFY_UNKNOWN"
+    },
+    "LPC80x": {
+      "core": "Cortex-M0+",
+      "architecture": "ARM",
+      "transport": "SWD",
+      "transport_evidence": "NXP_LPC80X_GROUP_AND_OPENOCD_TCL",
+      "vendor_url": "https://www.nxp.com/products/LPC80X",
+      "target_model": "cortex_m",
+      "route": "GENERIC_TARGET_BANK_DRIVER_SOURCE_ONLY",
+      "stop": "EXACT_802_804_ID_NOT_PROVED_ONE_BOUNDED_CHECK"
+    },
+    "K32L2": {
+      "core": "Cortex-M0+",
+      "architecture": "ARM",
+      "transport": "UNKNOWN",
+      "transport_evidence": "PINNED_K32L2_TARGET_UNKNOWN",
+      "vendor_url": "https://www.nxp.com/products/K32-L2",
+      "target_model": "UNKNOWN",
+      "route": "FLASH_DRIVER_FAMILY_CLUE_ONLY",
+      "stop": "EXACT_K32L2_TARGET_SDI_D_FLASH_BANK_UNKNOWN_ONE_BOUNDED_CHECK"
+    }
+  },
+  "prohibited_inferences": [
+    "same_core_means_same_flash_driver",
+    "swd_support_means_programming_supported",
+    "jtag_boundary_scan_means_flash_programming_transport",
+    "cfg_exists_means_exact_icpn_supported",
+    "source_flash_symbols_mean_installed_binary_or_target_executability",
+    "source_count_is_global_vendor_denominator"
+  ]
+}
