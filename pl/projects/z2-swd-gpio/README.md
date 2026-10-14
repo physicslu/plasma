@@ -29,6 +29,16 @@ The AXI base address is **assigned and exported by Vivado**, not hard-coded by L
 
 This follows the accepted design proposal in [PR #855](https://github.com/physicslu/plasma/pull/855); it does not depend on that PR being merged to build.
 
+## 先驗證現有 SWPC Runner 的 Vivado 環境
+
+這個階段先判斷 **Runner 執行帳號 `plasma-ci`** 是否能啟動 Vivado 並辨識 Zynq-7020 / 官方 PYNQ-Z2 Board Part；不建立 Bitstream、不需要連接 Z2。
+
+第一階段可在 SWPC 終端機以 `plasma-ci` 帳號執行 `check-swpc-vivado-runner.sh`。檢查器不會安裝套件或重新配置 Runner，結果會列印 `PLASMA_VIVADO_PREFLIGHT_PASS` 或明確失敗原因。如 `vivado` 不在 Runner PATH，需先確認已安裝 Vivado 的實際 `settings64.sh`，可透過環境變數 `VIVADO_SETTINGS64` 指定（不要盲目猜測路徑）。
+
+更精確的第二階段是在此 PR 合併後，從 GitHub Actions 的 `SWPC Vivado Runner Environment` Workflow 在 **main** 手動觸發。這才會實際驗證 Actions Runner Job 的 PATH、執行帳號與 Board Files；Workflow 僅接受 `workflow_dispatch` + `main`，絕不在未審核的 PR 上執行持久化 SWPC Runner。驗證腳本只產生暫存日誌，不安裝任何工具。
+
+**重要：** 這個 environment PASS 仍不是 Vivado 授權、Synthesis／Implementation／Timing、Bitstream 或實機 HIL PASS。後續必須執行下方的完整 Vivado Build 才能驗證上述能力。
+
 ## SWPC 一鍵驗證
 
 Prerequisites: a **clean committed checkout** of this PR in `/storage/projects/plasma`, Vivado on PATH, Python 3, Git, and the **official PYNQ-Z2 TUL board files** installed in the running Vivado version. The script deliberately fails if no correct board preset is found or multiple revisions cause ambiguity.
