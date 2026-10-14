@@ -87,15 +87,15 @@ def test_current_production_metrics() -> None:
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
-    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1185
+    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1290
     assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
     assert metrics["manufacturer_enrichment_m5_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
 
     enrichment = inventory["manufacturer_enrichment"]
     assert enrichment["highest_level_counts"] == {
-        "M0": expected_exact_icpns - 1185,
-        "M1": 1184,
+        "M0": expected_exact_icpns - 1290,
+        "M1": 1289,
         "M2": 0,
         "M3": 0,
         "M4": 1,
@@ -103,7 +103,7 @@ def test_current_production_metrics() -> None:
     }
     assert enrichment["at_least_level_counts"] == {
         "M0": expected_exact_icpns,
-        "M1": 1185,
+        "M1": 1290,
         "M2": 1,
         "M3": 1,
         "M4": 1,
@@ -112,6 +112,8 @@ def test_current_production_metrics() -> None:
     assert enrichment["by_family_highest_level"]["STM32F1"]["M4"] == 1
     assert enrichment["by_family_highest_level"]["STM32F1"]["M1"] == 279
     assert enrichment["by_family_highest_level"]["STM32F1"]["M0"] == 0
+    assert enrichment["by_family_highest_level"]["STM32F2"]["M1"] == 105
+    assert enrichment["by_family_highest_level"]["STM32F2"]["M0"] == 0
     assert enrichment["by_family_highest_level"]["STM32C0"]["M1"] == 226
     assert enrichment["by_family_highest_level"]["STM32C0"]["M0"] == 0
     assert enrichment["by_family_highest_level"]["STM32G0"]["M1"] == 406
@@ -227,6 +229,18 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
     assert c0_basic["dimensions"]["vdda"] is False
     assert c0_basic["evidence"]["device_basic_profile"].endswith(
         "stm32c0-device-basic-v1.json"
+    )
+
+    f2 = find_exact(inventory, "STM32F205RBT6")
+    f2_basic = f2["manufacturer_enrichment"]
+    assert f2_basic["highest_level"] == "M1"
+    assert f2_basic["dimensions"]["manufacturer_device_basic_profile"] is True
+    assert f2_basic["dimensions"]["ram"] is True
+    assert f2_basic["dimensions"]["operating_vdd"] is True
+    assert f2_basic["dimensions"]["io_supply"] is False
+    assert f2_basic["dimensions"]["vdda"] is False
+    assert f2_basic["evidence"]["device_basic_profile"].endswith(
+        "stm32f2-device-basic-v1.json"
     )
 
     g0 = find_exact(inventory, "STM32G031K8T3")
