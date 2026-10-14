@@ -57,7 +57,11 @@ def _require(ok: bool, msg: str) -> None:
 
 
 def _root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # Phase 1 is repository-owned Research data, NOT part of the installed
+    # Python wheel. The canonical Production manifest anchors the data tree.
+    from .device_catalog import default_catalog_manifest_path
+
+    return default_catalog_manifest_path().resolve().parents[3]
 
 
 def _git_blob(data: bytes) -> str:
