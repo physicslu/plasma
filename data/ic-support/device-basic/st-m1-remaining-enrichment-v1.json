@@ -58,19 +58,24 @@
     },
     "STM32F4": {
       "production_exact_icpns": 387,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
+      "blocker": "Full-family RAM/VDD evidence cannot be replayed from the allowed ST Product Selector/eStore surfaces for all 139 Production base devices. Product Selector values are variant-specific (including differing VDD minima inside the same series/density), while the retained/replayable surface available to this transaction does not expose the complete per-base-device parameter table and eStore cards do not provide a complete RAM mapping.",
       "notes": [
-        "Requires base-device-level evidence grouping because Product Selector shows variant-level Supply Voltage minima within the same series/density."
+        "A family-level or series+density inference would be unsafe because operating-VDD minima vary by base device.",
+        "The profile model could represent base-device-specific groups, but this transaction lacks a complete direct allowed-source value set for all 387 exact ICPNs.",
+        "Datasheet/product-page derivation is intentionally not used."
       ]
     },
     "STM32F7": {
       "production_exact_icpns": 173,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The allowed ST Product Selector/eStore surfaces do not provide a complete replayable RAM + Operating-VDD mapping across all 75 Production base devices in the current evidence capture. Product listings expose identities/Flash, but the dynamic selector parameter table is not retained completely and eStore cards do not close RAM for the whole family.",
+      "notes": [
+        "Some F7 exact devices have direct official metadata, but full-family exact applicability is mandatory.",
+        "No partial-family M1 admission and no datasheet fallback are allowed."
+      ]
     },
     "STM32U0": {
       "production_exact_icpns": 68,
@@ -81,24 +86,33 @@
     },
     "STM32L0": {
       "production_exact_icpns": 360,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The official STM32L0 Product Selector replay exposes the complete product/base-device list and Flash descriptions, but the captured allowed surface does not expose the per-device RAM and Operating-VDD parameter columns. eStore does not provide a complete RAM mapping for all 99 Production base devices.",
+      "notes": [
+        "The official selector currently enumerates L0 products from 16 KiB through 192 KiB Flash, but RAM/VDD are not present in the replayable selector DOM used by this transaction.",
+        "Using datasheet/order-information SRAM values would violate the M1 derivation-source boundary."
+      ]
     },
     "STM32L4": {
       "production_exact_icpns": 449,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The official STM32L4 Product Selector replay exposes the product/base-device list and Flash descriptions, but not a complete replayable RAM + Operating-VDD parameter table for all 139 Production base devices. Existing repository L4 metadata/publication artifacts are ordering-information/datasheet derived and are prohibited as M1 derivation sources.",
+      "notes": [
+        "The selector product list spans L412/L43x/L45x/L47x/L48x/L49x/L4A6/L4P5/L4Q5/L4R5/L4R7/L4R9/L4Sx cohorts, but the required profile-owned fields are not fully captured.",
+        "No family/density inference is substituted for missing direct evidence."
+      ]
     },
     "STM32L1": {
       "production_exact_icpns": 146,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "No complete replayable RAM + Operating-VDD mapping is available on the allowed ST Product Selector/eStore surfaces for all 59 Production STM32L1 base devices. Existing repository metadata authority is datasheet/order-information based and therefore cannot be reused as M1 derivation evidence.",
+      "notes": [
+        "Production identity/temperature/package metadata is complete, but that does not establish the M1 profile-owned RAM/VDD fields.",
+        "Partial-family admission is prohibited."
+      ]
     },
     "STM32U3": {
       "production_exact_icpns": 107,
@@ -116,10 +130,14 @@
     },
     "STM32U5": {
       "production_exact_icpns": 265,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The allowed ST surfaces do not provide one conflict-free, fully replayable RAM representation for the whole U5 family. Product Selector observations expose exact values such as 274 KiB, 786 KiB and 2514 KiB, while eStore/product-card descriptions use rounded marketing values such as 2.5 Mbytes; the current M1 contract has no approved precedence/rounding rule, and the dynamic selector RAM table is not fully retained for all cohorts.",
+      "notes": [
+        "Operating VDD is consistently 1.71–3.6 V on direct ST surfaces.",
+        "U5F7/U5G7/U5F9/U5G9 descriptions directly state 3 MB SRAM, but U535/U545/U575/U585/U595/U599/U5A5/U5A9 cannot all be closed with one unambiguous replayable RAM authority in this transaction.",
+        "A future evidence-precedence rule or retained Product Selector export could unblock the family without changing runtime/programming authority."
+      ]
     },
     "STM32H7RS": {
       "production_exact_icpns": 36,
@@ -133,10 +151,13 @@
     },
     "STM32H7": {
       "production_exact_icpns": 205,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "STM32H7 classic exposes multiple internal SRAM domains and cohort-specific memory totals; the allowed Product Selector/eStore evidence available to this transaction does not provide a complete, unambiguous single RAM-size value compatible with the current M1 `ram_size` field across all 205 Production exact ICPNs. Flattening the memory domains or borrowing datasheet totals would lose semantics.",
+      "notes": [
+        "Production catalog identity is complete, but existing H7 metadata authority is ordering-information/datasheet based and is not an allowed M1 derivation source.",
+        "H7RS is separately admitted because its eStore evidence directly states a bounded 620 KiB SRAM value; that evidence does not transfer to classic H7."
+      ]
     },
     "STM32WBA2X": {
       "production_exact_icpns": 14,
@@ -228,5 +249,13 @@
         "Partial-family admission is prohibited; WB09/WB06/WB07 evidence cannot promote the whole STM32WB0 family."
       ]
     }
+  },
+  "final_summary": {
+    "processed_remaining_st_exact_icpns": 3339,
+    "admitted_exact_icpns": 332,
+    "blocked_evidence_gap_exact_icpns": 3007,
+    "resulting_m1_exact_icpns": 1622,
+    "remaining_unadmitted_st_exact_icpns": 3007,
+    "all_families_dispositioned": true
   }
 }
