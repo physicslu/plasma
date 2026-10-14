@@ -256,7 +256,7 @@ def load_device_basic_coverage(
             )
             require(
                 isinstance(group.get("flash_size"), str)
-                and re.fullmatch(r"\\d+(?:\\.\\d+)? (?:KiB|MiB)", group["flash_size"]) is not None,
+                and re.fullmatch(r"\d+(?:\.\d+)? (?:KiB|MiB)", group["flash_size"]) is not None,
                 f"{icpn}: unsupported device basic Flash unit",
             )
             require(
