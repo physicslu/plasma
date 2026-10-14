@@ -1,0 +1,71 @@
+name: SWPC Vivado Runner Environment
+
+# This workflow is intentionally restricted to reviewed main code.
+# Do not add pull_request/pull_request_target or check out untrusted refs.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: swpc-vivado-runner-environment
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  trusted-main-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify trusted dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -n "$GITHUB_SHA"
+
+  vivado-environment:
+    needs: trusted-main-guard
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, plasma-integration]
+    timeout-minutes: 15
+    steps:
+      - name: Assert SWPC runner execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$(id -u)" -ne 0
+          test "$(hostname)" = "SWPC"
+          test "$(id -un)" = "plasma-ci"
+          test "$RUNNER_NAME" = "SWPC-plasma-ci"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Probe Vivado / PYNQ-Z2 installed board definition (read-only)
+        shell: bash
+        env:
+          PLASMA_EXPECT_SWPC_HOST: SWPC
+          PLASMA_EXPECT_RUNNER_USER: plasma-ci
+          VIVADO_SETTINGS64: /storage/tools/xilinx/2026.1/Vivado/settings64.sh
+          PLASMA_FPGA_PREFLIGHT_LOG_DIR: ${{ runner.temp }}/plasma-fpga-preflight
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash pl/projects/z2-swd-gpio/check-swpc-vivado-runner.sh
+      - name: Record verified scope
+        if: success()
+        shell: bash
+        run: |
+          echo "Vivado executable and PYNQ-Z2 board preset: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Runner: $RUNNER_NAME on $(hostname) / $(id -un)" >> "$GITHUB_STEP_SUMMARY"
+          echo "NOT tested: Vivado license checkout, synthesis, timing, bitstream, FPGA hardware, or target IC." >> "$GITHUB_STEP_SUMMARY"

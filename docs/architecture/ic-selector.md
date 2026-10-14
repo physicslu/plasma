@@ -1,6 +1,15 @@
 # IC Selector Architecture
 
-Status: Phase 1 implementation contract
+Status: legacy IC Selector Phase 1 implementation contract (not ADR-0002 IC Information Phase 1 acceptance)
+
+> **ADR-0002 phased migration (2026-10-14):** This document's earlier
+> "Phase 1" label is the IC Selector's historical implementation milestone,
+> not the new three-panel ADR-0002 Phase 1. The latter applies only to
+> manufacturer-sourced **01 IC Information** evidence. Default public
+> software-`SUPPORTED` selection filtering and coherent counts remain
+> **Phase 2 Programming / Issue #849**, not a completed runtime guarantee.
+> Internal exact-ICPN metadata completeness and software programming
+> qualification must not be conflated.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).

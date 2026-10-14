@@ -1,0 +1,28 @@
+name: NXP Phase 1 MCXA3 official exact v20
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-mcxa3fs-32-exact-source-v20.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-mcxa3fs-enriched-v20.csv'
+      - 'data/device-catalog/research/nxp-phase1-mcxa3fs-coverage-v20.json'
+      - 'data/device-catalog/research/nxp-phase1-mcxa3fs-lock-v20.json'
+      - 'data/device-catalog/research/nxp_phase1_mcxa3fs_v20.py'
+      - 'data/device-catalog/research/test_nxp_phase1_mcxa3fs_v20.py'
+      - 'data/device-catalog/research/NXP_PHASE1_MCXA3FS_V20.md'
+      - '.github/workflows/device-catalog-nxp-mcxa3fs-v20.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-manufacturer-mcxa3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rebuild 32 exact manufacturer SRAM records and all 501 Phase1 fields
+        run: python data/device-catalog/research/nxp_phase1_mcxa3fs_v20.py
+      - name: Verify exact flash match, identity and no voltage inference
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_mcxa3fs_v20.py' -v

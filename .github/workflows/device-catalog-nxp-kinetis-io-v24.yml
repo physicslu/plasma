@@ -1,0 +1,28 @@
+name: NXP Phase 1 KL25 and K32L2A partial GPIO reference v24
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-16-kl25-k32l2a-io-reference-source-v24.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-kl25-k32l2a-io-v24.csv'
+      - 'data/device-catalog/research/nxp-phase1-kl25-k32l2a-io-lock-v24.json'
+      - 'data/device-catalog/research/nxp-phase1-kl25-k32l2a-io-coverage-v24.json'
+      - 'data/device-catalog/research/nxp_phase1_kl25_k32l2a_io_v24.py'
+      - 'data/device-catalog/research/test_nxp_phase1_kl25_k32l2a_io_v24.py'
+      - 'data/device-catalog/research/NXP_PHASE1_KL25_K32L2A_IO_V24.md'
+      - '.github/workflows/device-catalog-nxp-kinetis-io-v24.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-kinetis-io-source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay 16 exact official GPIO VDD-reference PARTIAL observations
+        run: python data/device-catalog/research/nxp_phase1_kl25_k32l2a_io_v24.py
+      - name: Reject fabricated independent VDDIO and false VERIFIED confidence
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_kl25_k32l2a_io_v24.py' -v

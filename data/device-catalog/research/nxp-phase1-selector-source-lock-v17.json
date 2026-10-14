@@ -1,0 +1,47 @@
+{
+  "schema_version": 17,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "source_v16_501_git_blob": "9533005dbc2f2287614d15c4f7b24290bfbd9724",
+  "source_v16_lock_git_blob": "2fdf530e52108f0500cb78a2bc0eb8d63136bd86",
+  "source_mcxs_identity_git_blob": "688ce427e2b7cf0189d7216884d897734aba49e0",
+  "source_39_exact_rows_git_blob": "56a62c2672785a77611ef0bc4c73de2feeeb60a9",
+  "source_group_counts": {
+    "MCXCFS_REV0_FALLBACK": 18,
+    "MCXE24FS_REV1_FALLBACK": 8,
+    "MCXC15_C16_INDEXED_PARAMETRIC": 9,
+    "MCXW71_INDEXED_PARAMETRIC": 4
+  },
+  "source_reviews": [
+    {
+      "source_id": "MCXCFS_REV0_FALLBACK",
+      "url": "https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf",
+      "position": "PDF p2 MCU options table; p1 voltage range",
+      "source_bytes_archived": false
+    },
+    {
+      "source_id": "MCXE24FS_REV1_FALLBACK",
+      "url": "https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf",
+      "position": "PDF p2 MCX E24 exact part table; general 3-5 V not exact operating min/max",
+      "source_bytes_archived": false
+    },
+    {
+      "source_id": "MCXC15_C16_INDEXED_PARAMETRIC",
+      "url": "https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab",
+      "position": "Search-indexed table 9 exact rows; dynamic HTML bytes not archived",
+      "source_bytes_archived": false
+    },
+    {
+      "source_id": "MCXW71_INDEXED_PARAMETRIC",
+      "url": "https://www.nxp.com/products/MCX-W71?tab=Buy_Parametric_Tab",
+      "position": "Search-indexed table 4 exact rows SRAM; no exact VDD column",
+      "source_bytes_archived": false
+    }
+  ],
+  "source_observation_date": "2026-10-14",
+  "no_source_bytes_sha_claimed": true,
+  "unsupported_research_upgrades": 0,
+  "hard_fail_on_flash_disagreement": true,
+  "notes": "The first 39 exact part observations are vendor pages/data with explicit provenance limits. This is not a 224-row vendor API access proof."
+}

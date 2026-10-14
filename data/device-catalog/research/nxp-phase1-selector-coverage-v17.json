@@ -1,0 +1,209 @@
+{
+  "schema_version": 17,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "reviewed_cohort": "224 existing admitted NXP identities only; 277 Research identities unchanged",
+  "source_baseline_501_git_blob": "9533005dbc2f2287614d15c4f7b24290bfbd9724",
+  "source_observed_rows_39_git_blob": "56a62c2672785a77611ef0bc4c73de2feeeb60a9",
+  "source_original_pdf_html_export_archive_present": false,
+  "admitted_source_access_summary": {
+    "admitted_icpns": 224,
+    "parametric_exact_indexed": 13,
+    "official_fact_sheet_exact": 26,
+    "total_with_source_attested_exact_rows": 39,
+    "no_retrieved_exact_row_this_pass": 185,
+    "verified_nxp_parametric_export_xls_rows": 0
+  },
+  "prior_admitted_field_summary": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "current_admitted_field_summary": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 42,
+        "PARTIAL": 13,
+        "UNKNOWN": 169,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all_501_field_summary": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 57,
+        "PARTIAL": 61,
+        "UNKNOWN": 383,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 31,
+        "PARTIAL": 69,
+        "UNKNOWN": 401,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 501,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 485,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "new_source_backed_ram_rows": 39,
+  "new_source_backed_vdd_rows": 27,
+  "software_programming_supported_new": null,
+  "physical_compatibility_qualified_new": null,
+  "distinctions": {
+    "indexed_parametric": "Search-indexed official NXP Buy/Parametrics exact row, not successfully replayed or binary archived original dynamic HTML; mark fields PARTIAL.",
+    "official_factsheet": "Official exact commercial part number within named table on NXP fact sheet, PDF page manually checked; mark RAM VERIFIED, but original PDF bytes not archived.",
+    "voltage_family": "C04/C14/C24/C44 family-level feature 1.71–3.6 V, not per-exact operating electrical specification; label PARTIAL.",
+    "voltage_exact_index": "C15/C16 exact parametric search-indexed field 1.71–3.6 V, still PARTIAL because original HTML unavailable.",
+    "unknown": "185 uncovered SKUs were not exhaustively searched across NXP's dynamic catalog; not proof values do not exist. VDDIO/VDDA and program operations never inferred."
+  }
+}

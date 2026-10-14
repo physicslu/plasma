@@ -1,0 +1,28 @@
+name: NXP Phase 1 MCXA1FS Exact Source v18
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-mcxa1fs-76-exact-manufacturer-rows-v18.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-mcxa1fs-enriched-v18.csv'
+      - 'data/device-catalog/research/nxp-phase1-mcxa1fs-coverage-v18.json'
+      - 'data/device-catalog/research/nxp-phase1-mcxa1fs-lock-v18.json'
+      - 'data/device-catalog/research/nxp_phase1_mcxa1fs_v18.py'
+      - 'data/device-catalog/research/test_nxp_phase1_mcxa1fs_v18.py'
+      - 'data/device-catalog/research/NXP_PHASE1_MCXA1FS_V18.md'
+      - '.github/workflows/device-catalog-nxp-mcxa1fs-v18.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-official-ram-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify 76 exact manufacturer records and 72 admitted SRAM matches
+        run: python data/device-catalog/research/nxp_phase1_mcxa1fs_v18.py
+      - name: Test source replay, research identity and voltage fail-closed
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_mcxa1fs_v18.py' -v

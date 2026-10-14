@@ -151,6 +151,35 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(basic["physical_programming_qualified"])
         self.assertIsNone(result["selected_profile"])
 
+    def test_remaining_st_m1_batch_is_exposed_without_programming_authority(self) -> None:
+        cases = (
+            ("STM32U031C6T6", "STM32U0", "stm32u0-device-basic-v1", "12 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32U375CET6", "STM32U3", "stm32u3-device-basic-v1", "256 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32L552CCT6", "STM32L5", "stm32l5-device-basic-v1", "256 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32H7R3A8I6", "STM32H7RS", "stm32h7rs-device-basic-v1", "620 KiB", {"min": 1.62, "max": 3.6}),
+            ("STM32WBA50KGU6", "STM32WBA5X", "stm32wba5x-device-basic-v1", "64 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32N645A0H3Q", "STM32N6", "stm32n6-device-basic-v1", "4.2 MB", {"min": 1.71, "max": 3.6}),
+        )
+        for icpn, family, profile_id, ram, vdd in cases:
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                result = payload["results"][0]
+                self.assertEqual(result["family"], family)
+                basic = result["manufacturer_device_basic_profile"]
+                self.assertIsNotNone(basic)
+                assert basic is not None
+                self.assertEqual(basic["profile_id"], profile_id)
+                self.assertEqual(basic["ram_size"], ram)
+                self.assertEqual(basic["operating_vdd_v"], vdd)
+                self.assertIsNone(basic["io_supply_v"])
+                self.assertIsNone(basic["vdda_v"])
+                self.assertFalse(basic["programming_profile_authority"])
+                self.assertFalse(basic["hardware_runtime_ready"])
+                self.assertFalse(basic["physical_programming_qualified"])
+                self.assertIsNone(result["selected_profile"])
+
     def test_g4_basic_profile_exposes_direct_vdda_without_io_supply_inference(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G474VCH3TR&limit=1")
         self.assertEqual(status, 200)
