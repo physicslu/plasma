@@ -82,56 +82,56 @@
       "pin_count": "48",
       "flash": "64",
       "ram": "8",
-      "base_device": "LPC844M20"
+      "base_device": "LPC844M201"
     },
     "LPC844M201JBD64": {
       "package": "LQFP64",
       "pin_count": "64",
       "flash": "64",
       "ram": "8",
-      "base_device": "LPC844M20"
+      "base_device": "LPC844M201"
     },
     "LPC844M201JHI33": {
       "package": "HVQFN33",
       "pin_count": "33",
       "flash": "64",
       "ram": "8",
-      "base_device": "LPC844M20"
+      "base_device": "LPC844M201"
     },
     "LPC844M201JHI48": {
       "package": "HVQFN48",
       "pin_count": "48",
       "flash": "64",
       "ram": "8",
-      "base_device": "LPC844M20"
+      "base_device": "LPC844M201"
     },
     "LPC845M301JBD48": {
       "package": "LQFP48",
       "pin_count": "48",
       "flash": "64",
       "ram": "16",
-      "base_device": "LPC845M30"
+      "base_device": "LPC845M301"
     },
     "LPC845M301JBD64": {
       "package": "LQFP64",
       "pin_count": "64",
       "flash": "64",
       "ram": "16",
-      "base_device": "LPC845M30"
+      "base_device": "LPC845M301"
     },
     "LPC845M301JHI33": {
       "package": "HVQFN33",
       "pin_count": "33",
       "flash": "64",
       "ram": "16",
-      "base_device": "LPC845M30"
+      "base_device": "LPC845M301"
     },
     "LPC845M301JHI48": {
       "package": "HVQFN48",
       "pin_count": "48",
       "flash": "64",
       "ram": "16",
-      "base_device": "LPC845M30"
+      "base_device": "LPC845M301"
     }
   },
   "lpc84x_type_derived_base_device_scope": "LPC844M201 and LPC845M301 are derived from official NXP type-name prefixes; classification PARTIAL, not a proven exact silicon ID",

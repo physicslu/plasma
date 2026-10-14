@@ -15,6 +15,8 @@ class OfficialNXPInformationPhase1V14(unittest.TestCase):
     def test_all_15_exact_lpc_and_package_conflicts(self):
         self.assertEqual(self.by["LPC844M201JBD48E"]["ram"],"8")
         self.assertEqual(self.by["LPC845M301JHI48E"]["ram"],"16")
+        self.assertEqual(self.by["LPC844M201JBD48E"]["base_device"],"LPC844M201")
+        self.assertEqual(self.by["LPC845M301JHI48E"]["base_device"],"LPC845M301")
         self.assertEqual(self.by["LPC845M301JHI48K"]["package"],"HVQFN48")
         for sku in ("LPC844M201JHI33E","LPC844M201JHI33Y",
                     "LPC845M301JHI33E","LPC845M301JHI33K","LPC845M301JHI33Y"):
