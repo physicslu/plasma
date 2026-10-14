@@ -64,8 +64,9 @@ class NXPPhase1InformationSelectorTests(unittest.TestCase):
                 self.assertEqual(tuple(item["fields"][x]["state"]
                                        for x in ("ram", "working_vdd", "io_supply", "vdda")),
                                  (ram, vdd, io, vdda))
-                self.assertIsNone(item["fields"]["io_supply"]["value"]) if io == "UNKNOWN" else None
-        p3 = self.projection.resolve_exact(self.catalog.resolve("NXP", "MCXA144VFM"))
+                if io == "UNKNOWN":
+                    self.assertIsNone(item["fields"]["io_supply"]["value"])
+        p3 = self.projection.resolve_exact(self.catalog.resolve("NXP", "MCXA144VFT"))
         self.assertIsNotNone(p3)
         self.assertIn("VDD_P3", p3["fields"]["io_supply"]["value"])
         self.assertIn("VDD_ANA", p3["fields"]["vdda"]["value"])
