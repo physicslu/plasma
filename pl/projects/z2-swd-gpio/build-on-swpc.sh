@@ -12,6 +12,20 @@ version="${PLASMA_BITSTREAM_VERSION:-0.1.0}"
 jobs="${PLASMA_VIVADO_JOBS:-4}"
 export PLASMA_VIVADO_JOBS="$jobs"
 
+# Serialize reruns in this exact worktree. A previously interrupted SSH
+# session must not leave two builds writing into the same Vivado project.
+mkdir -p "$build"
+if ! command -v flock >/dev/null 2>&1; then
+  echo "flock is required for safe SWPC Vivado build serialization" >&2
+  exit 2
+fi
+exec 9>"$build/.build.lock"
+if ! flock -n 9; then
+  echo "VIVADO_BUILD_BUSY: this worktree already has a build in progress" >&2
+  exit 2
+fi
+echo "VIVADO_BUILD_LOCK_PASS"
+
 # Prefer the SWPC-qualified Vivado 2026.1 installation when no explicit
 # toolchain has been selected; keep the installed path configurable.
 if [[ -z "${VIVADO_SETTINGS64:-}" && -f /storage/tools/xilinx/2026.1/Vivado/settings64.sh ]]; then
@@ -39,11 +53,29 @@ vivado -version | head -n 2
 # Rebuild only this project's disposable output; never touch source or another
 # project. Git-protected source dirty checks run BEFORE deleting generated data.
 python3 "$script_dir/artifact.py" prepare --output "$generated" --version "$version"
-if [[ "$project" != "$repo/pl/build/z2-swd-gpio/project" ]]; then
-  echo "Unsafe project directory; refusing cleanup" >&2
+if [[ "$project" != "$repo/pl/build/z2-swd-gpio/project" || -L "$project" ]]; then
+  echo "Unsafe project directory (unexpected path/symlink); refusing cleanup" >&2
   exit 2
 fi
-rm -rf -- "$project" "$build/artifacts"
+
+# Avoid the ext4 'Directory not empty' race observed on SWPC while removing
+# IP Integrator generated BD trees. Move old output out of the build path
+# atomically first, then remove it best-effort. Never recycle the old project.
+if [[ -e "$project" ]]; then
+  [[ -d "$project" ]] || { echo "Unexpected non-directory Vivado project output" >&2; exit 2; }
+  retired="$(mktemp -d "$build/.retired-project.XXXXXXXX")"
+  if ! mv -T -- "$project" "$retired/project"; then
+    rmdir -- "$retired" || true
+    echo "Failed to quarantine stale Vivado project; refusing overwrite" >&2
+    exit 2
+  fi
+  echo "VIVADO_STALE_PROJECT_QUARANTINED=$retired/project"
+  if ! rm -rf -- "$retired"; then
+    echo "WARNING: stale generated files could not be fully removed: $retired" >&2
+    echo "WARNING: new build continues in a distinct fresh project path" >&2
+  fi
+fi
+rm -rf -- "$build/artifacts"
 mkdir -p "$logdir"
 echo "=== VIVADO IMPLEMENTATION ==="
 set +e
