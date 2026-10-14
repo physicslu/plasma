@@ -1,0 +1,298 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32u3-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32U3",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 107,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32u375-1m": {
+      "series": "STM32U375",
+      "flash_size": "1 MiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u375kgu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U375xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u375-512k": {
+      "series": "STM32U375",
+      "flash_size": "512 KiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u375kgu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U375xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u385-1m": {
+      "series": "STM32U385",
+      "flash_size": "1 MiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u385rgt6tr-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U385xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u3b5-1m": {
+      "series": "STM32U3B5",
+      "flash_size": "1 MiB",
+      "ram_size": "640 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u3b5vit6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U3B5xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u3b5-2m": {
+      "series": "STM32U3B5",
+      "flash_size": "2 MiB",
+      "ram_size": "640 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u3b5vit6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U3B5xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u3c5-2m": {
+      "series": "STM32U3C5",
+      "flash_size": "2 MiB",
+      "ram_size": "640 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u3c5cit6q-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U3C5xx",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32U375CET6": "stm32u375-512k",
+    "STM32U375CET6Q": "stm32u375-512k",
+    "STM32U375CET6TR": "stm32u375-512k",
+    "STM32U375CEU6": "stm32u375-512k",
+    "STM32U375CEU6Q": "stm32u375-512k",
+    "STM32U375CEY6QTR": "stm32u375-512k",
+    "STM32U375CGT6": "stm32u375-1m",
+    "STM32U375CGT6Q": "stm32u375-1m",
+    "STM32U375CGT6TR": "stm32u375-1m",
+    "STM32U375CGU6": "stm32u375-1m",
+    "STM32U375CGU6Q": "stm32u375-1m",
+    "STM32U375CGY6QTR": "stm32u375-1m",
+    "STM32U375KEU6": "stm32u375-512k",
+    "STM32U375KGU6": "stm32u375-1m",
+    "STM32U375KGU6TR": "stm32u375-1m",
+    "STM32U375KGU7": "stm32u375-1m",
+    "STM32U375REI6": "stm32u375-512k",
+    "STM32U375REI6Q": "stm32u375-512k",
+    "STM32U375RET6": "stm32u375-512k",
+    "STM32U375RET6Q": "stm32u375-512k",
+    "STM32U375RET6QTR": "stm32u375-512k",
+    "STM32U375RET6TR": "stm32u375-512k",
+    "STM32U375REY6QTR": "stm32u375-512k",
+    "STM32U375RGI6": "stm32u375-1m",
+    "STM32U375RGI6Q": "stm32u375-1m",
+    "STM32U375RGT6": "stm32u375-1m",
+    "STM32U375RGT6Q": "stm32u375-1m",
+    "STM32U375RGT6QTR": "stm32u375-1m",
+    "STM32U375RGT6TR": "stm32u375-1m",
+    "STM32U375RGY6GTR": "stm32u375-1m",
+    "STM32U375RGY6QTR": "stm32u375-1m",
+    "STM32U375VEI6": "stm32u375-512k",
+    "STM32U375VEI6Q": "stm32u375-512k",
+    "STM32U375VEI6TR": "stm32u375-512k",
+    "STM32U375VET6": "stm32u375-512k",
+    "STM32U375VET6Q": "stm32u375-512k",
+    "STM32U375VET6QTR": "stm32u375-512k",
+    "STM32U375VGI6": "stm32u375-1m",
+    "STM32U375VGI6Q": "stm32u375-1m",
+    "STM32U375VGT6": "stm32u375-1m",
+    "STM32U375VGT6Q": "stm32u375-1m",
+    "STM32U375VGT6QTR": "stm32u375-1m",
+    "STM32U385CGT6": "stm32u385-1m",
+    "STM32U385CGT6Q": "stm32u385-1m",
+    "STM32U385CGU6": "stm32u385-1m",
+    "STM32U385CGU6Q": "stm32u385-1m",
+    "STM32U385CGY6QTR": "stm32u385-1m",
+    "STM32U385KGU6": "stm32u385-1m",
+    "STM32U385RGI6": "stm32u385-1m",
+    "STM32U385RGI6Q": "stm32u385-1m",
+    "STM32U385RGI6TR": "stm32u385-1m",
+    "STM32U385RGT6": "stm32u385-1m",
+    "STM32U385RGT6Q": "stm32u385-1m",
+    "STM32U385RGT6TR": "stm32u385-1m",
+    "STM32U385RGT7": "stm32u385-1m",
+    "STM32U385RGY6GTR": "stm32u385-1m",
+    "STM32U385RGY6QTR": "stm32u385-1m",
+    "STM32U385VGI6": "stm32u385-1m",
+    "STM32U385VGI6Q": "stm32u385-1m",
+    "STM32U385VGI6TR": "stm32u385-1m",
+    "STM32U385VGT6": "stm32u385-1m",
+    "STM32U385VGT6Q": "stm32u385-1m",
+    "STM32U3B5CGT6": "stm32u3b5-1m",
+    "STM32U3B5CGT6Q": "stm32u3b5-1m",
+    "STM32U3B5CGU6": "stm32u3b5-1m",
+    "STM32U3B5CGU6Q": "stm32u3b5-1m",
+    "STM32U3B5CIT6": "stm32u3b5-2m",
+    "STM32U3B5CIT6Q": "stm32u3b5-2m",
+    "STM32U3B5CIU6": "stm32u3b5-2m",
+    "STM32U3B5CIU6Q": "stm32u3b5-2m",
+    "STM32U3B5JGY6QTR": "stm32u3b5-1m",
+    "STM32U3B5JIY6QTR": "stm32u3b5-2m",
+    "STM32U3B5QGI6": "stm32u3b5-1m",
+    "STM32U3B5QGI6Q": "stm32u3b5-1m",
+    "STM32U3B5QII6": "stm32u3b5-2m",
+    "STM32U3B5QII6Q": "stm32u3b5-2m",
+    "STM32U3B5RGT6": "stm32u3b5-1m",
+    "STM32U3B5RGT6Q": "stm32u3b5-1m",
+    "STM32U3B5RIT6": "stm32u3b5-2m",
+    "STM32U3B5RIT6Q": "stm32u3b5-2m",
+    "STM32U3B5VGT6": "stm32u3b5-1m",
+    "STM32U3B5VGT6Q": "stm32u3b5-1m",
+    "STM32U3B5VGY6QTR": "stm32u3b5-1m",
+    "STM32U3B5VIT6": "stm32u3b5-2m",
+    "STM32U3B5VIT6Q": "stm32u3b5-2m",
+    "STM32U3B5VIY6QTR": "stm32u3b5-2m",
+    "STM32U3B5WGY6QTR": "stm32u3b5-1m",
+    "STM32U3B5WIY6QTR": "stm32u3b5-2m",
+    "STM32U3B5ZGT6": "stm32u3b5-1m",
+    "STM32U3B5ZGT6Q": "stm32u3b5-1m",
+    "STM32U3B5ZIT6": "stm32u3b5-2m",
+    "STM32U3B5ZIT6Q": "stm32u3b5-2m",
+    "STM32U3C5CIT6": "stm32u3c5-2m",
+    "STM32U3C5CIT6Q": "stm32u3c5-2m",
+    "STM32U3C5CIU6": "stm32u3c5-2m",
+    "STM32U3C5CIU6Q": "stm32u3c5-2m",
+    "STM32U3C5JIY6QTR": "stm32u3c5-2m",
+    "STM32U3C5QII6": "stm32u3c5-2m",
+    "STM32U3C5QII6Q": "stm32u3c5-2m",
+    "STM32U3C5RIT6": "stm32u3c5-2m",
+    "STM32U3C5RIT6Q": "stm32u3c5-2m",
+    "STM32U3C5VIT6": "stm32u3c5-2m",
+    "STM32U3C5VIT6Q": "stm32u3c5-2m",
+    "STM32U3C5VIY6QTR": "stm32u3c5-2m",
+    "STM32U3C5WIY6QTR": "stm32u3c5-2m",
+    "STM32U3C5ZIT6": "stm32u3c5-2m",
+    "STM32U3C5ZIT6Q": "stm32u3c5-2m"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD are admitted only from cited ST eStore observations. I/O Supply and VDDA remain null because no separate direct allowed-source values are admitted. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
