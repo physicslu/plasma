@@ -169,6 +169,36 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(basic["programming_profile_authority"])
         self.assertIsNone(result["selected_profile"])
 
+    def test_remaining_st_m1_profiles_expose_ic_information_without_programming_authority(self) -> None:
+        cases = (
+            ("STM32U031R8T6", "STM32U0", "12 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32L552QCI6Q", "STM32L5", "256 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32H7R3A8I6", "STM32H7RS", "620 KiB", {"min": 1.62, "max": 3.6}),
+            ("STM32N657A0H3Q", "STM32N6", "4.2 MB", {"min": 1.71, "max": 3.6}),
+        )
+        for icpn, family, ram, vdd in cases:
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                result = payload["results"][0]
+                self.assertEqual(result["family"], family)
+                basic = result["manufacturer_device_basic_profile"]
+                self.assertIsNotNone(basic)
+                assert basic is not None
+                self.assertEqual(basic["ram_size"], ram)
+                self.assertEqual(basic["operating_vdd_v"], vdd)
+                self.assertIsNone(basic["io_supply_v"])
+                self.assertIsNone(basic["vdda_v"])
+                self.assertFalse(basic["programming_profile_authority"])
+                self.assertFalse(basic["hardware_runtime_ready"])
+                self.assertFalse(basic["physical_programming_qualified"])
+                self.assertIsNone(result["selected_profile"])
+
+        status, payload = self.request("/api/devices/search?q=STM32N657A0H3Q&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["results"][0]["manufacturer_device_basic_profile"]["flash_size"], "0-1 KiB")
+
     def test_admitted_icpn_without_manufacturer_selected_profile_returns_null(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F407VGT6&limit=1")
         self.assertEqual(status, 200)
