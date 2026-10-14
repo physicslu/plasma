@@ -125,8 +125,10 @@ def fetch(url):
         url, headers={"Accept": "application/json",
                       "User-Agent": "PLASMA-Phase1-Research/1.0"})
     with urllib.request.urlopen(req, timeout=18) as response:
+        final = urllib.parse.urlparse(response.geturl())
         require(response.status == 200 and official_url(response.geturl()),
-                "unexpected API status/redirect host")
+                "unexpected API status/redirect host: "
+                f"http={response.status} host={final.hostname} path={final.path}")
         raw = response.read(MAX_BYTES + 1)
         require(len(raw) <= MAX_BYTES, "API response size cap exceeded")
         return raw
