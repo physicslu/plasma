@@ -1,0 +1,275 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32wba5x-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32WBA5X",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 40,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32wba50-1m": {
+      "series": "STM32WBA50",
+      "flash_size": "1 MiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba50kgu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA50",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba52-1m": {
+      "series": "STM32WBA52",
+      "flash_size": "1 MiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba52ceu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA52",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba52-512k": {
+      "series": "STM32WBA52",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba52ceu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA52",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba54-1m": {
+      "series": "STM32WBA54",
+      "flash_size": "1 MiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba54cgu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA54",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba54-512k": {
+      "series": "STM32WBA54",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba54cgu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA54",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba55-1m": {
+      "series": "STM32WBA55",
+      "flash_size": "1 MiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba55ceu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA55",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba55-512k": {
+      "series": "STM32WBA55",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba55ceu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA55",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wba5m-1m": {
+      "series": "STM32WBA5M",
+      "flash_size": "1 MiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wba5mmgh6tr-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WBA5M",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32WBA50KGU6": "stm32wba50-1m",
+    "STM32WBA50KGU6TR": "stm32wba50-1m",
+    "STM32WBA52CEU6": "stm32wba52-512k",
+    "STM32WBA52CEU6TR": "stm32wba52-512k",
+    "STM32WBA52CGU6": "stm32wba52-1m",
+    "STM32WBA52CGU6TR": "stm32wba52-1m",
+    "STM32WBA52CGU7": "stm32wba52-1m",
+    "STM32WBA52KEU6": "stm32wba52-512k",
+    "STM32WBA52KGU6": "stm32wba52-1m",
+    "STM32WBA54CEU6": "stm32wba54-512k",
+    "STM32WBA54CEU7": "stm32wba54-512k",
+    "STM32WBA54CEU7TR": "stm32wba54-512k",
+    "STM32WBA54CGU6": "stm32wba54-1m",
+    "STM32WBA54CGU6TR": "stm32wba54-1m",
+    "STM32WBA54CGU7": "stm32wba54-1m",
+    "STM32WBA54CGU7TR": "stm32wba54-1m",
+    "STM32WBA54KEU6": "stm32wba54-512k",
+    "STM32WBA54KEU6TR": "stm32wba54-512k",
+    "STM32WBA54KEU7": "stm32wba54-512k",
+    "STM32WBA54KEU7TR": "stm32wba54-512k",
+    "STM32WBA54KGU6": "stm32wba54-1m",
+    "STM32WBA54KGU6TR": "stm32wba54-1m",
+    "STM32WBA54KGU7": "stm32wba54-1m",
+    "STM32WBA54KGU7TR": "stm32wba54-1m",
+    "STM32WBA55CEU6": "stm32wba55-512k",
+    "STM32WBA55CEU6TR": "stm32wba55-512k",
+    "STM32WBA55CEU7": "stm32wba55-512k",
+    "STM32WBA55CGU6": "stm32wba55-1m",
+    "STM32WBA55CGU6TR": "stm32wba55-1m",
+    "STM32WBA55CGU7": "stm32wba55-1m",
+    "STM32WBA55CGU7TR": "stm32wba55-1m",
+    "STM32WBA55HGF6TR": "stm32wba55-1m",
+    "STM32WBA55HGF7TR": "stm32wba55-1m",
+    "STM32WBA55UEI6": "stm32wba55-512k",
+    "STM32WBA55UEI7": "stm32wba55-512k",
+    "STM32WBA55UGI6": "stm32wba55-1m",
+    "STM32WBA55UGI6TR": "stm32wba55-1m",
+    "STM32WBA55UGI7": "stm32wba55-1m",
+    "STM32WBA55UGI7TR": "stm32wba55-1m",
+    "STM32WBA5MMGH6TR": "stm32wba5m-1m"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD are admitted only from cited ST eStore exact/series-scoped observations. I/O Supply and VDDA remain null without separate direct allowed-source evidence. Datasheet, Programming Guide, OpenOCD and family-name inference are prohibited."
+  }
+}

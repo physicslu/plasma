@@ -162,8 +162,7 @@ The coverage registry is research-only and cannot grant runtime or hardware auth
 
 Manufacturer Device Basic Profile v1 is stored as one explicit family profile per admitted
 family under `device-basic/*-device-basic-v1.json`. The current registry covers all
-**1,290** Production exact ICPNs in STM32F1 (280), STM32F2 (105), STM32C0 (226), STM32G0 (406)
-and STM32G4 (273).
+**1,622** Production exact ICPNs across STM32F1 (280), STM32F2 (105), STM32C0 (226), STM32G0 (406), STM32G4 (273), STM32U0 (68), STM32U3 (107), STM32L5 (49), STM32H7RS (36), STM32WBA5X (40), and STM32N6 (32).
 Every profile uses the fixed IC Information contract:
 ICPN / Base Device / Package / Pin Count / Flash / RAM / Operating VDD /
 I/O Supply / VDDA / Operating Temperature. I/O Supply and VDDA remain null unless
@@ -176,6 +175,18 @@ than the programming baseline: ST Product Selector / eStore observations are ret
 with official URLs and observation date, but no SHA-256 content lock is fabricated for
 dynamic web content. Programming semantics continue to require the stronger manufacturer
 evidence chain.
+
+The remaining-ST completion ledger is:
+
+```text
+data/ic-support/device-basic/st-m1-remaining-enrichment-v1.json
+```
+
+It records the completed review of the 3,339 ST exact ICPNs that were outside the 1,290
+baseline: 332 are admitted by six new complete family profiles and 3,007 are explicitly
+`blocked_evidence_gap`. A blocked disposition means the family was reviewed but cannot
+be promoted without violating the Product Selector/eStore-only derivation rule, losing
+manufacturer semantics, or inventing source precedence. It is not an unreviewed backlog.
 
 ## Validation
 
