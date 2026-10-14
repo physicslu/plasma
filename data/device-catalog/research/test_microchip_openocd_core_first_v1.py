@@ -9,8 +9,9 @@ import tempfile
 import unittest
 
 from microchip_openocd_core_first_v1 import (
-    SOURCE_LOCK, OPENOCD_RELEASE, PINNED_DFP_SOURCE,
+    SOURCE_LOCK, OPENOCD_RELEASE, OBSERVATION, PINNED_DFP_SOURCE,
     blob_sha, validate_registry, verify_upstream_source, triage_names,
+    validate_frozen_observation,
 )
 
 
@@ -19,12 +20,31 @@ class MicrochipCoreFirstResearchGateTests(unittest.TestCase):
     def setUpClass(cls):
         cls.lock = json.loads(SOURCE_LOCK.read_text(encoding="utf-8"))
         cls.release = json.loads(OPENOCD_RELEASE.read_text(encoding="utf-8"))
+        cls.observation = json.loads(OBSERVATION.read_text(encoding="utf-8"))
 
     def test_pinned_release_and_research_safety(self):
         result = validate_registry(self.lock, self.release)
         self.assertEqual(result["p0_source_lead_groups"], 9)
         self.assertEqual(result["p1_target_only_groups"], 2)
         self.assertIsNone(result["exact_icpn_software_supported_count"])
+
+    def test_frozen_dfp_source_observation_is_reconciled(self):
+        result = validate_frozen_observation(self.lock, self.observation)
+        self.assertTrue(result["frozen_observation_reconciled"])
+        self.assertEqual(result["observed_dfp_names"], 3717)
+        self.assertIsNone(result["software_supported_exact_icpns"])
+
+    def test_corrupt_frozen_counts_fail_closed(self):
+        corrupted = deepcopy(self.observation)
+        corrupted["dfp_research_priority_counts"]["P0"] += 1
+        with self.assertRaisesRegex(ValueError, "do not reconcile"):
+            validate_frozen_observation(self.lock, corrupted)
+
+    def test_false_supported_count_in_observation_rejected(self):
+        corrupted = deepcopy(self.observation)
+        corrupted["exact_icpn_software_supported_count"] = 364
+        with self.assertRaisesRegex(ValueError, "unsupported count promoted"):
+            validate_frozen_observation(self.lock, corrupted)
 
     def test_upstream_version_mismatch_fails_closed(self):
         release = dict(self.release, source_commit="0" * 40)
