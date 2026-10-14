@@ -1,13 +1,17 @@
 """NXP v24 manufacturer metadata is read-only and cannot promote hardware or software."""
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import _device_search_payload
+from plasma_web.device_catalog import DEVICE_CATALOG_MANIFEST_ENV
+import plasma_web.nxp_phase1_information as phase1_module
 from plasma_web.nxp_phase1_information import (
     ADMITTED_ROWS,
     LEDGER_RELATIVE_PATH,
@@ -100,6 +104,21 @@ class NXPPhase1InformationSelectorTests(unittest.TestCase):
                     self.projection.resolve_exact(altered)
         self.assertIsNone(self.projection.resolve_exact(self.catalog.resolve(
             "STMicroelectronics", "STM32F103C8T6")))
+
+    def test_installed_package_path_never_resolves_phase1_data_inside_venv(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        manifest = repo_root / "data/device-catalog/production/icpn-v1-manifest.json"
+        installed_module = (repo_root / ".venv/lib/python3.12/site-packages"
+                            / "plasma_web/nxp_phase1_information.py")
+        with patch.dict(os.environ, {DEVICE_CATALOG_MANIFEST_ENV: str(manifest)}):
+            with patch.object(phase1_module, "__file__", str(installed_module)):
+                self.assertEqual(phase1_module._root(), repo_root)
+                self.assertEqual(
+                    NXPPhase1Information.from_file(
+                        phase1_module._root() / LEDGER_RELATIVE_PATH
+                    ).size,
+                    ADMITTED_ROWS,
+                )
 
     def test_mutated_source_fails_git_blob_gate(self) -> None:
         raw = (_root() / LEDGER_RELATIVE_PATH).read_bytes()
