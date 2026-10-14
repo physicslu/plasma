@@ -14,6 +14,7 @@ flash_bytes="${PLASMA_RENDER_FLASH_BYTES:-1048576}"
 engineering_enabled="${PLASMA_RENDER_ENGINEERING_MOCK:-1}"
 catalog_manifest="${PLASMA_DEVICE_CATALOG_MANIFEST:-${repo_root}/data/device-catalog/production/icpn-v1-manifest.json}"
 ic_support_root="${PLASMA_IC_SUPPORT_ROOT:-${repo_root}/data/ic-support}"
+runtime_evidence_root="${PLASMA_RUNTIME_EVIDENCE_ROOT:-${repo_root}}"
 server_pid=""
 gateway_pid=""
 manager_pid=""
@@ -51,12 +52,42 @@ if [[ ! -d "${ic_support_root}/profiles" || ! -d "${ic_support_root}/bindings" ]
   exit 69
 fi
 export PLASMA_DEVICE_CATALOG_MANIFEST="${catalog_manifest}"
+if [[ ! -d "${runtime_evidence_root}" ]]; then
+  printf '[render-start] Missing full source-evidence root: %s\n' "${runtime_evidence_root}" >&2
+  exit 69
+fi
+export PLASMA_RUNTIME_EVIDENCE_ROOT="${runtime_evidence_root}"
 export PLASMA_IC_SUPPORT_ROOT="${ic_support_root}"
 
 # Fail closed before binding a public socket. These checks validate the two
 # repository-owned data roots used by the public Device Selector runtime.
 python -m plasma_web.device_catalog --manifest "${catalog_manifest}" >/dev/null
 python -m plasma_core.ic_support --summary >/dev/null
+
+# A complete Render checkout must never silently omit H5/C5 candidate metadata.
+# All records are source-only; preflight does not activate execution routes.
+python - <<'PY'
+from plasma_web.runtime_evidence_root import default_runtime_evidence_root
+from plasma_web.backend_candidate_registry import get_default_backend_candidate_registry
+from plasma_web.backend_source_reference import default_pinned_upstream
+from plasma_web.openocd_provider_registry import get_default_openocd_provider_registry
+
+root = default_runtime_evidence_root()
+if root is None or not root.is_dir():
+    raise SystemExit("[render-start] explicit OpenOCD source-evidence root unavailable")
+if get_default_backend_candidate_registry().size != 362:
+    raise SystemExit("[render-start] H5/C5 research candidates not fully present")
+provider = get_default_openocd_provider_registry()
+if provider is None or provider.inventory != {
+    "openocd-upstream": 4176,
+    "openocd-st-h5-research": 190,
+    "openocd-st-c5-stldr-research": 172,
+}:
+    raise SystemExit("[render-start] source-only OpenOCD provider inventory missing")
+if default_pinned_upstream() is None:
+    raise SystemExit("[render-start] pinned OpenOCD source reference missing")
+PY
+
 
 cleanup() {
   for pid_name in console_pid manager_pid gateway_pid server_pid; do
@@ -181,6 +212,33 @@ if mcx.get("icpn") != "MCXA132VFM" or not isinstance(evidence, dict):
     raise SystemExit("[render-start] installed NXP evidence path is broken")
 if evidence.get("icpn") != "MCXA132VFM" or mcx["backend"]["mapping_status"] != "no_mapping":
     raise SystemExit("[render-start] NXP manufacturer-only evidence boundary drift")
+for exact, provider_id in (
+    ("STM32H503CBT6", "openocd-st-h5-research"),
+    ("STM32C531CBT6", "openocd-st-c5-stldr-research"),
+):
+    with urlopen(
+        f"http://127.0.0.1:{port}/api/devices/search?q={exact}&limit=1",
+        timeout=3,
+    ) as response:
+        source_search = json.loads(response.read())
+    row = source_search.get("results", [None])[0]
+    if not isinstance(row, dict) or row.get("icpn") != exact:
+        raise SystemExit(f"[render-start] Source-only lookup missing for {exact}")
+    candidate = row.get("backend_candidate")
+    providers = row.get("backend_providers")
+    source_ref = row.get("backend_source_reference")
+    if (row["backend"]["mapping_status"] != "no_mapping"
+            or not isinstance(candidate, dict)
+            or candidate.get("provider_id") != provider_id
+            or candidate.get("executable") is not False
+            or candidate.get("hardware_runtime_ready") is not False
+            or not isinstance(source_ref, dict)
+            or source_ref.get("provider_id") != provider_id
+            or not isinstance(providers, list) or len(providers) != 1
+            or providers[0].get("provider_id") != provider_id
+            or providers[0].get("executable") is not False
+            or providers[0].get("installed_binary_sha256") is not None):
+        raise SystemExit(f"[render-start] H5/C5 pinned display metadata unavailable: {exact}")
 PY
 
 python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${gateway_port}" <<'PY'
