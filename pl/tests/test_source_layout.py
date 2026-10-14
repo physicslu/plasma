@@ -62,10 +62,17 @@ class BtledSourceLayoutTest(unittest.TestCase):
         self.assertNotIn("/storage/", tcl)
 
     def test_generated_vivado_project_files_are_not_in_source_tree(self) -> None:
-        forbidden_files = list(PL_DIR.rglob("*.xpr"))
-        forbidden_dirs = [
+        # Generated build outputs are permitted under pl/build/, but must not
+        # be committed or misclassified as source-controlled PL sources.
+        source_paths = [
             path
             for path in PL_DIR.rglob("*")
+            if "build" not in path.relative_to(PL_DIR).parts
+        ]
+        forbidden_files = [path for path in source_paths if path.suffix == ".xpr"]
+        forbidden_dirs = [
+            path
+            for path in source_paths
             if path.is_dir() and path.suffix in {".srcs", ".runs", ".cache"}
         ]
         self.assertEqual(forbidden_files, [])

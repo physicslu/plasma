@@ -53,7 +53,7 @@ pl/
 └── build/                    # generated Vivado output; not committed
 ```
 
-目前尚未有正式 Plasma production FPGA module。`site/`、`bus/`、`top/` 與 verification placeholders 是為第一個正式 module 保留的 source layout；實際 RTL、cocotb、SVA、reference model 或 harness 應在有需求時取代 placeholder，而不是為外觀建立空架構。
+原先尚未有正式 Plasma production FPGA module；現在已新增首個 Z2 EMIO GPIO／PL Identity **PoC 候選 RTL**，但尚未通過 Vivado 與實體 Z2 驗收。`site/`、`bus/`、`top/` 與 verification placeholders 是為第一個正式 module 保留的 source layout；實際 RTL、cocotb、SVA、reference model 或 harness 應在有需求時取代 placeholder，而不是為外觀建立空架構。
 
 ## 原則
 
@@ -69,6 +69,13 @@ pl/
 10. CI、Vivado build 與 hardware validation 必須分別回報，不可用 source-layout pytest 宣稱 FPGA 已驗證。
 
 目前 `btled` 只是開發流程驗證範例；正式 Plasma RTL 將依功能放在 `rtl/site/`、`rtl/bus/`、`rtl/top/`，並依 SWD/SPI/I2C 等實際介面需求建立 protocol-specific modules。
+
+## 首個 FPGA SWD EMIO / Identity 建置候選
+
+- [PYNQ-Z2 SWD EMIO GPIO + PL Identity 工程](projects/z2-swd-gpio/README.md)：Site 1 的 SWD GPIO proof-of-path、AXI4-Lite Identity ABI v1、Bitstream + HWH + Manifest、SWPC 一鍵 Vivado Build；尚未完成 Vivado/HIL 實證。
+- `rtl/site/swd_emio_bridge.sv` 是 PS EMIO GPIO 的 PL 腳位橋接；**不是**高速 FPGA SWD Master。
+- `rtl/bus/pl_identity_axi_lite.sv` 是首個 PS 可讀的 PL Identity register block。
+- `btled` 仍保留獨立教學範例，不作 Production IC programming qualification。
 
 ## 快速測試
 
