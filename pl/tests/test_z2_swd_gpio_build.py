@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -153,6 +154,37 @@ class Z2SourceContractTest(unittest.TestCase):
         self.assertNotIn('rm -rf -- "$project"', shell)
         self.assertNotIn("systemctl", shell)
         self.assertNotIn("fpga_manager", shell)
+
+    def test_vivado_version_parser_handles_actual_swpc_banner(self):
+        shell = (ROOT / "projects/z2-swd-gpio/build-on-swpc.sh").read_text()
+        match = re.search(r'vivado_version="\\$\\(vivado -version \\| sed -n \\'([^\\']+)\\'\\)"', shell)
+        self.assertIsNotNone(match, "Vivado version must be parsed by a testable sed expression")
+        for banner in ("vivado v2026.1 (64-bit)\\nTool Version Limit: 2026.06\\n",
+                       "Vivado v2024.2 (64-bit)\\n"):
+            output = subprocess.run(
+                ["sed", "-n", match.group(1)], input=banner,
+                text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            self.assertEqual(output, banner.split()[1][1:])
+        output = subprocess.run(
+            ["sed", "-n", match.group(1)], input="unsupported tool\\n",
+            text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        self.assertEqual(output, "")
+
+    def test_monitored_build_has_hard_timeout_and_terminal_status(self):
+        folder = ROOT / "projects/z2-swd-gpio"
+        monitor = (folder / "run-monitored-on-swpc.sh").read_text()
+        self.assertIn('PLASMA_BUILD_TIMEOUT_MINUTES:-120', monitor)
+        self.assertIn('flock -n 8', monitor)
+        self.assertIn('flock -n "$build/.build.lock" -c true', monitor)
+        self.assertIn('timeout --signal=TERM --kill-after=60s', monitor)
+        self.assertIn('bash "$script_dir/build-on-swpc.sh"', monitor)
+        for state in ("RUNNING", "PASS", "FAIL", "TIMEOUT"):
+            self.assertIn(state, monitor)
+        self.assertIn('[[ -s "$build/artifacts/manifest.json" ]]', monitor)
+        for forbidden in ("fpga_manager", "systemctl", "git push", "killall"):
+            self.assertNotIn(forbidden, monitor)
 
 
 if __name__ == "__main__":
