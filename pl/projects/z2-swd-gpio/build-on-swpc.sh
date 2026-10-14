@@ -35,7 +35,7 @@ if [[ "$project" != "$repo/pl/build/z2-swd-gpio/project" ]]; then
   echo "Unsafe project directory; refusing cleanup" >&2
   exit 2
 fi
-rm -rf -- "$project"
+rm -rf -- "$project" "$build/artifacts"
 mkdir -p "$logdir"
 echo "=== VIVADO IMPLEMENTATION ==="
 set +e
