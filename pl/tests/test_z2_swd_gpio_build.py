@@ -29,6 +29,15 @@ class IdentityArtifactContractTest(unittest.TestCase):
             gen = Path(tmp) / "gen"
             tool.prepare(gen, "0.1.0")
             header = (gen / "plasma_identity_generated.vh").read_text()
+            # The standalone SV must contain the *actual* source RTL with
+            # immutable release constants substituted before IP Integrator.
+            standalone = (gen / "pl_identity_axi_lite.sv").read_text()
+            original = (ROOT / "rtl/bus/pl_identity_axi_lite.sv").read_text()
+            directive = '`include "plasma_identity_generated.vh"'
+            self.assertEqual(original.count(directive), 1)
+            self.assertIn(original.replace(directive, header.rstrip("\n")), standalone)
+            self.assertNotIn(directive, standalone)
+            self.assertIn("module pl_identity_axi_lite (", standalone)
             self.assertIn("PLSM_VERSION = 32'h00000100", header)
             self.assertIn("PLSM_BUILD_ID_0 = 32'h01234567", header)
             self.assertIn("PLSM_BUILD_ID_3 = 32'h89ABCDEF", header)
@@ -120,6 +129,9 @@ class Z2SourceContractTest(unittest.TestCase):
         bd = (folder / "create_block_design.tcl").read_text()
         build = (folder / "build_bitstream.tcl").read_text()
         shell = (folder / "build-on-swpc.sh").read_text()
+        self.assertIn("[file join $generated_dir pl_identity_axi_lite.sv]", project)
+        self.assertNotIn("[file join $pl_dir rtl bus pl_identity_axi_lite.sv]", project)
+        self.assertNotIn("set_property include_dirs", project)
         self.assertIn("set_param board.repoPaths [list $board_repo]", project)
         self.assertIn("tul.com.tw:pynq-z2:part0:1.0", project)
         board_script = (folder / "prepare-board-repository.sh").read_text()
