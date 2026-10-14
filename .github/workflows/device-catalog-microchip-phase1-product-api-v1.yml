@@ -12,6 +12,7 @@ on:
       - 'data/device-catalog/research/microchip_phase1_chart_semantics_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_chart_semantics_v1.py'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_PRODUCT_API_V1.md'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_CHART_HTML_EVIDENCE_V1.md'
       - '.github/workflows/device-catalog-microchip-phase1-product-api-v1.yml'
   workflow_dispatch:
 
