@@ -121,12 +121,32 @@ WORK=/storage/projects/plasma-z2-pr859.jk6QVDTj
 bash "$WORK/pl/projects/z2-swd-gpio/build-blocking-on-swpc.sh" attach
 ```
 
-The `start` command stores `logs/monitored-build.pid`, and all foreground
-clients use `tail -f --pid` to wait for the exact supervisor to exit. Every
-status includes `SUPERVISOR_PID` to prevent reporting a stale previous
-build PASS. Final process exit codes: 0 for PASS; 1 for FAIL; 124 for TIMEOUT;
-2 for missing/stale/unexpected results. To inspect a completed build later,
-read `logs/monitored-build.status` and `logs/monitor.log`.
+The `start` command stores `logs/monitored-build.pid`. A foreground
+client prints a visible **RUNNING heartbeat every 10 seconds**, including
+**total elapsed and current stage elapsed** (HH:MM:SS), even when Vivado logs
+are temporarily quiet. The build emits timestamped `STAGE_EVENT` markers for
+Environment/Board, Identity, stale cleanup, Block Design, Synthesis,
+Implementation+Bitstream, Timing/DRC, artifact finalization and SHA-256
+verification. After completion, `build-progress.py` displays a **per-stage
+elapsed-time table** and total build time. Durations are measured from logged
+Unix-epoch millisecond timestamps, displayed to the nearest elapsed second.
+The overall Vivado stage overlaps its child stages and must **not** be added
+to Synthesis/Implementation when totaling time.
+
+The `attach` command never starts another Vivado build; it reads the existing
+supervisor's atomic status and stage logs. Every **new** status includes
+`SUPERVISOR_PID` to reject a stale previous build PASS. Final client exit
+codes: 0 for PASS; 1 for FAIL; 124 for TIMEOUT; 2 for missing/stale/unexpected
+results. For completed builds, inspect `logs/monitored-build.status`,
+`logs/monitor.log`, and `logs/driver.log`. **Termius/SSH losing its
+connection does not automatically reconnect the terminal.** Reconnect via
+SSH and run `attach` (or simply read the status after a completed build).
+
+Previous runs without `STAGE_EVENT` cannot produce an accurate historical
+per-stage breakdown; do not invent elapsed measurements from old logs.
+The user-tested 2026-10-14 build on commit `11885c74` returned
+`MONITOR_RESULT=PASS` even though the Termius connection dropped; this is
+successful detached-build behavior, not proof that Termius itself reconnects.
 
 This replaces the manual two-terminal launch-and-tail convention for **future**
 builds. The already-running 2026-10-14 supervisor (PID 742018) predates this
