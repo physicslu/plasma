@@ -56,6 +56,7 @@ jobs:
         env:
           PLASMA_EXPECT_SWPC_HOST: SWPC
           PLASMA_EXPECT_RUNNER_USER: plasma-ci
+          VIVADO_SETTINGS64: /storage/tools/xilinx/2026.1/Vivado/settings64.sh
           PLASMA_FPGA_PREFLIGHT_LOG_DIR: ${{ runner.temp }}/plasma-fpga-preflight
         run: |
           set -euo pipefail
