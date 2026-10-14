@@ -133,11 +133,11 @@
       "evidence": {
         "authority": "STMicroelectronics official",
         "source_surface": "st_estore",
-        "selector_url": "https://estore.st.com/en/stm32wle5ccu7-cpn.html",
+        "selector_url": "https://estore.st.com/en/stm32wle4ccu6-cpn.html",
         "observed_at_utc": "2026-10-14",
         "content_lock": null,
         "evidence_strength": "official_estore_observation",
-        "source_scope": "STM32WLE4|256 KiB",
+        "source_scope": "STM32WLE4 256 KiB",
         "observed_fields": [
           "ram",
           "operating_vdd"
