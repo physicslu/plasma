@@ -56,8 +56,15 @@ def require(ok, reason):
 def load_lock():
     lock=json.loads(LOCK.read_text(encoding="utf-8"))
     require(lock["schema_version"]==10 and lock["adr"]=="ADR-0002","ADR v10 schema drift")
-    require(blob(ADR.read_bytes())==lock["adr_git_blob"],"Accepted ADR-0002 policy changed")
     adrtxt=ADR.read_text(encoding="utf-8")
+    adr_blob=blob(ADR.read_bytes())
+    require(adr_blob in (lock["adr_git_blob"],lock["phase1_adr_git_blob"]),
+            "ADR-0002 source revision is not reviewed/approved")
+    if adr_blob==lock["phase1_adr_git_blob"]:
+        require("## Implementation Phases — three IC detail sections" in adrtxt
+                and "**Phase 1 — CURRENT**" in adrtxt
+                and "**Phase 2 — DEFERRED**" in adrtxt,
+                "Phased ADR contract changed: archived v10 cannot reauthorize Phase2")
     for heading in REQUIRED_RULE_HEADINGS:
         require(heading in adrtxt,"ADR-0002 approved implementation rule missing: "+heading)
     require(blob(V9_LEDGER.read_bytes())==lock["input_v9_git_blob"],"v9 501 source ledger changed")

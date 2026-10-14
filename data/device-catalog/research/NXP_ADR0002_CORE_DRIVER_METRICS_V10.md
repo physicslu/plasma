@@ -77,3 +77,5 @@ This is NXP ICPN *research* only. The cross-vendor public API/UI visibility
 migration is tracked separately by Issue #849, and the independent
 execution/runtime and physical HIL gates are unchanged. #847 remains Draft
 and requires one explicit owner merge approval at the end.
+
+**Version boundary:** The archived v10 replay test accepts exactly two Git-blob-locked owner-policy source revisions: pre-phase ADR-0002 and the staged Phase 1 text in [Draft #858](https://github.com/physicslu/plasma/pull/858). The new revision does not reactivate Phase 2 or imply software SUPPORTED. All other ADR changes require review.

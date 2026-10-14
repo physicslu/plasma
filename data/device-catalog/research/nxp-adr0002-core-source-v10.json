@@ -80,5 +80,7 @@
     "cfg_exists_means_exact_icpn_supported",
     "source_flash_symbols_mean_installed_binary_or_target_executability",
     "source_count_is_global_vendor_denominator"
-  ]
+  ],
+  "phase1_adr_git_blob": "3518896d287e602b7bc0ae620ed5003a15436b30",
+  "adr_change_policy": "Archived v10 research accepts exactly old Accepted ADR and phased ADR source Git blobs; no new Phase2 or HIL authority."
 }
