@@ -124,10 +124,13 @@
     },
     "STM32WBA2X": {
       "production_exact_icpns": 14,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The same allowed ST eStore exact-product evidence exposes conflicting Operating VDD minima (parameter field 1.8 V versus key-feature text 1.71 V); M1 cannot choose between conflicting direct values.",
+      "notes": [
+        "RAM/Flash identity is directly visible, but Operating VDD is not semantically unambiguous.",
+        "Datasheet evidence is intentionally not used to resolve the conflict because datasheets are prohibited for this Basic Profile layer."
+      ]
     },
     "STM32WL3": {
       "production_exact_icpns": 47,
@@ -182,10 +185,13 @@
     },
     "STM32WB0": {
       "production_exact_icpns": 24,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "ST Product Selector explicitly reports no Flash/RAM for STM32WB05N network-coprocessor variants, while the fixed M1 contract requires RAM and full-family exact-ICPN coverage.",
+      "notes": [
+        "Allowed-source evidence is incomplete by product design, not by catalog parsing.",
+        "Partial-family admission is prohibited; WB09/WB06/WB07 evidence cannot promote the whole STM32WB0 family."
+      ]
     }
   }
 }
