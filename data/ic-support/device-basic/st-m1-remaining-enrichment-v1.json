@@ -187,11 +187,12 @@
     },
     "STM32H5": {
       "production_exact_icpns": 190,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
+      "blocker": "The current Production H5 operating-temperature field carries regulator/mode semantics (LDO, SMPS, low-dissipation conditional maxima) that the fixed M1 simple min/max temperature contract cannot represent without discarding conditions.",
       "notes": [
-        "Complex temperature-grade semantics and supply-field ambiguity require explicit bounded treatment; not admitted yet."
+        "Examples include '-40..105 LDO', '-40..125 SMPS', and '-40..105; up to 125 at low dissipation'.",
+        "Flattening these strings into a simple range would fabricate equivalence; H5 remains outside M1 until the Basic Profile temperature model has an approved conditional representation."
       ]
     },
     "STM32N6": {
