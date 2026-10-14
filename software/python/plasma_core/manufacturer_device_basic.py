@@ -237,10 +237,17 @@ class ManufacturerDeviceBasicResolver:
             ram_size = group.get("ram_size")
             vdd = group.get("operating_vdd_v")
             evidence = group.get("evidence")
-            _require(
-                isinstance(series, str) and series.startswith(family),
-                f"{group_id}: invalid series",
+            family_series_ok = (
+                isinstance(series, str)
+                and (
+                    series.startswith(family)
+                    or (
+                        family == "STM32H7RS"
+                        and series.startswith(("STM32H7R", "STM32H7S"))
+                    )
+                )
             )
+            _require(family_series_ok, f"{group_id}: invalid series")
             _require(
                 isinstance(flash_size, str) and flash_size.endswith(" KiB"),
                 f"{group_id}: invalid Flash size",
