@@ -16,6 +16,10 @@ The nested portable bundle has original MicrochipDirect chart HTML, two full MCP
 
 ## 1. Determine an appropriate SWPC storage topology (read-only)
 
+Before running any command, explicitly set PLASMA_REPO in your interactive shell to the verified absolute path of the reviewed checkout. The commands below use that role-based variable, not a hardcoded host-specific location.
+
+
+
 On the authorized SWPC shell, inspect first. Do not assume that /storage has its own physical disk just because it has a different pathname:
 
 ~~~bash
@@ -23,19 +27,19 @@ hostname
 id
 pwd
 lsblk -f
-findmnt -T /storage/projects/plasma
-df -hT /storage /storage/projects/plasma
+findmnt -T $PLASMA_REPO
+df -hT /storage $PLASMA_REPO
 gh auth status
 ~~~
 
-The project repository is expected at /storage/projects/plasma from prior project documentation. **Verify this on the actual host.** If /storage shares the system drive or is an ephemeral/network mount, record the real topology and its risk. A distinct local disk is still **not an offsite copy, WORM, or enforceable retention**.
+The operator must set PLASMA_REPO to the actual, verified local checkout path. **No public documentation or repository workflow assumes its private pathname.** If /storage shares the system drive or is an ephemeral/network mount, record the real topology and its risk. A distinct local disk is still **not an offsite copy, WORM, or enforceable retention**.
 
 ## 2. Acquire the exact original bytes (operator action)
 
 Do not hardcode tokens, secrets or GitHub credentials in a script or PR. Use the locally authenticated GitHub CLI, and fetch the named Artifact into a **fresh**, outside-repository staging directory:
 
 ~~~bash
-cd /storage/projects/plasma
+cd $PLASMA_REPO
 git status --short
 git rev-parse HEAD
 gh auth status
