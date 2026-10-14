@@ -33,7 +33,7 @@ jobs:
         with:
           repository: openocd-org/openocd
           ref: 9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c
-          path: /tmp/plasma-upstream-openocd
+          path: openocd-pinned-v012
           sparse-checkout: |
             tcl/target
             src/flash/nor
@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           python data/device-catalog/research/microchip_openocd_core_first_v1.py \
-            --openocd-source-root /tmp/plasma-upstream-openocd
+            --openocd-source-root openocd-pinned-v012
       - name: Restore original manufacturer DFP archive from verified prior run
         uses: actions/download-artifact@v4
         with:
@@ -56,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           python data/device-catalog/research/microchip_openocd_core_first_v1.py \
-            --openocd-source-root /tmp/plasma-upstream-openocd \
+            --openocd-source-root openocd-pinned-v012 \
             --dfp-evidence-root "${{ runner.temp }}/microchip-dfp-original" \
             --output "${{ runner.temp }}/microchip-openocd-core-first-research-v1.json"
       - name: Retain version-pinned research triage evidence only
