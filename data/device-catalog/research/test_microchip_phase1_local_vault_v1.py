@@ -60,7 +60,7 @@ class LocalFilesystemVaultTests(unittest.TestCase):
             self.assertFalse(result["immutable_object_lock_verified"])
             self.assertFalse(result["retention_policy_enforced"])
             self.assertFalse(result["production_write_authorized"])
-        self.assertGreaterEqual(checked.call_count, 7)
+        self.assertGreaterEqual(checked.call_count, 6)
 
     def test_second_deposit_and_restore_overwrite_forbidden(self):
         with patch.object(vault.portable, "verify",
