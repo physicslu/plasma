@@ -28,6 +28,7 @@ jobs:
         run: |
           bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
           bash -n pl/projects/z2-swd-gpio/check-swpc-vivado-runner.sh
+          bash -n pl/projects/z2-swd-gpio/prepare-board-repository.sh
           python3 -m py_compile pl/projects/z2-swd-gpio/artifact.py
       - name: Source layout and artifact unit tests (no Vivado or Z2)
         run: |
