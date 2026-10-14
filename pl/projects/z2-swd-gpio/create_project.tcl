@@ -6,7 +6,7 @@ set project_dir [file join $pl_dir build z2-swd-gpio project]
 
 foreach source [list \
     [file join $pl_dir rtl site swd_emio_bridge.sv] \
-    [file join $pl_dir rtl bus pl_identity_axi_lite.sv] \
+    [file join $generated_dir pl_identity_axi_lite.sv] \
     [file join $pl_dir constraints pynq-z2 z2-swd-gpio.xdc] \
     [file join $generated_dir plasma_identity_generated.vh]] {
     if {![file isfile $source]} {error "Missing required PL source: $source"}
@@ -36,12 +36,12 @@ set_property simulator_language Mixed [current_project]
 
 set sources [list \
     [file join $pl_dir rtl site swd_emio_bridge.sv] \
-    [file join $pl_dir rtl bus pl_identity_axi_lite.sv]]
+    [file join $generated_dir pl_identity_axi_lite.sv]]
 add_files -norecurse $sources
 foreach source $sources {set_property file_type SystemVerilog [get_files $source]}
-add_files -norecurse [file join $generated_dir plasma_identity_generated.vh]
-set_property file_type {Verilog Header} [get_files [file join $generated_dir plasma_identity_generated.vh]]
-set_property include_dirs [list $generated_dir] [get_filesets sources_1]
+# The source identity RTL and its generated header are build inputs,
+# not separate Vivado units. Add Module parses the standalone generated
+# Identity SV; do not depend on IP Integrator inheriting include_dirs.
 add_files -fileset constrs_1 -norecurse [file join $pl_dir constraints pynq-z2 z2-swd-gpio.xdc]
 update_compile_order -fileset sources_1
 source [file join $script_dir create_block_design.tcl]
