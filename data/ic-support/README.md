@@ -162,14 +162,12 @@ The coverage registry is research-only and cannot grant runtime or hardware auth
 
 Manufacturer Device Basic Profile v1 is stored as one explicit family profile per admitted
 family under `device-basic/*-device-basic-v1.json`. The current registry covers all
-**1,290** Production exact ICPNs in STM32F1 (280), STM32F2 (105), STM32C0 (226), STM32G0 (406)
-and STM32G4 (273).
+**1,585** Production exact ICPNs in STM32F1 (280), STM32F2 (105), STM32C0 (226), STM32G0 (406), STM32G4 (273), STM32U0 (68), STM32U3 (107), STM32L5 (49), STM32WLX (31), and STM32WBA5X (40).
 Every profile uses the fixed IC Information contract:
 ICPN / Base Device / Package / Pin Count / Flash / RAM / Operating VDD /
 I/O Supply / VDDA / Operating Temperature. I/O Supply and VDDA remain null unless
 directly established by the allowed Product Selector/eStore evidence; they are never copied
-from VDD. STM32F2 admits RAM and Operating VDD from direct ST Product Selector observations while I/O Supply and VDDA remain null. STM32G4 is the first family profile with directly admitted VDDA evidence from
-ST eStore, while I/O Supply remains null. Basic Profile admission does not grant Programming Profile authority.
+from VDD. STM32F2 admits RAM and Operating VDD from direct ST Product Selector observations; U0/U3/L5/WLX/WBA5X admit those fields from direct ST eStore observations. STM32G4 remains the first family profile with directly admitted VDDA evidence from ST eStore, while I/O Supply remains null. Basic Profile admission does not grant Programming Profile authority.
 
 The Basic Profile deliberately uses a lighter official-product-metadata provenance class
 than the programming baseline: ST Product Selector / eStore observations are retained
@@ -223,3 +221,10 @@ python data/ic-support/evidence/source_integrity.py verify
 - no silicon-revision override without explicit errata/revision evidence;
 - no migration of the existing Device Catalog;
 - no claim that the current session is a valid blind AI extraction run.
+
+
+The ST M1 completion ledger is:
+
+`device-basic/st-m1-enrichment-completion-v1.json`
+
+It accounts for all 3,339 ST exact ICPNs that were M0 after the F2 batch: 295 are admitted by new full-family Basic Profiles and 3,044 remain blocked under the current allowed-source/semantic contract. A blocked disposition is an explicit evidence result, not an implicit support claim.
