@@ -34,7 +34,7 @@
     "tcl/target/klx.cfg": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
     "tcl/target/lpc84x.cfg": "af26f2757fb48ea87b80c297df0ecb8d8e5f2058",
     "tcl/target/lpc8xx.cfg": "4c54a2a6670d6186297306112deee8d25e2627e4",
-    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e",
+    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e42",
     "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
     "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
   },
