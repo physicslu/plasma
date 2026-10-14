@@ -12,7 +12,7 @@ import re
 import time
 from pathlib import Path
 
-EVENT = re.compile(r"^STAGE_EVENT ([A-Z_]+) (START|DONE) ([0-9]{13})$")
+EVENT = re.compile(r"^STAGE_EVENT ([A-Z0-9_]+) (START|DONE) ([0-9]{13})$")
 ORDER = (
     "ENVIRONMENT", "IDENTITY_PREPARE", "STALE_PROJECT_CLEANUP",
     "BLOCK_DESIGN", "SYNTHESIS", "IMPLEMENTATION", "TIMING_AND_REPORTS",
