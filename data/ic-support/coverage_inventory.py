@@ -259,7 +259,7 @@ def load_device_basic_coverage(
             )
             require(
                 isinstance(group.get("ram_size"), str)
-                and group["ram_size"].endswith(" KiB"),
+                and group["ram_size"].endswith((" KiB", " MiB", " MB")),
                 f"{icpn}: RAM missing",
             )
             vdd = group.get("operating_vdd_v")
