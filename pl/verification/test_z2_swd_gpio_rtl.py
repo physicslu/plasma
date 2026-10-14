@@ -25,7 +25,7 @@ def test_identity_axi_lite_cocotb():
         toplevel="pl_identity_axi_lite",
         module="test_pl_identity",
         python_search=[str(TB)],
-        timescale=("1ns", "1ps"),
+        timescale="1ns/1ps",
         sim_build=str(BUILD / "identity"),
     )
 
@@ -42,6 +42,6 @@ def test_swd_emio_tristate_cocotb():
         toplevel="swd_emio_bridge_tb",
         module="test_swd_emio_bridge",
         python_search=[str(TB)],
-        timescale=("1ns", "1ps"),
+        timescale="1ns/1ps",
         sim_build=str(BUILD / "swd-emio"),
     )
