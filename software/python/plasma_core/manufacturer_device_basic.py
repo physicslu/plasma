@@ -238,7 +238,7 @@ class ManufacturerDeviceBasicResolver:
             vdd = group.get("operating_vdd_v")
             evidence = group.get("evidence")
             _require(
-                isinstance(series, str) and series.startswith(family),
+                isinstance(series, str) and series.startswith("STM32"),
                 f"{group_id}: invalid series",
             )
             _require(
