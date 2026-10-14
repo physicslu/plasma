@@ -1,0 +1,450 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32f2-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32F2",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 105,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32f205-1024k": {
+      "series": "STM32F205",
+      "flash_size": "1024 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F205 1024 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f205-128k": {
+      "series": "STM32F205",
+      "flash_size": "128 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F205 128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f205-256k": {
+      "series": "STM32F205",
+      "flash_size": "256 KiB",
+      "ram_size": "96 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F205 256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f205-512k": {
+      "series": "STM32F205",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F205 512 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f205-768k": {
+      "series": "STM32F205",
+      "flash_size": "768 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F205 768 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f207-1024k": {
+      "series": "STM32F207",
+      "flash_size": "1024 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F207 1024 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f207-256k": {
+      "series": "STM32F207",
+      "flash_size": "256 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F207 256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f207-512k": {
+      "series": "STM32F207",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F207 512 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f207-768k": {
+      "series": "STM32F207",
+      "flash_size": "768 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F207 768 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f215-1024k": {
+      "series": "STM32F215",
+      "flash_size": "1024 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F215 1024 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f215-512k": {
+      "series": "STM32F215",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F215 512 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f217-1024k": {
+      "series": "STM32F217",
+      "flash_size": "1024 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F217 1024 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32f217-512k": {
+      "series": "STM32F217",
+      "flash_size": "512 KiB",
+      "ram_size": "128 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_product_selector",
+        "selector_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f2-series/products.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_product_selector_observation",
+        "source_scope": "STM32F217 512 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32F205RBT6": "stm32f205-128k",
+    "STM32F205RBT6TR": "stm32f205-128k",
+    "STM32F205RBT7": "stm32f205-128k",
+    "STM32F205RCT6": "stm32f205-256k",
+    "STM32F205RCT6TR": "stm32f205-256k",
+    "STM32F205RCT7": "stm32f205-256k",
+    "STM32F205RCT7TR": "stm32f205-256k",
+    "STM32F205RET6": "stm32f205-512k",
+    "STM32F205RET6TR": "stm32f205-512k",
+    "STM32F205RET7": "stm32f205-512k",
+    "STM32F205RET7TR": "stm32f205-512k",
+    "STM32F205REY6TR": "stm32f205-512k",
+    "STM32F205RFT6": "stm32f205-768k",
+    "STM32F205RFT6TR": "stm32f205-768k",
+    "STM32F205RGT6": "stm32f205-1024k",
+    "STM32F205RGT6TR": "stm32f205-1024k",
+    "STM32F205RGT7": "stm32f205-1024k",
+    "STM32F205RGY6TR": "stm32f205-1024k",
+    "STM32F205VBT6": "stm32f205-128k",
+    "STM32F205VBT6TR": "stm32f205-128k",
+    "STM32F205VCT6": "stm32f205-256k",
+    "STM32F205VCT6TR": "stm32f205-256k",
+    "STM32F205VCT7": "stm32f205-256k",
+    "STM32F205VCT7TR": "stm32f205-256k",
+    "STM32F205VET6": "stm32f205-512k",
+    "STM32F205VET6TR": "stm32f205-512k",
+    "STM32F205VET7": "stm32f205-512k",
+    "STM32F205VET7TR": "stm32f205-512k",
+    "STM32F205VFT6": "stm32f205-768k",
+    "STM32F205VFT6TR": "stm32f205-768k",
+    "STM32F205VGT6": "stm32f205-1024k",
+    "STM32F205VGT6TR": "stm32f205-1024k",
+    "STM32F205VGT7": "stm32f205-1024k",
+    "STM32F205VGT7TR": "stm32f205-1024k",
+    "STM32F205ZCT6": "stm32f205-256k",
+    "STM32F205ZCT6TR": "stm32f205-256k",
+    "STM32F205ZCT7": "stm32f205-256k",
+    "STM32F205ZCT7TR": "stm32f205-256k",
+    "STM32F205ZET6": "stm32f205-512k",
+    "STM32F205ZET6TR": "stm32f205-512k",
+    "STM32F205ZET7": "stm32f205-512k",
+    "STM32F205ZET7TR": "stm32f205-512k",
+    "STM32F205ZFT6": "stm32f205-768k",
+    "STM32F205ZGT6": "stm32f205-1024k",
+    "STM32F205ZGT6TR": "stm32f205-1024k",
+    "STM32F205ZGT7": "stm32f205-1024k",
+    "STM32F205ZGT7TR": "stm32f205-1024k",
+    "STM32F207ICH6": "stm32f207-256k",
+    "STM32F207ICT6": "stm32f207-256k",
+    "STM32F207IEH6": "stm32f207-512k",
+    "STM32F207IEH6TR": "stm32f207-512k",
+    "STM32F207IET6": "stm32f207-512k",
+    "STM32F207IFH6": "stm32f207-768k",
+    "STM32F207IFH6TR": "stm32f207-768k",
+    "STM32F207IFT6": "stm32f207-768k",
+    "STM32F207IGH6": "stm32f207-1024k",
+    "STM32F207IGH6TR": "stm32f207-1024k",
+    "STM32F207IGH7": "stm32f207-1024k",
+    "STM32F207IGT6": "stm32f207-1024k",
+    "STM32F207IGT6TR": "stm32f207-1024k",
+    "STM32F207IGT7": "stm32f207-1024k",
+    "STM32F207VCT6": "stm32f207-256k",
+    "STM32F207VCT6TR": "stm32f207-256k",
+    "STM32F207VCT7": "stm32f207-256k",
+    "STM32F207VET6": "stm32f207-512k",
+    "STM32F207VET6TR": "stm32f207-512k",
+    "STM32F207VFT6": "stm32f207-768k",
+    "STM32F207VFT6TR": "stm32f207-768k",
+    "STM32F207VGT6": "stm32f207-1024k",
+    "STM32F207VGT6TR": "stm32f207-1024k",
+    "STM32F207VGT7": "stm32f207-1024k",
+    "STM32F207ZCT6": "stm32f207-256k",
+    "STM32F207ZCT7": "stm32f207-256k",
+    "STM32F207ZCT7TR": "stm32f207-256k",
+    "STM32F207ZET6": "stm32f207-512k",
+    "STM32F207ZET6TR": "stm32f207-512k",
+    "STM32F207ZFT6": "stm32f207-768k",
+    "STM32F207ZGT6": "stm32f207-1024k",
+    "STM32F207ZGT6TR": "stm32f207-1024k",
+    "STM32F207ZGT7": "stm32f207-1024k",
+    "STM32F215RET6": "stm32f215-512k",
+    "STM32F215RET6TR": "stm32f215-512k",
+    "STM32F215RGT6": "stm32f215-1024k",
+    "STM32F215RGT6TR": "stm32f215-1024k",
+    "STM32F215VET6": "stm32f215-512k",
+    "STM32F215VGT6": "stm32f215-1024k",
+    "STM32F215VGT7": "stm32f215-1024k",
+    "STM32F215ZET6": "stm32f215-512k",
+    "STM32F215ZET6TR": "stm32f215-512k",
+    "STM32F215ZGT6": "stm32f215-1024k",
+    "STM32F215ZGT7": "stm32f215-1024k",
+    "STM32F215ZGT7TR": "stm32f215-1024k",
+    "STM32F217IEH6": "stm32f217-512k",
+    "STM32F217IET6": "stm32f217-512k",
+    "STM32F217IGH6": "stm32f217-1024k",
+    "STM32F217IGH6TR": "stm32f217-1024k",
+    "STM32F217IGT6": "stm32f217-1024k",
+    "STM32F217IGT7": "stm32f217-1024k",
+    "STM32F217VET6": "stm32f217-512k",
+    "STM32F217VET6TR": "stm32f217-512k",
+    "STM32F217VGT6": "stm32f217-1024k",
+    "STM32F217VGT6TR": "stm32f217-1024k",
+    "STM32F217ZET6": "stm32f217-512k",
+    "STM32F217ZET7": "stm32f217-512k",
+    "STM32F217ZGT6": "stm32f217-1024k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings; catalog-owned fields are read from the current Production Catalog exact identity/eStore evidence. RAM and Operating VDD are admitted only from the cited ST Product Selector observation. I/O Supply and VDDA remain null because no separate direct allowed-source values are admitted. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
