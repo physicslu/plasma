@@ -61,7 +61,7 @@ def _root() -> Path:
 
 
 def _git_blob(data: bytes) -> str:
-    return hashlib.sha1(f"blob {len(data)}\\0".encode("ascii") + data).hexdigest()
+    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
 
 
 def _source_for(row: dict[str, str], field: str) -> tuple[str | None, str | None, str | None]:
