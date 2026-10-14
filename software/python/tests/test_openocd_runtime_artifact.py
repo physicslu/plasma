@@ -349,6 +349,10 @@ def test_build_recipe_uses_pinned_commit_and_minimal_control_plane_adapters() ->
     assert 'test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"' in source
     assert "--enable-dummy" in source
     assert "--enable-remote-bitbang" in source
+    assert "--enable-linuxgpiod" in source
+    assert "libgpiod-dev" in source
+    assert "adapter list" in source
+    assert 'grep -q "libgpiod.so"' in source
     assert "--disable-jlink" in source
     assert "python3 tcl" in source
     assert "adapter driver dummy" in source
