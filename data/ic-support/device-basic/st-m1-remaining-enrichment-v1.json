@@ -47,10 +47,14 @@
     },
     "STM32F3": {
       "production_exact_icpns": 192,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The allowed ST Product Selector directly conflicts with the current Production Catalog for STM32F301C6/R6/K6: Production records these devices as 32 KiB Flash while the official STM32F3 Product Selector describes the same base devices as 64 Kbytes Flash. M1 cannot compose catalog-owned Flash identity with contradictory allowed-source product metadata.",
+      "notes": [
+        "The conflict is visible on the official STM32F3 series Product Selector, not inferred from a datasheet or OpenOCD.",
+        "Other F3 cohorts expose usable direct RAM/VDD rows, including low-voltage F3x8 devices, but full-family admission is mandatory.",
+        "Resolve the STM32F301x6 catalog/source discrepancy before any STM32F3 family M1 profile is admitted."
+      ]
     },
     "STM32F4": {
       "production_exact_icpns": 387,
