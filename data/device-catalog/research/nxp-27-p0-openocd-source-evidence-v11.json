@@ -1,0 +1,95 @@
+{
+  "schema_version": 11,
+  "adr": "ADR-0002",
+  "scope": "SOURCE_ONLY_NXP_P0_27_EXACT_REVIEW_NO_SOFTWARE_SUPPORT_PROMOTION",
+  "source_v10_501_core_ledger_git_blob": "9f0397fe6062356fd04cd5eb73133969e75d9bfb",
+  "source_kl25_12_canonical_git_blob": "53087e9082445e7948f88e688ecd890b0454d788",
+  "source_v10_family_lock_git_blob": "3f5209a70b3e263ed0a4ca92121ae3f24a5d2c65",
+  "source_v9_pinned_openocd_lock_git_blob": "e9ccb5af0c4649541955cbd0608340dfd2758856",
+  "provider": "openocd-upstream",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "upstream_source_blobs": {
+    "tcl/target/kl25.cfg": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+    "tcl/target/klx.cfg": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+    "tcl/target/lpc84x.cfg": "af26f2757fb48ea87b80c297df0ecb8d8e5f2058",
+    "tcl/target/lpc8xx.cfg": "4c54a2a6670d6186297306112deee8d25e2627e4",
+    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e42",
+    "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
+    "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
+  },
+  "review_cohorts": {
+    "KL25": 12,
+    "LPC844": 7,
+    "LPC845": 8
+  },
+  "source_observations": {
+    "KL25": {
+      "target_graph": [
+        "tcl/target/kl25.cfg",
+        "tcl/target/klx.cfg",
+        "src/flash/nor/kinetis.c"
+      ],
+      "evidence": [
+        "kl25.cfg sets CHIPNAME kl25 and sources klx.cfg",
+        "klx.cfg creates kinetis flash bank and calls kinetis create_banks",
+        "kinetis.c KL series branch sets initial 1KiB sector size, FS_PROGRAM_LONGWORD; actual bank count/size depends on runtime SDID FCFG1 FCFG2",
+        "kinetis.c erase and write callbacks exist",
+        "kinetis.c FCF address 0x400 and FSEC security protective guard require special review"
+      ],
+      "driver_dynamic_geometry_registers": [
+        "SIM_SDID",
+        "SIM_FCFG1",
+        "SIM_FCFG2"
+      ],
+      "exact_sdid_recorded": false,
+      "hardware_independent_generic_driver_program_erase_supported_source": true,
+      "exact_icpn_software_qualified": false
+    },
+    "LPC84x": {
+      "target_graph": [
+        "tcl/target/lpc84x.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "src/flash/nor/lpc2000.c"
+      ],
+      "evidence": [
+        "lpc84x.cfg sets lpc800, work area 0x1fe0 and ROM IAP entry 0x0F001FF1",
+        "lpc1xxx.cfg uses lpc2000 auto flash bank",
+        "lpc2000.c explicitly recognizes several LPC844_201 and LPC845_301 silicon Part ID values",
+        "recognized LPC844/845 IDs yield bank size 64 KiB and lpc800 geometry has 1KiB sectors",
+        "unknown Part ID falls through default LOG_ERROR then exit(-1), a critical unhandled process-level abort"
+      ],
+      "pinned_id_cases": {
+        "LPC844": [
+          "LPC844_201",
+          "LPC844_201_1",
+          "LPC844_201_2"
+        ],
+        "LPC845": [
+          "LPC845_301",
+          "LPC845_301_1",
+          "LPC845_301_2",
+          "LPC845_301_3"
+        ]
+      },
+      "exact_ordering_to_partid_mapping_locked": false,
+      "manufacturer_original_exact_part_metadata_available": false,
+      "driver_error_process_exit_risk": true,
+      "exact_icpn_software_qualified": false
+    }
+  },
+  "operation_gate": {
+    "probe_driver_symbol": true,
+    "erase_driver_symbol": true,
+    "write_driver_symbol": true,
+    "flash_read_verify_per_exact_icpn": "UNKNOWN",
+    "target_execution_or_emulation": "NOT_RUN",
+    "installed_ppu_runtime": "UNKNOWN"
+  },
+  "decision": {
+    "research_priority": "P0",
+    "software_support": "CANDIDATE",
+    "new_supported_exact": 0,
+    "production_catalog_changes": 0,
+    "physical_hil_tested": 0
+  }
+}

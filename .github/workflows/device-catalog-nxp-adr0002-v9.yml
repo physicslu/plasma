@@ -13,6 +13,11 @@ on:
       - 'data/device-catalog/research/nxp-adr0002-core-source-v10.json'
       - 'data/device-catalog/research/nxp-adr0002-core-aware-metrics-v10.json'
       - 'data/device-catalog/research/NXP_ADR0002_CORE_DRIVER_METRICS_V10.md'
+      - 'data/device-catalog/research/nxp_27_p0_flash_evidence_v11.py'
+      - 'data/device-catalog/research/test_nxp_27_p0_flash_evidence_v11.py'
+      - 'data/device-catalog/research/nxp-27-p0-exact-flash-review-v11.csv'
+      - 'data/device-catalog/research/nxp-27-p0-openocd-source-evidence-v11.json'
+      - 'data/device-catalog/research/NXP_27_P0_FLASH_REVIEW_V11.md'
   workflow_dispatch:
 permissions:
   contents: read
