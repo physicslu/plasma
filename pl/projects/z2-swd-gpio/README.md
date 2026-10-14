@@ -92,6 +92,44 @@ PLASMA_VIVADO_JOBS=4 PLASMA_BITSTREAM_VERSION=0.1.0 \
 
 The script runs `artifact.py prepare` → source-controlled Tcl Project/BD generation → synth/impl/bitstream → timing checks → `artifact.py finalize` → SHA-256 verification. It **does not** connect to Z2 or load a bitstream.
 
+### SWPC detached and bounded full rebuild (pre-merge manual verification)
+
+For a full restart after a failed Vivado build, first update an **isolated, clean**
+PR worktree to the reviewed PR SHA. Do not use `main`, do not bypass `.build.lock`,
+and do not run a second build while one is already active:
+
+```bash
+WORK=/storage/projects/plasma-z2-pr859.jk6QVDTj
+git -C "$WORK" fetch --no-tags origin pull/859/head
+git -C "$WORK" switch --detach FETCH_HEAD
+BUILD="$WORK/pl/build/z2-swd-gpio"
+mkdir -p "$BUILD/logs"
+nohup env PLASMA_BUILD_TIMEOUT_MINUTES=120 \
+  bash "$WORK/pl/projects/z2-swd-gpio/run-monitored-on-swpc.sh" \
+  > "$BUILD/logs/monitor.log" 2>&1 < /dev/null &
+echo "MONITOR_PID=$!"
+```
+
+The supervisor holds `.monitor.lock` and checks `.build.lock`, runs a **fresh**
+`build-on-swpc.sh`, logs a heartbeat every minute, and terminates the child build
+process group at the 120-minute deadline (TERM, then KILL after 60 seconds).
+The supervisor, not SSH, determines completion. Read
+`logs/monitored-build.status` for `STATUS=PASS|FAIL|TIMEOUT|RUNNING` and
+`logs/monitor.log` for detail; `logs/driver.log` and
+`logs/vivado-console.log` retain implementation evidence. Only `PASS` means the
+build script exited zero, emitted its complete review sentinel and wrote a
+non-empty `manifest.json` after artifact hashing. This is **not** a real Z2 HIL
+or physical SWD qualification.
+
+2026-10-14 SWPC evidence: Vivado 2026.1 emitted
+`IMPLEMENTED_TIMING_PASS setup=3.662 hold=0.043` and
+`BITSTREAM_BUILD_PASS` for commit `4edb8e981cc7590cecea02e70e3c87b6c0d45e47`,
+but the host script returned `Unable to read Vivado version` because
+`vivado -version` prints `vivado v2026.1` in lowercase.
+The parser is now case-tolerant and unit-tested. **Do not mark the full build
+PASS until a new supervised build also finishes artifact finalization and hashes.**
+
+
 **SWPC stale project cleanup (2026-10-14):** An interrupted/repeated Vivado run exposed an ext4 `rm: Directory not empty` failure under generated IP Integrator Block Design files. The build now takes a nonblocking `flock` in the scoped ignored output directory and **atomically relocates only this project's old generated `project/` tree** to a distinct `.retired-project.*` directory before best-effort deletion. A failed cleanup of retired output produces a warning, not a false Vivado Build PASS; the newly built project is always fresh. No other worktrees or unrelated projects are touched. Check `pgrep -af 'vivado|build-on-swpc.sh'` if the worktree is reported busy, and do not bypass the lock.
 
 **Vivado 2026.1 observed integration failure (2026-10-14):** During `create_bd_cell -type module -reference pl_identity_axi_lite`, IP Integrator's independent HDL parser could not resolve `plasma_identity_generated.vh`, despite `sources_1` include directories. The fix creates `generated/pl_identity_axi_lite.sv` as a **fully expanded, standalone compilation unit** by replacing the single include directive in the checked-in authoritative RTL with immutable generated constants. Vivado only adds this expanded module, while cocotb continues to test the original RTL against a fixed test fixture. `rtl-lint.sh` also lints the exact generated standalone module.
