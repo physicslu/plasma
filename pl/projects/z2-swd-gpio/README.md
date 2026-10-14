@@ -57,6 +57,23 @@ Board Files 不是本工程的 RTL 功能測試或實體 Z2 驗證。
 
 **重要：** 這個 environment PASS 仍不是 Vivado 授權、Synthesis／Implementation／Timing、Bitstream 或實機 HIL PASS。後續必須執行下方的完整 Vivado Build 才能驗證上述能力。
 
+## GitHub Actions 自動 Vivado Build（main only）
+
+正式納入版本控制的 Workflow：
+[SWPC Vivado Bitstream Build](../../../.github/workflows/swpc-vivado-bitstream-build.yml)。
+在 PR 合併至 `main` 且經過 Merge Approval 之後，於 GitHub Actions
+手動觸發 `workflow_dispatch`，限定來源為 `refs/heads/main`，
+專用 Job 使用已驗證的 `SWPC-plasma-ci` Runner（`plasma-integration`
+標籤），並以固定的 Vivado 2026.1 `settings64.sh` 執行同一支
+`build-on-swpc.sh`。Build PASS 才上傳 `.bit`／`.hwh`／Manifest／報告，
+錯誤日誌獨立保存；**不會載入 FPGA、重啟 Z2 或操作 IC**。
+
+PR CI 的 Verilator/Cocotb 在 GitHub-hosted Runner 上完成；
+**不能將未審核 PR checkout 到持久化高權限 SWPC Runner**。
+如需在合併前真正進行 Vivado Block Design／Bitstream 相容性驗證，
+只能在 SWPC 以開發者互動登入、使用隔離 worktree 執行一鍵 Script。
+這是工具權限例外，不代表對 PR 加入持久化 Runner 的 PR trigger。
+
 ## SWPC 一鍵驗證
 
 Prerequisites: a **clean committed checkout** of this PR (prefer an independent worktree), Python 3, Git, SWPC Vivado 2026.1 and its BASIC License. `build-on-swpc.sh` defaults to the SWPC-qualified `settings64.sh` if it exists, and automatically prepares the exact pinned PYNQ-Z2 Board Repository above. **No manual Board Store installation is required**; first-time cache creation requires network access to GitHub. The script fails closed if the exact Git commit, Board Part or preset is missing.
