@@ -31,7 +31,25 @@ This follows the accepted design proposal in [PR #855](https://github.com/physic
 
 ## 先驗證現有 SWPC Runner 的 Vivado 環境
 
-這個階段先判斷 **Runner 執行帳號 `plasma-ci`** 是否能啟動 Vivado 並辨識 Zynq-7020 / 官方 PYNQ-Z2 Board Part；不建立 Bitstream、不需要連接 Z2。
+這個階段先判斷 **Runner 執行帳號 `plasma-ci`** 是否能啟動 Vivado 並辨識 Zynq-7020 / PYNQ-Z2 Board Part；不建立 Bitstream、不需要連接 Z2。
+
+2026-10-14 在 SWPC 實測：`/storage/tools/xilinx/2026.1/Vivado/settings64.sh`、
+Vivado 2026.1 BASIC License（至 2027-08-01）、`xc7z020clg400-1` 都已通過；
+兩個帳號的 `board.repoPaths` 預設都為空，但下列**固定版本**的 Board Files
+透過 `board.repoPaths` 已在 `plasma-ci` 成功載入，Board ID
+`tul.com.tw:pynq-z2:part0:1.0`。
+
+為確保 CI 重現性，使用 [XUP Shanghai PYNQ-supported-board-file](https://github.com/xupsh/pynq-supported-board-file)
+的 Git Commit `e02d6a3866b5465218f777168cdc51344ac94e07`。
+`prepare-board-repository.sh` 會將它下載／快取在**被 Git 忽略的**
+`pl/build/z2-swd-gpio/board-repository`；且每次驗證 Commit、
+Git 工作樹與 `board.xml`、`preset.xml`、`part0_pins.xml`。
+Vivado Tcl 會明確設定 `board.repoPaths`，不依賴 GUI Board Store、個人
+`~/.Xilinx` 目錄設定，也不往 Vivado 安裝目錄複製資料。
+
+**注意：** 這是 2018 年版本 Board Files，已完成 **Vivado 2026.1 Board Part 識別 PASS**，
+尚未證明 PS7 Block Design Preset、RTL Synthesis／Implementation／Timing PASS。
+Board Files 不是本工程的 RTL 功能測試或實體 Z2 驗證。
 
 第一階段可在 SWPC 終端機以 `plasma-ci` 帳號執行 `check-swpc-vivado-runner.sh`。檢查器不會安裝套件或重新配置 Runner，結果會列印 `PLASMA_VIVADO_PREFLIGHT_PASS` 或明確失敗原因。如 `vivado` 不在 Runner PATH，需先確認已安裝 Vivado 的實際 `settings64.sh`，可透過環境變數 `VIVADO_SETTINGS64` 指定（不要盲目猜測路徑）。
 
@@ -41,7 +59,7 @@ This follows the accepted design proposal in [PR #855](https://github.com/physic
 
 ## SWPC 一鍵驗證
 
-Prerequisites: a **clean committed checkout** of this PR in `/storage/projects/plasma`, Vivado on PATH, Python 3, Git, and the **official PYNQ-Z2 TUL board files** installed in the running Vivado version. The script deliberately fails if no correct board preset is found or multiple revisions cause ambiguity.
+Prerequisites: a **clean committed checkout** of this PR (prefer an independent worktree), Python 3, Git, SWPC Vivado 2026.1 and its BASIC License. `build-on-swpc.sh` defaults to the SWPC-qualified `settings64.sh` if it exists, and automatically prepares the exact pinned PYNQ-Z2 Board Repository above. **No manual Board Store installation is required**; first-time cache creation requires network access to GitHub. The script fails closed if the exact Git commit, Board Part or preset is missing.
 
 ```bash
 cd /storage/projects/plasma
