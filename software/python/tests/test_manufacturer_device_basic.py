@@ -123,9 +123,9 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
 
-    def test_default_registry_bulk_profiles_cover_f1_f2_c0_g0_and_g4(self) -> None:
+    def test_default_registry_covers_all_admitted_m1_family_profiles(self) -> None:
         registry = get_default_manufacturer_device_basic_resolver()
-        self.assertEqual(registry.size, 1290)
+        self.assertEqual(registry.size, 1660)
         self.assertEqual(
             registry.profile_ids,
             (
@@ -134,6 +134,13 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 "stm32f2-device-basic-v1",
                 "stm32g0-device-basic-v1",
                 "stm32g4-device-basic-v1",
+                "stm32h7rs-device-basic-v1",
+                "stm32l5-device-basic-v1",
+                "stm32n6-device-basic-v1",
+                "stm32u0-device-basic-v1",
+                "stm32u3-device-basic-v1",
+                "stm32wl3-device-basic-v1",
+                "stm32wlx-device-basic-v1",
             ),
         )
 
@@ -208,6 +215,42 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         self.assertEqual(g4.operating_vdd_v, {"min": 1.71, "max": 3.6})
         self.assertIsNone(g4.io_supply_v)
         self.assertEqual(g4.vdda_v, {"min": 1.71, "max": 3.6})
+
+        l5 = registry.resolve_exact(
+            "STM32L552QCI6Q",
+            manufacturer="STMicroelectronics",
+            family="STM32L5",
+            series="STM32L552",
+            base_device="STM32L552QC",
+            package="UFBGA",
+            pin_count="132",
+            flash_size="256 KiB",
+            temperature_grade="-40..85 C",
+        )
+        self.assertIsNotNone(l5)
+        assert l5 is not None
+        self.assertEqual(l5.ram_size, "256 KiB")
+        self.assertEqual(l5.operating_vdd_v, {"min": 1.71, "max": 3.6})
+        self.assertEqual(l5.operating_temperature_c, {"min": -40, "max": 85})
+
+        n6 = registry.resolve_exact(
+            "STM32N657A0H3Q",
+            manufacturer="STMicroelectronics",
+            family="STM32N6",
+            series="STM32N657",
+            base_device="STM32N657A0",
+            package="VFBGA",
+            pin_count="169",
+            flash_size="0-1 KiB",
+            temperature_grade="-40 to 125 C",
+        )
+        self.assertIsNotNone(n6)
+        assert n6 is not None
+        self.assertEqual(n6.ram_size, "4.2 MB")
+        self.assertEqual(n6.flash_size, "0-1 KiB")
+        self.assertEqual(n6.operating_vdd_v, {"min": 1.71, "max": 3.6})
+        self.assertIsNone(n6.io_supply_v)
+        self.assertIsNone(n6.vdda_v)
 
     def test_other_family_does_not_gain_implicit_applicability(self) -> None:
         self.assertIsNone(
