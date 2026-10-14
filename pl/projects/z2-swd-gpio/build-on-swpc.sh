@@ -96,7 +96,9 @@ if ! grep -Fq 'BITSTREAM_BUILD_PASS' "$logdir/vivado-console.log"; then
   exit 2
 fi
 
-vivado_version="$(vivado -version | sed -n '1s/.*Vivado v\([^[:space:]]*\).*/\1/p')"
+# Vivado 2026.1 prints "vivado v2026.1 (64-bit)" (lowercase),
+# but some distributions use "Vivado". Parse both and reject malformed text.
+vivado_version="$(vivado -version | sed -n '1s/^[[:space:]]*[Vv]ivado v\([0-9][0-9.]*\).*/\1/p')"
 [[ -n "$vivado_version" ]] || { echo "Unable to read Vivado version" >&2; exit 2; }
 python3 "$script_dir/artifact.py" finalize \
   --output "$generated" \
