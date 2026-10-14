@@ -12,16 +12,22 @@ foreach source [list \
     if {![file isfile $source]} {error "Missing required PL source: $source"}
 }
 
-set boards [get_board_parts -quiet *pynq-z2*]
-if {[llength $boards] < 1} {
-    error "PYNQ-Z2 Vivado board files are required. Install the TUL PYNQ-Z2 board preset and rerun."
+# Never depend on user-specific Vivado Board Store state. The build runner
+# fetches the pinned upstream commit into ignored pl/build and exports its path.
+if {![info exists ::env(PLASMA_BOARD_REPO)]} {
+    error "PLASMA_BOARD_REPO is required; use build-on-swpc.sh"
 }
-if {[llength $boards] != 1} {
-    error "Ambiguous PYNQ-Z2 Vivado board revisions: $boards; select one verified board preset"
+set board_repo [file normalize $::env(PLASMA_BOARD_REPO)]
+foreach required [list board.xml preset.xml part0_pins.xml] {
+    if {![file isfile [file join $board_repo pynq-z2 A.0 $required]]} {
+        error "Missing PYNQ-Z2 board repository file: $required"
+    }
 }
-set board [lindex $boards 0]
-if {![string match "tul.com.tw:pynq-z2:part0:*" $board]} {
-    error "Unexpected PYNQ-Z2 board vendor/preset: $board"
+set_param board.repoPaths [list $board_repo]
+set board "tul.com.tw:pynq-z2:part0:1.0"
+set boards [get_board_parts -quiet $board]
+if {[llength $boards] != 1 || [lindex $boards 0] ne $board} {
+    error "Expected pinned PYNQ-Z2 board $board, Vivado detected: $boards"
 }
 create_project z2_swd_gpio $project_dir -part xc7z020clg400-1 -force
 set_property board_part $board [current_project]
