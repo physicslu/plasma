@@ -24,10 +24,14 @@
   "families": {
     "STM32C5": {
       "production_exact_icpns": 172,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "Allowed ST eStore exact-product evidence is internally inconsistent for the STM32C59x/C5A3 cohort: exact product headlines report 256 KB RAM while the same official pages' family description states up to 128 Kbyte SRAM. The M1 source policy has no approved precedence rule to select one direct value.",
+      "notes": [
+        "C531/C532/C542 direct eStore examples show 64 KB RAM and 2.7–3.6 V; C551/C552/C562 direct examples show 128 KB RAM and 2.7–3.6 V.",
+        "STM32C593 and STM32C5A3 exact eStore product headlines show 256 KB RAM, but the same pages' descriptive text states up to 128 Kbyte SRAM.",
+        "Because full-family admission is mandatory and direct allowed-source evidence conflicts, the entire STM32C5 family remains outside M1 until an evidence-precedence rule or corrected official surface resolves the contradiction."
+      ]
     },
     "STM32F0": {
       "production_exact_icpns": 263,
