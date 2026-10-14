@@ -1,0 +1,174 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32l5-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32L5",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 49,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32l552-256k": {
+      "series": "STM32L552",
+      "flash_size": "256 KiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32l552cet6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32L552",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32l552-512k": {
+      "series": "STM32L552",
+      "flash_size": "512 KiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32l552cet6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32L552",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32l562-512k": {
+      "series": "STM32L562",
+      "flash_size": "512 KiB",
+      "ram_size": "256 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32l562cet3p-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32L562",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32L552CCT6": "stm32l552-256k",
+    "STM32L552CCU6": "stm32l552-256k",
+    "STM32L552CCU6TR": "stm32l552-256k",
+    "STM32L552CET6": "stm32l552-512k",
+    "STM32L552CET6P": "stm32l552-512k",
+    "STM32L552CEU6": "stm32l552-512k",
+    "STM32L552CEU6P": "stm32l552-512k",
+    "STM32L552MEY6PTR": "stm32l552-512k",
+    "STM32L552MEY6QTR": "stm32l552-512k",
+    "STM32L552QCI6Q": "stm32l552-256k",
+    "STM32L552QEI6": "stm32l552-512k",
+    "STM32L552QEI6Q": "stm32l552-512k",
+    "STM32L552RCT3": "stm32l552-256k",
+    "STM32L552RCT6": "stm32l552-256k",
+    "STM32L552RET6": "stm32l552-512k",
+    "STM32L552RET6P": "stm32l552-512k",
+    "STM32L552RET6Q": "stm32l552-512k",
+    "STM32L552RET6TR": "stm32l552-512k",
+    "STM32L552VCT6Q": "stm32l552-256k",
+    "STM32L552VET6": "stm32l552-512k",
+    "STM32L552VET6Q": "stm32l552-512k",
+    "STM32L552VET6TR": "stm32l552-512k",
+    "STM32L552ZCT6Q": "stm32l552-256k",
+    "STM32L552ZET3": "stm32l552-512k",
+    "STM32L552ZET6": "stm32l552-512k",
+    "STM32L552ZET6Q": "stm32l552-512k",
+    "STM32L562CET3P": "stm32l562-512k",
+    "STM32L562CET6": "stm32l562-512k",
+    "STM32L562CET6P": "stm32l562-512k",
+    "STM32L562CEU3": "stm32l562-512k",
+    "STM32L562CEU6": "stm32l562-512k",
+    "STM32L562CEU6P": "stm32l562-512k",
+    "STM32L562CEU6TR": "stm32l562-512k",
+    "STM32L562MEY6PTR": "stm32l562-512k",
+    "STM32L562MEY6QTR": "stm32l562-512k",
+    "STM32L562QEI6": "stm32l562-512k",
+    "STM32L562QEI6Q": "stm32l562-512k",
+    "STM32L562QEI6TR": "stm32l562-512k",
+    "STM32L562RET6": "stm32l562-512k",
+    "STM32L562RET6P": "stm32l562-512k",
+    "STM32L562RET6Q": "stm32l562-512k",
+    "STM32L562RET6TR": "stm32l562-512k",
+    "STM32L562VET3": "stm32l562-512k",
+    "STM32L562VET6": "stm32l562-512k",
+    "STM32L562VET6Q": "stm32l562-512k",
+    "STM32L562VET6TR": "stm32l562-512k",
+    "STM32L562ZET6": "stm32l562-512k",
+    "STM32L562ZET6Q": "stm32l562-512k",
+    "STM32L562ZET6TR": "stm32l562-512k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD are admitted only from cited ST eStore observations. I/O Supply and VDDA remain null without separate direct allowed-source evidence. Datasheet, Programming Guide, OpenOCD and family-name inference are prohibited."
+  }
+}
