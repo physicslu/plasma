@@ -247,7 +247,7 @@ class ManufacturerDeviceBasicResolver:
             )
             _require(
                 isinstance(ram_size, str)
-                and re.fullmatch(r"\\d+(?:\\.\\d+)? (?:KiB|MB)", ram_size) is not None,
+                and re.fullmatch(r"\d+(?:\.\d+)? (?:KiB|MB)", ram_size) is not None,
                 f"{group_id}: invalid RAM size",
             )
             _require(
