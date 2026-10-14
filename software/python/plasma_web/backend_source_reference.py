@@ -13,13 +13,17 @@ from pathlib import Path
 from typing import Any
 
 from .device_catalog import DeviceCatalogIntegrityError, DeviceCatalogRecord
+from .runtime_evidence_root import default_runtime_evidence_root, source_files_available
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = default_runtime_evidence_root()
 UPSTREAM_RELEASE = "release/openocd.json"
 _ST_REPO = "https://github.com/STMicroelectronics/OpenOCD.git"
 
 
-def load_pinned_upstream(root: Path = ROOT) -> dict[str, Any] | None:
+def load_pinned_upstream(root: Path | None = ROOT) -> dict[str, Any] | None:
+    if not source_files_available(root, (UPSTREAM_RELEASE,)):
+        return None  # Legitimately slim runtime: never invent installed source.
+    assert root is not None
     file = root / UPSTREAM_RELEASE
     try:
         payload = json.loads(file.read_text(encoding="utf-8"))
