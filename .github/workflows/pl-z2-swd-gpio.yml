@@ -46,7 +46,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends verilator iverilog
           python3 -m pip install 'cocotb==1.9.2' 'cocotb-test==0.2.6'
       - name: Verilator lint and elaboration
-        run: bash pl/projects/z2-swd-gpio/rtl-lint.sh
+        run: |
+          bash pl/projects/z2-swd-gpio/rtl-lint.sh
+          verilator --lint-only --sv -Wall -Wno-UNUSEDSIGNAL --top-module pl_identity_axi_lite -GCAPABILITY_FLAGS=0 "-GSTRICT_ADDRESS=1'b1" -GAXI_BASE_ADDRESS=1073741824 -Ipl/sim/identity_constants pl/rtl/bus/pl_identity_axi_lite.sv
       - name: Cocotb real RTL functional regressions
         run: python3 -m pytest -v pl/verification/test_z2_swd_gpio_rtl.py pl/verification/test_z2_identity_rtl.py
       - name: Upload Cocotb simulation failure evidence

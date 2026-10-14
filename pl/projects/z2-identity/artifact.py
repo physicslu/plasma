@@ -46,6 +46,7 @@ def verify_hwh(path: Path, base: int) -> None:
     for key, expected in {"PCW_GPIO_EMIO_GPIO_ENABLE": 0,
                           "PCW_USE_M_AXI_GP0": 1,
                           "PCW_CRYSTAL_PERIPHERAL_FREQMHZ": 50,
+                          "PCW_M_AXI_GP0_FREQMHZ": 100,
                           "PCW_FPGA0_PERIPHERAL_FREQMHZ": 100}.items():
         # Vivado uses 0/1 for enable parameters in the HWH.
         if ps[key].lower() in {"true", "false"}:

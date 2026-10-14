@@ -81,3 +81,57 @@ operator-controlled power recovery path; assess JTAG as an additional recovery
 route. This preparation does not authorize reboot, power cycling, service
 stops or FPGA loading. If recovery requires any of those, it must be explicitly
 included in the future approved hardware plan.
+
+## Read-only platform audit (2026-10-14)
+
+The audited target runs Linux 6.6.10 on ARMv7. The installed PYNQ environment
+reports **3.1.1**, rather than the assumed 3.0. Source review found that
+`Overlay.download()` sets PL clock divisors before delegating to the device.
+`EmbeddedDevice.download()` requests old-IP shutdown, generates metadata,
+writes FPGA Manager flags/firmware, sets AXI port width and invokes XRT.
+`Device.shutdown()` may write shutdown-manager MMIO based on global state.
+No generated PS7 DDR initialization is called in those inspected functions;
+this is not proof that every loader/XRT side effect is safe. Do not run
+`ps7_init` or reapply a DDR preset to a running Linux system.
+
+FPGA Manager reported `operating`. Cached metadata contains `base.hwh`; no
+`global_pl_state_*.json` was present. Cache filenames do not authenticate the
+currently loaded FPGA binary or establish exclusive ownership. Jupyter and
+Plasma services were running and were left untouched. A sudo snapshot scanned
+process fds and maps for `/dev/mem`, `/dev/uio*`, `/dev/dri*`, `/dev/xlnk` and
+`/dev/xdevcfg` and found no matches. This does not exclude kernel drivers,
+subsequent accesses or use outside those device paths.
+
+The existing UIO resources were `audio-codec-ctrl` and `fabric`. The latter
+uses the same base as this candidate but belongs to the existing design; it
+must not be reused without reconciling ownership and its device-tree contract.
+The GPIO controller exposes 118 lines; GPIO registers were not accessed.
+Identity-only removes all EMIO/PMODB connections, so no SWD GPIO default-state
+assumption is needed for this candidate. This does not make replacement of
+other existing PL peripherals safe for their drivers/users.
+
+The pinned preset retains DQS-to-clock values -0.051, -0.006, -0.009 and
+-0.033. PSU-1..4 were observed in the historical SWD build. Retaining these
+HWH parameters is not a request to reinitialize DDR, and PL timing does not
+qualify them. Review warning applicability against the actual board/boot PS
+configuration before any future loading scope; do not change the values merely
+to remove warnings.
+
+Known-good recovery candidates are the existing base .bit/.hwh and converted
+base.bin. Read-only SHA256 values were:
+
+```text
+base.bit 3239e9cc37ee4993c25f02ae6c97da0b3372f0e722e267d10073e20adc5d6717
+base.hwh 222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a
+base.bin c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c
+```
+
+These digests identify files only. Recovery has not been executed or qualified.
+A future hardware plan must confirm the pre-load image, preserve matching
+metadata/driver state, and obtain exclusive ownership. If configuration fails
+while PS remains responsive, stop all AXI probes and use an approved reload of
+the known-good pair plus metadata/driver reconciliation. If PS/SSH hangs, avoid
+repeated probes; use the independent serial console, then an explicitly
+approved power/JTAG recovery route. Serial, physical power control and JTAG
+availability remain **unverified requirements**, not available capabilities.
+Loading remains NO-GO until these requirements and warning review are resolved.
