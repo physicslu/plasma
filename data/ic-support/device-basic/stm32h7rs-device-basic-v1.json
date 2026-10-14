@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32h7rs-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32H7RS",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 36,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32h7r3": {
+      "series": "STM32H7R3",
+      "flash_size": "64 KiB",
+      "ram_size": "620 KiB",
+      "operating_vdd_v": {
+        "min": 1.62,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32h7r3a8i6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32H7R3 64 KiB Bootflash",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32h7r7": {
+      "series": "STM32H7R7",
+      "flash_size": "64 KiB",
+      "ram_size": "620 KiB",
+      "operating_vdd_v": {
+        "min": 1.62,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32h7r7l8h6h-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32H7R7 64 KiB Bootflash",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32h7s3": {
+      "series": "STM32H7S3",
+      "flash_size": "64 KiB",
+      "ram_size": "620 KiB",
+      "operating_vdd_v": {
+        "min": 1.62,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32h7s3i8t6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32H7S3 64 KiB Bootflash",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32h7s7": {
+      "series": "STM32H7S7",
+      "flash_size": "64 KiB",
+      "ram_size": "620 KiB",
+      "operating_vdd_v": {
+        "min": 1.62,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32h7s7a8i6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32H7S7 64 KiB Bootflash",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32H7R3A8I6": "stm32h7r3",
+    "STM32H7R3I8K6": "stm32h7r3",
+    "STM32H7R3I8T6": "stm32h7r3",
+    "STM32H7R3L8H6": "stm32h7r3",
+    "STM32H7R3L8H6H": "stm32h7r3",
+    "STM32H7R3R8V6": "stm32h7r3",
+    "STM32H7R3V8H6": "stm32h7r3",
+    "STM32H7R3V8T6": "stm32h7r3",
+    "STM32H7R3V8Y6TR": "stm32h7r3",
+    "STM32H7R3Z8J6": "stm32h7r3",
+    "STM32H7R3Z8T6": "stm32h7r3",
+    "STM32H7R7A8I6": "stm32h7r7",
+    "STM32H7R7I8K6": "stm32h7r7",
+    "STM32H7R7I8T6": "stm32h7r7",
+    "STM32H7R7L8H6": "stm32h7r7",
+    "STM32H7R7L8H6H": "stm32h7r7",
+    "STM32H7R7Z8J6": "stm32h7r7",
+    "STM32H7S3A8I6": "stm32h7s3",
+    "STM32H7S3I8K6": "stm32h7s3",
+    "STM32H7S3I8T6": "stm32h7s3",
+    "STM32H7S3L8H6": "stm32h7s3",
+    "STM32H7S3L8H6H": "stm32h7s3",
+    "STM32H7S3L8H6TR": "stm32h7s3",
+    "STM32H7S3R8V6": "stm32h7s3",
+    "STM32H7S3V8H6": "stm32h7s3",
+    "STM32H7S3V8T6": "stm32h7s3",
+    "STM32H7S3V8Y6TR": "stm32h7s3",
+    "STM32H7S3Z8J6": "stm32h7s3",
+    "STM32H7S3Z8T6": "stm32h7s3",
+    "STM32H7S7A8I6": "stm32h7s7",
+    "STM32H7S7I8K6": "stm32h7s7",
+    "STM32H7S7I8T6": "stm32h7s7",
+    "STM32H7S7L8H6": "stm32h7s7",
+    "STM32H7S7L8H6H": "stm32h7s7",
+    "STM32H7S7L8H6HTR": "stm32h7s7",
+    "STM32H7S7Z8J6": "stm32h7s7"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD are admitted from cited ST eStore exact H7RS observations. I/O Supply and VDDA remain null. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
