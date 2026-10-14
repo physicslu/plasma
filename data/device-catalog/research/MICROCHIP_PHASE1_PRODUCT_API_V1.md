@@ -12,6 +12,12 @@ The guide describes structured manufacturer product fields including `part_numbe
 
 This is a valuable **independent exact-order-code source** to cross-check the existing official Microchip MCP `search_products` evidence. Both the Product Data API and MCP may use shared upstream manufacturer systems; agreement is not fully independent physical validation. The [Parametric Search chart XLSX importer](MICROCHIP_PHASE1_CHART_IMPORT_V1.md) remains a distinct manufacturer-family parameter source. No undocumented chart export endpoint or HTML 403 workaround is introduced.
 
+## Live official endpoint finding (2026-10-14)
+
+**Blocked — not manufacturer original-row evidence.** Two read-only official API probes from GitHub Actions ([run 38510595915](https://github.com/physicslu/plasma/actions/runs/38510595915), [run 38510679447](https://github.com/physicslu/plasma/actions/runs/38510679447)) did **not** retrieve Product Data API JSON. An HTTP 200 final response redirected to `www.microchipdirect.com/404`; the fail-closed allowlist/path validator correctly rejected it as `SOURCE_NOT_AVAILABLE`. The captured CI artifact contains an explicit **failure manifest only**, not a verified product response. Offline synthetic tests PASS; this must not be described as an available live source or count of Microchip parts.
+
+**Operational disposition:** Experimental alternative source **BLOCKED** pending manufacturer endpoint verification. Continue the established MCP original-response pathway and the independently documented Parametric Search XLSX route for Phase 1; do not substitute a guessed endpoint, scrape behind an access block, infer SKU nonexistence, or use a redirected error page as a source. No Production/identity admission or per-field verification from this API is authorized.
+
 ## Implementation
 
 `microchip_phase1_product_api_v1.py` uses Python stdlib `urllib` and a fixed allowlisted official HTTPS endpoint. A bounded **single base-device** query (`ATSAMD21G18A` by default) runs both 20-row and 60-row pagination; original JSON response bytes, exact requests, time, byte count and SHA-256 are retained in an immutable output directory. Offline replay independently validates each page's response metadata, identity, SHA-256, total count, complete pagination, and cross-pagination equality after excluding page-local array offsets.
