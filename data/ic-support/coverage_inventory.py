@@ -6,6 +6,7 @@ import copy
 import csv
 import hashlib
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -252,6 +253,11 @@ def load_device_basic_coverage(
             require(
                 group.get("series") == row["series"],
                 f"{icpn}: device basic series mismatch",
+            )
+            require(
+                isinstance(group.get("flash_size"), str)
+                and re.fullmatch(r"\\d+(?:\\.\\d+)? (?:KiB|MiB)", group["flash_size"]) is not None,
+                f"{icpn}: unsupported device basic Flash unit",
             )
             require(
                 group.get("flash_size") == row["flash_size"],
