@@ -228,6 +228,10 @@ class Z2SourceContractTest(unittest.TestCase):
             running = module.render(logs, now_ms=1700000005500)
             self.assertIn("RUNNING | total=00:00:05", running)
             self.assertIn("Synthesis (00:00:02)", running)
+            (logs / "driver.log").write_text(
+                "STAGE_EVENT SHA256_VERIFY START 1700000005500\n"
+                "STAGE_EVENT SHA256_VERIFY DONE 1700000006700\n"
+            )
             finished_status = (
                 "STATUS=PASS\nSTARTED_EPOCH_MS=1700000000000\n"
                 "UPDATED_EPOCH_MS=1700000006700\n"
@@ -236,6 +240,9 @@ class Z2SourceContractTest(unittest.TestCase):
             summary = module.render(logs, summary=True, now_ms=1700000999000)
             self.assertIn("TOTAL_ELAPSED=00:00:06", summary)
             self.assertIn("STAGE Block Design: 00:00:01", summary)
+            # The SHA256_VERIFY event name contains numerals; it must not
+            # incorrectly display NOT_STARTED after a successful hash check.
+            self.assertIn("STAGE SHA-256 verification: 00:00:01", summary)
 
     def test_foreground_blocking_client_with_mock_supervisor(self):
         """Real Bash detach+block+reattach behavior, no Vivado/FPGA execution."""
