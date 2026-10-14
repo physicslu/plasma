@@ -1,0 +1,106 @@
+name: Microchip Phase 1 Portable Original Evidence Bundle
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_portable_custody_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_portable_custody_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_PORTABLE_CUSTODY_V1.md'
+      - '.github/workflows/device-catalog-microchip-phase1-portable-custody-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-offline-custody:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Security, deterministic archive and no-false-custody tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_portable_custody_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_second_cohort_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_mcp_crosswalk_v1.py' -v
+      - name: Fresh original manufacturer source -> portable bundle -> offline cold replay
+        id: live
+        continue-on-error: true
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          base="${{ runner.temp }}/microchip-portable-source"
+          mkdir -p "$base"
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --capture "$base/chart"
+          python data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py \
+            --chart-original-root "$base/chart" \
+            --plan "$base/plan.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"]) / "microchip-portable-source"
+          plan = json.loads((base / "plan.json").read_text(encoding="utf-8"))
+          expected = {"sam-e5-d5": "MICROCHIP_QUERY_E5",
+                      "pic32mx": "MICROCHIP_QUERY_PIC32"}
+          assert len(plan["selected"]) == 2
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              for item in plan["selected"]:
+                  assert item["lead_id"] in expected
+                  assert item["query_intent"] == "EXPLORATORY_READ_ONLY_NOT_ORDER_CODE_REVIEW"
+                  print(f'{expected[item["lead_id"]]}={item["mcp_search_term"]}', file=f)
+          PY
+          # Same source chart Base Device names as the #874 bounded cohort.
+          # Resolve the names inside this step as GITHUB_ENV changes are
+          # available only to subsequent steps.
+      - name: Finish two official manufacturer captures and cold bundle replay
+        id: replay
+        if: steps.live.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          base="${{ runner.temp }}/microchip-portable-source"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$MICROCHIP_QUERY_E5" --output-dir "$base/mcp-e5"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$MICROCHIP_QUERY_PIC32" --output-dir "$base/mcp-pic32"
+          python data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py \
+            --chart-original-root "$base/chart" \
+            --e5-original-root "$base/mcp-e5" --e5-outcome REPLAYED \
+            --pic32-original-root "$base/mcp-pic32" --pic32-outcome REPLAYED \
+            --report "$base/report.json"
+          python data/device-catalog/research/microchip_phase1_portable_custody_v1.py \
+            --pack "$base/portable-original-evidence.zip" \
+            --chart-root "$base/chart" \
+            --e5-root "$base/mcp-e5" --pic32-root "$base/mcp-pic32" \
+            --plan "$base/plan.json" --report "$base/report.json" \
+            --receipt "$base/pack-receipt.json"
+          python data/device-catalog/research/microchip_phase1_portable_custody_v1.py \
+            --verify "$base/portable-original-evidence.zip" \
+            --receipt "$base/cold-replay-receipt.json"
+          cmp "$base/pack-receipt.json" "$base/cold-replay-receipt.json"
+          sha256sum "$base/portable-original-evidence.zip" > "$base/portable-original-evidence.sha256"
+      - name: Retain source originals and portable cold-replay receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-portable-bundle-live-and-receipts-v1
+          path: ${{ runner.temp }}/microchip-portable-source/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Distinguish portable bundle from durable offsite archive
+        if: always()
+        run: |
+          echo "Original chart selection: ${{ steps.live.outcome }}" >> "${{ github.step_summary }}"
+          echo "Real manufacturer capture and bundle cold replay: ${{ steps.replay.outcome }}" >> "${{ github.step_summary }}"
+          echo "Offline tests PASS != manufacturer original source acquisition PASS." >> "${{ github.step_summary }}"
+          echo "Portable bundle != verified durable or independent offsite custody." >> "${{ github.step_summary }}"
+          echo "Artifact TTL remains 90 days; final target storage needs owner configuration." >> "${{ github.step_summary }}"
