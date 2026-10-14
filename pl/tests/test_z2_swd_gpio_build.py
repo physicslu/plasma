@@ -144,6 +144,13 @@ class Z2SourceContractTest(unittest.TestCase):
         self.assertIn("get_timing_paths -setup", build)
         self.assertIn("get_timing_paths -hold", build)
         self.assertIn("BITSTREAM_BUILD_PASS", build)
+        # Prevent concurrent Vivado builds and the observed ext4 stale
+        # Block Design cleanup race; old generated data is never reused.
+        self.assertIn('flock -n 9', shell)
+        self.assertIn('VIVADO_BUILD_BUSY', shell)
+        self.assertIn('mv -T -- "$project" "$retired/project"', shell)
+        self.assertIn('mktemp -d "$build/.retired-project.XXXXXXXX"', shell)
+        self.assertNotIn('rm -rf -- "$project"', shell)
         self.assertNotIn("systemctl", shell)
         self.assertNotIn("fpga_manager", shell)
 
