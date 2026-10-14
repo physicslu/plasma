@@ -69,9 +69,9 @@ def prepare(output: Path, version: str) -> None:
         raise ValueError(
             "Identity RTL must contain exactly one generated constants include"
         )
-    expanded = source.replace(directive, header.rstrip("\\n"), 1)
+    expanded = source.replace(directive, header.rstrip("\n"), 1)
     (output / "pl_identity_axi_lite.sv").write_text(
-        "// GENERATED BUILD INPUT — do not edit; source is pl/rtl/bus/pl_identity_axi_lite.sv\\n"
+        "// GENERATED BUILD INPUT — do not edit; source is pl/rtl/bus/pl_identity_axi_lite.sv\n"
         + expanded
     )
     identity = {
