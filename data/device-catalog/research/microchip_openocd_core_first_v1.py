@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SOURCE_LOCK = HERE / "microchip-openocd-first-source-lock-v1.json"
 OPENOCD_RELEASE = ROOT / "release/openocd.json"
+OBSERVATION = HERE / "microchip-openocd-core-first-observation-v1.json"
 PINNED_COMMIT = "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c"
 PINNED_DFP_SOURCE = "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0"
 ARCHIVAL_LANES = frozenset(("excluded_mpu_candidate", "unclassified_or_non_mcu_pack"))
@@ -208,6 +209,55 @@ def triage_names(lock, inventory):
     }
 
 
+
+def validate_frozen_observation(lock, observation, dfp_report=None):
+    """Reconcile archived DFP counts without promoting any ICPN into support."""
+    require(observation["schema_version"] == 1
+            and observation["policy"] == "ADR-0002/Issue-851"
+            and observation["openocd_source_commit"] == lock["provider"]["commit"]
+            and observation["dfp_original_index_sha256"] == PINNED_DFP_SOURCE
+            and observation["research_classification_unit"] ==
+            "DFP device support name, not exact manufacturer commercial ICPN",
+            "frozen Research observation source/scope mismatch")
+    require(observation["archived_microchip_research_icpn_candidate_count"] ==
+            lock["counted_research_icpn_candidates_retained"]
+            and observation["openocd_source_blob_checks"] == 20,
+            "incorrect Research lineage/source check baseline")
+    for key in ("exact_icpn_software_supported_count",
+                "microchip_global_openocd_supported_denominator"):
+        require(observation[key] is None, f"unsupported count promoted: {key}")
+    for key in ("manufacturer_population_complete",
+                "arm_majority_supported_icpn_claimed",
+                "p0_is_supported_claimed",
+                "hardware_programming_qualified",
+                "socket_hil_claimed",
+                "production_write_authorized",
+                "catalog_publication_authorized"):
+        require(observation[key] is False, f"Research boundary breached: {key}")
+    total = observation["observed_original_dfp_support_names"]
+    priorities = observation["dfp_research_priority_counts"]
+    groups = observation["dfp_by_research_group"]
+    cores = observation["dfp_by_priority_and_core"]
+    require(total == sum(priorities.values()) ==
+            sum(groups.values()) == sum(cores.values()),
+            "frozen Research counts do not reconcile")
+    for priority in ("P0", "P1", "P2"):
+        require(priorities[priority] ==
+                sum(v for k, v in groups.items() if k.startswith(priority + ":")) ==
+                sum(v for k, v in cores.items() if k.startswith(priority + ":")),
+                f"frozen {priority} Research counts disagree")
+    if dfp_report is not None:
+        require(dfp_report["observed_dfp_names"] == total
+                and dfp_report["source_dfp_sha256"] == PINNED_DFP_SOURCE
+                and dfp_report["provider_commit"] == lock["provider"]["commit"]
+                and dfp_report["by_research_group"] == groups
+                and dfp_report["by_priority_and_core"] == cores
+                and dfp_report["exact_icpn_qualified_supported"] is None,
+                "original DFP replay differs from frozen source observation")
+    return {"frozen_observation_reconciled": True,
+            "observed_dfp_names": total,
+            "software_supported_exact_icpns": None}
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--openocd-source-root", type=Path,
@@ -219,10 +269,14 @@ def main():
     lock = json.loads(SOURCE_LOCK.read_text(encoding="utf-8"))
     release = json.loads(OPENOCD_RELEASE.read_text(encoding="utf-8"))
     report = {"source_lock_validation": validate_registry(lock, release)}
+    observation = json.loads(OBSERVATION.read_text(encoding="utf-8"))
+    report["observation_validation"] = validate_frozen_observation(lock, observation)
     if args.openocd_source_root:
         report["upstream"] = verify_upstream_source(lock, args.openocd_source_root)
     if args.dfp_evidence_root:
         report["dfp"] = triage_names(lock, archived_inventory(args.dfp_evidence_root))
+        report["observation_validation"] = validate_frozen_observation(
+            lock, observation, report["dfp"])
     if args.output:
         out = args.output.resolve()
         require("production" not in (p.lower() for p in out.parts),
