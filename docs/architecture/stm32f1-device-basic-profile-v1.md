@@ -1,7 +1,7 @@
 # Manufacturer Device Basic Profile v1
 
 Status: Current read-only manufacturer metadata profile registry
-Scope: STM32F1 / STM32F2 / STM32C0 / STM32G0 / STM32G4 Production exact ICPNs
+Scope: STM32F1 / STM32F2 / STM32C0 / STM32G0 / STM32G4 / STM32L5 / STM32H7RS Production exact ICPNs
 Programming authority: none
 Hardware authority: none
 
@@ -44,7 +44,9 @@ The registry currently contains:
 - STM32C0: 226 exact ICPNs;
 - STM32G0: 406 exact ICPNs;
 - STM32G4: 273 exact ICPNs;
-- 1,290 exact bindings in total;
+- STM32L5: 49 exact ICPNs;
+- STM32H7RS: 36 exact ICPNs;
+- 1,375 exact bindings in total;
 - catalog constraints for Base Device, Package, Pin Count, Flash and Operating Temperature;
 - official ST Product Selector/eStore provenance for reusable RAM/electrical groups.
 
@@ -91,7 +93,7 @@ independently from:
 selected_profile
 ```
 
-For example, an admitted STM32F1/F2/C0/G0/G4 exact ICPN may have a Basic Profile while
+For example, an admitted STM32F1/F2/C0/G0/G4/L5/H7RS exact ICPN may have a Basic Profile while
 `selected_profile=null`. That means its basic device information is available but its
 manufacturer-derived Programming Profile has not been established.
 
@@ -114,7 +116,7 @@ STM32F2 exact ICPNs      105
 C0 + G0 + G4 ICPNs       905
 
 M0+                    4,853
-M1+                    1,290
+M1+                    1,375
 M2+                        1
 M3+                        1
 M4+                        1
@@ -124,8 +126,8 @@ M5                         0
 Highest-level distribution is:
 
 ```text
-M0  3,563
-M1  1,289
+M0  3,478
+M1  1,374
 M2      0
 M3      0
 M4      1
@@ -155,15 +157,15 @@ Programming remains a separate section and continues to fail closed when
 
 The deterministic controls prove:
 
-- all 1,290 current Basic Profile Production exact ICPNs are explicitly bound;
+- all 1,375 current Basic Profile Production exact ICPNs are explicitly bound;
 - reusable series/density groups are complete;
 - catalog identity/package/pin/Flash/temperature drift is rejected;
 - non-ST authority is rejected;
 - a fake content lock is rejected;
 - removing an exact binding does not fall back to family inference;
 - one family profile never grants applicability to another family;
-- separate F1/F2/C0/G0/G4 family profiles are required for all 1,290 exact bindings;
-- registry-wide M1 coverage is 1,290 while M2+ remains unchanged;
+- separate F1/F2/C0/G0/G4/L5/H7RS family profiles are required for all 1,375 exact bindings;
+- registry-wide M1 coverage is 1,375 while M2+ remains unchanged;
 - optional VDDA can become available only when directly evidenced; I/O Supply remains fail-closed.
 
 No deployment, PPU runtime, Socket or physical programming state changes are part of this
