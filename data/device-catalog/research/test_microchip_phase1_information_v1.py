@@ -90,7 +90,7 @@ class MicrochipPhase1InformationTests(unittest.TestCase):
 
     def test_unknown_is_not_numeric_zero(self):
         invalid = deepcopy(self.dataset)
-        invalid["records"][0]["fields"]["io_supply"]["value"] = 0
+        invalid["records"][0]["fields"]["base_device"]["value"] = 0
         with self.assertRaisesRegex(ValueError, "unknown/conflict falsely populated"):
             check(invalid)
 
