@@ -103,7 +103,8 @@ class MicrochipCoreFirstResearchGateTests(unittest.TestCase):
 
     def test_matched_dfp_name_is_research_lead_not_exact_icpn(self):
         names = ["ATSAMD21G18A", "ATSAML11E16A", "PIC32MX270F256B",
-                 "ATMEGA128", "ATMEGA128RFA1", "PIC16F877A", "ATSAM4L8A"]
+                 "ATMEGA128", "ATMEGA128RFA1", "PIC16F877A", "ATSAM4L8A",
+                 "AVR32DA28", "AT32AP7000"]
         fake = {
             "manufacturer": "Microchip",
             "source_bytes_sha256": PINNED_DFP_SOURCE,
@@ -124,9 +125,23 @@ class MicrochipCoreFirstResearchGateTests(unittest.TestCase):
         self.assertEqual(result["by_research_group"]["P0:pic32mx"], 1)
         self.assertEqual(result["by_research_group"]["P0:atmega128-limited"], 1)
         self.assertEqual(result["by_research_group"]["P1:sam-l1x-target-only"], 1)
-        self.assertEqual(result["by_research_group"]["P2:archive_only"], 2)
+        self.assertEqual(result["by_research_group"]["P2:archive_only"], 3)
+        self.assertEqual(result["by_research_group"]["P1:avr32-target-only"], 1)
         self.assertIsNone(result["exact_icpn_qualified_supported"])
         self.assertTrue(result["p2_does_not_mean_openocd_unsupported"])
+
+    def test_avr32da_is_8bit_avr_updi_not_32bit_avr32_ap7k(self):
+        # Microchip AVR32DA28: '32' is Flash capacity, not AVR32 CPU.
+        group = next(x for x in self.lock["p1_bounded_leads"]
+                     if x["id"] == "avr32-target-only")
+        import re
+        matcher = re.compile(group["matcher"], re.IGNORECASE)
+        self.assertFalse(matcher.match("AVR32DA28"))
+        self.assertFalse(matcher.match("AVR32DA32"))
+        self.assertTrue(matcher.match("AT32AP7000"))
+        excluded = self.lock["known_false_positive_exclusions"][0]
+        self.assertEqual(excluded["manufacturer_core"], "8-bit AVR")
+        self.assertEqual(excluded["manufacturer_programming_interface"], "UPDI")
 
     def test_same_core_not_same_flash_controller(self):
         groups = {g["id"]: g for g in self.lock["p0_research_leads"]}
