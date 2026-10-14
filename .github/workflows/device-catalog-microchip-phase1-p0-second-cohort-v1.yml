@@ -1,0 +1,124 @@
+name: Microchip Phase 1 P0 Second Cohort
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_second_cohort_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_P0_SECOND_COHORT_V1.md'
+      - '.github/workflows/device-catalog-microchip-phase1-p0-second-cohort-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-replay-two-new-p0-leads:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline synthetic query and quarantine safety regressions
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_second_cohort_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_mcp_crosswalk_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_chart_batch_v1.py' -v
+      - name: Official chart capture with original-byte source replay
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --capture "${{ runner.temp }}/microchip-p0-second-chart"
+      - name: Select bounded new P0 query names directly from chart
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py \
+            --chart-original-root "${{ runner.temp }}/microchip-p0-second-chart" \
+            --plan "${{ runner.temp }}/microchip-p0-second-plan.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          plan = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "microchip-p0-second-plan.json").read_text())
+          assert len(plan["selected"]) == 2
+          expected = {"sam-e5-d5": "P0_E5_QUERY", "pic32mx": "P0_PIC32_QUERY"}
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              for item in plan["selected"]:
+                  assert item["lead_id"] in expected
+                  assert item["query_intent"] == "EXPLORATORY_READ_ONLY_NOT_ORDER_CODE_REVIEW"
+                  print(f'{expected[item["lead_id"]]}={item["mcp_search_term"]}', file=f)
+          PY
+      - name: Official MCP original source capture for E5/D5 P0 research lead
+        id: e5
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$P0_E5_QUERY" \
+            --output-dir "${{ runner.temp }}/microchip-p0-second-mcp-e5"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$P0_E5_QUERY" --replay \
+            --output-dir "${{ runner.temp }}/microchip-p0-second-mcp-e5"
+      - name: Official MCP original source capture for PIC32MX P0 research lead
+        id: pic32
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$P0_PIC32_QUERY" \
+            --output-dir "${{ runner.temp }}/microchip-p0-second-mcp-pic32"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query "$P0_PIC32_QUERY" --replay \
+            --output-dir "${{ runner.temp }}/microchip-p0-second-mcp-pic32"
+      - name: Crosswalk both queries or preserve independent SOURCE_NOT_AVAILABLE
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${{ steps.e5.outcome }}" = "success" ]; then
+            args+=(--e5-outcome REPLAYED --e5-original-root "${{ runner.temp }}/microchip-p0-second-mcp-e5")
+          else
+            args+=(--e5-outcome SOURCE_NOT_AVAILABLE)
+          fi
+          if [ "${{ steps.pic32.outcome }}" = "success" ]; then
+            args+=(--pic32-outcome REPLAYED --pic32-original-root "${{ runner.temp }}/microchip-p0-second-mcp-pic32")
+          else
+            args+=(--pic32-outcome SOURCE_NOT_AVAILABLE)
+          fi
+          python data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py \
+            --chart-original-root "${{ runner.temp }}/microchip-p0-second-chart" \
+            "${args[@]}" \
+            --report "${{ runner.temp }}/microchip-p0-second-report.json"
+          python data/device-catalog/research/microchip_phase1_p0_second_cohort_v1.py \
+            --chart-original-root "${{ runner.temp }}/microchip-p0-second-chart" \
+            "${args[@]}" \
+            --verify "${{ runner.temp }}/microchip-p0-second-report.json"
+      - name: Preserve original manufacturer responses, evidence and failure manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-p0-second-cohort-source-evidence-v1
+          path: |
+            ${{ runner.temp }}/microchip-p0-second-chart/
+            ${{ runner.temp }}/microchip-p0-second-mcp-e5/
+            ${{ runner.temp }}/microchip-p0-second-mcp-pic32/
+            ${{ runner.temp }}/microchip-p0-second-plan.json
+            ${{ runner.temp }}/microchip-p0-second-report.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Record independent manufacturer availability and evidence limits
+        if: always()
+        run: |
+          echo "Official E5/D5 P0 MCP query: ${{ steps.e5.outcome }}" >> "${{ github.step_summary }}"
+          echo "Official PIC32MX P0 MCP query: ${{ steps.pic32.outcome }}" >> "${{ github.step_summary }}"
+          echo "These are chart-driven exploratory research queries, not reviewed exact SKU identities." >> "${{ github.step_summary }}"
+          echo "Official raw-source artifact expires after 90 days and is NOT permanent evidence custody." >> "${{ github.step_summary }}"
