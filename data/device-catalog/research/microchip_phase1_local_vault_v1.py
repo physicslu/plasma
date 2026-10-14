@@ -199,8 +199,11 @@ def main():
                 "external receipt already exists")
         require(args.receipt.is_absolute() and args.receipt.parent.is_dir(),
                 "receipt requires an explicit existing absolute parent")
-        with args.receipt.open("xb") as f:
+        with args.receipt.open("x", encoding="utf-8") as f:
             json.dump(result, f, sort_keys=True, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
     print(json.dumps(result, sort_keys=True, indent=2))
 
 
