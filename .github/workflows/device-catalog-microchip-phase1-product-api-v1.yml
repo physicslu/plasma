@@ -7,6 +7,8 @@ on:
       - 'data/device-catalog/research/test_microchip_phase1_product_api_v1.py'
       - 'data/device-catalog/research/microchip_phase1_chart_html_source_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_chart_html_source_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_chart_html_row_probe_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_chart_html_row_probe_v1.py'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_PRODUCT_API_V1.md'
       - '.github/workflows/device-catalog-microchip-phase1-product-api-v1.yml'
   workflow_dispatch:
@@ -30,6 +32,8 @@ jobs:
             -p 'test_microchip_phase1_product_api_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_chart_html_source_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_chart_html_row_probe_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_information_v1.py' -v
       - name: Official Microchip Product API read-only capture canary
@@ -65,12 +69,23 @@ jobs:
             --capture "${{ runner.temp }}/microchip-phase1-chart-html-original"
           python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
             --replay "${{ runner.temp }}/microchip-phase1-chart-html-original"
+      - name: Inspect archived chart row/header text without field verification
+        id: chart_rows
+        if: steps.chart_live.outcome == 'success'
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_chart_html_row_probe_v1.py \
+            --original-root "${{ runner.temp }}/microchip-phase1-chart-html-original" \
+            --report "${{ runner.temp }}/microchip-phase1-chart-rows.json"
       - name: Retain bounded official chart HTML evidence or failure manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: microchip-phase1-chart-html-source-original-v1
-          path: ${{ runner.temp }}/microchip-phase1-chart-html-original/
+          path: |
+            ${{ runner.temp }}/microchip-phase1-chart-html-original/
+            ${{ runner.temp }}/microchip-phase1-chart-rows.json
           if-no-files-found: warn
           retention-days: 90
       - name: Report actual live acquisition outcome separately from unit tests
