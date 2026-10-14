@@ -41,12 +41,13 @@ def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
     build = text.index("Build pinned ARMv7 OpenOCD only on cache miss")
     verify = text.index("Verify cached or freshly built ARMv7 OpenOCD and pinned source identity")
     kit = text.index("Build real canonical ARMv7 PPU release and simulation-only Z2 kit fixture")
+    compat = text.index("Install Jammy libgpiod v1 compatibility runtime on QEMU ARMv7 target")
     e2e = text.index("Drive Manager to Bootstrap to QEMU deployment E2E")
     run_arm = text.index("Verify kit-deployed OpenOCD inside QEMU ARMv7 target")
     eight_sites = text.index("Qualify eight isolated OpenOCD workers inside deployed ARMv7 PPU")
     matrix = text.index("Prove Platform and Managed PS loopback lifecycle matrix")
     save = text.index("Save qualified ARMv7 OpenOCD build cache on main only")
-    assert restore < build < verify < kit < e2e < run_arm < eight_sites < matrix < save
+    assert restore < build < verify < kit < compat < e2e < run_arm < eight_sites < matrix < save
     build_part = text[build:verify]
     assert "if: steps.openocd-cache.outputs.cache-hit != 'true'" in build_part
     assert 'bash scripts/build-openocd-runtime.sh "$GITHUB_WORKSPACE/$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part
