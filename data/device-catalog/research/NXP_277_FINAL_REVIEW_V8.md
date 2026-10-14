@@ -37,3 +37,7 @@ Sources in temporary CI artifacts need durable archiving if retained longer than
 - CI artifact original HTML and PDF acquisition failure receipts retain
   their temporary lifecycle. Future durable archival of the original NXP
   binary must precede any gated LPC3 Production publication.
+
+## Superseded research priority under ADR-0002 (2026-10-14)
+
+The 277-v8 raw manufacturer source review and each negative/partial decision are retained as research evidence; however, the earlier next-step emphasis on acquiring the three LPC550x PDF originals is now P2 (archive only), not an active blocking dependency for software-first research. Under Accepted ADR-0002 and Issue #851, only devices with pinned OpenOCD Target/Flash Driver/operations evidence receive P0 or bounded P1 deep research. See `NXP_ADR0002_OPENOCD_TRIAGE_V9.md` and the 501-row source-locked v9 classification. No PDF URL failure is proof of chip EOL or lack of future backend support. Software/public visibility remains unqualified pending exact ICPN review under Issue #849; PPU/Socket HIL is independent.
