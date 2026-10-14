@@ -29,7 +29,7 @@ def load():
          and lk["adr"]=="ADR-0002","Phase1 contract changed")
     older=old_build()
     must(blob(OLD.read_bytes())==lk["v18_source_501_blob"]
-         and OLD.read_bytes()==old_emit(older,old_headers(OLD)+list(OLD_EXTRA)),
+         and OLD.read_bytes()==old_emit(older,old_headers(OLD)),
          "previous 501 manufacturer data not replayable")
     must(blob(SRC.read_bytes())==lk["official_source_32_blob"],
          "official exact MCXA3 table blob drift")
