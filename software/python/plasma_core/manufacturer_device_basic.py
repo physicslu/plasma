@@ -242,12 +242,12 @@ class ManufacturerDeviceBasicResolver:
                 f"{group_id}: invalid series",
             )
             _require(
-                isinstance(flash_size, str)
-                and re.fullmatch(r"\\d+(?: KiB| MiB)", flash_size) is not None,
+                isinstance(flash_size, str) and bool(flash_size.strip()),
                 f"{group_id}: invalid Flash size",
             )
             _require(
-                isinstance(ram_size, str) and ram_size.endswith(" KiB"),
+                isinstance(ram_size, str)
+                and re.fullmatch(r"\\d+(?:\\.\\d+)? (?:KiB|MB)", ram_size) is not None,
                 f"{group_id}: invalid RAM size",
             )
             _require(
