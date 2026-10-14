@@ -1,0 +1,36 @@
+name: Microchip Phase 1 XLSX Research Import
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_chart_xlsx_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_chart_xlsx_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_CHART_IMPORT_V1.md'
+      - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - '.github/workflows/device-catalog-microchip-phase1-xlsx-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-original-chart-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run synthetic XLSX parser and negative evidence tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_chart_xlsx_v1.py' -v
+      - name: Ensure existing Microchip Phase1 pilot contract is unaffected
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_information_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_mcp_identity_v1.py' -v
