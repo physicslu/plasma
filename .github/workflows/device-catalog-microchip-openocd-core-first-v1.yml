@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - 'data/device-catalog/research/microchip-openocd-core-first-observation-v1.json'
       - 'data/device-catalog/research/microchip_openocd_core_first_v1.py'
       - 'data/device-catalog/research/test_microchip_openocd_core_first_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_CORE_FIRST_V1.md'
