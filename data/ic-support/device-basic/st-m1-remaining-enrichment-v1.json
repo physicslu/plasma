@@ -35,10 +35,15 @@
     },
     "STM32F0": {
       "production_exact_icpns": 263,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "Full-family RAM mapping cannot be established on the allowed ST Product Selector/eStore surfaces without crossing into prohibited product-page/datasheet derivation. The F0x1 selector directly exposes RAM/VDD rows and low-voltage x8 eStore exposes VDD, but F0x0 selector output does not directly expose per-density RAM while eStore exact cards omit RAM.",
+      "notes": [
+        "STM32F0x1 Product Selector directly exposes RAM and 2.0–3.6 V rows for F031/F051 and related x1 devices.",
+        "STM32F0x8 eStore directly exposes the 1.65–1.95 V supply cohort.",
+        "STM32F0x0 Product Selector currently exposes product identity/Flash but not per-density RAM in the allowed selector surface; eStore exact cards likewise omit RAM.",
+        "Product pages/datasheets can resolve the missing RAM mapping, but those surfaces are explicitly prohibited derivation sources for M1. Partial-family admission is not allowed."
+      ]
     },
     "STM32F3": {
       "production_exact_icpns": 192,
