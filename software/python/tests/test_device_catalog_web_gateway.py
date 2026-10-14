@@ -131,6 +131,26 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(basic["programming_profile_authority"])
                 self.assertIsNone(result["selected_profile"])
 
+    def test_f2_basic_profile_is_exposed_without_programming_authority(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F205RBT6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F205RBT6")
+        self.assertEqual(result["family"], "STM32F2")
+        basic = result["manufacturer_device_basic_profile"]
+        self.assertIsNotNone(basic)
+        assert basic is not None
+        self.assertEqual(basic["profile_id"], "stm32f2-device-basic-v1")
+        self.assertEqual(basic["ram_size"], "64 KiB")
+        self.assertEqual(basic["operating_vdd_v"], {"min": 1.8, "max": 3.6})
+        self.assertIsNone(basic["io_supply_v"])
+        self.assertIsNone(basic["vdda_v"])
+        self.assertFalse(basic["programming_profile_authority"])
+        self.assertFalse(basic["hardware_runtime_ready"])
+        self.assertFalse(basic["physical_programming_qualified"])
+        self.assertIsNone(result["selected_profile"])
+
     def test_g4_basic_profile_exposes_direct_vdda_without_io_supply_inference(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G474VCH3TR&limit=1")
         self.assertEqual(status, 200)
