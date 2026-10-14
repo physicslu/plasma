@@ -8,6 +8,11 @@
 - `docs/development/fpga-development-guide.md` — RTL 與 FPGA 開發架構
 - `docs/development/fpga-verification-guide.md` — cocotb/pytest、SVA 與驗證流程
 
+## FPGA Bitstream / Socket Board 設計標準
+
+- [FPGA Bitstream Identity / Compatibility / Lifecycle v1](../docs/architecture/fpga-bitstream-identity-lifecycle-v1.md)：新正式 Bitstream 必須帶獨立版本、ABI、Build ID、SHA-256、PL 可讀 Identity，依 Programming Profile 執行安全 Preflight。
+- [Socket Board Identity / Usage / Presence](../docs/architecture/socket-board-management-design-notes.md)：記錄每 Site 最多一片 Socket Board、機械週期與燒錄計數分離、IC/Board Presence 及 PS 端管理介面方向。尚未定案 PCB／Sensor。
+
 ## Domain baseline
 
 Plasma 的可獨立 programming resource 稱為 **Site**：

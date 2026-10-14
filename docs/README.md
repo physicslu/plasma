@@ -16,6 +16,7 @@
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
 - **Plan / Accepted Policy** — [ADR-0002: OpenOCD 軟體支援、Catalog 顯示與研究優先順序](adr/0002-openocd-software-qualified-catalog-visibility.md)：產品 Catalog 僅顯示指定版本 OpenOCD 已確認具燒錄能力的 ICPN；Socket/PPU/Site HIL 獨立；研究工作優先針對 OpenOCD 支援目標，其餘原廠候選只保留來源。API/UI migration 追蹤 [Issue #849](https://github.com/physicslu/plasma/issues/849)，研究作業優先順序追蹤 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
+- **Plan / Accepted Policy** — [ADR-0003: FPGA Bitstream Identity 與 Programming Preflight 分離](adr/0003-fpga-bitstream-identity-preflight.md)：規定 Bitstream 獨立版本、PL Identity、硬體能力相容判定、Site 排他與配送／啟用分離；尚未完成實作。
 
 ## Operator
 
@@ -57,6 +58,8 @@
 - **Current** — [Versioned OpenOCD Provider Registry v1](architecture/openocd-versioned-provider-registry-v1.md)：將 Upstream／ST 來源與 x86／ARMv7 Artifact SHA-256 分離，沒有實機安裝證據不宣稱可燒錄。
 - **Current** — [ICPN Backend Candidate Registry v1](architecture/icpn-backend-candidate-registry-v1.md)：H5／C5 合計 362 顆來源鎖定的唯讀候選資訊，與 Production Backend Mapping、燒錄資格分離。
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
+- **Plan** — [FPGA Bitstream Identity / Compatibility / Lifecycle v1](architecture/fpga-bitstream-identity-lifecycle-v1.md)：正式 PL Bitstream 的 SemVer／ABI／Build ID／SHA-256、AXI-Lite Identity、Capability/Preflight 與 PPU-wide reload 安全規則。
+- **Plan** — [Socket Board Identity / Usage / Presence](architecture/socket-board-management-design-notes.md)：記錄一 Site 一 Socket Board、一板一 IC Socket、EEPROM 身分／機械壽命／燒錄次數、IC Presence 與 PS I²C 管理方向。
 - **Plan** — [Device Support / Hardware Execution / OpenOCD Architecture](architecture/device-support-hardware-openocd.md)：PoC 維持 PYNQ + Python；Production 將 Programmer Backend、stable Plasma HW API、UIO/MMIO/DMA/IRQ 與 PL protocol engine 分層，並避免 OpenOCD per-bit bit-banging。
 - **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
 - **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
