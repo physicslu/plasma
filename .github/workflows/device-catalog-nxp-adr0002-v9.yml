@@ -18,6 +18,11 @@ on:
       - 'data/device-catalog/research/nxp-27-p0-exact-flash-review-v11.csv'
       - 'data/device-catalog/research/nxp-27-p0-openocd-source-evidence-v11.json'
       - 'data/device-catalog/research/NXP_27_P0_FLASH_REVIEW_V11.md'
+      - 'data/device-catalog/research/nxp_38_p1_bounded_v12.py'
+      - 'data/device-catalog/research/test_nxp_38_p1_bounded_v12.py'
+      - 'data/device-catalog/research/nxp-38-p1-one-pass-v12.csv'
+      - 'data/device-catalog/research/nxp-38-p1-source-lock-v12.json'
+      - 'data/device-catalog/research/NXP_38_P1_BOUNDED_V12.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,3 +51,7 @@ jobs:
         run: python data/device-catalog/research/nxp_27_p0_flash_evidence_v11.py --upstream-root .evidence/openocd-0.12.0
       - name: P0 27 negative exact-ICPN software qualification tests
         run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_27_p0_flash_evidence_v11.py' -v
+      - name: P1 bounded 38 exact part source evidence check (one-pass stop rule)
+        run: python data/device-catalog/research/nxp_38_p1_bounded_v12.py --upstream-root .evidence/openocd-0.12.0
+      - name: P1 38 negative no-promotion and reproducible ledger tests
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_38_p1_bounded_v12.py' -v
