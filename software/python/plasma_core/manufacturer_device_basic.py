@@ -242,7 +242,7 @@ class ManufacturerDeviceBasicResolver:
                 f"{group_id}: invalid series",
             )
             _require(
-                isinstance(flash_size, str) and flash_size.endswith(" KiB"),
+                isinstance(flash_size, str) and re.fullmatch(r"\\d+(?:\\.\\d+)? (?:KiB|MiB)", flash_size) is not None,
                 f"{group_id}: invalid Flash size",
             )
             _require(
