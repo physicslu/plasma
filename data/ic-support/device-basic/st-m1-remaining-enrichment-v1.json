@@ -1,0 +1,191 @@
+{
+  "schema_version": "1.0.0",
+  "program_id": "st-m1-remaining-enrichment-v1",
+  "status": "in_progress",
+  "baseline_main_sha": "7ae887a4a5efcb588d9468d807f78979cc3b322a",
+  "baseline_m1_exact_icpns": 1290,
+  "baseline_remaining_st_exact_icpns": 3339,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet",
+      "brochure",
+      "product_page"
+    ]
+  },
+  "completion_rule": "Every listed family must end as admitted or blocked_evidence_gap before final approval.",
+  "families": {
+    "STM32C5": {
+      "production_exact_icpns": 172,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32F0": {
+      "production_exact_icpns": 263,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32F3": {
+      "production_exact_icpns": 192,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32F4": {
+      "production_exact_icpns": 387,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": [
+        "Requires base-device-level evidence grouping because Product Selector shows variant-level Supply Voltage minima within the same series/density."
+      ]
+    },
+    "STM32F7": {
+      "production_exact_icpns": 173,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32U0": {
+      "production_exact_icpns": 68,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 68,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32L0": {
+      "production_exact_icpns": 360,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32L4": {
+      "production_exact_icpns": 449,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32L1": {
+      "production_exact_icpns": 146,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32U3": {
+      "production_exact_icpns": 107,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 107,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32L5": {
+      "production_exact_icpns": 49,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 49,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32U5": {
+      "production_exact_icpns": 265,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32H7RS": {
+      "production_exact_icpns": 36,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32H7": {
+      "production_exact_icpns": 205,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WBA2X": {
+      "production_exact_icpns": 14,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WL3": {
+      "production_exact_icpns": 47,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WLX": {
+      "production_exact_icpns": 31,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WBX": {
+      "production_exact_icpns": 50,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WBA5X": {
+      "production_exact_icpns": 40,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WBA6X": {
+      "production_exact_icpns": 39,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32H5": {
+      "production_exact_icpns": 190,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": [
+        "Complex temperature-grade semantics and supply-field ambiguity require explicit bounded treatment; not admitted yet."
+      ]
+    },
+    "STM32N6": {
+      "production_exact_icpns": 32,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    },
+    "STM32WB0": {
+      "production_exact_icpns": 24,
+      "disposition": "in_progress",
+      "admitted_exact_icpns": 0,
+      "blocker": null,
+      "notes": []
+    }
+  }
+}
