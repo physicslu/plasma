@@ -76,8 +76,35 @@ fi
 echo "=== FOREGROUND BLOCKING MONITOR (PID=$pid) ==="
 echo "The foreground client blocks until supervisor exits; Build stays detached."
 echo "Press Ctrl-C to stop watching only."
-tail -n 15 -f --pid="$pid" "$monitor_log" || true
+echo "Progress refresh: every 10 seconds; duration format: HH:MM:SS."
 
+progress="$script_dir/build-progress.py"
+[[ -f "$progress" ]] || { echo "Missing progress reporter: $progress" >&2; exit 2; }
+command -v python3 >/dev/null || { echo "python3 not installed" >&2; exit 2; }
+
+# Never re-launch Vivado on attach. Read only the supervisor's atomic status,
+# own PID and stage logs. Visible heartbeat is produced locally so that even
+# a quiet synthesis run never appears frozen in Termius.
+while :; do
+  current_state="$(sed -n 's/^STATUS=//p' "$status_file" 2>/dev/null | tail -n 1 || true)"
+  current_pid="$(sed -n 's/^SUPERVISOR_PID=//p' "$status_file" 2>/dev/null | tail -n 1 || true)"
+
+  if [[ "$current_pid" == "$pid" ]]; then
+    python3 "$progress" --logdir "$logdir" || true
+    case "$current_state" in PASS|FAIL|TIMEOUT) break ;; esac
+  else
+    echo "[$(date '+%H:%M:%S')] Starting / waiting for supervisor status (PID=$pid)"
+  fi
+
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "Supervisor PID $pid exited; checking terminal status."
+    break
+  fi
+  sleep 10
+done
+
+echo "=== BUILD STAGE DURATIONS ==="
+python3 "$progress" --logdir "$logdir" --summary || true
 echo "=== TERMINAL BUILD STATUS ==="
 if [[ ! -f "$status_file" ]]; then
   echo "RESULT=UNKNOWN: no atomic status file (supervisor failed to initialize)" >&2
