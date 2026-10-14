@@ -92,34 +92,51 @@ PLASMA_VIVADO_JOBS=4 PLASMA_BITSTREAM_VERSION=0.1.0 \
 
 The script runs `artifact.py prepare` → source-controlled Tcl Project/BD generation → synth/impl/bitstream → timing checks → `artifact.py finalize` → SHA-256 verification. It **does not** connect to Z2 or load a bitstream.
 
-### SWPC detached and bounded full rebuild (pre-merge manual verification)
+### SWPC standard workflow: detached build + foreground blocking monitor
 
-For a full restart after a failed Vivado build, first update an **isolated, clean**
-PR worktree to the reviewed PR SHA. Do not use `main`, do not bypass `.build.lock`,
-and do not run a second build while one is already active:
+**Approved operating contract:** one background Vivado build supervised by
+`run-monitored-on-swpc.sh` and one blocking foreground observer using
+`build-blocking-on-swpc.sh`. An SSH disconnect or Ctrl-C detaches only the
+observer; the build supervisor keeps running. The supervisor, not the observer,
+owns the 120-minute timeout, which terminates that build (TERM, then KILL after
+60 seconds). `flock` prevents duplicate builds in the same worktree.
+
+Before starting a **new** build, use a clean, isolated worktree on the
+reviewed PR SHA; **never update the checkout while a previous build is
+running**. To start and block until PASS, FAIL or TIMEOUT:
 
 ```bash
 WORK=/storage/projects/plasma-z2-pr859.jk6QVDTj
+# After prior build finished: fetch and switch to the reviewed PR commit.
 git -C "$WORK" fetch --no-tags origin pull/859/head
 git -C "$WORK" switch --detach FETCH_HEAD
-BUILD="$WORK/pl/build/z2-swd-gpio"
-mkdir -p "$BUILD/logs"
-nohup env PLASMA_BUILD_TIMEOUT_MINUTES=120 \
-  bash "$WORK/pl/projects/z2-swd-gpio/run-monitored-on-swpc.sh" \
-  > "$BUILD/logs/monitor.log" 2>&1 < /dev/null &
-echo "MONITOR_PID=$!"
+PLASMA_BUILD_TIMEOUT_MINUTES=120 \
+  bash "$WORK/pl/projects/z2-swd-gpio/build-blocking-on-swpc.sh" start
 ```
 
-The supervisor holds `.monitor.lock` and checks `.build.lock`, runs a **fresh**
-`build-on-swpc.sh`, logs a heartbeat every minute, and terminates the child build
-process group at the 120-minute deadline (TERM, then KILL after 60 seconds).
-The supervisor, not SSH, determines completion. Read
-`logs/monitored-build.status` for `STATUS=PASS|FAIL|TIMEOUT|RUNNING` and
-`logs/monitor.log` for detail; `logs/driver.log` and
-`logs/vivado-console.log` retain implementation evidence. Only `PASS` means the
-build script exited zero, emitted its complete review sentinel and wrote a
-non-empty `manifest.json` after artifact hashing. This is **not** a real Z2 HIL
-or physical SWD qualification.
+To **reattach without rebuilding** in any SSH session:
+
+```bash
+WORK=/storage/projects/plasma-z2-pr859.jk6QVDTj
+bash "$WORK/pl/projects/z2-swd-gpio/build-blocking-on-swpc.sh" attach
+```
+
+The `start` command stores `logs/monitored-build.pid`, and all foreground
+clients use `tail -f --pid` to wait for the exact supervisor to exit. Every
+status includes `SUPERVISOR_PID` to prevent reporting a stale previous
+build PASS. Final process exit codes: 0 for PASS; 1 for FAIL; 124 for TIMEOUT;
+2 for missing/stale/unexpected results. To inspect a completed build later,
+read `logs/monitored-build.status` and `logs/monitor.log`.
+
+This replaces the manual two-terminal launch-and-tail convention for **future**
+builds. The already-running 2026-10-14 supervisor (PID 742018) predates this
+wrapper and must not be restarted or altered. For that particular run only,
+use `tail -n 15 -f --pid=742018 "$WORK/pl/build/z2-swd-gpio/logs/monitor.log"`
+and then inspect `logs/monitored-build.status`.
+
+A PASS requires an exited-successfully Vivado build plus a complete review
+sentinel, a non-empty manifest, and artifact digests. It **does not qualify**
+physical Z2 loading, SWD signals or an IC programming operation.
 
 2026-10-14 SWPC evidence: Vivado 2026.1 emitted
 `IMPLEMENTED_TIMING_PASS setup=3.662 hold=0.043` and
