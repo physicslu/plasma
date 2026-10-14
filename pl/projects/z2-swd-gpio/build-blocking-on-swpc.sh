@@ -43,18 +43,20 @@ if [[ "$mode" == start ]]; then
     exit 2
   fi
 
-  # The supervisor (not this SSH session) owns timeout and child cleanup.
-  # Avoid inherited launcher lock in the detached process.
-  flock -u 7
-  exec 7>&-
-
-  nohup env PLASMA_BUILD_TIMEOUT_MINUTES="${PLASMA_BUILD_TIMEOUT_MINUTES:-120}" \
-    bash "$script_dir/run-monitored-on-swpc.sh" \
-    > "$monitor_log" 2>&1 < /dev/null &
+  # Keep launcher lock while the supervisor is spawned and PID recorded.
+  # Explicitly close fd7 only in the child; it must never inherit the lock.
+  (
+    exec 7>&-
+    exec nohup env PLASMA_BUILD_TIMEOUT_MINUTES="${PLASMA_BUILD_TIMEOUT_MINUTES:-120}" \
+      bash "$script_dir/run-monitored-on-swpc.sh" \
+      > "$monitor_log" 2>&1 < /dev/null
+  ) &
   pid=$!
 
   # The watched PID is bound to atomic status updates by the supervisor.
   printf '%s\n' "$pid" > "$pid_file"
+  flock -u 7
+  exec 7>&-
   echo "BUILD_STARTED_SUPERVISOR_PID=$pid"
   echo "BUILD_CONTINUES_IF_SSH_DISCONNECTS"
 else
