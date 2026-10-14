@@ -301,10 +301,10 @@
     },
     {
       "id": "avr32-target-only",
-      "matcher": "^AVR32",
+      "matcher": "^AT32AP7",
       "target": "tcl/target/avr32.cfg",
       "target_sha": "e16d11439c998cb109de893e3ac0905dc22f3a7a",
-      "reason": "An OpenOCD target config exists but lacks an on-chip Flash Bank declaration; do not equate target presence with flash programming.",
+      "reason": "OpenOCD avr32.cfg targets AVR32 AP7K through JTAG; Microchip AVR32DAxx are 8-bit AVR DA UPDI devices, NOT 32-bit AVR32 AP7K. Official product: https://www.microchip.com/en-us/product/AVR32DA32 . This remains a target-only P1 source lead, with zero implied DFP support.",
       "exact_icpn_software_qualified": false,
       "openocd_supported_asserted": false,
       "core_architecture": "AVR32",
@@ -315,7 +315,7 @@
       "core_is_support_evidence": false,
       "device_applicability_reviewed": false,
       "qualification_state": "UNKNOWN",
-      "known_limitations": "An OpenOCD target config exists but lacks an on-chip Flash Bank declaration; do not equate target presence with flash programming."
+      "known_limitations": "OpenOCD avr32.cfg targets AVR32 AP7K through JTAG; Microchip AVR32DAxx are 8-bit AVR DA UPDI devices, NOT 32-bit AVR32 AP7K. Official product: https://www.microchip.com/en-us/product/AVR32DA32 . This remains a target-only P1 source lead, with zero implied DFP support."
     }
   ],
   "p2_policy": "Anything not source-backed in this bounded release-specific screen is ARCHIVE-ONLY until independently validated. Absence from this screen is NOT proof that OpenOCD cannot support it.",
@@ -341,5 +341,16 @@
     "counts_are_family_source_leads_not_exact_icpns": true
   },
   "p0_source_leads_are_not_software_supported": true,
-  "existing_branch_source": "research/microchip-openocd-first-v1@e13d8470dc8d9915f76f11dca578e78fe2264a34"
+  "existing_branch_source": "research/microchip-openocd-first-v1@e13d8470dc8d9915f76f11dca578e78fe2264a34",
+  "known_false_positive_exclusions": [
+    {
+      "example": "AVR32DA28",
+      "manufacturer_family": "AVR DA",
+      "manufacturer_core": "8-bit AVR",
+      "manufacturer_programming_interface": "UPDI",
+      "forbidden_inference": "AVR32DA28 is NOT an OpenOCD avr32.cfg / AVR32 AP7K target because it starts with AVR32",
+      "official_source": "https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus/avr-da",
+      "official_datasheet": "https://ww1.microchip.com/downloads/aemDocuments/documents/MCU08/ProductDocuments/DataSheets/AVR32DA28-32-48-Data-Sheet-DS40002228.pdf"
+    }
+  ]
 }
