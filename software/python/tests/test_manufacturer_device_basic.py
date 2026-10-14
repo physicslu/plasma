@@ -123,9 +123,9 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
 
-    def test_default_registry_bulk_profiles_cover_f1_f2_c0_g0_and_g4(self) -> None:
+    def test_default_registry_covers_all_admitted_device_basic_families(self) -> None:
         registry = get_default_manufacturer_device_basic_resolver()
-        self.assertEqual(registry.size, 1290)
+        self.assertEqual(registry.size, 1585)
         self.assertEqual(
             registry.profile_ids,
             (
@@ -134,6 +134,11 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 "stm32f2-device-basic-v1",
                 "stm32g0-device-basic-v1",
                 "stm32g4-device-basic-v1",
+                "stm32l5-device-basic-v1",
+                "stm32u0-device-basic-v1",
+                "stm32u3-device-basic-v1",
+                "stm32wba5x-device-basic-v1",
+                "stm32wlx-device-basic-v1",
             ),
         )
 
@@ -208,6 +213,57 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         self.assertEqual(g4.operating_vdd_v, {"min": 1.71, "max": 3.6})
         self.assertIsNone(g4.io_supply_v)
         self.assertEqual(g4.vdda_v, {"min": 1.71, "max": 3.6})
+
+        u3 = registry.resolve_exact(
+            "STM32U385CGU6",
+            manufacturer="STMicroelectronics",
+            family="STM32U3",
+            series="STM32U385",
+            base_device="STM32U385CG",
+            package="UFQFPN",
+            pin_count="48",
+            flash_size="1 MiB",
+            temperature_grade="-40..85 C",
+        )
+        self.assertIsNotNone(u3)
+        assert u3 is not None
+        self.assertEqual(u3.ram_size, "256 KiB")
+        self.assertEqual(u3.operating_vdd_v, {"min": 1.71, "max": 3.6})
+        self.assertEqual(u3.operating_temperature_c, {"min": -40, "max": 85})
+        self.assertIsNone(u3.io_supply_v)
+        self.assertIsNone(u3.vdda_v)
+
+        wba5 = registry.resolve_exact(
+            "STM32WBA50KGU6",
+            manufacturer="STMicroelectronics",
+            family="STM32WBA5X",
+            series="STM32WBA50",
+            base_device="STM32WBA50KG",
+            package="UFQFPN",
+            pin_count="32",
+            flash_size="1 MiB",
+            temperature_grade="-40..85 C",
+        )
+        self.assertIsNotNone(wba5)
+        assert wba5 is not None
+        self.assertEqual(wba5.ram_size, "64 KiB")
+        self.assertEqual(wba5.operating_vdd_v, {"min": 1.71, "max": 3.6})
+
+        wlx = registry.resolve_exact(
+            "STM32WLE5CCU6",
+            manufacturer="STMicroelectronics",
+            family="STM32WLX",
+            series="STM32WLE5",
+            base_device="STM32WLE5CC",
+            package="UFQFPN",
+            pin_count="48",
+            flash_size="256 KiB",
+            temperature_grade="-40..85 C",
+        )
+        self.assertIsNotNone(wlx)
+        assert wlx is not None
+        self.assertEqual(wlx.ram_size, "64 KiB")
+        self.assertEqual(wlx.operating_vdd_v, {"min": 1.8, "max": 3.6})
 
     def test_other_family_does_not_gain_implicit_applicability(self) -> None:
         self.assertIsNone(
