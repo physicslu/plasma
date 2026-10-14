@@ -1,0 +1,48 @@
+name: NXP Phase 1 IC Information read-only Selector v1
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_web/nxp_phase1_information.py'
+      - 'software/python/plasma_web/gateway.py'
+      - 'software/python/tests/test_nxp_phase1_information_selector_v1.py'
+      - 'software/web/app/device-catalog-api.ts'
+      - 'software/web/app/devices/ic-selector.tsx'
+      - 'software/web/app/devices/devices.css'
+      - 'software/web/tests/nxp-phase1-selector-contract.test.mjs'
+      - 'docs/architecture/nxp-phase1-selector-projection-v1.md'
+      - '.github/workflows/nxp-phase1-selector-projection-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-locked-gateway:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Control Station
+        run: python -m pip install -e software/python
+      - name: Verify 501 research IDs cannot expand 224 admitted and source fields fail closed
+        run: python -m unittest discover -s software/python/tests -p 'test_nxp_phase1_information_selector_v1.py' -v
+      - name: Regression old NXP manufacturer and Catalog API boundary
+        run: python -m unittest discover -s software/python/tests -p 'test_nxp_manufacturer_device_evidence_v6.py' -v
+  browser-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install checked-in Web dependencies
+        working-directory: software/web
+        run: npm ci --no-audit --no-fund
+      - name: Type-check Selector and Device API
+        working-directory: software/web
+        run: npx tsc --noEmit --target es2022 --module esnext --moduleResolution bundler --jsx react-jsx --skipLibCheck --esModuleInterop app/device-catalog-api.ts app/devices/ic-selector.tsx
+      - name: Phase1 and existing Selector contract tests
+        working-directory: software/web
+        run: node --test tests/nxp-phase1-selector-contract.test.mjs tests/ic-selector-contract.test.mjs
