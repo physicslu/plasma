@@ -4,7 +4,7 @@
 - **Date:** 2026-10-14
 - **Scope:** Manufacturer Research / Production Identity Catalog / Product IC Selector / OpenOCD software support / PPU-Site-Socket physical validation
 - **Owner decision:** 2026-10-14
-- **Tracking:** [Issue #849](https://github.com/physicslu/plasma/issues/849)
+- **Tracking:** [Issue #849 — Public Catalog qualification](https://github.com/physicslu/plasma/issues/849), [Issue #851 — OpenOCD-first manufacturer research prioritization](https://github.com/physicslu/plasma/issues/851)
 - **Related:** `docs/architecture/icpn-catalog-admission-policy.json`, `data/device-catalog/production/README.md`, `docs/architecture/ic-selector.md`, `docs/architecture/device-support-validation.md`, `docs/architecture/openocd-versioned-provider-registry-v1.md`
 
 ## Context
@@ -28,6 +28,24 @@ Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣
 5. **硬體驗證獨立維度**：分開保存 IC/package、Socket／Adapter 型號與修訂版、PPU/Site 型號、供電與接腳映射、OpenOCD/PLASMA 軟體版本及測試結果。OpenOCD = SUPPORTED 且 Socket = NOT_TESTED 的 exact ICPN **仍應顯示於 Catalog**；UI 必須明示「尚未實機驗證」，不能標成 Hardware Passed。
 6. **執行授權仍分離**：Catalog 顯示不代表目前安裝的 PPU Runtime 已安裝相符的 OpenOCD Binary，也不代表 Socket 適配、電壓、安全、Flash 操作限制均滿足。Job/Batch 必須維持既有 runtime/配置/安全條件的 fail-closed 機制。
 7. OpenOCD 是**目前產品 Catalog 顯示門檻**，不是永久禁止未來 Vendor Backend / Plasma-native Backend。變更此政策需另行核准並版本化，不能透過暗中放寬篩選達成。
+
+## Research prioritization — OpenOCD first (owner-approved)
+
+**PLASMA 的研發資源首先用於目前指定／核准 OpenOCD 版本確實有機會燒錄的 IC。全面保留原廠資料是低成本的 Research Inventory 行為，不代表必須逐顆深入調查。** 這是整個 ST、NXP、Microchip 等廠商通用的持續作業原則，執行追蹤見 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
+
+固定優先順序如下：
+
+| Priority | Criteria | Authorized research depth |
+|---|---|---|
+| **P0 — OpenOCD software-backed** | 指定版本 OpenOCD 的 Target + Flash Driver + 必要程式操作具版本鎖定來源證據，且具體 IC/variant 適用性可進一步驗證 | **優先**審核精確商業 ICPN、Flash geometry/operations、必要電氣條件、可重用 Profile、相關軟體測試；達到本 ADR 獨立的 software qualification 才准公開 Catalog |
+| **P1 — Bounded OpenOCD candidate** | OpenOCD 有可信的 Target/Driver 家族線索，但精確 IC 或 operation applicability 尚不完整 | **一次有界、明確範圍**的 Source/Driver/IC 相容性查核；證據不足便保留 Candidate/Unknown 並停止延伸，不自動變更支援宣告 |
+| **P2 — Archive only** | 無可信的指定 OpenOCD Flash programming 支援路徑，或不屬目前產品需要 | **只保存低成本來源資料**（名稱、來源、識別證據、既有原廠觀測與取得時間／雜湊）。停止一般性逐顆 datasheet 深究、訂購碼／EOL 全面追查、封裝／Socket／Programming Profile 建置；除非 OpenOCD 能力改變、客戶有需求或 Owner 明確要求 |
+
+研究順序要**先核對固定 OpenOCD Source/Driver/Target 的可用能力，再將能力對應到 Manufacturer Device Family／Exact ICPN**，而不是先耗費大量時間完整調查所有商用料號後才反向找 OpenOCD 支援。僅用檔名、家族前綴或資料庫 `mapped` 欄位匹配，不得宣稱已達 P0 的正式 `SUPPORTED` 資格。
+
+對既有 **Microchip 24,051 Research 候選 ICPN**，保留全部來源資料即可；目前不再以擴張候選總數或全面補完廠商生命週期為工作目標。**297 個 MCP `NOT_FOUND` 與 68 個 fuzzy-only 查詢**預設留在低優先 backlog，除非先證明其裝置家族屬於 P0/P1。P2 的 Research archival 不等於停產、OpenOCD 永久不支援或已被硬體驗證。
+
+工程指標應以「版本鎖定 OpenOCD 可證明的 Device/Driver/Operations → 通過精確 ICPN Software Qualification → Catalog 可見數量」為主要成果指標；24,051 等原始候選數是**獨立的背景庫存指標**，不得納入產品支援率分母或營運承諾。
 
 ## Status dimensions
 
