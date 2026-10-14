@@ -17,12 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from .backend_provenance import load_source_authorities
+from .runtime_evidence_root import default_runtime_evidence_root, source_files_available
 from .device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord,
     get_default_device_catalog,
 )
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = default_runtime_evidence_root()
 H5_FACTS = "data/device-catalog/research/st-h5-offline-flash-matrix-v1.json"
 C5_CROSSWALK = "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.csv"
 C5_DFP_REPORT = "data/device-catalog/research/st-c5-dfp-commercial-loader-crosswalk-v0.9.json"
@@ -93,7 +94,7 @@ def _catalog_family(catalog: DeviceCatalog, family: str, expected: int) -> list[
 class BackendCandidateRegistry:
     """Immutable read-only candidate lookup; never accepted as execution input."""
 
-    def __init__(self, catalog: DeviceCatalog, root: Path = ROOT, *,
+    def __init__(self, catalog: DeviceCatalog, root: Path | None = ROOT, *,
                  allow_missing_sources: bool = False):
         self.catalog_revision_sha256 = catalog.revision_sha256
         self._by_icpn: dict[str, dict[str, Any]] = {}
@@ -126,14 +127,14 @@ class BackendCandidateRegistry:
         # exclude research-only source evidence. They must keep the device search
         # operational, and must not fabricate or partially expose candidates.
         # Present-but-mutated evidence still fails the strict integrity checks.
-        if allow_missing_sources and any(
-            not (root / name).is_file() for name in (
-                "release/openocd.json",
-                "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json",
-                H5_FACTS, C5_CROSSWALK, C5_DFP_REPORT, C5_STATIC_GATE,
-            )
-        ):
+        required = (
+            "release/openocd.json",
+            "data/device-catalog/research/st-h5-c5-runtime-gap-v1.json",
+            H5_FACTS, C5_CROSSWALK, C5_DFP_REPORT, C5_STATIC_GATE,
+        )
+        if allow_missing_sources and not source_files_available(root, required):
             return
+        _ensure(root is not None, "explicit OpenOCD evidence root is required")
         upstream, gap = load_source_authorities(root)
         _ensure(upstream["source_commit"] == gap["packaged_runtime"]["commit"],
                 "OpenOCD release mismatch")
