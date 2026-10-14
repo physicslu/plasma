@@ -157,17 +157,20 @@ class Z2SourceContractTest(unittest.TestCase):
 
     def test_vivado_version_parser_handles_actual_swpc_banner(self):
         shell = (ROOT / "projects/z2-swd-gpio/build-on-swpc.sh").read_text()
-        match = re.search(r'vivado_version="\\$\\(vivado -version \\| sed -n \\'([^\\']+)\\'\\)"', shell)
-        self.assertIsNotNone(match, "Vivado version must be parsed by a testable sed expression")
-        for banner in ("vivado v2026.1 (64-bit)\\nTool Version Limit: 2026.06\\n",
-                       "Vivado v2024.2 (64-bit)\\n"):
+        expression = next(
+            line.split("sed -n '", 1)[1].split("'", 1)[0]
+            for line in shell.splitlines()
+            if line.startswith("vivado_version=")
+        )
+        for banner in ("vivado v2026.1 (64-bit)\nTool Version Limit: 2026.06\n",
+                       "Vivado v2024.2 (64-bit)\n"):
             output = subprocess.run(
-                ["sed", "-n", match.group(1)], input=banner,
+                ["sed", "-n", expression], input=banner,
                 text=True, capture_output=True, check=True,
             ).stdout.strip()
             self.assertEqual(output, banner.split()[1][1:])
         output = subprocess.run(
-            ["sed", "-n", match.group(1)], input="unsupported tool\\n",
+            ["sed", "-n", expression], input="unsupported tool\n",
             text=True, capture_output=True, check=True,
         ).stdout.strip()
         self.assertEqual(output, "")
