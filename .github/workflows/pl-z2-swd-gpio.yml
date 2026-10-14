@@ -1,0 +1,38 @@
+name: PL Z2 SWD GPIO source contracts
+
+on:
+  pull_request:
+    paths:
+      - "pl/**"
+      - ".github/workflows/pl-z2-swd-gpio.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/**"
+      - ".github/workflows/pl-z2-swd-gpio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  z2-swd-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate host script syntax and compile packaging tool
+        run: |
+          bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
+          python3 -m py_compile pl/projects/z2-swd-gpio/artifact.py
+      - name: Source layout and artifact unit tests (no Vivado or Z2)
+        run: |
+          python3 -m pip install pytest
+          python3 -m pytest -q pl/tests
+      - name: Validation boundary
+        run: |
+          echo "SOURCE CONTRACTS ONLY; synth/impl/timing requires SWPC Vivado." >> "$GITHUB_STEP_SUMMARY"
+          echo "No FPGA loading or physical SWD/HIL performed." >> "$GITHUB_STEP_SUMMARY"
