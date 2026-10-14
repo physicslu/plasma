@@ -197,6 +197,12 @@ def verify_capture(dataset, root):
         "source_count": MAX_SOURCE_COUNT,
         "source_byte_captures": sum(
             x["state"] == "SOURCE_BYTES_CAPTURED" for x in reports),
+        "captured_source_hashes": [
+            {"source_id": x["source_id"],
+             "original_bytes_sha256": x["original_bytes_sha256"],
+             "original_bytes_count": x["original_bytes_count"]}
+            for x in reports if x["state"] == "SOURCE_BYTES_CAPTURED"
+        ],
         "source_blockers": [
             {"source_id": x["source_id"], "state": x["state"],
              "diagnostic": x["diagnostic"]}
