@@ -1,0 +1,19 @@
+{
+  "schema_version": 20,
+  "phase": "IC_INFORMATION",
+  "adr": "ADR-0002",
+  "manufacturer": "NXP",
+  "v18_source_501_blob": "c92e9d445821e0ce15b3c39b6ac520e5a6da3d62",
+  "v18_generator_blob": "9fecf536ceddc728e28320786707f351c52e1266",
+  "official_source_32_blob": "f68bdc613f2df759c9d7d5a57af47a692adc4223",
+  "official_url": "https://www.nxp.jp/docs/en/fact-sheet/MCXAFS.pdf",
+  "source_footer": "MCXA3FS REV 0",
+  "listing_rev": "Rev 1.0 30 Mar 2026",
+  "source_pdf_page": "3",
+  "source_original_binary_archived": false,
+  "source_original_binary_sha256": null,
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research_only": 277,
+  "expected_exact_official": 32
+}

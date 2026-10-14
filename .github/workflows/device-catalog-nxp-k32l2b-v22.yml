@@ -1,0 +1,28 @@
+name: NXP Phase 1 K32L2B bounded group evidence v22
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-k32l2b-12-pattern-source-v22.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-k32l2b-partial-v22.csv'
+      - 'data/device-catalog/research/nxp-phase1-k32l2b-coverage-v22.json'
+      - 'data/device-catalog/research/nxp-phase1-k32l2b-group-lock-v22.json'
+      - 'data/device-catalog/research/nxp_phase1_k32l2b_v22.py'
+      - 'data/device-catalog/research/test_nxp_phase1_k32l2b_v22.py'
+      - 'data/device-catalog/research/NXP_PHASE1_K32L2B_V22.md'
+      - '.github/workflows/device-catalog-nxp-k32l2b-v22.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  manufacturer-bounded-k32l2b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate 12 exact NXP grouped-sourced K32 RAM PARTIAL and 501 source replay
+        run: python data/device-catalog/research/nxp_phase1_k32l2b_v22.py
+      - name: Test fail-closed grouped matching and no unsupported VERIFIED
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_k32l2b_v22.py' -v
