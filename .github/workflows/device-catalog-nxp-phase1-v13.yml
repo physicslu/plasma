@@ -9,6 +9,12 @@ on:
       - 'data/device-catalog/research/nxp-phase1-source-lock-v13.json'
       - 'data/device-catalog/research/NXP_PHASE1_IC_INFORMATION_V13.md'
       - '.github/workflows/device-catalog-nxp-phase1-v13.yml'
+      - 'data/device-catalog/research/nxp_phase1_datasheet_v14.py'
+      - 'data/device-catalog/research/test_nxp_phase1_datasheet_v14.py'
+      - 'data/device-catalog/research/nxp-501-phase1-enriched-information-v14.csv'
+      - 'data/device-catalog/research/nxp-phase1-datasheet-lock-v14.json'
+      - 'data/device-catalog/research/nxp-phase1-enriched-coverage-v14.json'
+      - 'data/device-catalog/research/NXP_PHASE1_DATASHEET_ENRICHMENT_V14.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,3 +31,7 @@ jobs:
         run: python data/device-catalog/research/nxp_phase1_information_v13.py
       - name: Test unknown/partial evidence, units and identity-vs-information boundary
         run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_information_v13.py' -v
+      - name: Verify exact KL25 and LPC84x source bound Phase1 enrichment
+        run: python data/device-catalog/research/nxp_phase1_datasheet_v14.py
+      - name: Test 27 official NXP ordering rows and fail-closed package naming conflict
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_datasheet_v14.py' -v
