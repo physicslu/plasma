@@ -6,7 +6,7 @@
 
 PRs #871 and #874 captured official MicrochipDirect MCU chart HTML and original 20/60-paginated Microchip MCP product responses. However their GitHub Actions original-byte Artifacts expire in **90 days**. A SHA-256 reference without its exact original bytes cannot be independently replayed afterward.
 
-This PR ships a standalone, versioned **portable evidence package**, not a storage server, data admission, authenticity signature, retention policy or offsite copy.
+This PR ships a standalone, versioned **portable evidence package plus local filesystem handoff verifier**, not a storage server, data admission, authenticity signature, enforceable retention policy or offsite copy.
 
 ## What the bundle holds
 
@@ -64,6 +64,45 @@ Inspect the specific live step outcome, archive and cold-replay receipt; a green
 - ZIP SHA-256 from actual GitHub Runner: **9d9de5ac644b8b9d59f20d343f94bf9a5e964920c96260cabc5461fa747efe2b**. Independent pack and cold-replay receipt comparison **PASS**.
 - **Expiration: 2027-01-12 08:11:45 UTC.** This is still an expiring GitHub Actions Artifact, with no separately configured long-term/offsite storage. An immutable/WORM copy and independent restore remain outstanding.
 - Validation is scoped to original manufacturer chart + two separate MCP source queries; this is not a validated worldwide SKU inventory or software-programming qualification.
+
+## Operator-controlled local storage handoff (not deployed)
+
+The new `microchip_phase1_local_vault_v1.py` adds three explicit operations against a pre-existing **absolute** filesystem directory; it requires no new web service or credentials. **No SWPC host was contacted or modified in this PR.**
+
+- `--deposit ORIGINAL_ZIP`: replay the original manufacturer bundle, exclusively create an evidence-key directory (never overwrite), stream-copy and fsync the stored file, **cold replay the stored copy**, and publish a receipt only after this passes. An incomplete key is preserved as a failure for operator inspection.
+- `--audit`: read from the chosen local store, verify the original bundle again, compare against the stored receipt, reject altered source content, unexpected files and unauthorized claim flags.
+- `--restore RESTORED_ZIP`: audit the stored object, exclusively create a new restore output, and independently reverify its original chart and full MCP response pagination evidence.
+
+All receipts explicitly report `durable_storage_verified=false`, `independent_offsite_copy_verified=false`, `immutable_object_lock_verified=false`, `retention_policy_enforced=false`, and `production_write_authorized=false`.
+
+**SWPC example only; paths are illustrative, not asserted to exist.** Provision and run with an account that owns the intended vault, not from a CI GitHub-runner temporary directory:
+
+~~~bash
+install -d -m 0700 /storage/plasma-evidence-vault
+
+python data/device-catalog/research/microchip_phase1_local_vault_v1.py \
+  --deposit /path/to/downloaded/portable-original-evidence.zip \
+  --vault-root /storage/plasma-evidence-vault \
+  --evidence-key microchip-p0-20261014-e5-pic32 \
+  --receipt /path/to/staging/local-deposit-receipt.json
+
+python data/device-catalog/research/microchip_phase1_local_vault_v1.py \
+  --audit --vault-root /storage/plasma-evidence-vault \
+  --evidence-key microchip-p0-20261014-e5-pic32 \
+  --receipt /path/to/staging/local-audit-receipt.json
+
+python data/device-catalog/research/microchip_phase1_local_vault_v1.py \
+  --restore /path/to/independent-restore/microchip-p0-restored.zip \
+  --vault-root /storage/plasma-evidence-vault \
+  --evidence-key microchip-p0-20261014-e5-pic32 \
+  --receipt /path/to/staging/local-restore-receipt.json
+~~~
+
+Each external receipt/restore parent directory must already exist and every output name must be new. A local `/storage` path is **not evidence of a different disk, an offsite copy, retention enforcement, disaster recovery, or immutability**.
+
+The updated CI performs **deposit/audit/restore** on the *real manufacturer-sourced* portable bundle inside an ephemeral GitHub Runner directory. It verifies this local code path but neither deploys to SWPC nor retains the resulting evidence beyond the same GitHub 90-day Artifact expiration.
+
+**Residual controls not implemented:** privileged administrators can edit/delete local files; hashes without independently held signed receipts do not prevent malicious coordinated replacement; retention, offsite storage, archive access management, and independent disaster restore are external operator duties.
 
 ## Explicit durable storage acceptance gate
 
