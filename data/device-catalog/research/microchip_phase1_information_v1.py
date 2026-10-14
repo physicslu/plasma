@@ -82,10 +82,24 @@ def check(dataset):
         sid = source.get("id")
         require(isinstance(sid, str) and sid not in by_id,
                 "invalid/duplicate source ID")
+        url = source.get("url", "")
+        product_url = "https://www.microchip.com/en-us/product/ATSAMD21G18"
+        datasheet_url = (
+            "https://ww1.microchip.com/downloads/aemDocuments/documents/"
+            "MCU32/ProductDocuments/DataSheets/"
+            "SAM-D21-DA1-Family-Data-Sheet-DS40001882H.pdf"
+        )
         require(source.get("publisher") == "Microchip Technology"
-                and source.get("url", "").startswith(
-                    "https://www.microchip.com/en-us/product/"),
+                and url in (product_url, datasheet_url),
                 "official manufacturer source required")
+        if url == datasheet_url:
+            require(source.get("source_version") == "DS40001882H"
+                    and source.get("scopes") == [FAMILY_SCOPE],
+                    "datasheet identity/revision/family scope mismatch")
+        else:
+            require(source.get("source_version") is None
+                    and EXACT_SCOPE in source.get("scopes", []),
+                    "product catalog source scope mismatch")
         try:
             date.fromisoformat(source["research_review_date"])
         except (TypeError, ValueError, KeyError):
@@ -163,6 +177,14 @@ def check(dataset):
                 if field == "manufacturer":
                     require(value == "Microchip", "manufacturer mismatch")
             check_numeric_value(field, entry)
+            if status == "PARTIAL" and field in ("io_supply", "vdda"):
+                expected_pin = "VDDIO" if field == "io_supply" else "VDDANA"
+                require(entry["source_id"] == 
+                        "microchip-sam-d21-da1-family-datasheet-ds40001882h"
+                        and expected_pin in entry["source_locator"]
+                        and "§8.2.1" in entry["source_locator"]
+                        and entry["value"] == {"min": 1.62, "max": 3.63},
+                        "unverified Phase 1 supply pin/source alias")
             results[field][status] += 1
     return {
         "policy": "ADR-0002 Phase 1",
