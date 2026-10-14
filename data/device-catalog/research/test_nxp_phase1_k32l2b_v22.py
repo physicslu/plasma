@@ -17,7 +17,7 @@ class TestNXPK32L2BStrictGroupEvidence(unittest.TestCase):
     def test_no_claim_of_exact_row_or_archived_pdf(self):
         subset=[x for x in self.rows if x["k32l2b_evidence_limit_v22"]]
         self.assertEqual(len(subset),12)
-        self.assertTrue(all("not_single_exact_ram_row" in x["k32l2b_evidence_limit_v22"] for x in subset))
+        self.assertTrue(all("not same original manufacturer exact row" in x["k32l2b_evidence_limit_v22"] for x in subset))
         self.assertTrue(all(x["identity_state"]=="ADMITTED" for x in subset))
     def test_all_other_fields_original(self):
         previous={x["icpn"]:x for x in old_build()}
