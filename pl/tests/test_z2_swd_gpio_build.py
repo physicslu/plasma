@@ -207,10 +207,10 @@ class Z2SourceContractTest(unittest.TestCase):
                 '#!/usr/bin/env bash\n'
                 'set -Eeuo pipefail\n'
                 'd="$(cd -- "$(dirname "$0")/../../build/z2-swd-gpio/logs" && pwd)"\n'
-                'printf "STATUS=RUNNING\\nSUPERVISOR_PID=%s\\n" "$" > "$d/monitored-build.status"\n'
+                'printf "STATUS=RUNNING\\nSUPERVISOR_PID=%s\\n" "$$" > "$d/monitored-build.status"\n'
                 'echo MOCK_BUILD_STARTED\n'
                 'sleep 0.3\n'
-                'printf "STATUS=PASS\\nSUPERVISOR_PID=%s\\n" "$" > "$d/monitored-build.status"\n'
+                'printf "STATUS=PASS\\nSUPERVISOR_PID=%s\\n" "$$" > "$d/monitored-build.status"\n'
                 'echo MOCK_BUILD_FINISHED\n'
             )
             subprocess.run(["git", "-C", tmp, "init", "-q"], check=True)
