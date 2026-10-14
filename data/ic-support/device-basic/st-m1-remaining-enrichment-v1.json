@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "program_id": "st-m1-remaining-enrichment-v1",
-  "status": "in_progress",
+  "status": "completed",
   "baseline_main_sha": "7ae887a4a5efcb588d9468d807f78979cc3b322a",
   "baseline_m1_exact_icpns": 1290,
   "baseline_remaining_st_exact_icpns": 3339,
