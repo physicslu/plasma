@@ -6,15 +6,22 @@ set parts [get_parts -quiet $part]
 if {[llength $parts] != 1} {
     error "VIVADO_PREFLIGHT_FAIL: target part $part not installed"
 }
-create_project -in_memory -part $part
-set boards [get_board_parts -quiet *pynq-z2*]
-puts "PLASMA_BOARD_CANDIDATES [join $boards ,]"
-if {[llength $boards] != 1} {
-    error "VIVADO_PREFLIGHT_FAIL: expected one registered PYNQ-Z2 board part; found [llength $boards]"
+if {![info exists ::env(PLASMA_BOARD_REPO)]} {
+    error "VIVADO_PREFLIGHT_FAIL: PLASMA_BOARD_REPO must point to pinned Board Files"
 }
-set board [lindex $boards 0]
-if {![string match "tul.com.tw:pynq-z2:part0:*" $board]} {
-    error "VIVADO_PREFLIGHT_FAIL: unexpected board identifier $board"
+set board_repo [file normalize $::env(PLASMA_BOARD_REPO)]
+foreach required [list board.xml preset.xml part0_pins.xml] {
+    if {![file isfile [file join $board_repo pynq-z2 A.0 $required]]} {
+        error "VIVADO_PREFLIGHT_FAIL: missing $required in pinned PYNQ-Z2 board repository"
+    }
+}
+set_param board.repoPaths [list $board_repo]
+create_project -in_memory -part $part
+set board "tul.com.tw:pynq-z2:part0:1.0"
+set boards [get_board_parts -quiet $board]
+puts "PLASMA_BOARD_CANDIDATES [join $boards ,]"
+if {[llength $boards] != 1 || [lindex $boards 0] ne $board} {
+    error "VIVADO_PREFLIGHT_FAIL: pinned PYNQ-Z2 board not available (found $boards)"
 }
 set_property board_part $board [current_project]
 if {[get_property board_part [current_project]] ne $board} {
