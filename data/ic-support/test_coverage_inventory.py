@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import importlib.util
 from collections import Counter
 from pathlib import Path
@@ -31,6 +32,42 @@ def find_base(inventory: dict, base_device: str) -> dict:
         if row["base_device"] == base_device:
             return row
     raise AssertionError(f"missing base device {base_device}")
+
+
+
+def test_st_m1_remaining_enrichment_ledger_is_terminal_and_reconciled() -> None:
+    ledger_path = HERE / "device-basic" / "st-m1-remaining-enrichment-v1.json"
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+
+    assert ledger["status"] == "completed"
+    assert ledger["baseline_remaining_st_exact_icpns"] == 3339
+
+    families = ledger["families"]
+    assert families
+    assert all(
+        row["disposition"] in {"admitted", "blocked_evidence_gap"}
+        for row in families.values()
+    )
+
+    processed = sum(row["production_exact_icpns"] for row in families.values())
+    admitted = sum(row["admitted_exact_icpns"] for row in families.values())
+    blocked = sum(
+        row["production_exact_icpns"]
+        for row in families.values()
+        if row["disposition"] == "blocked_evidence_gap"
+    )
+
+    assert processed == 3339
+    assert admitted == 332
+    assert blocked == 3007
+    assert processed == admitted + blocked
+
+    summary = ledger["final_summary"]
+    assert summary["processed_remaining_st_exact_icpns"] == processed
+    assert summary["admitted_exact_icpns"] == admitted
+    assert summary["blocked_evidence_gap_exact_icpns"] == blocked
+    assert summary["resulting_m1_exact_icpns"] == 1622
+    assert summary["all_families_dispositioned"] is True
 
 
 def test_current_production_metrics() -> None:
@@ -87,15 +124,15 @@ def test_current_production_metrics() -> None:
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
-    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1290
+    assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1622
     assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
     assert metrics["manufacturer_enrichment_m5_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
 
     enrichment = inventory["manufacturer_enrichment"]
     assert enrichment["highest_level_counts"] == {
-        "M0": expected_exact_icpns - 1290,
-        "M1": 1289,
+        "M0": expected_exact_icpns - 1622,
+        "M1": 1621,
         "M2": 0,
         "M3": 0,
         "M4": 1,
@@ -103,7 +140,7 @@ def test_current_production_metrics() -> None:
     }
     assert enrichment["at_least_level_counts"] == {
         "M0": expected_exact_icpns,
-        "M1": 1290,
+        "M1": 1622,
         "M2": 1,
         "M3": 1,
         "M4": 1,
@@ -120,6 +157,36 @@ def test_current_production_metrics() -> None:
     assert enrichment["by_family_highest_level"]["STM32G0"]["M0"] == 0
     assert enrichment["by_family_highest_level"]["STM32G4"]["M1"] == 273
     assert enrichment["by_family_highest_level"]["STM32G4"]["M0"] == 0
+    for family, count in {
+        "STM32U0": 68,
+        "STM32U3": 107,
+        "STM32L5": 49,
+        "STM32H7RS": 36,
+        "STM32WBA5X": 40,
+        "STM32N6": 32,
+    }.items():
+        assert enrichment["by_family_highest_level"][family]["M1"] == count
+        assert enrichment["by_family_highest_level"][family]["M0"] == 0
+    for family, count in {
+        "STM32C5": 172,
+        "STM32F0": 263,
+        "STM32F3": 192,
+        "STM32F4": 387,
+        "STM32F7": 173,
+        "STM32L0": 360,
+        "STM32L1": 146,
+        "STM32L4": 449,
+        "STM32U5": 265,
+        "STM32H7": 205,
+        "STM32WBA2X": 14,
+        "STM32WBA6X": 39,
+        "STM32WB0": 24,
+        "STM32WBX": 50,
+        "STM32WL3": 47,
+        "STM32WLX": 31,
+        "STM32H5": 190,
+    }.items():
+        assert enrichment["by_family_highest_level"][family]["M0"] == count
 
 
 def test_exact_icpn_to_base_device_to_profile_projection() -> None:
@@ -269,6 +336,21 @@ def test_manufacturer_enrichment_golden_reference_and_missing_layers() -> None:
         "stm32g4-device-basic-v1.json"
     )
 
+    for icpn, profile in {
+        "STM32U031C6T6": "stm32u0-device-basic-v1.json",
+        "STM32U375CET6": "stm32u3-device-basic-v1.json",
+        "STM32L552CCT6": "stm32l5-device-basic-v1.json",
+        "STM32H7R3A8I6": "stm32h7rs-device-basic-v1.json",
+        "STM32WBA50KGU6": "stm32wba5x-device-basic-v1.json",
+        "STM32N645A0H3Q": "stm32n6-device-basic-v1.json",
+    }.items():
+        admitted = find_exact(inventory, icpn)["manufacturer_enrichment"]
+        assert admitted["highest_level"] == "M1"
+        assert admitted["dimensions"]["manufacturer_device_basic_profile"] is True
+        assert admitted["dimensions"]["ram"] is True
+        assert admitted["dimensions"]["operating_vdd"] is True
+        assert admitted["evidence"]["device_basic_profile"].endswith(profile)
+
     outside_family = find_exact(inventory, "STM32F407VGT6")
     missing = outside_family["manufacturer_enrichment"]
     assert missing["highest_level"] == "M0"
@@ -366,6 +448,7 @@ def test_stm32h5_package_dependent_pin_count_resolution() -> None:
 
 
 def main() -> int:
+    test_st_m1_remaining_enrichment_ledger_is_terminal_and_reconciled()
     test_current_production_metrics()
     test_stm32h5_package_dependent_pin_count_resolution()
     test_exact_icpn_to_base_device_to_profile_projection()
