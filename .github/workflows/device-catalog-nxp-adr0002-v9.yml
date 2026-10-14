@@ -7,6 +7,12 @@ on:
       - 'data/device-catalog/research/nxp-501-adr0002-openocd-priority-v9.csv'
       - 'data/device-catalog/research/nxp-adr0002-openocd-source-v9.json'
       - '.github/workflows/device-catalog-nxp-adr0002-v9.yml'
+      - 'data/device-catalog/research/nxp_adr0002_core_qual_v10.py'
+      - 'data/device-catalog/research/test_nxp_adr0002_core_qual_v10.py'
+      - 'data/device-catalog/research/nxp-501-adr0002-core-transport-qualification-v10.csv'
+      - 'data/device-catalog/research/nxp-adr0002-core-source-v10.json'
+      - 'data/device-catalog/research/nxp-adr0002-core-aware-metrics-v10.json'
+      - 'data/device-catalog/research/NXP_ADR0002_CORE_DRIVER_METRICS_V10.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,3 +33,7 @@ jobs:
           persist-credentials: false
       - run: python data/device-catalog/research/nxp_adr0002_openocd_triage_v9.py --upstream-root .evidence/openocd-0.12.0
       - run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_adr0002_openocd_triage_v9.py' -v
+      - name: Replay Core, Transport, Flash source operations and 501 exact ICPN source chain against approved ADR
+        run: python data/device-catalog/research/nxp_adr0002_core_qual_v10.py --upstream-root .evidence/openocd-0.12.0
+      - name: Verify Core-aware denominators and fail-closed support semantics
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_adr0002_core_qual_v10.py' -v
