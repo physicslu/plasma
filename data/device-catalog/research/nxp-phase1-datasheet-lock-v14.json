@@ -1,0 +1,143 @@
+{
+  "schema_version": 14,
+  "adr": "ADR-0002",
+  "active_phase": "IC_INFORMATION_ONLY",
+  "source_snapshot_v13_git_blob": "4a0fbad8fa5f57580ba28e92f71b0793e12faf07",
+  "source_v13_generator_git_blob": "5984efefbf9377e223680b3038127ebee338228c",
+  "source_v13_lock_git_blob": "b8a89f49446130c2148fe82d1a9dfe34589a2328",
+  "original_document_bytes_persisted": false,
+  "original_document_sha256": null,
+  "documents": [
+    {
+      "document_id": "KL25P80M48SF0",
+      "revision": "Rev 5 08/2014",
+      "url": "https://www.nxp.com.cn/docs/en/data-sheet/KL25P80M48SF0.pdf",
+      "scope": "Table Ordering Information page 2 exact 12 commercial MKL25 ICPNs; Table 5 page 7 VDD/VDDA; p1-2 family 1.71-3.6V operating",
+      "blob_sha256": null
+    },
+    {
+      "document_id": "LPC84x",
+      "revision": "Rev 2.1 28 Oct 2020",
+      "url": "https://www.nxp.com/docs/en/data-sheet/LPC84x.pdf",
+      "scope": "Table 1/2 page 4 eight type-number forms and package/Flash/SRAM; page 3 VDD/Tambient; Table 11 page 46 operating supply conditional requirements",
+      "blob_sha256": null
+    },
+    {
+      "document_id": "LPC84x exact commercial suffixes",
+      "url": "https://www.nxp.com/products/LPC84X?tab=Package_Quality_Tab",
+      "scope": "15 exact quality-table commercial suffixes; includes HVQFN32 label for JHI33 versus datasheet HVQFN33",
+      "blob_sha256": null
+    }
+  ],
+  "kl25_sram_by_exact_icpn": {
+    "MKL25Z32VFM4": "4",
+    "MKL25Z64VFM4": "8",
+    "MKL25Z128VFM4": "16",
+    "MKL25Z32VFT4": "4",
+    "MKL25Z64VFT4": "8",
+    "MKL25Z128VFT4": "16",
+    "MKL25Z32VLH4": "4",
+    "MKL25Z64VLH4": "8",
+    "MKL25Z128VLH4": "16",
+    "MKL25Z32VLK4": "4",
+    "MKL25Z64VLK4": "8",
+    "MKL25Z128VLK4": "16"
+  },
+  "lpc84x_suffix_by_datasheet_type": {
+    "LPC844M201JBD48": [
+      "E",
+      "K",
+      "MP"
+    ],
+    "LPC844M201JBD64": [
+      "E"
+    ],
+    "LPC844M201JHI33": [
+      "E",
+      "Y"
+    ],
+    "LPC844M201JHI48": [
+      "E"
+    ],
+    "LPC845M301JBD48": [
+      "E"
+    ],
+    "LPC845M301JBD64": [
+      "E"
+    ],
+    "LPC845M301JHI33": [
+      "E",
+      "K",
+      "Y"
+    ],
+    "LPC845M301JHI48": [
+      "E",
+      "K",
+      "Y"
+    ]
+  },
+  "lpc84x_type_parameters": {
+    "LPC844M201JBD48": {
+      "package": "LQFP48",
+      "pin_count": "48",
+      "flash": "64",
+      "ram": "8",
+      "base_device": "LPC844M201"
+    },
+    "LPC844M201JBD64": {
+      "package": "LQFP64",
+      "pin_count": "64",
+      "flash": "64",
+      "ram": "8",
+      "base_device": "LPC844M201"
+    },
+    "LPC844M201JHI33": {
+      "package": "HVQFN33",
+      "pin_count": "33",
+      "flash": "64",
+      "ram": "8",
+      "base_device": "LPC844M201"
+    },
+    "LPC844M201JHI48": {
+      "package": "HVQFN48",
+      "pin_count": "48",
+      "flash": "64",
+      "ram": "8",
+      "base_device": "LPC844M201"
+    },
+    "LPC845M301JBD48": {
+      "package": "LQFP48",
+      "pin_count": "48",
+      "flash": "64",
+      "ram": "16",
+      "base_device": "LPC845M301"
+    },
+    "LPC845M301JBD64": {
+      "package": "LQFP64",
+      "pin_count": "64",
+      "flash": "64",
+      "ram": "16",
+      "base_device": "LPC845M301"
+    },
+    "LPC845M301JHI33": {
+      "package": "HVQFN33",
+      "pin_count": "33",
+      "flash": "64",
+      "ram": "16",
+      "base_device": "LPC845M301"
+    },
+    "LPC845M301JHI48": {
+      "package": "HVQFN48",
+      "pin_count": "48",
+      "flash": "64",
+      "ram": "16",
+      "base_device": "LPC845M301"
+    }
+  },
+  "lpc84x_type_derived_base_device_scope": "LPC844M201 and LPC845M301 are derived from official NXP type-name prefixes; classification PARTIAL, not a proven exact silicon ID",
+  "lpc84x_conflict_definition": "For each JHI33 commercial suffix, datasheet package HVQFN33 / 33 terminals conflicts in nomenclature with NXP Quality-tab package HVQFN32. Mark both package and pin_count CONFLICT; retain value from datasheet for visibility, prohibit release without review.",
+  "vdda_semantics": "KL25 Table 5 1.71-3.6V analog and differential; LPC84x Table 11 analog requirements conditional (ADC min2.4V, DAC min2.7V), no generic standalone analog range",
+  "baseline_identities_unmodified": true,
+  "no_icpn_identity_promotions": true,
+  "prevent_phase2_3_claims": true
+}

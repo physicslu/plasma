@@ -1,0 +1,30 @@
+{
+  "schema_version": 12,
+  "adr": "ADR-0002",
+  "scope": "NXP_P1_SINGLE_BOUNDED_SOURCE_REVIEW_38",
+  "pinned_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "input_v10_git_blob": "9f0397fe6062356fd04cd5eb73133969e75d9bfb",
+  "upstream_v9_source_lock_git_blob": "e9ccb5af0c4649541955cbd0608340dfd2758856",
+  "reviewed_source_blobs": {
+    "tcl/target/kl25.cfg": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+    "tcl/target/klx.cfg": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+    "tcl/target/lpc84x.cfg": "af26f2757fb48ea87b80c297df0ecb8d8e5f2058",
+    "tcl/target/lpc8xx.cfg": "4c54a2a6670d6186297306112deee8d25e2627e4",
+    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e42",
+    "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
+    "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
+  },
+  "extra_source_blob": {
+    "src/flash/nor/kinetis_ke.c": "c069f3ac89b30031b7d2af065d79a8f924c8692a"
+  },
+  "count": {
+    "LPC802_LPC804": 18,
+    "K32L2": 20
+  },
+  "negative_source_checks": {
+    "LPC802_LPC804": "lpc2000.c does not explicitly enumerate LPC802_ or LPC804_ identification; generic lpc8xx.cfg exists and flash bank lpc2000 has operation symbols",
+    "K32L2": "no explicit K32L2 part-specific case in kinetis.c or kinetis_ke.c, no target file with basename K32*.cfg in pinned checkout, generic Kinetis or KL family hints are not exact compatibility proof"
+  },
+  "frozen_decision": "P1 CANDIDATE, bounded review completed, parked pending source/provider or owner-driven scope change",
+  "not_claiming": "No conclusive unsupported, no hardware HIL, no Programming Profile, no Production or public Catalog change"
+}

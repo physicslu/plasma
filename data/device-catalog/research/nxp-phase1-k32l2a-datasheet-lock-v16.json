@@ -1,0 +1,40 @@
+{
+  "schema_version": 16,
+  "adr": "ADR-0002",
+  "active_phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "input_v15_ledger_git_blob": "2419f95add44678e53ace3909c0776c51bbac5cf",
+  "input_v15_generator_git_blob": "8dbb8a7dab1d302764b902121131770d6552817b",
+  "input_v15_lock_git_blob": "b41f03a82a9b4e988f30a2f72f9a4dec43f9ad4e",
+  "input_v15_coverage_git_blob": "09071e54575ba0fe19c0e12ab662afbee98fb0ba",
+  "K32L2Ax": {
+    "doc": "K32L2Ax",
+    "revision": "Rev 3 02/2021",
+    "pdf_url": "https://www.nxp.com/docs/en/data-sheet/K32L2Ax.pdf",
+    "table_exact": "Table 1 printed page 5",
+    "voltage_table": "Table 12 printed page 36",
+    "known_exact_icpns": {
+      "K32L2A31VLH1A": "256 kB",
+      "K32L2A31VLL1A": "256 kB",
+      "K32L2A41VLH1A": "512 kB",
+      "K32L2A41VLL1A": "512 kB"
+    },
+    "ram_kb_for_exact": 128,
+    "vdd_voltage_min": 1.71,
+    "vdd_voltage_max": 3.6,
+    "vdda_voltage_min": 1.71,
+    "vdda_voltage_max": 3.6,
+    "max_vdd_vdda_diff_absolute_volts": 0.1,
+    "source_original_pdf_sha256": null
+  },
+  "K32L2B3x": {
+    "doc": "K32L2B3x",
+    "official_listing": "https://www.nxp.com/products/K32-L2?tab=Documentation_Tab",
+    "supported_part_count_from_existing_source": 12,
+    "manufacturer_pdf_not_verified": "Official datasheet Rev 3 Oct 2020 listed for all 12, but NXP-hosted original PDF could not be accessed; no exact-SRAM or supply spec inferred.",
+    "unavailable_original_pdf_sha256": null
+  },
+  "no_production_mutation": true,
+  "no_public_catalog_mutation": true,
+  "no_openocd_or_hil_modification": true
+}

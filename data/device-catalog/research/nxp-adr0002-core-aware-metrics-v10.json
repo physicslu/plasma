@@ -1,0 +1,75 @@
+{
+  "schema_version": 10,
+  "adr": "ADR-0002",
+  "manufacturer": "NXP",
+  "metadata_granularity": "exact commercial ICPNs, bounded original 501 identities",
+  "provider": "openocd-upstream",
+  "version": "0.12.0",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "original_research_exact_icpns": 501,
+  "production_identity_admitted_exact": 224,
+  "research_pending_exact": 277,
+  "source_backed_target_driver_research_profiles": 3,
+  "source_backed_target_driver_profile_keys": [
+    {
+      "target_config": "tcl/target/lpc8xx.cfg",
+      "flash_driver": "lpc2000",
+      "source_backed": "SOURCE_BLOB_ONLY",
+      "device_profile_software_qualified": false
+    },
+    {
+      "target_config": "tcl/target/lpc84x.cfg",
+      "flash_driver": "lpc2000",
+      "source_backed": "SOURCE_BLOB_ONLY",
+      "device_profile_software_qualified": false
+    },
+    {
+      "target_config": "tcl/target/kl25.cfg",
+      "flash_driver": "kinetis",
+      "source_backed": "SOURCE_BLOB_ONLY",
+      "device_profile_software_qualified": false
+    }
+  ],
+  "verified_exact_supported_by_this_new_research": 0,
+  "actual_product_supported_exact_denominator": null,
+  "actual_user_facing_catalog_visible_exact": null,
+  "physical_hil_tested_configuration_count": null,
+  "unknown_is_not_zero": true,
+  "priority_counts": {
+    "P1": 38,
+    "P2": 436,
+    "P0": 27
+  },
+  "software_qualification_counts": {
+    "CANDIDATE": 65,
+    "UNKNOWN": 436
+  },
+  "core_counts": {
+    "Cortex-M0+": 65,
+    "UNKNOWN": 436
+  },
+  "debug_transport_counts": {
+    "UNKNOWN": 468,
+    "SWD": 33
+  },
+  "core_unknown_exact": 436,
+  "transport_unknown_exact": 468,
+  "by_manufacturer_core_transport_provider_driver": [
+    {
+      "key": "NXP | ARM | Cortex-M0+ | SWD | openocd-upstream@0.12.0 | lpc2000",
+      "exact_icpn_count": 33
+    },
+    {
+      "key": "NXP | ARM | Cortex-M0+ | UNKNOWN | openocd-upstream@0.12.0 | kinetis",
+      "exact_icpn_count": 32
+    },
+    {
+      "key": "NXP | UNKNOWN | UNKNOWN | UNKNOWN | openocd-upstream@0.12.0 | UNKNOWN",
+      "exact_icpn_count": 436
+    }
+  ],
+  "denominator_warning": "501=bounded manufacturer source observation, NOT entire NXP population, OpenOCD supported total, or physically qualified population",
+  "evidence_policy": "Core group classification is NXP family-level and never exact IC applicability or flash support. No ARM-majority claim from source target-config counts.",
+  "operation_policy": "Source-level erase/write/probe symbol does not qualify target flash operations; read/verify is unknown until independently assessed.",
+  "publication_or_runtime_modified": false
+}
