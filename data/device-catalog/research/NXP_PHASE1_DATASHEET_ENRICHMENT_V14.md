@@ -61,3 +61,5 @@ claims are introduced in this Phase 1 record set.
 - https://www.nxp.com.cn/docs/en/data-sheet/KL25P80M48SF0.pdf
 - https://www.nxp.com/docs/en/data-sheet/LPC84x.pdf
 - https://www.nxp.com/products/LPC84X?tab=Package_Quality_Tab
+
+> **v15 supersession — NXP official Fig. 7/42 reviewed:** the five JHI33 package/pin-count `CONFLICT` states here are historical, not current. The physical package consists of 32 perimeter terminals plus center VSS pad #33; datasheet name HVQFN33 and commercial alias HVQFN32 are reconciled in [NXP_PHASE1_LPC84X_PIN_PAD_V15.md](NXP_PHASE1_LPC84X_PIN_PAD_V15.md). No HIL/Socket permission follows.

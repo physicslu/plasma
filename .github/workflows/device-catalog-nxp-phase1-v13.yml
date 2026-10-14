@@ -15,6 +15,12 @@ on:
       - 'data/device-catalog/research/nxp-phase1-datasheet-lock-v14.json'
       - 'data/device-catalog/research/nxp-phase1-enriched-coverage-v14.json'
       - 'data/device-catalog/research/NXP_PHASE1_DATASHEET_ENRICHMENT_V14.md'
+      - 'data/device-catalog/research/nxp_phase1_pin_package_v15.py'
+      - 'data/device-catalog/research/test_nxp_phase1_pin_package_v15.py'
+      - 'data/device-catalog/research/nxp-501-phase1-pin-package-reconciled-v15.csv'
+      - 'data/device-catalog/research/nxp-phase1-pin-package-evidence-v15.json'
+      - 'data/device-catalog/research/nxp-phase1-pin-package-coverage-v15.json'
+      - 'data/device-catalog/research/NXP_PHASE1_LPC84X_PIN_PAD_V15.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,3 +41,7 @@ jobs:
         run: python data/device-catalog/research/nxp_phase1_datasheet_v14.py
       - name: Test 27 official NXP ordering rows and fail-closed package naming conflict
         run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_datasheet_v14.py' -v
+      - name: Verify official LPC84x JHI33 32 perimeter plus VSS center pad source reconciliation
+        run: python data/device-catalog/research/nxp_phase1_pin_package_v15.py
+      - name: Test 501 original identities and fail-closed 32 plus one package resolution
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_pin_package_v15.py' -v
