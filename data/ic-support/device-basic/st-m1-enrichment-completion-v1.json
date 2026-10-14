@@ -1,0 +1,250 @@
+{
+  "schema_version": "1.0.0",
+  "completion_id": "st-m1-enrichment-completion-v1",
+  "status": "completed_with_evidence_blocks",
+  "manufacturer": "STMicroelectronics",
+  "baseline": {
+    "production_exact_icpns": 4629,
+    "m1_exact_icpns": 1290,
+    "remaining_exact_icpns": 3339,
+    "baseline_main_commit": "7ae887a4a5efcb588d9468d807f78979cc3b322a"
+  },
+  "policy": {
+    "allowed_basic_sources": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "datasheet",
+      "programming_guide",
+      "OpenOCD",
+      "family_name_inference"
+    ],
+    "exact_icpn_binding_required": true,
+    "full_family_transaction_required": true,
+    "fail_closed_on_source_semantic_conflict": true,
+    "programming_authority": false,
+    "runtime_authority": false,
+    "hardware_authority": false
+  },
+  "dispositions": {
+    "admitted": [
+      {
+        "family": "STM32U0",
+        "exact_icpns": 68,
+        "profile_id": "stm32u0-device-basic-v1"
+      },
+      {
+        "family": "STM32U3",
+        "exact_icpns": 107,
+        "profile_id": "stm32u3-device-basic-v1"
+      },
+      {
+        "family": "STM32L5",
+        "exact_icpns": 49,
+        "profile_id": "stm32l5-device-basic-v1"
+      },
+      {
+        "family": "STM32WLX",
+        "exact_icpns": 31,
+        "profile_id": "stm32wlx-device-basic-v1"
+      },
+      {
+        "family": "STM32WBA5X",
+        "exact_icpns": 40,
+        "profile_id": "stm32wba5x-device-basic-v1"
+      }
+    ],
+    "blocked": [
+      {
+        "family": "STM32F0",
+        "exact_icpns": 263,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/stm32f030f4p6-cpn.html",
+        "note": "The allowed eStore surface states a family range of 4 to 32 KiB SRAM across x4/x6/x8/xC but does not uniquely bind every Production series+density group to one RAM value."
+      },
+      {
+        "family": "STM32F3",
+        "exact_icpns": 192,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/stm32f303cct6-cpn.html",
+        "note": "The allowed surface uses up-to SRAM language for multi-density subfamilies; full exact series+density RAM mapping is not uniquely established for every Production group."
+      },
+      {
+        "family": "STM32F4",
+        "exact_icpns": 387,
+        "blocking_dimensions": [
+          "operating_vdd"
+        ],
+        "blocker_type": "allowed_source_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/stm32f405oeh6-cpn.html",
+        "note": "Reviewed F4 eStore surfaces expose generic supply minima that can differ from application power-supply wording; Operating VDD cannot be normalized without choosing between conflicting semantics."
+      },
+      {
+        "family": "STM32F7",
+        "exact_icpns": 173,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "ram_semantic_normalization_required",
+        "representative_source": "https://estore.st.com/en/stm32f730i8k6-cpn.html",
+        "note": "The allowed surface separately reports SRAM, instruction TCM and backup SRAM. The fixed RAM field has no admitted normalization rule for these memory classes."
+      },
+      {
+        "family": "STM32C5",
+        "exact_icpns": 172,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/stm32c591ret6-cpn.html",
+        "note": "The eStore product summary and description expose conflicting RAM/SRAM quantities for reviewed C59 parts; fail closed until ST surface semantics converge or the contract distinguishes memory classes."
+      },
+      {
+        "family": "STM32L0",
+        "exact_icpns": 360,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus.html",
+        "note": "Full Production series+density RAM mapping is not directly established across all L0 groups by the allowed surfaces in this transaction."
+      },
+      {
+        "family": "STM32L1",
+        "exact_icpns": 146,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus.html",
+        "note": "Full Production series+density RAM mapping is not directly established across all L1 groups by the allowed surfaces in this transaction."
+      },
+      {
+        "family": "STM32L4",
+        "exact_icpns": 449,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/stm32l412cbt6-cpn.html",
+        "note": "Operating VDD is directly visible, but the 39 Production series+density groups require direct RAM mapping; not all groups have uniquely established RAM evidence."
+      },
+      {
+        "family": "STM32U5",
+        "exact_icpns": 265,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "ram_configuration_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/stm32u585aii6q-cpn.html",
+        "note": "The allowed surface reports 786 KiB SRAM with ECC off versus 722 KiB with ECC on. The fixed RAM field lacks a rule for configuration-dependent available RAM."
+      },
+      {
+        "family": "STM32H7RS",
+        "exact_icpns": 36,
+        "blocking_dimensions": [
+          "operating_vdd"
+        ],
+        "blocker_type": "supply_semantic_review_required",
+        "representative_source": "https://estore.st.com/en/stm32h7r3a8i6-cpn.html",
+        "note": "The eStore generic supply field reaches 1.62 V; this cannot be assumed to equal the application Operating VDD without an explicit semantic rule."
+      },
+      {
+        "family": "STM32H7",
+        "exact_icpns": 205,
+        "blocking_dimensions": [
+          "operating_vdd",
+          "ram"
+        ],
+        "blocker_type": "supply_and_ram_semantic_review_required",
+        "representative_source": "https://estore.st.com/en/stm32h743aii6-cpn.html",
+        "note": "The generic supply field reaches 1.62 V and RAM is split across TCM/user/backup classes; the current Basic contract has no admitted normalization for either ambiguity."
+      },
+      {
+        "family": "STM32WBA2X",
+        "exact_icpns": 14,
+        "blocking_dimensions": [
+          "operating_vdd"
+        ],
+        "blocker_type": "allowed_source_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wba-series/stm32wba2x.html",
+        "note": "The WBA2x eStore category reports Supply Voltage Min 1.8 V while reviewed exact-product key features report a 1.71 to 3.6 V power supply."
+      },
+      {
+        "family": "STM32WL3",
+        "exact_icpns": 47,
+        "blocking_dimensions": [
+          "operating_vdd"
+        ],
+        "blocker_type": "allowed_source_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/stm32wl30k8v6-cpn.html",
+        "note": "The same eStore exact product exposes Supply Voltage Min 1.7 V and Operating Voltage Min 1.8 V; the Basic Operating VDD contract cannot select one implicitly."
+      },
+      {
+        "family": "STM32WBX",
+        "exact_icpns": 50,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_group_mapping_incomplete",
+        "representative_source": "https://estore.st.com/en/stm32wb55cgu6-cpn.html",
+        "note": "Several WB groups are directly established, but allowed surfaces use up-to SRAM wording for parts of WB35/WB55 and do not close every Production series+density group."
+      },
+      {
+        "family": "STM32WBA6X",
+        "exact_icpns": 39,
+        "blocking_dimensions": [
+          "ram"
+        ],
+        "blocker_type": "allowed_source_field_not_exposed",
+        "representative_source": "https://estore.st.com/en/stm32wba65ciu6-cpn.html",
+        "note": "Operating VDD is directly exposed as 1.71 to 3.6 V, but the reviewed exact eStore surface does not expose a directly usable SRAM value for the full family transaction."
+      },
+      {
+        "family": "STM32H5",
+        "exact_icpns": 190,
+        "blocking_dimensions": [
+          "operating_vdd"
+        ],
+        "blocker_type": "allowed_source_semantic_conflict",
+        "representative_source": "https://estore.st.com/en/stm32h503cbt6-cpn.html",
+        "note": "Reviewed H5 eStore generic Supply Voltage Min can be 1.62 V while application VDD wording uses a different lower bound; generic supply is not admitted as Operating VDD."
+      },
+      {
+        "family": "STM32N6",
+        "exact_icpns": 32,
+        "blocking_dimensions": [
+          "flash",
+          "ram"
+        ],
+        "blocker_type": "basic_contract_semantic_mismatch",
+        "representative_source": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus.html",
+        "note": "Production catalog represents internal Flash as 0-1 KiB for N6; the current Basic contract assumes a conventional internal Flash/RAM product profile and requires a dedicated semantic decision before admission."
+      },
+      {
+        "family": "STM32WB0",
+        "exact_icpns": 24,
+        "blocking_dimensions": [
+          "flash"
+        ],
+        "blocker_type": "basic_contract_schema_mismatch",
+        "representative_source": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wb0-series.html",
+        "note": "The Production family includes STM32WB05N network-coprocessor rows with Flash='N/A (network coprocessor)', which cannot satisfy the numeric KiB/MiB Flash contract for a full-family profile."
+      }
+    ]
+  },
+  "totals": {
+    "reviewed_exact_icpns": 3339,
+    "admitted_exact_icpns": 295,
+    "blocked_exact_icpns": 3044,
+    "resulting_m1_exact_icpns": 1585,
+    "remaining_m0_exact_icpns": 3044
+  }
+}
