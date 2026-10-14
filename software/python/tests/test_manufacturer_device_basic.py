@@ -243,6 +243,33 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
             {"min": -40, "max": 105},
         )
 
+    def test_modern_catalog_temperature_notation_is_bounded(self) -> None:
+        resolved = self.resolve(temperature_grade="-40..105 C")
+        self.assertIsNotNone(resolved)
+        assert resolved is not None
+        self.assertEqual(resolved.operating_temperature_c, {"min": -40, "max": 105})
+        with self.assertRaisesRegex(ICSupportIntegrityError, "unsupported operating temperature"):
+            self.resolve(temperature_grade="-40 through 105 C")
+
+    def test_flash_unit_contract_accepts_kib_or_mib_only(self) -> None:
+        payload = copy.deepcopy(self.payload)
+        payload["groups"]["stm32f103-64k"]["flash_size"] = "1 MiB"
+        path = self.write_payload(payload)
+        try:
+            resolver = ManufacturerDeviceBasicResolver.from_file(path)
+            self.assertEqual(resolver.size, 280)
+        finally:
+            path.unlink(missing_ok=True)
+
+        payload = copy.deepcopy(self.payload)
+        payload["groups"]["stm32f103-64k"]["flash_size"] = "1 MB"
+        path = self.write_payload(payload)
+        try:
+            with self.assertRaisesRegex(ICSupportIntegrityError, "invalid Flash size"):
+                ManufacturerDeviceBasicResolver.from_file(path)
+        finally:
+            path.unlink(missing_ok=True)
+
     def test_optional_voltage_evidence_must_be_a_valid_range(self) -> None:
         payload = copy.deepcopy(self.payload)
         payload["groups"]["stm32f103-64k"]["vdda_v"] = {"min": 3.6, "max": 1.8}
