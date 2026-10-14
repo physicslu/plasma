@@ -1,0 +1,288 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32wlx-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32WLX",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 31,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32wl54-256k": {
+      "series": "STM32WL54",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl54ccu7-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL54|256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl55-256k": {
+      "series": "STM32WL55",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl55jci6tr-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL55|256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl5moc-256k": {
+      "series": "STM32WL5MOC",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl5moch6tr-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL5MOC|256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle4-128k": {
+      "series": "STM32WLE4",
+      "flash_size": "128 KiB",
+      "ram_size": "48 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle4jbi6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE4|128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle4-256k": {
+      "series": "STM32WLE4",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle4ccu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE4 256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle4-64k": {
+      "series": "STM32WLE4",
+      "flash_size": "64 KiB",
+      "ram_size": "20 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle4j8i6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE4|64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle5-128k": {
+      "series": "STM32WLE5",
+      "flash_size": "128 KiB",
+      "ram_size": "48 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle5cbu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE5|128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle5-256k": {
+      "series": "STM32WLE5",
+      "flash_size": "256 KiB",
+      "ram_size": "64 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle5ccu7-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE5|256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wle5-64k": {
+      "series": "STM32WLE5",
+      "flash_size": "64 KiB",
+      "ram_size": "20 KiB",
+      "operating_vdd_v": {
+        "min": 1.8,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wle5j8i6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WLE5|64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32WL54CCU6": "stm32wl54-256k",
+    "STM32WL54CCU7": "stm32wl54-256k",
+    "STM32WL54JCI6": "stm32wl54-256k",
+    "STM32WL54JCI7": "stm32wl54-256k",
+    "STM32WL55CCU6": "stm32wl55-256k",
+    "STM32WL55CCU6TR": "stm32wl55-256k",
+    "STM32WL55CCU7": "stm32wl55-256k",
+    "STM32WL55JCI6": "stm32wl55-256k",
+    "STM32WL55JCI6TR": "stm32wl55-256k",
+    "STM32WL55JCI7": "stm32wl55-256k",
+    "STM32WL5MOCH6STR": "stm32wl5moc-256k",
+    "STM32WL5MOCH6TR": "stm32wl5moc-256k",
+    "STM32WLE4C8U6": "stm32wle4-64k",
+    "STM32WLE4C8U6TR": "stm32wle4-64k",
+    "STM32WLE4CBU6": "stm32wle4-128k",
+    "STM32WLE4CCU6": "stm32wle4-256k",
+    "STM32WLE4CCU6TR": "stm32wle4-256k",
+    "STM32WLE4J8I6": "stm32wle4-64k",
+    "STM32WLE4JBI6": "stm32wle4-128k",
+    "STM32WLE4JCI6": "stm32wle4-256k",
+    "STM32WLE5C8U6": "stm32wle5-64k",
+    "STM32WLE5CBU6": "stm32wle5-128k",
+    "STM32WLE5CBU6TR": "stm32wle5-128k",
+    "STM32WLE5CCU6": "stm32wle5-256k",
+    "STM32WLE5CCU7": "stm32wle5-256k",
+    "STM32WLE5J8I6": "stm32wle5-64k",
+    "STM32WLE5JBI6": "stm32wle5-128k",
+    "STM32WLE5JBI6TR": "stm32wle5-128k",
+    "STM32WLE5JCI6": "stm32wle5-256k",
+    "STM32WLE5JCI6TR": "stm32wle5-256k",
+    "STM32WLE5JCI7": "stm32wle5-256k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD use cited ST eStore exact/density observations. I/O Supply and VDDA remain null. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}

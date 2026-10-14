@@ -1,0 +1,231 @@
+{
+  "schema_version": "1.0.0",
+  "program_id": "st-m1-remaining-enrichment-2026-10-14",
+  "status": "research_classification_complete",
+  "manufacturer": "STMicroelectronics",
+  "baseline": {
+    "production_exact_icpns": 4629,
+    "m1_exact_icpns_before_program": 1290,
+    "remaining_exact_icpns_before_program": 3339,
+    "already_m1_families": {
+      "STM32C0": 226,
+      "STM32F1": 280,
+      "STM32F2": 105,
+      "STM32G0": 406,
+      "STM32G4": 273
+    }
+  },
+  "authority_boundary": {
+    "programming_profile_authority": false,
+    "runtime_authority": false,
+    "hardware_authority": false,
+    "physical_programming_qualified": false,
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ]
+  },
+  "admitted": {
+    "STM32U0": {
+      "count": 68,
+      "profile": "data/ic-support/device-basic/stm32u0-device-basic-v1.json",
+      "basis": "Direct ST eStore RAM and Supply Voltage observations for U031/U073/U083."
+    },
+    "STM32L5": {
+      "count": 49,
+      "profile": "data/ic-support/device-basic/stm32l5-device-basic-v1.json",
+      "basis": "Direct ST eStore RAM and Supply Voltage observations for L552/L562."
+    },
+    "STM32U3": {
+      "count": 107,
+      "profile": "data/ic-support/device-basic/stm32u3-device-basic-v1.json",
+      "basis": "Direct ST eStore RAM and Supply Voltage observations for U375/U385/U3B5/U3C5."
+    },
+    "STM32WL3": {
+      "count": 47,
+      "profile": "data/ic-support/device-basic/stm32wl3-device-basic-v1.json",
+      "basis": "Direct ST eStore density-scoped RAM and Supply Voltage observations."
+    },
+    "STM32WLX": {
+      "count": 31,
+      "profile": "data/ic-support/device-basic/stm32wlx-device-basic-v1.json",
+      "basis": "Direct ST eStore density-scoped RAM and Supply Voltage observations."
+    },
+    "STM32H7RS": {
+      "count": 36,
+      "profile": "data/ic-support/device-basic/stm32h7rs-device-basic-v1.json",
+      "basis": "Direct ST eStore exact product title RAM and Supply Voltage observations for H7R3/H7R7/H7S3/H7S7."
+    },
+    "STM32N6": {
+      "count": 32,
+      "profile": "data/ic-support/device-basic/stm32n6-device-basic-v1.json",
+      "basis": "Direct ST eStore exact product title 4.2 MB SRAM and Supply Voltage observations; manufacturer unit preserved without conversion."
+    }
+  },
+  "blocked": {
+    "STM32F0": {
+      "count": 263,
+      "reason_code": "base_row_extraction_required",
+      "finding": "ST Product Selector exposes RAM Size and Supply Voltage per base-device row. Full exact-family admission requires deterministic extraction/join of those rows; series/density inference is not allowed.",
+      "next_evidence_needed": "Retained Product Selector base-row snapshot or supported official structured endpoint covering every Production base device.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32f0-series/products.html"
+      ]
+    },
+    "STM32F3": {
+      "count": 192,
+      "reason_code": "base_row_voltage_and_ram_mapping_required",
+      "finding": "Product Selector directly exposes RAM and Supply Voltage, but subseries have materially different voltage ranges and memory compositions. Current retained observations do not cover every Production base row.",
+      "next_evidence_needed": "Complete Product Selector base-row extraction for all Production F3 base devices.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32f3-series/products.html"
+      ]
+    },
+    "STM32F4": {
+      "count": 387,
+      "reason_code": "base_variant_vdd_split_requires_exact_selector_rows",
+      "finding": "Product Selector shows same series/density can have different Supply Voltage minima by base/package variant, so series+density grouping is unsafe.",
+      "next_evidence_needed": "Complete retained Product Selector row map for all Production F4 base devices.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32f4-series/products.html"
+      ]
+    },
+    "STM32F7": {
+      "count": 173,
+      "reason_code": "base_row_extraction_required",
+      "finding": "Product Selector provides RAM and Supply Voltage columns, but full Production base-row mapping has not been retained. No family-level inference is permitted.",
+      "next_evidence_needed": "Complete Product Selector base-row extraction for all Production F7 base devices.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32f7-series/products.html"
+      ]
+    },
+    "STM32C5": {
+      "count": 172,
+      "reason_code": "direct_source_ram_conflict_and_row_map_incomplete",
+      "finding": "eStore/Product Selector observations include C5A3 RAM wording inconsistency and the full base-row map is not yet retained.",
+      "next_evidence_needed": "Resolve C5A3 RAM from Product Selector row evidence and retain complete C5 base-row RAM/VDD map.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32-mainstream-mcus/products.html"
+      ]
+    },
+    "STM32L0": {
+      "count": 360,
+      "reason_code": "base_row_extraction_required",
+      "finding": "Legacy L0 variants require exact Product Selector RAM/VDD row mapping; current evidence is not complete enough for whole-family binding.",
+      "next_evidence_needed": "Complete Product Selector base-row extraction for all Production L0 base devices.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l0-series/products.html"
+      ]
+    },
+    "STM32L4": {
+      "count": 449,
+      "reason_code": "base_row_extraction_required",
+      "finding": "Product Selector exposes RAM and Supply Voltage, but L4/L4+ contains multiple RAM/VDD configurations. Full Production base-row mapping is required.",
+      "next_evidence_needed": "Complete Product Selector base-row extraction for all Production L4 base devices, including L4+.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l4-series/products.html",
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l4-plus-series/products.html"
+      ]
+    },
+    "STM32L1": {
+      "count": 146,
+      "reason_code": "density_specific_ram_evidence_incomplete",
+      "finding": "eStore confirms voltage range but available series descriptions use 'up to' RAM wording; density-specific exact RAM is not fully established for all Production rows.",
+      "next_evidence_needed": "Retained Product Selector density/base rows with exact RAM for all Production L1 devices.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32l1-series/products.html"
+      ]
+    },
+    "STM32U5": {
+      "count": 265,
+      "reason_code": "ram_representation_conflict_graphics_subseries",
+      "finding": "Official U5 observations use conflicting RAM representations for graphics subseries (marketing MB wording versus technical KiB values). Normalization without a locked Product Selector row policy would invent semantics.",
+      "next_evidence_needed": "Product Selector row snapshot defining authoritative RAM value/unit for every U5 base device.",
+      "evidence_urls": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32u5-series/products.html"
+      ]
+    },
+    "STM32H7": {
+      "count": 205,
+      "reason_code": "mixed_supply_and_ram_requires_exact_mapping",
+      "finding": "ST eStore H7 catalog contains multiple Supply Voltage minima and materially different SRAM configurations. Whole-family series-level reuse is unsafe.",
+      "next_evidence_needed": "Complete exact/base-level Product Selector/eStore RAM and Supply Voltage map for Production H7.",
+      "evidence_urls": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h7-series.html"
+      ]
+    },
+    "STM32WBA2X": {
+      "count": 14,
+      "reason_code": "estore_supply_parameter_description_conflict",
+      "finding": "The same official eStore product can show Supply Voltage Min parameter 1.8 V while descriptive operating-condition text states 1.71–3.6 V. Selecting one without an explicit source policy would be arbitrary.",
+      "next_evidence_needed": "Product Selector row or ST clarification establishing which allowed-source field owns Operating VDD.",
+      "evidence_urls": [
+        "https://estore.st.com/en/stm32wba23ceu7tr-cpn.html",
+        "https://estore.st.com/en/stm32wba25ceu6tr-cpn.html"
+      ]
+    },
+    "STM32WBX": {
+      "count": 50,
+      "reason_code": "density_specific_ram_evidence_incomplete",
+      "finding": "Several WB series have direct RAM values, but WB55 density variants are represented with 'up to 256 Kbytes SRAM' in available eStore descriptions; exact RAM per Production density is not completely established.",
+      "next_evidence_needed": "Product Selector rows or exact eStore evidence for WB55 256/512/640/1024-KiB Flash variants.",
+      "evidence_urls": [
+        "https://estore.st.com/en/stm32wb55vgq6tr-cpn.html",
+        "https://estore.st.com/en/stm32wb30ceu5a-cpn.html",
+        "https://estore.st.com/en/stm32wb10ccu5-cpn.html"
+      ]
+    },
+    "STM32WBA5X": {
+      "count": 40,
+      "reason_code": "subset_exact_ram_uses_up_to_wording",
+      "finding": "WBA50 has direct 64-KiB SRAM evidence and 1-MiB WBA52/54/55/WBA5M examples show 128 KiB, but some 512-KiB Flash variants expose only 'up to 128 Kbytes SRAM' wording.",
+      "next_evidence_needed": "Exact Product Selector/eStore RAM rows for every 512-KiB Production WBA5X base device.",
+      "evidence_urls": [
+        "https://estore.st.com/en/stm32wba50kgu6-cpn.html",
+        "https://estore.st.com/en/stm32wba52cgu6-cpn.html",
+        "https://estore.st.com/en/stm32wba54keu7-cpn.html",
+        "https://estore.st.com/en/stm32wba5mmgh6tr-cpn.html"
+      ]
+    },
+    "STM32WBA6X": {
+      "count": 39,
+      "reason_code": "exact_ram_mapping_incomplete",
+      "finding": "eStore Supply Voltage is available, but retained exact SRAM evidence is not complete across WBA62/63/64/65 Production variants.",
+      "next_evidence_needed": "Complete exact Product Selector/eStore RAM map for all WBA6X Production base devices.",
+      "evidence_urls": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wba-series/stm32wba62.html"
+      ]
+    },
+    "STM32H5": {
+      "count": 190,
+      "reason_code": "supply_voltage_semantics_ambiguous",
+      "finding": "eStore generic Supply Voltage may report 1.62 V while application VDD semantics observed elsewhere are 1.71 V-class. Treating generic supply as Operating VDD would risk semantic mislabeling.",
+      "next_evidence_needed": "Allowed-source Product Selector row evidence explicitly defining the Operating VDD field for all H5 base devices.",
+      "evidence_urls": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h5-series.html"
+      ]
+    },
+    "STM32WB0": {
+      "count": 24,
+      "reason_code": "mixed_device_role_and_nonstandard_memory_semantics",
+      "finding": "Production WB0 includes network-coprocessor identities with nonstandard Flash/RAM semantics alongside MCU variants. A single current Basic Profile RAM/Flash interpretation would overstate device-local memory.",
+      "next_evidence_needed": "Role-aware Product Selector/eStore memory contract for WB0 MCU versus network-coprocessor variants.",
+      "evidence_urls": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wb0-series.html"
+      ]
+    }
+  },
+  "totals": {
+    "admitted_exact_icpns": 370,
+    "blocked_exact_icpns": 2969,
+    "classified_exact_icpns": 3339,
+    "m1_exact_icpns_after_admitted_profiles": 1660,
+    "remaining_not_m1_exact_icpns": 2969
+  }
+}

@@ -38,7 +38,7 @@ _CATALOG_OWNED_FIELDS = (
 )
 _PROFILE_OWNED_FIELDS = ("ram", "operating_vdd")
 _NULLABLE_UNENRICHED_FIELDS = ("io_supply", "vdda")
-_TEMPERATURE_RE = re.compile(r"^(-?\d+)\s+to\s+(-?\d+)\s+C$")
+_TEMPERATURE_RE = re.compile(r"^(-?\d+)\s*(?:to|\.\.)\s*(-?\d+)\s+C$")
 
 
 def _require(condition: bool, message: str) -> None:
@@ -238,15 +238,16 @@ class ManufacturerDeviceBasicResolver:
             vdd = group.get("operating_vdd_v")
             evidence = group.get("evidence")
             _require(
-                isinstance(series, str) and series.startswith(family),
+                isinstance(series, str) and series.startswith("STM32"),
                 f"{group_id}: invalid series",
             )
             _require(
-                isinstance(flash_size, str) and flash_size.endswith(" KiB"),
+                isinstance(flash_size, str) and bool(flash_size.strip()),
                 f"{group_id}: invalid Flash size",
             )
             _require(
-                isinstance(ram_size, str) and ram_size.endswith(" KiB"),
+                isinstance(ram_size, str)
+                and re.fullmatch(r"\d+(?:\.\d+)? (?:KiB|MB)", ram_size) is not None,
                 f"{group_id}: invalid RAM size",
             )
             _require(

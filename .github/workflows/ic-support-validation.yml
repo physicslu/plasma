@@ -148,8 +148,11 @@ jobs:
         env:
           PYTHONPATH: software/python
         run: |
-          python -m py_compile software/python/plasma_core/manufacturer_device_basic.py
+          python -m py_compile \
+            software/python/plasma_core/manufacturer_device_basic.py \
+            data/ic-support/device-basic/validate_st_m1_remaining_v1.py
           python software/python/tests/test_manufacturer_device_basic.py
+          python data/ic-support/device-basic/validate_st_m1_remaining_v1.py
       - name: Validate manufacturer enrichment scope and coverage
         run: |
           python -m py_compile \
