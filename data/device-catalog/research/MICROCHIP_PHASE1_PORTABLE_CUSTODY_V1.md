@@ -25,9 +25,18 @@ The bundle is deterministic for identical inputs: fixed ZIP names, ordering, tim
 Use exact source files created by official checked-in capture scripts or a previously downloaded unmodified CI Artifact. Substitute actual operator-owned paths below.
 
 ~~~bash
-python data/device-catalog/research/microchip_phase1_portable_custody_v1.py   --pack /archive-staging/microchip-p0-evidence.zip   --chart-root /original-evidence/chart   --e5-root /original-evidence/mcp-e5   --pic32-root /original-evidence/mcp-pic32   --plan /original-evidence/plan.json   --report /original-evidence/report.json   --receipt /archive-staging/pack-receipt.json
+python data/device-catalog/research/microchip_phase1_portable_custody_v1.py \
+  --pack /archive-staging/microchip-p0-evidence.zip \
+  --chart-root /original-evidence/chart \
+  --e5-root /original-evidence/mcp-e5 \
+  --pic32-root /original-evidence/mcp-pic32 \
+  --plan /original-evidence/plan.json \
+  --report /original-evidence/report.json \
+  --receipt /archive-staging/pack-receipt.json
 
-python data/device-catalog/research/microchip_phase1_portable_custody_v1.py   --verify /archive-staging/microchip-p0-evidence.zip   --receipt /archive-staging/cold-replay-receipt.json
+python data/device-catalog/research/microchip_phase1_portable_custody_v1.py \
+  --verify /archive-staging/microchip-p0-evidence.zip \
+  --receipt /archive-staging/cold-replay-receipt.json
 
 sha256sum /archive-staging/microchip-p0-evidence.zip
 ~~~
@@ -47,6 +56,14 @@ No tool or ZIP file can truthfully assert its own permanent storage. Source auth
 The CI workflow runs negative/security tests offline, then a **separate best-effort live original MicrochipDirect chart + two bounded official MCP queries**. If live manufacturer access fails, the live step is a recorded failure even if offline unit tests and overall workflow PASS. It only publishes a real portable archive with a cold-replay receipt if both manufacturer query sources pass. The output Artifact **also expires in 90 days**.
 
 Inspect the specific live step outcome, archive and cold-replay receipt; a green GitHub check is not proof of the live source capture. Test fixtures are synthetic and **never** manufacturer data.
+
+## Verified live manufacturer cold-replay result (2026-10-14)
+
+- [CI run 38533403798](https://github.com/physicslu/plasma/actions/runs/38533403798): original MicrochipDirect chart and both bounded P0 MCP queries acquired; **ZIP pack + independent cold restore/replay PASS**.
+- [Temporary original-source ZIP and validation receipts artifact 11878554641](https://github.com/physicslu/plasma/actions/runs/38533403798/artifacts/11878554641): **18 original source/report files** in the exported portable bundle.
+- ZIP SHA-256 from actual GitHub Runner: **9d9de5ac644b8b9d59f20d343f94bf9a5e964920c96260cabc5461fa747efe2b**. Independent pack and cold-replay receipt comparison **PASS**.
+- **Expiration: 2027-01-12 08:11:45 UTC.** This is still an expiring GitHub Actions Artifact, with no separately configured long-term/offsite storage. An immutable/WORM copy and independent restore remain outstanding.
+- Validation is scoped to original manufacturer chart + two separate MCP source queries; this is not a validated worldwide SKU inventory or software-programming qualification.
 
 ## Explicit durable storage acceptance gate
 
