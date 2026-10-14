@@ -1,0 +1,304 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32wl3-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32WL3",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 47,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32wl30-128k": {
+      "series": "STM32WL30",
+      "flash_size": "128 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl30kbv6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL30 128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl30-64k": {
+      "series": "STM32WL30",
+      "flash_size": "64 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl30k8v6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL30 64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl31-128k": {
+      "series": "STM32WL31",
+      "flash_size": "128 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl31kbv6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL31 128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl31-64k": {
+      "series": "STM32WL31",
+      "flash_size": "64 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl31k8v6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL31 64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl33-128k": {
+      "series": "STM32WL33",
+      "flash_size": "128 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl33cbv7-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL33 128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl33-256k": {
+      "series": "STM32WL33",
+      "flash_size": "256 KiB",
+      "ram_size": "32 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl33kcv6x-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL33 256 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl33-64k": {
+      "series": "STM32WL33",
+      "flash_size": "64 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl33k8v6x-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL33 64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl3r-128k": {
+      "series": "STM32WL3R",
+      "flash_size": "128 KiB",
+      "ram_size": "16 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl3rkbv6x-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL3R 128 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32wl3r-64k": {
+      "series": "STM32WL3R",
+      "flash_size": "64 KiB",
+      "ram_size": "8 KiB",
+      "operating_vdd_v": {
+        "min": 1.7,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32wl3rk8v6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32WL3R 64 KiB",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32WL30K8V6": "stm32wl30-64k",
+    "STM32WL30KBV6": "stm32wl30-128k",
+    "STM32WL31C8V6": "stm32wl31-64k",
+    "STM32WL31CBV6": "stm32wl31-128k",
+    "STM32WL31K8V6": "stm32wl31-64k",
+    "STM32WL31KBV6": "stm32wl31-128k",
+    "STM32WL33C8V6": "stm32wl33-64k",
+    "STM32WL33C8V6TR": "stm32wl33-64k",
+    "STM32WL33C8V6X": "stm32wl33-64k",
+    "STM32WL33C8V7": "stm32wl33-64k",
+    "STM32WL33C8V7TR": "stm32wl33-64k",
+    "STM32WL33CBV6": "stm32wl33-128k",
+    "STM32WL33CBV6TR": "stm32wl33-128k",
+    "STM32WL33CBV6X": "stm32wl33-128k",
+    "STM32WL33CBV7": "stm32wl33-128k",
+    "STM32WL33CBV7TR": "stm32wl33-128k",
+    "STM32WL33CCV6": "stm32wl33-256k",
+    "STM32WL33CCV6A": "stm32wl33-256k",
+    "STM32WL33CCV6ATR": "stm32wl33-256k",
+    "STM32WL33CCV6TR": "stm32wl33-256k",
+    "STM32WL33CCV7": "stm32wl33-256k",
+    "STM32WL33CCV7A": "stm32wl33-256k",
+    "STM32WL33CCV7ATR": "stm32wl33-256k",
+    "STM32WL33CCV7TR": "stm32wl33-256k",
+    "STM32WL33K8V6": "stm32wl33-64k",
+    "STM32WL33K8V6TR": "stm32wl33-64k",
+    "STM32WL33K8V6X": "stm32wl33-64k",
+    "STM32WL33K8V6XTR": "stm32wl33-64k",
+    "STM32WL33K8V7": "stm32wl33-64k",
+    "STM32WL33K8V7TR": "stm32wl33-64k",
+    "STM32WL33KBV6": "stm32wl33-128k",
+    "STM32WL33KBV6TR": "stm32wl33-128k",
+    "STM32WL33KBV6X": "stm32wl33-128k",
+    "STM32WL33KBV7": "stm32wl33-128k",
+    "STM32WL33KBV7TR": "stm32wl33-128k",
+    "STM32WL33KCV6": "stm32wl33-256k",
+    "STM32WL33KCV6A": "stm32wl33-256k",
+    "STM32WL33KCV6ATR": "stm32wl33-256k",
+    "STM32WL33KCV6TR": "stm32wl33-256k",
+    "STM32WL33KCV6X": "stm32wl33-256k",
+    "STM32WL33KCV7": "stm32wl33-256k",
+    "STM32WL33KCV7TR": "stm32wl33-256k",
+    "STM32WL3RK8V6": "stm32wl3r-64k",
+    "STM32WL3RK8V6TR": "stm32wl3r-64k",
+    "STM32WL3RK8V6X": "stm32wl3r-64k",
+    "STM32WL3RKBV6": "stm32wl3r-128k",
+    "STM32WL3RKBV6X": "stm32wl3r-128k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD use cited ST eStore density observations and Supply Voltage fields. I/O Supply and VDDA remain null. The separate eStore Operating Voltage field is not substituted for the Supply Voltage-based Operating VDD contract. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
