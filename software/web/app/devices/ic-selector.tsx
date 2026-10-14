@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import {
   searchDevices,
   type DeviceSearchResult,
+  type NXPPhase1Field,
 } from "../device-catalog-api";
 import "./devices.css";
 
@@ -121,6 +122,26 @@ function formatClock(
   if (value.manufacturer_max !== null) parts.push(`max ${value.manufacturer_max.toLocaleString()} Hz`);
   if (value.manufacturer_recommended !== null) parts.push(`recommended ${value.manufacturer_recommended.toLocaleString()} Hz`);
   return parts.join(" · ");
+}
+
+/** Research confidence is rendered per field, never as software/physical support. */
+function nxpPhase1Value(field: NXPPhase1Field | undefined, zh: boolean) {
+  if (!field) return "—";
+  const unit = field.unit?.split(" (")[0] ?? "";
+  const displayValue = field.value === null
+    ? (zh ? "未知（缺少欄位證據）" : "Unknown (no field evidence)")
+    : `${field.value}${unit ? ` ${unit}` : ""}`;
+  return (
+    <span className="icSelectorPhase1Field">
+      <span>{displayValue}</span>
+      <small className="icSelectorPhase1State" data-evidence-state={field.state}>{field.state}</small>
+      {field.source_url ? (
+        <a href={field.source_url} target="_blank" rel="noopener noreferrer">
+          {zh ? "NXP 原廠來源" : "NXP source"}
+        </a>
+      ) : null}
+    </span>
+  );
 }
 
 const SEARCH_PAGE_SIZE = 30;
@@ -342,6 +363,8 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <p>
                     {selected.manufacturer_device_basic_profile
                       ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
+                      : selected.nxp_phase1_information
+                        ? (zh ? "NXP Phase 1 原廠資料；逐欄標示證據等級，未取得證據不推估，也不代表可燒錄" : "NXP Phase 1 evidence; field confidence is separate from programming support")
                       : selected.nxp_manufacturer_device_profile
                         ? (zh ? "NXP 官方單料號規格；未知欄位不推估，不代表燒錄資格" : "NXP exact-part evidence; unknown fields are not inferred or programming-qualified")
                         : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
@@ -354,28 +377,36 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
                 <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
                 <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
-                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? selected.nxp_manufacturer_device_profile?.ram_size ?? "—"}</dd></div>
+                <div><dt>RAM</dt><dd>{selected.nxp_phase1_information
+                  ? nxpPhase1Value(selected.nxp_phase1_information.fields.ram, zh)
+                  : (selected.manufacturer_device_basic_profile?.ram_size ?? selected.nxp_manufacturer_device_profile?.ram_size ?? "—")}</dd></div>
                 <div>
                   <dt>{zh ? "工作 VDD" : "Operating VDD"}</dt>
-                  <dd>{selected.manufacturer_device_basic_profile
-                    ? voltageRange(selected.manufacturer_device_basic_profile.operating_vdd_v)
-                    : voltageRange(selected.nxp_manufacturer_device_profile?.operating_vdd_v ?? undefined)}</dd>
+                  <dd>{selected.nxp_phase1_information
+                    ? nxpPhase1Value(selected.nxp_phase1_information.fields.working_vdd, zh)
+                    : selected.manufacturer_device_basic_profile
+                      ? voltageRange(selected.manufacturer_device_basic_profile.operating_vdd_v)
+                      : voltageRange(selected.nxp_manufacturer_device_profile?.operating_vdd_v ?? undefined)}</dd>
                 </div>
                 <div>
                   <dt>I/O Supply</dt>
-                  <dd>{selected.manufacturer_device_basic_profile?.io_supply_v
-                    ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
-                    : selected.nxp_manufacturer_device_profile
-                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
-                      : "—"}</dd>
+                  <dd>{selected.nxp_phase1_information
+                    ? nxpPhase1Value(selected.nxp_phase1_information.fields.io_supply, zh)
+                    : selected.manufacturer_device_basic_profile?.io_supply_v
+                      ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
+                      : selected.nxp_manufacturer_device_profile
+                        ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                        : "—"}</dd>
                 </div>
                 <div>
                   <dt>VDDA</dt>
-                  <dd>{selected.manufacturer_device_basic_profile?.vdda_v
-                    ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
-                    : selected.nxp_manufacturer_device_profile
-                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
-                      : "—"}</dd>
+                  <dd>{selected.nxp_phase1_information
+                    ? nxpPhase1Value(selected.nxp_phase1_information.fields.vdda, zh)
+                    : selected.manufacturer_device_basic_profile?.vdda_v
+                      ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
+                      : selected.nxp_manufacturer_device_profile
+                        ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                        : "—"}</dd>
                 </div>
                 <div>
                   <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
@@ -386,6 +417,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       : (selected.temperature_grade ?? "—")}</dd>
                 </div>
               </dl>
+              {selected.nxp_phase1_information ? (
+                <p className="icSelectorPhase1Boundary">
+                  {zh
+                    ? "以上僅為原廠 IC Information 研究證據。VERIFIED / PARTIAL 不是 OpenOCD 可燒錄、供電安全或 PPU/Socket 實機驗證。"
+                    : "Manufacturer IC Information only. VERIFIED / PARTIAL does not qualify OpenOCD programming, safe fixture voltages or physical PPU/Socket operation."}
+                </p>
+              ) : null}
             </section>
 
             <section className="icSelectorProfileSection" data-profile-section="programming">
