@@ -59,6 +59,17 @@ Physical HIL and compatibility evidence are independent of Phase 2 software qual
 
 This ADR's already-accepted final **user-facing default selectable Catalog = exact software `SUPPORTED` only** policy remains unchanged, but it is **not implemented merely by adopting these phases**. Phase 1 IC Information may be examined in internal Research/admin detail views; this does not make incomplete or unqualified ICPNs eligible in the default product selector. The current IC Selector/API visibility migration belongs to Phase 2 (Issue #849) and remains explicitly outstanding. No existing `OpenOCD CFG exists` badge may be interpreted as an affirmative programming-qualification result.
 
+## Phase scope of the existing OpenOCD-first and Core/Driver requirements
+
+The original OpenOCD-first prioritization, detailed Target/Flash Driver
+qualification, and supported-only public Catalog implementation below describe
+**Phase 2 Programming requirements**, not prerequisites to finish Phase 1
+IC Information. P0/P1/P2 may still be retained as existing, low-cost
+research-priority metadata in Phase 1, but no new Phase 2 or Phase 3
+work is permitted under the active Phase 1 scope. Existing source-locked
+manufacturer or OpenOCD investigations are preserved, not discarded and
+not retroactively certified.
+
 ## Research prioritization — OpenOCD first (owner-approved)
 
 **PLASMA 的研發資源首先用於目前指定／核准 OpenOCD 版本確實有機會燒錄的 IC。全面保留原廠資料是低成本的 Research Inventory 行為，不代表必須逐顆深入調查。** 這是整個 ST、NXP、Microchip 等廠商通用的持續作業原則，執行追蹤見 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
