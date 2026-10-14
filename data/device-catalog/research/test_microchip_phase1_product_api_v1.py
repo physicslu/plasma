@@ -137,7 +137,8 @@ class Phase1ProductApiTest(unittest.TestCase):
         proposed["ATSAMD21G18A-MU"]["package_raw"] = "OTHER"
         pilot = json.loads(source.PILOT.read_text(encoding="utf-8"))
         compared = source.pilot_comparison(list(proposed.values()), pilot)
-        self.assertEqual(compared[1]["fields"]["package"], "CONFLICT")
+        by_icpn = {entry["icpn"]: entry for entry in compared}
+        self.assertEqual(by_icpn["ATSAMD21G18A-MU"]["fields"]["package"], "CONFLICT")
         self.assertTrue(all(r["internal_admission_state"] == "NOT_ADMITTED"
                             for r in pilot["records"]))
 
