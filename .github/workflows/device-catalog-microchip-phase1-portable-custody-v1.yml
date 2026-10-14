@@ -113,19 +113,21 @@ jobs:
             --receipt "$base/ephemeral-local-restore-receipt.json"
           cmp "$base/portable-original-evidence.zip" "$base/independent-local-restored-evidence.zip"
           # Simulation on ephemeral GitHub hosted runner ONLY, never SWPC.
-          install -d -m 0700 "$base/swpc-sim-vault" "$base/swpc-sim-restore"
+          sim_vault="${{ runner.temp }}/swpc-sim-vault"
+          sim_restore="${{ runner.temp }}/swpc-sim-restore"
+          install -d -m 0700 "$sim_vault" "$sim_restore"
           expected_sha="$(sha256sum "$base/portable-original-evidence.zip" | cut -d ' ' -f1)"
           python scripts/microchip-phase1-swpc-vault-handoff-v1.py \
-            --artifact-dir "$base" --vault-root "$base/swpc-sim-vault" \
-            --restore-dir "$base/swpc-sim-restore" \
+            --artifact-dir "$base" --vault-root "$sim_vault" \
+            --restore-dir "$sim_restore" \
             --evidence-key ci-microchip-original-p0 --expected-sha256 "$expected_sha" \
             --receipt "$base/swpc-sim-preflight.json"
           python scripts/microchip-phase1-swpc-vault-handoff-v1.py \
-            --artifact-dir "$base" --vault-root "$base/swpc-sim-vault" \
-            --restore-dir "$base/swpc-sim-restore" \
+            --artifact-dir "$base" --vault-root "$sim_vault" \
+            --restore-dir "$sim_restore" \
             --evidence-key ci-microchip-original-p0 --expected-sha256 "$expected_sha" \
             --apply --receipt "$base/swpc-sim-deposit-and-restore.json"
-          cmp "$base/portable-original-evidence.zip" "$base/swpc-sim-restore/ci-microchip-original-p0-restored.zip"
+          cmp "$base/portable-original-evidence.zip" "$sim_restore/ci-microchip-original-p0-restored.zip"
       - name: Retain source originals and portable cold-replay receipts
         if: always()
         uses: actions/upload-artifact@v4
