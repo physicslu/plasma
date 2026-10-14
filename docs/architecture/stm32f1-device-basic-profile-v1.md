@@ -1,7 +1,7 @@
 # Manufacturer Device Basic Profile v1
 
 Status: Current read-only manufacturer metadata profile registry
-Scope: STM32F1 / STM32F2 / STM32C0 / STM32G0 / STM32G4 Production exact ICPNs
+Scope: all explicitly admitted ST Manufacturer Device Basic family profiles
 Programming authority: none
 Hardware authority: none
 
@@ -39,12 +39,19 @@ data/ic-support/device-basic/*-device-basic-v1.json
 
 The registry currently contains:
 
+- STM32C0: 226 exact ICPNs;
 - STM32F1: 280 exact ICPNs;
 - STM32F2: 105 exact ICPNs;
-- STM32C0: 226 exact ICPNs;
 - STM32G0: 406 exact ICPNs;
 - STM32G4: 273 exact ICPNs;
-- 1,290 exact bindings in total;
+- STM32H7RS: 36 exact ICPNs;
+- STM32L5: 49 exact ICPNs;
+- STM32N6: 32 exact ICPNs;
+- STM32U0: 68 exact ICPNs;
+- STM32U3: 107 exact ICPNs;
+- STM32WL3: 47 exact ICPNs;
+- STM32WLX: 31 exact ICPNs;
+- 1,660 exact bindings in total;
 - catalog constraints for Base Device, Package, Pin Count, Flash and Operating Temperature;
 - official ST Product Selector/eStore provenance for reusable RAM/electrical groups.
 
@@ -91,7 +98,7 @@ independently from:
 selected_profile
 ```
 
-For example, an admitted STM32F1/F2/C0/G0/G4 exact ICPN may have a Basic Profile while
+For example, an admitted exact ICPN in any of the 12 current Basic Profile families may have a Basic Profile while
 `selected_profile=null`. That means its basic device information is available but its
 manufacturer-derived Programming Profile has not been established.
 
@@ -109,12 +116,12 @@ At this baseline:
 
 ```text
 Production ICPNs       4,853
-STM32F1 exact ICPNs      280
-STM32F2 exact ICPNs      105
-C0 + G0 + G4 ICPNs       905
+ST Production ICPNs    4,629
+ST M1 admitted         1,660
+ST M1 blocked          2,969
 
 M0+                    4,853
-M1+                    1,290
+M1+                    1,660
 M2+                        1
 M3+                        1
 M4+                        1
@@ -124,8 +131,8 @@ M5                         0
 Highest-level distribution is:
 
 ```text
-M0  3,563
-M1  1,289
+M0  3,193
+M1  1,659
 M2      0
 M3      0
 M4      1
@@ -138,7 +145,7 @@ ICPNs stop at M1.
 ## UI boundary
 
 The IC Information section always shows the ten-field contract. Missing optional electrical
-fields render as `—`. STM32F2 has direct ST Product Selector evidence for RAM and Operating VDD while I/O Supply and VDDA remain unavailable. STM32G4 has direct ST eStore evidence for VDDA and therefore
+fields render as `—`. STM32N6 preserves the direct eStore RAM value `4.2 MB` without unit conversion, while its catalog-owned Flash string remains `0-1 KiB`. STM32G4 has direct ST eStore evidence for VDDA and therefore
 renders a real VDDA range; I/O Supply remains unavailable because no separate allowed-source
 value is admitted.
 
@@ -155,15 +162,16 @@ Programming remains a separate section and continues to fail closed when
 
 The deterministic controls prove:
 
-- all 1,290 current Basic Profile Production exact ICPNs are explicitly bound;
+- all 1,660 current Basic Profile Production exact ICPNs are explicitly bound;
 - reusable series/density groups are complete;
 - catalog identity/package/pin/Flash/temperature drift is rejected;
 - non-ST authority is rejected;
 - a fake content lock is rejected;
 - removing an exact binding does not fall back to family inference;
 - one family profile never grants applicability to another family;
-- separate F1/F2/C0/G0/G4 family profiles are required for all 1,290 exact bindings;
-- registry-wide M1 coverage is 1,290 while M2+ remains unchanged;
+- 12 explicit family profiles are required for all 1,660 exact bindings;
+- the previously remaining 3,339 ST exact ICPNs are deterministically classified as 370 admitted plus 2,969 evidence-blocked;
+- registry-wide M1 coverage is 1,660 while M2+ remains unchanged;
 - optional VDDA can become available only when directly evidenced; I/O Supply remains fail-closed.
 
 No deployment, PPU runtime, Socket or physical programming state changes are part of this
