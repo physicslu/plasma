@@ -26,6 +26,14 @@ if ! flock -n 9; then
 fi
 echo "VIVADO_BUILD_LOCK_PASS"
 
+# Machine-readable timing events (Unix epoch milliseconds). The foreground
+# monitor combines these with Vivado Tcl stage events for exact step durations.
+mkdir -p "$logdir"
+stage_event() {
+  printf 'STAGE_EVENT %s %s %s\n' "$1" "$2" "$(date +%s%3N)"
+}
+stage_event ENVIRONMENT START
+
 # Prefer the SWPC-qualified Vivado 2026.1 installation when no explicit
 # toolchain has been selected; keep the installed path configurable.
 if [[ -z "${VIVADO_SETTINGS64:-}" && -f /storage/tools/xilinx/2026.1/Vivado/settings64.sh ]]; then
@@ -49,10 +57,15 @@ command -v git >/dev/null || { echo "git missing" >&2; exit 2; }
 echo "=== PLASMA Z2 FPGA SOURCE CHECK ==="
 git -C "$repo" rev-parse --short=12 HEAD
 vivado -version | head -n 2
+stage_event ENVIRONMENT DONE
+
+stage_event IDENTITY_PREPARE START
 
 # Rebuild only this project's disposable output; never touch source or another
 # project. Git-protected source dirty checks run BEFORE deleting generated data.
 python3 "$script_dir/artifact.py" prepare --output "$generated" --version "$version"
+stage_event IDENTITY_PREPARE DONE
+stage_event STALE_PROJECT_CLEANUP START
 if [[ "$project" != "$repo/pl/build/z2-swd-gpio/project" || -L "$project" ]]; then
   echo "Unsafe project directory (unexpected path/symlink); refusing cleanup" >&2
   exit 2
@@ -76,8 +89,10 @@ if [[ -e "$project" ]]; then
   fi
 fi
 rm -rf -- "$build/artifacts"
+stage_event STALE_PROJECT_CLEANUP DONE
 mkdir -p "$logdir"
 echo "=== VIVADO IMPLEMENTATION ==="
+stage_event VIVADO START
 set +e
 vivado -mode batch -nojournal \
   -log "$logdir/vivado-build.log" \
@@ -95,6 +110,9 @@ if ! grep -Fq 'BITSTREAM_BUILD_PASS' "$logdir/vivado-console.log"; then
   tail -n 70 "$logdir/vivado-console.log" >&2
   exit 2
 fi
+stage_event VIVADO DONE
+
+stage_event ARTIFACT_FINALIZE START
 
 # Vivado 2026.1 prints "vivado v2026.1 (64-bit)" (lowercase),
 # but some distributions use "Vivado". Parse both and reject malformed text.
@@ -105,9 +123,12 @@ python3 "$script_dir/artifact.py" finalize \
   --project "$project" \
   --identity-address-file "$generated/identity-axi-base.txt" \
   --vivado-version "$vivado_version"
+stage_event ARTIFACT_FINALIZE DONE
 
+stage_event SHA256_VERIFY START
 echo "=== BITSTREAM / HWH DIGEST VALIDATION ==="
 (cd "$build/artifacts" && sha256sum -c -- ./*.sha256)
+stage_event SHA256_VERIFY DONE
 echo "=== B/C SOURCE BUILD PASS (NO Z2 HIL) ==="
 echo "Artifact dir : $build/artifacts"
 echo "Reports      : $build/reports"
