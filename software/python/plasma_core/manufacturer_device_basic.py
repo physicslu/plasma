@@ -38,7 +38,7 @@ _CATALOG_OWNED_FIELDS = (
 )
 _PROFILE_OWNED_FIELDS = ("ram", "operating_vdd")
 _NULLABLE_UNENRICHED_FIELDS = ("io_supply", "vdda")
-_FLASH_SIZE_RE = re.compile(r"^\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s+(?:KiB|MiB|MB)$")
+_FLASH_SIZE_RE = re.compile(r"^\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s+(?:KiB|MiB)$")
 _TEMPERATURE_RE = re.compile(r"^(-?\d+)\s*(?:to|\.\.)\s*(-?\d+)\s+C$")
 
 
