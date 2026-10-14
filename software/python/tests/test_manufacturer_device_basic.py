@@ -123,14 +123,15 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
 
-    def test_default_registry_bulk_profiles_cover_f1_c0_g0_and_g4(self) -> None:
+    def test_default_registry_bulk_profiles_cover_f1_f2_c0_g0_and_g4(self) -> None:
         registry = get_default_manufacturer_device_basic_resolver()
-        self.assertEqual(registry.size, 1185)
+        self.assertEqual(registry.size, 1290)
         self.assertEqual(
             registry.profile_ids,
             (
                 "stm32c0-device-basic-v1",
                 "stm32f1-device-basic-v1",
+                "stm32f2-device-basic-v1",
                 "stm32g0-device-basic-v1",
                 "stm32g4-device-basic-v1",
             ),
@@ -153,6 +154,24 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         self.assertEqual(c0.operating_vdd_v, {"min": 2.0, "max": 3.6})
         self.assertIsNone(c0.io_supply_v)
         self.assertIsNone(c0.vdda_v)
+
+        f2 = registry.resolve_exact(
+            "STM32F205RBT6",
+            manufacturer="STMicroelectronics",
+            family="STM32F2",
+            series="STM32F205",
+            base_device="STM32F205RB",
+            package="LQFP",
+            pin_count="64",
+            flash_size="128 KiB",
+            temperature_grade="-40 to 85 C",
+        )
+        self.assertIsNotNone(f2)
+        assert f2 is not None
+        self.assertEqual(f2.ram_size, "64 KiB")
+        self.assertEqual(f2.operating_vdd_v, {"min": 1.8, "max": 3.6})
+        self.assertIsNone(f2.io_supply_v)
+        self.assertIsNone(f2.vdda_v)
 
         g0 = registry.resolve_exact(
             "STM32G031K8T3",
