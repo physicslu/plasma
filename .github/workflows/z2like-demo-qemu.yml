@@ -327,6 +327,16 @@ jobs:
           )
           echo "kit=$kit" >> "$GITHUB_OUTPUT"
 
+      - name: Install OpenOCD libgpiod v1 runtime on QEMU ARMv7 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec plasma-z2like-demo-qemu sh -ec '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends libgpiod2
+          '
+
       - name: Drive Manager to Bootstrap to QEMU deployment E2E
         env:
           KIT: ${{ steps.kit.outputs.kit }}
