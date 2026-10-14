@@ -1,0 +1,46 @@
+name: KL25 backend implementation lock installed-runtime root v1
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_interfaces/kl25_openocd_plan.py'
+      - 'software/python/tests/test_kl25_runtime_root_contract_v1.py'
+      - '.github/workflows/kl25-installed-backend-lock-root-v1.yml'
+      - 'docs/architecture/kl25-runtime-backend-lock-root-v1.md'
+      - 'docs/README.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installed-wheel-kl25-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PLASMA_IC_SUPPORT_ROOT: ${{ github.workspace }}/data/ic-support
+      PLASMA_DEVICE_CATALOG_MANIFEST: ${{ github.workspace }}/data/device-catalog/production/icpn-v1-manifest.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python as wheel (no editable install)
+        run: python -m pip install software/python
+      - name: Assert runtime is imported from site-packages
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import plasma_interfaces.kl25_openocd_plan as kl25
+          module=Path(kl25.__file__).resolve()
+          assert "site-packages" in str(module), module
+          assert not module.is_relative_to(Path(os.environ["GITHUB_WORKSPACE"]).resolve()), module
+          print("KL25 installed module:", module)
+          PY
+      - name: KL25 root, lock hash and zero-admission regression
+        run: python -m unittest discover -s software/python/tests -p 'test_kl25_runtime_root_contract_v1.py' -v
+      - name: Existing KL25 compiler/executor software-only acceptance
+        run: |
+          python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_plan.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_executor.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_compiler_registry.py' -v
+      - name: Preserve IC Support path contract
+        run: python -m unittest discover -s software/python/tests -p 'test_ic_support_resolver.py' -v
