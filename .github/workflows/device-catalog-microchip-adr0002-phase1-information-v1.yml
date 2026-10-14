@@ -1,0 +1,37 @@
+name: Microchip ADR-0002 Phase 1 IC Information Research
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip-adr0002-phase1-ic-information-pilot-v1.json'
+      - 'data/device-catalog/research/microchip_phase1_information_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_information_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_ADR0002_PHASE1_INFORMATION_V1.md'
+      - '.github/workflows/device-catalog-microchip-adr0002-phase1-information-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phase1-only-information-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Phase 1 only evidence tests (no runtime or programming)
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s data/device-catalog/research \
+            -p 'test_microchip_phase1_information_v1.py' -v
+          python data/device-catalog/research/microchip_phase1_information_v1.py \
+            --report "${{ runner.temp }}/microchip-phase1-information-report-v1.json"
+      - name: Retain Phase 1 Research-only field completeness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-information-coverage-v1
+          path: ${{ runner.temp }}/microchip-phase1-information-report-v1.json
+          if-no-files-found: warn
+          retention-days: 90
