@@ -49,6 +49,7 @@
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Plan / Accepted Policy** — [IC Information Phase 1 Evidence Contract](architecture/ic-information-phase1.md)：ADR-0002 三階段實作中，現階段只建構 IC Information 精確料號、逐欄原廠證據與完整度統計；Programming 與 PLASMA Compatibility 後續執行。
+- **Current** — [NXP Phase 1 IC Selector Read-only Projection](architecture/nxp-phase1-selector-projection-v1.md)：將已收錄 224 顆 NXP exact ICPN 的 RAM、VDD、I/O Supply 與 VDDA 原廠研究證據及欄位可信度唯讀顯示，與 Programming／硬體驗證分離。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
 - **Current** — [Manufacturer Enrichment Coverage Framework v1](architecture/manufacturer-enrichment-coverage-v1.md)：定義 M0–M5 manufacturer enrichment coverage、逐 ICPN missing-dimension 投影、explicit exact-ICPN scope composition 與 fail-closed inheritance 規則；不授權 runtime 或 hardware readiness。
