@@ -96,7 +96,7 @@ env:
   Z2_PYTHON_CACHE_SCHEMA: "v1"
   OPENOCD_CACHE_SCHEMA: "v1"
   # Increment when Ubuntu 22.04 toolchain, package dependencies or image policy changes.
-  OPENOCD_TOOLCHAIN_EPOCH: "jammy-build-deps-2026-10-v1"
+  OPENOCD_TOOLCHAIN_EPOCH: "jammy-build-deps-2026-10-v2-gpiod"
 
 jobs:
   z2-python-runtime:
@@ -312,7 +312,7 @@ jobs:
             bash -euxo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
-              apt-get install -y --no-install-recommends python3
+              apt-get install -y --no-install-recommends python3 libgpiod2
               artifact="/artifacts/$ARTIFACT_NAME"
               python3 /repo/scripts/openocd-runtime.py install \
                 "$artifact" --sidecar "$artifact.sha256"
@@ -321,6 +321,9 @@ jobs:
               "$binary" --version
               ldd "$binary" | tee /tmp/openocd-ldd.txt
               ! grep -q "not found" /tmp/openocd-ldd.txt
+              grep -q "libgpiod.so" /tmp/openocd-ldd.txt
+              "$binary" -c "adapter list" -c "shutdown" 2>&1 | tee /tmp/openocd-adapters.txt
+              grep -Eq "(^|[[:space:]])linuxgpiod([[:space:]]|$)" /tmp/openocd-adapters.txt
               python3 /repo/data/ic-support/validate_stm32f103_openocd_real_binary.py \
                 --openocd "$binary" \
                 --scripts-root "$scripts_root" \
