@@ -1,0 +1,331 @@
+{
+  "schema_version": "1.0.0",
+  "program_id": "st-m1-enrichment-program-v1",
+  "status": "complete_evidence_disposition",
+  "manufacturer": "STMicroelectronics",
+  "scope": {
+    "baseline_m1_exact_icpns": 1290,
+    "remaining_exact_icpns_reviewed": 3339,
+    "families_reviewed": 23
+  },
+  "result": {
+    "newly_admitted_exact_icpns": 85,
+    "blocked_exact_icpns": 3254,
+    "post_program_m1_exact_icpns": 1375,
+    "post_program_st_m1_gap": 3254
+  },
+  "source_policy": {
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "datasheet",
+      "programming_guide",
+      "OpenOCD",
+      "family_name_inference"
+    ],
+    "observation_date_utc": "2026-10-14"
+  },
+  "authority_boundary": {
+    "programming_profile_authority": false,
+    "runtime_authority": false,
+    "hardware_authority": false,
+    "physical_programming_qualification": false
+  },
+  "families": [
+    {
+      "family": "STM32C5",
+      "production_exact_count": 172,
+      "disposition": "blocked_allowed_source_conflict",
+      "direct_fields_observed": [
+        "operating_vdd",
+        "ram"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32c5-series.html"
+      ],
+      "blocker": "eStore exposes 2.7-3.6 V across the family, but C591/C593 pages conflict internally: product/title metadata reports 256 KB RAM while description text reports 128-Kbyte SRAM. The Basic Profile RAM semantic cannot choose between those values."
+    },
+    {
+      "family": "STM32F0",
+      "production_exact_count": 263,
+      "disposition": "blocked_group_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32f0-series.html"
+      ],
+      "blocker": "eStore Active count matches Production 263, but direct voltage facets split into 1.65-1.95 V, 2.0-3.6 V, and 2.4-3.6 V populations. Full exact/subline voltage mapping and direct RAM mapping are not closed under allowed sources."
+    },
+    {
+      "family": "STM32F3",
+      "production_exact_count": 192,
+      "disposition": "blocked_group_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-mainstream-mcus/stm32f3-series.html"
+      ],
+      "blocker": "eStore Active count matches Production 192, but direct voltage facets split 14 low-voltage parts at 1.65-1.95 V from 178 parts at 2.0-3.6 V. Full exact/subline voltage mapping and direct RAM mapping are not closed."
+    },
+    {
+      "family": "STM32F4",
+      "production_exact_count": 387,
+      "disposition": "blocked_source_scope_and_group_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32f4-series.html"
+      ],
+      "blocker": "Current eStore scope does not equal the Production exact set and contains 1.7 V and 1.8 V minimum-voltage populations. A complete exact applicability map and RAM map are not directly established."
+    },
+    {
+      "family": "STM32F7",
+      "production_exact_count": 173,
+      "disposition": "blocked_allowed_source_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32f7-series.html",
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32f7-series/products.html"
+      ],
+      "blocker": "eStore Active count matches Production 173 and supply is 1.7-3.6 V, but a full series/density RAM mapping is not directly exposed by the admitted Product Selector/eStore observation. No RAM inference is allowed."
+    },
+    {
+      "family": "STM32H5",
+      "production_exact_count": 190,
+      "disposition": "blocked_allowed_source_semantic_conflict",
+      "direct_fields_observed": [
+        "ram"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h5-series.html"
+      ],
+      "blocker": "eStore generic Supply Voltage Min observations include 1.62 V while the Manufacturer Device Operating VDD contract cannot safely equate that generic field with application VDD. Datasheet resolution is intentionally prohibited for this layer."
+    },
+    {
+      "family": "STM32H7",
+      "production_exact_count": 205,
+      "disposition": "blocked_source_scope_and_voltage_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h7-series.html"
+      ],
+      "blocker": "The H7 eStore surface mixes classic H7 and H7RS populations and exposes both 1.62 V and 1.71 V minimum-voltage groups. Production STM32H7 applicability, voltage partition, and RAM groups are not fully closed without inference."
+    },
+    {
+      "family": "STM32H7RS",
+      "production_exact_count": 36,
+      "disposition": "admitted",
+      "profile_path": "data/ic-support/device-basic/stm32h7rs-device-basic-v1.json",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h7-series/stm32h7r3-7s3.html",
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32h7-series.html"
+      ],
+      "blocker": null
+    },
+    {
+      "family": "STM32L0",
+      "production_exact_count": 360,
+      "disposition": "blocked_group_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l0-series.html"
+      ],
+      "blocker": "eStore exposes multiple minimum-voltage populations (including 1.65 V and 1.8 V). Exact/subline voltage partition and full RAM mapping are not directly closed."
+    },
+    {
+      "family": "STM32L1",
+      "production_exact_count": 146,
+      "disposition": "blocked_source_coverage_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l1-series.html"
+      ],
+      "blocker": "Current eStore observation exposes only 79 Active plus 4 NRND items, materially below the 146 Production exact ICPNs, and also contains 1.65 V and 1.8 V populations. Full-family applicability cannot be established."
+    },
+    {
+      "family": "STM32L4",
+      "production_exact_count": 449,
+      "disposition": "blocked_source_scope_and_ram_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32l4-series.html"
+      ],
+      "blocker": "Production STM32L4 combines classic L4 and L4+ exact identities while eStore surfaces are split. Direct 1.71-3.6 V evidence exists for classic L4 examples, but full 449-part applicability plus series/density RAM mapping is not closed."
+    },
+    {
+      "family": "STM32L5",
+      "production_exact_count": 49,
+      "disposition": "admitted",
+      "profile_path": "data/ic-support/device-basic/stm32l5-device-basic-v1.json",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/stm32l552cct6-cpn.html",
+        "https://estore.st.com/en/stm32l562ret6-cpn.html"
+      ],
+      "blocker": null
+    },
+    {
+      "family": "STM32N6",
+      "production_exact_count": 32,
+      "disposition": "blocked_schema_boundary",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html"
+      ],
+      "blocker": "eStore closes 32/32 Active, 1.71-3.6 V and reports 4.2 MB SRAM, but the Basic Profile v1 RAM contract stores KiB strings. Converting a marketing 4.2 MB value into KiB would add an unapproved semantic conversion; no direct KiB allowed-source value was admitted."
+    },
+    {
+      "family": "STM32U0",
+      "production_exact_count": 68,
+      "disposition": "blocked_allowed_source_conflict",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32u0-series.html"
+      ],
+      "blocker": "Family eStore facets observed 68 parts at 1.71-3.6 V while a current STM32U073 exact eStore entry reports Supply Voltage Min 1.65 V. The allowed source is internally inconsistent for the Operating VDD projection."
+    },
+    {
+      "family": "STM32U3",
+      "production_exact_count": 107,
+      "disposition": "blocked_source_coverage_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32u3-series.html"
+      ],
+      "blocker": "Current eStore observation exposes 100 Active items versus 107 Production exact ICPNs. Full-family allowed-source applicability is not established."
+    },
+    {
+      "family": "STM32U5",
+      "production_exact_count": 265,
+      "disposition": "blocked_allowed_source_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-ultra-low-power-mcus/stm32u5-series.html"
+      ],
+      "blocker": "eStore closes 265/265 Active at 1.71-3.6 V, but the complete RAM mapping for all U535/U545/U575/U585/U59x/U5Ax/U5Fx/U5Gx Production groups was not directly established on Product Selector/eStore. Product presentations/application notes are outside the allowed M1 source surfaces."
+    },
+    {
+      "family": "STM32WB0",
+      "production_exact_count": 24,
+      "disposition": "blocked_schema_boundary",
+      "direct_fields_observed": [],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wb0-series.html"
+      ],
+      "blocker": "Production includes STM32WB05N network-coprocessor identities with non-numeric Flash semantics ('N/A (network coprocessor)'). Basic Profile v1 requires a normal Flash-bearing MCU identity and RAM field; schema broadening is out of scope."
+    },
+    {
+      "family": "STM32WBA2X",
+      "production_exact_count": 14,
+      "disposition": "blocked_allowed_source_conflict",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/stm32wba23ceu6-cpn.html",
+        "https://estore.st.com/en/stm32wba25ceu6-cpn.html"
+      ],
+      "blocker": "The same exact eStore page exposes Supply Voltage Min 1.8 V in parameters while description/key features state a 1.71-3.6 V power supply. The allowed source conflicts internally, so Operating VDD is not admitted."
+    },
+    {
+      "family": "STM32WBA5X",
+      "production_exact_count": 40,
+      "disposition": "blocked_source_coverage_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wba-series/stm32wba5x.html"
+      ],
+      "blocker": "Current WBA5x eStore observation exposes 39 Active products versus 40 Production exact ICPNs. Full-family applicability is not established."
+    },
+    {
+      "family": "STM32WBA6X",
+      "production_exact_count": 39,
+      "disposition": "blocked_allowed_source_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wba-series/stm32wba6x.html",
+        "https://estore.st.com/en/stm32wba65ciu6-cpn.html"
+      ],
+      "blocker": "eStore closes 39/39 Active at 1.71-3.6 V, but exact product observations do not directly expose the complete RAM mapping for all 1 MiB/2 MiB WBA62/63/64/65 groups."
+    },
+    {
+      "family": "STM32WBX",
+      "production_exact_count": 50,
+      "disposition": "blocked_group_mapping_gap",
+      "direct_fields_observed": [
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-wireless-mcus/stm32wb-series.html"
+      ],
+      "blocker": "eStore Active count matches Production 50 but voltage facets split 46 parts at 1.71 V minimum and 4 at 2.0 V. Exact voltage partition and complete RAM mapping are not closed under allowed sources."
+    },
+    {
+      "family": "STM32WL3",
+      "production_exact_count": 47,
+      "disposition": "blocked_catalog_conflict",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://www.st.com/en/microcontrollers-microprocessors/stm32wl3x/products.html"
+      ],
+      "blocker": "Direct Product Selector Flash/RAM observations conflict with current Production Flash for multiple exact identities (for example WL30KB/WL31CB/WL31KB populations). Catalog identity must be reconciled before a full-family profile can be admitted."
+    },
+    {
+      "family": "STM32WLX",
+      "production_exact_count": 31,
+      "disposition": "blocked_allowed_source_gap",
+      "direct_fields_observed": [
+        "ram",
+        "operating_vdd"
+      ],
+      "sources": [
+        "https://estore.st.com/en/stm32wl54ccu7-cpn.html",
+        "https://estore.st.com/en/stm32wle4c8u6-cpn.html",
+        "https://estore.st.com/en/stm32wle5cbu6-cpn.html",
+        "https://estore.st.com/en/stm32wle5ccu6-cpn.html",
+        "https://estore.st.com/en/stm32wl5moch6tr-cpn.html"
+      ],
+      "blocker": "WL54/55 and WLE4/E5 RAM/VDD are directly evidenced, but STM32WL5MOC module eStore observations do not directly expose RAM. Inferring module RAM from its underlying WL MCU is prohibited."
+    }
+  ]
+}
