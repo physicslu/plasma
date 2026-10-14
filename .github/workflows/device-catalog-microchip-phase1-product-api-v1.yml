@@ -5,6 +5,8 @@ on:
     paths:
       - 'data/device-catalog/research/microchip_phase1_product_api_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_product_api_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_chart_html_source_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_chart_html_source_v1.py'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_PRODUCT_API_V1.md'
       - '.github/workflows/device-catalog-microchip-phase1-product-api-v1.yml'
   workflow_dispatch:
@@ -26,6 +28,8 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_product_api_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_chart_html_source_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_information_v1.py' -v
       - name: Official Microchip Product API read-only capture canary
@@ -51,9 +55,28 @@ jobs:
             ${{ runner.temp }}/microchip-phase1-product-api-report.json
           if-no-files-found: warn
           retention-days: 90
+      - name: Official MicrochipDirect chart HTML source canary
+        id: chart_live
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --capture "${{ runner.temp }}/microchip-phase1-chart-html-original"
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --replay "${{ runner.temp }}/microchip-phase1-chart-html-original"
+      - name: Retain bounded official chart HTML evidence or failure manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-chart-html-source-original-v1
+          path: ${{ runner.temp }}/microchip-phase1-chart-html-original/
+          if-no-files-found: warn
+          retention-days: 90
       - name: Report actual live acquisition outcome separately from unit tests
         if: always()
         run: |
-          echo "Live canary outcome: ${{ steps.live.outcome }}" >> "${{ github.step_summary }}"
+          echo "Product API live outcome: ${{ steps.live.outcome }}"
+          echo "Official chart HTML live outcome: ${{ steps.chart_live.outcome }}" >> "${{ github.step_summary }}"
           echo "Offline unit-test success is NOT a manufacturer source-capture success." >> "${{ github.step_summary }}"
           echo "The 90-day artifact is not durable original-byte archival." >> "${{ github.step_summary }}"
