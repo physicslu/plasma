@@ -327,14 +327,39 @@ jobs:
           )
           echo "kit=$kit" >> "$GITHUB_OUTPUT"
 
-      - name: Install OpenOCD libgpiod v1 runtime on QEMU ARMv7 target
+      - name: Install Jammy libgpiod v1 compatibility runtime on QEMU ARMv7 target
         shell: bash
         run: |
           set -euo pipefail
+
+          # z2like-demo intentionally uses a Python 3.12 ARM image whose current
+          # base is Debian Trixie. The production OpenOCD artifact targets the
+          # Z2 Ubuntu/Jammy ABI and links libgpiod.so.2, which Trixie no longer
+          # ships. Extract the exact ABI family from an ARMv7 Jammy helper image
+          # rather than pretending the simulation target's apt repository is Z2.
+          compat="$RUNNER_TEMP/openocd-jammy-libgpiod-armv7"
+          rm -rf "$compat"
+          mkdir -p "$compat"
+          docker run --rm \
+            --platform linux/arm/v7 \
+            --volume "$compat:/out" \
+            arm32v7/ubuntu:22.04 \
+            sh -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends libgpiod2
+              cp -a /usr/lib/arm-linux-gnueabihf/libgpiod.so.2* /out/
+            '
+          test -e "$compat/libgpiod.so.2"
+          docker exec plasma-z2like-demo-qemu \
+            mkdir -p /usr/local/lib/plasma-openocd-compat
+          docker cp "$compat/." \
+            plasma-z2like-demo-qemu:/usr/local/lib/plasma-openocd-compat/
           docker exec plasma-z2like-demo-qemu sh -ec '
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update
-            apt-get install -y --no-install-recommends libgpiod2
+            printf "%s\n" /usr/local/lib/plasma-openocd-compat \
+              > /etc/ld.so.conf.d/plasma-openocd-compat.conf
+            ldconfig
+            ldconfig -p | grep -q "libgpiod.so.2"
           '
 
       - name: Drive Manager to Bootstrap to QEMU deployment E2E
