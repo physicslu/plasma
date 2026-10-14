@@ -168,9 +168,11 @@ def validate_config(cfg):
         require(item["unit"] is None or
                 (isinstance(item["unit"], str) and item["unit"].strip()),
                 "original unit must be specified or null")
-        require(item["unit"] is None if field in
-                ("base_device", "package", "core_architecture", "core_model") else True,
-                "non-numeric field may not have a unit")
+        if field in ("base_device", "package", "core_architecture", "core_model"):
+            require(item["unit"] is None, "categorical field cannot declare a unit")
+        else:
+            require(isinstance(item["unit"], str) and item["unit"].strip(),
+                    "numeric/range chart fields require their original source unit")
         names.append(item["header"])
     require(len(set(names)) == len(names), "duplicate source header mapping")
 
@@ -255,6 +257,7 @@ def generate(xlsx_path, cfg, lock_path=LOCK):
                   "original_file_name": Path(xlsx_path).name,
                   "original_byte_sha256": hashlib.sha256(raw).hexdigest(),
                   "original_byte_size": len(raw), "original_bytes_embedded": False,
+                  "official_export_origin_independently_verified": False,
                   "manufacturer_complete": False},
         "classification": {"pinned_openocd_version": lock["provider"]["version"],
                            "pinned_openocd_commit": lock["provider"]["commit"],
