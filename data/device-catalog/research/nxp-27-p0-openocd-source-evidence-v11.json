@@ -4,7 +4,7 @@
   "scope": "SOURCE_ONLY_NXP_P0_27_EXACT_REVIEW_NO_SOFTWARE_SUPPORT_PROMOTION",
   "source_v10_501_core_ledger_git_blob": "9f0397fe6062356fd04cd5eb73133969e75d9bfb",
   "source_kl25_12_canonical_git_blob": "53087e9082445e7948f88e688ecd890b0454d788",
-  "source_v10_family_lock_git_blob": "3f5209a70b3e263ed0a4ca92121ae3f24a5d2c65",
+  "source_v10_family_lock_git_blob": "2b2975af40af19da9e5abb1cd27dc8a9ab352c9e",
   "source_v9_pinned_openocd_lock_git_blob": "e9ccb5af0c4649541955cbd0608340dfd2758856",
   "provider": "openocd-upstream",
   "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
