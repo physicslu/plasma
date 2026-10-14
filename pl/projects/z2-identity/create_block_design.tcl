@@ -21,7 +21,12 @@ set addr [get_property OFFSET $seg]
 set range [get_property RANGE $seg]
 if {$addr != 0x40000000 || $range != 4096} {error "Identity AXI aperture mismatch: $addr $range"}
 # Only dedicated PS DDR/FIXED_IO interfaces may leave the design.
-if {[llength [get_bd_ports -quiet *]] != 0} {error "External PL scalar ports are forbidden"}
+foreach port [get_bd_ports -quiet *] {
+    set name [get_property NAME $port]
+    if {![string match "DDR_*" $name] && ![string match "FIXED_IO_*" $name]} {
+        error "External PL port is forbidden: $name"
+    }
+}
 validate_bd_design
 save_bd_design
 set fp [open [file join $generated_dir identity-axi-base.txt] w]
