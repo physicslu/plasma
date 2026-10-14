@@ -58,6 +58,22 @@ def prepare(output: Path, version: str) -> None:
         word = build_id[i * 8 : (i + 1) * 8]
         header += f"localparam logic [31:0] PLSM_BUILD_ID_{i} = 32'h{word.upper()};\n"
     (output / "plasma_identity_generated.vh").write_text(header)
+
+    # Vivado IP Integrator's "Add Module" HDL parser is not guaranteed to
+    # inherit sources_1 include_dirs. Materialize a self-contained SV module
+    # to make IP block-design reference parsing independent of include search
+    # paths. The source RTL remains authoritative and is used by cocotb.
+    source = (REPO / "pl/rtl/bus/pl_identity_axi_lite.sv").read_text()
+    directive = '`include "plasma_identity_generated.vh"'
+    if source.count(directive) != 1:
+        raise ValueError(
+            "Identity RTL must contain exactly one generated constants include"
+        )
+    expanded = source.replace(directive, header.rstrip("\\n"), 1)
+    (output / "pl_identity_axi_lite.sv").write_text(
+        "// GENERATED BUILD INPUT — do not edit; source is pl/rtl/bus/pl_identity_axi_lite.sv\\n"
+        + expanded
+    )
     identity = {
         "identity_schema_version": 1,
         "bitstream_version": version,
