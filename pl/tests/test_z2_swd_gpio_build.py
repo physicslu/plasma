@@ -212,14 +212,14 @@ class Z2SourceContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             logs = Path(tmp)
             (logs / "monitored-build.status").write_text(
-                "STATUS=RUNNING\\nSTARTED_EPOCH_MS=1700000000000\\n"
+                "STATUS=RUNNING\nSTARTED_EPOCH_MS=1700000000000\n"
             )
             (logs / "vivado-console.log").write_text(
-                "STAGE_EVENT BLOCK_DESIGN START 1700000001000\\n"
-                "STAGE_EVENT BLOCK_DESIGN DONE 1700000002500\\n"
-                "STAGE_EVENT SYNTHESIS START 1700000003000\\n"
+                "STAGE_EVENT BLOCK_DESIGN START 1700000001000\n"
+                "STAGE_EVENT BLOCK_DESIGN DONE 1700000002500\n"
+                "STAGE_EVENT SYNTHESIS START 1700000003000\n"
                 # A prior build's events must not contaminate current totals.
-                "STAGE_EVENT TIMING_AND_REPORTS DONE 1699999999000\\n"
+                "STAGE_EVENT TIMING_AND_REPORTS DONE 1699999999000\n"
             )
             reporter = importlib.util.spec_from_file_location("fpga_progress", script)
             self.assertIsNotNone(reporter)
@@ -229,8 +229,8 @@ class Z2SourceContractTest(unittest.TestCase):
             self.assertIn("RUNNING | total=00:00:05", running)
             self.assertIn("Synthesis (00:00:02)", running)
             finished_status = (
-                "STATUS=PASS\\nSTARTED_EPOCH_MS=1700000000000\\n"
-                "UPDATED_EPOCH_MS=1700000006700\\n"
+                "STATUS=PASS\nSTARTED_EPOCH_MS=1700000000000\n"
+                "UPDATED_EPOCH_MS=1700000006700\n"
             )
             (logs / "monitored-build.status").write_text(finished_status)
             summary = module.render(logs, summary=True, now_ms=1700000999000)
