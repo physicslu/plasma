@@ -110,10 +110,13 @@
     },
     "STM32H7RS": {
       "production_exact_icpns": 36,
-      "disposition": "in_progress",
-      "admitted_exact_icpns": 0,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 36,
       "blocker": null,
-      "notes": []
+      "notes": [
+        "ST eStore directly exposes 64 KiB Bootflash, 620 KiB SRAM and 1.62–3.6 V supply for all four H7RS series groups.",
+        "Production H7RS operating-temperature notation is bounded -40..85 C and is accepted by the strict parser."
+      ]
     },
     "STM32H7": {
       "production_exact_icpns": 205,
