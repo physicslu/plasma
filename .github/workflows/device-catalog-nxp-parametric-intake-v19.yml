@@ -1,0 +1,22 @@
+name: NXP Phase 1 Safe Parametric Export Intake v19
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp_phase1_parametric_ingest_v19.py'
+      - 'data/device-catalog/research/test_nxp_phase1_parametric_ingest_v19.py'
+      - 'data/device-catalog/research/NXP_PHASE1_PARAMETRIC_INTAKE_V19.md'
+      - '.github/workflows/device-catalog-nxp-parametric-intake-v19.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parametric-export-safe-importer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify offline exact-SKU export intake and fail-closed input handling
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_parametric_ingest_v19.py' -v
