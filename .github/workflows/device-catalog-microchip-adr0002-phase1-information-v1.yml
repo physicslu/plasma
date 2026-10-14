@@ -4,7 +4,11 @@ on:
     paths:
       - 'data/device-catalog/research/microchip-adr0002-phase1-ic-information-pilot-v1.json'
       - 'data/device-catalog/research/microchip_phase1_information_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_source_capture_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_mcp_identity_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_information_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_source_capture_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_mcp_identity_v1.py'
       - 'data/device-catalog/research/MICROCHIP_ADR0002_PHASE1_INFORMATION_V1.md'
       - '.github/workflows/device-catalog-microchip-adr0002-phase1-information-v1.yml'
   workflow_dispatch:
@@ -27,6 +31,57 @@ jobs:
             -p 'test_microchip_phase1_information_v1.py' -v
           python data/device-catalog/research/microchip_phase1_information_v1.py \
             --report "${{ runner.temp }}/microchip-phase1-information-report-v1.json"
+      - name: Verify source capture tool negative cases offline
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s data/device-catalog/research \
+            -p 'test_microchip_phase1_source_capture_v1.py' -v
+      - name: Capture official manufacturer source originals (best-effort Phase 1 research)
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_source_capture_v1.py \
+            --capture "${{ runner.temp }}/microchip-phase1-original-sources"
+      - name: Retain original manufacturer responses and SHA-256 replay manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-original-manufacturer-sources-v1
+          path: ${{ runner.temp }}/microchip-phase1-original-sources/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Source-locked exact manufacturer MCP identity negative tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s data/device-catalog/research \
+            -p 'test_microchip_phase1_mcp_identity_v1.py' -v
+      - name: Bounded official Microchip MCP manufacturer identity acquisition
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          # Exactly one manufacturer base-product query; no cross-family search.
+          mkdir -p "${{ runner.temp }}/microchip-phase1-mcp"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A \
+            --output-dir "${{ runner.temp }}/microchip-phase1-mcp/ATSAMD21G18A"
+          # Repeat full 20/60 pagination evidence replay from original MCP bytes.
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A --replay \
+            --output-dir "${{ runner.temp }}/microchip-phase1-mcp/ATSAMD21G18A"
+          python data/device-catalog/research/microchip_phase1_mcp_identity_v1.py \
+            --original-root "${{ runner.temp }}/microchip-phase1-mcp/ATSAMD21G18A" \
+            --report "${{ runner.temp }}/microchip-phase1-mcp/atsamd21g18a-exact-identity-replay.json"
+      - name: Retain bounded Phase 1 Microchip MCP original query responses
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-atsamd21g18a-mcp-original-v1
+          path: ${{ runner.temp }}/microchip-phase1-mcp/
+          if-no-files-found: warn
+          retention-days: 90
       - name: Retain Phase 1 Research-only field completeness report
         if: always()
         uses: actions/upload-artifact@v4

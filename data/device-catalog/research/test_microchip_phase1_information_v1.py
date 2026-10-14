@@ -33,10 +33,66 @@ class MicrochipPhase1InformationTests(unittest.TestCase):
         self.assertEqual(coverage["temperature"]["VERIFIED"], 2)
         self.assertEqual(coverage["flash"]["PARTIAL"], 2)
         self.assertEqual(coverage["vdd"]["PARTIAL"], 2)
-        self.assertEqual(coverage["io_supply"]["UNKNOWN"], 2)
-        self.assertEqual(coverage["vdda"]["UNKNOWN"], 2)
-        self.assertEqual(coverage["base_device"]["UNKNOWN"], 2)
-        self.assertEqual(report["sources_with_original_raw_bytes"], 0)
+        self.assertEqual(coverage["io_supply"]["PARTIAL"], 2)
+        self.assertEqual(coverage["vdda"]["PARTIAL"], 2)
+        self.assertEqual(coverage["base_device"]["VERIFIED"], 2)
+        self.assertEqual(report["sources_with_original_raw_bytes"], 2)
+
+    def test_analog_supply_is_not_core_regulator(self):
+        for rec in self.dataset["records"]:
+            with self.subTest(icpn=rec["icpn"]):
+                vdda = rec["fields"]["vdda"]
+                io = rec["fields"]["io_supply"]
+                self.assertEqual(vdda["status"], "PARTIAL")
+                self.assertEqual(io["status"], "PARTIAL")
+                self.assertIn("VDDANA", vdda["source_locator"])
+                self.assertIn("VDDIO", io["source_locator"])
+                self.assertNotIn("VDDCORE", vdda["source_locator"])
+                self.assertEqual(vdda["value"], {"min": 1.62, "max": 3.63})
+                self.assertEqual(io["value"], {"min": 1.62, "max": 3.63})
+                self.assertIn("same applied voltage", io["notes"])
+
+    def test_wrong_datasheet_revision_is_not_trusted(self):
+        invalid = deepcopy(self.dataset)
+        invalid["source_records"][1]["source_version"] = "DS40001882G"
+        with self.assertRaisesRegex(ValueError, "datasheet identity"):
+            check(invalid)
+
+    def test_wrong_supply_alias_is_rejected(self):
+        invalid = deepcopy(self.dataset)
+        invalid["records"][0]["fields"]["vdda"]["source_locator"] = (
+            "DS40001882H §8.2.1 VDDCORE"
+        )
+        with self.assertRaisesRegex(ValueError, "supply pin/source alias"):
+            check(invalid)
+
+    def test_source_must_not_be_silent_unverified_url(self):
+        invalid = deepcopy(self.dataset)
+        invalid["source_records"][1]["url"] = "https://not-microchip.example/fake.pdf"
+        with self.assertRaisesRegex(ValueError, "official manufacturer source"):
+            check(invalid)
+
+    def test_direct_mcp_base_device_verified_but_not_admitted(self):
+        for row in self.dataset["records"]:
+            with self.subTest(icpn=row["icpn"]):
+                f = row["fields"]["base_device"]
+                self.assertEqual(f["status"], "VERIFIED")
+                self.assertEqual(f["value"], "ATSAMD21G18")
+                self.assertIn("basePartNumber", f["source_locator"])
+                self.assertEqual(f["evidence_scope"], "exact_mcp_response_row")
+                self.assertEqual(row["internal_admission_state"], "NOT_ADMITTED")
+
+    def test_base_device_cannot_be_changed_to_parsed_guess(self):
+        invalid = deepcopy(self.dataset)
+        invalid["records"][0]["fields"]["base_device"]["value"] = "ATSAMD21G18A"
+        with self.assertRaisesRegex(ValueError, "base device not bound"):
+            check(invalid)
+
+    def test_archive_pointer_is_not_manufacturer_capture_proof_if_forged(self):
+        invalid = deepcopy(self.dataset)
+        invalid["source_records"][2]["capture_artifact_id"] = 12345
+        with self.assertRaisesRegex(ValueError, "capture provenance not pinned"):
+            check(invalid)
 
     def test_temperature_changes_with_exact_ordering_suffix(self):
         by_icpn = {r["icpn"]: r for r in self.dataset["records"]}
@@ -56,13 +112,18 @@ class MicrochipPhase1InformationTests(unittest.TestCase):
 
     def test_unknown_is_not_numeric_zero(self):
         invalid = deepcopy(self.dataset)
-        invalid["records"][0]["fields"]["io_supply"]["value"] = 0
+        field = invalid["records"][0]["fields"]["base_device"]
+        field.update({"status": "UNKNOWN", "value": 0, "source_id": None,
+                      "evidence_scope": None, "source_locator": None})
         with self.assertRaisesRegex(ValueError, "unknown/conflict falsely populated"):
             check(invalid)
 
     def test_unknown_base_device_not_parsed_from_icpn(self):
         invalid = deepcopy(self.dataset)
-        invalid["records"][0]["fields"]["base_device"]["value"] = "ATSAMD21G18A"
+        field = invalid["records"][0]["fields"]["base_device"]
+        field.update({"status": "UNKNOWN", "value": "ATSAMD21G18A",
+                      "source_id": None, "evidence_scope": None,
+                      "source_locator": None})
         with self.assertRaisesRegex(ValueError, "unknown/conflict falsely populated"):
             check(invalid)
 
