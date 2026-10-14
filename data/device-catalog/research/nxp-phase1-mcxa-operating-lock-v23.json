@@ -1,0 +1,44 @@
+{
+  "schema_version": 23,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "baseline_v22_git_blob": "6a38257c111e4283965abf22fb7aee767f55e58d",
+  "v22_generator_git_blob": "2f2afb41060106d2cc6e2d92834b8047c177bae0",
+  "v22_source_lock_git_blob": "08d2f5e3497be85cd481cb9fecdf1cca5eb4126e",
+  "exact_119_evidence_git_blob": "db594df78ae19161e2263ecde29da2926f690235",
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research_only": 277,
+  "expected_119": 119,
+  "document_exact_counts": {
+    "MCXAP064M096F30": 22,
+    "MCXAP100M096F60": 26,
+    "MCXAP100M180F41": 8,
+    "MCXAP144M240F61": 31,
+    "MCXAP100M180F40": 8,
+    "MCXAP144M240F60": 24
+  },
+  "document_revision": {
+    "MCXAP064M096F30": "Rev. 5.2 2026-05-26",
+    "MCXAP100M096F60": "Rev. 10 2026-05-26",
+    "MCXAP100M180F41": "Rev. 3.0 2026-07-06",
+    "MCXAP144M240F61": "Rev. 5 2026-07-06",
+    "MCXAP100M180F40": "Rev. 4.0 2026-07-06",
+    "MCXAP144M240F60": "Rev. 6 2026-07-06"
+  },
+  "expected_vdd_p3_alternate": 26,
+  "vendor_pdf_binary_archived": false,
+  "vendor_pdf_sha256": null,
+  "voltage_vdd": "1.71 to 3.6",
+  "vdda_constraint": "VDD_ANA: VDD-0.1 to VDD+0.1 V; POR VDD_ANA = VDD",
+  "io_default": "GPIO VDD 1.71 to 3.6 V (shared rail)",
+  "io_dual": "GPIO VDD 1.71 to 3.6 V; VDD_P3: normal 1.71 to 3.6 V OR 1.2V mode 1.14 to 1.32 V",
+  "prevent": [
+    "Production/identity admission",
+    "Phase2 Programming/Flash",
+    "Phase3 PPU Socket HIL",
+    "Console/API/runtime",
+    "absolute max mapped to VDD",
+    "USB analog mapped to all GPIO"
+  ]
+}
