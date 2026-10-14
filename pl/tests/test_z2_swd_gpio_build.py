@@ -110,7 +110,9 @@ class Z2SourceContractTest(unittest.TestCase):
             self.assertIn(offset, rtl)
         self.assertIn("32'h504C534D", rtl)
         self.assertIn("s_axi_bresp   = 2'b10", rtl)
-        self.assertIn("s_axi_araddr[31:5] != 27'b0", rtl)
+        # AXI interconnect may forward a full nonzero mapped physical base.
+        self.assertIn("s_axi_araddr[11:5] != 7'b0", rtl)
+        self.assertNotIn("s_axi_araddr[31:5] != 27'b0", rtl)
 
     def test_vivado_requires_board_preset_timing_and_no_load(self):
         folder = ROOT / "projects/z2-swd-gpio"
