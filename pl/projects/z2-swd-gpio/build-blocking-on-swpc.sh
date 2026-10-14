@@ -73,10 +73,15 @@ if [[ ! "$pid" =~ ^[1-9][0-9]*$ ]]; then
 fi
 [[ -f "$monitor_log" ]] || { echo "Missing monitor log: $monitor_log" >&2; exit 2; }
 
+interval="${PLASMA_PROGRESS_INTERVAL_SECONDS:-10}"
+if [[ ! "$interval" =~ ^[1-9][0-9]*$ ]] || ((interval > 60)); then
+  echo "Invalid PLASMA_PROGRESS_INTERVAL_SECONDS (must be 1..60)" >&2
+  exit 2
+fi
 echo "=== FOREGROUND BLOCKING MONITOR (PID=$pid) ==="
 echo "The foreground client blocks until supervisor exits; Build stays detached."
 echo "Press Ctrl-C to stop watching only."
-echo "Progress refresh: every 10 seconds; duration format: HH:MM:SS."
+echo "Progress refresh: every $interval seconds; duration format: HH:MM:SS."
 
 progress="$script_dir/build-progress.py"
 [[ -f "$progress" ]] || { echo "Missing progress reporter: $progress" >&2; exit 2; }
@@ -100,11 +105,13 @@ while :; do
     echo "Supervisor PID $pid exited; checking terminal status."
     break
   fi
-  sleep 10
+  sleep "$interval"
 done
 
 echo "=== BUILD STAGE DURATIONS ==="
 python3 "$progress" --logdir "$logdir" --summary || true
+echo "=== MONITOR COMPLETION LOG ==="
+tail -n 10 "$monitor_log" || true
 echo "=== TERMINAL BUILD STATUS ==="
 if [[ ! -f "$status_file" ]]; then
   echo "RESULT=UNKNOWN: no atomic status file (supervisor failed to initialize)" >&2
