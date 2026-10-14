@@ -21,6 +21,12 @@ on:
       - 'data/device-catalog/research/nxp-phase1-pin-package-evidence-v15.json'
       - 'data/device-catalog/research/nxp-phase1-pin-package-coverage-v15.json'
       - 'data/device-catalog/research/NXP_PHASE1_LPC84X_PIN_PAD_V15.md'
+      - 'data/device-catalog/research/nxp_phase1_k32l2a_v16.py'
+      - 'data/device-catalog/research/test_nxp_phase1_k32l2a_v16.py'
+      - 'data/device-catalog/research/nxp-501-phase1-k32l2a-enriched-v16.csv'
+      - 'data/device-catalog/research/nxp-phase1-k32l2a-datasheet-lock-v16.json'
+      - 'data/device-catalog/research/nxp-phase1-k32l2a-coverage-v16.json'
+      - 'data/device-catalog/research/NXP_PHASE1_K32L2A_V16.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,3 +51,7 @@ jobs:
         run: python data/device-catalog/research/nxp_phase1_pin_package_v15.py
       - name: Test 501 original identities and fail-closed 32 plus one package resolution
         run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_pin_package_v15.py' -v
+      - name: Verify K32L2A exact official datasheet RAM and voltage evidence
+        run: python data/device-catalog/research/nxp_phase1_k32l2a_v16.py
+      - name: Regression test 4 K32L2A and 12 K32L2B source-blocked exact identities
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_k32l2a_v16.py' -v
