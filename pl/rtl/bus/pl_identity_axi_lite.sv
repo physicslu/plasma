@@ -92,8 +92,11 @@ module pl_identity_axi_lite (
             if (accept_ar) begin
                 s_axi_rvalid <= 1'b1;
                 s_axi_rresp <= 2'b00; // OKAY
-                // Reject accesses beyond this 8-register window or unaligned.
-                if (s_axi_araddr[31:5] != 27'b0) begin
+                // An AXI interconnect decodes the peripheral base address,
+                // but may forward its nonzero upper address bits unchanged.
+                // Only the 4KB slave-local register offset is decoded here.
+                // The 8 registers occupy the first 32 bytes of that window.
+                if (s_axi_araddr[11:5] != 7'b0) begin
                     s_axi_rdata <= 32'b0;
                     s_axi_rresp <= 2'b10; // SLVERR
                 end else begin
