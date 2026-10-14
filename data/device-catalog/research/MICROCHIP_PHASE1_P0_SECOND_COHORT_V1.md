@@ -58,6 +58,22 @@ python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
 
 Then run the combined script with corresponding `--e5-original-root` / `--pic32-original-root`, `--e5-outcome REPLAYED` / `--pic32-outcome REPLAYED` and `--report`; independently recompute the exact report using `--verify`. If source capture fails, pass `--e5-outcome SOURCE_NOT_AVAILABLE` or `--pic32-outcome SOURCE_NOT_AVAILABLE` **without an original source root**. The dedicated CI automates this selection and captures at most two original official MCP queries.
 
+## Live manufacturer source-replay observation — 2026-10-14
+
+The actual GitHub Runner completed the two independent manufacturer MCP captures and both full original-source replays successfully. The [run 38528439094](https://github.com/physicslu/plasma/actions/runs/38528439094) archived the original source bytes, SHA-256 manifests, chart-derived selection plan and 341-row Research matrix in [artifact 11876777831](https://github.com/physicslu/plasma/actions/runs/38528439094/artifacts/11876777831).
+
+| Pinned P0 research lead | Original manufacturer chart Base Device / MCP query | Source-observed exact-ordering candidates | Classification |
+| --- | --- | ---: | --- |
+| `sam-e5-d5` | `ATSAMD51G18A` | **10** | `CURRENT_REPLAYED_MATCH`; source-observed, **not** individually reviewed |
+| `pic32mx` | `PIC32MX110F016B` | **14** | `CURRENT_REPLAYED_MATCH`; source-observed, **not** individually reviewed |
+| **This bounded cohort** | **2 original chart Base Devices** | **24** | **Research only, no admission** |
+
+The original MicrochipDirect chart SHA-256 in this capture was `3fccf5773f1137b057f0bee48919a07d0015b5b6ef5b0c27f8177b4e001ab0a7`. This is a *new* dynamically generated source response, not required to hash identically to previous manufacturer captures. Each MCP original response's own SHA-256 and pagination manifest are recorded inside the artifact.
+
+The 341-row P0 state matrix after this live experiment is **2 `CURRENT_REPLAYED_MATCH`**, **1 `PREVIOUS_REPLAYED_NOT_RECHECKED`** (SAMD21 from PR #871), **338 `NOT_QUERIED`**, **0 `SOURCE_NOT_AVAILABLE`**, and **0 `CURRENT_REPLAYED_NO_EXACT_MATCH`**. Prior SAMD21's **23** exact-prefix source candidates were **not re-queried in this run**. Thus 24 is the **new** source-observed cohort only; neither 24 nor any sum of cohorts is a manufacturer-wide SKU coverage denominator or OpenOCD-supported list.
+
+Original artifact expiration: **2027-01-12 07:27:29 UTC**. Original-response retention beyond this 90-day Artifact remains **NOT VERIFIED**. No exact commercial ICPN was admitted and no Phase 1 family memory, voltage, package or temperature value was automatically promoted to a per-commercial-part `VERIFIED` field.
+
 ## Durable original-byte custody gate (not yet satisfied)
 
 The GitHub Actions artifact retains original chart/MCP bytes, `manifest.json`, SHA-256 hashes, chart-derived plan and combined report for **90 days**. Before permanent admission, an operator must copy the original artifact **unchanged** into a durable, versioned, access-controlled archive; preserve its content hash, source URL/query, capture timestamp and provenance; configure retention and object integrity checks; and independently **replay the original bytes** from that archive. GitHub artifact URLs alone and SHA-256 references without the original byte content do **not** establish durable evidence.
