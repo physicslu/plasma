@@ -1,0 +1,196 @@
+{
+  "schema_version": 14,
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "cohort": "bounded 501 exact observed ordering strings",
+  "existing_production_identity": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 12,
+        "PARTIAL": 0,
+        "UNKNOWN": 212,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 12,
+        "PARTIAL": 0,
+        "UNKNOWN": 212,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 12,
+        "PARTIAL": 0,
+        "UNKNOWN": 212,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "pending_manufacturer_research": {
+    "exact_icpn_records": 277,
+    "identity_admitted": 0,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 0,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 10,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 5
+      },
+      "pin_count": {
+        "VERIFIED": 10,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 5
+      },
+      "flash": {
+        "VERIFIED": 15,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 15,
+        "PARTIAL": 48,
+        "UNKNOWN": 214,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 15,
+        "PARTIAL": 42,
+        "UNKNOWN": 220,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 277,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 277,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 15,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 234,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 5
+      },
+      "pin_count": {
+        "VERIFIED": 234,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 5
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 27,
+        "PARTIAL": 48,
+        "UNKNOWN": 426,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 27,
+        "PARTIAL": 42,
+        "UNKNOWN": 432,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 501,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 12,
+        "PARTIAL": 0,
+        "UNKNOWN": 489,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "enriched_source_attested_exact": 27,
+  "enriched_kl25": 12,
+  "enriched_lpc84x": 15,
+  "unresolved_hvqfn33_vs_hvqfn32_package_nomenclature": 5,
+  "source_binary_sha256_lock_available": false,
+  "software_qualified_exact_icpns": null,
+  "physical_hil_validated_configurations": null,
+  "underlying_snapshot_v13_blob": "4a0fbad8fa5f57580ba28e92f71b0793e12faf07",
+  "source_evidence_policy": "Original PDF bytes unavailable for Git SHA lock; document URLs/revisions and exact table/page locators recorded. No PDF byte digest inferred. Data is source-document transcription, independently reviewable.",
+  "note": "Manufacturer identity admission is independent of metadata verified fields; no Production/public Catalog/runtime/Programming/HIL changes."
+}
