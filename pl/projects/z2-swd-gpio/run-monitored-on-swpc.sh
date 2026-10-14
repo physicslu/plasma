@@ -40,10 +40,11 @@ if [[ -n "$(git -C "$repo" status --porcelain --untracked-files=no)" ]]; then
   exit 2
 fi
 
+started_epoch_ms="$(date +%s%3N)"
 write_status() {
   local state="$1" code="$2" temp="$status_file.tmp.$$"
-  printf 'STATUS=%s\nEXIT_CODE=%s\nSOURCE_SHA=%s\nSUPERVISOR_PID=%s\nUPDATED_AT=%s\n' \
-    "$state" "$code" "$commit" "$" "$(date -Is)" > "$temp"
+  printf 'STATUS=%s\nEXIT_CODE=%s\nSOURCE_SHA=%s\nSUPERVISOR_PID=%s\nSTARTED_EPOCH_MS=%s\nUPDATED_AT=%s\n' \
+    "$state" "$code" "$commit" "$$" "$started_epoch_ms" "$(date -Is)" > "$temp"
   mv -f -- "$temp" "$status_file"
 }
 
