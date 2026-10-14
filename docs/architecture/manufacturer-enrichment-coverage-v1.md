@@ -282,10 +282,9 @@ Framework v1 permanently tests that:
 
 Manufacturer Device enrichment remains a separate track from Programming Profile expansion.
 
-Any Programming Profile transaction must keep the 1,185 M1 Basic Profiles independent and separately establish the exact
+Any Programming Profile transaction must keep the 1,290 M1 Basic Profiles independent and separately establish the exact
 manufacturer applicability of programming interfaces, programming electrical constraints,
 Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
 M2 merely because an OpenOCD target mapping exists.
 
-After STM32F1 M2 proves the separation, the same Device Basic Profile pattern can be applied
-to another family without coupling basic catalog information to programming-algorithm maturity.
+The F1/F2/C0/G0/G4 Basic Profile batches prove the pattern can expand across families without coupling basic catalog information to programming-algorithm maturity.
