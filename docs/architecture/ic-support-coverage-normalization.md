@@ -64,7 +64,7 @@ OpenOCD-unmapped ICPNs:                   677
 Direct IC Support-bound ICPNs:              2
 Evidence-backed Programming Profiles:       1
 Native PPU runtime-ready ICPNs:              0
-Manufacturer Enrichment M1+:             1,290
+Manufacturer Enrichment M1+:             1,375
 Manufacturer Enrichment M4+:                 1
 Manufacturer Enrichment M5:                  0
 ```
@@ -72,9 +72,9 @@ Manufacturer Enrichment M5:                  0
 Base-device cardinality and per-family counts remain deterministic outputs of
 `coverage_inventory.py --summary`; they are not duplicated here as a hand-maintained constant.
 
-The current STM32F1 + STM32F2 + STM32C0 + STM32G0 + STM32G4 Device Basic batches raise 1,290
+The current STM32F1 + STM32F2 + STM32C0 + STM32G0 + STM32G4 + STM32L5 + STM32H7RS Device Basic batches raise 1,375
 ST Production exact ICPNs to M1 without changing the two existing IC Support Programming
-bindings or any hardware/runtime readiness.
+bindings or any hardware/runtime readiness. The complete ST M1 disposition sweep records the remaining 3,254 exact ICPNs as explicit evidence/schema/catalog blockers rather than treating them as unreviewed.
 
 The counts describe different maturity layers and must not be collapsed into a single
 `supported=true` claim. In particular, `4,176 deterministic OpenOCD-mapped ICPNs`
