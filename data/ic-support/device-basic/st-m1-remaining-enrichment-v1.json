@@ -137,10 +137,13 @@
     },
     "STM32WL3": {
       "production_exact_icpns": 47,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The same allowed exact eStore page exposes conflicting voltage semantics: Supply Voltage 1.7–3.6 V and Operating Voltage 1.8–3.6 V. The M1 Operating VDD contract has no approved rule to select one.",
+      "notes": [
+        "RAM is directly visible for representative WL3 exact products, so RAM is not the blocker.",
+        "Do not collapse Supply Voltage and Operating Voltage without an explicit architecture rule."
+      ]
     },
     "STM32WLX": {
       "production_exact_icpns": 31,
