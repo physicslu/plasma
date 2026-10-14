@@ -29,6 +29,11 @@ if [[ -n "${PLASMA_EXPECT_RUNNER_USER:-}" && "$(id -un)" != "$PLASMA_EXPECT_RUNN
   exit 2
 fi
 
+# SWPC runner's shell does not have Vivado on PATH until settings64.sh
+# is sourced. This default is from verified SWPC evidence, not a guessed path.
+if [[ -z "${VIVADO_SETTINGS64:-}" && -f /storage/tools/xilinx/2026.1/Vivado/settings64.sh ]]; then
+  VIVADO_SETTINGS64=/storage/tools/xilinx/2026.1/Vivado/settings64.sh
+fi
 if [[ -n "${VIVADO_SETTINGS64:-}" ]]; then
   if [[ ! -f "$VIVADO_SETTINGS64" ]]; then
     echo "PREFLIGHT_FAIL: VIVADO_SETTINGS64 does not exist: $VIVADO_SETTINGS64" >&2
@@ -38,6 +43,9 @@ if [[ -n "${VIVADO_SETTINGS64:-}" ]]; then
   source "$VIVADO_SETTINGS64"
 fi
 
+export PLASMA_BOARD_REPO
+PLASMA_BOARD_REPO="$(bash "$script_dir/prepare-board-repository.sh")"
+echo "BOARD_REPO=$PLASMA_BOARD_REPO"
 if ! command -v vivado >/dev/null 2>&1; then
   echo "PREFLIGHT_FAIL: vivado is not on PATH for this user/job" >&2
   echo "To use an installed Vivado, provide VIVADO_SETTINGS64=/actual/path/to/settings64.sh" >&2
