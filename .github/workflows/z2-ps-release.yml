@@ -281,6 +281,29 @@ jobs:
           export PLASMA_TEST_OPENOCD_SCRIPTS="$extract/plasma-openocd/payload/share/openocd/scripts"
           test -x "$PLASMA_TEST_OPENOCD"
           test -d "$PLASMA_TEST_OPENOCD_SCRIPTS"
+
+          # The OpenOCD artifact targets Ubuntu 22.04 and therefore links
+          # libgpiod.so.2. Hosted runners are Ubuntu 24.04, so inject the
+          # matching Jammy runtime library for this process-control test
+          # instead of silently testing against a different libgpiod ABI.
+          compat="$RUNNER_TEMP/openocd-jammy-libgpiod-x86_64"
+          rm -rf "$compat"
+          mkdir -p "$compat"
+          docker run --rm \
+            --platform linux/amd64 \
+            --volume "$compat:/out" \
+            ubuntu:22.04 \
+            bash -euxo pipefail -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends libgpiod2
+              cp -a /usr/lib/x86_64-linux-gnu/libgpiod.so.2* /out/
+            '
+          test -e "$compat/libgpiod.so.2"
+          export LD_LIBRARY_PATH="$compat${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          ldd "$PLASMA_TEST_OPENOCD" | tee "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
+          ! grep -q "not found" "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
+          grep -q "libgpiod.so.2" "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
           python -m pytest -q software/python/tests/test_openocd_rpc_worker_real.py
       - name: Install and execute on fresh matching Ubuntu 22.04 userspace
         shell: bash
