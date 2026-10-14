@@ -25,6 +25,8 @@ on:
       - "software/python/plasma_manager/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_web/**"
+      - "!software/python/plasma_web/device_catalog.py"
+      - "!software/python/plasma_web/*_manufacturer_device_evidence.py"
       - "software/web/app/engineering/openocd-control-plane-*"
       - "software/web/app/api/manager/**"
       - "software/web/tests/openocd-control-plane-contract.test.mjs"
@@ -57,6 +59,8 @@ on:
       - "software/python/plasma_manager/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_web/**"
+      - "!software/python/plasma_web/device_catalog.py"
+      - "!software/python/plasma_web/*_manufacturer_device_evidence.py"
       - "software/web/app/engineering/openocd-control-plane-*"
       - "software/web/app/api/manager/**"
       - "software/web/tests/openocd-control-plane-contract.test.mjs"
@@ -200,7 +204,8 @@ jobs:
         run: python -m pip install ./software/python pytest
 
       # Reuse only source/recipe-identical binaries; never restore a broader cache key.
-      # GitHub Actions PRs may read default-branch caches but may not publish them.
+      # GitHub scopes pull_request caches to refs/pull/<n>/merge, so a verified
+      # same-repo PR build can be reused by later runs without publishing into main.
       - name: Prepare portable ARMv7 OpenOCD cache path
         shell: bash
         run: |
@@ -391,11 +396,15 @@ jobs:
 
       # Publish cache only after a complete successful simulated deployment,
       # ARMv7 OpenOCD execution, 8-Site isolation and loopback lifecycle.
-      - name: Save qualified ARMv7 OpenOCD build cache on main only
+      # Main writes remain branch-scoped. Same-repo pull_request writes remain
+      # isolated to the PR merge ref and cannot seed the default-branch cache.
+      - name: Save qualified ARMv7 OpenOCD build cache
         if: >-
           steps.openocd-cache.outputs.cache-hit != 'true' &&
-          github.ref == 'refs/heads/main' &&
-          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          (github.event_name == 'push' ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+           (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository))
         uses: actions/cache/save@v4
         with:
           path: ${{ env.OPENOCD_ARMV7_CACHE_DIR }}

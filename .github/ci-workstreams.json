@@ -16,6 +16,7 @@
         ".github/workflows/python-tests.yml",
         ".github/workflows/ppu-release.yml",
         ".github/workflows/z2-ps-release.yml",
+        ".github/workflows/z2like-demo-qemu.yml",
         ".github/workflows/control-station-runtime.yml",
         ".github/workflows/mock-cd.yml",
         ".github/workflows/mock-cd-browser.yml",
