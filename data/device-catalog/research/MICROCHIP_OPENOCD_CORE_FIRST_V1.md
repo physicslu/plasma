@@ -25,9 +25,16 @@
 | P0 | PIC32MX | MIPS M4K | JTAG | `pic32mx.cfg` → `pic32mx` |
 | P0 | ATmega128 exact base name only | AVR 8-bit | JTAG | `atmega128.cfg` → `avr` |
 | P1 | SAM L1x | ARM; exact model unresolved in this pass | SWD | `atsaml1x.cfg` target only; no direct Flash Bank |
-| P1 | AVR32 | AVR32 AP7K | JTAG | `avr32.cfg` target only; no direct Flash Bank |
+| P1 | AT32AP7x (AVR32 AP7K candidate only) | AVR32 AP7K | JTAG | `avr32.cfg` target only; no direct Flash Bank; **NOT** AVR32DA 8-bit parts |
 
 This is a **curated shortlist** based on bounded pinned-source checks. It is **not an unbiased survey** showing that ARM is the majority of supported Microchip ICPNs or of all OpenOCD devices. AVR32 is distinct from the 8-bit AVR architecture. A generic `at91samdXX.cfg` comment mentioning Cortex-M0 does not settle the exact Core for every member of SAM D/C/R/L0; exact device matching remains unresolved.
+
+
+### Critical manufacturer part-name collision: AVR32DA is **not** AVR32 AP7K
+
+Actual archived DFP research names include `AVR32DA28`, `AVR32DA32` and related parts. The `32` in **AVR32DA** denotes the **32 KB Flash-density variant within the 8-bit AVR DA family**, **not** the historical 32-bit AVR32 architecture. Microchip's official [AVR DA family page](https://www.microchip.com/en-us/products/microcontrollers/8-bit-mcus/avr-mcus/avr-da) identifies this as an 8-bit product line, and the [AVR32DA32 product page](https://www.microchip.com/en-us/product/AVR32DA32) documents **UPDI**. These identifiers must not be matched to the `avr32.cfg` JTAG target with AVR32 AP7K CPU.
+
+The current bounded Research matcher therefore uses `^AT32AP7` for **candidate** AVR32 AP7K identifiers only; otherwise these DFP names remain **P2 archive**, with no assertion of permanent OpenOCD non-support. This is a concrete example of why **Core classification must be validated against manufacturer architecture/transport**, not inferred from apparent numeric prefixes.
 
 ### Inference limits
 
