@@ -48,9 +48,9 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After the STM32F1 + STM32C0 + STM32G0 + STM32G4 Device Basic Profile v1 batches,
+After the STM32F1 + STM32F2 + STM32C0 + STM32G0 + STM32G4 Device Basic Profile v1 batches,
 Production contains **4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly
-**1,185 ST Production ICPNs** (280 F1 + 226 C0 + 406 G0 + 273 G4) have an explicitly
+**1,290 ST Production ICPNs** (280 F1 + 105 F2 + 226 C0 + 406 G0 + 273 G4) have an explicitly
 bound M1 Basic Profile. STM32G4 is the first Basic Profile family where VDDA is populated
 from direct ST eStore evidence; I/O Supply remains explicitly missing.
 
@@ -58,8 +58,8 @@ Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 3,668 |
-| M1 | 1,184 |
+| M0 | 3,563 |
+| M1 | 1,289 |
 | M2 | 0 |
 | M3 | 0 |
 | M4 | 1 |
@@ -70,7 +70,7 @@ Cumulative coverage:
 | At least level | Exact ICPNs |
 |---|---:|
 | M0 | 4,853 |
-| M1 | 1,185 |
+| M1 | 1,290 |
 | M2 | 1 |
 | M3 | 1 |
 | M4 | 1 |
