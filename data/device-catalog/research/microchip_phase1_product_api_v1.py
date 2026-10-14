@@ -259,7 +259,15 @@ def replay(root, query, pilot_path=PILOT):
                 "API source pages incomplete/ambiguous")
         collections[size] = all_rows
     a, b = collections[PRIMARY_SIZE], collections[INDEPENDENT_SIZE]
-    require(a == b, "independent API pagination disagrees about product identities/fields")
+    # The per-page data[] index changes with page size. Compare *content*,
+    # not that page-local locator; only PRIMARY is the archived locator source.
+    def compare_rows(value):
+        return {key: field for key, field in value.items()
+                if key != "response_data_index"}
+    require(set(a) == set(b) and
+            all(compare_rows(a[identity]) == compare_rows(b[identity])
+                for identity in a),
+            "independent API pagination disagrees about product identities/fields")
     candidates = []
     for identity, row in sorted(a.items()):
         if row["is_query_prefix_ordering_candidate"]:
