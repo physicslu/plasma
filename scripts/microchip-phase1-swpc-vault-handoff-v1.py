@@ -113,7 +113,7 @@ def preflight(artifact_dir, vault_root, restore_dir, key, expected_sha):
 
     local_pin = regular(source / PIN).read_text(encoding="utf-8").strip().split()
     require(len(local_pin) == 2 and local_pin[0] == received_sha
-            and local_pin[1].lstrip("*") == ARCHIVE,
+            and Path(local_pin[1].lstrip("*")).name == ARCHIVE,
             "artifact SHA-256 sidecar mismatch")
     pack = json.loads(regular(source / PACK_RECEIPT).read_text(encoding="utf-8"))
     cold = json.loads(regular(source / COLD_RECEIPT).read_text(encoding="utf-8"))
