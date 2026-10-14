@@ -14,7 +14,7 @@
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0001](0001-pynq-system-python-plasma-runtime-separation.md) | Accepted | PYNQ System Python 與 Plasma PPU Python Runtime 分離；Plasma 不依賴或取代 PYNQ System Python。 |
-| [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted (implementation pending) | 產品 Catalog 僅顯示 OpenOCD 已完成軟體燒錄能力審查的精確 ICPN；Socket/PPU 驗證獨立；Issue #849 追蹤現有 API/UI migration gap。 |
+| [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted (implementation pending) | 產品 Catalog 僅顯示 OpenOCD 軟體合格 ICPN；Socket/PPU 驗證獨立；Research 優先調查 OpenOCD 支援家族，其他僅保留來源；Issues #849／#851 追蹤實作與研究優先順序。 |
 
 ## Maintenance rule
 
