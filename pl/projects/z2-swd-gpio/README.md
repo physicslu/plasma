@@ -92,6 +92,10 @@ PLASMA_VIVADO_JOBS=4 PLASMA_BITSTREAM_VERSION=0.1.0 \
 
 The script runs `artifact.py prepare` → source-controlled Tcl Project/BD generation → synth/impl/bitstream → timing checks → `artifact.py finalize` → SHA-256 verification. It **does not** connect to Z2 or load a bitstream. Only `pl/build/z2-swd-gpio/project` (ignored generated build state) is deleted and recreated.
 
+**Vivado 2026.1 observed integration failure (2026-10-14):** During `create_bd_cell -type module -reference pl_identity_axi_lite`, IP Integrator's independent HDL parser could not resolve `plasma_identity_generated.vh`, despite `sources_1` include directories. The fix creates `generated/pl_identity_axi_lite.sv` as a **fully expanded, standalone compilation unit** by replacing the single include directive in the checked-in authoritative RTL with immutable generated constants. Vivado only adds this expanded module, while cocotb continues to test the original RTL against a fixed test fixture. `rtl-lint.sh` also lints the exact generated standalone module.
+
+The same SWPC attempt reported four `PSU-1..4` critical warnings for negative DDR DQS-to-clock delay values from the pinned PYNQ-Z2 PS7 board preset. These must be assessed before physical Z2 loading and DDR/PS qualifications; **a Build PASS is not evidence that these board-level warnings are benign**.
+
 Expected build outputs:
 
 ```text
@@ -103,6 +107,7 @@ pl/build/z2-swd-gpio/
     *.sha256
   generated/
     plasma_identity_generated.vh
+    pl_identity_axi_lite.sv
     build-identity.json
     identity-axi-base.txt
   reports/
