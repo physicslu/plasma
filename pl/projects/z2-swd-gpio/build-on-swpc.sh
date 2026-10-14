@@ -12,6 +12,11 @@ version="${PLASMA_BITSTREAM_VERSION:-0.1.0}"
 jobs="${PLASMA_VIVADO_JOBS:-4}"
 export PLASMA_VIVADO_JOBS="$jobs"
 
+# Prefer the SWPC-qualified Vivado 2026.1 installation when no explicit
+# toolchain has been selected; keep the installed path configurable.
+if [[ -z "${VIVADO_SETTINGS64:-}" && -f /storage/tools/xilinx/2026.1/Vivado/settings64.sh ]]; then
+  VIVADO_SETTINGS64=/storage/tools/xilinx/2026.1/Vivado/settings64.sh
+fi
 if [[ -n "${VIVADO_SETTINGS64:-}" ]]; then
   [[ -f "$VIVADO_SETTINGS64" ]] || { echo "Missing Vivado settings file: $VIVADO_SETTINGS64" >&2; exit 2; }
   # shellcheck source=/dev/null
@@ -21,6 +26,9 @@ command -v vivado >/dev/null || {
   echo "Vivado not on PATH; source AMD Vivado settings64.sh or set VIVADO_SETTINGS64" >&2
   exit 2
 }
+export PLASMA_BOARD_REPO
+PLASMA_BOARD_REPO="$(bash "$script_dir/prepare-board-repository.sh")"
+echo "BOARD_REPO=$PLASMA_BOARD_REPO"
 command -v python3 >/dev/null || { echo "python3 missing" >&2; exit 2; }
 command -v git >/dev/null || { echo "git missing" >&2; exit 2; }
 
