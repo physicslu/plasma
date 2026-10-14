@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import json
 import re
 import subprocess
@@ -180,6 +181,9 @@ class Z2SourceContractTest(unittest.TestCase):
         monitor = (folder / "run-monitored-on-swpc.sh").read_text()
         self.assertIn('SUPERVISOR_PID=%s', monitor)
         self.assertIn('STARTED_EPOCH_MS=%s', monitor)
+        blocker = (folder / "build-blocking-on-swpc.sh").read_text()
+        self.assertIn('PLASMA_PROGRESS_INTERVAL_SECONDS:-10', blocker)
+        self.assertIn('python3 "$progress" --logdir "$logdir"', blocker)
         self.assertIn('UPDATED_EPOCH_MS=%s', monitor)
         self.assertIn('PLASMA_BUILD_TIMEOUT_MINUTES:-120', monitor)
         self.assertIn('flock -n 8', monitor)
@@ -191,6 +195,16 @@ class Z2SourceContractTest(unittest.TestCase):
         self.assertIn('[[ -s "$build/artifacts/manifest.json" ]]', monitor)
         for forbidden in ("fpga_manager", "systemctl", "git push", "killall"):
             self.assertNotIn(forbidden, monitor)
+
+    def test_tcl_measures_real_vivado_stage_transitions(self):
+        tcl = (ROOT / "projects/z2-swd-gpio/build_bitstream.tcl").read_text()
+        for phase in ("BLOCK_DESIGN", "SYNTHESIS", "IMPLEMENTATION", "TIMING_AND_REPORTS"):
+            self.assertIn(f"plasma_stage {phase} START", tcl)
+            self.assertIn(f"plasma_stage {phase} DONE", tcl)
+        self.assertIn("launch_runs synth_1", tcl)
+        self.assertIn("wait_on_run synth_1", tcl)
+        self.assertIn("launch_runs impl_1", tcl)
+        self.assertIn("wait_on_run impl_1", tcl)
 
     def test_progress_reporter_shows_stage_and_total_elapsed(self):
         """Report exact measured durations without any FPGA build dependency."""
@@ -251,6 +265,7 @@ class Z2SourceContractTest(unittest.TestCase):
             run = subprocess.run(
                 ["bash", str(folder / source.name), "start"],
                 text=True, capture_output=True, timeout=15,
+                env={**os.environ, "PLASMA_PROGRESS_INTERVAL_SECONDS": "1"},
             )
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             self.assertIn("BUILD_STARTED_SUPERVISOR_PID=", run.stdout)
