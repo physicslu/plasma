@@ -162,7 +162,9 @@ jobs:
       - name: Report research coverage projection against current catalog
         run: python data/ic-support/coverage_inventory.py --summary
       - name: Test research coverage normalization
-        run: python data/ic-support/test_coverage_inventory.py
+        run: |
+          python data/ic-support/test_coverage_inventory.py
+          python data/ic-support/test_st_m1_enrichment_program.py
       - name: Test isolated extraction contract
         run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
       - name: Test blind extraction workspace
