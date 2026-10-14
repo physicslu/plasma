@@ -179,6 +179,8 @@ class Z2SourceContractTest(unittest.TestCase):
         folder = ROOT / "projects/z2-swd-gpio"
         monitor = (folder / "run-monitored-on-swpc.sh").read_text()
         self.assertIn('SUPERVISOR_PID=%s', monitor)
+        self.assertIn('STARTED_EPOCH_MS=%s', monitor)
+        self.assertIn('UPDATED_EPOCH_MS=%s', monitor)
         self.assertIn('PLASMA_BUILD_TIMEOUT_MINUTES:-120', monitor)
         self.assertIn('flock -n 8', monitor)
         self.assertIn('flock -n "$build/.build.lock" -c true', monitor)
@@ -189,6 +191,37 @@ class Z2SourceContractTest(unittest.TestCase):
         self.assertIn('[[ -s "$build/artifacts/manifest.json" ]]', monitor)
         for forbidden in ("fpga_manager", "systemctl", "git push", "killall"):
             self.assertNotIn(forbidden, monitor)
+
+    def test_progress_reporter_shows_stage_and_total_elapsed(self):
+        """Report exact measured durations without any FPGA build dependency."""
+        script = ROOT / "projects/z2-swd-gpio/build-progress.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = Path(tmp)
+            (logs / "monitored-build.status").write_text(
+                "STATUS=RUNNING\\nSTARTED_EPOCH_MS=1700000000000\\n"
+            )
+            (logs / "vivado-console.log").write_text(
+                "STAGE_EVENT BLOCK_DESIGN START 1700000001000\\n"
+                "STAGE_EVENT BLOCK_DESIGN DONE 1700000002500\\n"
+                "STAGE_EVENT SYNTHESIS START 1700000003000\\n"
+                # A prior build's events must not contaminate current totals.
+                "STAGE_EVENT TIMING_AND_REPORTS DONE 1699999999000\\n"
+            )
+            reporter = importlib.util.spec_from_file_location("fpga_progress", script)
+            self.assertIsNotNone(reporter)
+            module = importlib.util.module_from_spec(reporter)
+            reporter.loader.exec_module(module)
+            running = module.render(logs, now_ms=1700000005500)
+            self.assertIn("RUNNING | total=00:00:05", running)
+            self.assertIn("Synthesis (00:00:02)", running)
+            finished_status = (
+                "STATUS=PASS\\nSTARTED_EPOCH_MS=1700000000000\\n"
+                "UPDATED_EPOCH_MS=1700000006700\\n"
+            )
+            (logs / "monitored-build.status").write_text(finished_status)
+            summary = module.render(logs, summary=True, now_ms=1700000999000)
+            self.assertIn("TOTAL_ELAPSED=00:00:06", summary)
+            self.assertIn("STAGE Block Design: 00:00:01", summary)
 
     def test_foreground_blocking_client_with_mock_supervisor(self):
         """Real Bash detach+block+reattach behavior, no Vivado/FPGA execution."""
@@ -203,6 +236,7 @@ class Z2SourceContractTest(unittest.TestCase):
             folder.mkdir(parents=True)
             monitor = folder / "run-monitored-on-swpc.sh"
             shutil.copyfile(source, folder / source.name)
+            shutil.copyfile(ROOT / "projects/z2-swd-gpio/build-progress.py", folder / "build-progress.py")
             monitor.write_text(
                 '#!/usr/bin/env bash\n'
                 'set -Eeuo pipefail\n'
