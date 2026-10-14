@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32n6-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32N6",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 32,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32n645": {
+      "series": "STM32N645",
+      "flash_size": "0-1 KiB",
+      "ram_size": "4.2 MB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=2",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32N6 active 32-item eStore category",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32n647": {
+      "series": "STM32N647",
+      "flash_size": "0-1 KiB",
+      "ram_size": "4.2 MB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=2",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32N6 active 32-item eStore category",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32n655": {
+      "series": "STM32N655",
+      "flash_size": "0-1 KiB",
+      "ram_size": "4.2 MB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=2",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32N6 active 32-item eStore category",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32n657": {
+      "series": "STM32N657",
+      "flash_size": "0-1 KiB",
+      "ram_size": "4.2 MB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/products/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus/stm32-high-performance-mcus/stm32n6-series.html?p=2",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32N6 active 32-item eStore category",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32N645A0H3Q": "stm32n645",
+    "STM32N645A0H3QG": "stm32n645",
+    "STM32N645B0H3Q": "stm32n645",
+    "STM32N645I0H3Q": "stm32n645",
+    "STM32N645L0H3Q": "stm32n645",
+    "STM32N645X0H3Q": "stm32n645",
+    "STM32N645Z0H3Q": "stm32n645",
+    "STM32N647A0H3Q": "stm32n647",
+    "STM32N647A0H3QG": "stm32n647",
+    "STM32N647B0H3Q": "stm32n647",
+    "STM32N647I0H3Q": "stm32n647",
+    "STM32N647L0H3Q": "stm32n647",
+    "STM32N647X0H3Q": "stm32n647",
+    "STM32N647Z0H3Q": "stm32n647",
+    "STM32N655A0H3Q": "stm32n655",
+    "STM32N655A0H3QG": "stm32n655",
+    "STM32N655B0H3Q": "stm32n655",
+    "STM32N655I0H3Q": "stm32n655",
+    "STM32N655L0H3Q": "stm32n655",
+    "STM32N655X0H3Q": "stm32n655",
+    "STM32N655Z0H3Q": "stm32n655",
+    "STM32N657A0H3Q": "stm32n657",
+    "STM32N657A0H3QG": "stm32n657",
+    "STM32N657A0H3QTR": "stm32n657",
+    "STM32N657B0H3Q": "stm32n657",
+    "STM32N657I0H3Q": "stm32n657",
+    "STM32N657I0H3QTR": "stm32n657",
+    "STM32N657L0H3Q": "stm32n657",
+    "STM32N657L0H3QTR": "stm32n657",
+    "STM32N657X0H3Q": "stm32n657",
+    "STM32N657Z0H3Q": "stm32n657",
+    "STM32N657Z0H3QTR": "stm32n657"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit. The official ST eStore N6 category directly exposes 4.2 MB SRAM and 1.71–3.6 V supply for the full 32-item family. Manufacturer RAM units are preserved rather than numerically converted. I/O Supply and VDDA remain null without separate direct evidence. Datasheet, Programming Guide, OpenOCD and family-name inference are prohibited."
+  }
+}
