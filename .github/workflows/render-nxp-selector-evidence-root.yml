@@ -1,0 +1,31 @@
+name: Render NXP installed-package Selector data root regression
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_web/nxp_manufacturer_device_evidence.py'
+      - 'software/python/tests/test_nxp_render_evidence_root_v1.py'
+      - 'scripts/render-start.sh'
+      - '.github/workflows/render-nxp-selector-evidence-root.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render-installed-wheel-root:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PLASMA_DEVICE_CATALOG_MANIFEST: ${{ github.workspace }}/data/device-catalog/production/icpn-v1-manifest.json
+      PLASMA_IC_SUPPORT_ROOT: ${{ github.workspace }}/data/ic-support
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact web gateway as package (not editable)
+        run: python -m pip install software/python
+      - name: Check Render startup script syntax
+        run: bash -n scripts/render-start.sh
+      - name: Simulate relocated installed Python and assert NXP selector
+        run: python -m unittest discover -s software/python/tests -p 'test_nxp_render_evidence_root_v1.py' -v
+      - name: Preserve existing NXP source SHA/admission behavior
+        run: python -m unittest discover -s software/python/tests -p 'test_nxp_manufacturer_device_evidence_v6.py' -v

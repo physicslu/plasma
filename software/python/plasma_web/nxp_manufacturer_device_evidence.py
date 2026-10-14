@@ -45,7 +45,14 @@ def _require(ok: bool, why: str) -> None:
 
 
 def _root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # An installed Render wheel lives under .venv/lib; module-relative
+    # parents[3] is NOT the repository. The Production manifest is already
+    # resolved and integrity-checked by the canonical Device Catalog loader.
+    # Research remains a sibling of the manifest's production directory.
+    from .device_catalog import default_catalog_manifest_path
+
+    manifest = default_catalog_manifest_path().resolve()
+    return manifest.parents[3]
 
 
 def _git_blob(data: bytes) -> str:

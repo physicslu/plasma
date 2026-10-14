@@ -154,6 +154,33 @@ if result.get("icpn") != "STM32F103C8T6" or not isinstance(selected_profile, dic
     raise SystemExit("[render-start] IC Selector runtime contract is missing selected_profile")
 if selected_profile.get("icpn") != "STM32F103C8T6":
     raise SystemExit("[render-start] IC Selector selected_profile identity mismatch")
+
+# A green STM32 smoke can hide the NXP installed-wheel research path bug.
+# Exercise the same query that users type, plus an exact MCX evidence join,
+# before advertising a healthy public Console.
+with urlopen(
+    f"http://127.0.0.1:{port}/api/devices/search?q=NXP&limit=1",
+    timeout=3,
+) as response:
+    nxp_search = json.loads(response.read())
+if nxp_search.get("total_count", 0) < 1 or not nxp_search.get("results"):
+    raise SystemExit("[render-start] NXP ICPN search unexpectedly empty")
+if nxp_search["results"][0].get("vendor") != "NXP":
+    raise SystemExit("[render-start] NXP query returned a non-NXP record")
+with urlopen(
+    f"http://127.0.0.1:{port}/api/devices/search?q=MCXA132VFM&limit=1",
+    timeout=3,
+) as response:
+    mcx_search = json.loads(response.read())
+mcx_rows = mcx_search.get("results")
+if not isinstance(mcx_rows, list) or len(mcx_rows) != 1:
+    raise SystemExit("[render-start] NXP exact ICPN search failed")
+mcx = mcx_rows[0]
+evidence = mcx.get("nxp_manufacturer_device_profile")
+if mcx.get("icpn") != "MCXA132VFM" or not isinstance(evidence, dict):
+    raise SystemExit("[render-start] installed NXP evidence path is broken")
+if evidence.get("icpn") != "MCXA132VFM" or mcx["backend"]["mapping_status"] != "no_mapping":
+    raise SystemExit("[render-start] NXP manufacturer-only evidence boundary drift")
 PY
 
 python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${gateway_port}" <<'PY'
