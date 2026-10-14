@@ -49,6 +49,28 @@ jobs:
           path: ${{ runner.temp }}/microchip-phase1-original-sources/
           if-no-files-found: warn
           retention-days: 90
+      - name: Bounded official Microchip MCP manufacturer identity acquisition
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          # Exactly one manufacturer base-product query; no cross-family search.
+          mkdir -p "${{ runner.temp }}/microchip-phase1-mcp"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A \
+            --output-dir "${{ runner.temp }}/microchip-phase1-mcp/ATSAMD21G18A"
+          # Repeat full 20/60 pagination evidence replay from original MCP bytes.
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A --replay \
+            --output-dir "${{ runner.temp }}/microchip-phase1-mcp/ATSAMD21G18A"
+      - name: Retain bounded Phase 1 Microchip MCP original query responses
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-atsamd21g18a-mcp-original-v1
+          path: ${{ runner.temp }}/microchip-phase1-mcp/
+          if-no-files-found: warn
+          retention-days: 90
       - name: Retain Phase 1 Research-only field completeness report
         if: always()
         uses: actions/upload-artifact@v4
