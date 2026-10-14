@@ -144,17 +144,23 @@
     },
     "STM32WLX": {
       "production_exact_icpns": 31,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "Allowed eStore evidence directly resolves the WLE4/WLE5 RAM/VDD density groups, but does not expose a complete direct RAM mapping for the dual-core WL54/WL55 and WL5M module groups; partial-family admission is prohibited.",
+      "notes": [
+        "WLE4/WLE5 exact eStore rows establish 64 KiB Flash→20 KiB SRAM, 128→48, 256→64 and 1.8–3.6 V.",
+        "WL54/WL55/WL5M remain outside M1 until their RAM mapping is directly available on an allowed surface."
+      ]
     },
     "STM32WBX": {
       "production_exact_icpns": 50,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "The WBX family spans 12 memory-density groups with allowed eStore pages exposing Flash/VDD consistently but not a complete direct RAM value for every group; generic 'up to' descriptions cannot be used to fill exact density groups.",
+      "notes": [
+        "WB5M exact eStore evidence directly shows 1 MiB Flash, 256 KiB SRAM and 1.71–3.6 V.",
+        "Other WB10/WB15/WB30/WB35/WB50/WB55 groups remain incomplete under the no-inference rule, so full-family admission is blocked."
+      ]
     },
     "STM32WBA5X": {
       "production_exact_icpns": 40,
