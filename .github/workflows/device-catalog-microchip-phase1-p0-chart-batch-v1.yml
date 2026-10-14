@@ -1,0 +1,73 @@
+name: Microchip Phase 1 P0 Chart Batch Research
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_p0_chart_batch_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_chart_batch_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_P0_CHART_BATCH_V1.md'
+      - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - '.github/workflows/device-catalog-microchip-phase1-p0-chart-batch-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chart-p0-batch-research-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline P0 chart batch source and priority negative tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_chart_batch_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_chart_semantics_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_information_v1.py' -v
+      - name: Capture a single official MicrochipDirect chart with original bytes
+        id: live_chart
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --capture "${{ runner.temp }}/phase1-p0-original-chart"
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --replay "${{ runner.temp }}/phase1-p0-original-chart"
+      - name: Source-replay P0 batch field coverage with P1 and P2 boundaries
+        id: live_batch
+        if: steps.live_chart.outcome == 'success'
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p0_chart_batch_v1.py \
+            --original-root "${{ runner.temp }}/phase1-p0-original-chart" \
+            --output "${{ runner.temp }}/phase1-p0-chart-batch-report.json"
+          python data/device-catalog/research/microchip_phase1_p0_chart_batch_v1.py \
+            --original-root "${{ runner.temp }}/phase1-p0-original-chart" \
+            --verify "${{ runner.temp }}/phase1-p0-chart-batch-report.json"
+      - name: Retain actual original source plus scope/coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-p0-batch-original-and-coverage-v1
+          path: |
+            ${{ runner.temp }}/phase1-p0-original-chart/
+            ${{ runner.temp }}/phase1-p0-chart-batch-report.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Distinguish offline contract pass from real manufacturer evidence
+        if: always()
+        run: |
+          echo "Live official chart capture: ${{ steps.live_chart.outcome }}" >> "${{ github.step_summary }}"
+          echo "Live P0 batch source replay: ${{ steps.live_batch.outcome }}" >> "${{ github.step_summary }}"
+          echo "Counts are chart-scoped Base Devices, NOT Microchip-wide exact commercial ICPNs." >> "${{ github.step_summary }}"
+          echo "P0/P1 is Research priority and not OpenOCD supported qualification." >> "${{ github.step_summary }}"
+          echo "90-day CI artifacts are not durable original-source archives." >> "${{ github.step_summary }}"
