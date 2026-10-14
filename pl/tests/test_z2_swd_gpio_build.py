@@ -39,7 +39,7 @@ class IdentityArtifactContractTest(unittest.TestCase):
             self.assertEqual(original.count(directive), 1)
             self.assertIn(original.replace(directive, header.rstrip("\n")), standalone)
             self.assertNotIn(directive, standalone)
-            self.assertIn("module pl_identity_axi_lite (", standalone)
+            self.assertIn("module pl_identity_axi_lite #(", standalone)
             self.assertIn("PLSM_VERSION = 32'h00000100", header)
             self.assertIn("PLSM_BUILD_ID_0 = 32'h01234567", header)
             self.assertIn("PLSM_BUILD_ID_3 = 32'h89ABCDEF", header)
