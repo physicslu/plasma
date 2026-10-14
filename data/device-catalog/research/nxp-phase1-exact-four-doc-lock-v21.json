@@ -1,0 +1,58 @@
+{
+  "schema_version": 21,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "input_v20_git_blob": "c66acf4c8406accbb5caf765e82b736e081967f5",
+  "input_v20_generator_blob": "373a3eb2f56eca8dfaf6f6ad120b74722a89b1c0",
+  "input_v20_lock_blob": "f330f7bb47f022e4777196e0cf52431c9d2091f5",
+  "source_54_exact_git_blob": "2a37d0f60085bdb1ca3021313039ebde39bf5857",
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research_only": 277,
+  "expected_exact_source": 54,
+  "expected_exact_admitted_matches": 53,
+  "existing_research_only_no_promotion": [
+    "MCXA255VLL"
+  ],
+  "sources": [
+    {
+      "doc": "MCXA2FS",
+      "url": "https://www.nxp.com/docs/en/fact-sheet/MCX-A2-FAMILY-MICROCONTROLLERS.pdf",
+      "rev": "REV 0 2026-03-30",
+      "pages": [
+        2
+      ],
+      "exact_source_rows": 16
+    },
+    {
+      "doc": "MCXE31FS",
+      "url": "https://www.nxp.com/docs/en/fact-sheet/MCXE31FS.pdf",
+      "rev": "REV 1 2025-10-23",
+      "pages": [
+        2
+      ],
+      "exact_source_rows": 7
+    },
+    {
+      "doc": "MCXN23x",
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXN23x.pdf",
+      "rev": "Rev 3 2025-01-21",
+      "pages": [
+        4
+      ],
+      "exact_source_rows": 6
+    },
+    {
+      "doc": "MCXNP184M150F70",
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXNP184M150F70.pdf",
+      "rev": "Rev 8.2 2026-06-11",
+      "pages": [
+        5,
+        6
+      ],
+      "exact_source_rows": 25
+    }
+  ],
+  "original_pdf_binary_archived": false,
+  "original_pdf_sha256": null
+}

@@ -1,0 +1,28 @@
+name: NXP Phase 1 119 exact MCX A rail sources v23
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-119-mcxa-operating-rails-source-v23.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-mcxa-operating-v23.csv'
+      - 'data/device-catalog/research/nxp-phase1-mcxa-operating-lock-v23.json'
+      - 'data/device-catalog/research/nxp-phase1-mcxa-operating-coverage-v23.json'
+      - 'data/device-catalog/research/nxp_phase1_mcxa_rails_v23.py'
+      - 'data/device-catalog/research/test_nxp_phase1_mcxa_rails_v23.py'
+      - 'data/device-catalog/research/NXP_PHASE1_MCXA_RAILS_V23.md'
+      - '.github/workflows/device-catalog-nxp-mcxa-rails-v23.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-mcxa-supply-domains:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify 119 exact NXP MCX A VDD and VDD ANA constrained supplies
+        run: python data/device-catalog/research/nxp_phase1_mcxa_rails_v23.py
+      - name: Reject unsafe single-VDD assumptions for 26 VDD P3 dual rail parts
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_mcxa_rails_v23.py' -v

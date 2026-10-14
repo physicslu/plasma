@@ -1,0 +1,29 @@
+name: NXP Phase 1 selector-first 224 source audit v17
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-39-official-source-rows-v17.csv'
+      - 'data/device-catalog/research/nxp-224-parametric-source-audit-v17.csv'
+      - 'data/device-catalog/research/nxp-501-phase1-selector-first-v17.csv'
+      - 'data/device-catalog/research/nxp-phase1-selector-coverage-v17.json'
+      - 'data/device-catalog/research/nxp-phase1-selector-source-lock-v17.json'
+      - 'data/device-catalog/research/nxp_phase1_selector_v17.py'
+      - 'data/device-catalog/research/test_nxp_phase1_selector_v17.py'
+      - 'data/device-catalog/research/NXP_PHASE1_SELECTOR_FIRST_V17.md'
+      - '.github/workflows/device-catalog-nxp-selector-v17.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nxp-phase1-admitted-exact-source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify 224 exact source classifications and 501-row information replay
+        run: python data/device-catalog/research/nxp_phase1_selector_v17.py
+      - name: Verify provenance confidence, missing-data limits and admissions
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_selector_v17.py' -v

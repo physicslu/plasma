@@ -1,0 +1,225 @@
+icpn,source_row_state,manufacturer_group,parametric_export_verified,source_kind,source_id,source_url,ram_state,vdd_state,io_supply_state,evidence_limit
+K32L2A31VLH1A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2A31VLL1A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2A41VLH1A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2A41VLL1A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B11VFM0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B11VFT0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B11VLH0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B11VMP0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B21VFM0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B21VFT0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B21VLH0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B21VMP0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B31VFM0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B31VFT0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B31VLH0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+K32L2B31VMP0A,NO_EXACT_ROW_EVIDENCE_IN_V17,K32L2,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA132VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA132VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA132VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA133VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA133VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA133VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA13,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA142VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA142VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA142VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA142VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA143VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA143VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA143VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA143VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA144VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA144VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA144VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA144VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA145VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA145VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA145VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA145VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA146VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA146VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA146VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA146VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA14,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA152VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA152VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA152VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA152VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA153VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA153VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA153VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA153VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA154VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA154VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA154VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA154VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA154VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA155VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA155VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA155VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA155VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA156VFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA156VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA156VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA156VMP,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA156VPJ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA15,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA173VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA173VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA173VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA173VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA174VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA174VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA174VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA174VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA175VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA175VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA175VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA175VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA176VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA176VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA176VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA176VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA17,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA185VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA185VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA185VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA185VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA186VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA186VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA186VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA186VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA18,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA255VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA255VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA255VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA256VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA256VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA256VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA256VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA25,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA265VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA265VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA265VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA265VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA266VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA266VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA266VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA266VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA26,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA343VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA343VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA343VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA343VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA344VFM,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA344VLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA344VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA344VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA345VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA345VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA345VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA345VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA346VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA346VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA346VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA346VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA34,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA355VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA355VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA355VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA355VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA356VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA356VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA356VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA356VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA35,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA365VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA365VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA365VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA365VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA366VLH,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA366VLL,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA366VLQ,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXA366VPN,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXA36,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXC041VFG,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC04,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC041VFK,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC04,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC141VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC141VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC142VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC143VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC143VFT,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC144VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC144VFT,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC14,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC151VFM,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC15,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC151VFT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC15,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC151VLF,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC15,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC161VFM,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC161VFT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC161VLF,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC162VFM,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC162VFT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC162VLF,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXC16,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXC15_C16_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-C15-C16?tab=Buy_Parametric_Tab,PARTIAL,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC242VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC242VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC243VFT,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC244VFM,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC244VFT,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC443VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC44,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC443VMP,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC44,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC444VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC44,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXC444VMP,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXC44,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXCFS_REV0_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXCFS.pdf,VERIFIED,PARTIAL,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE245VLF,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE245VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE245VLL,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE246VLH,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE246VLL,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE246VLQ,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE247VLL,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE247VLQ,EXACT_OFFICIAL_FACT_SHEET_FALLBACK,MCXE24,false,OFFICIAL_FACT_SHEET_EXACT_ORDERING_TABLE,MCXE24FS_REV1_FALLBACK,https://www.nxp.com/docs/en/fact-sheet/MCXE24FS.pdf,VERIFIED,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXE315MLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE315MPA,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE316MLF,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE316MPA,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE317MPA,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE317MPB,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXE31BMPB,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXE31,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN235VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN235VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN235VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN236VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN236VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN236VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN23,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN247VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN24,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN247VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN24,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN247VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN24,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN526VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN52,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN526VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN52,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN527VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN52,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN527VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN52,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN536VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN536VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN536VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN537VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN537VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN537VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN53,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN546VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN546VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN546VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN547VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN547VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN547VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN54,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN946VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN946VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN946VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN947VDFT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN947VKLT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXN947VPBT,NO_EXACT_ROW_EVIDENCE_IN_V17,MCXN94,false,,,,UNKNOWN,UNKNOWN,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MCXW716AMFPAT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXW71,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXW71_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-W71?tab=Buy_Parametric_Tab,PARTIAL,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXW716AMFTAT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXW71,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXW71_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-W71?tab=Buy_Parametric_Tab,PARTIAL,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXW716CMFPAT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXW71,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXW71_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-W71?tab=Buy_Parametric_Tab,PARTIAL,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MCXW716CMFTAT,EXACT_INDEXED_PARAMETRIC_UNARCHIVED,MCXW71,false,OFFICIAL_PARAMETRIC_INDEXED_EXACT_ROWS,MCXW71_INDEXED_PARAMETRIC,https://www.nxp.com/products/MCX-W71?tab=Buy_Parametric_Tab,PARTIAL,UNKNOWN,UNKNOWN,"Source-specific exact observations, full original HTML/PDF bytes not persisted"
+MKL25Z128VFM4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z128VFT4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z128VLH4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z128VLK4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z32VFM4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z32VFT4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z32VLH4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z32VLK4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z64VFM4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z64VFT4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z64VLH4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows
+MKL25Z64VLK4,NO_EXACT_ROW_EVIDENCE_IN_V17,KL25,false,,,,VERIFIED,VERIFIED,UNKNOWN,Not tested to exhaustion; cannot infer NXP lacks parametric rows

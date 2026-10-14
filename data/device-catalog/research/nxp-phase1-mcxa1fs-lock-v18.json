@@ -1,0 +1,36 @@
+{
+  "schema_version": 18,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "source_v17_501_git_blob": "c65edc0d639f96fbcc7d227df4bd0c131e7a7903",
+  "source_v17_generator_git_blob": "e688e68a2462b66c9718a4c7f153955074de9735",
+  "source_v17_lock_git_blob": "f4dbd54ef95fcb78a66d1166970d59f8d18cc65e",
+  "official_76_source_git_blob": "cd17ff3ee00332c835768def5916251e9e542f72",
+  "manufacturer_doc": "MCXA1FS",
+  "revision": "Rev 0, 30 Mar 2026",
+  "manufacturer_source_url": "https://www.nxp.com/docs/en/fact-sheet/MCXA1FS.pdf",
+  "source_pdf_physical_pages": [
+    2,
+    3,
+    4
+  ],
+  "source_pdf_original_bytes_archived": false,
+  "source_pdf_sha256": null,
+  "exact_official_rows": 76,
+  "admitted_exact_matched": 72,
+  "research_only_not_promoted": 4,
+  "research_only_exact": [
+    "MCXA144VLH",
+    "MCXA145VLH",
+    "MCXA146VLH",
+    "MCXA155VLH"
+  ],
+  "approved_scope": "SRAM exact Part number source row only; strict original Flash capacity and admissions",
+  "prohibited": [
+    "Production admissions",
+    "Catalog API/UI",
+    "Runtime programming",
+    "PPU/HIL",
+    "Voltage extrapolation"
+  ]
+}

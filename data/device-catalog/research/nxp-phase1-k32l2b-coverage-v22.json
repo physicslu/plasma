@@ -1,0 +1,196 @@
+{
+  "schema_version": 22,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "v21_input_git_blob": "c2c09cca46010263c6bc45b6b5efa4957432f0e2",
+  "source_12_groups_git_blob": "eff6323471366b48bebad7565832575d203da2a6",
+  "exact_admitted_k32l2b_full_order_codes": 12,
+  "family_pattern_official_RAM_32_KB": 12,
+  "result_evidence_state": "PARTIAL_NOT_EXACT_ORIGINAL_DATASHEET",
+  "prior_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 199,
+        "PARTIAL": 13,
+        "UNKNOWN": 12,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "current_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 199,
+        "PARTIAL": 25,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all_501": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 214,
+        "PARTIAL": 73,
+        "UNKNOWN": 214,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 31,
+        "PARTIAL": 69,
+        "UNKNOWN": 401,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 501,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 485,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "verified_source_exact_RAM_unchanged": 199,
+  "new_software_supported": null,
+  "physical_hil_qualification": null,
+  "source_original_pdf_sha256": null,
+  "note": "All 12 remaining K32L2B use 32KB RAM per two NXP wildcard-model tables, backed by exact NXP part applicability. NOT exact-row verified. VDD IO supplies and Programming/HIL unchanged."
+}
