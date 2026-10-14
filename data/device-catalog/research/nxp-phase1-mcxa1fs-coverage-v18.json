@@ -1,0 +1,203 @@
+{
+  "schema_version": 18,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "input_v17_501_git_blob": "c65edc0d639f96fbcc7d227df4bd0c131e7a7903",
+  "manufacturer_source_76_git_blob": "cd17ff3ee00332c835768def5916251e9e542f72",
+  "manufacturer_exact_official_rows": 76,
+  "admitted_matched_source_exact": 72,
+  "research_only_matched_source_exact": 4,
+  "research_only_matched_icpns_unchanged": [
+    "MCXA144VLH",
+    "MCXA145VLH",
+    "MCXA146VLH",
+    "MCXA155VLH"
+  ],
+  "admitted_RAM_newly_verified": 72,
+  "pdf_original_bytes_archived": false,
+  "pdf_original_sha256": null,
+  "prior_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 42,
+        "PARTIAL": 13,
+        "UNKNOWN": 169,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "current_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 114,
+        "PARTIAL": 13,
+        "UNKNOWN": 97,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all_501": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 129,
+        "PARTIAL": 61,
+        "UNKNOWN": 311,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 31,
+        "PARTIAL": 69,
+        "UNKNOWN": 401,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 501,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 485,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "software_supported_new": null,
+  "hil_validated_new": null,
+  "interpretation": "Exact NXP table part-number SRAM for admitted 72 only. Four existing Research-only identifiers remain untouched; no Production admission, VDD inference, Programming or Hardware claims."
+}
