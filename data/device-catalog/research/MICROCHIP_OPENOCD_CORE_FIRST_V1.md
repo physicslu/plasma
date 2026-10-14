@@ -45,6 +45,25 @@ The current bounded Research matcher therefore uses `^AT32AP7` for **candidate**
 - No physical test is required for **eventual Catalog display** when independent, version-pinned OpenOCD *software qualification* exists. HIL and installed backend runtime execution authorization remain separate, fail-closed.
 - P2 = cheaply archived in this bounded pass. It does not prove permanent lack of OpenOCD support; revisit only when new driver evidence, demand or explicit owner reprioritization arises.
 
+## Frozen results from original DFP + pinned OpenOCD sources
+
+Source-replayed observation: `microchip-openocd-core-first-observation-v1.json`. The observation is strictly **a bounded Research classification of 3,717 DFP device support names**; it contains **zero declarations** that commercial ICPNs have passed OpenOCD software qualification.
+
+| Research priority | Original DFP support-name count | Core breakdown | Interpretation |
+|---|---:|---|---|
+| **P0** | **364** | ARM: 235; MIPS: 128; AVR: 1 | Named device support entries that match nine curated OpenOCD 0.12.0 Target + Flash Driver source leads, subject to exact device/driver review |
+| **P1** | **12** | ARM: 12 | SAM L1x target-only evidence; bounded review, not software support |
+| **P2** | **3,341** | UNKNOWN/not screened further | Cheap archive; may include devices supported through other profiles; not proof of lack of support |
+| **Total** | **3,717** | — | DFP support-name inventory, not orderable ICPN count |
+
+P0 breakdown: PIC32MX **128**, SAM D/C/R/L0 bounded **143**, SAM E5/D5 **25**, SAM V/E70/S70 **67**, ATmega128 exact base name **1**. The source-backed SAM3/SAM4/SAM4L/SAM7 leads are still retained but **match no name** in the particular archived DFP snapshot; that is not proof of absence from Microchip commercial offerings.
+
+Microchip official evidence corrected **AVR32DA28/32** from a misleading hypothetical AVR32 AP7K/JTAG match to **8-bit AVR DA / UPDI**. These names are now P2 rather than incorrectly counted as P1. **The historical `AVR32` name prefix alone is never a valid Core/Transport classifier.**
+
+The original replay used the immutable 2026-10-13 DFP capture, source SHA-256 `9a00c71...`, and **20 exact Git blob checks** from OpenOCD 0.12.0, CI replay run [#38494643616](https://github.com/physicslu/plasma/actions/runs/38494643616) (provenance of the frozen observation). Source counts are verified against the observation during future CI replay; differing source data must fail closed rather than silently updating counts.
+
+**Do not use 364, 376 or 3,717 as PLASMA software-supported ICPN totals.** A population-wide ARM majority cannot be inferred from this selective matching screen; 3,341 DFP support names have no established Core classification within this bounded evidence set.
+
 ## Reproducible gate
 
 The stdlib-only tool `microchip_openocd_core_first_v1.py` can validate the checked-in lock and runtime pin offline:
@@ -70,7 +89,7 @@ python data/device-catalog/research/microchip_openocd_core_first_v1.py \
   --output /tmp/microchip-openocd-first-research-report.json
 ```
 
-The live CI workflow checks source pinning and can attach a derived, **Research-only** JSON report. Absence of the immutable original DFP archive must not trigger a synthetic or estimated manufacturer coverage report.
+The live CI workflow checks source pinning, the frozen observation and original-source replay, and attaches a derived, **Research-only** JSON report. Absence of the immutable original DFP archive must not trigger a synthetic or estimated manufacturer coverage report.
 
 ## Next bounded step
 
