@@ -36,6 +36,11 @@ class IdentityArtifactContractTest(unittest.TestCase):
             self.assertEqual(payload["source_git_sha"], commit)
             self.assertEqual(payload["build_id"], commit[:32])
             self.assertEqual(payload["capabilities"], ["swd_gpio"])
+            self.assertEqual(payload["board_part"], "tul.com.tw:pynq-z2:part0:1.0")
+            self.assertEqual(
+                payload["board_files_git_sha"],
+                "e02d6a3866b5465218f777168cdc51344ac94e07",
+            )
             self.assertFalse(payload["hardware_runtime_ready"])
             self.assertFalse(payload["physical_programming_qualified"])
 
