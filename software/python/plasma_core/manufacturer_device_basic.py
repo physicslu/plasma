@@ -246,7 +246,7 @@ class ManufacturerDeviceBasicResolver:
                 f"{group_id}: invalid Flash size",
             )
             _require(
-                isinstance(ram_size, str) and ram_size.endswith(" KiB"),
+                isinstance(ram_size, str) and ram_size.endswith((" KiB", " MiB", " MB")),
                 f"{group_id}: invalid RAM size",
             )
             _require(
