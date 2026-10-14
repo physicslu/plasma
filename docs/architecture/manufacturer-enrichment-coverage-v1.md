@@ -48,18 +48,29 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After the STM32F1 + STM32F2 + STM32C0 + STM32G0 + STM32G4 Device Basic Profile v1 batches,
-Production contains **4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly
-**1,290 ST Production ICPNs** (280 F1 + 105 F2 + 226 C0 + 406 G0 + 273 G4) have an explicitly
-bound M1 Basic Profile. STM32G4 is the first Basic Profile family where VDDA is populated
-from direct ST eStore evidence; I/O Supply remains explicitly missing.
+Production contains **4,853 exact ICPNs**: **4,629 ST** and **224 NXP**.
+
+The 2026-10-14 remaining-ST M1 program starts from 1,290 already-admitted ST M1 exact
+ICPNs and deterministically classifies every other **3,339** ST Production exact ICPNs:
+
+- **370 admitted to M1** across STM32U0, STM32L5, STM32U3, STM32WL3, STM32WLX,
+  STM32H7RS and STM32N6;
+- **2,969 evidence-blocked**, with a machine-readable reason and next evidence requirement
+  in `data/ic-support/device-basic/st-m1-evidence-gaps-v1.json`.
+
+Evidence-blocked means the investigation is complete for this transaction but the target
+does **not** receive M1. Typical blockers are incomplete Product Selector base-row extraction,
+density-specific RAM expressed only as "up to", or conflicting official supply-voltage
+semantics. No datasheet/OpenOCD/family inference is used to close those gaps.
+
+Exactly **1,660 ST Production ICPNs** therefore have an explicitly bound M1 Basic Profile.
 
 Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 3,563 |
-| M1 | 1,289 |
+| M0 | 3,193 |
+| M1 | 1,659 |
 | M2 | 0 |
 | M3 | 0 |
 | M4 | 1 |
@@ -70,7 +81,7 @@ Cumulative coverage:
 | At least level | Exact ICPNs |
 |---|---:|
 | M0 | 4,853 |
-| M1 | 1,290 |
+| M1 | 1,660 |
 | M2 | 1 |
 | M3 | 1 |
 | M4 | 1 |
@@ -282,9 +293,9 @@ Framework v1 permanently tests that:
 
 Manufacturer Device enrichment remains a separate track from Programming Profile expansion.
 
-Any Programming Profile transaction must keep the 1,290 M1 Basic Profiles independent and separately establish the exact
+Any Programming Profile transaction must keep the 1,660 M1 Basic Profiles independent and separately establish the exact
 manufacturer applicability of programming interfaces, programming electrical constraints,
 Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
 M2 merely because an OpenOCD target mapping exists.
 
-The F1/F2/C0/G0/G4 Basic Profile batches prove the pattern can expand across families without coupling basic catalog information to programming-algorithm maturity.
+The 12 admitted family profiles and the 16-family evidence-gap ledger prove the pattern can scale without converting missing evidence into inferred support.
