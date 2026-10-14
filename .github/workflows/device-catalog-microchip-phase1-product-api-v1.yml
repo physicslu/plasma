@@ -1,0 +1,59 @@
+name: Microchip Phase 1 Product API evidence
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_product_api_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_product_api_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_PRODUCT_API_V1.md'
+      - '.github/workflows/device-catalog-microchip-phase1-product-api-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-api-original-byte-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline Product API pagination and tamper negative tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_product_api_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_information_v1.py' -v
+      - name: Official Microchip Product API read-only capture canary
+        id: live
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_product_api_v1.py \
+            --query ATSAMD21G18A \
+            --capture "${{ runner.temp }}/microchip-phase1-product-api-original" \
+            --report "${{ runner.temp }}/microchip-phase1-product-api-report.json"
+          python data/device-catalog/research/microchip_phase1_product_api_v1.py \
+            --query ATSAMD21G18A \
+            --replay "${{ runner.temp }}/microchip-phase1-product-api-original"
+      - name: Persist actual original response evidence or explicit source failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-product-api-original-canary-v1
+          path: |
+            ${{ runner.temp }}/microchip-phase1-product-api-original/
+            ${{ runner.temp }}/microchip-phase1-product-api-report.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Report actual live acquisition outcome separately from unit tests
+        if: always()
+        run: |
+          echo "Live canary outcome: ${{ steps.live.outcome }}" >> "${{ github.step_summary }}"
+          echo "Offline unit-test success is NOT a manufacturer source-capture success." >> "${{ github.step_summary }}"
+          echo "The 90-day artifact is not durable original-byte archival." >> "${{ github.step_summary }}"
