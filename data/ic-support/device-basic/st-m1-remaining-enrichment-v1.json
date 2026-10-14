@@ -155,17 +155,23 @@
     },
     "STM32WBA5X": {
       "production_exact_icpns": 40,
-      "disposition": "in_progress",
-      "admitted_exact_icpns": 0,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 40,
       "blocker": null,
-      "notes": []
+      "notes": [
+        "ST eStore directly establishes WBA50 64 KiB SRAM, WBA52/54/55 and WBA5M 128 KiB SRAM, and 1.71–3.6 V Operating VDD.",
+        "Exact applicability remains explicit across all 40 Production ICPNs."
+      ]
     },
     "STM32WBA6X": {
       "production_exact_icpns": 39,
-      "disposition": "in_progress",
+      "disposition": "blocked_evidence_gap",
       "admitted_exact_icpns": 0,
-      "blocker": null,
-      "notes": []
+      "blocker": "Allowed ST eStore exact-product pages directly establish Flash and Operating VDD but do not expose an unambiguous exact RAM-size mapping for the full WBA6X family; the missing RAM mapping is visible only on prohibited presentation/datasheet surfaces.",
+      "notes": [
+        "eStore Supply Voltage is consistently 1.71–3.6 V.",
+        "Do not import the 1 MiB/256 KiB and 2 MiB/512 KiB mapping from product presentation or datasheet into M1."
+      ]
     },
     "STM32H5": {
       "production_exact_icpns": 190,
