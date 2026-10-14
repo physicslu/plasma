@@ -179,7 +179,7 @@ def check(dataset):
             check_numeric_value(field, entry)
             if status == "PARTIAL" and field in ("io_supply", "vdda"):
                 expected_pin = "VDDIO" if field == "io_supply" else "VDDANA"
-                require(entry["source_id"] == 
+                require(entry["source_id"] ==
                         "microchip-sam-d21-da1-family-datasheet-ds40001882h"
                         and expected_pin in entry["source_locator"]
                         and "§8.2.1" in entry["source_locator"]
