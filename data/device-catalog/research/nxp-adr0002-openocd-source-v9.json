@@ -1,0 +1,60 @@
+{
+  "schema_version": 9,
+  "adr": "ADR-0002",
+  "scope": "NXP_501_openocd_first_research_no_visibility_authority",
+  "openocd_version": "0.12.0",
+  "openocd_source_tag": "v0.12.0",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "release_openocd_json_git_blob": "08c884b1bf6f5999c6d34c090992a8b59d85971d",
+  "production_manifest_git_blob": "0c252b4d8673f722033302758db4705957f965c5",
+  "input_files": [
+    {
+      "path": "data/device-catalog/research/nxp-277-full-dispositions-v8.csv",
+      "git_blob": "c74025d92ca2bd014f22215787cc9563f199b582",
+      "rows": 277
+    },
+    {
+      "path": "data/device-catalog/research/nxp-kl25-commercial-icpn.csv",
+      "git_blob": "53087e9082445e7948f88e688ecd890b0454d788",
+      "rows": 12
+    },
+    {
+      "path": "data/device-catalog/research/nxp-mcx-196-commercial-v5.csv",
+      "git_blob": "688ce427e2b7cf0189d7216884d897734aba49e0",
+      "rows": 196
+    },
+    {
+      "path": "data/device-catalog/research/nxp-k32l2-16-commercial-v5.csv",
+      "git_blob": "6413149e6be0e9af504b644ccceb030d4d851582",
+      "rows": 16
+    }
+  ],
+  "upstream_git_blobs": {
+    "tcl/target/kl25.cfg": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+    "tcl/target/klx.cfg": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+    "tcl/target/lpc84x.cfg": "af26f2757fb48ea87b80c297df0ecb8d8e5f2058",
+    "tcl/target/lpc8xx.cfg": "4c54a2a6670d6186297306112deee8d25e2627e4",
+    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e",
+    "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
+    "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
+  },
+  "group_counts": {
+    "K32L2": 20,
+    "KW45": 30,
+    "LPC55": 97,
+    "LPC80x": 18,
+    "LPC84x": 15,
+    "MCX": 241,
+    "MIMXRT": 68,
+    "KL25": 12
+  },
+  "priority_counts": {
+    "P1": 38,
+    "P2": 436,
+    "P0": 27
+  },
+  "positive_evidence": "kl25.cfg -> klx.cfg -> kinetis erase/write/probe; lpc84x.cfg -> lpc1xxx.cfg -> lpc2000 erase/write/probe; pinned lpc2000.c contains LPC844_201 and LPC845_301 device IDs",
+  "negative_bounded_evidence": "pinned lpc2000.c does not enumerate LPC802/804 explicit chip IDs; pinned kinetis.c lacks K32L2 explicit family path; no established version-locked pairing for MCX/LPC55/KW45/MIMXRT",
+  "caveat": "P0/P1 are INVESTIGATION PRIORITIES; no exact ICPN is automatically software SUPPORTED, public visible or physical validated",
+  "runtime_or_production_changed": false
+}
