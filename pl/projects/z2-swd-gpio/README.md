@@ -105,6 +105,30 @@ After running the command on SWPC, provide `pl/build/z2-swd-gpio/logs/vivado-con
 
 Do **not** connect a Blue Pill or any DUT to PMODB before reviewing 3.3V I/O limits, SWDIO direction timing, external nRESET pull-up, board grounds, target VTref/voltage and overcurrent protection. `NRST` is only low / Hi-Z. A generated `.bit` file must not be automatically flashed into QSPI or written to the board as part of this B/C task.
 
+### RTL Lint + Cocotb（GitHub PR 必須通過）
+
+每次此工程的 RTL／XDC／驗證程式修改，`pl-z2-swd-gpio.yml`
+會在 GitHub-hosted Ubuntu Runner 執行 **Verilator 連接/寬度 Lint** 及
+**Icarus Verilog + cocotb + pytest** 真實 RTL 功能模擬。
+
+Cocotb 測試包含：AXI-Lite 身分 Register Map、非零 PS 實體基底位址、
+非法/未對齊位址的 SLVERR、寫入唯讀 Register 的 SLVERR、AW/W
+先後順序與 Backpressure、Reset 中斷/復原，以及 EMIO SWDIO
+高阻態／輸入採樣／SWCLK／NRST 低電位或高阻態。
+
+在本機安裝 `verilator`、`iverilog` 後，可執行：
+
+```bash
+python3 -m pip install 'pytest' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+bash pl/projects/z2-swd-gpio/rtl-lint.sh
+python3 -m pytest -v pl/verification/test_z2_swd_gpio_rtl.py
+```
+
+驗證的 Xilinx `IOBUF` 是 `pl/sim/IOBUF.sv` 的**純數位四態模型**，
+不參與 Vivado 合成，也無法證明硬體實際電氣安全。AXI 上游 Interconnect
+的基底位址解碼歸 Vivado Block Design 驗證，不由此 IP 的低 12-bit
+Register Decode 判斷是否屬於該周邊。
+
 ### Source-only test
 
 ```bash
@@ -112,4 +136,4 @@ python3 -m pytest -q pl/tests
 bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
 ```
 
-The tests above do not execute Vivado, FPGA RTL simulation or physical HIL. Use `run Vivado` evidence for B/C and explicit later HIL acceptance for site programming.
+The `pl/tests` source-only tests **do not** simulate RTL; simulation is done separately by `pl/verification/test_z2_swd_gpio_rtl.py`. Neither suite executes Vivado synthesis/implementation/timing or physical Z2 HIL.
