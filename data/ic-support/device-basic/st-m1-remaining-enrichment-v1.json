@@ -196,10 +196,13 @@
     },
     "STM32N6": {
       "production_exact_icpns": 32,
-      "disposition": "in_progress",
-      "admitted_exact_icpns": 0,
+      "disposition": "admitted",
+      "admitted_exact_icpns": 32,
       "blocker": null,
-      "notes": []
+      "notes": [
+        "The official ST eStore STM32N6 category covers 32 active items and directly exposes 4.2 MB SRAM and 1.71–3.6 V supply.",
+        "The M1 RAM string preserves the official MB unit rather than converting 4.2 MB into an inferred KiB value."
+      ]
     },
     "STM32WB0": {
       "production_exact_icpns": 24,
