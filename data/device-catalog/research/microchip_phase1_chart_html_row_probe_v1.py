@@ -11,7 +11,8 @@ import re
 
 from microchip_phase1_chart_html_source_v1 import replay
 
-DEVICE_PATTERN = re.compile(r"(?<![A-Z0-9])ATSAMD21G18A(?![A-Z0-9])", re.I)
+DEVICE_PATTERN = re.compile(r"(?<![A-Z0-9])ATSAMD21G18[A-Z0-9]*(?![A-Z0-9])", re.I)
+FAMILY_PATTERN = re.compile(r"\bATSAMD21[A-Z0-9]+", re.I)
 
 
 class RowProbe(HTMLParser):
@@ -25,6 +26,7 @@ class RowProbe(HTMLParser):
         self.total_rows = 0
         self.header_samples = []
         self.target_rows = []
+        self.family_device_name_samples = []
 
     def handle_starttag(self, tag, attrs):
         if tag == "tr":
@@ -61,6 +63,14 @@ class RowProbe(HTMLParser):
                     "source_tr_ordinal": self.total_rows,
                     "headers_observed": [x["text"] for x in cells[:100]]
                 })
+        if len(self.family_device_name_samples) < 60:
+            for cell in cells:
+                for match in FAMILY_PATTERN.findall(cell["text"]):
+                    name = match.upper()
+                    if name not in self.family_device_name_samples:
+                        self.family_device_name_samples.append(name)
+                    if len(self.family_device_name_samples) >= 60:
+                        break
         if len(self.target_rows) < 10 and any(
             DEVICE_PATTERN.search(x["text"]) for x in cells):
             self.target_rows.append({
@@ -86,7 +96,8 @@ def inspect(original_root):
         "original_html_bytes": integrity["size_bytes"],
         "source_tr_nodes_seen": parser.total_rows,
         "header_samples": parser.header_samples,
-        "target": "ATSAMD21G18A",
+        "target": "ATSAMD21G18-family chart row",
+        "family_name_samples_from_raw_table": parser.family_device_name_samples,
         "target_raw_row_candidates": parser.target_rows,
         "source_capture_replayed": True,
         "semantic_field_alignment_verified": False,
