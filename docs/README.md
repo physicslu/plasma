@@ -15,7 +15,7 @@
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
-- **Plan / Accepted Policy** — [ADR-0002: OpenOCD 軟體支援、Catalog 顯示與研究優先順序](adr/0002-openocd-software-qualified-catalog-visibility.md)：產品 Catalog 僅顯示指定版本 OpenOCD 已確認具燒錄能力的 ICPN；Socket/PPU/Site HIL 獨立；研究工作優先針對 OpenOCD 支援目標，其餘原廠候選只保留來源。API/UI migration 追蹤 [Issue #849](https://github.com/physicslu/plasma/issues/849)，研究作業優先順序追蹤 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
+- **Plan / Accepted Policy** — [ADR-0002: OpenOCD 軟體支援、Catalog 顯示與研究優先順序](adr/0002-openocd-software-qualified-catalog-visibility.md)（實作順序：Phase 1 IC Information → Phase 2 Programming → Phase 3 PLASMA Compatibility；預設 Product Catalog 的 SUPPORTED-only 政策維持，尚未完成遷移。）：產品 Catalog 僅顯示指定版本 OpenOCD 已確認具燒錄能力的 ICPN；Socket/PPU/Site HIL 獨立；研究工作優先針對 OpenOCD 支援目標，其餘原廠候選只保留來源。API/UI migration 追蹤 [Issue #849](https://github.com/physicslu/plasma/issues/849)，研究作業優先順序追蹤 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
 
 ## Operator
 
@@ -48,6 +48,7 @@
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
+- **Plan / Accepted Policy** — [IC Information Phase 1 Evidence Contract](architecture/ic-information-phase1.md)：ADR-0002 三階段實作中，現階段只建構 IC Information 精確料號、逐欄原廠證據與完整度統計；Programming 與 PLASMA Compatibility 後續執行。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
 - **Current** — [Manufacturer Enrichment Coverage Framework v1](architecture/manufacturer-enrichment-coverage-v1.md)：定義 M0–M5 manufacturer enrichment coverage、逐 ICPN missing-dimension 投影、explicit exact-ICPN scope composition 與 fail-closed inheritance 規則；不授權 runtime 或 hardware readiness。
