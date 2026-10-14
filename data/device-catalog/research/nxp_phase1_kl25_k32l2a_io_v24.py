@@ -2,6 +2,7 @@
 """ADR-0002 NXP Phase 1 v24: KL25/K32L2A GPIO VDD-reference, PARTIAL not proven VDDIO."""
 import csv
 import json
+from functools import lru_cache
 from collections import Counter
 from pathlib import Path
 
@@ -18,6 +19,11 @@ EXTRA = (
     "io_reference_source_revision_v24", "io_reference_source_locator_v24",
     "io_reference_inference_limit_v24", "io_reference_pdf_sha256_v24",
 )
+
+@lru_cache(maxsize=1)
+def baseline_rows():
+    """Source-locked v23 generator is pure; replay it once per validation process."""
+    return prev.build()
 
 def require(ok, why):
     if not ok:
@@ -41,7 +47,7 @@ def load():
     require(lock["vendor_pdf_binary_archived"] is False
             and lock["vendor_pdf_sha256"] is None, "false PDF archive/SHA256 claim")
     require(blob(prev.LEDGER.read_bytes()) == lock["baseline_v23_git_blob"]
-            and prev.LEDGER.read_bytes() == prev.dump(prev.build(), prev.header(prev.LEDGER)),
+            and prev.LEDGER.read_bytes() == prev.dump(baseline_rows(), prev.header(prev.LEDGER)),
             "v23 source ledger not reproducible")
     require(blob(SOURCE.read_bytes()) == lock["source_v24_git_blob"],
             "unreviewed change to original source rows")
@@ -81,7 +87,7 @@ def build():
     require(dict(counts) == lock["source_counts"], "source family cohort drift")
     output = []
     matched = set()
-    for old in prev.build():
+    for old in baseline_rows():
         row = dict(old)
         for k in EXTRA:
             row[k] = ""
@@ -126,7 +132,7 @@ def summary(rows):
 
 def stats(rows):
     lock = load()
-    old = prev.build()
+    old = baseline_rows()
     return {
         "schema_version": 24,
         "adr": "ADR-0002",
