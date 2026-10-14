@@ -1,0 +1,345 @@
+{
+  "schema_version": 2,
+  "policy": "ADR-0002/Issue-851",
+  "manufacturer": "Microchip",
+  "scope": "read_only_openocd_first_source_capability_research",
+  "provider": {
+    "engine": "openocd",
+    "source_repository": "https://github.com/openocd-org/openocd",
+    "release": "v0.12.0",
+    "version": "0.12.0",
+    "commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8"
+  },
+  "source_attestation": "Upstream blob SHA-1 is Git blob identity at pinned release commit, independently fetched; full source not stored or distributed.",
+  "evidence_level": "static_tcl_flash_bank_plus_driver_erase_write_probe_read_implementation_present_only",
+  "p0_research_leads": [
+    {
+      "id": "sam-d-c-r-l0",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:ATSAMD(?!5)|ATSAMC|ATSAMR|ATSAML0)",
+      "target": "tcl/target/at91samdXX.cfg",
+      "target_sha": "5132109ba8d7b570f951d957855aa935250e2835",
+      "driver": "at91samd",
+      "driver_source": "src/flash/nor/at91samd.c",
+      "driver_sha": "33e86c76e9f8310510844793da3f3074ed5dae8f",
+      "transport": "swd_or_jtag_depending_on_device",
+      "risk": "Generic SAM D/C/R/L0 family description; must validate exact silicon DSU ID and NVMCTRL version.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M0/M0+ (device-specific, not fixed by generic CFG)",
+      "debug_transports": [
+        "SWD"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "Generic SAM D/C/R/L0 family description; must validate exact silicon DSU ID and NVMCTRL version."
+    },
+    {
+      "id": "sam-e5-d5",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:ATSAME5|ATSAMD5)",
+      "target": "tcl/target/atsame5x.cfg",
+      "target_sha": "5093d41b09912401599d9cea8fcbffbe422a8692",
+      "driver": "atsame5",
+      "driver_source": "src/flash/nor/atsame5.c",
+      "driver_sha": "fdd610f5f38bcbeddd3131105f046c7b67f30381",
+      "transport": "swd",
+      "risk": "E5/D5 revision and Flash address/geometry and factory NVM specifics need independent exact-device check.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M4",
+      "debug_transports": [
+        "SWD"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "E5/D5 revision and Flash address/geometry and factory NVM specifics need independent exact-device check."
+    },
+    {
+      "id": "sam3",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:AT91SAM3|ATSAM3|SAM3)",
+      "target": "tcl/target/at91sam3ax_8x.cfg",
+      "target_sha": "46d580d3235ce02e50870424347d35ddfdee873c",
+      "driver": "at91sam3",
+      "driver_source": "src/flash/nor/at91sam3.c",
+      "driver_sha": "fb6d98b56f1a87003618368cffcd813184386df1",
+      "transport": "swd_or_jtag_depending_on_device",
+      "risk": "at91sam3ax_8x is a single exemplar target and is NOT evidence for all SAM3 orderable variants.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M3",
+      "debug_transports": [
+        "SWD",
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "at91sam3ax_8x is a single exemplar target and is NOT evidence for all SAM3 orderable variants."
+    },
+    {
+      "id": "sam4l",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:AT91SAM4L|ATSAM4L|SAM4L)",
+      "target": "tcl/target/at91sam4lXX.cfg",
+      "target_sha": "0910e3080a8b24e08a062a34f65b30c90493910b",
+      "driver": "at91sam4l",
+      "driver_source": "src/flash/nor/at91sam4l.c",
+      "driver_sha": "ddf42a8c5f417f5522b959b108a2782511a435db",
+      "transport": "swd_or_jtag_depending_on_device",
+      "risk": "Do not infer SAM4L algorithm compatibility from a different SAM4 family.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M4",
+      "debug_transports": [
+        "SWD",
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "Do not infer SAM4L algorithm compatibility from a different SAM4 family."
+    },
+    {
+      "id": "sam4-except-l",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:AT91SAM4(?!L)|ATSAM4(?!L)|SAM4(?!L))",
+      "target": "tcl/target/at91sam4sXX.cfg",
+      "target_sha": "2ceca00176b6c7000eccf630d397149f5f1a679b",
+      "driver": "at91sam4",
+      "driver_source": "src/flash/nor/at91sam4.c",
+      "driver_sha": "6b9437390708f35cdac717f9ca759be692f8eb30",
+      "transport": "swd_or_jtag_depending_on_device",
+      "risk": "at91sam4sXX exemplar only; SAM4C/SAM4E subsets need additional target/config crosswalk.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M4",
+      "debug_transports": [
+        "SWD",
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "at91sam4sXX exemplar only; SAM4C/SAM4E subsets need additional target/config crosswalk."
+    },
+    {
+      "id": "sam-v70-e70-s70",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:ATSAMV7|ATSAME70|ATSAMS70|SAMV7|SAME70|SAMS70)",
+      "target": "tcl/target/atsamv.cfg",
+      "target_sha": "7e9f6c57ef6341fc04d22e59e357b048419a033b",
+      "driver": "atsamv",
+      "driver_source": "src/flash/nor/atsamv.c",
+      "driver_sha": "67533fc1e5b891d1a6ed5dd03b0b7f8b96dcbeb7",
+      "transport": "swd_or_jtag_depending_on_device",
+      "risk": "Config comments describe SAMV/SAME/SAMS Cortex-M7; do not generalize other SAME/SAMS parts.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "Cortex-M7",
+      "debug_transports": [
+        "SWD",
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "Config comments describe SAMV/SAME/SAMS Cortex-M7; do not generalize other SAME/SAMS parts."
+    },
+    {
+      "id": "sam7",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^(?:AT91SAM7|ATSAM7|SAM7)",
+      "target": "tcl/target/at91sam7x256.cfg",
+      "target_sha": "2ebbf22c13bf913c2d354af929248d5ff308aab2",
+      "driver": "at91sam7",
+      "driver_source": "src/flash/nor/at91sam7.c",
+      "driver_sha": "8d8cf22268bee523e335c327bc4b23ae62bd9b2e",
+      "transport": "jtag",
+      "risk": "at91sam7x256 is a single exemplar; legacy JTAG/voltage/part identity require independent applicability review.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "ARM7TDMI",
+      "debug_transports": [
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "at91sam7x256 is a single exemplar; legacy JTAG/voltage/part identity require independent applicability review."
+    },
+    {
+      "id": "pic32mx",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^PIC32MX",
+      "target": "tcl/target/pic32mx.cfg",
+      "target_sha": "df68e807aeb504ab8b23b547803405df586b3928",
+      "driver": "pic32mx",
+      "driver_source": "src/flash/nor/pic32mx.c",
+      "driver_sha": "9a1a6341256039bf9fd68e41a109e7483a5f694e",
+      "transport": "jtag",
+      "risk": "PIC32MX OpenOCD MIPS/JTAG not interchangeable with PIC32MZ/MM/CX or ARM SWD; Flash geometry/ID/variant required.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "MIPS",
+      "core_model": "MIPS M4K",
+      "debug_transports": [
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "PIC32MX OpenOCD MIPS/JTAG not interchangeable with PIC32MZ/MM/CX or ARM SWD; Flash geometry/ID/variant required."
+    },
+    {
+      "id": "atmega128-limited",
+      "priority": "P0_SOURCE_BACKED",
+      "matcher": "^ATMEGA128$",
+      "target": "tcl/target/atmega128.cfg",
+      "target_sha": "c9469195eea1ee7ae52f847623331881590f033e",
+      "driver": "avr",
+      "driver_source": "src/flash/nor/avrf.c",
+      "driver_sha": "0e2e263ce5d9086595bd86ed46ae8d2421a48243",
+      "transport": "jtag",
+      "risk": "Source provides AVR JTAG flash driver; NOT general PIC/AVR ISP, UPDI, PDI, debugWIRE or other ATmega128 suffix variants.",
+      "driver_operations_declared": [
+        "erase",
+        "write",
+        "probe",
+        "read"
+      ],
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "AVR",
+      "core_model": "AVR 8-bit",
+      "debug_transports": [
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "Source provides AVR JTAG flash driver; NOT general PIC/AVR ISP, UPDI, PDI, debugWIRE or other ATmega128 suffix variants."
+    }
+  ],
+  "p1_bounded_leads": [
+    {
+      "id": "sam-l1x-target-only",
+      "matcher": "^(?:ATSAML1|SAML1)",
+      "target": "tcl/target/atsaml1x.cfg",
+      "target_sha": "5a1b8f8a2bc8f99a718e826aa699ab88cc449522",
+      "reason": "An OpenOCD target config exists but declares no Flash Bank in that file; no flash-driver/operation proof in this research pass.",
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "ARM",
+      "core_model": "UNKNOWN",
+      "debug_transports": [
+        "SWD"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "An OpenOCD target config exists but declares no Flash Bank in that file; no flash-driver/operation proof in this research pass."
+    },
+    {
+      "id": "avr32-target-only",
+      "matcher": "^AVR32",
+      "target": "tcl/target/avr32.cfg",
+      "target_sha": "e16d11439c998cb109de893e3ac0905dc22f3a7a",
+      "reason": "An OpenOCD target config exists but lacks an on-chip Flash Bank declaration; do not equate target presence with flash programming.",
+      "exact_icpn_software_qualified": false,
+      "openocd_supported_asserted": false,
+      "core_architecture": "AVR32",
+      "core_model": "AVR32 AP7K",
+      "debug_transports": [
+        "JTAG"
+      ],
+      "core_is_support_evidence": false,
+      "device_applicability_reviewed": false,
+      "qualification_state": "UNKNOWN",
+      "known_limitations": "An OpenOCD target config exists but lacks an on-chip Flash Bank declaration; do not equate target presence with flash programming."
+    }
+  ],
+  "p2_policy": "Anything not source-backed in this bounded release-specific screen is ARCHIVE-ONLY until independently validated. Absence from this screen is NOT proof that OpenOCD cannot support it.",
+  "manifest_policy": "Original Microchip DFP support-name inventory is read-only input only, not exact commercial ICPN enumeration.",
+  "counted_research_icpn_candidates_retained": 24051,
+  "qualified_exact_icpn_count": null,
+  "global_active_denominator": null,
+  "production_write_authorized": false,
+  "catalog_publication_authorized": false,
+  "ppu_hil_claimed": false,
+  "socket_hil_claimed": false,
+  "classification_dimensions": [
+    "core_architecture",
+    "core_model",
+    "debug_transports",
+    "target",
+    "driver",
+    "exact_icpn_applicability"
+  ],
+  "statistics_claims": {
+    "microchip_total_openocd_supported_unknown": true,
+    "core_majority_unproven": true,
+    "counts_are_family_source_leads_not_exact_icpns": true
+  },
+  "p0_source_leads_are_not_software_supported": true,
+  "existing_branch_source": "research/microchip-openocd-first-v1@e13d8470dc8d9915f76f11dca578e78fe2264a34"
+}
