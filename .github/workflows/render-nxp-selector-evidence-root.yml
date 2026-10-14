@@ -13,6 +13,9 @@ jobs:
   render-installed-wheel-root:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    env:
+      PLASMA_DEVICE_CATALOG_MANIFEST: ${{ github.workspace }}/data/device-catalog/production/icpn-v1-manifest.json
+      PLASMA_IC_SUPPORT_ROOT: ${{ github.workspace }}/data/ic-support
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
