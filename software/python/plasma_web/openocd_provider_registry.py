@@ -16,13 +16,14 @@ from pathlib import Path
 from typing import Any
 
 from .backend_candidate_registry import BackendCandidateRegistry
+from .runtime_evidence_root import default_runtime_evidence_root, source_files_available
 from .backend_provenance import load_source_authorities
 from .device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord,
     get_default_device_catalog,
 )
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = default_runtime_evidence_root()
 EVIDENCE_REL = "data/device-catalog/research/st-h5-offline-runtime-evidence-v1.json"
 EVIDENCE_GIT_BLOB = "ba332b1209eb6d1202759500558fa777f8baf0a5"
 ST_COMMIT = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
@@ -142,7 +143,8 @@ def _base_provider(row: DeviceCatalogRecord, *, provider_id: str,
 class OpenOCDProviderRegistry:
     """Many-to-one capable source binding; never consumed by Job/Batch execution."""
 
-    def __init__(self, catalog: DeviceCatalog, root: Path = ROOT) -> None:
+    def __init__(self, catalog: DeviceCatalog, root: Path | None = ROOT) -> None:
+        _require(root is not None, "explicit OpenOCD evidence root is required")
         self.catalog_revision_sha256 = catalog.revision_sha256
         st = [r for r in catalog.records if r.vendor == "STMicroelectronics"]
         nxp = [r for r in catalog.records if r.vendor == "NXP"]
@@ -283,6 +285,6 @@ def get_default_openocd_provider_registry() -> OpenOCDProviderRegistry | None:
         "data/device-catalog/research/st-c5-ps-backend-static-gate-v1.1.json",
         EVIDENCE_REL,
     )
-    if any(not (ROOT / rel).is_file() for rel in required):
+    if not source_files_available(ROOT, required):
         return None
-    return OpenOCDProviderRegistry(get_default_device_catalog())
+    return OpenOCDProviderRegistry(get_default_device_catalog(), root=ROOT)
