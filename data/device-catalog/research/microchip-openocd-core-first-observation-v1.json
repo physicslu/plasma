@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "type": "microchip-openocd-core-first-pinned-dfp-replay-research-observation",
+  "policy": "ADR-0002/Issue-851",
+  "manufacturer": "Microchip",
+  "openocd_provider": "openocd-upstream",
+  "openocd_version": "0.12.0",
+  "openocd_source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "openocd_source_blob_checks": 20,
+  "dfp_original_index_sha256": "9a00c71e262882687219fce322169435a36d45ac06d0a26bf146c4d6a5db83b0",
+  "dfp_original_acquisition_run_id": 38338847345,
+  "replay_ci_run_id": 38494643616,
+  "research_classification_unit": "DFP device support name, not exact manufacturer commercial ICPN",
+  "observed_original_dfp_support_names": 3717,
+  "dfp_research_priority_counts": {
+    "P0": 364,
+    "P1": 12,
+    "P2": 3341
+  },
+  "dfp_by_research_group": {
+    "P0:atmega128-limited": 1,
+    "P0:pic32mx": 128,
+    "P0:sam-d-c-r-l0": 143,
+    "P0:sam-e5-d5": 25,
+    "P0:sam-v70-e70-s70": 67,
+    "P1:sam-l1x-target-only": 12,
+    "P2:archive_only": 3341
+  },
+  "dfp_by_priority_and_core": {
+    "P0:ARM": 235,
+    "P0:AVR": 1,
+    "P0:MIPS": 128,
+    "P1:ARM": 12,
+    "P2:UNKNOWN": 3341
+  },
+  "replay_unit_tests_passed": 12,
+  "archived_microchip_research_icpn_candidate_count": 24051,
+  "exact_icpn_software_supported_count": null,
+  "microchip_global_openocd_supported_denominator": null,
+  "manufacturer_population_complete": false,
+  "arm_majority_supported_icpn_claimed": false,
+  "p0_is_supported_claimed": false,
+  "hardware_programming_qualified": false,
+  "socket_hil_claimed": false,
+  "production_write_authorized": false,
+  "catalog_publication_authorized": false,
+  "notes": [
+    "P0 groups are curated source-backed Flash driver investigation leads, not software support decisions for exact ICPNs.",
+    "AVR32DA-prefixed names refer to 8-bit AVR DA/UPDI and were excluded from the AVR32 AP7K/JTAG P1 matcher.",
+    "P2 means archive-only in bounded screen, not proven OpenOCD non-support.",
+    "Observed P0/P1/P2 populations are DFP device support names, NOT unique manufacturer orderable ICPNs or runtime-capable parts."
+  ]
+}
