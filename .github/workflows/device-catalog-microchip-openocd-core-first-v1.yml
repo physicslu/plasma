@@ -1,0 +1,69 @@
+name: Microchip OpenOCD 0.12.0 Core-first research gate v1
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - 'data/device-catalog/research/microchip_openocd_core_first_v1.py'
+      - 'data/device-catalog/research/test_microchip_openocd_core_first_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_OPENOCD_CORE_FIRST_V1.md'
+      - 'release/openocd.json'
+      - '.github/workflows/device-catalog-microchip-openocd-core-first-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  pinned-openocd-source-and-research-dfp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline ADR-0002 support/identity/priority negative tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s data/device-catalog/research \
+            -p 'test_microchip_openocd_core_first_v1.py' -v
+          python data/device-catalog/research/microchip_openocd_core_first_v1.py
+      - name: Checkout the exact PLASMA OpenOCD v0.12.0 source commit (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: openocd-org/openocd
+          ref: 9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c
+          path: /tmp/plasma-upstream-openocd
+          sparse-checkout: |
+            tcl/target
+            src/flash/nor
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+      - name: Verify source-locked Tcl Flash Bank / driver implementation
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_openocd_core_first_v1.py \
+            --openocd-source-root /tmp/plasma-upstream-openocd
+      - name: Restore original manufacturer DFP archive from verified prior run
+        uses: actions/download-artifact@v4
+        with:
+          name: microchip-official-packs-index-raw
+          repository: physicslu/plasma
+          run-id: 38338847345
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/microchip-dfp-original
+      - name: Reclassify original DFP device support names only (not commercial ICPNs)
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_openocd_core_first_v1.py \
+            --openocd-source-root /tmp/plasma-upstream-openocd \
+            --dfp-evidence-root "${{ runner.temp }}/microchip-dfp-original" \
+            --output "${{ runner.temp }}/microchip-openocd-core-first-research-v1.json"
+      - name: Retain version-pinned research triage evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-openocd-core-first-research-v1
+          path: ${{ runner.temp }}/microchip-openocd-core-first-research-v1.json
+          if-no-files-found: warn
+          retention-days: 90
