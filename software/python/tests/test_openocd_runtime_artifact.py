@@ -367,6 +367,8 @@ def test_z2_release_builds_both_openocd_architectures_and_packages_armv7() -> No
     assert "- armv7l" in source
     assert "bash scripts/build-openocd-runtime.sh" in source
     assert "Install and execute on fresh matching Ubuntu 22.04 userspace" in source
+    assert "libgpiod2" in source
+    assert 'grep -Eq "(^|[[:space:]])linuxgpiod([[:space:]]|$)"' in source
     assert "plasma-openocd-*-linux-armv7l-" in source
     assert 'python "$root/scripts/openocd-runtime.py" verify' in source
     assert "hardware_runtime_ready" in source
