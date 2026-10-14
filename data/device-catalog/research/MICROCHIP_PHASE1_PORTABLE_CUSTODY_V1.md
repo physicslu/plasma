@@ -104,6 +104,17 @@ The updated CI performs **deposit/audit/restore** on the *real manufacturer-sour
 
 **Residual controls not implemented:** privileged administrators can edit/delete local files; hashes without independently held signed receipts do not prevent malicious coordinated replacement; retention, offsite storage, archive access management, and independent disaster restore are external operator duties.
 
+## Second live source-to-local-vault verification (2026-10-14)
+
+[GitHub Actions run 38535132442](https://github.com/physicslu/plasma/actions/runs/38535132442) performed **actual manufacturer HTML and MCP source capture**, validated the complete original source bundle, then deposited it into a separate *ephemeral Runner filesystem directory*. The same run audited the stored ZIP, restored a new file and performed an independent cold replay with the existing manufacturer original-byte parsers.
+
+- [Original source, ZIP, local vault copy and audit/restore receipts — artifact 11879887575](https://github.com/physicslu/plasma/actions/runs/38535132442/artifacts/11879887575)
+- **Original ZIP SHA-256:** `1db2e04fc1c1903bf6fb65fa042abd44b39e4517807ab5acfc46db3261ce3715`
+- **18 original-source and report members** in this particular portable bundle; source and stored copy SHA-256 agree.
+- **Local deposit PASS; local stored-copy audit PASS; independent restored-copy cold replay PASS.**
+- Latest Artifact expiration: **2027-01-12 08:26:38 UTC**. No evidence that this copy has been placed on SWPC, on physically separate media or offsite.
+- **Durable, immutable, offsite and retention flags stay false.** This is a validated *handoff procedure*, not a completed long-term custody deployment.
+
 ## Explicit durable storage acceptance gate
 
 Before authorizing a permanent identity Catalog decision, the operator needs:
