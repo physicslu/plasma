@@ -1,0 +1,281 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32u0-device-basic-v1",
+  "status": "manufacturer_device_basic_available",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32U0",
+  "purpose": "IC Information basic manufacturer profile only; no Programming Profile authority",
+  "binding_count": 68,
+  "source_policy": {
+    "allowed_authority": "STMicroelectronics official",
+    "allowed_surfaces": [
+      "st_product_selector",
+      "st_estore"
+    ],
+    "prohibited_derivation_sources": [
+      "OpenOCD",
+      "family_name_inference",
+      "programming_guide",
+      "datasheet"
+    ],
+    "observation_date_utc": "2026-10-14",
+    "content_lock_required": false
+  },
+  "fields": [
+    "icpn",
+    "base_device",
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "operating_vdd",
+    "io_supply",
+    "vdda",
+    "operating_temperature"
+  ],
+  "groups": {
+    "stm32u031-16k": {
+      "series": "STM32U031",
+      "flash_size": "16 KiB",
+      "ram_size": "12 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u031r8t6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U031x4/x6/x8",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u031-32k": {
+      "series": "STM32U031",
+      "flash_size": "32 KiB",
+      "ram_size": "12 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u031r8t6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U031x4/x6/x8",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u031-64k": {
+      "series": "STM32U031",
+      "flash_size": "64 KiB",
+      "ram_size": "12 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u031r8t6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U031x4/x6/x8",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u073-128k": {
+      "series": "STM32U073",
+      "flash_size": "128 KiB",
+      "ram_size": "40 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u073cbu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U073x8/xB/xC",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u073-256k": {
+      "series": "STM32U073",
+      "flash_size": "256 KiB",
+      "ram_size": "40 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u073cbu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U073x8/xB/xC",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u073-64k": {
+      "series": "STM32U073",
+      "flash_size": "64 KiB",
+      "ram_size": "40 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u073cbu6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U073x8/xB/xC",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    },
+    "stm32u083-256k": {
+      "series": "STM32U083",
+      "flash_size": "256 KiB",
+      "ram_size": "40 KiB",
+      "operating_vdd_v": {
+        "min": 1.71,
+        "max": 3.6
+      },
+      "evidence": {
+        "authority": "STMicroelectronics official",
+        "source_surface": "st_estore",
+        "selector_url": "https://estore.st.com/en/stm32u083rci6-cpn.html",
+        "observed_at_utc": "2026-10-14",
+        "content_lock": null,
+        "evidence_strength": "official_estore_observation",
+        "source_scope": "STM32U083xC",
+        "observed_fields": [
+          "ram",
+          "operating_vdd"
+        ]
+      }
+    }
+  },
+  "bindings": {
+    "STM32U031C6T6": "stm32u031-32k",
+    "STM32U031C6U6": "stm32u031-32k",
+    "STM32U031C8T6": "stm32u031-64k",
+    "STM32U031C8T6TR": "stm32u031-64k",
+    "STM32U031C8U6": "stm32u031-64k",
+    "STM32U031F4P3": "stm32u031-16k",
+    "STM32U031F4P3TR": "stm32u031-16k",
+    "STM32U031F4P6": "stm32u031-16k",
+    "STM32U031F6P6": "stm32u031-32k",
+    "STM32U031F8P6": "stm32u031-64k",
+    "STM32U031K4U6": "stm32u031-16k",
+    "STM32U031K6U3": "stm32u031-32k",
+    "STM32U031K6U6": "stm32u031-32k",
+    "STM32U031K8U3": "stm32u031-64k",
+    "STM32U031K8U6": "stm32u031-64k",
+    "STM32U031K8U6TR": "stm32u031-64k",
+    "STM32U031R6I6": "stm32u031-32k",
+    "STM32U031R6T6": "stm32u031-32k",
+    "STM32U031R8I6": "stm32u031-64k",
+    "STM32U031R8T6": "stm32u031-64k",
+    "STM32U073C8T6": "stm32u073-64k",
+    "STM32U073C8U6": "stm32u073-64k",
+    "STM32U073CBT6": "stm32u073-128k",
+    "STM32U073CBT6TR": "stm32u073-128k",
+    "STM32U073CBU3": "stm32u073-128k",
+    "STM32U073CBU3TR": "stm32u073-128k",
+    "STM32U073CBU6": "stm32u073-128k",
+    "STM32U073CCT6": "stm32u073-256k",
+    "STM32U073CCT6TR": "stm32u073-256k",
+    "STM32U073CCU3": "stm32u073-256k",
+    "STM32U073CCU3TR": "stm32u073-256k",
+    "STM32U073CCU6": "stm32u073-256k",
+    "STM32U073CCU6TR": "stm32u073-256k",
+    "STM32U073K8U6": "stm32u073-64k",
+    "STM32U073KBU6": "stm32u073-128k",
+    "STM32U073KCU3": "stm32u073-256k",
+    "STM32U073KCU6": "stm32u073-256k",
+    "STM32U073KCU6TR": "stm32u073-256k",
+    "STM32U073M8I6": "stm32u073-64k",
+    "STM32U073M8T6": "stm32u073-64k",
+    "STM32U073MBI6": "stm32u073-128k",
+    "STM32U073MBT3": "stm32u073-128k",
+    "STM32U073MBT6": "stm32u073-128k",
+    "STM32U073MBT6TR": "stm32u073-128k",
+    "STM32U073MCI6": "stm32u073-256k",
+    "STM32U073MCT3": "stm32u073-256k",
+    "STM32U073MCT6": "stm32u073-256k",
+    "STM32U073R8I6": "stm32u073-64k",
+    "STM32U073R8T6": "stm32u073-64k",
+    "STM32U073RBI6": "stm32u073-128k",
+    "STM32U073RBT6": "stm32u073-128k",
+    "STM32U073RBT6TR": "stm32u073-128k",
+    "STM32U073RCI6": "stm32u073-256k",
+    "STM32U073RCT3": "stm32u073-256k",
+    "STM32U073RCT6": "stm32u073-256k",
+    "STM32U073RCT6TR": "stm32u073-256k",
+    "STM32U083CCT6": "stm32u083-256k",
+    "STM32U083CCT6TR": "stm32u083-256k",
+    "STM32U083CCU6": "stm32u083-256k",
+    "STM32U083CCU6TR": "stm32u083-256k",
+    "STM32U083KCU3": "stm32u083-256k",
+    "STM32U083KCU6": "stm32u083-256k",
+    "STM32U083KCU6TR": "stm32u083-256k",
+    "STM32U083MCI6": "stm32u083-256k",
+    "STM32U083MCT6": "stm32u083-256k",
+    "STM32U083MCT6TR": "stm32u083-256k",
+    "STM32U083RCI6": "stm32u083-256k",
+    "STM32U083RCT6": "stm32u083-256k"
+  },
+  "composition": {
+    "catalog_owned_fields": [
+      "icpn",
+      "base_device",
+      "package",
+      "pin_count",
+      "flash",
+      "operating_temperature"
+    ],
+    "profile_owned_fields": [
+      "ram",
+      "operating_vdd"
+    ],
+    "nullable_unenriched_fields": [
+      "io_supply",
+      "vdda"
+    ],
+    "rule": "Exact ICPN applicability is explicit in bindings. RAM and Operating VDD are admitted only from cited ST eStore observations. I/O Supply and VDDA remain null because no separate direct allowed-source values are admitted. No Datasheet, Programming Guide, OpenOCD, or family-name fallback is permitted."
+  }
+}
