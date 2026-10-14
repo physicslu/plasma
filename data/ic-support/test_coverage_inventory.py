@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import importlib.util
 from collections import Counter
 from pathlib import Path
@@ -31,6 +32,42 @@ def find_base(inventory: dict, base_device: str) -> dict:
         if row["base_device"] == base_device:
             return row
     raise AssertionError(f"missing base device {base_device}")
+
+
+
+def test_st_m1_remaining_enrichment_ledger_is_terminal_and_reconciled() -> None:
+    ledger_path = HERE / "device-basic" / "st-m1-remaining-enrichment-v1.json"
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+
+    assert ledger["status"] == "completed"
+    assert ledger["baseline_remaining_st_exact_icpns"] == 3339
+
+    families = ledger["families"]
+    assert families
+    assert all(
+        row["disposition"] in {"admitted", "blocked_evidence_gap"}
+        for row in families.values()
+    )
+
+    processed = sum(row["production_exact_icpns"] for row in families.values())
+    admitted = sum(row["admitted_exact_icpns"] for row in families.values())
+    blocked = sum(
+        row["production_exact_icpns"]
+        for row in families.values()
+        if row["disposition"] == "blocked_evidence_gap"
+    )
+
+    assert processed == 3339
+    assert admitted == 332
+    assert blocked == 3007
+    assert processed == admitted + blocked
+
+    summary = ledger["final_summary"]
+    assert summary["processed_remaining_st_exact_icpns"] == processed
+    assert summary["admitted_exact_icpns"] == admitted
+    assert summary["blocked_evidence_gap_exact_icpns"] == blocked
+    assert summary["resulting_m1_exact_icpns"] == 1622
+    assert summary["all_families_dispositioned"] is True
 
 
 def test_current_production_metrics() -> None:
@@ -411,6 +448,7 @@ def test_stm32h5_package_dependent_pin_count_resolution() -> None:
 
 
 def main() -> int:
+    test_st_m1_remaining_enrichment_ledger_is_terminal_and_reconciled()
     test_current_production_metrics()
     test_stm32h5_package_dependent_pin_count_resolution()
     test_exact_icpn_to_base_device_to_profile_projection()
