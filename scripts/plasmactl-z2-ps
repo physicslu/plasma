@@ -149,6 +149,25 @@ parse_activation_args() {
       require_file "$python_sidecar" "Plasma Python runtime sidecar"
     fi
   fi
+  # September 2026 factory Bootstraps call this kit-local plasmactl without
+  # --openocd-artifact/--openocd-sidecar. The *already verified kit* places
+  # exactly one OpenOCD candidate next to its canonical PPU release artifact.
+  # Discover only in that directory, never from PATH, an arbitrary download,
+  # or the untrusted system-wide filesystem. The installer re-verifies SHA256.
+  if [[ -z "$openocd_artifact" && ! -f "$openocd_evidence" ]]; then
+    [[ -z "$openocd_sidecar" ]] || die "--openocd-sidecar requires --openocd-artifact"
+    local artifact_dir
+    artifact_dir="$(cd "$(dirname "$release_artifact")" && pwd -P)"
+    local -a candidates=()
+    shopt -s nullglob
+    candidates=( "$artifact_dir"/plasma-openocd-*-linux-armv7l.tar.gz )
+    shopt -u nullglob
+    (("${#candidates[@]}" == 1)) || die "missing or ambiguous kit-local OpenOCD artifact (found ${#candidates[@]}); provide exactly one qualified --openocd-artifact"
+    openocd_artifact="${candidates[0]}"
+    openocd_sidecar="$openocd_artifact.sha256"
+    say "legacy Bootstrap compatibility: using SHA256-verified OpenOCD from PPU kit artifacts"
+  fi
+
   if [[ -n "$openocd_artifact" ]]; then
     require_file "$openocd_runtime_tool" "OpenOCD runtime tool"
     require_file "$openocd_artifact" "OpenOCD runtime artifact"
