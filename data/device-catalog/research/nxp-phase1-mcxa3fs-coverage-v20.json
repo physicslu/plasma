@@ -1,0 +1,200 @@
+{
+  "schema_version": 20,
+  "phase": "IC_INFORMATION",
+  "adr": "ADR-0002",
+  "manufacturer": "NXP",
+  "v18_501_blob": "c92e9d445821e0ce15b3c39b6ac520e5a6da3d62",
+  "official_mcxa3_32_blob": "f68bdc613f2df759c9d7d5a57af47a692adc4223",
+  "exact_official_rows": 32,
+  "matched_admitted_exact": 32,
+  "source_url": "https://www.nxp.jp/docs/en/fact-sheet/MCXAFS.pdf",
+  "source_pdf_page": 3,
+  "source_footer": "MCXA3FS REV 0",
+  "product_page_listing_rev": "Rev 1.0 30 Mar 2026",
+  "revision_discrepancy_explicit": true,
+  "original_pdf_bytes_archived": false,
+  "original_pdf_sha256": null,
+  "prior_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 114,
+        "PARTIAL": 13,
+        "UNKNOWN": 97,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "current_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 146,
+        "PARTIAL": 13,
+        "UNKNOWN": 65,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 16,
+        "PARTIAL": 27,
+        "UNKNOWN": 181,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 208,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all501": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 161,
+        "PARTIAL": 61,
+        "UNKNOWN": 279,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 31,
+        "PARTIAL": 69,
+        "UNKNOWN": 401,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 0,
+        "PARTIAL": 0,
+        "UNKNOWN": 501,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 16,
+        "PARTIAL": 0,
+        "UNKNOWN": 485,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "software_qualified_count": null,
+  "physical_hil_count": null,
+  "nonclaims": "No VDD/VDDA/VDDIO inference; no Production admission, Product Catalog UI/Runtime, or Programming support status changes."
+}
