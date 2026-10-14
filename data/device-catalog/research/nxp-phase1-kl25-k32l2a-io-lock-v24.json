@@ -1,0 +1,33 @@
+{
+  "schema_version": 24,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "baseline_v23_git_blob": "dd7589d769e940d411f74acf9340d59361146563",
+  "source_v24_git_blob": "b1a634fcbcd9c225d06fc015956cd34bcceac527",
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research_only": 277,
+  "source_counts": {
+    "KL25P80M48SF0": 12,
+    "K32L2Ax": 4
+  },
+  "documents": {
+    "KL25P80M48SF0": {
+      "revision": "Rev 5 08/2014",
+      "url": "https://www.nxp.com.cn/docs/en/data-sheet/KL25P80M48SF0.pdf",
+      "ordering": "Ordering Information, PDF physical page 2",
+      "electrical": "Table 4 PDF p6 (rating) and Table 5 PDF p7 (operating)"
+    },
+    "K32L2Ax": {
+      "revision": "Rev 3 02/2021",
+      "url": "https://www.nxp.com/docs/en/data-sheet/K32L2Ax.pdf",
+      "ordering": "Table 1, PDF physical page 5",
+      "electrical": "Table 11 PDF p35 (rating) and Table 12 PDF pp36-37 (operating)"
+    }
+  },
+  "io_supply_value": "GPIO VIH/VIL and open-drain pull-up referenced to VDD (1.71–3.6 V operating); independent GPIO VDDIO supply NOT established",
+  "io_supply_state": "PARTIAL",
+  "vendor_pdf_binary_archived": false,
+  "vendor_pdf_sha256": null,
+  "preservation_note": "These official PDFs show exact ordering codes, normal VDD, VDD-relative GPIO VIH/VIL and pull-up. They do NOT individually identify independent VDDIO or support a socket rail/flash/HIL claim."
+}
