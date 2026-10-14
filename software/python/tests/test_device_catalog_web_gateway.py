@@ -151,6 +151,34 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(basic["physical_programming_qualified"])
         self.assertIsNone(result["selected_profile"])
 
+    def test_completion_batch_basic_profiles_remain_information_only(self) -> None:
+        cases = (
+            ("STM32U083CCT6TR", "STM32U0", "40 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32U385CGU6", "STM32U3", "256 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32L552CET6", "STM32L5", "256 KiB", {"min": 1.71, "max": 3.6}),
+            ("STM32WLE5CCU6", "STM32WLX", "64 KiB", {"min": 1.8, "max": 3.6}),
+            ("STM32WBA50KGU6", "STM32WBA5X", "64 KiB", {"min": 1.71, "max": 3.6}),
+        )
+        for icpn, family, ram, vdd in cases:
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                result = payload["results"][0]
+                self.assertEqual(result["icpn"], icpn)
+                self.assertEqual(result["family"], family)
+                basic = result["manufacturer_device_basic_profile"]
+                self.assertIsNotNone(basic)
+                assert basic is not None
+                self.assertEqual(basic["ram_size"], ram)
+                self.assertEqual(basic["operating_vdd_v"], vdd)
+                self.assertIsNone(basic["io_supply_v"])
+                self.assertIsNone(basic["vdda_v"])
+                self.assertFalse(basic["programming_profile_authority"])
+                self.assertFalse(basic["hardware_runtime_ready"])
+                self.assertFalse(basic["physical_programming_qualified"])
+                self.assertIsNone(result["selected_profile"])
+
     def test_g4_basic_profile_exposes_direct_vdda_without_io_supply_inference(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G474VCH3TR&limit=1")
         self.assertEqual(status, 200)
