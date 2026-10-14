@@ -1,5 +1,14 @@
 # NXP ADR-0002 — OpenOCD-first 501 Exact ICPN triage v9
 
+> **Archived for ADR-0002 Phase 2 Programming (owner scope change, 2026-10-14).**
+> These source/driver investigations remain auditable historical evidence, NOT
+> deliverables or blockers for the currently active **Phase 1 IC Information**.
+> Do not continue silicon-ID/Erase/Program/Verify or Profile work under Phase 1.
+> Phase 1's source-bound exact manufacturer fields and coverage are in
+> [NXP_PHASE1_IC_INFORMATION_V13.md](NXP_PHASE1_IC_INFORMATION_V13.md).
+> No software `SUPPORTED`, Catalog visibility or hardware HIL claim follows.
+>
+
 Single research batch on Draft PR #847, one final owner approval. Retains the 277 v8 manufacturer records as historical research. No Production Manifest, public Catalog filter, runtime, Job/Batch, OpenOCD binary, PS/PL or HIL changes.
 
 OpenOCD version is pinned by release/openocd.json to upstream v0.12.0 and commit 9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c. All seven Tcl/C source files have pinned Git blob digests verified from independently checked-out upstream bytes in CI.

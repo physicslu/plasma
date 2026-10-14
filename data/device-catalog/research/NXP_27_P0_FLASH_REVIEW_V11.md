@@ -1,5 +1,14 @@
 # NXP P0 — 27 exact ordering parts, pinned OpenOCD source Flash/ID/security v11
 
+> **Archived for ADR-0002 Phase 2 Programming (owner scope change, 2026-10-14).**
+> These source/driver investigations remain auditable historical evidence, NOT
+> deliverables or blockers for the currently active **Phase 1 IC Information**.
+> Do not continue silicon-ID/Erase/Program/Verify or Profile work under Phase 1.
+> Phase 1's source-bound exact manufacturer fields and coverage are in
+> [NXP_PHASE1_IC_INFORMATION_V13.md](NXP_PHASE1_IC_INFORMATION_V13.md).
+> No software `SUPPORTED`, Catalog visibility or hardware HIL claim follows.
+>
+
 ADR-0002 scope: **Research only**, one Draft PR #847, no interim merge permission.
 
 ### Source-attested facts, no exact device support claim

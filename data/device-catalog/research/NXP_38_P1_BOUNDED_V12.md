@@ -1,5 +1,14 @@
 # NXP P1 (38 exact) — one bounded OpenOCD v0.12.0 source check completed
 
+> **Archived for ADR-0002 Phase 2 Programming (owner scope change, 2026-10-14).**
+> These source/driver investigations remain auditable historical evidence, NOT
+> deliverables or blockers for the currently active **Phase 1 IC Information**.
+> Do not continue silicon-ID/Erase/Program/Verify or Profile work under Phase 1.
+> Phase 1's source-bound exact manufacturer fields and coverage are in
+> [NXP_PHASE1_IC_INFORMATION_V13.md](NXP_PHASE1_IC_INFORMATION_V13.md).
+> No software `SUPPORTED`, Catalog visibility or hardware HIL claim follows.
+>
+
 **ADR-0002 stop rule:** P1 is a single scope-budgeted source inquiry, NOT
 a standing instruction to research every exact NXP commercial SKU.
 
