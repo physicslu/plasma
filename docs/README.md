@@ -15,6 +15,7 @@
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
+- **Plan / Accepted Policy** — [ADR-0002: OpenOCD 軟體支援、Catalog 顯示與研究優先順序](adr/0002-openocd-software-qualified-catalog-visibility.md)：產品 Catalog 僅顯示指定版本 OpenOCD 已確認具燒錄能力的 ICPN；Socket/PPU/Site HIL 獨立；研究工作優先針對 OpenOCD 支援目標，其餘原廠候選只保留來源。API/UI migration 追蹤 [Issue #849](https://github.com/physicslu/plasma/issues/849)，研究作業優先順序追蹤 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
 
 ## Operator
 
