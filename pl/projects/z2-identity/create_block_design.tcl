@@ -5,7 +5,7 @@ apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 \
 if {[get_property CONFIG.PCW_CRYSTAL_PERIPHERAL_FREQMHZ $ps] != 50} {error "PYNQ-Z2 PS crystal preset mismatch"}
 set_property -dict [list CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0} \
     CONFIG.PCW_USE_M_AXI_GP0 {1} CONFIG.PCW_EN_CLK0_PORT {1} \
-    CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100} CONFIG.PCW_M_AXI_GP0_FREQMHZ {100}] $ps
+    CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100}] $ps
 set identity [create_bd_cell -type module -reference pl_identity_axi_lite identity_0]
 set_property -dict [list CONFIG.CAPABILITY_FLAGS {0} CONFIG.STRICT_ADDRESS {1} \
     CONFIG.AXI_BASE_ADDRESS {0x40000000}] $identity

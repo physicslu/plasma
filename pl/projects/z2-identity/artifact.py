@@ -46,7 +46,6 @@ def verify_hwh(path: Path, base: int) -> None:
     for key, expected in {"PCW_GPIO_EMIO_GPIO_ENABLE": 0,
                           "PCW_USE_M_AXI_GP0": 1,
                           "PCW_CRYSTAL_PERIPHERAL_FREQMHZ": 50,
-                          "PCW_M_AXI_GP0_FREQMHZ": 100,
                           "PCW_FPGA0_PERIPHERAL_FREQMHZ": 100}.items():
         # Vivado uses 0/1 for enable parameters in the HWH.
         if ps[key].lower() in {"true", "false"}:
@@ -55,6 +54,12 @@ def verify_hwh(path: Path, base: int) -> None:
             actual = float(ps[key])
         if actual != expected:
             raise ValueError(f"PS parameter mismatch: {key}")
+    # PCW_M_AXI_GP0_FREQMHZ is read-only preset metadata (10 MHz in the
+    # pinned board file); validate the connected clock, not that stale value.
+    ports = {p.get("NAME"): p for p in modules["ps7_0"].iter("PORT")}
+    gp0 = ports["M_AXI_GP0_ACLK"]
+    if gp0.get("CLKFREQUENCY") != "100000000" or gp0.get("SIGNAME") != "ps7_0_FCLK_CLK0":
+        raise ValueError("GP0 clock connection mismatch")
 
 
 def finalize(build: Path, version: str) -> None:

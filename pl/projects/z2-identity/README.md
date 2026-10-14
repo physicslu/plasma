@@ -135,3 +135,11 @@ repeated probes; use the independent serial console, then an explicitly
 approved power/JTAG recovery route. Serial, physical power control and JTAG
 availability remain **unverified requirements**, not available capabilities.
 Loading remains NO-GO until these requirements and warning review are resolved.
+
+Vivado 2026.1 also reports BD 41-702 because the pinned preset marks
+`PCW_M_AXI_GP0_FREQMHZ=10` with USER strength. That property is read-only:
+an attempted explicit assignment was rejected with BD 41-737 and is not used
+in the final source. The actual GP0 ACLK HWH port is connected to FCLK0 with
+`CLKFREQUENCY=100000000`, confirmed by implemented timing. Artifact validation
+checks that physical connection instead of pretending to repair the preset's
+annotation. The preset and live PS registers remain unchanged.
