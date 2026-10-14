@@ -1,0 +1,100 @@
+name: Microchip Phase 1 P0 MCP Crosswalk
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_p0_mcp_crosswalk_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_mcp_crosswalk_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_P0_MCP_CROSSWALK_V1.md'
+      - '.github/workflows/device-catalog-microchip-phase1-p0-mcp-crosswalk-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-manufacturer-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Original-byte crosswalk negative tests and existing Pilot regression
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_mcp_crosswalk_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_mcp_identity_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_chart_batch_v1.py' -v
+      - name: Read-only original-byte official chart acquisition
+        id: chart
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --capture "${{ runner.temp }}/mcp-crosswalk-chart"
+          python data/device-catalog/research/microchip_phase1_chart_html_source_v1.py \
+            --replay "${{ runner.temp }}/mcp-crosswalk-chart"
+      - name: Produce baseline report before any MCP request
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p0_mcp_crosswalk_v1.py \
+            --chart-original-root "${{ runner.temp }}/mcp-crosswalk-chart" \
+            --mcp-outcome NOT_RUN \
+            --output "${{ runner.temp }}/mcp-crosswalk-baseline.json"
+      - name: Single reviewed SAMD21 official MCP source acquisition
+        id: mcp
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A \
+            --output-dir "${{ runner.temp }}/mcp-crosswalk-ATSAMD21G18A"
+          python data/device-catalog/research/microchip_mcp_paged_probe_v2.py \
+            --query ATSAMD21G18A --replay \
+            --output-dir "${{ runner.temp }}/mcp-crosswalk-ATSAMD21G18A"
+      - name: Crosswalk source-backed exact ICPNs or record explicit blocker
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.mcp.outcome }}" = "success" ]; then
+            python data/device-catalog/research/microchip_phase1_p0_mcp_crosswalk_v1.py \
+              --chart-original-root "${{ runner.temp }}/mcp-crosswalk-chart" \
+              --mcp-original-root "${{ runner.temp }}/mcp-crosswalk-ATSAMD21G18A" \
+              --mcp-outcome REPLAYED \
+              --output "${{ runner.temp }}/mcp-crosswalk-phase1.json"
+            python data/device-catalog/research/microchip_phase1_p0_mcp_crosswalk_v1.py \
+              --chart-original-root "${{ runner.temp }}/mcp-crosswalk-chart" \
+              --mcp-original-root "${{ runner.temp }}/mcp-crosswalk-ATSAMD21G18A" \
+              --mcp-outcome REPLAYED \
+              --verify "${{ runner.temp }}/mcp-crosswalk-phase1.json"
+          else
+            python data/device-catalog/research/microchip_phase1_p0_mcp_crosswalk_v1.py \
+              --chart-original-root "${{ runner.temp }}/mcp-crosswalk-chart" \
+              --mcp-outcome SOURCE_NOT_AVAILABLE \
+              --output "${{ runner.temp }}/mcp-crosswalk-phase1.json"
+          fi
+      - name: Archive original source and chart/MCP exact-identity coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-p0-phase1-mcp-crosswalk-originals-v1
+          path: |
+            ${{ runner.temp }}/mcp-crosswalk-chart/
+            ${{ runner.temp }}/mcp-crosswalk-ATSAMD21G18A/
+            ${{ runner.temp }}/mcp-crosswalk-baseline.json
+            ${{ runner.temp }}/mcp-crosswalk-phase1.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Report live source status without inventing a manufacturer census
+        if: always()
+        run: |
+          echo "Single original MCP search live outcome: ${{ steps.mcp.outcome }}" >> "${{ github.step_summary }}"
+          echo "Chart 341 P0 Base Devices does not mean 341 MCP queries or any exact commercial SKU support." >> "${{ github.step_summary }}"
+          echo "Unqueried != zero; manufacturer search != globally complete." >> "${{ github.step_summary }}"
+          echo "GitHub Actions 90-day original-byte artifacts are temporary." >> "${{ github.step_summary }}"
