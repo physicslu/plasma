@@ -48,18 +48,24 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After the STM32F1 + STM32F2 + STM32C0 + STM32G0 + STM32G4 Device Basic Profile v1 batches,
-Production contains **4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly
-**1,290 ST Production ICPNs** (280 F1 + 105 F2 + 226 C0 + 406 G0 + 273 G4) have an explicitly
-bound M1 Basic Profile. STM32G4 is the first Basic Profile family where VDDA is populated
-from direct ST eStore evidence; I/O Supply remains explicitly missing.
+After the completed ST M1 evidence-review program, Production contains **4,853 exact ICPNs**:
+**4,629 ST** and **224 NXP**. Exactly **1,622 ST Production ICPNs** have an explicitly
+bound M1 Basic Profile. The admitted families are STM32F1 (280), STM32F2 (105),
+STM32C0 (226), STM32G0 (406), STM32G4 (273), STM32U0 (68), STM32U3 (107),
+STM32L5 (49), STM32H7RS (36), STM32WBA5X (40), and STM32N6 (32).
+
+The other **3,007 ST exact ICPNs have also been reviewed**. They remain M0 with an explicit
+`blocked_evidence_gap` disposition because the allowed Product Selector/eStore evidence
+is incomplete, internally conflicting, not replayable at the required field granularity,
+or cannot be represented without losing manufacturer semantics. The disposition ledger is
+`data/ic-support/device-basic/st-m1-remaining-enrichment-v1.json`.
 
 Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 3,563 |
-| M1 | 1,289 |
+| M0 | 3,231 |
+| M1 | 1,621 |
 | M2 | 0 |
 | M3 | 0 |
 | M4 | 1 |
@@ -70,7 +76,7 @@ Cumulative coverage:
 | At least level | Exact ICPNs |
 |---|---:|
 | M0 | 4,853 |
-| M1 | 1,290 |
+| M1 | 1,622 |
 | M2 | 1 |
 | M3 | 1 |
 | M4 | 1 |
@@ -282,9 +288,9 @@ Framework v1 permanently tests that:
 
 Manufacturer Device enrichment remains a separate track from Programming Profile expansion.
 
-Any Programming Profile transaction must keep the 1,290 M1 Basic Profiles independent and separately establish the exact
+Any Programming Profile transaction must keep the 1,622 M1 Basic Profiles independent and separately establish the exact
 manufacturer applicability of programming interfaces, programming electrical constraints,
 Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
 M2 merely because an OpenOCD target mapping exists.
 
-The F1/F2/C0/G0/G4 Basic Profile batches prove the pattern can expand across families without coupling basic catalog information to programming-algorithm maturity.
+The completed ST review proves two things simultaneously: the Basic Profile pattern can expand across families without coupling basic catalog information to programming-algorithm maturity, and fail-closed evidence blockers remain visible instead of being converted into inferred metadata.
