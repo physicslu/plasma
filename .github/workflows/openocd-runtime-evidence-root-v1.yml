@@ -1,0 +1,53 @@
+name: OpenOCD full/slim runtime evidence root installed-wheel v1
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_web/runtime_evidence_root.py'
+      - 'software/python/plasma_web/backend_candidate_registry.py'
+      - 'software/python/plasma_web/backend_source_reference.py'
+      - 'software/python/plasma_web/openocd_provider_registry.py'
+      - 'software/python/tests/test_runtime_openocd_evidence_root_v1.py'
+      - 'scripts/render-start.sh'
+      - 'docs/architecture/runtime-evidence-root-implementation-v1.md'
+      - '.github/workflows/openocd-runtime-evidence-root-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installed-wheel-source-only-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PLASMA_DEVICE_CATALOG_MANIFEST: ${{ github.workspace }}/data/device-catalog/production/icpn-v1-manifest.json
+      PLASMA_IC_SUPPORT_ROOT: ${{ github.workspace }}/data/ic-support
+      PLASMA_RUNTIME_EVIDENCE_ROOT: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real package (non-editable, like Render)
+        run: python -m pip install software/python
+      - name: Verify code executes from site-packages rather than source checkout
+        run: |
+          python - <<'PY'
+          import plasma_web
+          from pathlib import Path
+          import os
+          path = Path(plasma_web.__file__).resolve()
+          assert "site-packages" in str(path), path
+          assert not path.is_relative_to(Path(os.environ["GITHUB_WORKSPACE"]).resolve()), path
+          print("installed-wheel test PASS:", path)
+          PY
+      - name: Verify bash startup syntax
+        run: bash -n scripts/render-start.sh
+      - name: Full-root/partial/slim/source-only vendor regression
+        run: python -m unittest discover -s software/python/tests -p 'test_runtime_openocd_evidence_root_v1.py' -v
+      - name: H5/C5 source-locked candidate registry replay
+        run: python -m unittest discover -s software/python/tests -p 'test_icpn_backend_candidate_registry_v1.py' -v
+      - name: OpenOCD upstream provider and source provenance replay
+        run: |
+          python -m unittest discover -s software/python/tests -p 'test_openocd_versioned_provider_registry_v1.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_icpn_backend_source_reference_v1.py' -v
+      - name: Reconfirm 224 NXP search is not regressed
+        run: python -m unittest discover -s software/python/tests -p 'test_nxp_render_evidence_root_v1.py' -v
