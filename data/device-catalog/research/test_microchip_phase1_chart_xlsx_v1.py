@@ -150,6 +150,12 @@ class Phase1ChartTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "required chart column"):
             chart.generate(self.file, cfg)
 
+    def test_numeric_source_unit_cannot_be_guessed(self):
+        cfg = config()
+        cfg["columns"]["flash"]["unit"] = None
+        with self.assertRaisesRegex(ValueError, "numeric/range chart fields require"):
+            chart.generate(self.file, cfg)
+
     def test_source_lock_pin_required(self):
         lock = json.loads(chart.LOCK.read_text(encoding="utf-8"))
         lock["provider"]["version"] = "unreviewed-latest"
