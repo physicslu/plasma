@@ -32,6 +32,8 @@ jobs:
           bash -n pl/projects/z2-swd-gpio/check-swpc-vivado-runner.sh
           bash -n pl/projects/z2-swd-gpio/prepare-board-repository.sh
           bash -n pl/projects/z2-swd-gpio/rtl-lint.sh
+          bash -n pl/projects/z2-identity/build-on-swpc.sh
+          python3 -m py_compile pl/projects/z2-identity/artifact.py
           python3 -m py_compile pl/projects/z2-swd-gpio/artifact.py
           python3 -m py_compile pl/projects/z2-swd-gpio/build-progress.py
       - name: Source layout and artifact unit tests (no Vivado or Z2)
@@ -46,7 +48,7 @@ jobs:
       - name: Verilator lint and elaboration
         run: bash pl/projects/z2-swd-gpio/rtl-lint.sh
       - name: Cocotb real RTL functional regressions
-        run: python3 -m pytest -v pl/verification/test_z2_swd_gpio_rtl.py
+        run: python3 -m pytest -v pl/verification/test_z2_swd_gpio_rtl.py pl/verification/test_z2_identity_rtl.py
       - name: Upload Cocotb simulation failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

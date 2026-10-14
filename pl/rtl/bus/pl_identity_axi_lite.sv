@@ -1,7 +1,13 @@
 // Versioned PL Identity AXI4-Lite read-only block, ABI v1.
 // Only identity registers 0x00..0x1c are defined. Writes return SLVERR.
 // Generated constants are derived from git commit + release manifest inputs.
-module pl_identity_axi_lite (
+module pl_identity_axi_lite #(
+    // Legacy SWD project retains its original defaults. Identity-only builds
+    // enable exact physical-address decoding and advertise no SWD capability.
+    parameter logic [31:0] CAPABILITY_FLAGS = 32'h00000001,
+    parameter bit STRICT_ADDRESS = 1'b0,
+    parameter logic [31:0] AXI_BASE_ADDRESS = 32'h40000000
+) (
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 s_axi_aclk CLK" *)
     (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME s_axi_aclk, ASSOCIATED_BUSIF S_AXI, ASSOCIATED_RESET s_axi_aresetn, FREQ_HZ 100000000" *)
     input  logic         s_axi_aclk,
@@ -96,7 +102,9 @@ module pl_identity_axi_lite (
                 // but may forward its nonzero upper address bits unchanged.
                 // Only the 4KB slave-local register offset is decoded here.
                 // The 8 registers occupy the first 32 bytes of that window.
-                if (s_axi_araddr[11:5] != 7'b0) begin
+                if ((STRICT_ADDRESS &&
+                     s_axi_araddr[31:5] != AXI_BASE_ADDRESS[31:5]) ||
+                    s_axi_araddr[11:5] != 7'b0) begin
                     s_axi_rdata <= 32'b0;
                     s_axi_rresp <= 2'b10; // SLVERR
                 end else begin
@@ -104,7 +112,7 @@ module pl_identity_axi_lite (
                         5'h00: s_axi_rdata <= 32'h504C534D; // "PLSM"
                         5'h04: s_axi_rdata <= PLSM_VERSION;
                         5'h08: s_axi_rdata <= 32'd1; // ABI 1
-                        5'h0C: s_axi_rdata <= 32'h00000001; // swd_gpio only
+                        5'h0C: s_axi_rdata <= CAPABILITY_FLAGS;
                         5'h10: s_axi_rdata <= PLSM_BUILD_ID_0;
                         5'h14: s_axi_rdata <= PLSM_BUILD_ID_1;
                         5'h18: s_axi_rdata <= PLSM_BUILD_ID_2;
