@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from plasma_core.enums import Operation
+from plasma_core.ic_support import ICSupportIntegrityError, default_ic_support_root
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 
@@ -22,19 +23,56 @@ from .openocd_plan import (
 KL25_PROGRAMMING_PROFILE_ID = "nxp-kl25-ftfa-programming-v0"
 KL25_MEMORY_GEOMETRY_PROFILE_ID = "nxp-mkl25z128-128k-v0"
 KL25_TARGET_CONFIG = "target/kl25.cfg"
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+# Independently reviewed implementation lock content hash, not the separate
+# CompilerRegistry backend-lock identity (7628554b...). Never conflate them.
+KL25_IMPLEMENTATION_LOCK_DIGEST = "877b3fd9c0b9f8dc3191eb53393e5670efb93b9952ac1747bded155ebcaef4d1"
+KL25_IMPLEMENTATION_LOCK_RELATIVE_PATH = Path(
+    "benchmarks/nxp-kl25/backend-implementation-lock.json"
+)
 
 
 def load_backend_lock() -> dict[str, Any]:
-    path = _repo_root() / "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
-    value = json.loads(path.read_text(encoding="utf-8"))
+    """Load the pinned source evidence from IC Support's configured runtime root.
+
+    Non-editable wheels do not own repository data; resolve via the existing
+    PLASMA_IC_SUPPORT_ROOT contract. No fallback to site-packages, the CWD or
+    a silently missing file, and no change to production Operation Admission.
+    """
+    try:
+        root = default_ic_support_root()
+    except ICSupportIntegrityError as exc:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "KL25 backend implementation lock requires configured IC Support root",
+            original_exception=exc,
+        ) from exc
+    path = root / KL25_IMPLEMENTATION_LOCK_RELATIVE_PATH
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "KL25 backend implementation lock unavailable or malformed",
+            original_exception=exc,
+        ) from exc
+    _require(isinstance(value, dict), "KL25 backend implementation lock must be an object")
     digest = value.get("lock_digest")
     payload = {k: v for k, v in value.items() if k != "lock_digest"}
     actual = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    _require(digest == actual, "KL25 backend implementation lock digest mismatch")
+    _require(
+        digest == actual == KL25_IMPLEMENTATION_LOCK_DIGEST,
+        "KL25 backend implementation lock digest mismatch",
+    )
+    _require(
+        value.get("artifact_type") == "kl25_openocd_backend_implementation_lock"
+        and value.get("implementation") == "OpenOCD"
+        and value.get("schema_version") == "0.1.0"
+        and value.get("trust_boundary", {}).get("production_admission") is False
+        and value.get("trust_boundary", {}).get("hardware_behavior_validated") is False
+        and value.get("trust_boundary", {}).get("destructive_security_operation_admission") is False
+        and value.get("admitted_constraints", {}).get("target_config") == KL25_TARGET_CONFIG,
+        "KL25 backend implementation lock authority mismatch",
+    )
     return value
 
 
