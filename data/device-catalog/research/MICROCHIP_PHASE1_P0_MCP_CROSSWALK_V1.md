@@ -51,6 +51,17 @@ For a baseline **without network/MCP capture**, set `--mcp-outcome NOT_RUN` and 
 
 **Evidence custody:** GitHub Actions stores original HTML/MCP response bytes and SHA-256 manifests for **90 days**, which is **not** a permanent, version-locked archive. Long-lived evidence preservation, manufacturer MCP coverage beyond this one query, and its exact variant gaps remain separate gates.
 
+## First real official manufacturer query result — 2026-10-14
+
+**Manufacturer original-byte replay PASS:** [GitHub Actions run 38521157253](https://github.com/physicslu/plasma/actions/runs/38521157253); [original chart + full dual-paginated MCP responses + 341-row JSON coverage artifact 11873762953](https://github.com/physicslu/plasma/actions/runs/38521157253/artifacts/11873762953).
+
+- Current original official MicrochipDirect chart SHA-256: `d295b1057594f77a05798afd46d569b0985dd141c59b3af8d1f09bfba041a069` (different original response capture from PR #868; dynamic manufacturer HTML, not a conflicting specification).
+- Reviewed single manufacturer search: `ATSAMD21G18A`, source-verified chart Base Device `ATSAMD21G18`.
+- Original MCP `search_products` result: **24 observed rows; 23 exact-query-prefix commercial ordering-code candidates; 1 unrelated fuzzy result excluded**. Every linked commercial candidate preserved as **`NOT_ADMITTED`**. Of the 23 candidates, the two previously reviewed exact pilot identities `ATSAMD21G18A-MU` and `ATSAMD21G18A-MF` were independently replayed, leaving **21 additional source-observed exact-ordering candidates not individually reviewed**. Manufacturer base mismatch quarantine count in this capture: **0**.
+- Chart P0 denominator states: **1 `MCP_ORIGINAL_IDENTITY_REPLAYED`**, **340 `NOT_QUERIED`**, **0 `MCP_SOURCE_NOT_AVAILABLE`**. This does **not** demonstrate 1/341 OpenOCD support, 23 active SKUs, or manufacturer-wide coverage.
+- Original response/manifest and source SHA-256 per raw MCP page are kept in the CI artifact; the workflow artifact currently expires **2027-01-12 06:15:31 UTC**. It is a **90-day temporary archive**. Independent durable source retention remains a blocker for irreversible Catalog admission.
+- Base Device/chart family Flash/RAM/VDD evidence stays `PARTIAL`; exact commercial part variant package, pin count, rated temperature and separate VDDIO/VDDA applicability still require their own precise manufacturer evidence. No Phase 2/3 qualification, production write or public selector change is authorized.
+
 ## Safety and scale-up criteria
 
 Before allowing further P0 queries, require: (1) one observed chart Base Device, (2) an explicit documented query name and manufacturer ordering evidence, (3) independent complete MCP pagination and source hash replay, (4) mismatch quarantine and identity/variant distinction, and (5) a per-chart-family denominator report marking unqueried names. No undocumented MCP enumeration, fuzzy-name auto-promotion, blind mass scraping, Phase 2 Flash programming verification or Phase 3 hardware qualifications are allowed.
