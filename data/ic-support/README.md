@@ -162,12 +162,14 @@ The coverage registry is research-only and cannot grant runtime or hardware auth
 
 Manufacturer Device Basic Profile v1 is stored as one explicit family profile per admitted
 family under `device-basic/*-device-basic-v1.json`. The current registry covers all
-**912** Production exact ICPNs in STM32F1 (280), STM32C0 (226) and STM32G0 (406).
+**1,185** Production exact ICPNs in STM32F1 (280), STM32C0 (226), STM32G0 (406)
+and STM32G4 (273).
 Every profile uses the fixed IC Information contract:
 ICPN / Base Device / Package / Pin Count / Flash / RAM / Operating VDD /
-I/O Supply / VDDA / Operating Temperature. I/O Supply and VDDA are present but null
-until directly established by the allowed Product Selector/eStore evidence; they are never
-copied from VDD. Basic Profile admission does not grant Programming Profile authority.
+I/O Supply / VDDA / Operating Temperature. I/O Supply and VDDA remain null unless
+directly established by the allowed Product Selector/eStore evidence; they are never copied
+from VDD. STM32G4 is the first family profile with directly admitted VDDA evidence from
+ST eStore, while I/O Supply remains null. Basic Profile admission does not grant Programming Profile authority.
 
 The Basic Profile deliberately uses a lighter official-product-metadata provenance class
 than the programming baseline: ST Product Selector / eStore observations are retained

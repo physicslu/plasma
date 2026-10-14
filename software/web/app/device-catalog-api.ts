@@ -217,7 +217,7 @@ export type ManufacturerDeviceBasicProfile = {
     selector_url: string;
     observed_at_utc: string;
     content_lock: null;
-    evidence_strength: "official_product_selector_observation";
+    evidence_strength: "official_product_selector_observation" | "official_estore_observation";
   };
   programming_profile_authority: false;
   hardware_runtime_ready: false;

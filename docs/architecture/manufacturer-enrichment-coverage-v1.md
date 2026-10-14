@@ -48,16 +48,18 @@ These levels are evidence coverage only. They do not redefine generic IC Support
 
 ## 3. Current baseline
 
-After the STM32F1 + STM32C0 + STM32G0 Device Basic Profile v1 batch, Production contains
-**4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly **912 ST Production ICPNs**
-(280 F1 + 226 C0 + 406 G0) have an explicitly bound M1 Basic Profile.
+After the STM32F1 + STM32C0 + STM32G0 + STM32G4 Device Basic Profile v1 batches,
+Production contains **4,853 exact ICPNs**: **4,629 ST** and **224 NXP**. Exactly
+**1,185 ST Production ICPNs** (280 F1 + 226 C0 + 406 G0 + 273 G4) have an explicitly
+bound M1 Basic Profile. STM32G4 is the first Basic Profile family where VDDA is populated
+from direct ST eStore evidence; I/O Supply remains explicitly missing.
 
 Highest achieved level:
 
 | Highest level | Exact ICPNs |
 |---|---:|
-| M0 | 4,361 |
-| M1 | 279 |
+| M0 | 3,668 |
+| M1 | 1,184 |
 | M2 | 0 |
 | M3 | 0 |
 | M4 | 1 |
@@ -67,16 +69,16 @@ Cumulative coverage:
 
 | At least level | Exact ICPNs |
 |---|---:|
-| M0 | 4,641 |
-| M1 | 280 |
+| M0 | 4,853 |
+| M1 | 1,185 |
 | M2 | 1 |
 | M3 | 1 |
 | M4 | 1 |
 | M5 | 0 |
 
-The M4 golden reference remains `STM32F103C8T6`. The other 279 STM32F1 exact ICPNs
-gain only M1; they do **not** gain Programming Profile, Execution IR, OpenOCD differential,
-or physical qualification.
+The M4 golden reference remains `STM32F103C8T6`. All other Basic Profile targets stop
+at M1; they do **not** gain Programming Profile, Execution IR, OpenOCD differential, or
+physical qualification.
 
 ## 4. Coverage dimensions
 
@@ -179,7 +181,7 @@ The generic scoped-fact contract above is designed for technical manufacturer fa
 be source-locked. M1 Basic Device metadata is deliberately lighter: dynamic ST Product
 Selector / eStore observations may not have stable downloadable bytes to SHA-256 lock.
 
-Therefore STM32F1 Device Basic Profile v1 uses:
+Therefore Manufacturer Device Basic Profile v1 family profiles use:
 
 - official ST URLs and observation date;
 - reusable series + Flash-density metadata groups;
@@ -280,7 +282,7 @@ Framework v1 permanently tests that:
 
 Manufacturer Device enrichment remains a separate track from Programming Profile expansion.
 
-Any Programming Profile transaction must keep the 912 M1 Basic Profiles independent and separately establish the exact
+Any Programming Profile transaction must keep the 1,185 M1 Basic Profiles independent and separately establish the exact
 manufacturer applicability of programming interfaces, programming electrical constraints,
 Flash geometry/controller semantics and program/erase behavior. M1 must never be promoted to
 M2 merely because an OpenOCD target mapping exists.

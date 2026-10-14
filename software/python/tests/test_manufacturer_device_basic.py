@@ -123,15 +123,16 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
 
-    def test_default_registry_bulk_profiles_cover_f1_c0_and_g0(self) -> None:
+    def test_default_registry_bulk_profiles_cover_f1_c0_g0_and_g4(self) -> None:
         registry = get_default_manufacturer_device_basic_resolver()
-        self.assertEqual(registry.size, 912)
+        self.assertEqual(registry.size, 1185)
         self.assertEqual(
             registry.profile_ids,
             (
                 "stm32c0-device-basic-v1",
                 "stm32f1-device-basic-v1",
                 "stm32g0-device-basic-v1",
+                "stm32g4-device-basic-v1",
             ),
         )
 
@@ -171,6 +172,24 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         self.assertIsNone(g0.io_supply_v)
         self.assertIsNone(g0.vdda_v)
 
+        g4 = registry.resolve_exact(
+            "STM32G474VCH3TR",
+            manufacturer="STMicroelectronics",
+            family="STM32G4",
+            series="STM32G474",
+            base_device="STM32G474VC",
+            package="TFBGA",
+            pin_count="100",
+            flash_size="256 KiB",
+            temperature_grade="-40 to 125 C",
+        )
+        self.assertIsNotNone(g4)
+        assert g4 is not None
+        self.assertEqual(g4.ram_size, "128 KiB")
+        self.assertEqual(g4.operating_vdd_v, {"min": 1.71, "max": 3.6})
+        self.assertIsNone(g4.io_supply_v)
+        self.assertEqual(g4.vdda_v, {"min": 1.71, "max": 3.6})
+
     def test_other_family_does_not_gain_implicit_applicability(self) -> None:
         self.assertIsNone(
             self.resolver.resolve_exact(
@@ -204,6 +223,16 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
             temperature_variant.operating_temperature_c,
             {"min": -40, "max": 105},
         )
+
+    def test_optional_voltage_evidence_must_be_a_valid_range(self) -> None:
+        payload = copy.deepcopy(self.payload)
+        payload["groups"]["stm32f103-64k"]["vdda_v"] = {"min": 3.6, "max": 1.8}
+        path = self.write_payload(payload)
+        try:
+            with self.assertRaisesRegex(ICSupportIntegrityError, "invalid VDDA"):
+                ManufacturerDeviceBasicResolver.from_file(path)
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_non_st_or_non_selector_evidence_and_fake_content_lock_are_rejected(self) -> None:
         for mutation, pattern in (
