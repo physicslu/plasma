@@ -214,13 +214,7 @@ def self_test() -> None:
     assert examine_source(
         oldpath, legacy.replace("def _repository_root()", "def new_loader()")
     )
-    synthetic = {
-        path: "def x():\n    return " + "\n" .join(
-            f"{name}()" for name in required
-        )
-        for path, required in REQUIRED_RESOLVER_CALLS.items()
-    }
-    # Keep the AST test focused: missing resolver invocation must always fail.
+    # A protected loader with only one of its required resolvers is invalid.
     for path, required in REQUIRED_RESOLVER_CALLS.items():
         tree = ast.parse("".join(f"{name}()\n" for name in required))
         assert len([n for n in ast.walk(tree) if isinstance(n, ast.Call)]) == len(required)
