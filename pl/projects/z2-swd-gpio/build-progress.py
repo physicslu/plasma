@@ -69,6 +69,11 @@ def render(logdir: Path, *, summary: bool = False, now_ms: int | None = None) ->
     now_ms = now_ms if now_ms is not None else time.time_ns() // 1_000_000
     status = read_status(logdir / "monitored-build.status")
     state = status.get("STATUS", "STARTING")
+    # Freeze terminal elapsed time once the supervisor reaches its final state.
+    if state in ("PASS", "FAIL", "TIMEOUT"):
+        raw_end = status.get("UPDATED_EPOCH_MS", "")
+        if raw_end.isdigit():
+            now_ms = int(raw_end)
     raw_start = status.get("STARTED_EPOCH_MS", "")
     start = int(raw_start) if raw_start.isdigit() else now_ms
     events = read_events(logdir, start)
