@@ -11,12 +11,14 @@ async def settle():
     await Timer(2, units="ns")
 
 
-def binary(signal):
-    return int(signal.value)
-
-
 def logic(signal):
     return str(signal.value).lower()
+
+
+def gpio_bit(dut, offset):
+    # Preserve genuine X/Z values. Converting the entire 64-bit EMIO bus
+    # to int would fail when any unrelated input is intentionally floating.
+    return logic(dut.gpio_i)[-(offset + 1)]
 
 
 @cocotb.test()
@@ -29,7 +31,7 @@ async def site1_swdio_turnaround_and_external_sampling(dut):
     assert logic(dut.swdio_pin) == "z"
     assert logic(dut.swclk_pin) == "z"
     assert logic(dut.nrst_pin) == "z"
-    assert binary(dut.gpio_i) & ~0b111 == 0
+    assert set(logic(dut.gpio_i)[:-3]) <= {"0"}
 
     # PS drives bits only while GPIO_T is low.
     for bit in (1, 0, 1):
@@ -37,7 +39,7 @@ async def site1_swdio_turnaround_and_external_sampling(dut):
         dut.gpio_t.value = 0b101  # SWDIO drives, others float
         await settle()
         assert logic(dut.swdio_pin) == str(bit)
-        assert binary(dut.gpio_i) & 0b10 == bit << 1
+        assert gpio_bit(dut, 1) == str(bit)
 
     # SWD request/ack turnaround: relinquish to target and sample 0/1.
     dut.gpio_t.value = 0b111
@@ -46,7 +48,7 @@ async def site1_swdio_turnaround_and_external_sampling(dut):
         dut.ext_data.value = bit << 1
         await settle()
         assert logic(dut.swdio_pin) == str(bit)
-        assert binary(dut.gpio_i) & 0b10 == bit << 1
+        assert gpio_bit(dut, 1) == str(bit)
     dut.ext_oe.value = 0
     await settle()
     assert logic(dut.swdio_pin) == "z"
@@ -65,7 +67,7 @@ async def swclk_direction_and_nreset_open_drain(dut):
         dut.gpio_t.value = 0b110  # SWCLK output
         await settle()
         assert logic(dut.swclk_pin) == str(bit)
-        assert binary(dut.gpio_i) & 1 == bit
+        assert gpio_bit(dut, 0) == str(bit)
 
     # nRESET only ever drives low or floats (never drives high).
     dut.gpio_t.value = 0b011  # reset output enable
@@ -85,7 +87,7 @@ async def swclk_direction_and_nreset_open_drain(dut):
     dut.ext_data.value = 0b100
     await settle()
     assert logic(dut.nrst_pin) == "1"
-    assert binary(dut.gpio_i) & 0b100 == 0b100
+    assert gpio_bit(dut, 2) == "1"
 
 
 @cocotb.test()
