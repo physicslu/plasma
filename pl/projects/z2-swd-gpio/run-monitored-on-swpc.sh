@@ -43,8 +43,10 @@ fi
 started_epoch_ms="$(date +%s%3N)"
 write_status() {
   local state="$1" code="$2" temp="$status_file.tmp.$$"
-  printf 'STATUS=%s\nEXIT_CODE=%s\nSOURCE_SHA=%s\nSUPERVISOR_PID=%s\nSTARTED_EPOCH_MS=%s\nUPDATED_AT=%s\n' \
-    "$state" "$code" "$commit" "$$" "$started_epoch_ms" "$(date -Is)" > "$temp"
+  local updated_ms
+  updated_ms="$(date +%s%3N)"
+  printf 'STATUS=%s\nEXIT_CODE=%s\nSOURCE_SHA=%s\nSUPERVISOR_PID=%s\nSTARTED_EPOCH_MS=%s\nUPDATED_EPOCH_MS=%s\nUPDATED_AT=%s\n' \
+    "$state" "$code" "$commit" "$$" "$started_epoch_ms" "$updated_ms" "$(date -Is)" > "$temp"
   mv -f -- "$temp" "$status_file"
 }
 
@@ -69,7 +71,7 @@ while kill -0 "$build_pid" 2>/dev/null; do
     grep -E '^(BLOCK_DESIGN_VALIDATED|PROJECT_CREATED|IMPLEMENTED_TIMING_PASS|BITSTREAM_BUILD_PASS|ERROR:)' \
       "$vivado_log" | tail -n 3 || true
   fi
-  sleep 60
+  sleep 10
 done
 
 code=0
