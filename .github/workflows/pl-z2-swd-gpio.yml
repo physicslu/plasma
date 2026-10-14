@@ -29,12 +29,31 @@ jobs:
           bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
           bash -n pl/projects/z2-swd-gpio/check-swpc-vivado-runner.sh
           bash -n pl/projects/z2-swd-gpio/prepare-board-repository.sh
+          bash -n pl/projects/z2-swd-gpio/rtl-lint.sh
           python3 -m py_compile pl/projects/z2-swd-gpio/artifact.py
       - name: Source layout and artifact unit tests (no Vivado or Z2)
         run: |
           python3 -m pip install pytest
           python3 -m pytest -q pl/tests
+      - name: Install RTL simulators and cocotb test requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends verilator iverilog
+          python3 -m pip install 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Verilator lint and elaboration
+        run: bash pl/projects/z2-swd-gpio/rtl-lint.sh
+      - name: Cocotb real RTL functional regressions
+        run: python3 -m pytest -v pl/verification/test_z2_swd_gpio_rtl.py
+      - name: Upload Cocotb simulation failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: z2-swd-cocotb-failure-${{ github.run_id }}
+          path: |
+            pl/build/z2-swd-gpio/sim/
+          retention-days: 7
+          if-no-files-found: warn
       - name: Validation boundary
         run: |
-          echo "SOURCE CONTRACTS ONLY; synth/impl/timing requires SWPC Vivado." >> "$GITHUB_STEP_SUMMARY"
-          echo "No FPGA loading or physical SWD/HIL performed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verilator RTL lint/elaboration + Icarus/Cocotb AXI and SWD digital functional regressions: PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "Vivado IP Integrator, synthesis, implementation, timing, Bitstream, Z2 HIL and real IC NOT tested." >> "$GITHUB_STEP_SUMMARY"
