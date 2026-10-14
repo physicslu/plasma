@@ -123,9 +123,9 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 assert resolved is not None
                 self.assertEqual(resolved.ram_size, expected_ram)
 
-    def test_default_registry_bulk_profiles_cover_f1_f2_c0_g0_and_g4(self) -> None:
+    def test_default_registry_covers_all_admitted_m1_families(self) -> None:
         registry = get_default_manufacturer_device_basic_resolver()
-        self.assertEqual(registry.size, 1290)
+        self.assertEqual(registry.size, 1622)
         self.assertEqual(
             registry.profile_ids,
             (
@@ -134,6 +134,12 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
                 "stm32f2-device-basic-v1",
                 "stm32g0-device-basic-v1",
                 "stm32g4-device-basic-v1",
+                "stm32h7rs-device-basic-v1",
+                "stm32l5-device-basic-v1",
+                "stm32n6-device-basic-v1",
+                "stm32u0-device-basic-v1",
+                "stm32u3-device-basic-v1",
+                "stm32wba5x-device-basic-v1",
             ),
         )
 
@@ -251,9 +257,18 @@ class ManufacturerDeviceBasicResolverTests(unittest.TestCase):
         with self.assertRaisesRegex(ICSupportIntegrityError, "unsupported operating temperature"):
             self.resolve(temperature_grade="-40 through 105 C")
 
-    def test_flash_unit_contract_accepts_kib_or_mib_only(self) -> None:
+    def test_flash_unit_contract_accepts_catalog_kib_mib_and_bounded_kib(self) -> None:
         payload = copy.deepcopy(self.payload)
         payload["groups"]["stm32f103-64k"]["flash_size"] = "1 MiB"
+        path = self.write_payload(payload)
+        try:
+            resolver = ManufacturerDeviceBasicResolver.from_file(path)
+            self.assertEqual(resolver.size, 280)
+        finally:
+            path.unlink(missing_ok=True)
+
+        payload = copy.deepcopy(self.payload)
+        payload["groups"]["stm32f103-64k"]["flash_size"] = "0-1 KiB"
         path = self.write_payload(payload)
         try:
             resolver = ManufacturerDeviceBasicResolver.from_file(path)
