@@ -89,13 +89,20 @@ def check(dataset):
             "MCU32/ProductDocuments/DataSheets/"
             "SAM-D21-DA1-Family-Data-Sheet-DS40001882H.pdf"
         )
+        mcp_url = "https://api.microchip.com/mcp/resources"
         require(source.get("publisher") == "Microchip Technology"
-                and url in (product_url, datasheet_url),
+                and url in (product_url, datasheet_url, mcp_url),
                 "official manufacturer source required")
         if url == datasheet_url:
             require(source.get("source_version") == "DS40001882H"
                     and source.get("scopes") == [FAMILY_SCOPE],
                     "datasheet identity/revision/family scope mismatch")
+        elif url == mcp_url:
+            require(source.get("id") ==
+                    "microchip-atsamd21g18a-mcp-exact-product-query"
+                    and source.get("scopes") == ["exact_mcp_response_row"]
+                    and "MCP protocol 2025-03-26" in source.get("source_version", ""),
+                    "original manufacturer MCP identity/scope mismatch")
         else:
             require(source.get("source_version") is None
                     and EXACT_SCOPE in source.get("scopes", []),
@@ -110,6 +117,13 @@ def check(dataset):
                 "invalid original capture digest")
         require(source.get("raw_capture_retained") is (digest is not None),
                 "raw source evidence integrity falsely claimed")
+        if source.get("raw_capture_retained"):
+            require(source.get("capture_run_id") == 38504676852
+                    and source.get("capture_artifact_id") in
+                    (11867871328, 11867771515)
+                    and source.get("raw_capture_artifact_expires_at_utc") ==
+                    "2027-01-12T03:08:13Z",
+                    "original source capture provenance not pinned")
         require(source.get("document_id") and source.get("scopes"),
                 "source document/scope absent")
         by_id[sid] = source
@@ -165,10 +179,20 @@ def check(dataset):
                         and bool(entry["source_locator"].strip()),
                         f"missing traceable manufacturer evidence: {field}")
                 if status == "VERIFIED":
-                    require(entry["evidence_scope"] == EXACT_SCOPE,
+                    allowed_exact = {EXACT_SCOPE}
+                    if field == "base_device":
+                        allowed_exact.add("exact_mcp_response_row")
+                    require(entry["evidence_scope"] in allowed_exact,
                             "family-level fact cannot be exact VERIFIED")
                     require(icpn in entry["source_locator"],
                             "exact scope lacks exact ICPN row locator")
+                    if field == "base_device":
+                        require(entry["evidence_scope"] == "exact_mcp_response_row"
+                                and entry["source_id"] ==
+                                "microchip-atsamd21g18a-mcp-exact-product-query"
+                                and "basePartNumber" in entry["source_locator"]
+                                and value == "ATSAMD21G18",
+                                "base device not bound to exact manufacturer MCP record")
                 if status == "PARTIAL":
                     require(entry["evidence_scope"] == FAMILY_SCOPE,
                             "PARTIAL status must name a family source")
