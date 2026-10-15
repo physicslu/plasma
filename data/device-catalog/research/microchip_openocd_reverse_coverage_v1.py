@@ -280,22 +280,30 @@ def replay_all_original_batch_sources(dfp_root, source_specs):
     result = full_mcp.build(expected, inventory, digest, source_specs)
     audit = json.loads((gates.HERE / 
         "microchip-dfp-full-first-pass-audit-20261013.json").read_text(encoding="utf-8"))
-    require(audit["original_dfp_index_sha256"] == digest
-            and audit["planned_dfp_queries"] == expected["supported_text_search_seeds"]
-            and audit["planned_batches"] == expected["batch_count"]
-            and result["observed_batch_archives"] == audit["batch_archives_with_valid_capture_attestation"]
-            and result["replayed_positive_exact_prefix_queries"] == audit["complete_positive_exact_prefix_queries"]
-            and result["replayed_zero_exact_prefix_queries"] == audit["fully_replayed_zero_exact_prefix_queries"]
-            and result["unique_exact_prefix_research_candidates"] == audit["unique_exact_prefix_candidates_without_conflicts"]
-            and result["conflicting_lifecycle_identity_count"] == audit["raw_lifecycle_conflicts"] == 0
-            and result["replayed_queries"] ==
-                audit["complete_positive_exact_prefix_queries"] +
-                audit["fully_replayed_zero_exact_prefix_queries"]
-            and result["production_write_authorized"] is False,
-            "original manufacturer full sweep differs from audited 2026-10-13 evidence")
-    require(sum(len(v["sources"]) for v in result["ordering_candidates"]) ==
-            audit["verified_original_source_response_links"],
-            "original MCP exact-ordering response link count changed")
+    actual_replay = {
+        "original_dfp_index_sha256": digest,
+        "planned_dfp_queries": expected["supported_text_search_seeds"],
+        "planned_batches": expected["batch_count"],
+        "batch_archives_with_valid_capture_attestation": result["observed_batch_archives"],
+        "complete_positive_exact_prefix_queries": result["replayed_positive_exact_prefix_queries"],
+        "fully_replayed_zero_exact_prefix_queries": result["replayed_zero_exact_prefix_queries"],
+        "unique_exact_prefix_candidates_without_conflicts": result["unique_exact_prefix_research_candidates"],
+        "raw_lifecycle_conflicts": result["conflicting_lifecycle_identity_count"],
+        "replayed_queries": result["replayed_queries"],
+        "verified_original_source_response_links": sum(
+            len(v["sources"]) for v in result["ordering_candidates"]),
+    }
+    expected_replay = {k: audit[k] for k in actual_replay
+                       if k != "replayed_queries"}
+    expected_replay["replayed_queries"] = (
+        audit["complete_positive_exact_prefix_queries"] +
+        audit["fully_replayed_zero_exact_prefix_queries"])
+    drift = {key: {"observed": value, "frozen_expected": expected_replay[key]}
+             for key, value in actual_replay.items()
+             if value != expected_replay[key]}
+    require(not drift and result["production_write_authorized"] is False,
+            "original manufacturer full sweep differs from audited 2026-10-13 evidence: " +
+            json.dumps(drift, sort_keys=True))
     return result, {
         "original_source_count": len(source_specs),
         "original_batch_archives_replayed": result["observed_batch_archives"],
