@@ -44,7 +44,7 @@ class SAMR30OriginalSourceTests(unittest.TestCase):
             self.assertEqual(source.replay(root),result)
             original=root/"manufacturer-samr30e-original.html"
             original.write_bytes(original.read_bytes()+b"not in official hash")
-            with self.assertRaisesRegex(ValueError,"SHA256 mismatch"):
+            with self.assertRaisesRegex(ValueError,"original HTML SHA mismatch"):
                 source.replay(root)
 
     def test_bounded_missing_source_keeps_failed_manifest_and_no_fake_success(self):
@@ -60,7 +60,7 @@ class SAMR30OriginalSourceTests(unittest.TestCase):
             self.assertFalse(m["live_original_source_observation_complete"])
             self.assertEqual(m["sources"][1]["status"],"SOURCE_NOT_AVAILABLE")
             self.assertFalse(m["phase1_icpn_fields_verified_by_this_source_only"])
-            with self.assertRaisesRegex(ValueError,"cannot establish"):
+            with self.assertRaisesRegex(ValueError,"untrusted original source-only receipt"):
                 source.replay(root)
 
     def test_http200_html_shell_archived_but_never_verified(self):
