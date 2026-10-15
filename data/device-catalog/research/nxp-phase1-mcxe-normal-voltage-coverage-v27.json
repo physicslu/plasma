@@ -1,0 +1,202 @@
+{
+  "schema_version": 27,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "source_15_git_blob": "46c02c0f92f77f30a14d630bdca16d278db368f3",
+  "baseline_501_v26_git_blob": "5156324546f9f5ffc19a2a785ef0560e39799a65",
+  "prior_54_exact_v21_git_blob": "2a37d0f60085bdb1ca3021313039ebde39bf5857",
+  "exact_mcx_e24": 8,
+  "exact_mcx_e31": 7,
+  "ram_source_discrepancies": {
+    "MCXE315MLF": "Rev1 Factsheet 64KB vs Rev4 Datasheet 112KB",
+    "MCXE315MPA": "Rev1 Factsheet 64KB vs Rev4 Datasheet 112KB"
+  },
+  "before_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 199,
+        "PARTIAL": 25,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "working_vdd": {
+        "VERIFIED": 166,
+        "PARTIAL": 39,
+        "UNKNOWN": 19,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 150,
+        "PARTIAL": 16,
+        "UNKNOWN": 58,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 166,
+        "PARTIAL": 0,
+        "UNKNOWN": 58,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "after_admitted": {
+    "exact_icpn_records": 224,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 197,
+        "PARTIAL": 25,
+        "UNKNOWN": 0,
+        "CONFLICT": 2
+      },
+      "working_vdd": {
+        "VERIFIED": 181,
+        "PARTIAL": 39,
+        "UNKNOWN": 4,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 157,
+        "PARTIAL": 24,
+        "UNKNOWN": 43,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 181,
+        "PARTIAL": 0,
+        "UNKNOWN": 43,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 224,
+        "PARTIAL": 0,
+        "UNKNOWN": 0,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "all_501": {
+    "exact_icpn_records": 501,
+    "identity_admitted": 224,
+    "fields": {
+      "base_device": {
+        "VERIFIED": 224,
+        "PARTIAL": 15,
+        "UNKNOWN": 262,
+        "CONFLICT": 0
+      },
+      "package": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "pin_count": {
+        "VERIFIED": 239,
+        "PARTIAL": 70,
+        "UNKNOWN": 192,
+        "CONFLICT": 0
+      },
+      "flash": {
+        "VERIFIED": 239,
+        "PARTIAL": 11,
+        "UNKNOWN": 251,
+        "CONFLICT": 0
+      },
+      "ram": {
+        "VERIFIED": 212,
+        "PARTIAL": 73,
+        "UNKNOWN": 214,
+        "CONFLICT": 2
+      },
+      "working_vdd": {
+        "VERIFIED": 196,
+        "PARTIAL": 81,
+        "UNKNOWN": 224,
+        "CONFLICT": 0
+      },
+      "io_supply": {
+        "VERIFIED": 157,
+        "PARTIAL": 24,
+        "UNKNOWN": 320,
+        "CONFLICT": 0
+      },
+      "vdda": {
+        "VERIFIED": 181,
+        "PARTIAL": 0,
+        "UNKNOWN": 320,
+        "CONFLICT": 0
+      },
+      "temperature": {
+        "VERIFIED": 239,
+        "PARTIAL": 3,
+        "UNKNOWN": 259,
+        "CONFLICT": 0
+      }
+    }
+  },
+  "e24_vdd_mode": "MCXE247 2.7V FIRC vs >=2.97V PLL",
+  "e24_io": "VDD referenced but independent VDDIO unestablished: PARTIAL",
+  "e31_analog": "VDD_HV_A analog main rail; no dedicated VDDA pin",
+  "original_vendor_pdf_sha256_archived": false,
+  "new_production_admitted": 0,
+  "new_programming_supported": 0,
+  "new_physical_hil_passed": 0
+}
