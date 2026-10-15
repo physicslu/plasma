@@ -93,19 +93,21 @@ def page_evidence(page14, page16):
                       if re.search(r"\b" + name + r"\b", c14)})
     require(tuple(present) == BASES,
             "all twelve exact device-family feature rows not replayed")
-    mandatory = ("SAM L10/L11 Family", "Ordering Information",
-                 "Product Series", "Pin Count", "Memory Density",
-                 "Device Variant", "Package Type", "Package Grade",
-                 "Package Carrier", "ATSAML")
+    # Microchip page 16 is a *graphical* ordering tree. Poppler's -layout
+    # extracts code/value tokens but not all of its heading labels as adjacent
+    # text. Require revision, page identity, and independently reviewed code
+    # values, never infer whole commercial order-code rows from this diagram.
+    mandatory = (
+        "SAM L10/L11 Family", "Ordering Information", "ATSAML",
+        "Cortex-M23", "24 Pins", "32 Pins",
+        "16 KB", "32 KB", "64 KB",
+        "TQFP", "VQFN", "SSOP", "WLCSP", "KPH",
+    )
     missing = [token for token in mandatory if token not in c16]
     has_footer = bool(re.search(r"DS60001513G\s*-\s*page\s*16", c16))
     require(not missing and has_footer,
             f"official revision / ordering page 16 mismatch: "
-            f"missing={missing}, footer={has_footer}, " \
-            f"snippet={c16[:420]!r}")
-    require(all(token in c16 for token in
-                ("TQFP", "VQFN", "SSOP", "WLCSP", "KPH")),
-            "manufacturer package or ordering caveats missing")
+            f"missing={missing}, footer={has_footer}")
     return {
         "datasheet_page_14": "Table 1-1 device-specific family features",
         "datasheet_page_16": "Section 2 ordering information conventions",
