@@ -30,7 +30,7 @@ REQUIRED = (
     "manufacturer", "icpn", "base_device", "package", "pin_count",
     "flash", "ram", "vdd", "io_supply", "vdda", "temperature")
 VALID_STATES = frozenset(("IDENTIFIED", "RESEARCH_ONLY", "IDENTITY_DISPUTED"))
-FIELD_STATES = tuple(STATUSES) + ("NOT_APPLICABLE",)
+FIELD_STATES = tuple(STATUSES)
 BLOB_CAP = 64*1024*1024
 
 
