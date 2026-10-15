@@ -40,6 +40,7 @@ REMAINING_BY_CFG={
 FIRST_CODES_SHA="7a75e18a5f23cc2b80e10e1675918ce7da0601fe0d8d35664ebb78c4fb8d3b64"
 EXPECTED_REMAINING_IDS_SHA="fa29b7a2b739caad4aa8cd0bc6e8d6ee74a90aa50ea230b5e3c7a10b2eb81db6"
 EXPECTED_QUEUE_JSONL_SHA="965b7faaba2942cdadf982768236c7a666bce46733b2afc3a16ea3e03de824e8"
+EXPECTED_IDENTITY_CSV_SHA="ecec8112d52d3d5b3b7313e2316da67e6dc670794713abf49b5b8fdeb6f0688d"
 PHASE_FIELDS=frozen.ST_FIELDS
 EVIDENCE_STATES=("VERIFIED","PARTIAL","UNKNOWN","CONFLICT","NOT_APPLICABLE")
 PDF_SHA=official_pdf.PDF_SHA
@@ -283,6 +284,12 @@ def main():
     canonical_csv=identity_csv(rows)
     identity_csv_sha=hashlib.sha256(canonical_csv.encode("utf-8")).hexdigest()
     summary["remaining_research_identity_csv_sha256"]=identity_csv_sha
+    require(identity_csv_sha==EXPECTED_IDENTITY_CSV_SHA,
+            "official Microchip 2441 canonical identity CSV SHA-256 drift")
+    committed=Path(__file__).with_name("microchip-phase1-remaining2441-exact-identity-v1.csv")
+    require(committed.is_file()
+            and committed.read_bytes()==canonical_csv.encode("utf-8"),
+            "Git-backed Phase 1 2441 exact material index no longer matches original replay")
     require(summary["remaining_icpn_names_sha256"]==EXPECTED_REMAINING_IDS_SHA
             and summary["remaining_source_queue_sha256"]==EXPECTED_QUEUE_JSONL_SHA,
             "2441 original-source material membership/payload SHA freeze drift")
