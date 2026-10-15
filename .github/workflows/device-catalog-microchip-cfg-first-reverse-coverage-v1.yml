@@ -285,11 +285,11 @@ jobs:
                 json.dumps(report["dfp_archive_exact_icpn_by_manufacturer_pack"],
                            sort_keys=True))
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
-              f.write("ADR-0002 Microchip P0: 2,437; bounded P1: 126; P2: 20,713\\n")
+              f.write("ADR-0002 Microchip P0: 2,437; bounded P1: 126; P2: 20,713\n")
               f.write("Included within P2: 2,065 exact original-MCP x DFP-only "
-                      "identity records across 340 DFP Base Devices\\n")
-              f.write("Historical 2,191 combined-P1 label corrected; NOT P1.\\n")
-              f.write("No OpenOCD SUPPORTED, Phase 2, Catalog or Production.\\n")
+                      "identity records across 340 DFP Base Devices\n")
+              f.write("Historical 2,191 combined-P1 label corrected; NOT P1.\n")
+              f.write("No OpenOCD SUPPORTED, Phase 2, Catalog or Production.\n")
           PY
       - name: Derive all 2437 P0 exact-ICPN Phase 1 field-evidence states and source gaps
         run: |
