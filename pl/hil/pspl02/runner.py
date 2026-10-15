@@ -12,7 +12,6 @@ import mmap
 import os
 from pathlib import Path
 import platform
-import struct
 import sys
 
 from pl.hil.pspl02 import contract as c, mmio as m
@@ -104,13 +103,17 @@ def runtime_audit(session: dict, *, board_options=None):
 class DevMem:
     def __init__(self, readonly):
         self.readonly, self.pages, self.fd = readonly, {}, None
+        self.words = {}
 
     def __enter__(self):
+        c._require(sys.byteorder == "little", "MMIO requires little-endian native words")
         c._require(Path("/dev/mem").is_char_device(), "No real /dev/mem")
         self.fd = os.open("/dev/mem", (os.O_RDONLY if self.readonly else os.O_RDWR) | os.O_SYNC)
         return self
 
     def __exit__(self, *_):
+        for words in self.words.values():
+            words.release()
         for page in self.pages.values():
             page.close()
         if self.fd is not None:
@@ -118,23 +121,38 @@ class DevMem:
 
     def page(self, address):
         c._require(type(address) is int and address in m.READS | m.WRITES, "Unlisted address")
+        c._require(address % 4 == 0, "Unaligned MMIO word")
         base = address & ~4095
         c._require(base in c.BASES.values() and self.fd is not None, "Outside reviewed apertures")
         if base not in self.pages:
-            self.pages[base] = mmap.mmap(self.fd, 4096, flags=mmap.MAP_SHARED,
-                                        prot=mmap.PROT_READ | (0 if self.readonly else mmap.PROT_WRITE),
-                                        offset=base)
-        return self.pages[base], address-base
+            page = mmap.mmap(self.fd, 4096, flags=mmap.MAP_SHARED,
+                             prot=mmap.PROT_READ | (0 if self.readonly else mmap.PROT_WRITE),
+                             offset=base)
+            words = None
+            try:
+                words = memoryview(page).cast("I")
+                c._require(words.itemsize == 4, "Native MMIO word is not 32 bits")
+            except BaseException:
+                if words is not None:
+                    words.release()
+                page.close()
+                raise
+            self.pages[base], self.words[base] = page, words
+        return self.words[base], (address-base)//4
 
     def read32(self, address):
         c._require(address in m.READS, "Unlisted read")
-        page, offset = self.page(address)
-        return struct.unpack_from("<I", page, offset)[0]
+        words, index = self.page(address)
+        return words[index]
 
     def write32(self, address, value):
         c._require(not self.readonly and address in m.WRITES, "Unlisted write")
-        page, offset = self.page(address)
-        struct.pack_into("<I", page, offset, value)
+        c._require(type(value) is int and 0 <= value <= 0xffffffff, "Invalid MMIO word")
+        words, index = self.page(address)
+        # pack_into first clears the destination with memset: ARMv7 emits
+        # byte stores, so base+1 receives SLVERR from word-addressed registers.
+        # Native uint32 view indexing was checked as one ARMv7 STR/LDR in RAM.
+        words[index] = value
 
 
 def main(argv=None):
