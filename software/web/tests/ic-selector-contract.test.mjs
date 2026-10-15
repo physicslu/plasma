@@ -51,9 +51,9 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(selector, /Authority/);
   assert.match(selector, /icSelectorStatusStack/);
   assert.match(selector, /icSelectorStatusPhysical[\s\S]*physicalValidationLabel\("PPU"[\s\S]*physicalValidationLabel\("Socket"/);
-  assert.match(selector, /icSelectorStatusEvidence[\s\S]*softwareQualificationLabel[\s\S]*openOcdConfigLabel[\s\S]*manufacturerPartLabel/);
+  assert.match(selector, /icSelectorStatusEvidence[\s\S]*softwareQualificationLabel[\s\S]*openOcdConfigLabel[\s\S]*phase1IdentityLabel/);
   assert.match(selector, /OpenOCD 設定 · 已存在/);
-  assert.match(selector, /原廠料號 · 已確認/);
+  assert.match(selector, /Phase 1 · IDENTIFIED/);
   assert.match(selector, /未實機測試/);
   assert.match(selector, /實機測試通過/);
   assert.match(selector, /device\.physical_validation\.ppu_status/);
@@ -82,8 +82,8 @@ test("Phase 2 software qualification is projected independently from CFG mapping
   assert.match(api, /physical_programming_qualified:\s*false/);
   assert.match(api, /openocd_software_qualification\?:\s*OpenOCDSoftwareQualification\s*\|\s*null/);
 
-  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.software_state, zh\)/);
-  assert.match(selector, /軟體資格 ·/);
+  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.phase2_state, zh\)/);
+  assert.match(selector, /Phase 2 ·/);
   assert.match(selector, /Software Qualification/);
   assert.match(selector, /Qualified Operations/);
   assert.match(selector, /Flash Driver/);
