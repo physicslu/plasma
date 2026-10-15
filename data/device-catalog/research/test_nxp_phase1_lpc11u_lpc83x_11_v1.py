@@ -75,8 +75,7 @@ class NxpLpc11uLpc83xPhase1Tests(unittest.TestCase):
 
     def test_reject_nonreverse_discovered_material(self):
         with self.assertRaisesRegex(ValueError,"reverse wave"):
-            self.check(copy.deepcopy(self.rows)) if "NOT_ACTUAL" in self.wave else (
-                cohort.verify_rows(copy.deepcopy(self.rows),self.old,set()))
+            cohort.verify_rows(copy.deepcopy(self.rows), self.old, set())
 
     def test_reject_plasma_transcription_blob_drift(self):
         with patch.object(cohort,"SOURCE_GIT_BLOB","0"*40):
