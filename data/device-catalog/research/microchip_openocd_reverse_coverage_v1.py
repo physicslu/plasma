@@ -278,7 +278,7 @@ def replay_all_original_batch_sources(dfp_root, source_specs):
             "unpinned original manufacturer DFP source")
     expected = batch_plan.plan_inventory(inventory, digest, batch_size=10)
     result = full_mcp.build(expected, inventory, digest, source_specs)
-    audit = json.loads((gates.HERE / 
+    audit = json.loads((gates.HERE /
         "microchip-dfp-full-first-pass-audit-20261013.json").read_text(encoding="utf-8"))
     # The historical 23,427 is an *observation-event* count, not the number
     # of per-identity links retained by the deduplicated 23,276-row rollup.
