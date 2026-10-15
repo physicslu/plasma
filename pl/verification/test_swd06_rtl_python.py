@@ -50,3 +50,7 @@ def test_driver_against_real_axi_and_virtual_wire_target():
 
 def test_driver_cancellation_against_real_axi():
     _run("python_driver_owner_thread_abort_against_real_axi", synth_fixture=True)
+
+
+def test_driver_rtl_timeout_and_explicit_recovery():
+    _run("python_driver_rtl_timeout_and_explicit_recovery", synth_fixture=True)
