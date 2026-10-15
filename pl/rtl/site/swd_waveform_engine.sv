@@ -30,7 +30,7 @@ module swd_waveform_engine (
     logic [15:0] ticks_left;
     logic [15:0] half_period_q;
     logic [5:0]  count_q;
-    logic [5:0]  bit_index;
+    logic [4:0]  bit_index;
     logic [31:0] tx_q;
 
     assign busy = state != ST_IDLE;
@@ -93,13 +93,13 @@ module swd_waveform_engine (
                         // Sample just before the generated falling edge.
                         rx_data[bit_index] <= swdio_in;
                         swclk <= 1'b0;
-                        if (bit_index == count_q - 6'd1) begin
+                        if ({1'b0, bit_index} == count_q - 6'd1) begin
                             swdio_oe <= 1'b0;
                             done <= 1'b1;
                             state <= ST_IDLE;
                         end else begin
-                            bit_index <= bit_index + 6'd1;
-                            swdio_out <= tx_q[bit_index + 6'd1];
+                            bit_index <= bit_index + 5'd1;
+                            swdio_out <= tx_q[bit_index + 5'd1];
                             ticks_left <= half_period_q - 16'd1;
                             state <= ST_LOW;
                         end
