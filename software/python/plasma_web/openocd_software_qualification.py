@@ -28,9 +28,9 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v3.json"
-APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json"
-EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v2.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
+APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
+EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -284,10 +284,14 @@ class OpenOCDSoftwareQualificationRegistry:
             and app_medium.get("document") == app_ordering.get("document") == "DS5319 Rev 20"
             and set(app_ordering.get("required_flash_codes", [])) == {"8", "B"}
             and app_medium.get("flash_codes") == ["8", "B"]
+            and app_medium.get("pin_count", {}).get("C") == 48
             and app_medium.get("pin_count", {}).get("R") == 64
             and app_medium.get("pin_count", {}).get("V") == 100
             and app_medium.get("package", {}).get("T") == "LQFP"
-            and app_medium.get("temperature_c", {}).get("6") == "-40 to 85 C",
+            and app_medium.get("temperature_c", {}).get("6") == "-40 to 85 C"
+            and app_medium.get("temperature_c", {}).get("7") == "-40 to 105 C"
+            and app_ordering.get("required_temperature_codes")
+            == {"6": "-40 to 85 C", "7": "-40 to 105 C"},
             "STM32F103 medium-density manufacturer applicability drift",
         )
 
@@ -322,6 +326,11 @@ class OpenOCDSoftwareQualificationRegistry:
                 "STM32F103RBT6",
                 "STM32F103V8T6",
                 "STM32F103VBT6",
+                "STM32F103C8T7",
+                "STM32F103CBT7",
+                "STM32F103R8T7",
+                "STM32F103RBT7",
+                "STM32F103VBT7",
             },
             "manufacturer applicability scope expanded without review",
         )
@@ -418,6 +427,11 @@ class OpenOCDSoftwareQualificationRegistry:
                 "STM32F103RBT6TR",
                 "STM32F103V8T6TR",
                 "STM32F103VBT6TR",
+                "STM32F103C8T7TR",
+                "STM32F103CBT7TR",
+                "STM32F103R8T7TR",
+                "STM32F103RBT7TR",
+                "STM32F103VBT7TR",
             },
             "ordering-equivalence scope expanded without review",
         )
@@ -579,6 +593,16 @@ class OpenOCDSoftwareQualificationRegistry:
                 ("STMicroelectronics", "STM32F103V8T6TR"),
                 ("STMicroelectronics", "STM32F103VBT6"),
                 ("STMicroelectronics", "STM32F103VBT6TR"),
+                ("STMicroelectronics", "STM32F103C8T7"),
+                ("STMicroelectronics", "STM32F103C8T7TR"),
+                ("STMicroelectronics", "STM32F103CBT7"),
+                ("STMicroelectronics", "STM32F103CBT7TR"),
+                ("STMicroelectronics", "STM32F103R8T7"),
+                ("STMicroelectronics", "STM32F103R8T7TR"),
+                ("STMicroelectronics", "STM32F103RBT7"),
+                ("STMicroelectronics", "STM32F103RBT7TR"),
+                ("STMicroelectronics", "STM32F103VBT7"),
+                ("STMicroelectronics", "STM32F103VBT7TR"),
             },
             "Phase 2 qualification scope expanded without review",
         )
