@@ -1,0 +1,76 @@
+name: Microchip SAM L10 L11 PDF source custody
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase1_p1_saml1x_pdf_custody_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p1_saml1x_pdf_custody_v1.py'
+      - '.github/workflows/device-catalog-microchip-saml1x-pdf-custody-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-manufacturer-pdf-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run fail-closed offline PDF custody tests
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_saml1x_pdf_custody_v1.py' -v
+          pdftotext -v
+      - name: Attempt actual official DS60001513G PDF byte capture and semantic replay
+        id: manufacturer_pdf
+        timeout-minutes: 4
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          root="${{ runner.temp }}/microchip-saml1x-datasheet-original"
+          python data/device-catalog/research/microchip_phase1_p1_saml1x_pdf_custody_v1.py \
+            --capture "$root"
+          python data/device-catalog/research/microchip_phase1_p1_saml1x_pdf_custody_v1.py \
+            --replay "$root"
+      - name: Audit original PDF source state and qualification boundary
+        if: always()
+        env:
+          LIVE_OUTCOME: ${{ steps.manufacturer_pdf.outcome }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, "data/device-catalog/research")
+          import microchip_phase1_p1_saml1x_pdf_custody_v1 as source
+          root = Path(os.environ["RUNNER_TEMP"])/"microchip-saml1x-datasheet-original"
+          if not (root/"manifest.json").is_file():
+              raise SystemExit("No manufacturer PDF source receipt was recorded")
+          receipt = source.audit(root)
+          ok = receipt["status"] == "SOURCE_BYTES_CAPTURED_AND_SEMANTICALLY_REPLAYED"
+          if (os.environ["LIVE_OUTCOME"] == "success") != ok:
+              raise SystemExit("Live-source step and fail-closed evidence disagree")
+          assert receipt["new_phase1_exact_variant_verified_fields"] == 0
+          assert receipt["manufacturer_exact_icpn_count_from_pdf"] == 0
+          assert receipt["software_supported_claimed"] is False
+          assert receipt["production_write_authorized"] is False
+          print("Microchip SAM L10/L11 official PDF:",receipt["status"])
+          print("Original PDF SHA256:",receipt["original_pdf_sha256"])
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip SAM L10/L11 official PDF: " + receipt["status"] + "\n")
+              f.write("Exact ICPN specification VERIFIED promotions: 0\n")
+              f.write("Phase 2 programming / Selector / Production: unchanged\n")
+          PY
+      - name: Archive original manufacturer PDF bytes and source receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-saml1x-ds60001513g-original-pdf-source-custody-v1
+          path: ${{ runner.temp }}/microchip-saml1x-datasheet-original/
+          if-no-files-found: warn
+          retention-days: 90
