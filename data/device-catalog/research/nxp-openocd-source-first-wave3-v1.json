@@ -121,7 +121,7 @@
       "family": "LPC2148",
       "manufacturer_url": "https://www.nxp.com/products/processors-and-microcontrollers/arm-microcontrollers/general-purpose-mcus/lpc2000-arm7/single-chip-16-bit-32-bit-microcontrollers-up-to-512-kb-flash-with-isp-iap-usb-2-0-full-speed-device-10-bit-adc-and-dac:LPC2148FBD64?tab=Package_Quality_Tab",
       "manufacturer_evidence_state": "PUBLIC_OFFICIAL_PACKAGE_QUALITY_OBSERVED_ORIGINAL_BYTES_NOT_SHA256_ARCHIVED",
-      "manufacturer_status": "Active",
+      "manufacturer_status": "MIXED_MATERIAL_LIFECYCLE_ACTIVE_151_157_NLM_118",
       "candidate_class": "P1_ORDERING_VARIANT_AMBIGUITY",
       "pinned_target_config": "tcl/target/lpc2148.cfg",
       "pinned_target_helper": "tcl/target/lpc2xxx.cfg",
