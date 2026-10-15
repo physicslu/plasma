@@ -15,7 +15,7 @@ from pathlib import Path
 
 import nxp_phase1_kinetis_21_official_v1 as approved_phase1
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SUB = Path("data/device-catalog/research")
 SRC = {
     "legacy": ("nxp-501-phase1-ic-information-v13.csv", "4a0fbad8fa5f57580ba28e92f71b0793e12faf07", 501),
