@@ -24,6 +24,7 @@ EXPECTED_BY_CFG = {
     "tcl/target/atsaml1x.cfg": 126,
 }
 EXPECTED = 2563
+FROZEN_IDENTITY_SHA256 = "0c37ad68c1db0a4fb50ff5a1d229faaca0ee6eac44cfb9d9b7de4e8a931daf2a"
 ST_FIELDS = (
     "manufacturer", "icpn", "base_device", "package", "pin_count",
     "flash", "ram", "working_vdd", "io_supply", "vdda", "temperature",
@@ -223,6 +224,8 @@ def from_ledgers(source, p0_info, p1_info, s1_info, upstream_sha):
     require(dict(count)==EXPECTED_BY_CFG and len(selected)==EXPECTED
             and len(seen)==EXPECTED, "five CFG frozen exact ICPN counts drift")
     selected.sort(key=lambda r:r["icpn"].upper())
+    require(freeze_digest(selected)==FROZEN_IDENTITY_SHA256,
+            "frozen 2563 exact ICPN / manufacturer Base / CFG membership changed")
     for f in ST_FIELDS:
         require(sum(coverage[f].values())==EXPECTED,"field denominator drift")
     s1_complete = sum(
