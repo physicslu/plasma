@@ -60,6 +60,21 @@ class MicrochipFiveCfgSTFields(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"UNKNOWN"):
             ledger.normalize_field(unknown)
 
+    def test_not_applicable_requires_explicit_source_and_cannot_be_zero(self):
+        raw=field("NOT_APPLICABLE",None,"official_exact_applicability_table")
+        raw["unit"]=None
+        raw["notes"]="Manufacturer table says NOT_APPLICABLE for this exact item"
+        result=ledger.normalize_field(raw)
+        self.assertEqual(result["state"],"NOT_APPLICABLE")
+        self.assertIsNone(result["value"])
+        self.assertEqual(result["source_sha256_refs"],[SHA])
+        invented=dict(raw, value=0)
+        with self.assertRaisesRegex(ValueError,"NOT_APPLICABLE"):
+            ledger.normalize_field(invented)
+        uncited=dict(raw, original_response_sha256_refs=None)
+        with self.assertRaisesRegex(ValueError,"NOT_APPLICABLE"):
+            ledger.normalize_field(uncited)
+
     def test_conflict_must_not_select_winner(self):
         conflict=dict(field("CONFLICT",None,"unresolved_conflict"))
         self.assertEqual(ledger.normalize_field(conflict)["state"],"CONFLICT")
