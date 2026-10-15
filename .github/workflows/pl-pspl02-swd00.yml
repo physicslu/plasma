@@ -3,7 +3,8 @@ name: PL PSPL-02 SWD-00 offline RTL
 on:
   pull_request:
     paths:
-      - "pl/rtl/bus/pl_control_axi_lite.sv"
+      - "pl/rtl/bus/**"
+      - "pl/rtl/site/**"
       - "pl/rtl/site/swd_waveform_engine.sv"
       - "pl/rtl/bus/swd_command_axi_lite.sv"
       - "pl/rtl/site/pl_loopback_responder.sv"
@@ -15,11 +16,13 @@ on:
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
       - "pl/projects/z2-control-waveform/**"
+      - "pl/projects/z2-control-waveform/**"
       - ".github/workflows/pl-pspl02-swd00.yml"
   push:
     branches: [main]
     paths:
-      - "pl/rtl/bus/pl_control_axi_lite.sv"
+      - "pl/rtl/bus/**"
+      - "pl/rtl/site/**"
       - "pl/rtl/site/swd_waveform_engine.sv"
       - "pl/rtl/bus/swd_command_axi_lite.sv"
       - "pl/rtl/site/pl_loopback_responder.sv"
@@ -30,6 +33,7 @@ on:
       - "pl/verification/cocotb/test_pl_control.py"
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
+      - "pl/projects/z2-control-waveform/**"
       - ".github/workflows/pl-pspl02-swd00.yml"
   workflow_dispatch:
 

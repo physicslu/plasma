@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
@@ -99,6 +100,11 @@ def finalize(build: Path, version: str) -> None:
     if 'CRITICAL WARNING:' in vivado or 'ERROR:' in vivado:
         raise ValueError('Vivado critical warnings/errors require resolution, not suppression')
     project = build / 'project'
+    # OOC synthesis/implementation messages may exist only in child run logs.
+    for log in project.glob('*.runs/*/runme.log'):
+        content = log.read_text(errors='replace')
+        if 'CRITICAL WARNING:' in content or 'ERROR:' in content:
+            raise ValueError('Blocking child-run diagnostic: ' + str(log.relative_to(build)))
     bit = project / 'z2_control_waveform.runs/impl_1/system_wrapper.bit'
     hwh = project / 'z2_control_waveform.gen/sources_1/bd/system/hw_handoff/system.hwh'
     metadata['axi_address_map'] = verify_hwh(hwh)
@@ -127,7 +133,13 @@ def finalize(build: Path, version: str) -> None:
                     waveform_transfer_limit_bits=32, waveform_half_period_cycles=[2,65535],
                     physical_programming_qualified=False, hardware_runtime_ready=False,
                     baseline_retention='Preserve this entire uniquely named build directory; never overwrite a known-good baseline')
-    (artifacts/'manifest.json').write_text(json.dumps(metadata,indent=2,sort_keys=True)+'\n')
+    match = re.search(r'^IMPLEMENTED_TIMING_PASS setup=([0-9.]+) hold=([0-9.]+)$', vivado, re.MULTILINE)
+    if not match:
+        raise ValueError('Missing nonnegative implemented timing values')
+    metadata['implemented_slack_ns'] = {'setup': float(match[1]), 'hold': float(match[2])}
+    manifest = artifacts/'manifest.json'
+    manifest.write_text(json.dumps(metadata,indent=2,sort_keys=True)+'\n')
+    (artifacts/'manifest.json.sha256').write_text(f'{shared._digest(manifest)}  manifest.json\n')
     print('LOOPBACK_ARTIFACT_PASS',artifacts)
 
 

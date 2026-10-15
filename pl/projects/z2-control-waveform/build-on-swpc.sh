@@ -15,6 +15,7 @@ echo "LOOPBACK_BUILD_DIR=$PLASMA_LOOPBACK_BUILD"
 trap 'rc=$?; printf "EXIT_CODE=%s\n" "$rc" > "$PLASMA_LOOPBACK_BUILD/logs/build.status"' EXIT
 # Mandatory host loopback gate before Vivado; pytest must include assertions.
 "${PLASMA_TEST_PYTHON:-python3}" -m pytest -q "$repo/pl/verification/test_pspl02_swd00_rtl.py" > "$PLASMA_LOOPBACK_BUILD/logs/host-regression.log" 2>&1
+"${PLASMA_TEST_PYTHON:-python3}" -m pytest -q "$repo/pl/tests/test_z2_control_waveform_build.py" > "$PLASMA_LOOPBACK_BUILD/logs/artifact-regression.log" 2>&1
 python3 "$script_dir/artifact.py" prepare --build "$PLASMA_LOOPBACK_BUILD" --version "${PLASMA_BITSTREAM_VERSION:-0.1.0}"
 settings="${VIVADO_SETTINGS64:-/storage/tools/xilinx/2026.1/Vivado/settings64.sh}"
 source "$settings"
