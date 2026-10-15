@@ -5,6 +5,9 @@ on:
     paths:
       - 'data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py'
       - 'data/device-catalog/research/test_microchip_openocd_reverse_coverage_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P0_PHASE1_INFORMATION_LEDGER_V1.md'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
       - '.github/workflows/device-catalog-microchip-cfg-first-reverse-coverage-v1.yml'
   workflow_dispatch:
@@ -27,6 +30,8 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_reverse_coverage_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_information_ledger_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_core_first_v1.py' -v
           python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
@@ -130,6 +135,10 @@ jobs:
           mkdir -p "$root/dfp" "$root/old"
           gh run download 38338847345 --repo "${{ github.repository }}" --name microchip-official-packs-index-raw --dir "$root/dfp"
           gh run download 38348043707 --repo "${{ github.repository }}" --name microchip-multilane-16-batch-raw-research-20261013 --dir "$root/old"
+          mkdir -p "$root/chart-archive"
+          gh run download 38535507957 --repo "${{ github.repository }}" \
+            --name microchip-phase1-portable-bundle-live-and-receipts-v1 \
+            --dir "$root/chart-archive"
           for shard in $(seq 0 11); do
             mkdir -p "$root/shard-$shard"
             gh run download 38357451545 --repo "${{ github.repository }}" --name "microchip-dfp-shard-$shard-raw-20261013" --dir "$root/shard-$shard"
@@ -140,6 +149,28 @@ jobs:
           root="${{ runner.temp }}/microchip-full-sources"
           test -f "$root/dfp/index.html"
           test -f "$root/dfp/manifest.json"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+          import sys
+          sys.path.insert(0,"data/device-catalog/research")
+          import microchip_phase1_portable_custody_v1 as portable
+          root=Path(os.environ["RUNNER_TEMP"])/"microchip-full-sources"
+          archives=list((root/"chart-archive").rglob("portable-original-evidence.zip"))
+          if len(archives)!=1:
+              raise SystemExit(f"Expected exactly one original official chart bundle; got {len(archives)}")
+          receipt=portable.verify(archives[0])
+          if receipt["offline_bundle_verification"]!="PASS":
+              raise SystemExit("Original manufacturer source bundle not verified")
+          chart=root/"official-chart"
+          chart.mkdir(mode=0o700)
+          with ZipFile(archives[0]) as z:
+              for name in ("chart/original-chart.html","chart/manifest.json"):
+                  (chart/Path(name).name).write_bytes(z.read(name))
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as f:
+              print(f"MICROCHIP_CHART_ROOT={chart}",file=f)
+          PY
           test -d "$root/old/microchip-live-research"
           test "$(find "$root/old/microchip-live-research" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 16
           echo "MICROCHIP_DFP_ROOT=$root/dfp" >> "$GITHUB_ENV"
@@ -180,11 +211,53 @@ jobs:
                             "cfg_counts":data["icpn_by_cfg_candidate_counts"],
                             "historical_24051_complete":False},sort_keys=True,indent=2))
           PY
+      - name: Derive all 2437 P0 exact-ICPN Phase 1 field-evidence states and source gaps
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --chart-original-root "$MICROCHIP_CHART_ROOT" \
+            --output "${{ runner.temp }}/microchip-p0-phase1-information-ledger.json"
+          python data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --chart-original-root "$MICROCHIP_CHART_ROOT" \
+            --output "${{ runner.temp }}/microchip-p0-phase1-information-ledger.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/
+            "microchip-p0-phase1-information-ledger.json").read_text(encoding="utf-8"))
+          assert report["p0_icpn_count"] == 2437
+          assert len(report["records"]) == 2437
+          assert report["record_level_phase1_information_complete"] == 0
+          assert report["record_level_internal_identity_admitted"] == 0
+          for f in ("manufacturer","icpn","base_device"):
+            assert report["per_field_coverage"][f]["VERIFIED"] == 2437
+          for f in ("package","pin_count","flash","ram","vdd","io_supply","vdda",
+                    "temperature","core_architecture","core_model"):
+            states=report["per_field_coverage"][f]
+            assert sum(states.values()) == 2437
+            assert states["VERIFIED"] == 0
+            assert states["CONFLICT"] == 0
+          assert report["chart_original_bytes_replayed_by_upstream_chart_builder"]
+          assert report["p0_family_chart_evidence"]["p0_manufacturer_chart_base_count"] == 341
+          assert report["p0_family_chart_evidence"]["p0_icpns_exact_manufacturer_base_joined_to_chart"] == 2370
+          assert report["p0_family_chart_evidence"]["p0_icpns_not_in_observed_chart"] == 67
+          assert len(report["p0_family_chart_evidence"]["chart_unmatched_exact_icpns"]) == 67
+          for f in ("io_supply","vdda","core_architecture"):
+            assert report["per_field_coverage"][f]["UNKNOWN"] == 2437
+          assert not report["production_write_authorized"]
+          assert not report["catalog_publication_authorized"]
+          assert not report["phase1_p0_information_complete_claimed"]
+          print("MICROCHIP P0 FIELD GAPS: 2437 exact ICPNs; identity VERIFIED; applicable chart fields PARTIAL; exact-variant evidence remains UNKNOWN")
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: microchip-phase1-full-original-mcp-cfg-reverse-coverage-v1
-          path: ${{ runner.temp }}/microchip-full-reverse.json
+          path: |
+            ${{ runner.temp }}/microchip-full-reverse.json
+            ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
           if-no-files-found: warn
           retention-days: 90
