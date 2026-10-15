@@ -143,6 +143,67 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "qualification"):
             phase1.build(changed, upstream_bytes_sha256=H)
 
+    def test_official_chart_adds_partial_only_on_exact_mcp_base(self):
+        chart_rows = []
+        partials = ("package", "pin_count", "flash", "ram", "vdd",
+                    "temperature", "core_model")
+        for i in range(341):
+            base = ("BASE000023" if i == 0 else f"CHARTOTHER{i:04d}")
+            fields = {}
+            for n, field in enumerate(partials):
+                fields[field] = {
+                    "status": "PARTIAL" if i == 0 else "UNKNOWN",
+                    "value": 64 if i == 0 else None,
+                    "original_raw_value": "64" if i == 0 else "",
+                    "original_header": field,
+                    "original_unit": "KB" if field in ("flash", "ram") else None,
+                    "source_tr_ordinal": i + 5,
+                    "source_column_number_1based": n + 1,
+                    "source_original_sha256": H,
+                    "evidence_scope": "official_base_device_chart_not_exact_icpn",
+                }
+            chart_rows.append({
+                "base_device_chart_observation": base,
+                "priority": "P0",
+                "exact_icpn_verified_from_chart": False,
+                "fields_family_scope_only": fields,
+            })
+        chart = {
+            "schema_version": 1,
+            "policy": "ADR-0002 Phase 1 - IC Information",
+            "manufacturer": "Microchip",
+            "chart_scope": "microchipdirect_chart_branchID_21_mid_3_only",
+            "chart_records": {"P0_source_leads": 341},
+            "exact_icpn_fields_verified_from_chart": 0,
+            "production_write_authorized": False,
+            "catalog_publication_authorized": False,
+            "source_original_sha256": H,
+            "source_url": "https://www.microchipdirect.com/chart.aspx?branchID=21&mid=3",
+            "p0_family_records": chart_rows,
+        }
+        result = phase1.build(self.data, upstream_bytes_sha256=H, chart_report=chart)
+        proof = result["p0_family_chart_evidence"]
+        self.assertEqual(proof["p0_icpns_exact_manufacturer_base_joined_to_chart"], 1)
+        self.assertTrue(result["chart_original_bytes_replayed_by_upstream_chart_builder"])
+        for field in partials:
+            self.assertEqual(result["per_field_coverage"][field]["PARTIAL"], 1)
+            self.assertEqual(result["per_field_coverage"][field]["UNKNOWN"], 2436)
+        r = next(x for x in result["records"] if x["base_device"] == "BASE000023")
+        self.assertEqual(r["fields"]["flash"]["status"], "PARTIAL")
+        self.assertEqual(r["fields"]["flash"]["unit"], "KB")
+        self.assertEqual(r["fields"]["flash"]["evidence_scope"],
+                         "official_base_device_chart_not_exact_icpn")
+        self.assertEqual(r["fields"]["base_device"]["status"], "VERIFIED")
+        self.assertEqual(result["record_level_phase1_information_complete"], 0)
+        broken = copy.deepcopy(chart)
+        broken["p0_family_records"][0]["fields_family_scope_only"]["flash"]["source_original_sha256"] = "0"*64
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            phase1.build(self.data, upstream_bytes_sha256=H, chart_report=broken)
+        broken = copy.deepcopy(chart)
+        broken["p0_family_records"][1]["base_device_chart_observation"] = "BASE000023"
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            phase1.build(self.data, upstream_bytes_sha256=H, chart_report=broken)
+
     def test_no_family_fields_promoted_or_fabricated(self):
         with self.assertRaisesRegex(ValueError, "invented"):
             phase1.status_field("UNKNOWN", 100)
