@@ -111,3 +111,80 @@ jobs:
           echo "CFG/DFP matching means CANDIDATE only; not OpenOCD SUPPORTED" >> "$GITHUB_STEP_SUMMARY"
           echo "Only 24 source-observed two-family commercial ICPNs are replayed, not 24,051" >> "$GITHUB_STEP_SUMMARY"
           echo "No Production admission, Flash Driver qualification, firmware, hardware or UI changes" >> "$GITHUB_STEP_SUMMARY"
+
+  full-original-batch-reverse-coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download all archived official DFP and 13 original MCP data sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 14
+        run: |
+          set -euo pipefail
+          root="${{ runner.temp }}/microchip-full-sources"
+          mkdir -p "$root/dfp" "$root/old"
+          gh run download 38338847345 --repo "${{ github.repository }}" --name microchip-official-packs-index-raw --dir "$root/dfp"
+          gh run download 38348043707 --repo "${{ github.repository }}" --name microchip-multilane-16-batch-raw-research-20261013 --dir "$root/old"
+          for shard in $(seq 0 11); do
+            mkdir -p "$root/shard-$shard"
+            gh run download 38357451545 --repo "${{ github.repository }}" --name "microchip-dfp-shard-$shard-raw-20261013" --dir "$root/shard-$shard"
+          done
+      - name: Validate original input source directory presence
+        run: |
+          set -euo pipefail
+          root="${{ runner.temp }}/microchip-full-sources"
+          test -f "$root/dfp/index.html"
+          test -f "$root/dfp/manifest.json"
+          test -d "$root/old/microchip-live-research"
+          test "$(find "$root/old/microchip-live-research" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 16
+          echo "MICROCHIP_DFP_ROOT=$root/dfp" >> "$GITHUB_ENV"
+          echo "MICROCHIP_SWEEP_ROOT=$root" >> "$GITHUB_ENV"
+          for shard in $(seq 0 11); do
+            dir="$root/shard-$shard/microchip-live-shard"
+            test -d "$dir"
+            test "$(find "$dir" -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 1
+          done
+      - name: Replay all 313 source batches and reverse-map full Research ICPN subset
+        timeout-minutes: 27
+        run: |
+          set -euo pipefail
+          set -- --dfp-evidence-root "$MICROCHIP_DFP_ROOT" --original-batch-source "original-16-batches=$MICROCHIP_SWEEP_ROOT/old/microchip-live-research"
+          for shard in $(seq 0 11); do
+            set -- "$@" --original-batch-source "shard-$shard=$MICROCHIP_SWEEP_ROOT/shard-$shard/microchip-live-shard"
+          done
+          python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py "$@" --output "${{ runner.temp }}/microchip-full-reverse.json"
+          python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py "$@" --output "${{ runner.temp }}/microchip-full-reverse.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])/"microchip-full-reverse.json"
+          data=json.loads(path.read_text(encoding="utf-8"))
+          source=data["full_batch_original_source_replay"]
+          assert source["source_replay_status"]=="REPLAYED_AGAINST_PINNED_ORIGINAL_BYTES"
+          assert source["historical_research_icpn_candidates_replayed"]==23276
+          assert source["original_batch_archives_replayed"]==313
+          assert source["exact_prefix_queries_replayed"]==2821
+          assert data["icpn_denominator_joined_in_this_run"]==23276
+          assert sum(data["icpn_mapping_state_counts"].values())==23276
+          assert data["all_icpn_original_bytes_replayed_in_this_command"] is True
+          assert data["actual_original_dfp_p0_names_replayed"]==364
+          assert data["production_write_authorized"] is False
+          assert data["cfg_software_supported_claimed"] is False
+          print(json.dumps({"source_replayed_icpn_count":len(data["icpn_rows"]),
+                            "mapping_states":data["icpn_mapping_state_counts"],
+                            "cfg_counts":data["icpn_by_cfg_candidate_counts"],
+                            "historical_24051_complete":False},sort_keys=True,indent=2))
+          PY
+      - name: Archive Research-only exact ICPN crosswalk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-full-original-mcp-cfg-reverse-coverage-v1
+          path: ${{ runner.temp }}/microchip-full-reverse.json
+          if-no-files-found: warn
+          retention-days: 90
