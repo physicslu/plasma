@@ -1,0 +1,453 @@
+{
+  "schema_version": 1,
+  "kind": "NXP_OPENOCD_CONFIG_REVERSE_DISCOVERY_WAVE4_SOURCE_ONLY",
+  "provider": "openocd-org/openocd",
+  "openocd_version": "0.12.0",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "observed_date": "2026-10-15",
+  "research_cohorts_existing": [
+    501,
+    27,
+    18
+  ],
+  "manufacturer_official_pages": [
+    "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+    "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+    "https://www.nxp.com/products/LPC1769FBD100"
+  ],
+  "official_page_original_html_byte_custody": false,
+  "nxp_global_active_denominator": null,
+  "openocd_source_git_blobs": {
+    "tcl/target/lpc8xx.cfg": "4c54a2a6670d6186297306112deee8d25e2627e4",
+    "tcl/target/lpc11xx.cfg": "d288e2a32b08b5e9ad26b7c86fb7035e8e08b1b6",
+    "tcl/target/lpc17xx.cfg": "35d8badea416e641babe6ccad3fd8503f3de7cae",
+    "tcl/target/lpc1xxx.cfg": "70d26d2673900b06c6d5eef8e55b4542103e9e42",
+    "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
+  },
+  "records": [
+    {
+      "icpn": "LPC11U24FHI33/301Y",
+      "family": "LPC11U24",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U24_301",
+        "LPC11U24_401"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U67JBD100E",
+      "family": "LPC11U67",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U67_1",
+        "LPC11U67_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U67JBD48E",
+      "family": "LPC11U67",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U67_1",
+        "LPC11U67_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U67JBD64E",
+      "family": "LPC11U67",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U67_1",
+        "LPC11U67_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U68JBD48E",
+      "family": "LPC11U68",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U68_1",
+        "LPC11U68_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U68JBD48K",
+      "family": "LPC11U68",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U68_1",
+        "LPC11U68_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U68JBD64E",
+      "family": "LPC11U68",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U68_1",
+        "LPC11U68_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U68JBD64K",
+      "family": "LPC11U68",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U68_1",
+        "LPC11U68_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC11U68JBD64Y",
+      "family": "LPC11U68",
+      "openocd_target": "tcl/target/lpc11xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC11U68_1",
+        "LPC11U68_2"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC11U00?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC1769FBD100",
+      "family": "LPC1769",
+      "openocd_target": "tcl/target/lpc17xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC1769"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC1769FBD100",
+      "manufacturer_evidence_scope": "PRODUCT_ACTIVE_MATERIAL_LIFECYCLE_UNVERIFIED",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC811M001JDH16FP",
+      "family": "LPC811",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC811_001"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC811M001JDH16J",
+      "family": "LPC811",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC811_001"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JD20J",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JDH16FP",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JDH16J",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JDH20FP",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JDH20J",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC812M101JTB16X",
+      "family": "LPC812",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [
+        "LPC812_101",
+        "LPC812_101_1",
+        "LPC812_101_2",
+        "LPC812_101_3"
+      ],
+      "priority": "P0_DISCOVERY_CANDIDATE_ONLY",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC832M101FDH20FP",
+      "family": "LPC832",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [],
+      "priority": "P1_GENERIC_TARGET_EXPLICIT_ID_MISSING",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    },
+    {
+      "icpn": "LPC834M101FHI33Y",
+      "family": "LPC834",
+      "openocd_target": "tcl/target/lpc8xx.cfg",
+      "openocd_helper": "tcl/target/lpc1xxx.cfg",
+      "openocd_flash_driver": "src/flash/nor/lpc2000.c",
+      "openocd_driver_part_id_cases": [],
+      "priority": "P1_GENERIC_TARGET_EXPLICIT_ID_MISSING",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_evidence_scope": "MATERIAL_ACTIVE",
+      "manufacturer_observed_lifecycle": "Active",
+      "manufacturer_original_bytes_archived": false,
+      "exact_material_to_silicon_part_id_verified": false,
+      "flash_programming_qualified": false,
+      "production_admitted": false,
+      "physical_hil_verified": false
+    }
+  ],
+  "excluded": [
+    {
+      "icpn": "LPC810M021FN8FP",
+      "family": "LPC810",
+      "manufacturer_url": "https://www.nxp.com/products/LPC81X_LPC83X?tab=Package_Quality_Tab",
+      "manufacturer_observed_lifecycle": "No Longer Manufactured",
+      "openocd_driver_part_id_cases": [
+        "LPC810_021"
+      ],
+      "priority": "EXCLUDED_FROM_ACTIVE_SOURCE_FIRST_DISCOVERY",
+      "manufacturer_original_bytes_archived": false
+    }
+  ],
+  "limitations": [
+    "Only 3 bounded official NXP pages; not a global SKU count",
+    "LPC1769 product-header Active only; material-level Active evidence not captured",
+    "Some codes represent commercial material/packing strings; canonical identity normalization not approved",
+    "Target CFG + Part ID case + Flash Driver presence alone does not verify exact ordering code or program/erase/verify operations",
+    "No raw manufacturer DOM/HTML bytes or per-item original SHA256 archived; live page observation not immutable replay",
+    "No change to legacy 501 priority, wave2 27, wave3 18, Production Catalog, installed PPU, PL/HIL"
+  ]
+}
