@@ -12,7 +12,8 @@ import io
 from dataclasses import dataclass
 from pathlib import Path
 
-from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord, _repository_root
+from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord
+from .runtime_evidence_root import default_runtime_evidence_root
 
 RESEARCH = Path("data/device-catalog/research")
 SOURCE_BLOBS = (
@@ -107,7 +108,9 @@ def _extract(filename: str, row: dict[str, str]) -> tuple[str, str, str, str, st
 
 def build_nxp_phase1_selector_catalog(production: DeviceCatalog, *, root: Path | None = None) -> DeviceCatalog:
     """Compose the Phase1 lookup index, not a new Production/Job Catalog."""
-    source_root = root if root is not None else _repository_root()
+    source_root = root if root is not None else default_runtime_evidence_root()
+    _check(source_root is not None,
+           "Phase1 manufacturer evidence root unavailable; configure PLASMA_RUNTIME_EVIDENCE_ROOT")
     records = list(production.records)
     existing = {(r.vendor.upper(), r.identifier.upper()) for r in records}
     added: set[str] = set()
