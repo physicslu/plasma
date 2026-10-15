@@ -28,6 +28,11 @@ def candidate_files(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(c, "RECOVERY_BIN_SHA256", _hash(paths["base.bin"]))
     monkeypatch.setattr(c, "RECOVERY_HWH_SHA256", _hash(paths["base.hwh"]))
     manifest = {
+        "identity_schema_version": 1, "hardware_abi_version": 1,
+        "swd_command_abi_version": 1, "swd_transaction_abi_version": 1,
+        "bitstream_version": "0.1.0", "build_id": c.SOURCE_SHA[:32],
+        "fpga_part": "xc7z020clg400-1", "board_part": "tul.com.tw:pynq-z2:part0:1.0",
+        "external_pl_io": False, "capability_flags": 0,
         "source_git_sha": c.SOURCE_SHA,
         "bitstream_sha256": c.BIT_SHA256,
         "hwh_sha256": c.HWH_SHA256,
@@ -169,7 +174,7 @@ class SimulatedMMIO:
         if address == c.COMMAND:
             if value == 1:
                 cfg = self.state[c.CONFIG]
-                if cfg == 0 and self.state[c.HALF] == 9:
+                if cfg == 0 and self.state[c.HALF] == 65535:
                     self.state[c.STATUS] = 1  # Busy, awaiting ABORT
                 else:
                     self.state[c.STATUS] = c.RESP_VALID
@@ -350,6 +355,7 @@ def live_session_fixture(tmp_path, monkeypatch):
     }))
     bin_file = tmp_path / "approved.bin"
     bin_file.write_bytes(b"synthetic firmware; never flash")
+    monkeypatch.setattr(c, "CANDIDATE_BIN_SHA256", c.sha256_file(bin_file))
     session = tmp_path / "session.json"
     fields = dict.fromkeys((
         "confirmed_after_gate2_merge",

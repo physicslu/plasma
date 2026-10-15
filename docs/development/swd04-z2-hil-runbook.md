@@ -1,9 +1,10 @@
 # SWD-04 — Z2 PS→AXI→PL Internal DPIDR HIL Runbook
 
-**Status:** Gate 1 implementation / host CI only. Gate 2 merge approval has
-NOT been granted. This runbook is **NOT** authorization to access Z2 now.
-No SWD-04 bitstream loading, Linux service change, memory-mapped live IO,
-or Z2 hardware operation has taken place under this PR.
+**Status:** initial SWD-04 merged as PR #917; this remains host-only
+preparation. Hardware execution requires a separately authorized maintenance
+window. See the [offline execution checklist](swd04-offline-execution-checklist.md)
+for verified staging commands, missing-recovery NO-GO and current HIL procedure.
+No SWD-04 physical qualification is claimed.
 
 ## Provenance and scope
 
@@ -28,10 +29,11 @@ or Z2 hardware operation has taken place under this PR.
 
 ## Human and automation trust boundary
 
-Per `AGENTS.md`, Gate 1 approved scoped engineering. The SWD-04 PR must stop
-at Gate 2; hardware work is in the approved *post-merge* maintenance plan.
-Until Gate 2: GitHub-hosted CI, synthetic data, offline documentation and
-static checks **only**.
+Per `AGENTS.md`, engineering merge and hardware authorization must follow the
+approved scope. The initial SWD-04 PR #917 is merged. The current staging task
+is host-only: merge status alone does not authorize a new hardware operation.
+Use the current execution checklist and obtain the separately scoped maintenance
+authorization before target access.
 
 A software/JSON PASS can be fabricated and cannot independently prove a
 physical UART cable, a power switch or that every former MMIO mapping has
