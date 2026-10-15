@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "contract_id": "ADR-0002_CROSS_VENDOR_IC_DISCOVERY_V1",
+  "authority": "PHASE1_DISCOVERY_AND_CANONICALIZATION",
+  "manufacturer_policy": "NO_MANUFACTURER_ALLOWLIST",
+  "selector_visibility_policy": "S1_IDENTIFIED_EXACT_ICPN",
+  "execution_authority_policy": "PHASE2_AND_RUNTIME_GATES_ONLY",
+  "source_adapter_policy": "VENDOR_SPECIFIC_ACQUISITION_ALLOWED_CANONICAL_OUTPUT_MANDATORY",
+  "default_discovery_strategy": "PINNED_OPENOCD_CAPABILITY_FIRST_THEN_OFFICIAL_MANUFACTURER_EXACT_IDENTITY",
+  "stages": [
+    "CAPABILITY_SEED",
+    "OFFICIAL_MANUFACTURER_IDENTITY_ACQUISITION",
+    "EXACT_ICPN_CROSSWALK",
+    "PHASE1_IC_INFORMATION_PROJECTION",
+    "PHASE2_PROGRAMMING_HANDOFF"
+  ],
+  "canonical_identity_key": [
+    "manufacturer",
+    "exact_icpn"
+  ],
+  "canonical_record_required_fields": [
+    "manufacturer",
+    "exact_icpn",
+    "base_device",
+    "family",
+    "identity_state",
+    "information_state",
+    "fields",
+    "manufacturer_source_ref",
+    "manufacturer_source_scope",
+    "source_observed_at",
+    "source_custody_state",
+    "research_priority",
+    "openocd_capability_ref",
+    "phase2_software_state",
+    "phase3_compatibility_state"
+  ],
+  "identity_states": [
+    "IDENTIFIED",
+    "RESEARCH_ONLY",
+    "IDENTITY_DISPUTED"
+  ],
+  "information_states": [
+    "INFORMATION_COMPLETE",
+    "INFORMATION_INCOMPLETE"
+  ],
+  "field_states": [
+    "VERIFIED",
+    "PARTIAL",
+    "UNKNOWN",
+    "CONFLICT",
+    "NOT_APPLICABLE"
+  ],
+  "phase2_states": [
+    "UNKNOWN",
+    "CANDIDATE",
+    "SUPPORTED",
+    "UNSUPPORTED"
+  ],
+  "phase3_states": [
+    "NOT_TESTED",
+    "PASSED",
+    "FAILED"
+  ],
+  "phase1_required_information_fields": [
+    "package",
+    "pin_count",
+    "flash",
+    "ram",
+    "working_vdd",
+    "io_supply",
+    "vdda",
+    "temperature"
+  ],
+  "optional_information_fields": [
+    "core_architecture",
+    "core_model"
+  ],
+  "field_evidence_required_keys": [
+    "value",
+    "state",
+    "source_authority",
+    "source_scope",
+    "source_locator"
+  ],
+  "source_custody_states": [
+    "ARCHIVED_HASH_VERIFIED",
+    "SOURCE_BYTES_NOT_ARCHIVED"
+  ],
+  "openocd_capability_fields": [
+    "provider",
+    "provider_version_or_commit",
+    "target_config",
+    "include_graph",
+    "flash_driver",
+    "silicon_identity_or_probe_rule"
+  ],
+  "research_priority_states": [
+    "P0",
+    "P1",
+    "P2",
+    "UNPRIORITIZED"
+  ],
+  "separation_invariants": [
+    "manufacturer_source_method_may_differ_but_canonical_semantics_may_not",
+    "cfg_or_driver_never_proves_exact_commercial_identity",
+    "phase1_identified_never_implies_phase2_supported",
+    "phase2_supported_never_implies_phase3_passed",
+    "selector_visibility_depends_on_s1_identified_not_s2_supported",
+    "job_batch_execution_never_follows_selector_visibility",
+    "research_priority_is_not_phase_state",
+    "missing_source_bytes_is_not_identity_failure_when_exact_official_identity_is_unambiguous",
+    "family_level_evidence_may_not_be_promoted_to_exact_verified_without_applicability",
+    "ordering_suffixes_may_not_be_synthesized_without_official_exact_identity"
+  ],
+  "selector_projection": {
+    "visible_identity_state": "IDENTIFIED",
+    "show_phase1_information_state": true,
+    "show_phase2_software_state": true,
+    "show_phase3_compatibility_state": true,
+    "phase2_supported_required_for_visibility": false,
+    "phase3_passed_required_for_visibility": false
+  },
+  "execution_projection": {
+    "selector_visibility_grants_execution": false,
+    "phase2_supported_required": true,
+    "installed_runtime_and_safety_gates_required": true,
+    "phase3_configuration_gate_required_when_physical_execution_policy_demands_it": true
+  },
+  "representative_vendor_adapters": {
+    "STMicroelectronics": {
+      "phase1_projection": "data/device-catalog/research/adr0002_st_phase1_information_v1.py",
+      "phase1_contract_doc": "data/device-catalog/research/ST_ADR0002_PHASE1_BASELINE_V1.md",
+      "official_source_methods": [
+        "Product Selector",
+        "eStore",
+        "Datasheet",
+        "Ordering table"
+      ]
+    },
+    "NXP": {
+      "phase1_projection": "data/device-catalog/research/nxp_phase1_funnel_audit_v1.py",
+      "phase1_contract_doc": "data/device-catalog/research/NXP_PHASE1_FUNNEL_INVENTORY_V1.md",
+      "official_source_methods": [
+        "Package/Quality material page",
+        "Buy/Parametrics",
+        "Datasheet",
+        "Fact sheet",
+        "Ordering table"
+      ]
+    },
+    "Microchip": {
+      "phase1_projection": "data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py",
+      "phase1_contract_doc": "data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md",
+      "official_source_methods": [
+        "MCP exact product response",
+        "DFP",
+        "Parametric chart",
+        "Datasheet",
+        "Ordering table"
+      ]
+    }
+  },
+  "canonical_storage_target": {
+    "logical_layers": [
+      "source_capture",
+      "phase1_identity_and_information",
+      "phase2_programming_qualification",
+      "phase3_physical_compatibility"
+    ],
+    "historical_vendor_specific_artifacts_may_remain": true,
+    "new_cross_vendor_consumers_must_use_canonical_field_names_and_states": true
+  },
+  "prohibited_inferences": [
+    "cfg_exists_means_supported",
+    "production_admitted_means_supported",
+    "selector_visible_means_executable",
+    "p0_means_supported",
+    "family_name_means_exact_icpn",
+    "unknown_means_zero_or_not_applicable",
+    "one_vendor_source_quality_rule_may_be_weakened_for_another_vendor"
+  ]
+}
