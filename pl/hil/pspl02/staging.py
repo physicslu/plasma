@@ -28,6 +28,9 @@ def create(paths: dict[str, Path], output: Path):
     (output/"templates").mkdir()
     c.write_record(output/"templates/attestation.json",
                    dict(schema_version=1, **dict.fromkeys(c.PREREQUISITES, False)))
+    # Independent templates: never convert missing observations into PASS.
+    c.write_record(output/"templates/attestation-development.json",
+                   dict(schema_version=1, **dict.fromkeys(c.DEVELOPMENT_PREREQUISITES, False)))
     for stage in c.STAGES:
         session = dict.fromkeys(("candidate_loaded_and_verified", "original_uios_unbound",
             "kernel_and_clocks_reviewed_after_load", "uart_login_verified_now",
@@ -37,6 +40,12 @@ def create(paths: dict[str, Path], output: Path):
                        metadata_file="", metadata_backup="", metadata_sha256="",
                        board_identity_sha256="")
         c.write_record(output/f"templates/session-{stage}.json", session)
+        if stage in c.DEVELOPMENT_STAGES:
+            dev_session = dict(session)
+            for obsolete in ("uart_login_verified_now", "independent_power_recovery_ready",
+                             "operator_present"):
+                dev_session.pop(obsolete)
+            c.write_record(output/f"templates/session-development-{stage}.json", dev_session)
     checklist = root/"docs/development/pspl02-swd00-hil-runbook.md"
     if not checklist.is_file():
         checklist = root/"CHECKLIST.md"

@@ -6,6 +6,65 @@ Do not substitute SWD-03/SWD-04 tools or their four-aperture firmware.
 Identity ABI v1 and physical capability flags 0 remain unchanged.
 The baseline project and all earlier Identity artifacts/evidence are immutable.
 
+## Fast development profile (PSPL-02 / SWD-00)
+
+Use `--profile development` for the internal loopback milestone
+`IDENTITY -> PSPL02 -> SWD00` only. This is a deliberately smaller
+**preflight attestation**, not a claim that an existing board is safe without
+current observation. `ERROR` and `RESET` are **not authorized in development
+profile** because the deliberate AXI error can stall Linux indefinitely and
+the strict runner requires sequential evidence. Use the existing
+`qualification` profile for the full five-stage acceptance.
+
+Development preflight no longer requires per-run human declarations of
+`uart_login_verified_now`, `operator_present`,
+`independent_power_recovery_ready`, or
+`no_external_dut_swd_or_pmod`. No boolean may be manufactured to bypass
+the stricter qualification workflow. The restricted internal-loopback design
+does not qualify external DUT wiring, voltage or actual IC programming.
+
+The **three development attestation fields** are
+`gate1_scope_approved`, `no_shared_service_changes_required` and
+`no_asynchronous_pl_reconfiguration`: each must be supported by this
+approved task and the current non-conflicting loader/service environment.
+Start with `templates/attestation-development.json` (all false).
+Do not bulk-set it true. Existing root inventory remains mandatory, including
+current FPGA ownership, FCLK0, driver bindings, complete `/proc` scans,
+PYNQ metadata backup, unchanged services and independently reviewed board
+identity. All six candidate/recovery artifacts remain SHA-256 pinned.
+Inventory and live sessions still expire after ten minutes. This profile
+does not alter the old kit, historical evidence or default qualification
+preflight behavior.
+
+After fresh root inventory and reviewing its original-driver field, invoke
+from a newly staged development-capable kit:
+
+```sh
+python3 -m pl.hil.pspl02.runner preflight --profile development \
+  --bit artifacts/bit --hwh artifacts/hwh --manifest artifacts/manifest \
+  --bin artifacts/bin --base-bin artifacts/base.bin --base-hwh artifacts/base.hwh \
+  --inventory "$E/before.json" \
+  --attestation "$E/attestation-development.json" --output "$E/p0-development.json"
+```
+
+For each live stage use the corresponding
+`templates/session-development-IDENTITY.json`,
+`templates/session-development-PSPL02.json` or
+`templates/session-development-SWD00.json`. Bind the original metadata,
+preflight hash, candidate load log and current board identity digest exactly
+as described below; run `live` with the reviewed options and stage-specific
+evidence and precedents. Neither the CLI nor Development Mode loads firmware,
+unbinds drivers, restarts services, or powers hardware automatically.
+
+**Root remains a technical prerequisite.** A successful sudo invocation in
+one SSH/TTY session does not grant Codex's other SSH session elevated rights.
+Do not change sudoers or inject credentials to make a test pass. To avoid
+repeated access requests, execute a reviewed bounded hardware session via one
+operator-authenticated root console, collect its evidence, then let the
+engineering agent inspect the results. It must still stop on a failed current
+privileged check; a 180-second preparation budget is a target, never an
+automatic permission to bypass safety.
+
 ## Authorization and current status
 
 Root AGENTS.md's two gates apply. Gate 1 covers the agreed implementation and

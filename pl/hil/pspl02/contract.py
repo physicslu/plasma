@@ -30,6 +30,17 @@ PREREQUISITES = (
     "no_shared_service_changes_required", "no_asynchronous_pl_reconfiguration",
 )
 
+# Development is limited to internal PS/PL functional tests. Current privileged
+# inventory, pinned firmware/recovery, and live ownership checks still apply.
+# Historical UART qualification and per-run human/power attestations do not.
+# ERROR has a documented unrecoverable AXI-stall risk: qualification only.
+DEVELOPMENT_PREREQUISITES = (
+    "gate1_scope_approved", "no_shared_service_changes_required",
+    "no_asynchronous_pl_reconfiguration",
+)
+DEVELOPMENT_STAGES = ("IDENTITY", "PSPL02", "SWD00")
+PROFILES = ("qualification", "development")
+
 
 def json_object(path: Path) -> dict:
     value = json.loads(path.read_text())
@@ -62,11 +73,13 @@ def verify_artifacts(paths: dict[str, Path]) -> dict:
             "artifact_integrity": "PASS", "hardware_execution": "NOT_RUN"}
 
 
-def preflight(inventory: dict, attestation: dict) -> None:
-    """Operator facts supplement, and never replace, current privileged evidence."""
+def preflight(inventory: dict, attestation: dict, *, profile: str = "qualification") -> None:
+    """Privileged inventory is mandatory; development skips repeat human attestations."""
+    _require(profile in PROFILES, "Unknown HIL execution profile")
     _require(type(inventory) is dict and type(attestation) is dict, "Expected evidence objects")
     _require(attestation.get("schema_version") == 1, "Attestation schema missing")
-    for field in PREREQUISITES:
+    required = DEVELOPMENT_PREREQUISITES if profile == "development" else PREREQUISITES
+    for field in required:
         _require(attestation.get(field) is True, "Unverified prerequisite: " + field)
     _require(inventory.get("architecture") == "armv7l", "Not ARMv7")
     _require(inventory.get("pynq_version") == "3.1.1", "Unexpected PYNQ version")

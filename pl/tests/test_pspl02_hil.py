@@ -224,3 +224,48 @@ def test_metadata_is_hashed_never_unpickled(tmp_path):
     (tmp_path/"global_pl_state_0.json").write_text("invalid json but retained bytes")
     (tmp_path/"unrelated").write_text("ignore")
     assert set(collect.metadata_hashes(tmp_path)) == {"_current_metadata.pkl", "global_pl_state_0.json"}
+
+
+def test_development_preflight_skips_repeated_human_attestations():
+    inv = inventory()
+    # Existing trusted identity and fresh privileged inventory remain mandatory.
+    att = dict(schema_version=1, **dict.fromkeys(c.DEVELOPMENT_PREREQUISITES, True))
+    c.preflight(inv, att, profile="development")
+    with pytest.raises(c.SafetyError, match="Unverified prerequisite"):
+        c.preflight(inv, att, profile="qualification")
+    for key in c.DEVELOPMENT_PREREQUISITES:
+        bad = dict(att, **{key: False})
+        with pytest.raises(c.SafetyError, match="Unverified prerequisite"):
+            c.preflight(inv, bad, profile="development")
+    bad_inventory = dict(inv, pl_users=[{"pid": "123", "kind": "mmap"}])
+    with pytest.raises(c.SafetyError, match="PL users"):
+        c.preflight(bad_inventory, att, profile="development")
+
+
+def test_development_session_rejects_axi_fault_stages_without_human_booleans(tmp_path):
+    p0, session, record = session_files(tmp_path)
+    proof = c.json_object(p0)
+    proof["profile"] = "development"
+    proof["attestation"] = dict(
+        schema_version=1, **dict.fromkeys(c.DEVELOPMENT_PREREQUISITES, True))
+    p0.write_text(json.dumps(proof))
+    record["p0_sha256"] = c.sha256_file(p0)
+    for name in ("uart_login_verified_now", "independent_power_recovery_ready", "operator_present"):
+        del record[name]
+    session.write_text(json.dumps(record))
+    assert runner.require_session(p0, session, "IDENTITY", None)["profile"] == "development"
+    with pytest.raises(c.SafetyError, match="excludes ERROR/RESET"):
+        runner.require_session(p0, session, "ERROR", None)
+
+
+def test_staging_includes_false_by_default_development_templates(tmp_path, monkeypatch):
+    kit = tmp_path/"kit"
+    staging.create(artifacts(tmp_path, monkeypatch), kit)
+    dev_att = c.json_object(kit/"templates/attestation-development.json")
+    assert dev_att["schema_version"] == 1
+    assert all(dev_att[key] is False for key in c.DEVELOPMENT_PREREQUISITES)
+    for stage in c.DEVELOPMENT_STAGES:
+        dev_session = c.json_object(kit/f"templates/session-development-{stage}.json")
+        assert "operator_present" not in dev_session
+        assert dev_session["candidate_loaded_and_verified"] is False
+    assert not (kit/"templates/session-development-ERROR.json").exists()
