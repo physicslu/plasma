@@ -75,7 +75,7 @@ test("Phase 2 Programming qualification is vendor-neutral and independent from C
   assert.match(api, /ProgrammingQualification/);
   assert.match(api, /programming_qualification\?:\s*ProgrammingQualification\s*\|\s*null/);
   assert.match(api, /phase:\s*"PROGRAMMING"/);
-  assert.match(api, /state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
+  assert.match(api, /state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"BLOCKED"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
   assert.match(api, /phase1_identity_state:\s*"IDENTIFIED"\s*\|\s*"NOT_IDENTIFIED"/);
   assert.match(api, /selector_visibility_authority:\s*"PHASE1_IDENTIFIED"/);
   assert.match(api, /execution_authorized:\s*false/);
@@ -83,7 +83,7 @@ test("Phase 2 Programming qualification is vendor-neutral and independent from C
   assert.match(api, /physical_programming_qualified:\s*false/);
   assert.doesNotMatch(api, /openocd_software_qualification/);
 
-  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);
+  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);\n  assert.match(selector, /state === "CANDIDATE" \|\| state === "BLOCKED"/);
   assert.match(selector, /軟體資格 ·/);
   assert.match(selector, /Software Qualification/);
   assert.match(selector, /Qualified Operations/);
