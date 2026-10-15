@@ -6,6 +6,9 @@ on:
       - 'data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py'
       - 'data/device-catalog/research/test_microchip_openocd_reverse_coverage_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p1_information_ledger_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P1_PHASE1_INFORMATION_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P0_PHASE1_INFORMATION_LEDGER_V1.md'
       - 'data/device-catalog/research/MICROCHIP_P0_OFFICIAL_SOURCE_GAPS_V1.md'
@@ -35,6 +38,8 @@ jobs:
             -p 'test_microchip_openocd_reverse_coverage_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p0_information_ledger_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_information_ledger_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p0_samr30_online_original_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
@@ -283,6 +288,54 @@ jobs:
           assert not report["phase1_p0_information_complete_claimed"]
           print("MICROCHIP P0 FIELD GAPS: 2437 exact ICPNs; identity VERIFIED; applicable chart fields PARTIAL; exact-variant evidence remains UNKNOWN")
           PY
+      - name: Create original-source-replayed Microchip P1 exact-ICPN Phase 1 information ledger
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --chart-original-root "$MICROCHIP_CHART_ROOT" \
+            --output "${{ runner.temp }}/microchip-p1-phase1-information-ledger.json"
+          python data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --chart-original-root "$MICROCHIP_CHART_ROOT" \
+            --output "${{ runner.temp }}/microchip-p1-phase1-information-ledger.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])/"microchip-p1-phase1-information-ledger.json"
+          out=json.loads(path.read_text(encoding="utf-8"))
+          assert out["p1_target_only_icpn_count"] == 126
+          assert len(out["records"]) == 126
+          assert out["p1_openocd_target_cfg_research_only"] == "tcl/target/atsaml1x.cfg"
+          assert out["p1_target_only_not_software_supported"] is True
+          assert out["chart_original_bytes_replayed_by_upstream_chart_builder"] is True
+          audit=out["p1_official_chart_evidence"]
+          assert audit["p1_icpns_exact_base_joined_to_chart"]+audit["p1_icpns_no_chart_base_match"]==126
+          assert audit["chart_exact_variant_verified_fields"]==0
+          assert len(audit["p1_unmatched_icpns"]) == audit["p1_icpns_no_chart_base_match"]
+          for key in ("manufacturer","icpn","base_device"):
+              assert out["per_field_coverage"][key]["VERIFIED"] == 126
+          for key in ("package","pin_count","flash","ram","vdd","io_supply",
+                      "vdda","temperature","core_architecture","core_model"):
+              count=out["per_field_coverage"][key]
+              assert sum(count.values())==126 and count["VERIFIED"]==0 and count["CONFLICT"]==0
+          for key in ("io_supply","vdda","core_architecture"):
+              assert out["per_field_coverage"][key]["UNKNOWN"]==126
+          assert out["internal_identity_admitted_count"]==0
+          assert out["phase1_fully_verified_exact_icpns"]==0
+          assert out["software_supported_icpn_count"]==0
+          assert out["production_write_authorized"] is False
+          assert out["catalog_publication_authorized"] is False
+          print(json.dumps({
+             "microchip_p1_exact_icpn_count":126,
+             "distinct_manufacturer_bases":out["p1_unique_original_mcp_base_device_count"],
+             "p1_target_only_cfg":out["p1_openocd_target_cfg_research_only"],
+             "p1_original_chart":audit,
+             "field_coverage":out["per_field_coverage"],
+             "phase1_information_complete":False,
+             "software_supported":False,
+          },sort_keys=True,indent=2))
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
@@ -291,6 +344,7 @@ jobs:
           path: |
             ${{ runner.temp }}/microchip-full-reverse.json
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
+            ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
           if-no-files-found: warn
           retention-days: 90
 
