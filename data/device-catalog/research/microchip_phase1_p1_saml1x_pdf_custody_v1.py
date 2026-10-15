@@ -97,9 +97,11 @@ def page_evidence(page14, page16):
                  "Product Series", "Pin Count", "Memory Density",
                  "Device Variant", "Package Type", "Package Grade",
                  "Package Carrier", "ATSAML")
-    require(all(token in c16 for token in mandatory) and
-            re.search(r"DS60001513G\s*-\s*page\s*16", c16),
-            "official revision / ordering page 16 mismatch")
+    missing = [token for token in mandatory if token not in c16]
+    has_footer = bool(re.search(r"DS60001513G\s*-\s*page\s*16", c16))
+    require(not missing and has_footer,
+            f"official revision / ordering page 16 mismatch: "
+            f"missing={missing}, footer={has_footer}")
     require(all(token in c16 for token in
                 ("TQFP", "VQFN", "SSOP", "WLCSP", "KPH")),
             "manufacturer package or ordering caveats missing")
