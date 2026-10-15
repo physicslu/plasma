@@ -35,7 +35,9 @@ class NXPReverseCoverageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tampered = Path(tmp) / "nxp.csv"
             tampered.write_bytes(audit.V10.read_bytes() + b"\n")
-            with patch.object(audit, "V10", tampered):
+            altered = {tampered if p == audit.V10 else p: sha
+                       for p, sha in audit.PINS.items()}
+            with patch.object(audit, "V10", tampered), patch.object(audit, "PINS", altered):
                 with self.assertRaisesRegex(ValueError, "immutable input drift"):
                     audit.build()
 
