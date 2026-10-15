@@ -14,6 +14,7 @@ on:
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
+      - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -38,6 +39,7 @@ on:
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
+      - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -128,6 +130,7 @@ jobs:
               ".github/device-catalog-ci-trigger-debt.json",
               "scripts/tests/test-ci-domain-boundaries.py",
               "scripts/ci/device-catalog-trigger-governance.py",
+              "scripts/ci/ppu-network-trigger.py",
               ".github/workflows/python-tests.yml",
               ".github/workflows/ic-support-validation.yml",
               ".github/workflows/ppu-release.yml",
@@ -215,6 +218,8 @@ jobs:
           python-version: "3.12"
       - name: Lock Device Catalog / AI research / software CI boundaries
         run: python scripts/tests/test-ci-domain-boundaries.py
+      - name: Self-test PPU network heavy-gate routing
+        run: python scripts/ci/ppu-network-trigger.py --self-test
       - name: Enforce Device Catalog CI trigger governance
         env:
           PLASMA_CI_GOVERNANCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
