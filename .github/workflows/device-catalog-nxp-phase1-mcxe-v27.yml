@@ -1,0 +1,44 @@
+name: NXP ADR-0002 Phase1 MCXE exact rails and RAM contradictions v27
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-15-mcxe-normal-voltage-exact-source-v27.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxe-operating-source-lock-v27.json"
+      - "data/device-catalog/research/nxp-501-phase1-mcxe-normal-voltage-v27.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxe-normal-voltage-coverage-v27.json"
+      - "data/device-catalog/research/nxp_phase1_mcxe_rails_v27.py"
+      - "data/device-catalog/research/test_nxp_phase1_mcxe_rails_v27.py"
+      - "data/device-catalog/research/NXP_PHASE1_MCXE_OPERATING_RAILS_V27.md"
+      - "data/device-catalog/research/nxp-501-phase1-mcxn-operating-rails-v26.csv"
+      - "data/device-catalog/research/nxp-54-exact-ordering-rows-v21.csv"
+      - ".github/workflows/device-catalog-nxp-phase1-mcxe-v27.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp-15-mcxe-normal-voltage-exact-source-v27.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxe-operating-source-lock-v27.json"
+      - "data/device-catalog/research/nxp-501-phase1-mcxe-normal-voltage-v27.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxe-normal-voltage-coverage-v27.json"
+      - "data/device-catalog/research/nxp_phase1_mcxe_rails_v27.py"
+      - "data/device-catalog/research/test_nxp_phase1_mcxe_rails_v27.py"
+      - ".github/workflows/device-catalog-nxp-phase1-mcxe-v27.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-mcxe-v27:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay 15 MCXE exact official Table 3/4 voltage sources and RAM contradiction gates
+        run: python data/device-catalog/research/nxp_phase1_mcxe_rails_v27.py
+      - name: Fail closed on fictitious VDDIO and hidden MCXE315 64/112KB conflict
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_mcxe_rails_v27.py" -v
+      - name: Regression test prior v26 MCXN operating-voltage lock
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_mcxn_rails_v26.py" -v
