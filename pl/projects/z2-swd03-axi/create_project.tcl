@@ -12,7 +12,7 @@ create_project z2_swd03_axi [file join $build_dir project] -part xc7z020clg400-1
 set_property board_part $board [current_project]
 
 # Old three apertures must remain byte-for-byte identical RTL.
-# Only these seven synthesizable source files enter the new project.
+# These eight synthesizable source files enter only the new SWD-03 project.
 add_files -norecurse [list \
     [file join $generated_dir pl_identity_axi_lite.sv] \
     [file join $pl_dir rtl bus pl_control_axi_lite.sv] \
