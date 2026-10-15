@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pl.hil.swd04.contract import REQUIRED_SERVICES, SafetyError
+from pl.hil.swd04.contract import REQUIRED_SERVICES, SafetyError, sha256_file
 
 
 def fclk0_from_summary(text: str) -> int:
@@ -38,6 +38,7 @@ def _text(path: Path) -> str:
 
 
 def collect(*, sysroot: Path, device_tree: Path, clock_summary: Path,
+            metadata_path: Path,
             service_status, architecture: str,
             pynq_version: str) -> dict[str, object]:
     manager = _text(sysroot / "class/fpga_manager/fpga0/state")
@@ -61,6 +62,7 @@ def collect(*, sysroot: Path, device_tree: Path, clock_summary: Path,
         "pynq_version": pynq_version,
         "fpga_manager_state": manager,
         "fclk0_hz": clock,
+        "metadata_sha256": sha256_file(metadata_path),
         "sysfs_read_only": True,
         "device_model_confirmed": (
             "pynq-z2" in model.lower() or "pynq z2" in model.lower()
@@ -88,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--device-tree", type=Path, default=Path("/proc/device-tree"))
     p.add_argument("--clock-summary", type=Path,
                    default=Path("/sys/kernel/debug/clk/clk_summary"))
+    p.add_argument("--metadata-file", type=Path, required=True,
+                   help="Current original PYNQ overlay metadata for hash only")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
     if args.output.exists():
@@ -102,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             sysroot=args.sysroot,
             device_tree=args.device_tree,
             clock_summary=args.clock_summary,
+            metadata_path=args.metadata_file,
             service_status=systemctl_status,
             architecture=platform.machine(),
             pynq_version=pynq,
