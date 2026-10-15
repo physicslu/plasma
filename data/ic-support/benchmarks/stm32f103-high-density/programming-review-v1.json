@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "review_id": "stm32f103-high-density-programming-review-v1",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "target_scope": {
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "high",
+    "package_class": "LQFP",
+    "pin_code": "R"
+  },
+  "shared": {
+    "programming_profile_id": "stm32f1-high-density-flash-v0",
+    "openocd_target_config": "tcl/target/stm32f1x.cfg",
+    "openocd_device_id": "0x414",
+    "main_flash_start": "0x08000000",
+    "page_size_bytes": 2048,
+    "program_granularity_bytes": 2,
+    "programming_vdd_v": {
+      "min": 2,
+      "max": 3.6
+    },
+    "external_vpp_required": false
+  },
+  "source_locks": {
+    "st_pm0075_rev2": {
+      "sha256": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a"
+    },
+    "st_ds5792_rev13": {
+      "authority": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+      "document": "DS5792 Rev 13"
+    }
+  },
+  "review_facts": [
+    {
+      "fact_id": "stm32f103-high-density-family-applicability",
+      "statement": "STM32F103xC/xD/xE are the reviewed high-density commercial band; this review is bounded to exact R-pin LQFP Production identities."
+    },
+    {
+      "fact_id": "stm32f103-high-density-page-geometry",
+      "statement": "High-density Main Flash erase pages are 2 KiB; exact total Flash size remains variant-specific."
+    },
+    {
+      "fact_id": "stm32f103-high-density-program-granularity",
+      "statement": "Main Flash programming is 16-bit halfword programming."
+    },
+    {
+      "fact_id": "stm32f103-high-density-erase-capabilities",
+      "statement": "Page erase and mass erase are available for Main Flash under the documented Flash controller procedure."
+    },
+    {
+      "fact_id": "stm32f103-high-density-standard-program-sequence",
+      "statement": "Programming uses the standard unlock, halfword write, BSY polling and readback verification model."
+    },
+    {
+      "fact_id": "stm32f103-high-density-temperature-applicability",
+      "statement": "Flash programming/erase characteristics cover the reviewed -40 to +105 C ambient range; commercial temperature codes 6 and 7 remain exact-order-code attributes."
+    }
+  ],
+  "operations": {
+    "admitted": [
+      "READ",
+      "VERIFY",
+      "PROGRAM",
+      "ERASE"
+    ],
+    "excluded": [
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE"
+    ]
+  },
+  "qualification_boundary": {
+    "exact_icpn_only": true,
+    "family_wide": false,
+    "executable_on_hardware": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}
