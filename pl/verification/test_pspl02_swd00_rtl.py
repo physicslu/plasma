@@ -33,3 +33,20 @@ def test_swd00_waveform_engine():
         timescale="1ns/1ps",
         sim_build=str(BUILD / "waveform"),
     )
+
+
+def test_swd_axi_loopback_baseline():
+    run(
+        simulator="icarus",
+        verilog_sources=[
+            str(RTL / "bus/swd_command_axi_lite.sv"),
+            str(RTL / "site/swd_waveform_engine.sv"),
+            str(RTL / "site/pl_loopback_responder.sv"),
+            str(PL / "verification/sva/pl_axi_waveform_checks.sv"),
+            str(PL / "sim/swd_command_axi_tb.sv"),
+        ],
+        compile_args=["-g2012"],
+        toplevel="swd_command_axi_tb", module="test_swd_command",
+        python_search=[str(TESTS)], timescale="1ns/1ps",
+        sim_build=str(BUILD / "axi-loopback"), waves=True,
+    )
