@@ -21,7 +21,7 @@ Development Mode and prior verified enrollment/Identity evidence are inputs,
 not new approval milestones.
 
 Execution host: SWPC.
-Repository: /storage/projects/plasma.
+Repository: $PLASMA_REPO (resolve the existing SWPC repository path).
 Board: owner's enrolled PYNQ-Z2, resolved from the current lab inventory.
 SSH account: xilinx.
 SSH/sudo secret: read the owner-approved local credential store defined in
