@@ -34,7 +34,10 @@ Python 程序 microchip_adr0002_phase1_remaining2441_queue_v1.py 經 CI 使用�
 3. Microchip DS60001513G 官方 PDF 原始 SHA-256 ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e 與 126 筆原廠 MCP 的訂購碼交叉檢查。
 4. 第一批 122 個精確料號名稱集合 SHA-256 為 7a75e18a5f23cc2b80e10e1675918ce7da0601fe0d8d35664ebb78c4fb8d3b64，僅扣除此 122 個 exact code，不依 family/prefix/資料完整度猜測。
 
-輸出兩個 Research artifact：
+Git 倉庫另保留 **data/device-catalog/research/microchip-phase1-remaining2441-exact-identity-v1.csv**，包含 2,441 筆精確商業料號、Base、原廠 URI／scope／SHA、來源觀察時間與 CFG 研究線索及 Phase 2／3 狀態。
+此來源索引的原始 CI 重播 SHA-256 為 **ecec8112d52d3d5b3b7313e2316da67e6dc670794713abf49b5b8fdeb6f0688d**。CI 會重新產生 CSV，逐位元組比較已提交 Git 的檔案，禁止來源漂移。
+
+輸出兩個主要 Research artifact：
 - microchip-adr0002-phase1-remaining2441.jsonl：每筆原廠身份、十三欄資料及 VERIFIED／PARTIAL／UNKNOWN／CONFLICT／NOT_APPLICABLE 狀態、source、SHA、CFG research-only lead。
 - microchip-adr0002-phase1-remaining2441-summary.json：逐 CFG、逐欄位狀態分布、完整來源佇列 SHA-256 與安全宣告。
 
