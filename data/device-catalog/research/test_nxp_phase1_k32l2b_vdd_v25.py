@@ -78,15 +78,23 @@ class TestNXPPhase1K32L2BVDDv25(unittest.TestCase):
                         v25.build()
 
     def test_explicitly_deny_false_pdf_custody_in_lock(self):
-        lock = v25.load()
-        bad = copy.deepcopy(lock)
-        bad["original_vendor_pdf_binary_archived"] = True
-        # The load() path must fail if any reviewer fabricates a captured PDF.
-        real_read = v25.LOCK.read_text
-        with patch.object(v25, "blob", wraps=v25.blob):
-            self.assertFalse(lock["original_vendor_pdf_binary_archived"])
-        self.assertTrue(bad["original_vendor_pdf_binary_archived"])
-        self.assertNotEqual(bad,lock)
+        from types import SimpleNamespace
+        import json
+        original = v25.load()
+        for key, fake in (
+            ("original_vendor_pdf_binary_archived", True),
+            ("original_vendor_pdf_sha256", "a" * 64),
+            ("expected_voltage_state", "VERIFIED"),
+            ("software_programming_support_granted", True),
+            ("production_or_hil_changed", True),
+        ):
+            with self.subTest(key=key):
+                altered = copy.deepcopy(original)
+                altered[key] = fake
+                fake_file = SimpleNamespace(read_text=lambda encoding: json.dumps(altered))
+                with patch.object(v25, "LOCK", fake_file):
+                    with self.assertRaises(ValueError):
+                        v25.load()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
