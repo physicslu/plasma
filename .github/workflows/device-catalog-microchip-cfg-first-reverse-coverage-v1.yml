@@ -399,6 +399,10 @@ jobs:
           assert report["production_write_authorized"] is False
           assert report["catalog_publication_authorized"] is False
           print("MANUFACTURER P1 EXACT ORDERING APPLICABILITY", report["status_counts"])
+          exceptions=[{"icpn":r["icpn"],"base_device":r["base_device"],"status":r["status"]}
+                      for r in report["records"] if r["status"] !=
+                      "MCP_EXACT_CODE_MATCHES_PDF_ORDERING_GRAMMAR"]
+          print("MANUFACTURER P1 EXCEPTION EXACT CODES",json.dumps(exceptions,sort_keys=True))
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
               f.write("Microchip P1 original MCP x official PDF exact ICPNs: 126\n")
               f.write("Original PDF pinned SHA: " + report["pdf_source_replay"]["original_pdf_sha256"] + "\n")
