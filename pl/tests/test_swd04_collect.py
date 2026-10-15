@@ -50,7 +50,7 @@ def test_read_only_inventory_fake_z2(tmp_path):
 
 @pytest.mark.parametrize("fault", ["clock", "duplicate_clock", "uio_map", "missing_state"])
 def test_inventory_fails_on_corrupt_observation(tmp_path, fault):
-    sysroot, dt, clock = fake_z2(tmp_path)
+    sysroot, dt, clock, metadata = fake_z2(tmp_path)
     if fault == "clock":
         clock.write_text("empty")
     elif fault == "duplicate_clock":
