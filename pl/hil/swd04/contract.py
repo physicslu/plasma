@@ -159,9 +159,10 @@ def verify_inventory(inventory: dict[str, Any], attestation: dict[str, Any]) -> 
     ]
     _require(len(fabric) == 1 and fabric[0].get("size") == "0x00010000",
              "Preload fabric UIO mapping differs from accepted HIL-PSPL-01")
-    _require(inventory.get("potential_pl_users_cleared") is True,
-             "Cannot prove PL consumer isolation by fd scan alone")
+    # A sysfs snapshot cannot prove exclusive ownership of old MMIO mappings.
+    # This is independently acknowledged by the operator after an access audit.
     required = (
+        "exclusive_pl_ownership_confirmed",
         "uart_console_verified",
         "independent_power_recovery_verified",
         "maintenance_window_confirmed",
