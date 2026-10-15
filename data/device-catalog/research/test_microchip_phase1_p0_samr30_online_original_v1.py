@@ -63,6 +63,29 @@ class SAMR30OriginalSourceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"cannot establish"):
                 source.replay(root)
 
+    def test_http200_html_shell_archived_but_never_verified(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/"source"
+            def page(_uri,lane):
+                if lane=="SAMR30E":
+                    return b"<html><head><title>Microchip Manual</title></head><body><div id='app'></div></body></html>"
+                return sample(lane)
+            with self.assertRaisesRegex(ValueError,"SOURCE_NOT_AVAILABLE_OR_UNREPLAYABLE"):
+                source.capture(root,getter=page)
+            receipt=source.audit_original_receipt(root)
+            self.assertFalse(receipt["live_original_source_observation_complete"])
+            first=receipt["sources"][0]
+            self.assertEqual(first["status"],"SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE")
+            self.assertEqual(first["exact_ordering_row_count"],0)
+            self.assertIsNotNone(first["original_sha256"])
+            self.assertIsNotNone(first["file"])
+            self.assertFalse(any(first["manufacturer_order_code_tokens_present"].values()))
+            self.assertFalse(receipt["phase1_icpn_fields_verified_by_this_source_only"])
+            original=root/first["file"]
+            original.write_bytes(b"<html>TAMPER</html>")
+            with self.assertRaisesRegex(ValueError,"original HTML SHA mismatch"):
+                source.audit_original_receipt(root)
+
     def test_forged_exact_sku_row_or_duplicate_is_not_accepted(self):
         html=sample("SAMR30E").replace(b"256K",b"128K",1)
         with self.assertRaisesRegex(ValueError,"source table differs"):
