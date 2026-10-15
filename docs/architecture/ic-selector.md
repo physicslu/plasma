@@ -123,6 +123,13 @@ rejected
 
 The Production exact-ICPN UI uses **three display states within the existing OpenOCD Tag** (not a fifth Tag): `mapped` (green) when the Production Catalog backend says `mapped`; `candidate` (amber) only when Production remains `no_mapping` and independent, immutable, source-locked `backend_candidate` research evidence exists; `no_mapping` (neutral) otherwise. A source candidate is never an executable programming route; `backend.mapping_status` and `backend.target_config` remain the server's authority. The other three Tags (PPU, Socket, manufacturer part) are unaffected and never infer real hardware validation. Candidate evidence is optional in slim PPU bundles; missing evidence displays `no_mapping` without breaking catalog searches.
 
+ADR-0002 Phase 2B adds a separate **Software Qualification** badge. It is not a
+replacement for the OpenOCD CFG tag: `CFG mapped` answers whether a Catalog route exists,
+while `SUPPORTED / CANDIDATE / UNKNOWN / UNSUPPORTED` answers whether that exact ICPN has
+completed the version-locked OpenOCD software qualification transaction. In particular,
+a mapped CFG with an unreviewed exact ICPN must render `Software · UNKNOWN`, never
+`SUPPORTED`.
+
 The older `mapping_candidate` relationship state remains a separate architecture concept; UI `candidate` is a **read-only projection**, not a change to the canonical mapping data.
 
 ## Backend Provider, version and validation evidence in the detail panel
@@ -150,11 +157,15 @@ Package enrichment is a separate authoritative-data task.
 
 ## Selected IC information layers
 
-The same search result can carry two independent additive manufacturer projections:
+The same search result can carry three independent additive projections:
 
 - `manufacturer_device_basic_profile` — operator-facing Basic Device information.
 - `selected_profile` — deeper manufacturer/programming composition, only where the
   Programming Profile evidence chain exists.
+- `openocd_software_qualification` — SW/PPU-owned Phase 2 exact-ICPN software
+  qualification. It may be `SUPPORTED` even when `selected_profile` is absent, because
+  the qualification ledger binds the reviewed Programming Profile and exact geometry
+  independently from the legacy deep-detail projection.
 
 For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
@@ -178,8 +189,9 @@ for execution-oriented research.
 The browser presents three primary information layers:
 
 1. IC Information — the Basic Device Profile above.
-2. Programming — programming interface, manufacturer speed evidence, programming
-   electrical conditions, Flash geometry and programming-flow semantics.
+2. Programming — Phase 2 software qualification state first, then qualified
+   Provider/operations/electrical/Flash geometry, with deeper manufacturer interface/pin
+   and programming-flow detail where `selected_profile` exists.
 3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
 
 A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1,
