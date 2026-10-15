@@ -1,0 +1,27 @@
+# Reviewed operation excerpts followed by explicitly normalized observations.
+# Original operator.log SHA256: a2a5200a06676838df7f8595d611dab2f5ded574ec11a23b66a8dce5a67fde87
+2026-10-14T23:53:47+0800 FPGA_CONFIGURATION_RETURNED_OPERATING plasma-hil-pspl-01-f3249a87.bin
+2026-10-14T23:57:51+0800 FPGA_CONFIGURATION_ATTEMPT base.bin
+2026-10-14T23:57:51+0800 FPGA_CONFIGURATION_RETURNED_OPERATING base.bin
+2026-10-14T23:57:53+0800 BOUND 40000000.fabric
+2026-10-14T23:57:53+0800 BOUND 43c00000.audio-codec-ctrl
+2026-10-14T23:58:37+0800 restored_GATEWAY_HEALTH_PASS
+# Normalized post-recovery observations from final-verification.json:
+FPGA_MANAGER_STATE=operating
+BASE_RESTORATION=PASS
+METADATA_EQUALS_PRELOAD_BACKUP=true
+SSH_PUBLIC_KEY_RECOVERY=PASS
+JUPYTER_LOGIN_HTTP=200
+JUPYTER_UNAUTHENTICATED_API_HTTP=403
+PLASMA_GATEWAY_LIVE_HTTP=200
+PLASMA_GATEWAY_READY_HTTP=200
+PLASMA_EXECUTION=ready
+FCLK0_ENABLED=true
+FCLK0_RATE_HZ=100000000
+SERVICE jupyter.service=active
+SERVICE plasma-bootstrap.service=active
+SERVICE plasma-server.service=active
+SERVICE plasma-web.service=active
+SERVICE plasma-runtime-activation.service=active
+UIO fabric address=0x40000000 size=0x00010000 driver=uio_pdrv_genirq
+UIO audio-codec-ctrl address=0x43c00000 size=0x00010000 driver=uio_pdrv_genirq

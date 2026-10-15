@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "qualification": "HIL-PSPL-01",
+  "collection_id": "hil-pspl-01-20261014T153821Z",
+  "original_evidence_file_count": 51,
+  "original_evidence_total_bytes": 229250,
+  "all_original_sha256_verified": true,
+  "original_evidence_unchanged": true,
+  "original_evidence_retention": "Complete collection retained on SWPC; no raw files or binaries published",
+  "original_evidence": [
+    {
+      "source_relative_path": "base-restored/bindings.json",
+      "bytes": 66,
+      "sha256": "1d93680e38e77f6626594a004d84c7f7caaa72172d16b2295f016940a8162be5",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/clocks.txt",
+      "bytes": 11031,
+      "sha256": "089bffe2b672009cb7fdfe68a25966c7d737f36d77d95f0d1adcfbef0dbcaebb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "complete PS clock configuration beyond accepted FCLK0 facts"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/fpga-flags",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/fpga-state",
+      "bytes": 10,
+      "sha256": "1e5bd3291a8eed6477b8668296e617daa4b11c21c4289020a2a8df6a9ff6284c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/fpga-status",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/kernel.txt",
+      "bytes": 29515,
+      "sha256": "e6d3eb0258a6dbfbb58cdcccca7da9d1b70652d26422e007e967583c9526bee5",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "host identifiers",
+        "boot configuration",
+        "hardware UUIDs",
+        "unrelated boot messages"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/processes.txt",
+      "bytes": 2707,
+      "sha256": "ced0997b1e9b9e7233555bcb98b724c49c1085a54ff22a9d5edbe0f31f02cf56",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "operator process inventory"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/services.txt",
+      "bytes": 360,
+      "sha256": "94b2c1fc986119b3a5c12a197fd2cbd69c1af1e3146dfae46d523027d2255425",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "control-group inventory"
+      ]
+    },
+    {
+      "source_relative_path": "base-restored/sockets.txt",
+      "bytes": 800,
+      "sha256": "408c3b9fcbc932e048bf201daba141fdce4b9eef358b22c0e580d19b07d5db00",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "private addresses",
+        "unrelated service/socket topology"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/bindings.json",
+      "bytes": 66,
+      "sha256": "1d93680e38e77f6626594a004d84c7f7caaa72172d16b2295f016940a8162be5",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/clocks.txt",
+      "bytes": 11031,
+      "sha256": "089bffe2b672009cb7fdfe68a25966c7d737f36d77d95f0d1adcfbef0dbcaebb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "complete PS clock configuration beyond accepted FCLK0 facts"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/fpga-flags",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/fpga-state",
+      "bytes": 10,
+      "sha256": "1e5bd3291a8eed6477b8668296e617daa4b11c21c4289020a2a8df6a9ff6284c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/fpga-status",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/kernel.txt",
+      "bytes": 29286,
+      "sha256": "9bacd70788cf7f8e737708fe1a8cd3b17f631aace1a727e7b07cec1748b15afb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "host identifiers",
+        "boot configuration",
+        "hardware UUIDs",
+        "unrelated boot messages"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/processes.txt",
+      "bytes": 2743,
+      "sha256": "8c59d477fa1f280e7fbf152529abb0f6caba6c5802ee3ecdd1ff434a3d1abf41",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "operator process inventory"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/services.txt",
+      "bytes": 360,
+      "sha256": "94b2c1fc986119b3a5c12a197fd2cbd69c1af1e3146dfae46d523027d2255425",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "control-group inventory"
+      ]
+    },
+    {
+      "source_relative_path": "exclusive/sockets.txt",
+      "bytes": 800,
+      "sha256": "408c3b9fcbc932e048bf201daba141fdce4b9eef358b22c0e580d19b07d5db00",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "private addresses",
+        "unrelated service/socket topology"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/bindings.json",
+      "bytes": 66,
+      "sha256": "1d93680e38e77f6626594a004d84c7f7caaa72172d16b2295f016940a8162be5",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/clocks.txt",
+      "bytes": 11031,
+      "sha256": "089bffe2b672009cb7fdfe68a25966c7d737f36d77d95f0d1adcfbef0dbcaebb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "complete PS clock configuration beyond accepted FCLK0 facts"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/fpga-flags",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/fpga-state",
+      "bytes": 10,
+      "sha256": "1e5bd3291a8eed6477b8668296e617daa4b11c21c4289020a2a8df6a9ff6284c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/fpga-status",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/kernel.txt",
+      "bytes": 29412,
+      "sha256": "d8641bb542e8975341e361c1889d72590c322d6fcd13374f06b6bd1942788ab7",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "host identifiers",
+        "boot configuration",
+        "hardware UUIDs",
+        "unrelated boot messages"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/processes.txt",
+      "bytes": 2757,
+      "sha256": "f8a3deb55685550111cbcf6bdcd003532b8f4e3c2bc1e62e65ce86a5facdbfb7",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "operator process inventory"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/services.txt",
+      "bytes": 360,
+      "sha256": "94b2c1fc986119b3a5c12a197fd2cbd69c1af1e3146dfae46d523027d2255425",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "control-group inventory"
+      ]
+    },
+    {
+      "source_relative_path": "identity-loaded/sockets.txt",
+      "bytes": 800,
+      "sha256": "408c3b9fcbc932e048bf201daba141fdce4b9eef358b22c0e580d19b07d5db00",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "private addresses",
+        "unrelated service/socket topology"
+      ]
+    },
+    {
+      "source_relative_path": "identity.json",
+      "bytes": 326,
+      "sha256": "ded6478a377dda8501ff5c3d0234e1386e7da8e6dabfa61d083d53be500e652a",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "operator.log",
+      "bytes": 4339,
+      "sha256": "a2a5200a06676838df7f8595d611dab2f5ded574ec11a23b66a8dce5a67fde87",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "operator absolute paths",
+        "full privileged command transcript"
+      ]
+    },
+    {
+      "source_relative_path": "preload-health.json",
+      "bytes": 273,
+      "sha256": "9dcc13bb9f2589fafa8c96c69967c812e5e9ed19a1c3194cd39b0ec464c60a74",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "deployment-specific PPU identity"
+      ]
+    },
+    {
+      "source_relative_path": "preload/bindings.json",
+      "bytes": 144,
+      "sha256": "da90af2810eec7937cf98c82a20caced713c96cc17005edf50ad38970b048443",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "preload/clocks.txt",
+      "bytes": 11031,
+      "sha256": "089bffe2b672009cb7fdfe68a25966c7d737f36d77d95f0d1adcfbef0dbcaebb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "complete PS clock configuration beyond accepted FCLK0 facts"
+      ]
+    },
+    {
+      "source_relative_path": "preload/fpga-flags",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "preload/fpga-state",
+      "bytes": 10,
+      "sha256": "1e5bd3291a8eed6477b8668296e617daa4b11c21c4289020a2a8df6a9ff6284c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "preload/fpga-status",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "preload/kernel.txt",
+      "bytes": 29286,
+      "sha256": "9bacd70788cf7f8e737708fe1a8cd3b17f631aace1a727e7b07cec1748b15afb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "host identifiers",
+        "boot configuration",
+        "hardware UUIDs",
+        "unrelated boot messages"
+      ]
+    },
+    {
+      "source_relative_path": "preload/processes.txt",
+      "bytes": 2790,
+      "sha256": "3337449375c4fac0d5af94e79a998eb804055ff99ff2a233fa805fa22c7686ee",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "operator process inventory"
+      ]
+    },
+    {
+      "source_relative_path": "preload/services.txt",
+      "bytes": 539,
+      "sha256": "84ddf84057cda27b42331cf72a56bd5079ad98df9bcdc0d5bdc5504ea833bd23",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "control-group inventory"
+      ]
+    },
+    {
+      "source_relative_path": "preload/sockets.txt",
+      "bytes": 1414,
+      "sha256": "f64619d958f0d3c87de7a472e35b15d17d4c01e7c88463e87316c3276bc561e0",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "private addresses",
+        "unrelated service/socket topology"
+      ]
+    },
+    {
+      "source_relative_path": "restored-health.json",
+      "bytes": 273,
+      "sha256": "9dcc13bb9f2589fafa8c96c69967c812e5e9ed19a1c3194cd39b0ec464c60a74",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "deployment-specific PPU identity"
+      ]
+    },
+    {
+      "source_relative_path": "restored/bindings.json",
+      "bytes": 144,
+      "sha256": "da90af2810eec7937cf98c82a20caced713c96cc17005edf50ad38970b048443",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "restored/clocks.txt",
+      "bytes": 11031,
+      "sha256": "089bffe2b672009cb7fdfe68a25966c7d737f36d77d95f0d1adcfbef0dbcaebb",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "complete PS clock configuration beyond accepted FCLK0 facts"
+      ]
+    },
+    {
+      "source_relative_path": "restored/fpga-flags",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "restored/fpga-state",
+      "bytes": 10,
+      "sha256": "1e5bd3291a8eed6477b8668296e617daa4b11c21c4289020a2a8df6a9ff6284c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "restored/fpga-status",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "restored/kernel.txt",
+      "bytes": 29515,
+      "sha256": "e6d3eb0258a6dbfbb58cdcccca7da9d1b70652d26422e007e967583c9526bee5",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "host identifiers",
+        "boot configuration",
+        "hardware UUIDs",
+        "unrelated boot messages"
+      ]
+    },
+    {
+      "source_relative_path": "restored/processes.txt",
+      "bytes": 2855,
+      "sha256": "57cbf2722117895ee31c97cfb2c3dd00b01b0db465e23af1d274a48ad1e1f092",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "operator process inventory"
+      ]
+    },
+    {
+      "source_relative_path": "restored/services.txt",
+      "bytes": 547,
+      "sha256": "3245b3527d01844c2ca82a6bef6851d66b259f10c340263fc974321da465d936",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "process IDs",
+        "control-group inventory"
+      ]
+    },
+    {
+      "source_relative_path": "restored/sockets.txt",
+      "bytes": 1428,
+      "sha256": "0f3a77817f24a1ad6cf110eaa7f139ec2d5a749d97d409c25954699535ddc13b",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "private addresses",
+        "unrelated service/socket topology"
+      ]
+    },
+    {
+      "source_relative_path": "users-1791993090105293535.json",
+      "bytes": 32,
+      "sha256": "d6647ad211e83b45a3b3e1faacc5cede5ccda2f3b3b3c9a8483e3b500e02030c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    },
+    {
+      "source_relative_path": "users-1791993226573360322.json",
+      "bytes": 32,
+      "sha256": "d6647ad211e83b45a3b3e1faacc5cede5ccda2f3b3b3c9a8483e3b500e02030c",
+      "publication": "hash_and_reviewed_derivatives_only",
+      "raw_omission_reasons": [
+        "retain complete originals locally; publish reviewed facts in derived records"
+      ]
+    }
+  ],
+  "supporting_records": [
+    {
+      "record": "final-verification.json",
+      "sha256": "20f97a01febf55a4b5b3b753205be14cd48496e3f5f8b4d26c5c3cbab7495425",
+      "publication": "hash_only"
+    },
+    {
+      "record": "remote-evidence-sha256.json",
+      "sha256": "c47665fa576d2379a8b447bba2d1d76558cab9a35583b0277106cefb073f587c",
+      "publication": "hash_only"
+    },
+    {
+      "record": "original_build_manifest",
+      "sha256": "18abc73422c8b412b408caa8bc7ba44071b31cc62c1af523bfbfdcbc7b99a69c",
+      "publication": "reviewed_provenance_fields_only"
+    },
+    {
+      "record": "reviewed_operator_procedure",
+      "sha256": "519a718980fab37b8de2805ce7732f377954f1874c5aa0caeb9dc9d934f7f5e2",
+      "publication": "hash_only; retained locally"
+    }
+  ],
+  "published_derivatives": [
+    {
+      "file": "README.md",
+      "sha256": "07268bb672e2cf06e73be97af41069ca21bde41198dcb0a04144ac71e693a6ac",
+      "bytes": 5909
+    },
+    {
+      "file": "acceptance.json",
+      "sha256": "fa66699c5709853c61bab3e90fc45690773ccd5349bc1bc9f7183850b10d3310",
+      "bytes": 7994
+    },
+    {
+      "file": "artifact-checksums.sha256",
+      "sha256": "3aa53217bb8133becdd74ea84289f926ecb6c1f0f6e30f307923d2fb82f85420",
+      "bytes": 674
+    },
+    {
+      "file": "identity-readback.log",
+      "sha256": "7dc4157d215d35d79eba89a01ed344912af3a5f039b0f93ca21409015e804943",
+      "bytes": 672
+    },
+    {
+      "file": "restoration.log",
+      "sha256": "1700d3ec0b1cc6ad1ce3cc810ebfdc2dec682772708c6add581a41359d80819a",
+      "bytes": 1271
+    }
+  ],
+  "derivation": {
+    "identity-readback.log": {
+      "source": "operator.log",
+      "source_sha256": "a2a5200a06676838df7f8595d611dab2f5ded574ec11a23b66a8dce5a67fde87",
+      "identity_line_numbers": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32
+      ],
+      "acceptance_line_numbers": [
+        33
+      ],
+      "method": "Literal allowlisted timestamps/address/value/PASS excerpt; no new reads"
+    },
+    "restoration.log": {
+      "source": "operator.log",
+      "source_sha256": "a2a5200a06676838df7f8595d611dab2f5ded574ec11a23b66a8dce5a67fde87",
+      "excerpt_line_numbers": [
+        24,
+        35,
+        36,
+        39,
+        40,
+        61
+      ],
+      "normalized_observations_source": "final-verification.json",
+      "method": "Allowlisted operation excerpt followed by labelled normalized post-recovery facts"
+    },
+    "acceptance.json": {
+      "sources": [
+        "identity.json",
+        "operator.log",
+        "preload/bindings.json",
+        "restored/bindings.json",
+        "preload/clocks.txt",
+        "restored/clocks.txt",
+        "preload-health.json",
+        "restored-health.json",
+        "final-verification.json",
+        "original_build_manifest",
+        "reviewed_operator_procedure"
+      ],
+      "method": "Identity independently derived from manifest; baseline comparisons; exclude private identity/path/address and unrelated configuration fields"
+    },
+    "artifact-checksums.sha256": {
+      "sources": [
+        "original_build_manifest",
+        "reviewed_operator_procedure",
+        "final-verification.json"
+      ],
+      "method": "Candidate files hashed locally; recovery reference hashes from verified operator procedure, backed by checksum PASS transcript and final recovery audit"
+    }
+  },
+  "security_review": {
+    "raw_records_reviewed": 51,
+    "strategy": "Allowlisted derivatives, not raw-log bulk redaction",
+    "credential_search_hits": "Only boot service descriptions for password request handling; no credential payload or SSH key found",
+    "not_published": [
+      "SSH keys",
+      "credentials/tokens",
+      "private IP addresses/host identities",
+      "operator absolute paths",
+      "UUIDs/MACs/process IDs",
+      "full system configuration",
+      "raw metadata/pickle",
+      "large bit/bin artifacts",
+      "unreviewed raw logs"
+    ]
+  },
+  "self_checksum_note": "This manifest is excluded from published_derivatives to avoid circular hashing; Git commit binds it to the archive."
+}

@@ -1,0 +1,8 @@
+# Artifact identities only; binaries are retained locally and not included here.
+c77af35a76fec4c3657b2872b6b647ff6a122a96579d778e8ea4680ffa74b42d  plasma-z2-identity-0.1.0.bit
+9a9d75c4f73f2f879014d05c47c79d436b0ee3ab57b355b573d990aee089acc0  plasma-z2-identity-0.1.0.hwh
+18abc73422c8b412b408caa8bc7ba44071b31cc62c1af523bfbfdcbc7b99a69c  manifest.json
+623befdb7c9b6afe663d762a27c9a94d17cd120ed5abe99173353e344920d748  plasma-hil-pspl-01-f3249a87.bin
+c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c  base.bin
+3239e9cc37ee4993c25f02ae6c97da0b3372f0e722e267d10073e20adc5d6717  base.bit
+222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a  base.hwh

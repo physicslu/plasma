@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "qualification": "HIL-PSPL-01",
+  "hardware_execution_date": "2026-10-14",
+  "archive_date": "2026-10-15",
+  "timezone": "Asia/Taipei",
+  "overall_result": "FULL PASS",
+  "scope": "Single real PYNQ-Z2 Identity-only AXI GP0 readback and restoration; excludes programming qualification",
+  "platform": {
+    "board": "PYNQ-Z2",
+    "soc": "Zynq-7020",
+    "fpga_part": "xc7z020clg400-1",
+    "linux_architecture": "armv7l",
+    "pynq_version": "3.1.1",
+    "external_pl_io": false,
+    "emio_swd_enabled": false
+  },
+  "design": {
+    "variant": "identity_only",
+    "source_git_sha": "f3249a87e1f3e453efd4c82e0241fa562e75fb71",
+    "implementation_pr": "https://github.com/physicslu/plasma/pull/881",
+    "implementation_merge_commit": "53f2c82fff096db240bc5ae9a0b660788c7d8534",
+    "bitstream_version": "0.1.0",
+    "hardware_abi_version": 1,
+    "build_id": "f3249a87e1f3e453efd4c82e0241fa56",
+    "capability_flags": 0,
+    "axi_identity_base_address": "0x40000000",
+    "axi_segment_size_bytes": 4096,
+    "identity_register_span_bytes": 32,
+    "toolchain": {
+      "name": "Vivado",
+      "version": "2026.1"
+    },
+    "board_part": "tul.com.tw:pynq-z2:part0:1.0",
+    "board_files_git_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+  },
+  "artifacts": {
+    "bitstream": {
+      "name": "plasma-z2-identity-0.1.0.bit",
+      "sha256": "c77af35a76fec4c3657b2872b6b647ff6a122a96579d778e8ea4680ffa74b42d"
+    },
+    "hwh": {
+      "name": "plasma-z2-identity-0.1.0.hwh",
+      "sha256": "9a9d75c4f73f2f879014d05c47c79d436b0ee3ab57b355b573d990aee089acc0"
+    },
+    "original_build_manifest_sha256": "18abc73422c8b412b408caa8bc7ba44071b31cc62c1af523bfbfdcbc7b99a69c",
+    "loaded_firmware": {
+      "name": "plasma-hil-pspl-01-f3249a87.bin",
+      "sha256": "623befdb7c9b6afe663d762a27c9a94d17cd120ed5abe99173353e344920d748"
+    },
+    "note": "Immutable build manifest predates HIL and retains NOT_RUN/NOT_QUALIFIED fields; this separate dated acceptance record adds observed hardware evidence."
+  },
+  "configuration": {
+    "method": "Linux FPGA Manager full configuration; no PYNQ Overlay/XRT load invoked by the operator procedure",
+    "candidate_load_attempts": 1,
+    "candidate_returned_state": "operating",
+    "base_restore_attempts": 1,
+    "base_returned_state": "operating",
+    "candidate_load_time": "2026-10-14T23:53:47+08:00",
+    "identity_read_time": "2026-10-14T23:57:51+08:00",
+    "base_restore_time": "2026-10-14T23:57:51+08:00",
+    "services_and_gateway_restored_time": "2026-10-14T23:58:37+08:00",
+    "automatic_power_cycle": false,
+    "manual_ps_register_writes": false
+  },
+  "identity_readback": {
+    "direction": "PS Linux -> AXI GP0 -> PL Identity -> PS Linux",
+    "read_count": 8,
+    "registers": [
+      {
+        "name": "magic",
+        "address": "0x40000000",
+        "offset": "0x00",
+        "actual": "0x504C534D",
+        "expected": "0x504C534D",
+        "status": "PASS"
+      },
+      {
+        "name": "bitstream_version",
+        "address": "0x40000004",
+        "offset": "0x04",
+        "actual": "0x00000100",
+        "expected": "0x00000100",
+        "status": "PASS"
+      },
+      {
+        "name": "hardware_abi_version",
+        "address": "0x40000008",
+        "offset": "0x08",
+        "actual": "0x00000001",
+        "expected": "0x00000001",
+        "status": "PASS"
+      },
+      {
+        "name": "capability_flags",
+        "address": "0x4000000C",
+        "offset": "0x0C",
+        "actual": "0x00000000",
+        "expected": "0x00000000",
+        "status": "PASS"
+      },
+      {
+        "name": "build_id_word_0",
+        "address": "0x40000010",
+        "offset": "0x10",
+        "actual": "0xF3249A87",
+        "expected": "0xF3249A87",
+        "status": "PASS"
+      },
+      {
+        "name": "build_id_word_1",
+        "address": "0x40000014",
+        "offset": "0x14",
+        "actual": "0xE1F3E453",
+        "expected": "0xE1F3E453",
+        "status": "PASS"
+      },
+      {
+        "name": "build_id_word_2",
+        "address": "0x40000018",
+        "offset": "0x18",
+        "actual": "0xEFD4C82E",
+        "expected": "0xEFD4C82E",
+        "status": "PASS"
+      },
+      {
+        "name": "build_id_word_3",
+        "address": "0x4000001C",
+        "offset": "0x1C",
+        "actual": "0x0241FA56",
+        "expected": "0x0241FA56",
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "evidence_boundary": "CPU-side MMIO returned expected data; AXI RRESP was not directly observed."
+  },
+  "restoration": {
+    "status": "PASS",
+    "recovery_image": "base.bin",
+    "recovery_image_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+    "metadata_matches_preload_backup": true,
+    "metadata_sha256": "589ecedae190d3e8f1f121842432c231c89119d3c38c71df91291bf5de589adf",
+    "uios": [
+      {
+        "name": "fabric",
+        "address": "0x40000000",
+        "size": "0x00010000",
+        "driver": "uio_pdrv_genirq",
+        "status": "PASS"
+      },
+      {
+        "name": "audio-codec-ctrl",
+        "address": "0x43c00000",
+        "size": "0x00010000",
+        "driver": "uio_pdrv_genirq",
+        "status": "PASS"
+      }
+    ],
+    "uio_numbering_note": "UIO enumeration changed after rebind; match by resource name/address, not uio index.",
+    "services": {
+      "jupyter.service": "active",
+      "plasma-bootstrap.service": "active",
+      "plasma-server.service": "active",
+      "plasma-web.service": "active",
+      "plasma-runtime-activation.service": "active"
+    },
+    "public_key_ssh": {
+      "connected": true,
+      "status": "PASS",
+      "identity_and_host_redacted": true
+    },
+    "jupyter_http": {
+      "login_page_status": 200,
+      "unauthenticated_api_status": 403,
+      "status": "PASS",
+      "boundary": "HTTP/login responsiveness only; no authenticated notebook kernel execution."
+    },
+    "plasma_gateway": {
+      "liveness_http_status": 200,
+      "readiness_http_status": 200,
+      "ok": true,
+      "gateway": "alive",
+      "execution": "ready",
+      "status": "PASS"
+    },
+    "preload_restored_bindings_clocks_health_equal": true
+  },
+  "observations": {
+    "fclk0": {
+      "enabled": true,
+      "rate_hz": 100000000,
+      "preload_and_restored_clock_snapshots_identical": true
+    },
+    "new_kernel_events": "Only candidate and base firmware-loading messages were added; no new configuration/AXI error observed. Pre-existing boot warnings are not reclassified as passing hardware tests.",
+    "driver_controlled_reset": "FPGA Manager handles configuration/reset; no live reset register readback performed in the final audit.",
+    "ddr_boundary": "Existing Linux DDR configuration retained; negative preset delay metadata does not constitute DDR qualification.",
+    "emergency_recovery": "Operator reported UART and physical power recovery readiness; no emergency power recovery was needed or tested."
+  },
+  "acceptance_matrix": {
+    "candidate_artifact_integrity": "PASS",
+    "candidate_fpga_configuration": "PASS",
+    "identity_mmio_8_of_8": "PASS",
+    "axi_gp0_identity_readback": "PASS",
+    "original_base_restoration": "PASS",
+    "uio_driver_bindings": "PASS",
+    "public_key_ssh_recovery": "PASS",
+    "jupyter_http_responsiveness": "PASS",
+    "plasma_gateway_liveness": "PASS",
+    "plasma_gateway_readiness": "PASS",
+    "original_services_active": "PASS",
+    "metadata_restoration": "PASS",
+    "fclk0_preservation": "PASS",
+    "new_kernel_error_check": "PASS",
+    "direct_axi_rresp_observation": "NOT RUN",
+    "axi_write_qualification": "NOT RUN",
+    "authenticated_notebook_kernel_execution": "NOT RUN",
+    "fpga_swd_master_qualification": "NOT RUN",
+    "real_ic_programming": "NOT RUN",
+    "fpga_binary_readback": "NOT RUN",
+    "ddr_reinitialization": "NOT RUN",
+    "ps7_init": "NOT RUN",
+    "emergency_power_recovery": "NOT RUN"
+  },
+  "failed_checks": [],
+  "raw_evidence_publication": false,
+  "evidence_manifest": "evidence-manifest.json"
+}
