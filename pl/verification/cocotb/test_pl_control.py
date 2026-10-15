@@ -69,7 +69,10 @@ async def loopback_and_strobes(dut):
 async def rejected_writes_and_invalid_reads(dut):
     await setup(dut)
     await write(dut, BASE, 0xDEADBEEF)
-    for addr in (BASE + 1, BASE + 4, BASE + 8, BASE + 0xFFC,
+    # STATUS is readable but must reject writes. Other addresses reject both.
+    await write(dut, BASE + 4, 0, order="aw", response=2, stall=1)
+    await read_reg(dut, BASE + 4, 0xDEADBEEF ^ MASK)
+    for addr in (BASE + 1, BASE + 8, BASE + 0xFFC,
                  BASE + 0x1000, BASE - 4, 0x43C00000):
         await write(dut, addr, 0, order="aw", response=2, stall=1)
         await read_reg(dut, addr, 0, response=2)
