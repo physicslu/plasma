@@ -1,0 +1,61 @@
+{
+  "acceptance": {
+    "LB-HOST": "PASS",
+    "LB-Z2": "NOT_RUN",
+    "real_swd_target": "NOT_RUN"
+  },
+  "artifact_fault_injection_tests": 10,
+  "axi_address_map": {
+    "control_0": {
+      "base_address": "0x40001000",
+      "segment_size_bytes": 4096
+    },
+    "identity_0": {
+      "base_address": "0x40000000",
+      "segment_size_bytes": 4096
+    },
+    "swd_0": {
+      "base_address": "0x40002000",
+      "segment_size_bytes": 4096
+    }
+  },
+  "baseline_run": "run.NPA332Aw",
+  "bitstream_file": "plasma-z2-control-waveform-0.1.0.bit",
+  "bitstream_sha256": "df04dae96af5d3918600142efab5ae646fd8ba1e03f51ca2ecf95333edc27880",
+  "bitstream_version": "0.1.0",
+  "board_files_git_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+  "board_part": "tul.com.tw:pynq-z2:part0:1.0",
+  "build_id": "cbe2fb9d012d8ea3df3098ac9ceae0f3",
+  "critical_warnings": 0,
+  "date": "2026-10-15",
+  "drc_checks": 0,
+  "evidence_sha256": {
+    "logs/host-regression.log": "963d02abffddff4cbf1956a253aabbf6ed32fbbcf446c48b7502070580fb3fc6",
+    "logs/vivado-console.log": "7833cef7912424c222a5991cd0303f56a01b02d063ef2dbffa675c14b80ce60b",
+    "reports/drc.rpt": "b6355f86bb762763358c2e4f9edea73a11bc897bd9a477c8989ce724ba555e70",
+    "reports/methodology.rpt": "c28a0b34f2c7d40fe3b248597f2eedf79a7a10617c06f607fdc9bba2b10085e3",
+    "reports/timing_summary.rpt": "8de1c60bdc3d7298bcfbb710e77f55f8159b8308b01fd72f88a097126e29181d"
+  },
+  "external_pl_io": false,
+  "fpga_part": "xc7z020clg400-1",
+  "hardware_runtime_ready": false,
+  "host_cocotb_cases": 12,
+  "host_pytest_runners": 3,
+  "hwh_file": "plasma-z2-control-waveform-0.1.0.hwh",
+  "hwh_sha256": "8e0abb1a1c7196e2ee51c5144a038a898a7af7a08887e55f33047ad925f174d5",
+  "implemented_slack_ns": {
+    "hold": 0.038,
+    "setup": 0.719
+  },
+  "loading_safety": "NOT_QUALIFIED",
+  "methodology_checks": 0,
+  "original_manifest_sha256": "2f7df31dc7760869b03d104f10609b7ed9a1150e89700af4cff2433311390ba8",
+  "physical_hardware_operations": "NONE",
+  "psu_1_to_4_warnings": 0,
+  "raw_evidence_retained": true,
+  "source_git_sha": "cbe2fb9d012d8ea3df3098ac9ceae0f3d2e468f9",
+  "toolchain": {
+    "name": "Vivado",
+    "version": "2026.1"
+  }
+}
