@@ -113,9 +113,8 @@ SystemVerilog RTL
     -> synthesis
     -> implementation
     -> timing checks
-    -> merge approval
-    -> deploy approval
-    -> Z2 hardware validation
+    -> approved-scope Z2 hardware validation (when applicable)
+    -> merge approval (for PR integration)
 ```
 
 Not every stage is configured in CI yet. Report the exact stages that were actually run.
@@ -133,7 +132,9 @@ FPGA work inherits the repository approval model:
 - Merge to `main` requires explicit user approval unless the root contract explicitly allows a
   documentation-only direct-main workflow requested by the user.
 - Loading a new bitstream on Z2, changing FPGA I/O behavior on connected hardware, changing DUT
-  power/voltage, or programming a real IC requires the protected hardware approval defined by
-  the root `AGENTS.md`.
+  power/voltage, or programming a real IC requires explicit coverage in the **approved Gate 1 scope**
+  under the root `AGENTS.md`. Do not invent a separate deployment/hardware approval gate.
+  Internal-loopback prototype HIL defaults to the root's `development` profile and canonical
+  autonomous Codex execution command; operations outside that scope still need authorization.
 
 Never turn a software/simulation pass into a claim of hardware validation.
