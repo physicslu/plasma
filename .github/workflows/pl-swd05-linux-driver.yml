@@ -1,0 +1,42 @@
+name: PL SWD-05 Linux PS SWD transaction driver
+
+on:
+  pull_request:
+    paths:
+      - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/tests/test_swd_transaction_driver.py"
+      - "docs/development/swd05-linux-swd-transaction-driver.md"
+      - ".github/workflows/pl-swd05-linux-driver.yml"
+  push:
+    branches: [main]
+    paths:
+      - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/tests/test_swd_transaction_driver.py"
+      - "docs/development/swd05-linux-swd-transaction-driver.md"
+      - ".github/workflows/pl-swd05-linux-driver.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swd05-host-driver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install software package and host test dependencies
+        run: |
+          python3 -m pip install -e ./software/python
+          python3 -m pip install 'pytest==8.4.2'
+      - name: Compile host-only driver
+        run: python3 -m py_compile software/python/plasma_interfaces/swd_transaction.py
+      - name: SWD-05 MMIO fake protocol regression
+        run: python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py
+      - name: Explicit acceptance boundary
+        run: |
+          echo "SWD05_HOST_ONLY_DRIVER_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "No FPGA load, physical Z2 MMIO, OpenOCD adapter registration, external SWD pins or IC operations performed." >> "$GITHUB_STEP_SUMMARY"
