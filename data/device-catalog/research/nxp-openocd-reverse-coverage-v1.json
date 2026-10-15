@@ -1,0 +1,61 @@
+{
+  "active_observed_priority": {
+    "P0": 12,
+    "P1": 20,
+    "P2": 321
+  },
+  "additional_exact_matches_to_legacy_target_family_leads": 0,
+  "existing_nxp_exact_reviewed": 501,
+  "extra_target_leads": [
+    "k40.cfg",
+    "k60.cfg",
+    "kl46.cfg",
+    "lpc11xx.cfg",
+    "lpc17xx.cfg",
+    "lpc40xx.cfg"
+  ],
+  "new_p0_exact_attested_by_reverse_check": 0,
+  "new_software_supported_exact": 0,
+  "non_equivalence": [
+    "imx-app-processor-target-does-not-equal-mimxrt-cross-over-mcu",
+    "rt600-xtensa-dsp-config-is-not-exact-mcu-flash-driver-proof",
+    "cfg-or-driver-family-source-does-not-qualify-exact-icpn",
+    "not-found-in-bounded-cohort-is-not-vendor-wide-unsupported"
+  ],
+  "not_observed_active_priority": {
+    "P0": 15,
+    "P1": 18,
+    "P2": 115
+  },
+  "nxp_entire_active_portfolio_complete": false,
+  "official_active_already_in_review": 353,
+  "official_active_new_to_review": 0,
+  "official_active_observed_bounded": 353,
+  "older_review_without_current_active_observation": 148,
+  "openocd_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "openocd_provider": "openocd-upstream",
+  "openocd_version": "0.12.0",
+  "p0_existing_exact_families": {
+    "KL25": 12,
+    "LPC844": 7,
+    "LPC845": 8
+  },
+  "pinned_target_directory_entries": 309,
+  "production_catalog_changed": false,
+  "programming_or_hil_authorized": false,
+  "research_priority_scope_complete": true,
+  "review_priority_existing": {
+    "P0": 27,
+    "P1": 38,
+    "P2": 436
+  },
+  "schema_version": 1,
+  "scope": "NXP_ADR0002_REVERSE_COVERAGE_BOUNDED_501_AND_353",
+  "selected_filename_target_evidence_entries": 48,
+  "source_evidence_class_counts": {
+    "imx_app_processor_not_imx_rt": 16,
+    "legacy_target_without_exact_sample": 26,
+    "previously_reviewed_chain": 5,
+    "rt600_dsp_debug_only": 1
+  }
+}

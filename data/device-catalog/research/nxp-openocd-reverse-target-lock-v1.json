@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "scope": "SOURCE_ONLY_BOUNDED_NXP_REVERSE_LOOKUP_NO_SUPPORT_PROMOTION",
+  "provider": "openocd-upstream",
+  "release": "0.12.0",
+  "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "target_root_listing_entries": 309,
+  "selection_rule": "tcl/target root-level filenames starting imx or lpc, k40/k60/kx/kl25/kl46/klx, xtensa-core-nxp_rt600; bounded name-filter, not complete NXP support inventory",
+  "target_files": [
+    {
+      "path": "tcl/target/imx.cfg",
+      "git_blob": "d76f60e1c6de21a671e425a6cbb93358e1831811",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx21.cfg",
+      "git_blob": "7c9cca35d4f30fb4ccd3ac8382936b926590b641",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx25.cfg",
+      "git_blob": "ed94cc0674aa3aa990df8c3c269d91b62f69f94a",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx27.cfg",
+      "git_blob": "c79d85e77898dee18896321349d8a7c635dbb91c",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx28.cfg",
+      "git_blob": "d52fc4eafb22c4905886e995b50a1bdaa4ae1ce8",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx31.cfg",
+      "git_blob": "10e9fefc01d197979757923fea63d902c4a9a6e9",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx35.cfg",
+      "git_blob": "fa173bb89226560694b4352adcb264899464c675",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx51.cfg",
+      "git_blob": "fc3dfa91d608f19c2755eadb3626c8aa4a5df6a9",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx53.cfg",
+      "git_blob": "855a6aeaabaed5b1e5c88b94679b00ae646ca2e7",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx6.cfg",
+      "git_blob": "c9b6acf79d7d3eb9ac12b549f93f38595904590a",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx6sx.cfg",
+      "git_blob": "3d4240ab04aae2df06fc465b7a9c52d1da746104",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx6ul.cfg",
+      "git_blob": "354745e791fd117a1a307007193be8960362a827",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx7.cfg",
+      "git_blob": "bd9e3ddc021904b93b92cf44159cac91a9430e2c",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx7ulp.cfg",
+      "git_blob": "1467f7cc1078c30fb01fb035f0b64a5c2b41b649",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx8m.cfg",
+      "git_blob": "69380903c31c8a8de9644096c9c9274c5d7677eb",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/imx8qm.cfg",
+      "git_blob": "33f9ca16d846cab076ce84d1f16ce749415f44bf",
+      "review_class": "imx_app_processor_not_imx_rt"
+    },
+    {
+      "path": "tcl/target/k40.cfg",
+      "git_blob": "33e8235460aed85fb18addc4533c5ea5eb02661b",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/k60.cfg",
+      "git_blob": "3b89102babbe072cf3e11d6d27647d5a88a2e8f1",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/kl25.cfg",
+      "git_blob": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+      "review_class": "previously_reviewed_chain"
+    },
+    {
+      "path": "tcl/target/kl46.cfg",
+      "git_blob": "bf6b244d87072d00bfe04dc4b0f20670ea29f626",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/klx.cfg",
+      "git_blob": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+      "review_class": "previously_reviewed_chain"
+    },
+    {
+      "path": "tcl/target/kx.cfg",
+      "git_blob": "c87116b728a0f803e43f6b0a4b26741804ae4338",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc11xx.cfg",
+      "git_blob": "d288e2a32b08b5e9ad26b7c86fb7035e8e08b1b6",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc12xx.cfg",
+      "git_blob": "ace5e0676c3cd6d0e6147bbaf989b3b1c9c85119",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc13xx.cfg",
+      "git_blob": "5ac29d3bf1589bc0a636dfe31b778ed2bc939a7c",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc17xx.cfg",
+      "git_blob": "35d8badea416e641babe6ccad3fd8503f3de7cae",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc1850.cfg",
+      "git_blob": "6dd1ab753810d77e25ea3e71857e1bd320f56339",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc1xxx.cfg",
+      "git_blob": "70d26d2673900b06c6d5eef8e55b4542103e9e42",
+      "review_class": "previously_reviewed_chain"
+    },
+    {
+      "path": "tcl/target/lpc2103.cfg",
+      "git_blob": "c49b0e5d5562cdd70533380922f8268d078bdf94",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2124.cfg",
+      "git_blob": "053ebeb701c2568dbec976e3704d5c11fbed9737",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2129.cfg",
+      "git_blob": "88ee20f171b36d0fa9581ccecb9278a7840968a9",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2148.cfg",
+      "git_blob": "fda622f11d9e240cb46e3e43243ea14a8abd4246",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2294.cfg",
+      "git_blob": "7537a6541cccbcf42222b9523b2384b5ff01053b",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2378.cfg",
+      "git_blob": "59e41c9a10cfe92a3d57de91209dfcdf223599de",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2460.cfg",
+      "git_blob": "59b646631c88e0ef41859b967a931804003bfb40",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2478.cfg",
+      "git_blob": "e4fd49d43b5bb88558a756056ff911de3e04aeb6",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2900.cfg",
+      "git_blob": "67e3c92249c270a22e0611f6d193f8d4752451c3",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc2xxx.cfg",
+      "git_blob": "bc5e6009f88567471d8b9c2f6865d50f8bf132fb",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc3131.cfg",
+      "git_blob": "09d698ac6c32aed7a993f54102d585c082ecd47f",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc3250.cfg",
+      "git_blob": "244d9814c5bbe772fc5a5dbd622a687d5c408dce",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc40xx.cfg",
+      "git_blob": "f0be5a1e40979b2484f9f8edec0c4dfa49a65069",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc4350.cfg",
+      "git_blob": "453306aeebc7108c48f592a44b08e40e61186f6b",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc4357.cfg",
+      "git_blob": "f7835057feba027efbb80b7fe1ce13e629a03f29",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc4370.cfg",
+      "git_blob": "fe9e76b7a1c8fcf561ad530d261a0203e0a98702",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc84x.cfg",
+      "git_blob": "af26f2757fb48ea87b80c297df0ecb8d8e5f2058",
+      "review_class": "previously_reviewed_chain"
+    },
+    {
+      "path": "tcl/target/lpc8nxx.cfg",
+      "git_blob": "859e99b6a3ba2298176072e301d1711b335de466",
+      "review_class": "legacy_target_without_exact_sample"
+    },
+    {
+      "path": "tcl/target/lpc8xx.cfg",
+      "git_blob": "4c54a2a6670d6186297306112deee8d25e2627e4",
+      "review_class": "previously_reviewed_chain"
+    },
+    {
+      "path": "tcl/target/xtensa-core-nxp_rt600.cfg",
+      "git_blob": "abd961e4f54783a8ec7414fd90ebda94a7b834cc",
+      "review_class": "rt600_dsp_debug_only"
+    }
+  ],
+  "verified_baseline_driver_blobs": {
+    "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
+    "src/flash/nor/lpc2000.c": "f12eef7e4ce68fc8830773f6c57da57dfb87d6b8"
+  },
+  "non_authority": "CFG filename and static driver symbols are source research clues, never exact silicon Flash operation qualification"
+}
