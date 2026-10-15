@@ -1,0 +1,40 @@
+name: NXP pinned OpenOCD source-first Active candidates v2
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-openocd-exact-active-discovery-v2.json'
+      - 'data/device-catalog/research/nxp_validate_source_first_active_v2.py'
+      - 'data/device-catalog/research/test_nxp_source_first_active_v2.py'
+      - 'data/device-catalog/research/NXP_OPENOCD_SOURCE_FIRST_EXACT_ACTIVE_V2.md'
+      - 'data/device-catalog/research/nxp-openocd-reverse-target-lock-v1.json'
+      - 'data/device-catalog/research/nxp-501-adr0002-core-transport-qualification-v10.csv'
+      - 'release/openocd.json'
+      - '.github/workflows/device-catalog-nxp-source-first-active-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/nxp-openocd-exact-active-discovery-v2.json'
+      - 'data/device-catalog/research/nxp_validate_source_first_active_v2.py'
+      - 'data/device-catalog/research/test_nxp_source_first_active_v2.py'
+      - '.github/workflows/device-catalog-nxp-source-first-active-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-source-first-exact-candidate-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay source-first manufacturer candidate evidence
+        run: python data/device-catalog/research/nxp_validate_source_first_active_v2.py
+      - name: Enforce no unreviewed OpenOCD or Production admission
+        run: python data/device-catalog/research/test_nxp_source_first_active_v2.py -v
+      - name: Reconfirm previous 501 and 353 bounded close-out
+        run: python data/device-catalog/research/nxp_adr0002_reverse_coverage_v1.py --check

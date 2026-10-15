@@ -1,0 +1,38 @@
+name: NXP OpenOCD source-first exact LPC discovery wave3
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/nxp-openocd-source-first-wave3-v1.json'
+      - 'data/device-catalog/research/nxp_validate_source_first_wave3_v1.py'
+      - 'data/device-catalog/research/test_nxp_source_first_wave3_v1.py'
+      - 'data/device-catalog/research/NXP_OPENOCD_SOURCE_FIRST_WAVE3_V1.md'
+      - 'data/device-catalog/research/nxp-openocd-exact-active-discovery-v2.json'
+      - 'data/device-catalog/research/nxp-openocd-reverse-target-lock-v1.json'
+      - 'data/device-catalog/research/nxp-501-adr0002-core-transport-qualification-v10.csv'
+      - 'release/openocd.json'
+      - '.github/workflows/device-catalog-nxp-source-first-wave3-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/nxp-openocd-source-first-wave3-v1.json'
+      - 'data/device-catalog/research/nxp_validate_source_first_wave3_v1.py'
+      - 'data/device-catalog/research/test_nxp_source_first_wave3_v1.py'
+      - '.github/workflows/device-catalog-nxp-source-first-wave3-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nxp-openocd-source-first-wave3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify pinned NXP OpenOCD target and official observation research boundaries
+        run: python data/device-catalog/research/nxp_validate_source_first_wave3_v1.py
+      - name: Run negative source, JTAG, lifecycle, admission and priority regression tests
+        run: python data/device-catalog/research/test_nxp_source_first_wave3_v1.py -v
+      - name: Regression test the prior NXP source-first batch
+        run: python data/device-catalog/research/test_nxp_source_first_active_v2.py -v
