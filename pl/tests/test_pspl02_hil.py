@@ -1,6 +1,7 @@
 """Safety boundaries with synthetic evidence; functional algorithms use actual RTL."""
 from datetime import datetime, timedelta, timezone
 import json
+import mmap
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -269,3 +270,75 @@ def test_staging_includes_false_by_default_development_templates(tmp_path, monke
         assert "operator_present" not in dev_session
         assert dev_session["candidate_loaded_and_verified"] is False
     assert not (kit/"templates/session-development-ERROR.json").exists()
+
+
+# The real backend is exercised against ordinary file-backed RAM, never PL.
+@pytest.fixture
+def mapped_ram(tmp_path, monkeypatch):
+    native_mmap = mmap.mmap
+    opened, mappings = [], []
+    monkeypatch.setattr(runner.Path, "is_char_device", lambda _: True)
+    monkeypatch.setattr(runner.os, "open", lambda *args: 123)
+    close = Mock()
+    monkeypatch.setattr(runner.os, "close", close)
+
+    def map_ram(fd, length, *, flags, prot, offset):
+        assert fd == 123 and length == 4096 and flags == mmap.MAP_SHARED
+        path = tmp_path / str(offset)
+        if not path.exists():
+            path.write_bytes(bytes.fromhex("aabbccdd") * 1024)
+        f = path.open("r+b")
+        opened.append(f)
+        page = native_mmap(f.fileno(), length, flags=flags, prot=prot)
+        mappings.append((offset, page, prot, path))
+        return page
+
+    monkeypatch.setattr(runner.mmap, "mmap", map_ram)
+    yield mappings, close
+    for f in opened:
+        f.close()
+
+
+def test_word_writes_preserve_neighbors_and_use_word_indices(mapped_ram):
+    mappings, close = mapped_ram
+    with runner.DevMem(readonly=False) as hardware:
+        hardware.write32(m.CONTROL, 0x12345678)
+        assert hardware.read32(m.CONTROL) == 0x12345678
+        assert hardware.read32(m.CONTROL+4) == 0xddccbbaa
+        hardware.write32(m.TX, 0x87654321)  # byte offset 8 -> word index 2
+        assert hardware.read32(m.TX) == 0x87654321
+        assert hardware.read32(m.SWD+4) == 0xddccbbaa
+        assert hardware.read32(m.SWD+12) == 0xddccbbaa
+        hardware.write32(m.CONTROL, 0xffffffff)
+        hardware.write32(m.CONTROL, 0)
+        assert hardware.read32(m.CONTROL) == 0
+        assert len(mappings) == 2  # one mapping per aperture, reused
+    assert all(page.closed for _, page, _, _ in mappings)
+    assert mappings[1][3].read_bytes()[8:12] == bytes.fromhex("21436587")
+    close.assert_called_once_with(123)
+
+
+def test_identity_mapping_stays_read_only_and_views_release_on_error(mapped_ram):
+    mappings, close = mapped_ram
+    with pytest.raises(RuntimeError, match="stage failure"):
+        with runner.DevMem(readonly=True) as hardware:
+            assert hardware.read32(m.IDENTITY) == 0xddccbbaa
+            with pytest.raises(c.SafetyError):
+                hardware.write32(m.CONTROL, 0)
+            assert mappings[0][2] == mmap.PROT_READ
+            assert hardware.words[m.IDENTITY].readonly
+            raise RuntimeError("stage failure")
+    assert mappings[0][1].closed  # no retained exported view / BufferError
+    close.assert_called_once_with(123)
+
+
+def test_invalid_access_fails_before_any_mapping(mapped_ram):
+    mappings, _ = mapped_ram
+    with runner.DevMem(readonly=False) as hardware:
+        for address in (m.CONTROL+1, m.CONTROL+2, m.CONTROL+3, 0x40003000):
+            with pytest.raises(c.SafetyError):
+                hardware.write32(address, 0)
+        for value in (-1, 1 << 32, True):
+            with pytest.raises(c.SafetyError):
+                hardware.write32(m.CONTROL, value)
+        assert mappings == []

@@ -72,6 +72,23 @@ existing `runner` still does **not** load/restore firmware by itself.
 The 180-second preparation budget is an objective, not permission to bypass
 a real technical hazard.
 
+### ARMv7 MMIO access width
+
+The live backend indexes a native unsigned 32-bit `memoryview` of each
+page, requires little-endian words and aligned allowlisted addresses, and
+releases views before unmapping. Read-only stages retain read-only mappings.
+Do not replace this with `struct.pack_into`: on the tested ARMv7 Python,
+its destination-clearing `memset` issues byte stores. CONTROL accepts only
+its exact word address; subsequent byte addresses return SLVERR and can
+terminate Linux userspace with SIGBUS.
+
+Access width was checked on the board's actual Python using protected
+ordinary anonymous RAM under GDB: the old path faults at `STRB` in `memset`,
+while native word indexing uses `STR`/`LDR`. This does not probe PL or directly
+measure physical BRESP. The offline CONTROL regression checks byte-address
+rejection, unchanged registers after SLVERR, and aligned full-word success.
+Recheck generated access width when changing the deployed Python/toolchain.
+
 ## Authorization and current status
 
 Root AGENTS.md's two gates apply. Gate 1 covers the agreed implementation and
