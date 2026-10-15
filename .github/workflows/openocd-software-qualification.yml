@@ -8,7 +8,9 @@ on:
       - "release/openocd.json"
       - "release/openocd-qualification/**"
       - "software/python/plasma_web/openocd_software_qualification.py"
+      - "software/python/plasma_web/programming_qualification.py"
       - "software/python/tests/test_openocd_software_qualification_v1.py"
+      - "software/python/tests/test_programming_qualification.py"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json"
@@ -44,7 +46,9 @@ on:
       - "release/openocd.json"
       - "release/openocd-qualification/**"
       - "software/python/plasma_web/openocd_software_qualification.py"
+      - "software/python/plasma_web/programming_qualification.py"
       - "software/python/tests/test_openocd_software_qualification_v1.py"
+      - "software/python/tests/test_programming_qualification.py"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
       - "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json"
@@ -100,8 +104,11 @@ jobs:
         env:
           PYTHONPATH: software/python
         run: |
-          python -m py_compile software/python/plasma_web/openocd_software_qualification.py
+          python -m py_compile \
+            software/python/plasma_web/openocd_software_qualification.py \
+            software/python/plasma_web/programming_qualification.py
           python software/python/tests/test_openocd_software_qualification_v1.py
+          python software/python/tests/test_programming_qualification.py
       - name: Report reviewed software support
         env:
           PYTHONPATH: software/python
@@ -111,8 +118,12 @@ jobs:
           from plasma_web.openocd_software_qualification import (
               get_default_openocd_software_qualification_registry,
           )
-          registry = get_default_openocd_software_qualification_registry()
-          assert registry is not None
+          from plasma_web.programming_qualification import (
+              get_default_programming_qualification_registry,
+          )
+          provider = get_default_openocd_software_qualification_registry()
+          assert provider is not None
+          registry = get_default_programming_qualification_registry()
           print(json.dumps(registry.summary, indent=2, sort_keys=True))
-          print("SUPPORTED=" + ",".join(registry.supported_exact_icpns()))
+          print("ST_PROVIDER_SUPPORTED=" + ",".join(provider.supported_exact_icpns()))
           PY
