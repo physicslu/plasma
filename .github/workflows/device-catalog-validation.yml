@@ -52,6 +52,23 @@ jobs:
           python data/device-catalog/research/test_st_browser_readiness_retry.py
       - name: Validate generic device catalog evidence framework
         run: python data/device-catalog/research/test_device_catalog_evidence_framework.py
+      - name: Validate ST ADR-0002 Phase 1 field-level baseline
+        run: |
+          python data/device-catalog/research/test_adr0002_st_phase1_information_v1.py
+          python data/device-catalog/research/adr0002_st_phase1_information_v1.py --summary /tmp/st-phase1-summary.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("/tmp/st-phase1-summary.json").read_text(encoding="utf-8"))
+          print(json.dumps({
+              "exact_icpn_count": report["exact_icpn_count"],
+              "existing_source_backed_basic_bindings": report["existing_source_backed_basic_bindings"],
+              "legacy_m1_blocked_exact_icpns": report["legacy_m1_blocked_exact_icpns"],
+              "ram": report["field_coverage"]["ram"],
+              "working_vdd": report["field_coverage"]["working_vdd"],
+              "temperature": report["field_coverage"]["temperature"],
+          }, indent=2, sort_keys=True))
+          PY
       - name: Validate retained STM32F1 browser evidence
         run: |
           python data/device-catalog/research/validate_stm32f1_retained_evidence.py
