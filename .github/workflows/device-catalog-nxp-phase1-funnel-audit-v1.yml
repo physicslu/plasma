@@ -1,0 +1,36 @@
+name: NXP ADR-0002 Phase1 source-bound exact ICPN funnel inventory
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-501-phase1-ic-information-v13.csv"
+      - "data/device-catalog/research/nxp-65-openocd-discovery-gates-v1.csv"
+      - "data/device-catalog/research/nxp-8-lpc82x-official-phase1-observations-v1.csv"
+      - "data/device-catalog/research/nxp-8-lpc81x-phase1-official-material-v1.csv"
+      - "data/device-catalog/research/nxp_phase1_funnel_audit_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_funnel_audit_v1.py"
+      - "data/device-catalog/research/NXP_PHASE1_FUNNEL_INVENTORY_V1.md"
+      - ".github/workflows/device-catalog-nxp-phase1-funnel-audit-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp_phase1_funnel_audit_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_funnel_audit_v1.py"
+      - ".github/workflows/device-catalog-nxp-phase1-funnel-audit-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-exact-icpn:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reconcile source-locked historical 501 and disjoint 65 reverse observations
+        run: python data/device-catalog/research/nxp_phase1_funnel_audit_v1.py
+      - name: Verify new ADR-0002 NXP Phase1 source and funnel negative gates
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_funnel_audit_v1.py" -v
