@@ -534,3 +534,50 @@ def test_bad_ack_requires_explicit_link_reset():
         d.read_dp(0)
     assert d.line_reset().status == SWDStatus.OK
     assert d.read_dp(0) == DPIDR
+
+
+def test_worker_thread_can_request_abort_without_racing_mmio_ack():
+    import threading
+
+    in_poll = threading.Event()
+    continue_poll = threading.Event()
+    outcome = []
+
+    class PausingTarget(FakeAXI):
+        pause = False
+
+        def read32(self, address):
+            if self.pause and self.busy and address == self.base + 0x24:
+                self.pause = False
+                in_poll.set()
+                if not continue_poll.wait(2):
+                    raise OSError("test poll coordination timeout")
+            return super().read32(address)
+
+    hw = PausingTarget()
+    d = driver(hw)
+    connect(d)
+    assert d.request_abort() is False
+    hw.pause = True
+
+    def owner_thread():
+        try:
+            d.write_dp(4, 0xDEADBEEF)
+        except Exception as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=owner_thread)
+    worker.start()
+    assert in_poll.wait(2)
+    assert d.request_abort() is True
+    # A second caller only sets an Event; it does NOT write MMIO itself.
+    assert command_writes(hw)[-1] == 1
+    continue_poll.set()
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], SWDDriverError)
+    assert outcome[0].response.status == SWDStatus.ABORTED
+    assert outcome[0].uncertain_target_effects is True
+    assert command_writes(hw)[-3:] == [1, 2, 4]
+    assert d.request_abort() is False
