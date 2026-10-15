@@ -25,7 +25,7 @@ Therefore:
 
 ## Deterministic baseline
 
-`st_phase1_information_v1.py` replays:
+`adr0002_st_phase1_information_v1.py` replays:
 
 1. the Production manifest and all ST exact-ICPN source CSVs, verifying each manifest
    SHA-256 and row count;
@@ -89,13 +89,13 @@ algorithms, Socket information and HIL are outside this transaction.
 From the repository root:
 
 ```bash
-python data/device-catalog/research/st_phase1_information_v1.py
-python data/device-catalog/research/st_phase1_information_v1.py \
+python data/device-catalog/research/adr0002_st_phase1_information_v1.py
+python data/device-catalog/research/adr0002_st_phase1_information_v1.py \
   --ledger /tmp/st-phase1-ledger.json \
   --summary /tmp/st-phase1-summary.json
 
 python -m pytest -q \
-  data/device-catalog/research/test_st_phase1_information_v1.py
+  data/device-catalog/research/test_adr0002_st_phase1_information_v1.py
 ```
 
 ## Acceptance boundary
