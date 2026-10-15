@@ -52,6 +52,7 @@ def inventory_attestation():
         "pynq_version": "3.1.1",
         "fpga_manager_state": "operating",
         "fclk0_hz": 100000000,
+        "metadata_sha256": "a" * 64,
         "sysfs_read_only": True,
         "device_model_confirmed": True,
         "services": {s: "active" for s in c.REQUIRED_SERVICES},
