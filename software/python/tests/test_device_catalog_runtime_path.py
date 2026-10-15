@@ -77,7 +77,10 @@ class DeviceCatalogRuntimePathTests(unittest.TestCase):
             catalog = DeviceCatalog.from_manifest(manifest)
 
             self.assertEqual(catalog.size, 1)
-            self.assertEqual(catalog.search("STM32F103C8T6")[0].icpn, "STM32F103C8T6")
+            record = catalog.search("STM32F103C8T6")[0]
+            self.assertEqual(record.icpn, "STM32F103C8T6")
+            self.assertEqual(record.phase1_identity_state, "IDENTIFIED")
+            self.assertEqual(record.to_payload()["phase1"]["identity_state"], "IDENTIFIED")
 
     def test_manifest_rejects_git_blob_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as root:
