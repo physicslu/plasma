@@ -81,7 +81,7 @@ class ReverseCoverage(unittest.TestCase):
                 "ATSAMD21G18A-TR","ATSAMD21G18"),source(
                 "ATSAMD21G18A-TR","ATSAMD21G18A")]},
             {"icpn":"PIC16F777-I/SP","sources":[source(
-                "PIC16F777-I/SP","")]},
+                "PIC16F777-I/SP","","PIC16F777")]},
         ]
         rows, states, counts=target.join_icpns({},sample_index(),make_rollup(entries))
         byid={r["icpn"]:r for r in rows}
