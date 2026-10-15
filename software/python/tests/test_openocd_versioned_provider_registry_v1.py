@@ -28,7 +28,7 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         return self.provider.describe("STMicroelectronics", part)
 
     def test_all_4629_exact_icpns_and_independent_states(self):
-        self.assertEqual(self.catalog.size, 4853)
+        self.assertEqual(self.catalog.size, 4975)
         self.assertEqual(sum(row.vendor == "STMicroelectronics" for row in self.catalog.records), 4629)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "KL25" for row in self.catalog.records), 12)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "MCX" and row.mapping_status == "no_mapping" for row in self.catalog.records),196)
