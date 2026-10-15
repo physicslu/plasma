@@ -23,6 +23,26 @@
       ]
     },
     {
+      "source_id": "st_ds5792_rev13",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "DS5792",
+      "revision": "13",
+      "title": "STM32F103xC STM32F103xD STM32F103xE datasheet",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103ze.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "device_scope",
+        "flash_capacity",
+        "package_family",
+        "temperature_grade",
+        "flash_programming_characteristics"
+      ]
+    },
+    {
       "source_id": "st_pm0075_rev2",
       "manufacturer": "STMicroelectronics",
       "document_number": "PM0075",
