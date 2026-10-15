@@ -156,6 +156,8 @@ def confirm_target_index(evidence: dict, previous: dict, upstream_root: Path | N
 
 
 def build(*, upstream_root: Path | None = None) -> dict:
+    require(set(PINS) == {V10, ACTIVE, PREVIOUS, RELEASE},
+            "immutable input path contract changed")
     for path, expected in PINS.items():
         require(blob(path.read_bytes()) == expected, "immutable input drift: " + path.name)
     release, previous, evidence = (
