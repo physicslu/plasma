@@ -1,13 +1,13 @@
 # IC Information — Phase 1 evidence and admission contract
 
-Status: **proposed via ADR-0002 Phase split**, no Catalog/Runtime migration in this PR.
+Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-10-15.** Public Catalog/Runtime migration remains separate.
 
 ## Right-hand IC details: independent phase ownership
 
 | Section | Phase | Purpose | Is it currently in scope? |
 | --- | --- | --- | --- |
-| 01 IC Information | Phase 1 | Original manufacturer IC identity / specifications, exact-ICPN evidence, known/unknown per field | YES |
-| 02 Programming | Phase 2 | Silicon/revision applicability, manufacturer programming specification, OpenOCD target/driver and erase/program/read/verify | NO |
+| 01 IC Information | Phase 1 | Original manufacturer IC identity / specifications, exact-ICPN evidence, known/unknown per field | BASELINE / BACKFILL ONLY |
+| 02 Programming | Phase 2 | Silicon/revision applicability, manufacturer programming specification, OpenOCD target/driver and erase/program/read/verify | YES — CURRENT |
 | 03 PLASMA Compatibility | Phase 3 | Versioned PPU/Site/Socket/Adapter + voltage/pin and HIL/physical evidence | NO |
 
 ## Phase 1 canonical information fields
@@ -25,13 +25,13 @@ Status: **proposed via ADR-0002 Phase split**, no Catalog/Runtime migration in t
 2. Count `VERIFIED/PARTIAL/UNKNOWN/CONFLICT` for every attribute, with independent admitted/candidate denominators; count unresolved identity separately.
 3. Record original manufacturer evidence SHA or source ref when it exists. A `PARTIAL` observation does not qualify a software profile; a missing attribute does not create an unsupported software decision.
 4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by this phase.
-5. Phase 2 starts only after a distinct owner transition to Programming scope. Phase 3 separately validates concrete Site/Adapter/Socket/PPU configurations.
+5. The distinct owner transition to Phase 2 Programming was approved on 2026-10-15. Phase 1 evidence may be backfilled while reviewing the same official manufacturer documents, but Programming qualification owns the current work. Phase 3 separately validates concrete Site/Adapter/Socket/PPU configurations.
 
 ## Catalog surface distinction
 
 There are two different concepts: **IC Information research/detail completeness** versus **default public IC Selector eligibility**. IC information in a research/admin detail view may be incomplete; it does not grant default product Catalog visibility.
 
-Accepted ADR-0002 final policy stays: default product selectable Catalog is limited to qualified OpenOCD software `SUPPORTED` exact ICPNs. That filtering and consistent count migration is outstanding, tracked separately in Issue #849 and explicitly **not** implemented by Phase 1. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
+Accepted ADR-0002 final policy stays: default product selectable Catalog is limited to qualified OpenOCD software `SUPPORTED` exact ICPNs. That filtering and consistent count migration is outstanding, tracked separately in Issue #849 and is **not** implemented merely by completing the Phase 1 baseline or the initial Phase 2A qualification registry. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
 
 ## Examples of excluded Phase 1 questions
 
