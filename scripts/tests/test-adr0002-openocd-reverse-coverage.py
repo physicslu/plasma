@@ -96,8 +96,11 @@ def audit_contract(contract: dict, adr: str) -> None:
         "### Vendor-agnostic OpenOCD Reverse Coverage SOP",
         "Provider + Version/Commit + Target + Flash Driver + Silicon Identity/Probe Rule",
         "CLOSE_P1_EVIDENCE_GAP", "CLOSED_EVIDENCE_GAP",
-        "PROPOSE_P0", "ARCHIVE_P2", "Phase 2 — CURRENT",
-        "Phase 3 — DEFERRED", "SUPPORTED",
+        "PROPOSE_P0", "ARCHIVE_P2",
+        "Phase 1 — IC Information", "Phase 2 — Programming",
+        "Phase 3 — PLASMA Compatibility",
+        "S3 ⊆ S2 ⊆ S1", "S1_complete",
+        "Phase 1 `S1` 不需要先取得 P0", "SUPPORTED",
         "本修訂不重分類",
     ]
     for heading_or_invariant in needs_adr:
@@ -158,6 +161,20 @@ class ADR0002ReverseCoverageTests(unittest.TestCase):
 
     def test_normative_contract_matches_adr(self):
         audit_contract(self.contract, self.adr)
+
+
+    def test_phase_funnel_is_not_research_priority(self):
+        audit_contract(self.contract, self.adr)
+        for expected in (
+            "Phase 1 — IC Information", "Phase 2 — Programming",
+            "Phase 3 — PLASMA Compatibility", "S3 ⊆ S2 ⊆ S1",
+            "Phase 1 `S1` 不需要先取得 P0",
+            "SOURCE_BYTES_NOT_ARCHIVED",
+        ):
+            with self.subTest(phase_boundary=expected):
+                self.assertIn(expected, self.adr)
+        self.assertEqual(self.contract["authority"],
+                         "RESEARCH_PRIORITY_AND_EVIDENCE_ONLY")
 
     def test_p0_source_path_independent_of_manufacturer(self):
         for maker in ("SYNTHETIC_VENDORA", "SYNTHETIC_VENDORB", "UNKNOWN"):
