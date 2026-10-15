@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pl.hil.swd04.contract import SafetyError, sha256_file, _require
 from pl.hil.swd04.staging import bit_payload
+from pl.hil.pspl02.identity import validate_report
 
 SOURCE = "cbe2fb9d012d8ea3df3098ac9ceae0f3d2e468f9"
 HASHES = {
@@ -70,6 +71,7 @@ def preflight(inventory: dict, attestation: dict) -> None:
     _require(inventory.get("architecture") == "armv7l", "Not ARMv7")
     _require(inventory.get("pynq_version") == "3.1.1", "Unexpected PYNQ version")
     _require(inventory.get("device_model_confirmed") is True, "Board unverified")
+    validate_report(inventory.get("board_identity"))
     _require(inventory.get("fpga_manager_state") == "operating", "Manager not operating")
     _require(inventory.get("fclk0_hz") == 100_000_000
              and inventory.get("fclk0_enabled") is True, "FCLK0 unavailable")

@@ -6,11 +6,14 @@ from unittest.mock import Mock
 
 import pytest
 from pl.hil.pspl02 import contract as c, mmio as m, runner, recovery, staging, inventory as collect
+from pl.hil.pspl02 import identity
 from pl.tests.test_swd04_staging import bit_fixture
 
 
 def inventory():
     return dict(architecture="armv7l", pynq_version="3.1.1", device_model_confirmed=True,
+                board_identity=dict(schema_version=1, board="PYNQ-Z2", method="device_tree_model",
+                                    model="TUL PYNQ-Z2", compatible=["xlnx,zynq-7000"]),
                 fpga_manager_state="operating", fclk0_hz=100_000_000, fclk0_enabled=True,
                 root_audit_complete=True, pl_users=[], audit_errors=[], metadata_backup_matches=True,
                 original_drivers_reviewed=True, services=dict.fromkeys(c.SERVICES, "active"),
@@ -40,6 +43,7 @@ def test_no_automatic_attestation(field):
     ("services", {}), ("metadata_backup_matches", False), ("original_drivers_reviewed", False),
     ("metadata_sha256", {}), ("driver_bindings", {}),
     ("uio", []), ("architecture", "x86_64"), ("observed_utc", "2026-01-01T00:00:00+00:00"),
+    ("board_identity", None),
 ])
 def test_incomplete_inventory_fails_closed(field, value):
     inv = inventory(); inv[field] = value
@@ -160,13 +164,14 @@ def session_files(tmp_path):
               "independent_power_recovery_ready", "operator_present", "no_shared_service_changes",
               "no_asynchronous_pl_reconfiguration")
     record = dict(stage="IDENTITY", p0_sha256=c.sha256_file(p0), observed_utc=runner.utc(),
+                  board_identity_sha256=identity.digest_report(inventory()["board_identity"]),
                   load_log=str(log), load_log_sha256=c.sha256_file(log), **dict.fromkeys(fields, True))
     c.write_record(session, record)
     return p0, session, record
 
 
 @pytest.mark.parametrize("bad", ["stage", "p0_sha256", "observed_utc", "load_log_sha256",
-                                 "operator_present", "no_shared_service_changes"])
+                                 "operator_present", "no_shared_service_changes", "board_identity_sha256"])
 def test_live_session_binds_current_loading_session(tmp_path, bad):
     p0, path, record = session_files(tmp_path)
     runner.require_session(p0, path, "IDENTITY", None)

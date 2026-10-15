@@ -14,6 +14,7 @@ import platform
 import sys
 
 from pl.hil.pspl02 import contract as c
+from pl.hil.pspl02 import identity
 from pl.hil.swd04.collect import collect, systemctl_status
 
 
@@ -54,6 +55,7 @@ def main(argv=None):
     parser.add_argument("--metadata-dir", type=Path, required=True)
     parser.add_argument("--backup-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    identity.add_arguments(parser)
     args = parser.parse_args(argv)
     try:
         c._require(not args.output.exists(), "Refuse overwrite")
@@ -65,7 +67,8 @@ def main(argv=None):
         report = collect(sysroot=Path("/sys"), device_tree=Path("/proc/device-tree"),
                          clock_summary=clock, metadata_path=args.metadata_dir/next(iter(metadata)),
                          service_status=systemctl_status, architecture=platform.machine(),
-                         pynq_version=importlib.metadata.version("pynq"))
+                         pynq_version=importlib.metadata.version("pynq"),
+                         board_identity_check=lambda: identity.verify(**identity.options(args)))
         rows = [line.split() for line in clock.read_text().splitlines()
                 if line.split() and line.split()[0].lower() in {"fclk0", "fclk_clk0", "fclk0_clk"}]
         hits, errors = process_users()

@@ -42,7 +42,7 @@ artifact pins; this harness intentionally rejects other builds.
 Run Verilator lint as in `.github/workflows/pl-pspl02-swd00.yml` and:
 
 ```sh
-python3 -m pytest -q pl/tests/test_pspl02_hil.py pl/tests/test_z2_control_waveform_build.py
+python3 -m pytest -q pl/tests/test_pspl02_hil.py pl/tests/test_pspl02_identity.py pl/tests/test_z2_control_waveform_build.py
 python3 -m pytest -q pl/verification/test_pspl02_swd00_rtl.py pl/verification/test_pspl02_hil_rtl.py
 ```
 
@@ -89,6 +89,78 @@ Unpack without overwriting files and run `sha256sum -c SHA256SUMS`. Set
 unchanged; choose a new private evidence directory `E` outside it (`umask 077`).
 
 ## Before loading: all conditions mandatory
+
+### Board identity with the existing Linux Device Tree
+
+`/proc/device-tree` may be a symlink to `/sys/firmware/devicetree/base` and
+legitimately lack `model`. Do not change the Device Tree or create a synthetic
+property. The shared `pl.hil.pspl02.identity` verifier is used by inventory and
+runtime; preflight requires its structured evidence, not only
+`device_model_confirmed=true`. Older inventories need fresh collection; archived
+HIL evidence must not be edited to add the new fields.
+
+An exact case-insensitive model of `TUL PYNQ-Z2`, `PYNQ-Z2` or `PYNQ Z2` is an
+accepted DT identity source. Substring matches and conflicting models fail.
+When present, compatible must be exactly the supported NUL-separated list
+`xlnx,zynq-7000`; additional unknown board entries fail closed. A model-bearing
+DT may omit compatible. Generic Zynq compatibility alone **never** identifies
+PYNQ-Z2, even with working clocks, UIO, PYNQ packages and services.
+
+With model absent, all of the following are required:
+
+- DT compatible `xlnx,zynq-7000`, parsed as strings rather than concatenated bytes.
+- An independently reviewed physical board-marking/asset inspection file (for
+  example a retained photograph and review record), plus a reviewed JSON
+  enrollment record linking that evidence to this Linux installation.
+- The record's expected SHA256 supplied from the trusted review independently
+  of the board/record. Never automatically trust an adjacent checksum file or
+  calculate a new expected digest just to accept a changed record.
+- Actual current `/etc/machine-id` (a valid nonzero lowercase 32-hex ID), hashed
+  without its surrounding whitespace; actual original known-good base.bin and
+  base.hwh whose digests match both the record and the existing recovery pins.
+
+Enrollment record schema (example only, deliberately **not ready**):
+
+```json
+{
+  "schema_version": 1,
+  "board": "PYNQ-Z2",
+  "physical_board_marking_verified": false,
+  "machine_id_sha256": null,
+  "physical_evidence_sha256": null,
+  "base_bin_sha256": null,
+  "base_hwh_sha256": null
+}
+```
+
+An authorized reviewer must inspect the physical evidence and its association
+with the machine before approving the record's exact bytes/digest. The software
+does not prove a photograph's content. machine-id and recovery files can be
+cloned: this is operational identification under that external review, not
+cryptographic authentication of a unique physical board. All supplied evidence
+is read-only; no enrollment is generated or automatically endorsed by the tools.
+Keep actual records, machine identifiers and physical evidence private.
+
+For the missing-model path, append these arguments to **both** inventory and
+each live runner invocation, using actual reviewed files and the independently
+trusted digest:
+
+```sh
+--board-record "$BOARD_RECORD" --board-record-sha256 "$TRUSTED_RECORD_SHA256" \
+--board-physical-evidence "$PHYSICAL_EVIDENCE" \
+--board-base-bin "$ORIGINAL_BASE_BIN" --board-base-hwh "$ORIGINAL_BASE_HWH"
+```
+
+Do not substitute candidate files for original base evidence. Runtime rereads
+the actual DT, current machine-id, enrollment, physical evidence and original
+base bytes before MMIO. The resulting evidence digest must match preflight
+and the session's `board_identity_sha256`; set this field to
+`identity.digest_report(before["board_identity"])` from the reviewed inventory.
+Changed evidence or another installation fails closed. Missing evidence remains
+NO-GO; do not manufacture it to unblock HIL. This opt-in policy does not change
+SWD-04's default collector/CLI behavior or broaden its accepted identity sources.
+
+### Platform and recovery checks
 
 1. Independently verify current UART login and a physically present operator's
    independent power recovery ability without using Hub Port 3. Keep UART open.
