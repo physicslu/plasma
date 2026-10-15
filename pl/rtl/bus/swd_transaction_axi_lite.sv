@@ -64,28 +64,28 @@ module swd_transaction_axi_lite #(
 
 
     // Fixed AXI4-Lite ABI widths. Not configurable without a new ABI.
-    localparam int unsigned AXI_ADDR_W = 32;
-    localparam int unsigned AXI_DATA_W = 32;
-    localparam int unsigned AXI_STRB_W = AXI_DATA_W / 8;
+    localparam integer AXI_ADDR_W = 32;
+    localparam integer AXI_DATA_W = 32;
+    localparam integer AXI_STRB_W = AXI_DATA_W / 8;
 
     // SWD command field widths.
-    localparam int unsigned CFG_W         = 8;
-    localparam int unsigned SWD_ADDR_W    = 4;
-    localparam int unsigned SWD_HALF_W    = 16;
-    localparam int unsigned SWD_TURN_W    = 3;
-    localparam int unsigned SWD_IDLE_W    = 8;
-    localparam int unsigned SWD_RETRY_W   = 8;
-    localparam int unsigned SWD_LINK_W    = 2;
-    localparam int unsigned RESP_STATUS_W = 4;
-    localparam int unsigned RESP_ACK_W    = 3;
-    localparam int unsigned RESP_ATTEMPT_W = 9;
+    localparam integer CFG_W         = 8;
+    localparam integer SWD_ADDR_W    = 4;
+    localparam integer SWD_HALF_W    = 16;
+    localparam integer SWD_TURN_W    = 3;
+    localparam integer SWD_IDLE_W    = 8;
+    localparam integer SWD_RETRY_W   = 8;
+    localparam integer SWD_LINK_W    = 2;
+    localparam integer RESP_STATUS_W = 4;
+    localparam integer RESP_ACK_W    = 3;
+    localparam integer RESP_ATTEMPT_W = 9;
 
     // CONFIG register bit positions.
-    localparam int unsigned CFG_OP_BIT    = 0;
-    localparam int unsigned CFG_AP_BIT    = 1;
-    localparam int unsigned CFG_READ_BIT  = 2;
-    localparam int unsigned CFG_ADDR_LSB  = 3;
-    localparam int unsigned CFG_ERROR_BIT = 7;
+    localparam integer CFG_OP_BIT    = 0;
+    localparam integer CFG_AP_BIT    = 1;
+    localparam integer CFG_READ_BIT  = 2;
+    localparam integer CFG_ADDR_LSB  = 3;
+    localparam integer CFG_ERROR_BIT = 7;
 
     // Software command encodings.
     localparam logic [AXI_DATA_W-1:0] CMD_START = 32'd1;
@@ -113,8 +113,8 @@ module swd_transaction_axi_lite #(
         {AXI_DATA_W{1'b1}} << SWD_RETRY_W;
 
     // Packed status and response field widths.
-    localparam int unsigned STATUS_USED_W = SWD_LINK_W + 3;
-    localparam int unsigned META_USED_W =
+    localparam integer STATUS_USED_W = SWD_LINK_W + 3;
+    localparam integer META_USED_W =
         RESP_ATTEMPT_W + 1 + RESP_ACK_W + RESP_STATUS_W;
 
     localparam logic [AXI_ADDR_W-1:0]
