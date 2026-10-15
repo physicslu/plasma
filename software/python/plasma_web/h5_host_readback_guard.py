@@ -11,6 +11,7 @@ from typing import Any
 
 from .backend_candidate_registry import BackendCandidateRegistry
 from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError
+from .microchip_phase1_admission_guard import admitted_microchip_phase1_count
 
 _ST_FORK_COMMIT = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
 _SYNTHETIC_SCOPE = "host_supplied_synthetic_inputs_only"
@@ -35,7 +36,7 @@ class H5HostReadbackGuard:
     """
 
     def __init__(self, catalog: DeviceCatalog, candidates: BackendCandidateRegistry):
-        if (catalog.status != "production" or catalog.size != 4853 or
+        if (catalog.status != "production" or catalog.size != 4853 + admitted_microchip_phase1_count(catalog) or
                 sum(r.vendor == "STMicroelectronics" for r in catalog.records) != 4629 or
                 sum(r.vendor == "NXP" and r.family == "KL25" for r in catalog.records) != 12 or
                 sum(r.vendor == "NXP" and r.family == "MCX" and
