@@ -83,6 +83,8 @@ class MicrochipFiveCfgSTFields(unittest.TestCase):
 
     def test_st_field_contract_and_cfg_cohort_frozen(self):
         self.assertEqual(sum(ledger.EXPECTED_BY_CFG.values()),2563)
+        self.assertEqual(ledger.FROZEN_IDENTITY_SHA256,
+                         "0c37ad68c1db0a4fb50ff5a1d229faaca0ee6eac44cfb9d9b7de4e8a931daf2a")
         self.assertEqual(len(ledger.EXPECTED_BY_CFG),5)
         self.assertEqual(len(ledger.ST_FIELDS),13)
         self.assertIn("working_vdd",ledger.ST_FIELDS)
