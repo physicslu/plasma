@@ -16,6 +16,14 @@ on:
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
       - "pl/projects/z2-control-waveform/**"
+      - "pl/hil/pspl02/**"
+      - "pl/hil/swd04/contract.py"
+      - "pl/hil/swd04/collect.py"
+      - "pl/hil/swd04/staging.py"
+      - "pl/tests/test_pspl02_hil.py"
+      - "pl/verification/test_pspl02_hil_rtl.py"
+      - "pl/verification/cocotb/pspl02_hil_cocotb.py"
+      - "docs/development/pspl02-swd00-hil-runbook.md"
       - "pl/projects/swd-transaction/**"
       - "pl/verification/models/**"
       - "pl/verification/test_swd_transaction_rtl.py"
@@ -40,6 +48,14 @@ on:
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
       - "pl/projects/z2-control-waveform/**"
+      - "pl/hil/pspl02/**"
+      - "pl/hil/swd04/contract.py"
+      - "pl/hil/swd04/collect.py"
+      - "pl/hil/swd04/staging.py"
+      - "pl/tests/test_pspl02_hil.py"
+      - "pl/verification/test_pspl02_hil_rtl.py"
+      - "pl/verification/cocotb/pspl02_hil_cocotb.py"
+      - "docs/development/pspl02-swd00-hil-runbook.md"
       - "pl/projects/swd-transaction/**"
       - "pl/verification/models/**"
       - "pl/verification/test_swd_transaction_rtl.py"
@@ -76,6 +92,13 @@ jobs:
         run: python3 -m pytest -q pl/tests/test_z2_control_waveform_build.py
       - name: Real RTL simulation
         run: python3 -m pytest -v pl/verification/test_pspl02_swd00_rtl.py
+      - name: PSPL-02 HIL safety contracts and exact functions against RTL
+        run: |
+          python3 -m pytest -q pl/tests/test_pspl02_hil.py pl/verification/test_pspl02_hil_rtl.py
+          python3 -m pl.hil.pspl02.runner --help
+          python3 -m pl.hil.pspl02.inventory --help
+          python3 -m pl.hil.pspl02.recovery --help
+          python3 -m pl.hil.pspl02.staging --help
       - name: SWD transaction strict lint
         run: verilator --lint-only --sv -Wall --top-module swd_transaction_master pl/rtl/site/swd_transaction_master.sv pl/rtl/site/swd_waveform_engine.sv
       - name: SWD transaction and independent target regression
@@ -87,6 +110,7 @@ jobs:
           name: pspl02-swd00-failure-${{ github.run_id }}
           path: |
             pl/build/pspl02-swd00/sim/
+            pl/build/pspl02-hil/
             pl/build/swd01-02/sim/
           retention-days: 7
           if-no-files-found: warn
