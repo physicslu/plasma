@@ -427,7 +427,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </div>
                     {selected.programming_qualification.provider && (
                       <>
-                        <div><dt>{zh ? "Provider" : "Provider"}</dt><dd>OpenOCD {selected.programming_qualification.provider.version}</dd></div>
+                        <div><dt>{zh ? "Provider" : "Provider"}</dt><dd>{selected.programming_qualification.provider.provider_id} {selected.programming_qualification.provider.version}</dd></div>
                         <div><dt>Target CFG</dt><dd><code>{selected.programming_qualification.provider.target_config}</code></dd></div>
                         <div><dt>Flash Driver</dt><dd><code>{selected.programming_qualification.provider.flash_driver}</code></dd></div>
                       </>
@@ -546,7 +546,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               {selected.programming_qualification && (
                 <>
                   <div><dt>{zh ? "Software Qualification" : "Software Qualification"}</dt><dd><strong>{selected.programming_qualification.state}</strong></dd></div>
-                  <div><dt>{zh ? "Qualification Registry" : "Qualification Registry"}</dt><dd><code>{selected.programming_qualification.registry_id}</code></dd></div>
+                  {selected.programming_qualification.registry_id && (
+                    <div><dt>{zh ? "Qualification Registry" : "Qualification Registry"}</dt><dd><code>{selected.programming_qualification.registry_id}</code></dd></div>
+                  )}
                   {selected.programming_qualification.provider && (
                     <>
                       <div><dt>{zh ? "Qualified Provider Commit" : "Qualified provider commit"}</dt><dd><code>{selected.programming_qualification.provider.source_commit}</code></dd></div>
@@ -640,8 +642,8 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             <div className="icSelectorBoundary">
               {selected.programming_qualification?.state === "SUPPORTED"
                 ? (zh
-                  ? "此 exact ICPN 已完成 Phase 2 OpenOCD software qualification；這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
-                  : "This exact ICPN has completed Phase 2 OpenOCD software qualification. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
+                  ? "此 exact ICPN 已完成 Phase 2 Programming qualification；Provider 與版本證據見上方。這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
+                  : "This exact ICPN has completed Phase 2 Programming qualification. Provider/version evidence is shown above. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
                 : selected.programming_qualification?.state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
                   ? (zh
                     ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Phase 2 software qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
