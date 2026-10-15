@@ -40,9 +40,9 @@ def table1_family(base):
     """Only documented Table 1-1, NOT an inferred commercial SKU."""
     require(re.fullmatch(r"ATSAML(?:10|11)[DE](?:14|15|16)A", base) is not None,
             "manufacturer Base Device outside twelve source-locked candidates")
-    series = base[5:7]
-    group = base[7]
-    density = base[8:10]
+    series = base[6:8]
+    group = base[8]
+    density = base[9:11]
     flash = MEMORY[density]
     ram = 16 if density == "16" else (8 if series == "11" or density == "15" else 4)
     return {"flash_kib":flash, "data_flash_kib":2,
