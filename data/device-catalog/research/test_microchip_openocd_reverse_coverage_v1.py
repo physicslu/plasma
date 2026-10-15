@@ -1,6 +1,7 @@
 """Negative tests for OpenOCD CFG-FIRST Microchip ICPN/Base Device crosswalk."""
 from copy import deepcopy
 import unittest
+from unittest.mock import patch
 
 import microchip_openocd_reverse_coverage_v1 as target
 
@@ -133,6 +134,69 @@ class ReverseCoverage(unittest.TestCase):
     def test_no_rollup_join_without_original_dfp(self):
         with self.assertRaisesRegex(ValueError,"actual pinned original DFP"):
             target.build(None,make_rollup([]))
+
+    def test_full_source_requires_all_thirteen_disjoint_archives(self):
+        with self.assertRaisesRegex(ValueError, "13"):
+            target.replay_all_original_batch_sources("/synthetic/dfp", [
+                ("original-16-batches", "/synthetic/old"),
+                ("shard-0", "/synthetic/shard-0")])
+        with self.assertRaisesRegex(ValueError, "unapproved"):
+            target.replay_all_original_batch_sources("/synthetic/dfp", [
+                ("original-16-batches", "/synthetic/old")] +
+                [("shard-0", "/synthetic/path") for _ in range(12)])
+        with self.assertRaisesRegex(ValueError, "original manufacturer DFP"):
+            target.replay_all_original_batch_sources(None, [
+                ("original-16-batches", "/synthetic/old")] +
+                [(f"shard-{n}", f"/synthetic/shard-{n}") for n in range(12)])
+
+    def test_full_source_frozen_audit_rejects_missing_query_replays(self):
+        # The actual GitHub CI also repeats the complete 13 source archives.
+        # Mocked objects below only exercise the immutable audit gate.
+        audit = {
+            "original_dfp_index_sha256": target.gates.PINNED_DFP_SOURCE,
+            "planned_dfp_queries": 3198,
+            "planned_batches": 321,
+            "batch_archives_with_valid_capture_attestation": 313,
+            "complete_positive_exact_prefix_queries": 2753,
+            "fully_replayed_zero_exact_prefix_queries": 68,
+            "unique_exact_prefix_candidates_without_conflicts": 23276,
+            "raw_lifecycle_conflicts": 0,
+            "verified_original_source_response_links": 23427,
+        }
+        expected = {
+            "supported_text_search_seeds": 3198,
+            "batch_count": 321,
+        }
+        result = {
+            "observed_batch_archives": 313,
+            "replayed_positive_exact_prefix_queries": 2753,
+            "replayed_zero_exact_prefix_queries": 68,
+            "unique_exact_prefix_research_candidates": 23276,
+            "conflicting_lifecycle_identity_count": 0,
+            "replayed_queries": 2821,
+            "production_write_authorized": False,
+            "ordering_candidates": [{"sources": [{} for _ in range(23427)]}],
+        }
+        sources = [("original-16-batches", "/synthetic/old")] + [
+            (f"shard-{n}", f"/synthetic/shard-{n}") for n in range(12)]
+        inventory = {"source_bytes_sha256": target.gates.PINNED_DFP_SOURCE}
+        with patch.object(target, "archived_inventory", return_value=inventory), \
+             patch.object(target.batch_plan, "plan_inventory", return_value=expected), \
+             patch.object(target.full_mcp, "build", return_value=result), \
+             patch("pathlib.Path.read_text", side_effect=lambda *a,**kw: __import__("json").dumps(
+                 audit if "microchip-dfp-full-first-pass-audit" in str(a[0])
+                 else {"gate_1b_surface_audit": {"dfp_index_observation": {
+                    "raw_index_sha256": target.gates.PINNED_DFP_SOURCE}}})):
+            output, summary = target.replay_all_original_batch_sources(
+                "/synthetic/dfp", sources)
+            self.assertEqual(summary["historical_research_icpn_candidates_replayed"],23276)
+            self.assertEqual(summary["exact_prefix_queries_replayed"],2821)
+            self.assertFalse(summary["manufacturer_whole_population_known"])
+            corrupted = deepcopy(result)
+            corrupted["replayed_positive_exact_prefix_queries"] = 2752
+            with patch.object(target.full_mcp, "build", return_value=corrupted):
+                with self.assertRaisesRegex(ValueError, "audited"):
+                    target.replay_all_original_batch_sources("/synthetic/dfp",sources)
 
     def test_original_dfp_index_rejects_case_insensitive_duplicates(self):
         lock,_=target.source_lock()
