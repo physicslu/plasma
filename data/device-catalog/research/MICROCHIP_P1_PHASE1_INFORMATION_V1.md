@@ -40,6 +40,20 @@ The real GitHub-hosted, offline original-byte replay of **all 13 Microchip MCP a
 - **Manufacturer, ICPN and Base Device: VERIFIED for 126** each. **I/O Supply, VDDA and Core Architecture: UNKNOWN for 126** each.
 - **Record-level Phase 1 fully verified: 0; software SUPPORTED: 0; Production/Selector admission: 0.**
 
+### Source-replayed P1 manufacturer Base Device distribution
+
+| SAM L10 Base Device | ICPNs | SAM L11 Base Device | ICPNs |
+| --- | ---: | --- | ---: |
+| ATSAML10D14A | 8 | ATSAML11D14A | 8 |
+| ATSAML10D15A | 10 | ATSAML11D15A | 10 |
+| ATSAML10D16A | 11 | ATSAML11D16A | 10 |
+| ATSAML10E14A | 8 | ATSAML11E14A | 8 |
+| ATSAML10E15A | 12 | ATSAML11E15A | 12 |
+| ATSAML10E16A | 15 | ATSAML11E16A | 14 |
+| **L10 subtotal** | **64** | **L11 subtotal** | **62** |
+
+These are the exact manufacturer-reported `basePartNumber` group counts reproduced from original MCP bytes, **not** a fabricated complete family SKU census. Each commercial ICPN is separately listed in the CI artifact with its original response hash; all twelve names match original DFP and Chart rows.
+
 **Official document for the next evidence acquisition:** Microchip [SAM L10/L11 Family Data Sheet, DS60001513G](https://ww1.microchip.com/downloads/en/DeviceDoc/SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf), **Section 2 Ordering Information (datasheet page 16)**. The section explains the manufacturer's ordering-code conventions (family/series, pin group, Flash density, package/temperature grade and carrier). These conventions are a *research lookup aid*, **not authority to invent an exact ICPN or promote any field without the original PDF bytes, complete existing manufacturer order code and documented applicability**.
 
 **PDF status:** reference located, **original PDF bytes have NOT been archived and independently replayed into the PLASMA Research evidence vault in this PR**. Accordingly this PR contains **no new PDF-derived VERIFIED field**, no exact ordering-table claim and no vendor Programming Profile. Preserve the existing 126 manufacturer-MCP identities and their chart PARTIAL state until a dedicated reviewed PDF evidence enrichment PR.
