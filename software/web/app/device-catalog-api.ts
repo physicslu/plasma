@@ -313,7 +313,7 @@ export type MicrochipPhase1ICInformation = {
   working_vdd_v: null;
   io_supply_v: null;
   vdda_v: null;
-  field_states: Record<string, "VERIFIED" | "PARTIAL" | "UNKNOWN">;
+  field_states: Record<string, "VERIFIED" | "PARTIAL" | "UNKNOWN" | "CONFLICT" | "NOT_APPLICABLE">;
   source: {
     authority: "Microchip Technology official";
     exact_mcp_material_source: string;
