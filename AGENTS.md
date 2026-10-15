@@ -144,6 +144,73 @@ prototype, propose and implement a scoped Development Mode change through
 normal engineering review rather than fabricate evidence or silently bypass
 executable checks.
 
+## 1B. Canonical Codex task/SSH execution contract (normative)
+
+**A Codex instruction is an execution assignment, not an invitation to
+re-plan the same approved work.** For every task already covered by Gate 1,
+the agent must carry out *all* authorized steps through actual acceptance or
+a truthful, actionable blocker, without transferring routine SSH/sudo,
+building, staging, test execution, restore, CI repair or status checking to
+the owner. Explicit Gate 2 approval still controls merging.
+
+The standard input packet for hardware tasks is
+`docs/development/codex-z2-hil-development-command.md`. Its fixed sections
+are: objective, already-approved scope, target/repository, credentials,
+autonomous sequence, stop/recovery policy and PASS/FAIL/NOT RUN evidence.
+For non-hardware work use the same pattern, with the task's actual acceptance
+criteria; do not invent hardware stages.
+
+**Z2 development SSH/sudo authentication:**
+
+- The standard PYNQ-Z2 development-image SSH account is `xilinx`.
+  A factory-image account name is not an authorization token. Resolve the
+  actual target hostname/IP from current, owner-authorized lab config;
+  never guess a network target or select another device solely by hostname.
+- The SSH password and (unless explicitly different) sudo password come
+  from the owner's approved **local** credential source, not from Git.
+  Canonical per-user file on the **integration host**:
+  `~/.config/plasma/z2-dev-credentials.json` containing
+  `ssh_host`, `ssh_username`, `ssh_password`, `sudo_password`.
+  The file/directory must be owner-only (`0600`/`0700`), outside the
+  repository, never committed, copied to a PR/CI artifact, logged, printed,
+  or transmitted to unrelated endpoints. A password reused for SSH and
+  sudo is acceptable for this owner-authorized lab prototype.
+- The owner has authorized the agent to use the supplied development-board
+  credentials for bounded PYNQ-Z2 SSH/sudo HIL within the approved Gate 1
+  scope. **Do not introduce a redundant manual sudo approval.** Prefer
+  existing SSH agent/key or owner-approved credential store when usable;
+  otherwise read the local secret in memory and feed sudo through stdin
+  (e.g., `sudo -S`), never via shell arguments or a committed script.
+  Redact secrets from errors and logs. Never edit sudoers to avoid a prompt.
+- If the approved credential store is absent but the owner supplied the
+  credential in the agent's active authorized session, initialize/use the
+  private store without asking again. If the credential genuinely is
+  unavailable to the execution environment, request it **once**, as a
+  concrete access blocker, rather than looping through failed SSH/sudo
+  preflights. Do not assume a chat secret magically appears on the host.
+- Agent permission/sandbox boundaries still apply. A text prompt or
+  stored credential cannot create SSH access or override a real sandbox
+  denial. Never state that a physical action ran unless it was observed.
+
+**Default end-to-end Z2 prototype-HIL sequence, when hardware execution is
+within the approved task:** safely synchronize code, identify actual board
+and known-good candidate/recovery artifacts, perform one bounded
+Development Mode preflight, obtain the authorized root channel, perform
+supervised candidate load, check its new-build identity, execute PSPL-02
+Control/Status and SWD-00 internal loopback, **always attempt original FPGA
+recovery even on test failure**, verify restored board state, and publish
+the observed results with evidence paths. If current tooling stops at
+preflight or live-MMIO primitives, the agent must implement/stage a minimal
+bounded orchestration path in the approved scope rather than misrepresent
+those tools as a one-command hardware runner. Never claim a promised
+automation is already implemented.
+
+For this internal-loopback development milestone, do **not** run the
+intentional AXI-fault `ERROR`/`RESET` stages or external SWD/DUT operations.
+Stop on genuine ownership, artifact, electrical, recovery or access
+hazards. Distinguish *candidate loaded*, *functional PASS* and *original
+image recovered*; all must be actually observed.
+
 ## 2. Programming data model
 
 Plasma separates source data, execution instructions, and target-memory data.
@@ -760,7 +827,7 @@ Treat `$PLASMA_REPO` as the normal workspace boundary for AI-assisted developmen
 - Read/create/modify/delete files only inside the repository unless the task genuinely requires an already-authorized external resource.
 - Keep ordinary development commands inside the repository or subdirectories.
 - Do not inspect unrelated repositories, personal files, credentials, SSH configuration, container data, or system configuration as ordinary Plasma work.
-- Do not commit usernames, private hostnames, workstation inventory, keys, tokens, or other operator-specific infrastructure metadata into public guidance.
+- Do not commit personal usernames, private hostnames, workstation inventory, passwords, keys, tokens, or other operator-specific infrastructure metadata into public guidance. An intentionally documented vendor-default lab image account name (such as the PYNQ-Z2 development account) is not a personal username or credential secret.
 - If a task cannot be completed without leaving the workspace boundary, stop and explain the required external resource.
 
 This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.
