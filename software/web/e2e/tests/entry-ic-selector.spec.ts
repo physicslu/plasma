@@ -40,6 +40,7 @@ test("IC Selector first enriched result renders without page error and paginatio
     identifier,
     identifier_kind: "manufacturer_part_number",
     icpn: identifier,
+    phase1: { identity_state: "IDENTIFIED" as const },
     package: "LQFP",
     pin_count: "48",
     flash_size: "64 KiB",
