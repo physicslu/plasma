@@ -101,7 +101,8 @@ def page_evidence(page14, page16):
     has_footer = bool(re.search(r"DS60001513G\s*-\s*page\s*16", c16))
     require(not missing and has_footer,
             f"official revision / ordering page 16 mismatch: "
-            f"missing={missing}, footer={has_footer}")
+            f"missing={missing}, footer={has_footer}, " \
+            f"snippet={c16[:420]!r}")
     require(all(token in c16 for token in
                 ("TQFP", "VQFN", "SSOP", "WLCSP", "KPH")),
             "manufacturer package or ordering caveats missing")
