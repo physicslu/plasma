@@ -45,6 +45,19 @@ ARMv7 platform, hardware/session evidence, a staged BIN hash, an operating
 FPGA Manager and prior phase evidence. **It never loads firmware** and it
 never shuts down or restarts services, and provides no automatic rollback.
 
+## Isolated software staging on Z2 (post-Gate-2 only)
+
+Do not install this HIL tool into the running Plasma PPU Python environment,
+alter the PYNQ system packages, or use the existing Jupyter kernel as the
+test process. Stage the exact reviewed `pl/hil/swd04/` source into an isolated
+read-only source checkout/location, record its source SHA, and run with a
+Python version >=3.10. `python3 -m pl.hil.swd04.<command>` requires the
+repository root on `PYTHONPATH` (or an equivalent isolated package staging).
+The read-only collector's `/sys/kernel/debug/clk/clk_summary` access
+may require approved privileges; **missing clock evidence is NO-GO**.
+The live MMIO process is an intentionally separate privileged invocation,
+not a persistent service or PYNQ Overlay consumer.
+
 ## P0 — immutable artifact and read-only environment preflight
 
 After Gate 2, **before any modification to Z2**, create a fresh isolated
