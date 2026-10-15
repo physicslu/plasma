@@ -259,6 +259,7 @@ export type NXPManufacturerDeviceProfile = {
 export type ProgrammingQualification = {
   schema_version: "1.0.0";
   phase: "PROGRAMMING";
+  registry_id: string | null;
   state: "UNKNOWN" | "CANDIDATE" | "SUPPORTED" | "UNSUPPORTED";
   reviewed: boolean;
   phase1_identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
