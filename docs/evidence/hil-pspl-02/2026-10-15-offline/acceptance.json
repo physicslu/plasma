@@ -1,0 +1,93 @@
+{
+  "blockers": [
+    "Current independent UART login and physical power recovery not independently confirmed",
+    "Authorized privileged target access unavailable; complete PL-user/MMIO/clock audit pending",
+    "Safe ownership must be established without shared service changes"
+  ],
+  "candidate_and_recovery_sha256": {
+    "base.bin": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+    "base.hwh": "222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a",
+    "bin": "3d473eee307cf6dc36c66ffc9a80055a44141fa5b37c27acd0a850d0ab8f72e4",
+    "bit": "df04dae96af5d3918600142efab5ae646fd8ba1e03f51ca2ecf95333edc27880",
+    "hwh": "8e0abb1a1c7196e2ee51c5144a038a898a7af7a08887e55f33047ad925f174d5",
+    "manifest": "2f7df31dc7760869b03d104f10609b7ed9a1150e89700af4cff2433311390ba8"
+  },
+  "candidate_design": "control_waveform_loopback",
+  "candidate_source_git_sha": "cbe2fb9d012d8ea3df3098ac9ceae0f3d2e468f9",
+  "date": "2026-10-15",
+  "external_pl_io": false,
+  "hardware_status": "NO_GO",
+  "identity_abi": 1,
+  "new_z2_tests": {
+    "HIL-PSPL-02A": "NOT_RUN",
+    "HIL-PSPL-02B": "NOT_RUN",
+    "HIL-RECOVERY": "NOT_RUN",
+    "HIL-SWD-00A": "NOT_RUN",
+    "HIL-SWD-00B": "NOT_RUN",
+    "HIL-SWD-00C": "NOT_RUN",
+    "HIL-SWD-00D": "NOT_RUN"
+  },
+  "observed_checks": [
+    {
+      "command": "pl/.venv/bin/python -m pytest -q pl/tests",
+      "result": "PASS",
+      "subtests_passed": 10,
+      "tests_passed": 225
+    },
+    {
+      "command": "pl/.venv/bin/python -m pytest -q pl/verification/test_pspl02_swd00_rtl.py pl/verification/test_pspl02_hil_rtl.py",
+      "executor": "integration_host_outside_sandbox",
+      "pytest_runners_passed": 5,
+      "result": "PASS"
+    },
+    {
+      "check": "Verilator 4.038 lint, Control/Waveform/Command RTL, -Wall -Wno-UNUSED",
+      "result": "PASS"
+    },
+    {
+      "check": "Bootgen 2026.1 raw BIN conversion; every swapped payload byte and exact trailing NOP",
+      "result": "PASS"
+    },
+    {
+      "check": "Candidate BIT/HWH/original manifest, retained Vivado evidence hashes and unchanged production build inputs",
+      "result": "PASS"
+    },
+    {
+      "check": "Independent copy of original board base.bin/base.hwh; pinned hashes",
+      "result": "PASS"
+    },
+    {
+      "check": "Offline kit SHA256SUMS and verify/CLI execution from kit directory",
+      "result": "PASS"
+    },
+    {
+      "check": "HIL-PSPL-01 retained original evidence SHA256",
+      "files": 51,
+      "result": "PASS"
+    }
+  ],
+  "operations": {
+    "driver_or_metadata_change": "NOT_RUN",
+    "dut_power": "NOT_RUN",
+    "fpga_load": "NOT_RUN",
+    "ic_programming": "NOT_RUN",
+    "live_mmio": "NOT_RUN",
+    "physical_swd": "NOT_RUN",
+    "power_cycle": "NOT_RUN",
+    "shared_service_restart": "NOT_RUN"
+  },
+  "qualification": "PSPL-02/SWD-00_OFFLINE_PREPARATION",
+  "retained_build_evidence": {
+    "drc_checks": 0,
+    "hold_slack_ns": 0.038,
+    "reference": "../../../../pl/projects/z2-control-waveform/baseline-host-2026-10-15.json",
+    "setup_slack_ns": 0.719,
+    "vivado_rebuilt_this_task": false
+  },
+  "validation_limitations": [
+    "Initial Verilator UNUSED warning spelling adapted for installed 4.038; CI retains current UNUSEDSIGNAL spelling",
+    "Sandbox simulator subprocess waiting anomaly: two own test processes terminated; unchanged RTL suite passed on integration host",
+    "No new synthesis/implementation claim: immutable prior Vivado evidence was reverified",
+    "No hardware acceptance or emergency recovery qualification"
+  ]
+}
