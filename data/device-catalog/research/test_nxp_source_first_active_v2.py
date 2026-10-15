@@ -75,7 +75,7 @@ class SourceFirstReverseTests(unittest.TestCase):
             audit.validate(original=self.rows)
 
     def test_deny_prior_501_overlap(self):
-        self.rows["records"][-1]["icpn"] = "MKL25Z128VLL4"
+        self.rows["records"][-1]["icpn"] = "MKL25Z128VLK4"
         self.rows["records"].sort(key=lambda x: x["icpn"])
         with self.assertRaisesRegex(ValueError, "candidate overlaps"):
             audit.validate(original=self.rows)
