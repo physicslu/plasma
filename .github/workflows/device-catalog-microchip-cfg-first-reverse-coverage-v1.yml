@@ -21,6 +21,9 @@ on:
       - 'data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_s1_exact_identity_funnel_v1.py'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md'
+      - 'data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_cfg2563_st_field_ledger_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_5CFG_2563_PHASE1_ST_FIELDS_V1.md'
       - 'data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
@@ -460,6 +463,67 @@ jobs:
                       str(d["phase1_research_only_source_gaps"])+"\n")
               f.write("Research P0/P1/P2 are separate from S1/S2/S3.\n")
           PY
+      - name: Freeze 5 CFG x 2563 original Microchip ICPN ST-style Phase 1 field evidence
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_cfg2563_st_field_ledger_v1.py' -v
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py \
+            --upstream-cfg-report "$root/microchip-full-reverse.json" \
+            --p0-information-ledger "$root/microchip-p0-phase1-information-ledger.json" \
+            --p1-information-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --s1-funnel "$root/microchip-phase1-s1-exact-identity-funnel.json" \
+            --output "$root/microchip-phase1-5cfg-2563-st-fields.json"
+          python data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py \
+            --upstream-cfg-report "$root/microchip-full-reverse.json" \
+            --p0-information-ledger "$root/microchip-p0-phase1-information-ledger.json" \
+            --p1-information-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --s1-funnel "$root/microchip-phase1-s1-exact-identity-funnel.json" \
+            --output "$root/microchip-phase1-5cfg-2563-st-fields.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/
+              "microchip-phase1-5cfg-2563-st-fields.json").read_text())
+          assert d["record_count"]==d["s1_identified"]==2563
+          assert d["s1_complete"]==0
+          assert d["cfg_counts"]=={
+              "tcl/target/pic32mx.cfg":1241,
+              "tcl/target/at91samdXX.cfg":667,
+              "tcl/target/atsame5x.cfg":354,
+              "tcl/target/atsamv.cfg":175,
+              "tcl/target/atsaml1x.cfg":126,
+          }
+          assert len(d["records"])==2563
+          assert len({r["icpn"].upper() for r in d["records"]})==2563
+          for field in ("manufacturer","icpn","base_device"):
+              assert d["field_coverage"][field]["VERIFIED"]==2563
+          for field in ("package","pin_count","flash","ram","working_vdd",
+                        "temperature","core_model"):
+              assert d["field_coverage"][field]["PARTIAL"]==2496
+              assert d["field_coverage"][field]["UNKNOWN"]==67
+              assert d["field_coverage"][field]["VERIFIED"]==0
+          for field in ("io_supply","vdda","core_architecture"):
+              assert d["field_coverage"][field]["UNKNOWN"]==2563
+          assert not any((d["production_write_authorized"],
+                          d["catalog_publication_authorized"],
+                          d["phase2_programming_authorized"],
+                          d["phase3_hil_authorized"]))
+          assert all(r["non_claims"]["openocd_software_supported"] is False
+              and r["non_claims"]["public_selector_eligibility_changed"] is False
+              for r in d["records"])
+          print("MICROCHIP_5CFG_2563_IDENTITY_FREEZE_SHA256",
+                d["cfg_identity_freeze_sha256"])
+          print("MICROCHIP_5CFG_2563_FIELDS",
+                json.dumps(d["field_coverage"],sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip frozen 5 CFG / 2563 manufacturer exact ICPNs\n")
+              f.write("CFG+exact-ICPN+base freeze SHA256: "+
+                      d["cfg_identity_freeze_sha256"]+"\n")
+              f.write("13 ST-style per-field evidence states; S1_complete=0\n")
+              f.write("No Production admission, public Selector or software support\n")
+          PY
       - name: Validate P1 original-MCP ordering grammar audit offline fail-closed
         run: |
           set -euo pipefail
@@ -528,6 +592,7 @@ jobs:
             ${{ runner.temp }}/microchip-p1-dfp-discovery.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-phase1-s1-exact-identity-funnel.json
+            ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
           if-no-files-found: warn
           retention-days: 90
