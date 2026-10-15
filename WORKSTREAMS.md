@@ -170,7 +170,7 @@ retained research evidence
         -> HIL / physical qualification
 ```
 
-The exact promotion mechanism is still an architecture item. Until it exists, research data must not be described as production runtime support.
+ADR-0002 Phase 2 now defines the first explicit OpenOCD promotion mechanism: reviewed AI IC Support evidence remains under `data/ic-support/`, while the SW/PPU-owned software qualification authority is versioned under `release/openocd-qualification/` and validated by the dedicated OpenOCD software-qualification workflow. Only exact ICPNs explicitly admitted by that promotion transaction may become software `SUPPORTED`; research profiles alone remain non-runtime authority.
 
 ### ICPN -> capability state
 
