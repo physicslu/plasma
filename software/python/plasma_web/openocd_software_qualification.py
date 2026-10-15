@@ -28,13 +28,13 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v5.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v6.json"
 MEDIUM_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
 APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
 EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json"
-HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-r-lqfp-v1.json"
-HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-r-lqfp-t6-t7-applicability-v1.json"
-HIGH_EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-high-density-r-lqfp-tr-ordering-equivalence-v1.json"
+HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rv-lqfp-v2.json"
+HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-rv-lqfp-t6-t7-applicability-v2.json"
+HIGH_EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-high-density-rv-lqfp-tr-ordering-equivalence-v2.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -113,11 +113,11 @@ class OpenOCDSoftwareQualificationRegistry:
             qualification_manifest.get("provider_source_lock_id") == source_lock.get("source_lock_id")
             and qualification_manifest.get("provider") == q_provider
             and qualification_manifest.get("qualification_id")
-            == "adr0002-phase2-openocd-012-stm32f103-v5"
+            == "adr0002-phase2-openocd-012-stm32f103-v6"
             and qualification_manifest.get("predecessor_qualification_id")
-            == qualification.get("qualification_id")
-            and qualification_manifest.get("supported_exact_icpn_count") == 31,
-            "STM32F103 v5 qualification manifest drift",
+            == "adr0002-phase2-openocd-012-stm32f103-v5"
+            and qualification_manifest.get("supported_exact_icpn_count") == 41,
+            "STM32F103 v6 qualification manifest drift",
         )
         manifest_cohorts = {
             item.get("qualification_path"): item
@@ -126,13 +126,13 @@ class OpenOCDSoftwareQualificationRegistry:
         }
         _require(
             set(manifest_cohorts) == {MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL},
-            "STM32F103 v5 cohort manifest scope drift",
+            "STM32F103 v6 cohort manifest scope drift",
         )
         for rel in (MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL):
             raw = (root / rel).read_bytes()
             _require(
                 _git_blob_sha1(raw) == manifest_cohorts[rel].get("git_blob_sha1"),
-                f"STM32F103 v5 cohort lock drift: {rel}",
+                f"STM32F103 v6 cohort lock drift: {rel}",
             )
         _require(
             high_qualification.get("provider_source_lock_id") == source_lock.get("source_lock_id")
@@ -785,6 +785,7 @@ class OpenOCDSoftwareQualificationRegistry:
             and set(high_ordering.get("required_flash_codes", [])) == {"C", "D", "E"}
             and high_band.get("flash_codes") == ["C", "D", "E"]
             and high_band.get("pin_count", {}).get("R") == 64
+            and high_band.get("pin_count", {}).get("V") == 100
             and high_band.get("package", {}).get("T") == "LQFP"
             and high_band.get("temperature_c", {}).get("6") == "-40 to 85 C"
             and high_band.get("temperature_c", {}).get("7") == "-40 to 105 C"
@@ -834,6 +835,11 @@ class OpenOCDSoftwareQualificationRegistry:
                 "STM32F103RDT6",
                 "STM32F103RET6",
                 "STM32F103RET7",
+                "STM32F103VCT6",
+                "STM32F103VDT6",
+                "STM32F103VDT7",
+                "STM32F103VET6",
+                "STM32F103VET7",
             },
             "high-density manufacturer applicability scope expanded without review",
         )
@@ -898,6 +904,11 @@ class OpenOCDSoftwareQualificationRegistry:
                 "STM32F103RCT7TR",
                 "STM32F103RDT6TR",
                 "STM32F103RET6TR",
+                "STM32F103VCT6TR",
+                "STM32F103VDT6TR",
+                "STM32F103VDT7TR",
+                "STM32F103VET6TR",
+                "STM32F103VET7TR",
             },
             "high-density ordering-equivalence scope expanded without review",
         )
@@ -1045,16 +1056,26 @@ class OpenOCDSoftwareQualificationRegistry:
             ("STMicroelectronics", "STM32F103RET6"),
             ("STMicroelectronics", "STM32F103RET6TR"),
             ("STMicroelectronics", "STM32F103RET7"),
+            ("STMicroelectronics", "STM32F103VCT6"),
+            ("STMicroelectronics", "STM32F103VCT6TR"),
+            ("STMicroelectronics", "STM32F103VDT6"),
+            ("STMicroelectronics", "STM32F103VDT6TR"),
+            ("STMicroelectronics", "STM32F103VDT7"),
+            ("STMicroelectronics", "STM32F103VDT7TR"),
+            ("STMicroelectronics", "STM32F103VET6"),
+            ("STMicroelectronics", "STM32F103VET6TR"),
+            ("STMicroelectronics", "STM32F103VET7"),
+            ("STMicroelectronics", "STM32F103VET7TR"),
         }
         _require(
-            high_exact.issubset(self._records) and len(self._records) == 31,
+            high_exact.issubset(self._records) and len(self._records) == 41,
             "combined Phase 2 qualification scope expanded without review",
         )
 
         for qualification_name, boundary in (
             ("medium-density", qualification.get("acceptance_boundary", {})),
             ("high-density", high_qualification.get("acceptance_boundary", {})),
-            ("v5 manifest", qualification_manifest.get("acceptance_boundary", {})),
+            ("v6 manifest", qualification_manifest.get("acceptance_boundary", {})),
         ):
             for boundary_key in (
                 "public_catalog_visibility_changed",
