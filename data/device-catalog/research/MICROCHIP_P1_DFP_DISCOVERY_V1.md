@@ -65,6 +65,10 @@ identity observations unless independently reclassified.
 
 ## Deliberate implementation limit
 
+The generated report is **schema_version=2**; the historical PR #909
+schema v1 output has been superseded and cannot be compared by key name
+without this explicit classification migration.
+
 The existing script / test / CI file names containing `p1_dfp_discovery_v1`
 are retained as references to PR #909; **their result schema has corrected
 `adr0002_p1_openocd_candidate_exact_icpns`, `adr0002_p2_archive_exact_icpns`,
