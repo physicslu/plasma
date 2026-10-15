@@ -3,7 +3,7 @@
   "contract_id": "ADR-0002_CROSS_VENDOR_IC_DISCOVERY_V1",
   "authority": "PHASE1_DISCOVERY_AND_CANONICALIZATION",
   "manufacturer_policy": "NO_MANUFACTURER_ALLOWLIST",
-  "selector_visibility_policy": "S1_IDENTIFIED_EXACT_ICPN",
+  "selector_visibility_policy": "PHASE1_IDENTIFIED_EXACT_ICPN",
   "execution_authority_policy": "PHASE2_AND_RUNTIME_GATES_ONLY",
   "source_adapter_policy": "VENDOR_SPECIFIC_ACQUISITION_ALLOWED_CANONICAL_OUTPUT_MANDATORY",
   "default_discovery_strategy": "PINNED_OPENOCD_CAPABILITY_FIRST_THEN_OFFICIAL_MANUFACTURER_EXACT_IDENTITY",
@@ -106,7 +106,7 @@
     "cfg_or_driver_never_proves_exact_commercial_identity",
     "phase1_identified_never_implies_phase2_supported",
     "phase2_supported_never_implies_phase3_passed",
-    "selector_visibility_depends_on_s1_identified_not_s2_supported",
+    "selector_visibility_depends_on_phase1_identified_not_phase2_supported",
     "job_batch_execution_never_follows_selector_visibility",
     "research_priority_is_not_phase_state",
     "missing_source_bytes_is_not_identity_failure_when_exact_official_identity_is_unambiguous",
@@ -114,7 +114,7 @@
     "ordering_suffixes_may_not_be_synthesized_without_official_exact_identity"
   ],
   "selector_projection": {
-    "visible_identity_state": "IDENTIFIED",
+    "visible_phase1_identity_state": "IDENTIFIED",
     "show_phase1_information_state": true,
     "show_phase2_software_state": true,
     "show_phase3_compatibility_state": true,
@@ -179,5 +179,19 @@
     "family_name_means_exact_icpn",
     "unknown_means_zero_or_not_applicable",
     "one_vendor_source_quality_rule_may_be_weakened_for_another_vendor"
-  ]
+  ],
+  "terminology_policy": {
+    "canonical_phase_names": [
+      "PHASE1",
+      "PHASE2",
+      "PHASE3"
+    ],
+    "public_labels": [
+      "Phase 1",
+      "Phase 2",
+      "Phase 3"
+    ],
+    "s1_s2_s3_status_names_forbidden": true,
+    "note": "S1/S2/S3 may appear only as historical or mathematical set notation; they are not canonical API, UI, storage, or workflow status names."
+  }
 }
