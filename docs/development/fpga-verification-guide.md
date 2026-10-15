@@ -1,7 +1,7 @@
 # Plasma FPGA Verification Guide
 
 > Scope: RTL functional, temporal, regression, and hardware-validation strategy  
-> Updated: 2026-08-19
+> Updated: 2026-10-15
 
 ## 1. Verification goals
 
@@ -31,10 +31,7 @@ Regression
 Synthesis / implementation / timing
    |
    v
-Human deploy approval
-   |
-   v
-Z2 hardware validation
+Z2 hardware validation (when already authorized in Gate 1 scope)
 ```
 
 These layers answer different questions and must not be collapsed into one generic "all tests passed" claim.
@@ -59,14 +56,19 @@ Use `channel` only for a genuine lower-level protocol/bus channel distinct from 
 
 ## 3. Current repository status
 
-At the current baseline, `pl/tests/` contains repository/source-layout pytest checks, not a complete production RTL simulator regression.
+The repository contains both source-layout pytest checks and implemented
+Cocotb/RTL regressions for selected PS/PL blocks (including PSPL-02
+CONTROL and SWD waveform logic). Coverage is **per design and per layer**,
+not a blanket FPGA sign-off. In particular, a Cocotb run that drives AXI
+signals does not establish that CPython on the Zynq ARM emits the same
+transactions through Linux MMIO.
 
 Therefore:
 
-- do not claim cocotb regression exists until it is actually added;
-- do not claim SVA coverage exists until assertion sources and a supporting simulator flow are configured;
-- do not block documentation-only work on tools not yet selected/installed;
-- add executable verification infrastructure together with the first production RTL that needs it.
+- report which exact Cocotb/SVA modules, simulator and RTL variant ran;
+- identify any unimplemented driver/architecture-integration coverage;
+- never infer RTL, timing, PS/Linux MMIO or HIL PASS from source-only tests;
+- do not block documentation-only changes on unrelated FPGA tools.
 
 ## 4. Python-first functional verification
 
@@ -106,6 +108,79 @@ async def test_basic_transaction(dut):
 ```
 
 Exact APIs and simulator integration must be defined by the first real module, not copied blindly from an unrelated project.
+
+## 4A. Production PS driver reuse across Cocotb and Linux (required for AXI-Lite)
+
+**Design requirement:** one production PS driver/control layer implements
+register definitions, programming order, status/error processing and state
+transitions. Tests **reuse that implementation** instead of recoding the
+same sequence solely in Cocotb.
+
+```text
+                  Shared production PS driver logic
+              (register map, sequence, checks, state)
+                               |
+                       injected MMIO interface
+                     read32 / write32 / ...
+                           /         \
+         Cocotb AXI BFM backend     Real Linux MMIO backend
+           (simulation-time I/O)     (/dev/mem or vetted driver)
+                   |                         |
+              actual PL RTL          ARMv7 + Linux + PS7/AXI + PL
+                   |                         |
+           transaction simulation             Z2 HIL
+```
+
+**Scope of reuse:** share the real PS control algorithm; not necessarily
+the physical MMIO transport or all coroutine/synchronous glue.
+Cocotb's AXI bus-functional model normally emits transactions on HDL
+ports; it does **not** run CPython inside the ARM core or execute actual
+`/dev/mem` accesses. If the production driver is synchronous and the
+Cocotb bus driver asynchronous, provide an explicit thin adapter or
+software-driver test harness rather than copy/paste the algorithm.
+Where a layer cannot run unchanged, report that limitation.
+
+**Validation matrix:**
+
+| Layer | Execute/observe | Can claim | Cannot claim |
+| --- | --- | --- | --- |
+| PS driver pytest | Actual control/sequence code with fake MMIO/trace backend | Correct call order, offsets, values, expected errors | Hardware bus cycles or CPU access width |
+| Shared PS logic + Cocotb RTL | Same driver operations through Cocotb AXI BFM | Address/value semantics, real RTL response to modeled transactions | Actual ARM stores, Linux `mmap` attributes or PS7 interconnect behavior |
+| Target MMIO backend verification | Inspect real target binary/disassembly and controlled memory access implementation | Verified ARMv7 instruction width/alignment for the tested build and mapping assumptions | That a specific PL received the expected AXI transaction |
+| Bounded Z2 HIL | Real PS application/driver through Linux, PS7 and loaded FPGA | Observed PS-to-PL behavior with stated bitstream and board | Untested boundary/error cases or future hardware revisions |
+
+For each AXI-Lite peripheral, simulate representative aligned 32-bit
+reads/writes; defined sub-word accesses and WSTRB combinations; legal and
+illegal offsets; independent AW/W arrival order; OKAY/SLVERR BRESP and
+RRESP; valid/ready stalls; reset and back-to-back requests. Explicitly
+compare the **protocol the production driver expects** with the RTL
+response. Unsupported widths are a documented interface decision, not an
+unexamined assumption. An RTL-only test of invented ideal full-word
+transactions is insufficient PS/PL integration coverage.
+
+**Linux backend-specific requirement:** `struct.pack_into("<I", buffer,
+offset, value)` promises a little-endian four-byte representation,
+**not** one atomic/aligned 32-bit ARM device-store instruction.
+Inspect the actual CPython/native implementation or its ARMv7 disassembly,
+confirm `STR` versus `STRB` (and offsets), address alignment and MMIO
+mapping/cacheability/barrier requirements; use a verified access primitive
+for device registers. A C `volatile uint32_t` access alone is not proof
+of the entire PS7/AXI transaction. Confirm the relevant path in HIL.
+
+**Failure evidence rule:** an ARM external-abort fault address within a
+register's byte range (for example CONTROL `base+1`) alone does **not**
+prove the slave observed the same AWADDR or emitted SLVERR. Establish the
+instruction, fault status and access mapping first; use bus-level evidence
+when needed. For the current PSPL-02 development incident, treat
+MMIO-width/decode mismatch as a hypothesis pending confirmation; do not
+repeat the bus-faulting write blindly. Deliberately malformed AXI
+transactions belong in Cocotb or an explicitly authorized separate
+qualification experiment, **not** the normal development HIL.
+
+For Prototype, do **not** build a full ARM/Linux/FPGA co-simulation
+platform just to satisfy this policy. Reuse the existing PS driver,
+augment the focused offline checks, and reserve a short real-board smoke
+test for the physical integration boundary.
 
 ## 5. Minimal HDL simulation harness
 
@@ -300,8 +375,7 @@ main
   -> reproducible Vivado build
   -> implementation/timing checks
   -> artifact identified
-  -> explicit deploy/hardware approval
-  -> load bitstream on Z2
+  -> load bitstream on Z2 (if included in the approved Gate 1 scope)
   -> hardware-in-the-loop test
   -> record observed result
 ```
@@ -317,7 +391,7 @@ Future HIL tests may include:
 - abort/error recovery;
 - throughput/timing measurements.
 
-Hardware tests must use known-safe electrical configuration and remain behind the hardware approval gate.
+Hardware tests must use known-safe electrical configuration and remain within the hardware operations explicitly authorized by the root AGENTS.md Gate 1. No separate hardware approval gate is created.
 
 ## 17. First production RTL checklist
 
@@ -333,6 +407,6 @@ When the first real Plasma FPGA module is introduced:
 - configure failure logs/waveforms;
 - add CI only after the same command is reproducible outside CI;
 - document what remains Vivado-only;
-- keep Z2 loading behind explicit approval.
+- keep Z2 loading within the approved Gate 1 scope; no third approval gate.
 
 This is where the verification architecture becomes executable rather than documentation-only.
