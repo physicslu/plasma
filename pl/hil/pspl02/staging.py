@@ -34,7 +34,8 @@ def create(paths: dict[str, Path], output: Path):
             "independent_power_recovery_ready", "operator_present", "no_shared_service_changes",
             "no_asynchronous_pl_reconfiguration"), False)
         session.update(stage=stage, p0_sha256="", observed_utc="", load_log="", load_log_sha256="",
-                       metadata_file="", metadata_backup="", metadata_sha256="")
+                       metadata_file="", metadata_backup="", metadata_sha256="",
+                       board_identity_sha256="")
         c.write_record(output/f"templates/session-{stage}.json", session)
     checklist = root/"docs/development/pspl02-swd00-hil-runbook.md"
     if not checklist.is_file():

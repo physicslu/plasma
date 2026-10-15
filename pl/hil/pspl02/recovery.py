@@ -9,6 +9,7 @@ from pl.hil.pspl02 import contract as c
 
 def verify(before: dict, after: dict, observed: dict):
     for snapshot in (before, after):
+        c.validate_report(snapshot.get("board_identity"))
         c._require(snapshot.get("architecture") == "armv7l"
                    and snapshot.get("device_model_confirmed") is True
                    and snapshot.get("pynq_version") == "3.1.1", "Wrong restored platform")
@@ -17,7 +18,7 @@ def verify(before: dict, after: dict, observed: dict):
                    and snapshot.get("fclk0_enabled") is True, "Manager/clock mismatch")
         c._require(snapshot.get("services") == dict.fromkeys(c.SERVICES, "active"),
                    "Services not restored")
-    for field in ("metadata_sha256", "driver_bindings", "uio"):
+    for field in ("board_identity", "metadata_sha256", "driver_bindings", "uio"):
         old, new = before.get(field), after.get(field)
         c._require(bool(old) and bool(new), "Missing recovery snapshot: " + field)
         if field == "uio":

@@ -16,6 +16,7 @@ import struct
 import sys
 
 from pl.hil.pspl02 import contract as c, mmio as m
+from pl.hil.pspl02 import identity
 from pl.hil.swd04.collect import fclk0_from_summary, systemctl_status
 
 
@@ -29,6 +30,8 @@ def require_session(p0: Path, session: Path, stage: str, previous: Path | None):
                and proof.get("preflight") == "PASS" and proof.get("sha256") == c.HASHES,
                "Preflight not bound to reviewed baseline/recovery")
     c.preflight(proof.get("inventory", {}), proof.get("attestation", {}))
+    c._require(record.get("board_identity_sha256") == identity.digest_report(
+        proof["inventory"]["board_identity"]), "Session board identity mismatch")
     c._require(record.get("stage") == stage and record.get("p0_sha256") == c.sha256_file(p0),
                "Session stage/preflight mismatch")
     c.require_fresh(record.get("observed_utc"))
@@ -55,13 +58,14 @@ def require_session(p0: Path, session: Path, stage: str, previous: Path | None):
     return record
 
 
-def runtime_audit(session: dict):
+def runtime_audit(session: dict, *, board_options=None):
     """Recheck privileged facts before opening /dev/mem; no PL register access."""
     c._require(os.geteuid() == 0 and platform.machine() == "armv7l", "Requires root on Z2")
     state = Path("/sys/class/fpga_manager/fpga0/state").read_text().strip()
     c._require(state == "operating", "FPGA not operating")
-    model = Path("/proc/device-tree/model").read_text().lower()
-    c._require("pynq-z2" in model or "pynq z2" in model, "Wrong board")
+    board = identity.verify(**(board_options or {}))
+    c._require(identity.digest_report(board) == session.get("board_identity_sha256"),
+               "Current board identity differs from preflight/session")
     summary = Path("/sys/kernel/debug/clk/clk_summary").read_text()
     c._require(fclk0_from_summary(summary) == 100_000_000, "FCLK0 mismatch")
     rows = [line.split() for line in summary.splitlines()
@@ -136,6 +140,7 @@ def main(argv=None):
                         help="New JSON file, or new evidence directory for live")
     parser.add_argument("--execute-live", action="store_true")
     parser.add_argument("--ack-unrecoverable-axi-stall-risk", action="store_true")
+    identity.add_arguments(parser)
     args = parser.parse_args(argv)
     try:
         c._require(not args.output.exists(), "Refuse existing evidence output")
@@ -156,7 +161,7 @@ def main(argv=None):
             c.write_record(args.output, report)
         else:
             record = require_session(args.p0, args.session, args.stage, args.previous)
-            runtime_audit(record)
+            runtime_audit(record, board_options=identity.options(args))
             args.output.mkdir(exist_ok=False, mode=0o700)
             common = dict(qualification="PSPL-02/SWD-00", stage=args.stage, sha256=c.HASHES,
                           p0_sha256=c.sha256_file(args.p0), session_sha256=c.sha256_file(args.session),
