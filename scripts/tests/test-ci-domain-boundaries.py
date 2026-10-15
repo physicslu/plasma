@@ -203,6 +203,11 @@ def main() -> int:
     require(
         ai_support,
         '"data/device-catalog/research/stm32f1-commercial-icpn.csv"',
+        '"data/device-catalog/research/stm32f1-ordering-authority-v2.4.json"',
+        '"data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json"',
+        '"data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json"',
+        '"data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json"',
+        '"data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json"',
         owner="AI IC Support",
     )
 
