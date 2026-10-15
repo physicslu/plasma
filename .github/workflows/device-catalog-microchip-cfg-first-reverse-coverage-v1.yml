@@ -1,0 +1,113 @@
+name: Microchip CFG-first Phase 1 Reverse Coverage
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py'
+      - 'data/device-catalog/research/test_microchip_openocd_reverse_coverage_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
+      - '.github/workflows/device-catalog-microchip-cfg-first-reverse-coverage-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reverse-openocd-cfg-coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline source-lock and fail-closed reverse join regression
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_openocd_reverse_coverage_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_openocd_core_first_v1.py' -v
+          python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
+            --output "${{ runner.temp }}/microchip-reverse-frozen-source-only.json"
+      - name: Download immutable manufacturer original DFP and MCP research captures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/microchip-dfp" "${{ runner.temp }}/microchip-source-zip"
+          gh run download 38338847345 --repo "${{ github.repository }}" \
+            --name microchip-official-packs-index-raw \
+            --dir "${{ runner.temp }}/microchip-dfp"
+          gh run download 38535507957 --repo "${{ github.repository }}" \
+            --name microchip-phase1-portable-bundle-live-and-receipts-v1 \
+            --dir "${{ runner.temp }}/microchip-source-zip"
+      - name: Reverse pinned CFG -> original DFP names -> 24 original MCP order-code candidates
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          found=[
+              p.parent for p in (root/"microchip-dfp").rglob("index.html")
+              if (p.parent/"manifest.json").is_file()
+          ]
+          bundles=list((root/"microchip-source-zip").rglob("portable-original-evidence.zip"))
+          if len(found)!=1 or len(bundles)!=1:
+              raise SystemExit(
+                  f"missing/ambiguous original manufacturer evidence: DFP={len(found)}, MCP={len(bundles)}")
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as f:
+              print(f"MICROCHIP_DFP_ROOT={found[0]}",file=f)
+              print(f"MICROCHIP_SOURCE_BUNDLE={bundles[0]}",file=f)
+          PY
+      - name: Perform real original-byte reverse mapping and independent report replay
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
+            --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
+            --portable-bundle "$MICROCHIP_SOURCE_BUNDLE" \
+            --output "${{ runner.temp }}/microchip-reverse-cfg-icpn-report.json"
+          python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
+            --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
+            --portable-bundle "$MICROCHIP_SOURCE_BUNDLE" \
+            --output "${{ runner.temp }}/microchip-reverse-cfg-icpn-report.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/
+              "microchip-reverse-cfg-icpn-report.json").read_text())
+          assert report["actual_original_dfp_p0_names_replayed"] == 364
+          assert report["actual_original_dfp_p1_names_replayed"] == 12
+          assert report["all_icpn_original_bytes_replayed_in_this_command"] is True
+          assert report["production_write_authorized"] is False
+          assert report["cfg_software_supported_claimed"] is False
+          assert report["icpn_denominator_joined_in_this_run"] == 24
+          print(json.dumps({
+              "p0_cfg_groups": report["p0_target_cfg_count"],
+              "original_dfp_p0": report["actual_original_dfp_p0_names_replayed"],
+              "original_mcp_icpn_joined": report["icpn_denominator_joined_in_this_run"],
+              "icpn_statuses": report["icpn_mapping_state_counts"],
+              "icpn_cfg_counts": report["icpn_by_cfg_candidate_counts"],
+              "remaining_icpn_research_population_not_joined": "UNKNOWN",
+          },indent=2,sort_keys=True))
+          PY
+      - name: Preserve Research-only mapping output and independent frozen summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase1-cfg-first-original-evidence-crosswalk-v1
+          path: |
+            ${{ runner.temp }}/microchip-reverse-frozen-source-only.json
+            ${{ runner.temp }}/microchip-reverse-cfg-icpn-report.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: State strict non-admission boundary
+        if: always()
+        run: |
+          echo "CFG/DFP matching means CANDIDATE only; not OpenOCD SUPPORTED" >> "$GITHUB_STEP_SUMMARY"
+          echo "Only 24 source-observed two-family commercial ICPNs are replayed, not 24,051" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Production admission, Flash Driver qualification, firmware, hardware or UI changes" >> "$GITHUB_STEP_SUMMARY"
