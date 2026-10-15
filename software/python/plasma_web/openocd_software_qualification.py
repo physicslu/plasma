@@ -126,6 +126,47 @@ class OpenOCDSoftwareQualificationRegistry:
         review = _read_json(
             root / "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json"
         )
+        comparison = _read_json(
+            root / "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json"
+        )
+        baseline = _read_json(
+            root / "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json"
+        )
+        backend_reference = comparison.get("backend_reference", {})
+        _require(
+            comparison.get("target", {}).get("icpn") == "STM32F103C8T6"
+            and backend_reference.get("version") == release["version"]
+            and backend_reference.get("source_commit") == release["source_commit"]
+            and "src/flash/nor/stm32f1x.c" in backend_reference.get("files", [])
+            and "tcl/target/stm32f1x.cfg" in backend_reference.get("files", []),
+            "independent OpenOCD comparison provenance drift",
+        )
+        observations = {
+            item.get("id"): item
+            for item in comparison.get("observations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        expected_observations = {
+            "medium_density_page_size": "exact_match",
+            "program_alignment": "exact_match",
+            "page_erase_core": "exact_match",
+            "program_core": "exact_match",
+            "verify_layering": "functionally_equivalent",
+            "device_family_probe": "backend_extra_requires_manufacturer_validation",
+            "blue_pill_flash_override": "conflict_or_out_of_spec",
+        }
+        for observation_id, expected_class in expected_observations.items():
+            _require(
+                observations.get(observation_id, {}).get("classification") == expected_class,
+                f"OpenOCD semantic observation drift: {observation_id}",
+            )
+        conclusions = comparison.get("conclusions", {})
+        _require(
+            conclusions.get("same_core_flash_programming_semantics") is True
+            and conclusions.get("hardware_runtime_ready") is False
+            and conclusions.get("physical_programming_qualified") is False,
+            "OpenOCD differential qualification boundary drift",
+        )
         _require(
             review.get("shared", {}).get("programming_profile_id")
             == "stm32f1-medium-density-flash-v0",
@@ -146,6 +187,28 @@ class OpenOCDSoftwareQualificationRegistry:
                 opq.get(operation, {}).get("state") == "SUPPORTED",
                 f"reference operation not software-qualified: {operation}",
             )
+        review_fact_ids = {
+            item.get("fact_id")
+            for item in review.get("review_facts", [])
+            if isinstance(item, dict)
+        }
+        constraint_ids = {
+            item.get("id")
+            for item in baseline.get("programming_profile", {}).get("special_constraints", [])
+            if isinstance(item, dict)
+        }
+        for operation in REQUIRED_OPERATIONS:
+            row = opq[operation]
+            for basis in row.get("manufacturer_basis", []):
+                _require(
+                    basis in review_fact_ids or basis in constraint_ids,
+                    f"manufacturer operation evidence not resolved: {operation}/{basis}",
+                )
+            for basis in row.get("differential_basis", []):
+                _require(
+                    basis in observations,
+                    f"OpenOCD differential evidence not resolved: {operation}/{basis}",
+                )
         _require(
             group.get("programming_electrical", {}).get("external_vpp_required") is False,
             "external VPP qualification drift",
