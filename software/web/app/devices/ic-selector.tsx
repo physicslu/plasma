@@ -65,9 +65,7 @@ function openOcdConfigLabel(status: OpenOcdTagState, zh: boolean): string {
   return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
 }
 
-function softwareQualificationClass(
-  state: DeviceSearchResult["openocd_software_qualification"] extends infer _T ? string | undefined : string | undefined,
-): string {
+function softwareQualificationClass(state: string | undefined): string {
   if (state === "SUPPORTED") return "verified";
   if (state === "UNSUPPORTED") return "failed";
   if (state === "CANDIDATE") return "pending";
