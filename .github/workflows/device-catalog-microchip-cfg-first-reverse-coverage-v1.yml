@@ -8,6 +8,9 @@ on:
       - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P0_PHASE1_INFORMATION_LEDGER_V1.md'
+      - 'data/device-catalog/research/MICROCHIP_P0_OFFICIAL_SOURCE_GAPS_V1.md'
+      - 'data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
       - '.github/workflows/device-catalog-microchip-cfg-first-reverse-coverage-v1.yml'
   workflow_dispatch:
@@ -32,6 +35,8 @@ jobs:
             -p 'test_microchip_openocd_reverse_coverage_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p0_information_ledger_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_samr30_online_original_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_core_first_v1.py' -v
           python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
@@ -286,5 +291,67 @@ jobs:
           path: |
             ${{ runner.temp }}/microchip-full-reverse.json
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  samr30-online-source-original-canary:
+    # Independent new vendor source probing only. This is not required for
+    # the already replayed 23,276 historical original-order-code dataset.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify bounded online documentation parser and fail-closed semantics
+        run: |
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_samr30_online_original_v1.py' -v
+      - name: Attempt official live online SAM R30 ordering-table capture
+        id: live_vendor_capture
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          python data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py \
+            --capture "${{ runner.temp }}/microchip-samr30-online-original" \
+            --report "${{ runner.temp }}/microchip-samr30-original-observations.json"
+      - name: Audit source result and never imply a successful vendor capture from green CI
+        if: always()
+        env:
+          LIVE_SOURCE_OUTCOME: ${{ steps.live_vendor_capture.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"microchip-samr30-online-original"
+          manifest=root/"manifest.json"
+          if not manifest.is_file():
+              raise SystemExit("No online manufacturer source receipt; cannot assess canary")
+          data=json.loads(manifest.read_text())
+          records=data["sources"]
+          status=data["live_original_source_observation_complete"]
+          success=(os.environ["LIVE_SOURCE_OUTCOME"] == "success")
+          if success != status:
+              raise SystemExit("Live source step outcome and archived receipt disagree")
+          assert data["pdf_semantic_crosscheck_completed"] is False
+          assert data["phase1_icpn_fields_verified_by_this_source_only"] is False
+          assert data["production_write_authorized"] is False
+          print("MANUFACTURER ONLINE ORIGINAL SOURCE:", "PASS" if success else "SOURCE_NOT_AVAILABLE")
+          for r in records:
+              print(r["lane"],r["status"],r.get("original_sha256"),r.get("error"))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("SAM R30 official online source: " +
+                      ("PASS, PDF confirmation still pending" if success
+                       else "SOURCE_NOT_AVAILABLE, no Phase 1 VERIFIED promotion")+"\n")
+          PY
+      - name: Preserve original HTML receipts, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-samr30-official-online-original-byte-canary-v1
+          path: |
+            ${{ runner.temp }}/microchip-samr30-online-original/
+            ${{ runner.temp }}/microchip-samr30-original-observations.json
           if-no-files-found: warn
           retention-days: 90
