@@ -390,17 +390,21 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <dt>I/O Supply</dt>
                   <dd>{selected.manufacturer_device_basic_profile?.io_supply_v
                     ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
-                    : selected.nxp_manufacturer_device_profile || selected.microchip_phase1_ic_information
-                      ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
-                      : "—"}</dd>
+                    : selected.nxp_manufacturer_device_profile
+                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                      : selected.microchip_phase1_ic_information
+                        ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
+                        : "—"}</dd>
                 </div>
                 <div>
                   <dt>VDDA</dt>
                   <dd>{selected.manufacturer_device_basic_profile?.vdda_v
                     ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
-                    : selected.nxp_manufacturer_device_profile || selected.microchip_phase1_ic_information
-                      ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
-                      : "—"}</dd>
+                    : selected.nxp_manufacturer_device_profile
+                      ? (zh ? "未有個別原廠證據" : "Not independently sourced")
+                      : selected.microchip_phase1_ic_information
+                        ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
+                        : "—"}</dd>
                 </div>
                 <div>
                   <dt>{zh ? "工作溫度" : "Operating Temperature"}</dt>
