@@ -118,6 +118,7 @@ def main() -> int:
     z2like_qemu = read("z2like-demo-qemu.yml")
     ai_support = read("ic-support-validation.yml")
     openocd_qualification = read("openocd-software-qualification.yml")
+    ppu_network_trigger = (ROOT / "scripts/ci/ppu-network-trigger.py").read_text(encoding="utf-8")
 
     # Device Catalog owns user-selectable ICPN inventory. A data-only catalog
     # expansion must not fan out into the generic software or release domains.
@@ -191,6 +192,34 @@ def main() -> int:
     require(python_tests, '"software/python/**"', owner="SW/PPU Python/PL")
     require(python_tests, '"pl/rtl/**"', owner="SW/PPU Python/PL")
     require(ppu_release, '"scripts/ppu-release.py"', owner="SW/PPU PPU release")
+    require(ppu_release, '"scripts/ci/ppu-network-trigger.py"', owner="SW/PPU PPU network routing")
+    require(ppu_release, "route-ppu-network:", owner="SW/PPU PPU network routing")
+    require_count(
+        ppu_release,
+        "if: needs.route-ppu-network.outputs.network_changed == 'true'",
+        4,
+        owner="SW/PPU PPU network routing",
+    )
+    require(
+        ppu_network_trigger,
+        '"software/python/plasma_web/openocd_software_qualification.py"',
+        owner="SW/PPU PPU network routing self-test",
+    )
+    require(
+        ppu_network_trigger,
+        '"release/openocd-qualification/openocd-0.12.0-stm32f103-v6.json"',
+        owner="SW/PPU PPU network routing self-test",
+    )
+    require(
+        ppu_network_trigger,
+        '"software/python/plasma_web/ppu_network_activation.py"',
+        owner="SW/PPU PPU network routing self-test",
+    )
+    require(
+        repository_contracts,
+        '"scripts/ci/ppu-network-trigger.py"',
+        owner="REPO PPU network routing governance",
+    )
     require(ppu_release, '"software/python/plasma_server/**"', owner="SW/PPU PPU release")
     require(z2_release, '"scripts/z2-python-runtime.py"', owner="SW/PPU Z2 release")
     require(z2_release, '"software/python/plasma_server/**"', owner="SW/PPU Z2 release")
