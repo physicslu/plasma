@@ -6,6 +6,9 @@ on:
       - "pl/rtl/bus/swd_transaction_axi_lite.sv"
       - "pl/rtl/site/swd_transaction_master.sv"
       - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "pl/verification/cocotb/test_swd03_synth_fixture.py"
       - "pl/verification/cocotb/test_swd03_axi.py"
       - "pl/verification/test_swd03_axi_rtl.py"
       - "pl/verification/cocotb/test_swd_transaction.py"
@@ -18,6 +21,9 @@ on:
       - "pl/rtl/bus/swd_transaction_axi_lite.sv"
       - "pl/rtl/site/swd_transaction_master.sv"
       - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "pl/verification/cocotb/test_swd03_synth_fixture.py"
       - "pl/verification/cocotb/test_swd03_axi.py"
       - "pl/verification/test_swd03_axi_rtl.py"
       - "pl/verification/cocotb/test_swd_transaction.py"
@@ -49,6 +55,10 @@ jobs:
             pl/rtl/bus/swd_transaction_axi_lite.sv \
             pl/rtl/site/swd_transaction_master.sv \
             pl/rtl/site/swd_waveform_engine.sv
+      - name: Synthesizable test fixture lint
+        run: |
+          verilator --lint-only --sv -Wall --top-module swd03_dpidr_responder \
+            pl/rtl/site/swd03_dpidr_responder.sv
       - name: Icarus elaboration
         run: |
           mkdir -p pl/build/swd03
@@ -56,6 +66,12 @@ jobs:
             pl/rtl/site/swd_waveform_engine.sv \
             pl/rtl/site/swd_transaction_master.sv \
             pl/rtl/bus/swd_transaction_axi_lite.sv
+          iverilog -g2012 -s swd03_axi_fixture_tb -o pl/build/swd03/fixture-elab.vvp \
+            pl/rtl/site/swd_waveform_engine.sv \
+            pl/rtl/site/swd_transaction_master.sv \
+            pl/rtl/bus/swd_transaction_axi_lite.sv \
+            pl/rtl/site/swd03_dpidr_responder.sv \
+            pl/sim/swd03_axi_fixture_tb.sv
       - name: Existing SWD and loopback regression
         run: |
           python3 -m pytest -q \
