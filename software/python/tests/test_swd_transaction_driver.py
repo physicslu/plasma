@@ -434,3 +434,103 @@ def test_ap_posted_read_is_atomic_against_other_site_owner_thread():
     assert errors == []
     assert hw.start_configs == [0x46, 0x64, 0x20]
     assert outcomes == [("ap", 0xCAFE0008), ("dp_write", SWDStatus.OK)]
+
+
+def test_response_mutation_before_ack_is_fail_closed():
+    class MutatingMeta(FakeAXI):
+        mutate = False
+        reads = 0
+
+        def read32(self, address):
+            result = super().read32(address)
+            if self.mutate and address == self.base + 0x28:
+                self.reads += 1
+                if self.reads == 2:
+                    return result ^ 0x10
+            return result
+
+    hw = MutatingMeta()
+    d = driver(hw)
+    connect(d)
+    hw.mutate = True
+    prev_acks = command_writes(hw).count(4)
+    with pytest.raises(SWDDriverError, match="Response changed"):
+        d.read_dp(4)
+    assert d.poisoned
+    assert hw.resp is True
+    assert command_writes(hw).count(4) == prev_acks
+
+
+def test_unknown_response_status_does_not_ack_or_replay():
+    hw = FakeAXI()
+    d = driver(hw)
+    connect(d)
+    hw.inject.append((15, 0, False, 0, 1))
+    with pytest.raises(SWDDriverError, match="Unknown hardware"):
+        d.read_dp(4)
+    assert d.poisoned and hw.resp
+    assert command_writes(hw)[-1] == 1
+
+
+def test_axi_ack_failure_is_poisoned_and_never_reissued():
+    class AckError(FakeAXI):
+        fail_ack = False
+
+        def write32(self, address, value):
+            if self.fail_ack and address == self.base + 4 and value == 4:
+                self.log.append(("write", 4, value))
+                raise OSError("AXI ACK write timed out; acceptance unknown")
+            return super().write32(address, value)
+
+    hw = AckError()
+    d = driver(hw)
+    connect(d)
+    hw.fail_ack = True
+    with pytest.raises(SWDDriverError, match="AXI MMIO write failed"):
+        d.write_dp(4, 0xCAFEBABE)
+    assert d.poisoned
+    assert hw.resp
+    with pytest.raises(SWDDriverError, match="poisoned"):
+        d.line_reset()
+
+
+def test_monotonic_deadline_also_stops_stuck_busy_without_implicit_abort():
+    hw = FakeAXI()
+    hw.hang = True
+    tick = [0]
+
+    def clock():
+        tick[0] += 1
+        return float(tick[0])
+
+    d = driver(hw, clock=clock, max_poll_seconds=2.5)
+    with pytest.raises(SWDDriverError, match="polling deadline"):
+        d.line_reset()
+    assert d.poisoned and command_writes(hw) == [1]
+
+
+def test_status_reserved_bits_fail_closed_before_hardware_write():
+    class InvalidStatus(FakeAXI):
+        def read32(self, address):
+            value = super().read32(address)
+            return value | 0x80000000 if address == self.base + 0x24 else value
+
+    hw = InvalidStatus()
+    d = driver(hw)
+    with pytest.raises(SWDDriverError, match="Reserved"):
+        d.line_reset()
+    assert d.poisoned and command_writes(hw) == []
+
+
+def test_bad_ack_requires_explicit_link_reset():
+    hw = FakeAXI()
+    d = driver(hw)
+    connect(d)
+    hw.inject.append((SWDStatus.BAD_ACK, 7, False, 0, 1))
+    with pytest.raises(SWDDriverError) as result:
+        d.read_dp(4)
+    assert result.value.response.status == SWDStatus.BAD_ACK
+    with pytest.raises(SWDDriverError, match="line_reset"):
+        d.read_dp(0)
+    assert d.line_reset().status == SWDStatus.OK
+    assert d.read_dp(0) == DPIDR
