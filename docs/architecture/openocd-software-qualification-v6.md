@@ -1,6 +1,6 @@
 # OpenOCD Software Qualification v6 — STM32F103 high-density V-pin LQFP expansion
 
-Status: **Current ADR-0002 Phase 2 software qualification authority**
+Status: **Historical ADR-0002 Phase 2 software qualification authority; superseded by v7**
 
 ## Scope
 
