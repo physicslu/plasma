@@ -89,9 +89,19 @@ queue, run parallel transactions, or retry an operation on its own.
 - A successful SWD write transport response **does not prove target Flash
   committed**. The caller/Programming Engine must check DP sticky
   `WDATAERR` and device programming semantics where appropriate.
-- `abort()` is an explicit caller-controlled cancellation only if
-  hardware STATUS confirms BUSY. It cannot safely rescue an already
-  poisoned driver or interrupted Linux bus.
+- `request_abort()` is safe to signal from a second Python Thread: it
+  only sets a cancellation Event; the owner of the polling operation issues
+  the single ABORT MMIO write if STATUS still confirms BUSY, then handles
+  the ABORTED response. The signal is not a guarantee of physical rollback.
+  If the target has already completed, no ABORT write is necessary.
+- `abort()` is a separate explicit synchronous cancellation only if
+  hardware STATUS confirms BUSY **and no other caller is concurrently
+  operating the same driver**. It cannot safely rescue a poisoned
+  driver or interrupted Linux bus.
+- The driver serializes single-Site transactions with a re-entrant lock;
+  `read_ap_posted()` protects AP READ + DP RDBUFF as one logical sequence.
+  Separate processes or distinct driver instances sharing the same aperture
+  remain forbidden until exclusive ownership/arbitration is implemented.
 - No real IC erase/program/verify or power/voltage functions exist.
   `plasma_interfaces.fpga.FPGAInterface` remains fail-closed.
 
