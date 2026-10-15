@@ -189,6 +189,11 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         self.assertEqual(proof["p0_icpns_not_in_observed_chart"], 2436)
         self.assertEqual(len(proof["chart_unmatched_exact_icpns"]), 2436)
         self.assertEqual(sum(proof["chart_unmatched_by_research_cfg"].values()), 2436)
+        self.assertEqual(proof["p0_unmatched_distinct_manufacturer_base_count"], 2436)
+        self.assertEqual(len(proof["p0_official_source_acquisition_queue"]), 2436)
+        self.assertTrue(all(entry["official_exact_ordering_table_state"] ==
+                            "NOT_REPLAYED" for entry in
+                            proof["p0_official_source_acquisition_queue"]))
         self.assertTrue(result["chart_original_bytes_replayed_by_upstream_chart_builder"])
         for field in partials:
             self.assertEqual(result["per_field_coverage"][field]["PARTIAL"], 1)
@@ -249,6 +254,11 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         self.assertEqual(proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"],23)
         self.assertEqual(proof["p0_icpns_exact_manufacturer_base_joined_to_chart"],0)
         self.assertEqual(proof["p0_icpns_not_in_observed_chart"],2414)
+        self.assertEqual(proof["p0_unmatched_distinct_manufacturer_base_count"],2414)
+        self.assertEqual(sum(x["exact_icpn_count"] for x in
+                            proof["p0_official_source_acquisition_queue"]),2414)
+        self.assertFalse(any(x["field_inference_authorized"] for x in
+                             proof["p0_official_source_acquisition_queue"]))
         self.assertEqual(proof["partial_field_observation_counts"]["flash"],23)
         alias_rows=[r for r in outcome["records"] if
             r["cfg_candidate_state"] ==
