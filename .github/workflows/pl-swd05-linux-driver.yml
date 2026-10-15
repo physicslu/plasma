@@ -4,14 +4,18 @@ on:
   pull_request:
     paths:
       - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
       - "software/python/tests/test_swd_transaction_driver.py"
+      - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
       - ".github/workflows/pl-swd05-linux-driver.yml"
   push:
     branches: [main]
     paths:
       - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
       - "software/python/tests/test_swd_transaction_driver.py"
+      - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
       - ".github/workflows/pl-swd05-linux-driver.yml"
   workflow_dispatch:
@@ -32,11 +36,12 @@ jobs:
         run: |
           python3 -m pip install -e ./software/python
           python3 -m pip install 'pytest==8.4.2'
-      - name: Compile host-only driver
-        run: python3 -m py_compile software/python/plasma_interfaces/swd_transaction.py
-      - name: SWD-05 MMIO fake protocol regression
-        run: python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py
+      - name: Compile host-only driver and native MMIO backend
+        run: python3 -m py_compile software/python/plasma_interfaces/swd_transaction.py software/python/plasma_interfaces/linux_mmio.py
+      - name: SWD-05 protocol and native file-backed MMIO regressions
+        run: |
+          python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py
       - name: Explicit acceptance boundary
         run: |
-          echo "SWD05_HOST_ONLY_DRIVER_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "SWD05_HOST_AND_MMIO_RAM_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
           echo "No FPGA load, physical Z2 MMIO, OpenOCD adapter registration, external SWD pins or IC operations performed." >> "$GITHUB_STEP_SUMMARY"
