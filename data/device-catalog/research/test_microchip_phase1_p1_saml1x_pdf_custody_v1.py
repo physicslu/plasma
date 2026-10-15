@@ -29,8 +29,9 @@ def mock_reader(_path, page):
         return (
             "SAM L10/L11 Family Ordering Information\n"
             "ATSAML 11 D 14 A M U T KPH\n"
-            "Product Series Pin Count Memory Density (Flash) "
-            "Device Variant Package Type Package Grade Package Carrier "
+            "10 = Cortex-M23 CPU 11 = Cortex-M23 CPU with TrustZone "
+            "D = 24 Pins E = 32 Pins "
+            "14 = 16 KB 15 = 32 KB 16 = 64 KB "
             "TQFP VQFN SSOP WLCSP\n"
             "Datasheet DS60001513G-page 16\n"
         )
@@ -95,7 +96,7 @@ class OriginalPdfEvidenceTest(unittest.TestCase):
             pdf.page_evidence(missing(None, 14), missing(None, 16))
 
     def test_malformed_ordering_page_rejected(self):
-        text = mock_reader(None, 16).replace("Package Carrier", "")
+        text = mock_reader(None, 16).replace("WLCSP", "")
         with self.assertRaisesRegex(ValueError, "ordering page"):
             pdf.page_evidence(mock_reader(None, 14), text)
 
