@@ -70,6 +70,67 @@ curl -fsS http://<Z2_LAN_IP>:18081/v1/status
 
 Expected state: `bootstrap.state=bootstrap_ready`, `runtime.state=runtime_absent`, `capabilities.fpga_update=false`.
 
+## Single-Z2 R&D refresh (current development route)
+
+This is the preferred approach while Plasma has **one development Z2**. Do not
+add a legacy-kit adapter to `plasmactl-z2-ps` just to support the September 2026
+Bootstrap. Refresh the device's factory Bootstrap **once**, then perform the
+PPU Runtime + OpenOCD deployment via the existing Control Station Console.
+
+**Preconditions:** use a successful `ppu-bootstrap-factory-bundle` and
+`plasma-z2-ps-kit-*.tar.gz` from the same accepted **main** commit; keep
+all Sites idle and preserve independent SSH recovery access. No FPGA bitstream,
+target power or IC programming is performed in this procedure.
+
+1. On the Z2, install the Ubuntu/PYNQ-compatible `libgpiod2` shared library
+   required by the new `linuxgpiod`-enabled OpenOCD runtime. The Z2's OS
+   package repository must be reachable; if not, prepare an offline,
+   architecture-matched `libgpiod2` package separately.
+2. Copy the factory bundle archive **and its matching SHA-256 sidecar** to
+   the Z2. The following commands must be run from the directory holding
+   those two verified CI files:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends libgpiod2
+sha256sum -c plasma-ppu-bootstrap-*.tar.gz.sha256
+tar -xzf plasma-ppu-bootstrap-*.tar.gz
+cd plasma-ppu-bootstrap-*/
+sudo /usr/bin/python3 scripts/ppu-bootstrap-installer.py \
+  --source-root "$PWD/scripts" \
+  --host 192.168.2.99 \
+  --enable-now
+# --enable-now does NOT restart an already-running Bootstrap unit.
+sudo systemctl restart plasma-bootstrap.service
+systemctl is-active plasma-bootstrap.service
+curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/health
+curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/status
+```
+
+This reinstall updates the factory scripts and service unit without clearing
+`/var/lib/plasma-bootstrap`, rotating its token, replacing System Python or
+changing the existing `/etc/plasma/ppu.yaml`. It is an intentional **one-off
+local Bootstrap refresh**, not an automated backward-compatibility promise.
+If status reports `recovery_required`, do not bypass that condition; investigate
+before another deployment.
+
+3. In **EMode → PPU Sites → Runtime Deployment**, use the same PPU/device pairing
+   and upload the matching modern Z2 kit + SHA-256 sidecar. The newly installed
+   Bootstrap passes explicit `--openocd-artifact` / `--openocd-sidecar`
+   arguments to the kit-local `plasmactl`.
+4. Observe deployment `succeeded` / Runtime `runtime_active` and collect
+   `/opt/plasma/install/openocd-runtime.json`. Confirm the packaged OpenOCD
+   binary executes, `adapter list` includes `linuxgpiod`, and
+   `hardware_runtime_ready=false`. Run the established Z2 PS loopback and
+   reboot-persistence check. **No physical SWD/PL readiness is implied.**
+
+If an older immutable OpenOCD install already occupies the identical
+`runtime_id` but contains a different binary, the installer will reject the
+collision rather than overwrite it. For the one-board R&D baseline, first
+inspect the installed evidence; reinitialize the disposable development
+baseline deliberately if needed. Do not silently delete/overwrite an installed
+binary during an active deployment.
+
 ## HIL artifact provenance
 
 Before touching a physical PYNQ-Z2, manually dispatch both **PPU bootstrap regression** and **Z2 PS release candidate** from the same `main` commit. The Real Z2 qualification record must retain both workflow run IDs, the accepted 40-character source commit, and the downloaded artifact SHA-256 values.

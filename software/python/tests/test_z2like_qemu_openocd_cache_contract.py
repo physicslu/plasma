@@ -24,15 +24,17 @@ def test_cache_key_is_pinned_to_architecture_release_and_build_recipe() -> None:
     assert "/tmp/plasma-openocd-armv7l-cached" not in text
 
 
-def test_prs_may_restore_but_only_main_can_save_cache() -> None:
+def test_same_repo_prs_may_save_only_pr_scoped_verified_cache() -> None:
     text = workflow_text()
     assert "uses: actions/cache/restore@v4" in text
     assert "uses: actions/cache/save@v4" in text
-    assert "github.ref == 'refs/heads/main'" in text
-    assert "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')" in text
-    save_section = text.split("Save qualified ARMv7 OpenOCD build cache on main only", 1)[1]
-    assert "github.event_name == 'pull_request'" not in save_section
+    save_section = text.split("Save qualified ARMv7 OpenOCD build cache", 1)[1]
     assert "steps.openocd-cache.outputs.cache-hit != 'true'" in save_section
+    assert "github.event_name == 'push'" in save_section
+    assert "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')" in save_section
+    assert "github.event_name == 'pull_request'" in save_section
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in save_section
+    assert "isolated to the PR merge ref and cannot seed the default-branch cache" in text
 
 
 def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
@@ -41,12 +43,13 @@ def test_cache_hit_skips_only_openocd_compile_never_integrity_gate() -> None:
     build = text.index("Build pinned ARMv7 OpenOCD only on cache miss")
     verify = text.index("Verify cached or freshly built ARMv7 OpenOCD and pinned source identity")
     kit = text.index("Build real canonical ARMv7 PPU release and simulation-only Z2 kit fixture")
+    compat = text.index("Install Jammy libgpiod v1 compatibility runtime on QEMU ARMv7 target")
     e2e = text.index("Drive Manager to Bootstrap to QEMU deployment E2E")
     run_arm = text.index("Verify kit-deployed OpenOCD inside QEMU ARMv7 target")
     eight_sites = text.index("Qualify eight isolated OpenOCD workers inside deployed ARMv7 PPU")
     matrix = text.index("Prove Platform and Managed PS loopback lifecycle matrix")
-    save = text.index("Save qualified ARMv7 OpenOCD build cache on main only")
-    assert restore < build < verify < kit < e2e < run_arm < eight_sites < matrix < save
+    save = text.index("Save qualified ARMv7 OpenOCD build cache")
+    assert restore < build < verify < kit < compat < e2e < run_arm < eight_sites < matrix < save
     build_part = text[build:verify]
     assert "if: steps.openocd-cache.outputs.cache-hit != 'true'" in build_part
     assert 'bash scripts/build-openocd-runtime.sh "$GITHUB_WORKSPACE/$OPENOCD_ARMV7_CACHE_DIR" armv7l' in build_part

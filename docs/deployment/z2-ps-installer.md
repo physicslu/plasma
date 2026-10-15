@@ -63,7 +63,20 @@ OpenOCD is also packaged as an independent, versioned Programming Engine runtime
 The current pinned runtime is OpenOCD 0.12.0 at upstream commit
 `9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c`. Its artifact carries the OpenOCD
 binary, the matching `share/openocd/scripts` tree, internal/detached SHA-256
-evidence, ELF architecture identity and shared-library dependency evidence.
+evidence, ELF architecture identity and shared-library dependency evidence. The development
+build explicitly enables the OpenOCD `linuxgpiod` bit-bang adapter using
+Ubuntu 22.04 `libgpiod-dev` (libgpiod 1.x API). The installed binary depends
+on the OS-provided `libgpiod2` shared library; the **Z2 host must provide it**
+before Console deployment. CI runs `adapter list` on both x86_64 and ARMv7
+packages and refuses a candidate without `linuxgpiod`.
+
+For the single-Z2 development baseline, refresh the factory Bootstrap once
+using the procedure in
+[PPU Bootstrap Factory Provisioning and Z2 HIL](ppu-bootstrap-factory-and-hil.md).
+Then use the existing Console update path; no legacy Bootstrap compatibility
+shim is maintained. This adapter availability is **software-only evidence**,
+not proof that the EMIO GPIO routing, SWDIO turnaround, reset, voltages or
+physical target programming work.
 
 This packaging milestone does **not** start an OpenOCD service and does not enable
 the production programming route. The runtime manifest and install evidence keep

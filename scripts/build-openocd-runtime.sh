@@ -57,7 +57,7 @@ docker run --rm \
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y --no-install-recommends \
-      build-essential ca-certificates git autoconf automake libtool pkg-config python3 tcl
+      build-essential ca-certificates git autoconf automake libtool pkg-config python3 tcl libgpiod-dev
 
     prefix="/opt/plasma/programming-engines/openocd/${OPENOCD_RUNTIME_ID}"
     mkdir -p /tmp/openocd-src
@@ -78,6 +78,7 @@ docker run --rm \
       --disable-doxygen-html \
       --enable-dummy \
       --enable-remote-bitbang \
+      --enable-linuxgpiod \
       --disable-jlink
     make -j2
     make install
@@ -92,6 +93,10 @@ docker run --rm \
       -s "$prefix/share/openocd/scripts" \
       -c "adapter driver dummy" \
       -c "shutdown"
+    "$prefix/bin/openocd" -c "adapter list" -c "shutdown" 2>&1 \
+      | tee /tmp/openocd-adapters.txt
+    grep -Eq "(^|[[:space:]])linuxgpiod([[:space:]]|$)" /tmp/openocd-adapters.txt
+    grep -q "libgpiod.so" /tmp/openocd-ldd.txt
 
     python3 /repo/scripts/openocd-runtime.py build \
       --prefix "$prefix" \
