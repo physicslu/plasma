@@ -62,11 +62,12 @@ def input_fixture():
     return upstream,rows
 
 
-class P1DFPDiscoveryTest(unittest.TestCase):
+class DFPOnlyP2ArchiveTest(unittest.TestCase):
     def setUp(self):
         self.original,self.rows=input_fixture()
         for name,val in (("SOURCE_SUBSET",5),("P0_BASELINE",1),
-                         ("P1_TARGET_BASELINE",1),("DFP_SUPPORTED_NAMES",4)):
+                         ("P1_TARGET_BASELINE",1),("P2_BASELINE",3),
+                         ("DFP_SUPPORTED_NAMES",4)):
             p=patch.object(discovery,name,val)
             p.start()
             self.addCleanup(p.stop)
@@ -77,14 +78,23 @@ class P1DFPDiscoveryTest(unittest.TestCase):
 
     def test_exact_mcp_and_dfp_32bit_only(self):
         report=discovery.classify(self.original,inventory())
-        self.assertEqual(report["p1_discovery_exact_icpn_candidates"],1)
-        self.assertEqual(report["p1_expanded_research_queue_total"],2)
+        self.assertEqual(report["schema_version"],2)
+        self.assertEqual(report["dfp_only_p2_archive_exact_icpn_subset"],1)
+        self.assertEqual(report["adr0002_p1_openocd_candidate_exact_icpns"],1)
+        self.assertEqual(report["adr0002_p2_archive_exact_icpns"],3)
+        self.assertEqual(report["p2_other_archived_exact_icpns"],2)
+        self.assertNotIn("p1_expanded_research_queue_total",report)
+        self.assertNotIn("p1_discovery_exact_icpn_candidates",report)
         self.assertEqual(report["baseline_p0_p1_records_reclassified"],0)
         self.assertEqual(report["records"][0]["icpn"],
                          "PIC32MZ1024EFH064-I/PT")
         self.assertEqual(report["records"][0]["openocd_target_cfg"],None)
-        self.assertEqual(report["records"][0]["p1_research_state"],
+        self.assertEqual(report["records"][0]["dfp_identity_research_state"],
                          discovery.STATE)
+        self.assertEqual(report["records"][0]["adr0002_research_priority"],"P2")
+        self.assertFalse(report["records"][0]["counts_as_adr0002_p1_candidate"])
+        self.assertEqual(report["records"][0]["source_mapping_state"],UNMAPPED)
+        self.assertTrue(report["dfp_only_archive_not_adr0002_p1"])
         self.assertEqual(report["new_phase1_fields_verified"],0)
         self.assertFalse(report["production_write_authorized"])
         self.assertFalse(report["phase2_programming_authorized"])

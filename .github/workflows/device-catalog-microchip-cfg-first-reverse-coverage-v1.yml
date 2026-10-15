@@ -235,7 +235,7 @@ jobs:
                             "cfg_counts":data["icpn_by_cfg_candidate_counts"],
                             "historical_24051_complete":False},sort_keys=True,indent=2))
           PY
-      - name: Audit expanded P1 exact-MCP and official DFP candidate discovery
+      - name: Audit original-MCP x DFP-only P2 identity archive (ADR-0002 corrected)
         run: |
           set -euo pipefail
           python -m unittest discover -s data/device-catalog/research \
@@ -243,43 +243,60 @@ jobs:
           python data/device-catalog/research/microchip_phase1_p1_dfp_discovery_v1.py \
             --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
             --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
-            --output "${{ runner.temp }}/microchip-p1-dfp-discovery.json"
+            --output "${{ runner.temp }}/microchip-p2-dfp-identity-archive.json"
           python data/device-catalog/research/microchip_phase1_p1_dfp_discovery_v1.py \
             --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
             --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
-            --output "${{ runner.temp }}/microchip-p1-dfp-discovery.json" --verify
+            --output "${{ runner.temp }}/microchip-p2-dfp-identity-archive.json" --verify
           python - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
           report=json.loads((Path(os.environ["RUNNER_TEMP"])/
-              "microchip-p1-dfp-discovery.json").read_text())
+              "microchip-p2-dfp-identity-archive.json").read_text())
+          assert report["schema_version"]==2
           assert report["source_subset_original_mcp_exact_icpns"]==23276
           assert report["baseline_p0_exact_icpns_unchanged"]==2437
           assert report["baseline_p1_target_only_exact_icpns_unchanged"]==126
-          assert report["p1_discovery_exact_icpn_candidates"]==2065
+          assert report["adr0002_p1_openocd_candidate_exact_icpns"]==126
+          assert report["adr0002_p2_archive_exact_icpns"]==20713
+          assert report["dfp_only_p2_archive_exact_icpn_subset"]==2065
+          assert report["p2_other_archived_exact_icpns"]==18648
           assert report["manufacturer_dfp_matched_distinct_base_names"]==340
-          assert report["p1_expanded_research_queue_total"]==2191
-          assert report["p1_expanded_research_queue_total"]==(
-              report["p1_discovery_exact_icpn_candidates"]+126)
+          assert 2437+126+20713==23276
+          assert 2065+18648==20713
+          assert report["dfp_only_archive_not_adr0002_p1"] is True
+          assert "p1_expanded_research_queue_total" not in report
+          assert "p1_discovery_exact_icpn_candidates" not in report
           assert report["baseline_p0_p1_records_reclassified"]==0
           assert report["new_phase1_fields_verified"]==0
           assert report["openocd_software_supported_count"]==0
+          assert report["catalog_publication_authorized"] is False
           assert report["production_write_authorized"] is False
           assert report["phase2_programming_authorized"] is False
-          print("P1_DISCOVERY_EXACT_ICPN_COUNT",
-                report["p1_discovery_exact_icpn_candidates"])
-          print("P1_DISCOVERY_DISTINCT_DFP_BASE_COUNT",
-                report["manufacturer_dfp_matched_distinct_base_names"])
-          print("P1_DISCOVERY_BY_PACK",
-                json.dumps(report["candidate_exact_icpn_by_manufacturer_pack"],
+          assert len(report["records"])==2065
+          assert len({r["icpn"] for r in report["records"]})==2065
+          assert all(r["adr0002_research_priority"]=="P2"
+              and r["counts_as_adr0002_p1_candidate"] is False
+              and r["dfp_identity_research_state"]==
+                  "P2_ARCHIVE_DFP_IDENTITY_ONLY_NO_OPENOCD_LEAD"
+              and r["openocd_target_cfg"] is None
+              and r["phase2_software_supported"] is False
+              and r["production_write_authorized"] is False
+              for r in report["records"])
+          print("ADR0002_MICROCHIP_P0",2437)
+          print("ADR0002_MICROCHIP_P1_TARGET_ONLY",126)
+          print("ADR0002_MICROCHIP_P2_ARCHIVE",20713)
+          print("MICROCHIP_P2_DFP_ONLY_ARCHIVE_SUBSET",2065)
+          print("MICROCHIP_DFP_ONLY_DISTINCT_BASE",340)
+          print("MICROCHIP_DFP_ONLY_BY_PACK",
+                json.dumps(report["dfp_archive_exact_icpn_by_manufacturer_pack"],
                            sort_keys=True))
           with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
-              f.write("Microchip P1 baseline Target CFG: 126 exact MCP ICPNs\n")
-              f.write("Additional P1 DFP-only discovery candidates: "+
-                      str(report["p1_discovery_exact_icpn_candidates"])+"\n")
-              f.write("P1 research queue combined (non-equivalent evidence tiers): "+
-                      str(report["p1_expanded_research_queue_total"])+"\n")
-              f.write("No OpenOCD qualification, Phase 2, Catalog or Production.\n")
+              f.write("ADR-0002 Microchip P0: 2,437; bounded P1: 126; P2: 20,713\n")
+              f.write("Included within P2: 2,065 exact original-MCP x DFP-only "
+                      "identity records across 340 DFP Base Devices\n")
+              f.write("Historical 2,191 combined-P1 label corrected; NOT P1.\n")
+              f.write("No OpenOCD SUPPORTED, Phase 2, Catalog or Production.\n")
           PY
       - name: Derive all 2437 P0 exact-ICPN Phase 1 field-evidence states and source gaps
         run: |
@@ -589,7 +606,7 @@ jobs:
           path: |
             ${{ runner.temp }}/microchip-full-reverse.json
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
-            ${{ runner.temp }}/microchip-p1-dfp-discovery.json
+            ${{ runner.temp }}/microchip-p2-dfp-identity-archive.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-phase1-s1-exact-identity-funnel.json
             ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
