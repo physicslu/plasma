@@ -306,12 +306,17 @@ jobs:
           out=json.loads(path.read_text(encoding="utf-8"))
           assert out["p1_target_only_icpn_count"] == 126
           assert len(out["records"]) == 126
+          assert out["p1_unique_original_mcp_base_device_count"] == 12
           assert out["p1_openocd_target_cfg_research_only"] == "tcl/target/atsaml1x.cfg"
           assert out["p1_target_only_not_software_supported"] is True
           assert out["chart_original_bytes_replayed_by_upstream_chart_builder"] is True
           audit=out["p1_official_chart_evidence"]
-          assert audit["p1_icpns_exact_base_joined_to_chart"]+audit["p1_icpns_no_chart_base_match"]==126
-          assert audit["chart_exact_variant_verified_fields"]==0
+          assert audit["chart_p1_base_name_count"] == 12
+          assert audit["p1_icpns_exact_base_joined_to_chart"] == 126
+          assert audit["p1_icpns_no_chart_base_match"] == 0
+          assert audit["chart_exact_variant_verified_fields"] == 0
+          for key in ("package","pin_count","flash","ram","vdd","temperature","core_model"):
+              assert out["per_field_coverage"][key]["PARTIAL"] == 126
           assert len(audit["p1_unmatched_icpns"]) == audit["p1_icpns_no_chart_base_match"]
           for key in ("manufacturer","icpn","base_device"):
               assert out["per_field_coverage"][key]["VERIFIED"] == 126
