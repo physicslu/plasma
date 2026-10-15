@@ -121,7 +121,8 @@ def require_live_session(*, phase: str, p0: Path, session: Path,
         r"[a-f0-9]{64}", str(record.get("candidate_bin_sha256", ""))
     ):
         raise c.SafetyError("Missing bound converted candidate firmware")
-    if c.sha256_file(candidate_bin) != record["candidate_bin_sha256"]:
+    if (c.sha256_file(candidate_bin) != c.CANDIDATE_BIN_SHA256
+            or record["candidate_bin_sha256"] != c.CANDIDATE_BIN_SHA256):
         raise c.SafetyError("Converted firmware digest mismatch")
     if not re.fullmatch(
         r"[a-f0-9]{64}", str(record.get("supervised_load_log_sha256", ""))
@@ -171,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # There is no automatic resume, reset, unload or rollback on error:
     # an AXI stall may leave the kernel unable to process recovery commands.
+    io = None
     try:
         with DevMemBackend(readonly=args.stage == "HIL01") as hw:
             io = m.RestrictedMMIO(hw)
@@ -202,6 +204,23 @@ def main(argv: list[str] | None = None) -> int:
             json.dump(record, f, indent=2, sort_keys=True)
             f.write("\n")
     except (OSError, ValueError, c.SafetyError) as exc:
+        # Preserve completed operations without issuing another hardware access.
+        # A kernel/AXI hang cannot reach this handler and still needs UART/power.
+        failure = {
+            "qualification": "SWD-04", "stage": args.stage, "result": "FAIL",
+            "source_git_sha": c.SOURCE_SHA, "error": str(exc),
+            "utc_finished": datetime.now(timezone.utc).isoformat(),
+            "mmio_audit": [] if io is None else [
+                {"op": op, "address": f"0x{address:08X}", "value": f"0x{value:08X}"}
+                for op, address, value in io.audit],
+            "recovery_restoration": "NOT_RUN",
+        }
+        try:
+            with args.output.open("x") as stream:
+                json.dump(failure, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+        except OSError as evidence_error:
+            print("Failure evidence could not be saved: " + str(evidence_error), file=sys.stderr)
         print("SWD04_LIVE_STOP: " + str(exc), file=sys.stderr)
         print("Do not issue more AXI accesses; follow supervised base restoration",
               file=sys.stderr)

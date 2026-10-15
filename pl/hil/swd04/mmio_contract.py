@@ -45,7 +45,7 @@ class RestrictedMMIO:
         allowed_values = {
             COMMAND: (1, 2, 4),  # START, ABORT, explicit RESPONSE ACK
             CONFIG: (0, 4, 5),  # DP write (fixture-only), DP read, line reset
-            HALF: (2, 9),
+            HALF: (2, 65535),
         }
         if value not in allowed_values[address]:
             raise SafetyError("MMIO write value not whitelisted")
@@ -163,7 +163,10 @@ def hil03_recovery(io: RestrictedMMIO) -> dict[str, object]:
     _expect_equal(io.read(STATUS) & (READY | RESP_VALID), READY,
                   "HIL-03 precondition")
     io.write(CONFIG, 0)  # DP write; no external target connected
-    io.write(HALF, 9)  # allow deterministic in-flight ABORT observation
+    # Expand the BUSY window for a Linux userspace round trip. The existing
+    # 1,000,000-cycle watchdog still bounds this attempt to 10 ms at 100 MHz.
+    # Scheduling can miss even this window: require BUSY or STOP, never retry.
+    io.write(HALF, 65535)
     io.write(COMMAND, 1)
     status = io.read(STATUS)
     if not status & 1:

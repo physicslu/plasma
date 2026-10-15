@@ -16,6 +16,7 @@ from typing import Any
 SOURCE_SHA = "d39e85194f27e20f0ae7f2eb7c0623b293ff1108"
 BIT_SHA256 = "80e8a6ef0c86ac000f9f0b16af2ee25ba3f6f1bb61dd3f3e7ab232508bc4c38b"
 HWH_SHA256 = "96ce1767ec2ca1ec4c45aaa0cdb4b674bd8349f5753e3f35728d18cf646843bc"
+CANDIDATE_BIN_SHA256 = "8f105de35bbe9a8c05c78e8318fcd06d3003a400978c7242c9f01d1346e47a64"
 RECOVERY_BIN_SHA256 = "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c"
 RECOVERY_HWH_SHA256 = "222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a"
 DPIDR = 0x2BA01477
@@ -93,13 +94,11 @@ class Candidate:
     recovery_hwh: Path
 
 
-def verify_artifacts(candidate: Candidate) -> dict[str, str]:
+def verify_candidate(candidate: Candidate) -> dict[str, str]:
     """Independent, immutable verification; no device access."""
     paths = {
         "bit": (candidate.bit, BIT_SHA256),
         "hwh": (candidate.hwh, HWH_SHA256),
-        "recovery_bin": (candidate.recovery_bin, RECOVERY_BIN_SHA256),
-        "recovery_hwh": (candidate.recovery_hwh, RECOVERY_HWH_SHA256),
     }
     for name, (path, expected) in paths.items():
         _require(path.is_file() and path.stat().st_size > 0,
@@ -116,6 +115,21 @@ def verify_artifacts(candidate: Candidate) -> dict[str, str]:
              "Manifest improperly claims runtime hardware qualification")
     _require(doc.get("physical_programming_qualified") is False,
              "Manifest improperly claims physical programming qualification")
+    # The actual SWD-03 manifest has separate schema, Identity and SWD ABIs.
+    # These are not interchangeable, and bool is not an ABI integer.
+    for key in ("identity_schema_version", "hardware_abi_version",
+                "swd_command_abi_version", "swd_transaction_abi_version"):
+        _require(type(doc.get(key)) is int and doc[key] == 1,
+                 "Unsupported/missing manifest ABI/schema: " + key)
+    for key, expected in {
+        "bitstream_version": "0.1.0", "build_id": SOURCE_SHA[:32],
+        "fpga_part": "xc7z020clg400-1",
+        "board_part": "tul.com.tw:pynq-z2:part0:1.0",
+    }.items():
+        _require(doc.get(key) == expected, "Manifest identity mismatch: " + key)
+    _require(doc.get("external_pl_io") is False, "External PL IO forbidden")
+    _require(type(doc.get("capability_flags")) is int
+             and doc["capability_flags"] == 0, "Physical capability flags forbidden")
     mapping = doc.get("axi_address_map", {})
     _require(type(mapping) is dict and set(mapping) == set(AXI_BASES),
              "Manifest four-aperture map missing/extra")
@@ -128,6 +142,19 @@ def verify_artifacts(candidate: Candidate) -> dict[str, str]:
             "Manifest AXI map mismatch: " + name,
         )
     return {name: digest for name, (_, digest) in paths.items()}
+
+
+def verify_artifacts(candidate: Candidate) -> dict[str, str]:
+    digests = verify_candidate(candidate)
+    for name, path, expected in (
+        ("recovery_bin", candidate.recovery_bin, RECOVERY_BIN_SHA256),
+        ("recovery_hwh", candidate.recovery_hwh, RECOVERY_HWH_SHA256),
+    ):
+        _require(path.is_file() and path.stat().st_size > 0,
+                 "Missing nonempty artifact: " + name)
+        _require(sha256_file(path) == expected, "SHA256 mismatch: " + name)
+        digests[name] = expected
+    return digests
 
 
 def verify_inventory(inventory: dict[str, Any], attestation: dict[str, Any]) -> None:
