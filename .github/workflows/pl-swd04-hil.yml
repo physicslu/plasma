@@ -35,6 +35,9 @@ jobs:
         run: |
           python3 -m compileall -q pl/hil/swd04/
           python3 -m pl.hil.swd04.preflight --help
+          python3 -m pl.hil.swd04.collect --help
+          python3 -m pl.hil.swd04.live --help
+          python3 -m pl.hil.swd04.restore --help
       - name: SWD-04 offline synthetic regressions
         run: |
           python3 -m pytest -q \
