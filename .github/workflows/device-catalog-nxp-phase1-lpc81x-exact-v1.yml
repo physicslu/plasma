@@ -1,0 +1,36 @@
+name: NXP ADR-0002 Phase1 LPC811 and LPC812 eight exact material fields
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-8-lpc81x-phase1-official-material-v1.csv"
+      - "data/device-catalog/research/nxp_phase1_lpc81x_exact_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_lpc81x_exact_v1.py"
+      - "data/device-catalog/research/NXP_PHASE1_LPC81X_EIGHT_EXACT_V1.md"
+      - "data/device-catalog/research/nxp-65-openocd-discovery-gates-v1.csv"
+      - "data/device-catalog/research/nxp-openocd-source-first-wave4-v1.json"
+      - ".github/workflows/device-catalog-nxp-phase1-lpc81x-exact-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp-8-lpc81x-phase1-official-material-v1.csv"
+      - "data/device-catalog/research/nxp_phase1_lpc81x_exact_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_lpc81x_exact_v1.py"
+      - ".github/workflows/device-catalog-nxp-phase1-lpc81x-exact-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-lpc81x-eight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay source-locked original 501 and 65 then eight LPC81x materials
+        run: python data/device-catalog/research/nxp_phase1_lpc81x_exact_v1.py
+      - name: Reject fictitious LPC81x ordering, VDD and support claims
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_lpc81x_exact_v1.py" -v
