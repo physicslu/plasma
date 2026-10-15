@@ -83,6 +83,7 @@ def validate_workstream_registry() -> None:
         ".github/workflows/python-tests.yml": "sw_ppu",
         ".github/workflows/ppu-release.yml": "sw_ppu",
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
+        ".github/workflows/z2like-demo-qemu.yml": "sw_ppu",
         ".github/workflows/persistent-integration-host.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
         ".github/workflows/device-catalog-current-validation.yml": "icpn",
@@ -113,6 +114,7 @@ def main() -> int:
     repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
+    z2like_qemu = read("z2like-demo-qemu.yml")
     ai_support = read("ic-support-validation.yml")
 
     # Device Catalog owns user-selectable ICPN inventory. A data-only catalog
@@ -124,6 +126,32 @@ def main() -> int:
         forbid(python_tests, token, owner="SW/PPU Python/PL")
     forbid(ppu_release, '"data/device-catalog/production/**"', owner="SW/PPU PPU release")
     forbid(z2_release, '"data/device-catalog/production/**"', owner="SW/PPU Z2 release")
+    for token in (
+        '"data/device-catalog/production/**"',
+        '"data/device-catalog/research/*-commercial-icpn.csv"',
+    ):
+        forbid(z2like_qemu, token, owner="SW/PPU QEMU acceptance")
+
+    # QEMU acceptance still owns executable Gateway/runtime changes, but catalog-only
+    # modules are an explicit narrow cross-workstream exclusion. Keep both push and
+    # pull_request filters aligned so IC Selector evidence updates do not compile ARMv7.
+    require_count(
+        z2like_qemu,
+        '"software/python/plasma_web/**"',
+        2,
+        owner="SW/PPU QEMU acceptance",
+    )
+    for token in (
+        '"!software/python/plasma_web/device_catalog.py"',
+        '"!software/python/plasma_web/*_manufacturer_device_evidence.py"',
+    ):
+        require_count(z2like_qemu, token, 2, owner="SW/PPU QEMU acceptance")
+    require_count(
+        repository_contracts,
+        '".github/workflows/z2like-demo-qemu.yml"',
+        3,
+        owner="REPO QEMU CI-boundary governance",
+    )
 
     # REPO governance tests are not SW/PPU source tests. Because python-tests
     # still owns the broad scripts/tests/** software-helper surface, explicitly

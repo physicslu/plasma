@@ -36,7 +36,7 @@ def test_cache_key_is_separate_per_architecture_source_recipe_and_toolchain_epoc
     workflow = WORKFLOW.read_text(encoding="utf-8")
     body = job()
     assert 'OPENOCD_CACHE_SCHEMA: "v1"' in workflow
-    assert 'OPENOCD_TOOLCHAIN_EPOCH: "jammy-build-deps-2026-10-v1"' in workflow
+    assert 'OPENOCD_TOOLCHAIN_EPOCH: "jammy-build-deps-2026-10-v2-gpiod"' in workflow
     assert "          - x86_64\n          - armv7l" in body
     assert body.count("key: " + CACHE_KEY) == 2
     assert "restore-keys:" not in body

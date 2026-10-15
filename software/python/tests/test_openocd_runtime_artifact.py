@@ -349,6 +349,10 @@ def test_build_recipe_uses_pinned_commit_and_minimal_control_plane_adapters() ->
     assert 'test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"' in source
     assert "--enable-dummy" in source
     assert "--enable-remote-bitbang" in source
+    assert "--enable-linuxgpiod" in source
+    assert "libgpiod-dev" in source
+    assert "adapter list" in source
+    assert 'grep -q "libgpiod.so"' in source
     assert "--disable-jlink" in source
     assert "python3 tcl" in source
     assert "adapter driver dummy" in source
@@ -363,6 +367,11 @@ def test_z2_release_builds_both_openocd_architectures_and_packages_armv7() -> No
     assert "- armv7l" in source
     assert "bash scripts/build-openocd-runtime.sh" in source
     assert "Install and execute on fresh matching Ubuntu 22.04 userspace" in source
+    assert "libgpiod2" in source
+    assert "openocd-jammy-libgpiod-x86_64" in source
+    assert "LD_LIBRARY_PATH" in source
+    assert 'grep -q "libgpiod.so.2"' in source
+    assert 'grep -Eq "(^|[[:space:]])linuxgpiod([[:space:]]|$)"' in source
     assert "plasma-openocd-*-linux-armv7l-" in source
     assert 'python "$root/scripts/openocd-runtime.py" verify' in source
     assert "hardware_runtime_ready" in source
@@ -371,6 +380,10 @@ def test_z2_release_builds_both_openocd_architectures_and_packages_armv7() -> No
 def test_qemu_workflow_verifies_kit_deployed_armv7_openocd_without_hardware_claims() -> None:
     source = QEMU_WORKFLOW.read_text(encoding="utf-8")
     assert "Drive Manager to Bootstrap to QEMU deployment E2E" in source
+    assert "Install Jammy libgpiod v1 compatibility runtime on QEMU ARMv7 target" in source
+    assert "arm32v7/ubuntu:22.04" in source
+    assert "/usr/local/lib/plasma-openocd-compat" in source
+    assert 'ldconfig -p | grep -q "libgpiod.so.2"' in source
     assert "Verify kit-deployed OpenOCD inside QEMU ARMv7 target" in source
     assert "Install and smoke packaged OpenOCD inside QEMU ARMv7 target" not in source
     assert "python3 /tmp/openocd-runtime.py install" not in source
