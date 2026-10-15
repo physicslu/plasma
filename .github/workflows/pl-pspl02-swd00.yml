@@ -16,6 +16,13 @@ on:
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
       - "pl/projects/z2-control-waveform/**"
+      - "pl/projects/swd-transaction/**"
+      - "pl/verification/models/**"
+      - "pl/verification/test_swd_transaction_rtl.py"
+      - "pl/verification/cocotb/test_swd_transaction.py"
+      - "pl/verification/sva/swd_transaction_checks.sv"
+      - "pl/sim/swd_transaction_tb.sv"
+      - "pl/tests/test_swd_reference.py"
       - ".github/workflows/pl-pspl02-swd00.yml"
   push:
     branches: [main]
@@ -33,6 +40,13 @@ on:
       - "pl/verification/cocotb/test_swd_waveform.py"
       - "pl/verification/test_pspl02_swd00_rtl.py"
       - "pl/projects/z2-control-waveform/**"
+      - "pl/projects/swd-transaction/**"
+      - "pl/verification/models/**"
+      - "pl/verification/test_swd_transaction_rtl.py"
+      - "pl/verification/cocotb/test_swd_transaction.py"
+      - "pl/verification/sva/swd_transaction_checks.sv"
+      - "pl/sim/swd_transaction_tb.sv"
+      - "pl/tests/test_swd_reference.py"
       - ".github/workflows/pl-pspl02-swd00.yml"
   workflow_dispatch:
 
@@ -62,12 +76,18 @@ jobs:
         run: python3 -m pytest -q pl/tests/test_z2_control_waveform_build.py
       - name: Real RTL simulation
         run: python3 -m pytest -v pl/verification/test_pspl02_swd00_rtl.py
+      - name: SWD transaction strict lint
+        run: verilator --lint-only --sv -Wall --top-module swd_transaction_master pl/rtl/site/swd_transaction_master.sv pl/rtl/site/swd_waveform_engine.sv
+      - name: SWD transaction and independent target regression
+        run: python3 -m pytest -v pl/tests/test_swd_reference.py pl/verification/test_swd_transaction_rtl.py
       - name: Failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: pspl02-swd00-failure-${{ github.run_id }}
-          path: pl/build/pspl02-swd00/sim/
+          path: |
+            pl/build/pspl02-swd00/sim/
+            pl/build/swd01-02/sim/
           retention-days: 7
           if-no-files-found: warn
       - name: Scope boundary
