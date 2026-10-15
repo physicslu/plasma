@@ -14,6 +14,8 @@ on:
       - "pl/verification/cocotb/test_swd_transaction.py"
       - "pl/verification/models/**"
       - "pl/verification/test_swd_transaction_rtl.py"
+      - "pl/projects/z2-swd03-axi/**"
+      - "pl/tests/test_z2_swd03_axi_build.py"
       - ".github/workflows/pl-swd03-axi.yml"
   push:
     branches: [main]
@@ -29,6 +31,8 @@ on:
       - "pl/verification/cocotb/test_swd_transaction.py"
       - "pl/verification/models/**"
       - "pl/verification/test_swd_transaction_rtl.py"
+      - "pl/projects/z2-swd03-axi/**"
+      - "pl/tests/test_z2_swd03_axi_build.py"
       - ".github/workflows/pl-swd03-axi.yml"
   workflow_dispatch:
 
@@ -81,6 +85,11 @@ jobs:
             pl/tests/test_z2_control_waveform_build.py
       - name: SWD-03 AXI and transaction regression
         run: python3 -m pytest -v pl/verification/test_swd03_axi_rtl.py
+      - name: SWD-03 Vivado build source and HWH fault injection
+        run: |
+          python3 -m pytest -v pl/tests/test_z2_swd03_axi_build.py
+          python3 -m py_compile pl/projects/z2-swd03-axi/artifact.py
+          bash -n pl/projects/z2-swd03-axi/build-on-swpc.sh
       - name: Failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
@@ -94,5 +103,5 @@ jobs:
           retention-days: 7
       - name: Acceptance scope
         run: |
-          echo "SWD-03 offline AXI RTL regression PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "SWD-03 offline AXI/fixture RTL and source HWH fault-injection PASS." >> "$GITHUB_STEP_SUMMARY"
           echo "No Vivado synthesis/implementation/timing, physical Z2 HIL, pin-level SWD, or real IC programming qualification." >> "$GITHUB_STEP_SUMMARY"
