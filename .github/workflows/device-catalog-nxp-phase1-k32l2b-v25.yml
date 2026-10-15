@@ -1,0 +1,42 @@
+name: NXP ADR-0002 Phase1 K32L2B Working VDD v25
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-12-k32l2b-working-vdd-partial-source-v25.csv"
+      - "data/device-catalog/research/nxp-phase1-k32l2b-vdd-source-lock-v25.json"
+      - "data/device-catalog/research/nxp-501-phase1-k32l2b-vdd-partial-v25.csv"
+      - "data/device-catalog/research/nxp-phase1-k32l2b-vdd-partial-coverage-v25.json"
+      - "data/device-catalog/research/nxp_phase1_k32l2b_vdd_v25.py"
+      - "data/device-catalog/research/test_nxp_phase1_k32l2b_vdd_v25.py"
+      - "data/device-catalog/research/NXP_PHASE1_K32L2B_WORKING_VDD_V25.md"
+      - "data/device-catalog/research/nxp-501-phase1-kl25-k32l2a-io-v24.csv"
+      - "data/device-catalog/research/nxp_phase1_kl25_k32l2a_io_v24.py"
+      - ".github/workflows/device-catalog-nxp-phase1-k32l2b-v25.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp-phase1-k32l2b-vdd-source-lock-v25.json"
+      - "data/device-catalog/research/nxp-501-phase1-k32l2b-vdd-partial-v25.csv"
+      - "data/device-catalog/research/nxp_phase1_k32l2b_vdd_v25.py"
+      - "data/device-catalog/research/test_nxp_phase1_k32l2b_vdd_v25.py"
+      - ".github/workflows/device-catalog-nxp-phase1-k32l2b-v25.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-k32l2b-vdd-v25:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify original v24 to v25 Phase 1 501-row replay and field metrics
+        run: python data/device-catalog/research/nxp_phase1_k32l2b_vdd_v25.py
+      - name: Reject false vendor PDF provenance, exact-VERIFIED and unauthorized admissions
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_k32l2b_vdd_v25.py" -v
+      - name: Regression test previous v24 Kinetis analog supply boundary
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_kl25_k32l2a_io_v24.py" -v
