@@ -132,6 +132,24 @@ class Microchip126Test(unittest.TestCase):
         self.assertEqual(record["derived_ordering_observations"]
                          ["temperature_max_c"],125)
 
+    def test_four_original_mcp_vao_variants_are_not_standard_pdf_grammar(self):
+        codes=(
+            ("ATSAML10D16A","ATSAML10D16A-MZTVAO"),
+            ("ATSAML10E16A","ATSAML10E16A-MZTVAO"),
+            ("ATSAML10E16A","ATSAML10E16A-MZVAO"),
+            ("ATSAML11E16A","ATSAML11E16A-MZTVAO"),
+        )
+        for base,code in codes:
+            r=xwalk.interpret_one(row(base,code))
+            self.assertEqual(
+                r["status"],
+                "MCP_VAO_SPECIAL_SUFFIX_SEPARATE_SOURCE_REVIEW_REQUIRED")
+            self.assertEqual(r["special_suffix_observed"],"VAO")
+            self.assertEqual(r["derived_ordering_observations"],{})
+            self.assertEqual(r["phase1_field_verified_promotions"],0)
+            self.assertFalse(r["software_supported_claimed"])
+            self.assertFalse(r["production_write_authorized"])
+
     def test_base_mismatch_and_unrecognized_codes_not_promoted(self):
         base="ATSAML11E16A"
         bad=xwalk.interpret_one(row(base,"ATSAML10E16A-MUT"))
