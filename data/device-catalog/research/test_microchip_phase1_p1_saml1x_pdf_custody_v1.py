@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import microchip_phase1_p1_saml1x_pdf_custody_v1 as pdf
@@ -39,6 +40,16 @@ def mock_reader(_path, page):
 
 
 class OriginalPdfEvidenceTest(unittest.TestCase):
+    def setUp(self):
+        # Synthetic bytes are deliberately NOT the official 8.9 MB PDF.
+        self._pin = patch.object(
+            pdf, "PINNED_ORIGINAL_SHA256",
+            hashlib.sha256(mock_original()).hexdigest())
+        self._pin.start()
+
+    def tearDown(self):
+        self._pin.stop()
+
     def test_valid_source_only_not_icpn_verified(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "research"
