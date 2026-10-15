@@ -1,4 +1,4 @@
-"""ADR-0002 Phase 2A OpenOCD software-qualification registry.
+"""ADR-0002 Phase 2 OpenOCD provider-specific qualification registry.
 
 This registry is intentionally separate from:
 - Production identity admission,
@@ -491,12 +491,12 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.production_admitted
+                row.phase1_identity_state == "IDENTIFIED"
                 and row.identifier_kind == "manufacturer_part_number"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"qualified exact ICPN Production route drift: {key[1]}",
+                f"qualified exact ICPN Phase 1 / Programming route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"qualification basis missing: {key[1]}")
@@ -937,12 +937,12 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"high-density qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.production_admitted
+                row.phase1_identity_state == "IDENTIFIED"
                 and row.identifier_kind == "manufacturer_part_number"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"high-density exact ICPN Production route drift: {key[1]}",
+                f"high-density exact ICPN Phase 1 / Programming route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"high-density qualification basis missing: {key[1]}")
@@ -1095,7 +1095,6 @@ class OpenOCDSoftwareQualificationRegistry:
             ("v7 manifest", qualification_manifest.get("acceptance_boundary", {})),
         ):
             for boundary_key in (
-                "public_catalog_visibility_changed",
                 "job_batch_execution_changed",
                 "installed_runtime_attested",
                 "hardware_runtime_ready",
@@ -1104,19 +1103,18 @@ class OpenOCDSoftwareQualificationRegistry:
             ):
                 _require(
                     boundary.get(boundary_key) is False,
-                    f"unsafe {qualification_name} Phase 2A boundary: {boundary_key}",
+                    f"unsafe {qualification_name} Phase 2 boundary: {boundary_key}",
                 )
 
         boundary = qualification_manifest.get("acceptance_boundary", {})
         for key in (
-            "public_catalog_visibility_changed",
             "job_batch_execution_changed",
             "installed_runtime_attested",
             "hardware_runtime_ready",
             "physical_programming_qualified",
             "phase3_compatibility_claimed",
         ):
-            _require(boundary.get(key) is False, f"unsafe Phase 2A boundary: {key}")
+            _require(boundary.get(key) is False, f"unsafe Phase 2 boundary: {key}")
 
         self.source_lock_id = source_lock["source_lock_id"]
         self.qualification_id = qualification_manifest["qualification_id"]
@@ -1136,6 +1134,11 @@ class OpenOCDSoftwareQualificationRegistry:
             "default_unreviewed_software_state"
         )
         _require(self.default_unreviewed_state == "UNKNOWN", "unreviewed exact ICPNs must remain UNKNOWN")
+
+    @property
+    def reviewed_exact_keys(self) -> tuple[tuple[str, str], ...]:
+        """Exact ICPNs with an explicit provider review result."""
+        return tuple(sorted(self._records))
 
     def lookup(self, manufacturer: str, exact_icpn: str) -> dict[str, Any] | None:
         record = self._records.get((manufacturer, exact_icpn))
@@ -1163,7 +1166,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "provider": None,
             "operations": {},
             "programming": None,
-            "public_catalog_visibility_changed": False,
+            "selector_visibility_authority": "PHASE1_IDENTIFIED",
             "job_batch_execution_changed": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -1238,7 +1241,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "supported_exact_icpns": supported,
             "catalog_exact_icpns": self._catalog.size,
             "unreviewed_default_unknown_exact_icpns": self._catalog.size - len(self._records),
-            "public_catalog_visibility_changed": False,
+            "selector_visibility_authority": "PHASE1_IDENTIFIED",
             "hardware_runtime_ready": False,
             "physical_programming_qualified": False,
         }
