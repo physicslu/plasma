@@ -84,9 +84,9 @@ class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
     def test_unreviewed_historical_priority_never_public_phase_state(self):
         row=self.by_part["LPC11U68JBD48E"]
         self.assertNotIn("research_priority",row)
-        self.assertNotIn("P0",str(row))
-        self.assertNotIn("P1",str(row))
-        self.assertNotIn("P2",str(row))
+        # NXP may legitimately use /P1K in the official order code. The
+        # obsolete research priority field, not those literal characters,
+        # must be absent from the normative Phase1/Phase2 schema.
         for row in self.rows:
             self.assertNotIn("research_priority",row)
 
