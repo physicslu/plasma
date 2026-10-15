@@ -1,6 +1,6 @@
 # OpenOCD Software Qualification v7 — STM32F103 high-density Z-pin LQFP expansion
 
-Status: **Current ADR-0002 Phase 2 software qualification authority**
+Status: **Current ADR-0002 Phase 2 Programming authority (ST / STM32F103 reference implementation)**
 
 ## Scope
 
@@ -13,8 +13,7 @@ The combined registry contains **49 exact ICPNs**:
 - 19 previously qualified high-density R/V-pin LQFP exact ICPNs;
 - 8 newly qualified high-density Z-pin LQFP exact ICPNs.
 
-The ST Phase 1 frozen denominator remains **4,629 exact ICPNs**. This transaction changes
-only Phase 2 software qualification.
+The ST Phase 1 frozen denominator remains **4,629 `IDENTIFIED` exact ICPNs**. Phase 2 consumes that identity state and changes only Programming qualification; it does not own Selector visibility or execution authorization.
 
 ## New Z-pin direct cohort
 
@@ -27,8 +26,7 @@ Direct manufacturer-applicability records:
 - `STM32F103ZET7`
 
 The cohort is bounded to pin code `Z` (144 pins), package code `T` (LQFP), and
-high-density C/D/E Flash codes. Only exact commercial identities already present in the
-locked ST Production authority are admitted.
+high-density C/D/E Flash codes. Only exact commercial identities already present in the locked ST Phase 1 identity authority are admitted. Runtime projects those authoritative Production exact-identity rows as Phase 1 `IDENTIFIED`; Production admission is no longer treated as a separate Phase 2 semantic.
 
 The following syntactically plausible codes are **not** admitted because they are absent
 from the locked exact-identity authority:
@@ -97,12 +95,15 @@ claim full raw-source custody for that document.
 
 ## Phase boundary
 
-v7 remains **software qualification only**:
+v7 remains **Phase 2 Programming qualification only**:
 
-- Phase 1 ST remains frozen at 4,629 exact ICPNs;
-- public Catalog migration is unchanged;
-- Job/Batch execution authorization is unchanged;
-- installed-runtime attestation is unchanged;
+- Phase 1 ST remains frozen at 4,629 `IDENTIFIED` exact ICPNs;
+- IC Selector visibility is owned by Phase 1 `IDENTIFIED`, not by this Phase 2 authority;
+- the canonical runtime projection is `programming_qualification.phase2_state`; the historical `openocd_software_qualification` field is compatibility-only;
+- Job/Batch execution authorization remains independent and fail-closed;
+- installed-runtime attestation remains independent;
 - `hardware_runtime_ready=false`;
 - `physical_programming_qualified=false`;
 - Phase 3 remains separate.
+
+The 49-member `SUPPORTED` exact-ICPN set, all manufacturer/OpenOCD evidence locks, Programming Profiles, memory geometry and qualified operations are unchanged by the ADR-0002 normalization.
