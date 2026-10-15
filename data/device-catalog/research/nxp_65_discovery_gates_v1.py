@@ -93,7 +93,9 @@ def classify(wave: int, record: dict, source: str) -> dict:
 
     require(bool(driver) and (pr == "P1" or bool(target)),
             "P0 lacks source-backed target + driver")
-    require(lifecycle in ("Active", "NRND"),
+    require(lifecycle == "Active" or
+            (sku == "LPC2148FBD64" and lifecycle ==
+             "MIXED_MATERIAL_LIFECYCLE_ACTIVE_151_157_NLM_118"),
             "unexpected lifecycle asserted as valid Active")
     if sku == "LPC1769FBD100":
         require(scope == "PRODUCT_ACTIVE_MATERIAL_LIFECYCLE_UNVERIFIED" and wave == 4,
