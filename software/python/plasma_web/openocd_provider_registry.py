@@ -18,6 +18,7 @@ from typing import Any
 from .backend_candidate_registry import BackendCandidateRegistry
 from .runtime_evidence_root import default_runtime_evidence_root, source_files_available
 from .backend_provenance import load_source_authorities
+from .microchip_phase1_admission_guard import admitted_microchip_phase1_count
 from .device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord,
     get_default_device_catalog,
@@ -148,7 +149,8 @@ class OpenOCDProviderRegistry:
         self.catalog_revision_sha256 = catalog.revision_sha256
         st = [r for r in catalog.records if r.vendor == "STMicroelectronics"]
         nxp = [r for r in catalog.records if r.vendor == "NXP"]
-        _require(catalog.status == "production" and catalog.size == 4853 and
+        microchip = admitted_microchip_phase1_count(catalog)
+        _require(catalog.status == "production" and catalog.size == 4853 + microchip and
                  len(st) == 4629 and len(nxp) == 224 and
                  Counter((r.family,r.mapping_status) for r in nxp) == {
                      ("KL25","mapped"):12,
@@ -210,9 +212,9 @@ class OpenOCDProviderRegistry:
                     cnt["no_candidate"] += 1
             self._routes[key] = self._guard_distinct_providers(entries)
         _require(cnt == {"mapped": 4176, "STM32H5": 190,
-                         "STM32C5": 172, "no_candidate": 315},
+                         "STM32C5": 172, "no_candidate": 315 + microchip},
                  f"Unexpected catalog/backend baseline {dict(cnt)}")
-        _require(len(self._routes) == 4853, "full exact-ICPN graph incomplete")
+        _require(len(self._routes) == 4853 + microchip, "full exact-ICPN graph incomplete")
 
     @staticmethod
     def _guard_distinct_providers(values: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:
