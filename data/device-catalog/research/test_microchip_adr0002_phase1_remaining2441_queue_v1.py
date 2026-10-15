@@ -19,7 +19,7 @@ VAO=[
 def fixtures():
     variants=[]
     for series, group, density, package, grade, tail in product(
-          ("10","11"),("D","E"),("14","15","16"),("M","A"),("U","F"),("","T")):
+          ("10","11"),("D","E"),("14","15","16"),("M","A","U","Y"),("U","F"),("","T")):
         code=f"ATSAML{series}{group}{density}A-{package}{grade}{tail}"
         if q.official_pdf.ORDER.fullmatch(code):
             variants.append(code)
