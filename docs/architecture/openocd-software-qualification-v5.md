@@ -1,6 +1,6 @@
 # OpenOCD Software Qualification v5 — STM32F103 bounded multi-density authority
 
-Status: **Current ADR-0002 Phase 2 software qualification authority**
+Status: **Historical ADR-0002 Phase 2 software qualification authority; superseded by v6**
 
 ## Scope
 
