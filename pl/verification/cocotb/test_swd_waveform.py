@@ -109,3 +109,31 @@ async def abort_on_reset_and_reject_busy_start(dut):
         await cycle(dut)
     assert val(dut.done) == 1
     assert val(dut.error) == 0
+
+@cocotb.test()
+async def full_32_bit_boundary_and_back_to_back(dut):
+    await init(dut)
+    dut.swdio_in.value = 1
+    tx = 0x87654321
+    await launch(dut, tx, 32, 2, 1)
+    for bit in range(32):
+        assert val(dut.swdio_out) == ((tx >> bit) & 1)
+        await cycle(dut)
+        assert val(dut.swclk) == 0
+        await cycle(dut)
+        assert val(dut.swclk) == 1
+        await cycle(dut)
+        assert val(dut.swclk) == 1
+        await cycle(dut)
+        assert val(dut.swclk) == 0
+    assert val(dut.done) == 1
+    assert val(dut.busy) == 0
+    assert val(dut.rx_data) == 0xFFFFFFFF
+    assert val(dut.swdio_oe) == 0
+    await launch(dut, 0b101, 3, 2, 0)
+    for _ in range(3 * 4):
+        await cycle(dut)
+    assert val(dut.done) == 1
+    assert val(dut.error) == 0
+    assert val(dut.rx_data) == 0b111
+    assert val(dut.swdio_oe) == 0
