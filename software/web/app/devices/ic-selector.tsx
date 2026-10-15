@@ -68,7 +68,7 @@ function openOcdConfigLabel(status: OpenOcdTagState, zh: boolean): string {
 function softwareQualificationClass(state: string | undefined): string {
   if (state === "SUPPORTED") return "verified";
   if (state === "UNSUPPORTED") return "failed";
-  if (state === "CANDIDATE") return "pending";
+  if (state === "CANDIDATE" || state === "BLOCKED") return "pending";
   return "unmapped";
 }
 
