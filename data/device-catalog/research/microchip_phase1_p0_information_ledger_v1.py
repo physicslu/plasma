@@ -16,6 +16,7 @@ from pathlib import Path
 
 from microchip_phase1_information_v1 import FIELDS, STATUSES
 import microchip_phase1_p0_chart_batch_v1 as chart_batch
+from microchip_openocd_reverse_coverage_v1 import REVIEWED_ALIAS
 
 EXPECTED_ALL = 23276
 EXPECTED_P0 = 2437
@@ -128,10 +129,15 @@ def make_entry(row):
             len(set(hashes)) == len(hashes) and
             all(valid_sha(x) for x in hashes),
             "P0 evidence missing original MCP response byte digest")
-    require((row["mapping_state"] == "EXACT_DFP_NAME_CFG_CANDIDATE"
-             and base.upper() == dfp.upper()) or
-            row["mapping_state"] == "REVIEWED_MANUFACTURER_ALIAS_CFG_CANDIDATE",
-            "CFG candidate DFP/base relationship contradicts evidence")
+    if row["mapping_state"] == "EXACT_DFP_NAME_CFG_CANDIDATE":
+        require(base.upper() == dfp.upper(),
+                "exact manufacturer Base Device/DFP name disagreement")
+    else:
+        reviewed = REVIEWED_ALIAS.get(base.upper())
+        require(reviewed is not None
+                and reviewed["dfp_name"] == dfp.upper()
+                and cfg == "tcl/target/at91samdXX.cfg",
+                "reviewed manufacturer Base/DFP alias is not source-approved")
     # Original manufacturer search_products response proves only Part Number
     # and basePartNumber here. A CFG candidate proves NO IC information field.
     loc = f"Microchip MCP search_products partNumber={icpn}"
@@ -198,21 +204,38 @@ def enrich_from_replayed_chart(records, chart_report):
         by_base[base.upper()] = r
     allowed = {"package", "pin_count", "flash", "ram", "vdd",
                "temperature", "core_model"}
-    matched = 0
+    matched_exact = 0
+    matched_reviewed_alias = 0
     filled = Counter()
     not_in_chart = []
     for rec in records:
         found = by_base.get(rec["base_device"].upper())
+        used_reviewed_alias = False
+        if found is None and rec["cfg_candidate_state"] == (
+                "REVIEWED_MANUFACTURER_ALIAS_CFG_CANDIDATE"):
+            alias = REVIEWED_ALIAS.get(rec["base_device"].upper())
+            require(alias is not None
+                    and alias["dfp_name"] == rec["dfp_name"].upper()
+                    and rec["openocd_target_cfg_research_only"] ==
+                        "tcl/target/at91samdXX.cfg",
+                    "reviewed alias identity differs from source lock")
+            found = by_base.get(alias["dfp_name"])
+            used_reviewed_alias = found is not None
         if found is None:
             not_in_chart.append({
                 "icpn": rec["icpn"],
                 "manufacturer_base_device": rec["base_device"],
                 "openocd_target_cfg_research_only":
                     rec["openocd_target_cfg_research_only"],
-                "gap": "NO_EXACT_BASE_NAME_IN_OBSERVED_32BIT_CHART",
+                "gap": "NO_APPROVED_BASE_OR_ALIAS_IN_OBSERVED_32BIT_CHART",
+                "dfp_device_name": rec["dfp_name"],
+                "cfg_candidate_state": rec["cfg_candidate_state"],
             })
             continue
-        matched += 1
+        if used_reviewed_alias:
+            matched_reviewed_alias += 1
+        else:
+            matched_exact += 1
         source_fields = found.get("fields_family_scope_only", {})
         require(isinstance(source_fields, dict), "invalid base chart fields")
         for field in allowed:
@@ -235,22 +258,58 @@ def enrich_from_replayed_chart(records, chart_report):
                     and isinstance(tr, int) and tr > 0
                     and isinstance(col, int) and col > 0,
                     "chart PARTIAL value missing raw-unit/row/column evidence")
-            rec["fields"][field] = status_field(
-                "PARTIAL", value,
-                locator=(f"{chart_report['source_url']} / TR {tr} / "
-                         f"column {col}: {head} = {raw}"),
-                hashes=[sha], scope="official_base_device_chart_not_exact_icpn",
-                unit=unit, note=(
-                    "Manufacturer parametric Base Device row only. "
+            locator = (f"{chart_report['source_url']} / TR {tr} / "
+                       f"column {col}: {head} = {raw}")
+            evidence_hashes = [sha]
+            scope = "official_base_device_chart_not_exact_icpn"
+            note = ("Manufacturer parametric Base Device row only. "
                     "Exact ICPN applicability has not been proven. "
-                    "Original raw units are preserved."))
+                    "Original raw units are preserved.")
+            if used_reviewed_alias:
+                scope = "official_chart_via_reviewed_mcp_dfp_alias_not_exact_icpn"
+                evidence_hashes += rec["source_original_mcp_response_sha256_refs"]
+                locator += (f" / Original MCP basePartNumber="
+                            f"{rec['base_device']}; approved DFP/Chart name="
+                            f"{rec['dfp_name']}")
+                note += (" Only the source-reviewed manufacturer Base/DFP "
+                         "alias was used; no ordering suffix inference.")
+            rec["fields"][field] = status_field(
+                "PARTIAL", value, locator=locator, hashes=evidence_hashes,
+                scope=scope, unit=unit, note=note)
             filled[field] += 1
+    groups = defaultdict(list)
+    for missing in not_in_chart:
+        groups[(missing["openocd_target_cfg_research_only"],
+                missing["manufacturer_base_device"])].append(missing["icpn"])
+    acquisition_queue = [{
+        "openocd_target_cfg_research_only": cfg,
+        "manufacturer_base_device": base,
+        "exact_icpn_count": len(parts),
+        "exact_icpns": sorted(parts),
+        "chart_status": "NO_APPROVED_BASE_OR_ALIAS_IN_OBSERVED_32BIT_CHART",
+        "official_exact_ordering_table_state": "NOT_REPLAYED",
+        "official_family_datasheet_state": "NOT_BOUND_TO_THIS_BASE",
+        "recommended_evidence_path": (
+            "Manufacturer ordering/SKU table for exact Package, Pin Count, "
+            "Temperature; official revisioned datasheet for family electrical "
+            "and memory evidence, with explicitly documented Base applicability."),
+        "field_inference_authorized": False,
+    } for (cfg, base), parts in sorted(groups.items())]
+    require(sum(x["exact_icpn_count"] for x in acquisition_queue) ==
+            len(not_in_chart), "gap acquisition queue loses exact ICPNs")
     return {
         "source_chart_scope": chart_report["chart_scope"],
         "source_chart_original_sha256": sha,
         "p0_manufacturer_chart_base_count": 341,
-        "p0_icpns_exact_manufacturer_base_joined_to_chart": matched,
+        "p0_icpns_exact_manufacturer_base_joined_to_chart": matched_exact,
+        "p0_icpns_reviewed_manufacturer_alias_joined_to_chart": matched_reviewed_alias,
+        "p0_icpns_chart_linked_with_approved_identity": (
+            matched_exact + matched_reviewed_alias),
         "p0_icpns_not_in_observed_chart": len(not_in_chart),
+        "p0_unmatched_distinct_manufacturer_base_count": len(acquisition_queue),
+        "p0_official_source_acquisition_queue": acquisition_queue,
+        "chart_unmatched_by_manufacturer_base": dict(sorted(Counter(
+            r["manufacturer_base_device"] for r in not_in_chart).items())),
         "chart_unmatched_by_research_cfg": dict(sorted(Counter(
             r["openocd_target_cfg_research_only"] for r in not_in_chart).items())),
         "chart_unmatched_exact_icpns": sorted(not_in_chart,
