@@ -22,6 +22,8 @@ import zipfile
 
 import microchip_phase1_portable_custody_v1 as portable
 import microchip_phase1_p0_second_cohort_v1 as second
+import microchip_mcp_full_rollup_v1 as full_mcp
+import microchip_mcp_batch_plan_v1 as batch_plan
 import microchip_openocd_core_first_v1 as gates
 from microchip_dfp_index_inventory_v1 import archived_inventory
 
@@ -251,10 +253,73 @@ def portable_original_icpn_rollup(path):
     }
 
 
-def build(dfp_root=None, mcp_rollup=None, portable_bundle=None):
+def replay_all_original_batch_sources(dfp_root, source_specs):
+    """Recompute all Research candidates from captured original MCP responses.
+
+    This accepts only the 13 operator-identified, disjoint source roots:
+    the original bounded 16-batch dataset plus 12 independently named
+    shards. The SHA-verified original DFP index derives their exact plan.
+    A failing original-source replay, changed research population or
+    conflicting lifecycle must abort the whole run rather than map partial
+    batches or silently report a smaller numerator.
+    """
+    require(dfp_root is not None, "original manufacturer DFP index required")
+    require(isinstance(source_specs, list) and len(source_specs) == 13,
+            "full original sweep requires 16-batch archive plus 12 shard archives")
+    labels = [label for label, _ in source_specs]
+    require(set(labels) == {"original-16-batches"} |
+            {f"shard-{n}" for n in range(12)} and len(labels) == 13,
+            "missing, duplicated or unapproved Microchip original research shard")
+    inventory = archived_inventory(dfp_root)
+    reg = json.loads(batch_plan.REGISTRY.read_text(encoding="utf-8"))
+    digest = reg["gate_1b_surface_audit"]["dfp_index_observation"]["raw_index_sha256"]
+    require(digest == gates.PINNED_DFP_SOURCE
+            and inventory["source_bytes_sha256"] == digest,
+            "unpinned original manufacturer DFP source")
+    expected = batch_plan.plan_inventory(inventory, digest, batch_size=10)
+    result = full_mcp.build(expected, inventory, digest, source_specs)
+    audit = json.loads((gates.HERE / 
+        "microchip-dfp-full-first-pass-audit-20261013.json").read_text(encoding="utf-8"))
+    require(audit["original_dfp_index_sha256"] == digest
+            and audit["planned_dfp_queries"] == expected["supported_text_search_seeds"]
+            and audit["planned_batches"] == expected["batch_count"]
+            and result["observed_batch_archives"] == audit["batch_archives_with_valid_capture_attestation"]
+            and result["replayed_positive_exact_prefix_queries"] == audit["complete_positive_exact_prefix_queries"]
+            and result["replayed_zero_exact_prefix_queries"] == audit["fully_replayed_zero_exact_prefix_queries"]
+            and result["unique_exact_prefix_research_candidates"] == audit["unique_exact_prefix_candidates_without_conflicts"]
+            and result["conflicting_lifecycle_identity_count"] == audit["raw_lifecycle_conflicts"] == 0
+            and result["replayed_queries"] ==
+                audit["complete_positive_exact_prefix_queries"] +
+                audit["fully_replayed_zero_exact_prefix_queries"]
+            and result["production_write_authorized"] is False,
+            "original manufacturer full sweep differs from audited 2026-10-13 evidence")
+    require(sum(len(v["sources"]) for v in result["ordering_candidates"]) ==
+            audit["verified_original_source_response_links"],
+            "original MCP exact-ordering response link count changed")
+    return result, {
+        "original_source_count": len(source_specs),
+        "original_batch_archives_replayed": result["observed_batch_archives"],
+        "exact_prefix_queries_replayed": result["replayed_queries"],
+        "positive_exact_prefix_queries": result["replayed_positive_exact_prefix_queries"],
+        "zero_exact_prefix_queries": result["replayed_zero_exact_prefix_queries"],
+        "distinct_original_mcp_response_links": audit["verified_original_source_response_links"],
+        "historical_research_icpn_candidates_replayed": result["unique_exact_prefix_research_candidates"],
+        "manufacturer_whole_population_known": False,
+        "source_replay_status": "REPLAYED_AGAINST_PINNED_ORIGINAL_BYTES",
+    }
+
+
+def build(dfp_root=None, mcp_rollup=None, portable_bundle=None,
+          original_batch_sources=None):
     lock, observation = source_lock()
+    require(sum(x is not None for x in (mcp_rollup, portable_bundle,
+            original_batch_sources)) <= 1,
+            "only one original or derived Microchip ICPN input is allowed")
+    source_replay = None
+    if original_batch_sources is not None:
+        mcp_rollup, source_replay = replay_all_original_batch_sources(
+            dfp_root, original_batch_sources)
     if portable_bundle is not None:
-        require(mcp_rollup is None, "only one exact-ICPN evidence input is allowed")
         mcp_rollup = portable_original_icpn_rollup(portable_bundle)
     if mcp_rollup is not None:
         require(dfp_root is not None,
@@ -281,7 +346,9 @@ def build(dfp_root=None, mcp_rollup=None, portable_bundle=None):
         "icpn_rows": [],
         "icpn_mapping_state_counts": {},
         "icpn_by_cfg_candidate_counts": {},
-        "all_icpn_original_bytes_replayed_in_this_command": portable_bundle is not None,
+        "all_icpn_original_bytes_replayed_in_this_command": (
+            portable_bundle is not None or original_batch_sources is not None),
+        "full_batch_original_source_replay": source_replay,
         "base_device_from_suffix_inference": False,
         "cfg_software_supported_claimed": False,
         "production_write_authorized": False,
@@ -298,7 +365,7 @@ def build(dfp_root=None, mcp_rollup=None, portable_bundle=None):
             g["dfp_device_name_count"] for g in groups if g["priority"]=="P1")
         if mcp_rollup is not None:
             rows, states, counts = join_icpns(lock, indexed, mcp_rollup)
-            if portable_bundle is not None:
+            if portable_bundle is not None or original_batch_sources is not None:
                 for row in rows:
                     row["manufacturer_base_identity_evidence"] = (
                         "ORIGINAL_MICROCHIP_MCP_RESPONSE_REPLAYED_IN_THIS_COMMAND")
@@ -317,6 +384,9 @@ def build(dfp_root=None, mcp_rollup=None, portable_bundle=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dfp-evidence-root", type=Path)
+    p.add_argument("--original-batch-source", action="append",
+                   metavar="LABEL=PATH",
+                   help="all thirteen original MCP roots: original-16-batches plus shard-0 through shard-11; forces complete original source replay")
     p.add_argument("--portable-bundle", type=Path,
                    help="verified original two-query Microchip source ZIP from PR #878")
     p.add_argument("--mcp-rollup", type=Path,
@@ -328,7 +398,14 @@ def main():
     require("production" not in {part.casefold() for part in output.parts},
             "Research report must not write Production")
     raw = json.loads(args.mcp_rollup.read_text(encoding="utf-8")) if args.mcp_rollup else None
-    report = build(args.dfp_evidence_root, raw, args.portable_bundle)
+    sources = None
+    if args.original_batch_source is not None:
+        sources = []
+        for value in args.original_batch_source:
+            require("=" in value, "original batch source must be LABEL=PATH")
+            label, root = value.split("=", 1)
+            sources.append((label, Path(root)))
+    report = build(args.dfp_evidence_root, raw, args.portable_bundle, sources)
     if args.verify:
         require(json.loads(output.read_text(encoding="utf-8")) == report,
                 "reverse CFG mapping report differs from original-source replay")
