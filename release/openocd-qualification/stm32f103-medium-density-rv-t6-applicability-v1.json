@@ -63,7 +63,7 @@
       "target_config": "tcl/target/stm32f1x.cfg",
       "memory_geometry_profile_id": "stm32f103r8-64k-v0",
       "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
-      "memory_geometry_git_blob_sha1": "d3e8f1f2a01f5bb32a4c53aa9ad9dfcfb3013a1c",
+      "memory_geometry_git_blob_sha1": "851171147296f574dbe66ded56e2887db12d458e",
       "main_flash_size_bytes": 65536,
       "page_count": 64
     },
@@ -78,7 +78,7 @@
       "target_config": "tcl/target/stm32f1x.cfg",
       "memory_geometry_profile_id": "stm32f103rb-128k-v0",
       "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
-      "memory_geometry_git_blob_sha1": "7e3ea3cb1b46fc63df52f1814265a2238f694ba7",
+      "memory_geometry_git_blob_sha1": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
       "main_flash_size_bytes": 131072,
       "page_count": 128
     },
@@ -93,7 +93,7 @@
       "target_config": "tcl/target/stm32f1x.cfg",
       "memory_geometry_profile_id": "stm32f103v8-64k-v0",
       "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json",
-      "memory_geometry_git_blob_sha1": "2ffdbb02b4f47fb08bb8683989dff76ff184749a",
+      "memory_geometry_git_blob_sha1": "9d1b1578b62225f144856f7aa4674d158fa34203",
       "main_flash_size_bytes": 65536,
       "page_count": 64
     },
@@ -108,7 +108,7 @@
       "target_config": "tcl/target/stm32f1x.cfg",
       "memory_geometry_profile_id": "stm32f103vb-128k-v0",
       "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
-      "memory_geometry_git_blob_sha1": "8c00c154f41e0ca18901ea34a37782e319e3323a",
+      "memory_geometry_git_blob_sha1": "64799b571bb6a80258355f86c906d052b18dc242",
       "main_flash_size_bytes": 131072,
       "page_count": 128
     }
