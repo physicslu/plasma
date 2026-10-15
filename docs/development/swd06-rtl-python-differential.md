@@ -62,7 +62,7 @@ fixture tests distinct; neither fixture is a production IC.
 
 `pl/verification/test_swd06_rtl_python.py` launches an Icarus simulation
 per Cocotb scenario; the new test module is
-`pl/verification/cocotb/test_swd06_rtl_python.py`.
+`pl/verification/cocotb/swd06_driver_cocotb.py`.
 `.github/workflows/pl-swd06-differential.yml` installs the software
 package, Icarus, Cocotb 1.9.2 and Cocotb-Test 0.2.6, runs all
 new scenarios and retained SWD-03/SWD-05 regressions.
