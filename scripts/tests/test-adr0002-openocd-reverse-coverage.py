@@ -94,16 +94,12 @@ def audit_contract(contract: dict, adr: str) -> None:
         raise ValueError("P0 incorrectly grants product/runtime permission")
     needs_adr = [
         "### Vendor-agnostic OpenOCD Reverse Coverage SOP",
-        "NO_MANUFACTURER_ALLOWLIST",
         "Provider + Version/Commit + Target + Flash Driver + Silicon Identity/Probe Rule",
         "CLOSE_P1_EVIDENCE_GAP", "CLOSED_EVIDENCE_GAP",
         "PROPOSE_P0", "ARCHIVE_P2", "Phase 2 — CURRENT",
         "Phase 3 — DEFERRED", "SUPPORTED",
         "本修訂不重分類",
     ]
-    # Scope label is encoded in the machine contract; the prose explicitly says
-    # there is no manufacturer allowlist without assuming the same enum spelling.
-    needs_adr.remove("NO_MANUFACTURER_ALLOWLIST")
     for heading_or_invariant in needs_adr:
         if heading_or_invariant not in adr:
             raise ValueError("ADR-0002 lacks promised evidence boundary: " +
@@ -140,10 +136,12 @@ def audit_research_record(record: dict, contract: dict) -> None:
             if not record.get("stop_reason") or not record.get("reopen_triggers"):
                 raise ValueError("closed P1 needs stop reason and reopening criteria")
     else:
-        if record["investigation_state"] != "P2_ARCHIVED" and record["investigation_state"] != "REOPENED":
+        if record["investigation_state"] not in ("P2_ARCHIVED", "REOPENED"):
             raise ValueError("P2 not archived/reopened")
         if record.get("stop_reason") not in contract["p2_stop_reasons"]:
             raise ValueError("P2 lacks a bounded research/business stop reason")
+        if record["stop_reason"] == "NO_CREDIBLE_PINNED_FLASH_PATH" and full:
+            raise ValueError("P2 no-path conclusion contradicts complete P0 source route")
 
     # Manufacturer is annotation, not part of the capability index;
     # any nonblank vendor string is allowed, and UNKNOWN is valid.
@@ -211,10 +209,20 @@ class ADR0002ReverseCoverageTests(unittest.TestCase):
             "investigation_state": "P2_ARCHIVED",
             "software_support": "UNKNOWN",
             "stop_reason": "NO_CREDIBLE_PINNED_FLASH_PATH",
+            "operation_source_path": False,
         }
         audit_research_record(test, self.contract)
         test["software_support"] = "UNSUPPORTED"
         with self.assertRaisesRegex(ValueError, "cannot grant software"):
+            audit_research_record(test, self.contract)
+
+    def test_reject_p2_no_path_with_complete_proof(self):
+        test = BASE_P0 | {
+            "priority": "P2",
+            "investigation_state": "P2_ARCHIVED",
+            "stop_reason": "NO_CREDIBLE_PINNED_FLASH_PATH",
+        }
+        with self.assertRaisesRegex(ValueError, "contradicts complete P0"):
             audit_research_record(test, self.contract)
 
     def test_p2_business_deprioritization_not_eol(self):
