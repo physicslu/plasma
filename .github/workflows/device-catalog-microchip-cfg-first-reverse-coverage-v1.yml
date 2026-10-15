@@ -9,6 +9,7 @@ on:
       - 'data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p1_ordering_crosswalk_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p1_ordering_crosswalk_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P1_ORDERING_APPLICABILITY_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p1_information_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P1_PHASE1_INFORMATION_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
