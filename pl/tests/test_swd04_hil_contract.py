@@ -203,7 +203,7 @@ def test_hil02_dpidr_and_explicit_ack():
     hw = SimulatedMMIO()
     io = m.RestrictedMMIO(hw)
     assert m.hil02_dpidr(io)["dpidr"] == "0x2BA01477"
-    assert [v for op,a,v in hw.events if op == "write" and a == c.COMMAND] == [1,4,1,4]
+    assert [e[2] for e in hw.events if e[0] == "write" and e[1] == c.COMMAND] == [1,4,1,4]
 
 
 def test_hil03_abort_and_bounded_recovery():
