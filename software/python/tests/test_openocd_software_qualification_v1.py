@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,105 +13,174 @@ from plasma_web.openocd_software_qualification import (
 )
 
 
+EVIDENCE_FILES = (
+    "release/openocd.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v3.json",
+    "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json",
+    "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v2.json",
+    "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
+    "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
+    "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
+    "data/ic-support/bindings/stm32f103c-pilot-v0.json",
+    "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json",
+    "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
+    "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+    "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+)
+
+
+def copy_evidence_tree(destination: Path) -> None:
+    assert ROOT is not None
+    for rel in EVIDENCE_FILES:
+        src = ROOT / rel
+        dst = destination / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(src.read_bytes())
+
+
 class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.catalog = get_default_device_catalog()
         cls.registry = OpenOCDSoftwareQualificationRegistry(cls.catalog, ROOT)
 
-    def test_reference_cohort_is_exact_and_supported(self):
+    def test_reviewed_cohort_is_exact_and_supported(self):
+        expected = (
+            "STM32F103C8T6",
+            "STM32F103C8T6TR",
+            "STM32F103CBT6",
+            "STM32F103CBT6TR",
+            "STM32F103R8T6",
+            "STM32F103R8T6TR",
+            "STM32F103RBT6",
+            "STM32F103RBT6TR",
+            "STM32F103V8T6",
+            "STM32F103V8T6TR",
+            "STM32F103VBT6",
+            "STM32F103VBT6TR",
+        )
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
-            (
-                "STM32F103C8T6",
-                "STM32F103C8T6TR",
-                "STM32F103CBT6",
-                "STM32F103CBT6TR",
-            ),
+            expected,
         )
-        for icpn in self.registry.supported_exact_icpns("STMicroelectronics"):
+        for icpn in expected:
             row = self.registry.lookup("STMicroelectronics", icpn)
             self.assertIsNotNone(row)
             self.assertEqual(row["software_state"], "SUPPORTED")
             self.assertEqual(row["operations"], list(REQUIRED_OPERATIONS))
 
-    def test_exact_geometries_are_not_collapsed(self):
-        c8 = self.registry.lookup("STMicroelectronics", "STM32F103C8T6")
-        cb = self.registry.lookup("STMicroelectronics", "STM32F103CBT6")
-        self.assertEqual(c8["main_flash_size_bytes"], 64 * 1024)
-        self.assertEqual(c8["page_count"], 64)
-        self.assertEqual(cb["main_flash_size_bytes"], 128 * 1024)
-        self.assertEqual(cb["page_count"], 128)
-        self.assertEqual(c8["programming_profile_id"], cb["programming_profile_id"])
-        self.assertNotEqual(c8["memory_geometry_profile_id"], cb["memory_geometry_profile_id"])
+    def test_direct_medium_density_applicability_preserves_exact_geometry(self):
+        expected = {
+            "STM32F103R8T6": ("STM32F103R8", "stm32f103r8-64k-v0", 64 * 1024, 64),
+            "STM32F103RBT6": ("STM32F103RB", "stm32f103rb-128k-v0", 128 * 1024, 128),
+            "STM32F103V8T6": ("STM32F103V8", "stm32f103v8-64k-v0", 64 * 1024, 64),
+            "STM32F103VBT6": ("STM32F103VB", "stm32f103vb-128k-v0", 128 * 1024, 128),
+        }
+        for icpn, (base, geometry, size, pages) in expected.items():
+            with self.subTest(icpn=icpn):
+                row = self.registry.lookup("STMicroelectronics", icpn)
+                self.assertEqual(row["qualification_basis"]["kind"], "manufacturer_applicability")
+                self.assertEqual(row["base_device"], base)
+                self.assertEqual(row["programming_profile_id"], "stm32f1-medium-density-flash-v0")
+                self.assertEqual(row["memory_geometry_profile_id"], geometry)
+                self.assertEqual(row["main_flash_size_bytes"], size)
+                self.assertEqual(row["page_count"], pages)
 
-        c8tr = self.registry.lookup("STMicroelectronics", "STM32F103C8T6TR")
-        cbtr = self.registry.lookup("STMicroelectronics", "STM32F103CBT6TR")
-        self.assertEqual(c8tr["qualification_basis"]["kind"], "ordering_equivalence")
-        self.assertEqual(c8tr["qualification_basis"]["equivalent_to_icpn"], "STM32F103C8T6")
-        self.assertEqual(cbtr["qualification_basis"]["kind"], "ordering_equivalence")
-        self.assertEqual(cbtr["qualification_basis"]["equivalent_to_icpn"], "STM32F103CBT6")
-        for variant, source in ((c8tr, c8), (cbtr, cb)):
-            self.assertEqual(variant["programming_profile_id"], source["programming_profile_id"])
-            self.assertEqual(variant["memory_geometry_profile_id"], source["memory_geometry_profile_id"])
-            self.assertEqual(variant["main_flash_size_bytes"], source["main_flash_size_bytes"])
-            self.assertEqual(variant["page_count"], source["page_count"])
-            self.assertEqual(variant["operations"], source["operations"])
+    def test_tape_and_reel_variants_inherit_only_from_reviewed_reference(self):
+        pairs = (
+            ("STM32F103C8T6TR", "STM32F103C8T6"),
+            ("STM32F103CBT6TR", "STM32F103CBT6"),
+            ("STM32F103R8T6TR", "STM32F103R8T6"),
+            ("STM32F103RBT6TR", "STM32F103RBT6"),
+            ("STM32F103V8T6TR", "STM32F103V8T6"),
+            ("STM32F103VBT6TR", "STM32F103VBT6"),
+        )
+        for variant_icpn, source_icpn in pairs:
+            with self.subTest(icpn=variant_icpn):
+                variant = self.registry.lookup("STMicroelectronics", variant_icpn)
+                source = self.registry.lookup("STMicroelectronics", source_icpn)
+                self.assertEqual(variant["qualification_basis"]["kind"], "ordering_equivalence")
+                self.assertEqual(
+                    variant["qualification_basis"]["equivalent_to_icpn"],
+                    source_icpn,
+                )
+                for field in (
+                    "base_device",
+                    "programming_profile_id",
+                    "memory_geometry_profile_id",
+                    "main_flash_size_bytes",
+                    "page_count",
+                    "operations",
+                ):
+                    self.assertEqual(variant[field], source[field])
 
-    def test_same_family_or_existing_mapping_does_not_grant_supported(self):
+    def test_same_base_or_cfg_without_exact_review_does_not_grant_supported(self):
+        # T7 is the same R8 Base Device but a different temperature ordering code.
         self.assertEqual(
-            self.registry.state_for("STMicroelectronics", "STM32F103R8T6"),
+            self.registry.state_for("STMicroelectronics", "STM32F103R8T7"),
+            "UNKNOWN",
+        )
+        # High-density F103 remains outside this medium-density transaction.
+        self.assertEqual(
+            self.registry.state_for("STMicroelectronics", "STM32F103RCT6"),
             "UNKNOWN",
         )
         self.assertEqual(
             self.registry.state_for("STMicroelectronics", "STM32F407VGT6"),
             "UNKNOWN",
         )
-        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103R8T6"))
+        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103R8T7"))
 
     def test_projection_separates_supported_from_unreviewed_mapping(self):
-        c8 = self.registry.describe("STMicroelectronics", "STM32F103C8T6")
-        self.assertEqual(c8["software_state"], "SUPPORTED")
-        self.assertTrue(c8["reviewed"])
-        self.assertEqual(c8["provider"]["version"], "0.12.0")
-        self.assertEqual(c8["provider"]["flash_driver"], "stm32f1x")
-        self.assertEqual(c8["operations"]["probe"]["state"], "SUPPORTED")
-        self.assertEqual(c8["operations"]["verify"]["state"], "SUPPORTED")
-        self.assertEqual(
-            c8["programming"]["electrical"]["vdd_programming_v"],
-            {"min": 2.0, "max": 3.6},
-        )
-        self.assertFalse(c8["programming"]["electrical"]["external_vpp_required"])
-        self.assertEqual(c8["programming"]["flash_geometry"]["main_flash_size_bytes"], 65536)
-        self.assertEqual(c8["programming"]["flash_geometry"]["page_count"], 64)
+        for icpn, expected_size, expected_pages in (
+            ("STM32F103C8T6", 64 * 1024, 64),
+            ("STM32F103CBT6", 128 * 1024, 128),
+            ("STM32F103R8T6", 64 * 1024, 64),
+            ("STM32F103RBT6", 128 * 1024, 128),
+            ("STM32F103V8T6", 64 * 1024, 64),
+            ("STM32F103VBT6", 128 * 1024, 128),
+            ("STM32F103R8T6TR", 64 * 1024, 64),
+            ("STM32F103VBT6TR", 128 * 1024, 128),
+        ):
+            with self.subTest(icpn=icpn):
+                item = self.registry.describe("STMicroelectronics", icpn)
+                self.assertEqual(item["software_state"], "SUPPORTED")
+                self.assertTrue(item["reviewed"])
+                self.assertEqual(item["provider"]["version"], "0.12.0")
+                self.assertEqual(item["provider"]["flash_driver"], "stm32f1x")
+                self.assertEqual(item["operations"]["probe"]["state"], "SUPPORTED")
+                self.assertEqual(item["operations"]["verify"]["state"], "SUPPORTED")
+                self.assertEqual(
+                    item["programming"]["electrical"]["vdd_programming_v"],
+                    {"min": 2.0, "max": 3.6},
+                )
+                self.assertFalse(
+                    item["programming"]["electrical"]["external_vpp_required"]
+                )
+                self.assertEqual(
+                    item["programming"]["flash_geometry"]["main_flash_size_bytes"],
+                    expected_size,
+                )
+                self.assertEqual(
+                    item["programming"]["flash_geometry"]["page_count"],
+                    expected_pages,
+                )
 
-        cb = self.registry.describe("STMicroelectronics", "STM32F103CBT6")
-        self.assertEqual(cb["software_state"], "SUPPORTED")
-        self.assertEqual(cb["programming"]["flash_geometry"]["main_flash_size_bytes"], 131072)
-        self.assertEqual(cb["programming"]["flash_geometry"]["page_count"], 128)
-
-        c8tr = self.registry.describe("STMicroelectronics", "STM32F103C8T6TR")
-        self.assertEqual(c8tr["software_state"], "SUPPORTED")
-        self.assertTrue(c8tr["reviewed"])
-        self.assertEqual(c8tr["programming"]["flash_geometry"]["main_flash_size_bytes"], 65536)
-        self.assertEqual(c8tr["programming"]["flash_geometry"]["page_count"], 64)
-
-        cbtr = self.registry.describe("STMicroelectronics", "STM32F103CBT6TR")
-        self.assertEqual(cbtr["software_state"], "SUPPORTED")
-        self.assertTrue(cbtr["reviewed"])
-        self.assertEqual(cbtr["programming"]["flash_geometry"]["main_flash_size_bytes"], 131072)
-        self.assertEqual(cbtr["programming"]["flash_geometry"]["page_count"], 128)
-
-        r8 = self.registry.describe("STMicroelectronics", "STM32F103R8T6")
-        self.assertEqual(r8["software_state"], "UNKNOWN")
-        self.assertFalse(r8["reviewed"])
-        self.assertIsNone(r8["provider"])
-        self.assertEqual(r8["operations"], {})
-        self.assertIsNone(r8["programming"])
-        self.assertFalse(r8["public_catalog_visibility_changed"])
-        self.assertFalse(r8["job_batch_execution_changed"])
-        self.assertFalse(r8["hardware_runtime_ready"])
-        self.assertFalse(r8["physical_programming_qualified"])
+        unreviewed = self.registry.describe("STMicroelectronics", "STM32F103R8T7")
+        self.assertEqual(unreviewed["software_state"], "UNKNOWN")
+        self.assertFalse(unreviewed["reviewed"])
+        self.assertIsNone(unreviewed["provider"])
+        self.assertEqual(unreviewed["operations"], {})
+        self.assertIsNone(unreviewed["programming"])
+        self.assertFalse(unreviewed["public_catalog_visibility_changed"])
+        self.assertFalse(unreviewed["job_batch_execution_changed"])
+        self.assertFalse(unreviewed["hardware_runtime_ready"])
+        self.assertFalse(unreviewed["physical_programming_qualified"])
 
     def test_operation_qualification_is_source_bounded(self):
         opq = self.registry.operation_qualification
@@ -132,69 +199,49 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 4)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 4)
-        self.assertGreater(registry.summary["unreviewed_default_unknown_exact_icpns"], 0)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 12)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 12)
+        self.assertEqual(
+            registry.summary["unreviewed_default_unknown_exact_icpns"],
+            registry.summary["catalog_exact_icpns"] - 12,
+        )
 
     def test_local_evidence_blob_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            for rel in (
-                "release/openocd.json",
-                "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-                "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v2.json",
-                "release/openocd-qualification/stm32f103c-tr-ordering-equivalence-v1.json",
-                "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
-                "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
-                "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
-                "data/ic-support/bindings/stm32f103c-pilot-v0.json",
-                "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json",
-                "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json",
-                "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
-                "data/device-catalog/research/stm32-icpn-phase2-st-authoritative-sources.md",
-                "data/device-catalog/research/stm32-icpn-phase2-cb-evidence.md",
-                "data/device-catalog/research/stm32f1-commercial-icpn.csv",
-            ):
-                src = ROOT / rel
-                dst = root / rel
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_bytes(src.read_bytes())
-
+            copy_evidence_tree(root)
             drift = root / "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json"
             drift.write_bytes(drift.read_bytes() + b"\n")
             with self.assertRaisesRegex(DeviceCatalogIntegrityError, "local evidence blob drift"):
                 OpenOCDSoftwareQualificationRegistry(self.catalog, root)
 
-    def test_ordering_equivalence_evidence_drift_fails_closed(self):
+    def test_applicability_authority_artifact_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            for rel in (
-                "release/openocd.json",
-                "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-                "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v2.json",
-                "release/openocd-qualification/stm32f103c-tr-ordering-equivalence-v1.json",
-                "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
-                "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
-                "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
-                "data/ic-support/bindings/stm32f103c-pilot-v0.json",
-                "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json",
-                "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json",
-                "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
-                "data/device-catalog/research/stm32-icpn-phase2-st-authoritative-sources.md",
-                "data/device-catalog/research/stm32-icpn-phase2-cb-evidence.md",
-                "data/device-catalog/research/stm32f1-commercial-icpn.csv",
-            ):
-                src = ROOT / rel
-                dst = root / rel
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_bytes(src.read_bytes())
-
-            drift = root / "data/device-catalog/research/stm32-icpn-phase2-st-authoritative-sources.md"
+            copy_evidence_tree(root)
+            drift = (
+                root
+                / "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json"
+            )
             drift.write_bytes(drift.read_bytes() + b"\n")
             with self.assertRaisesRegex(
-                DeviceCatalogIntegrityError, "ordering identity evidence blob drift"
+                DeviceCatalogIntegrityError,
+                "qualification authority artifact drift",
+            ):
+                OpenOCDSoftwareQualificationRegistry(self.catalog, root)
+
+    def test_manufacturer_applicability_source_drift_fails_closed(self):
+        self.assertIsNotNone(ROOT)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            copy_evidence_tree(root)
+            drift = root / "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json"
+            drift.write_bytes(drift.read_bytes() + b"\n")
+            with self.assertRaisesRegex(
+                DeviceCatalogIntegrityError,
+                "applicability source blob drift",
             ):
                 OpenOCDSoftwareQualificationRegistry(self.catalog, root)
 

@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v2",
+  "predecessor_equivalence_id": "st-stm32f103c-tr-ordering-equivalence-v1",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "manufacturer": "STMicroelectronics",
+  "scope": "Commercial packing-only TR equivalence for explicitly qualified STM32F103 medium-density T6 ordering codes.",
+  "ordering_authority": {
+    "path": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+    "git_blob_sha1": "0c4b4b1d2e727726d0431ef89d687a6b6d2e98cf",
+    "series": "STM32F103",
+    "band": "medium",
+    "document": "DS5319 Rev 20",
+    "suffix": "TR",
+    "meaning": "tape-and-reel"
+  },
+  "production_exact_identity": {
+    "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+    "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3",
+    "source_authority": "STMicroelectronics official"
+  },
+  "inheritance_contract": {
+    "required_equal_catalog_fields": [
+      "base_device",
+      "package",
+      "pin_count",
+      "flash_size",
+      "temperature_grade",
+      "target_config"
+    ],
+    "permitted_commercial_difference": {
+      "field": "option_suffix",
+      "reference": "",
+      "variant": "TR",
+      "meaning": "tape-and-reel"
+    },
+    "inherited_phase2_semantics": [
+      "programming_profile_id",
+      "memory_geometry_profile_id",
+      "main_flash_size_bytes",
+      "page_count",
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ]
+  },
+  "variants": [
+    {
+      "icpn": "STM32F103C8T6TR",
+      "equivalent_to_icpn": "STM32F103C8T6",
+      "base_device": "STM32F103C8",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103CBT6TR",
+      "equivalent_to_icpn": "STM32F103CBT6",
+      "base_device": "STM32F103CB",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103R8T6TR",
+      "equivalent_to_icpn": "STM32F103R8T6",
+      "base_device": "STM32F103R8",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103RBT6TR",
+      "equivalent_to_icpn": "STM32F103RBT6",
+      "base_device": "STM32F103RB",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103V8T6TR",
+      "equivalent_to_icpn": "STM32F103V8T6",
+      "base_device": "STM32F103V8",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103VBT6TR",
+      "equivalent_to_icpn": "STM32F103VBT6",
+      "base_device": "STM32F103VB",
+      "packing_suffix": "TR"
+    }
+  ],
+  "non_claims": {
+    "family_wide_equivalence": false,
+    "temperature_grade_equivalence": false,
+    "package_code_equivalence": false,
+    "silicon_revision_equivalence_inferred_from_suffix": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}
