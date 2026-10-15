@@ -109,9 +109,16 @@ def validate()->dict:
     # from the in-memory replay. Never rewrite the historical receipt.
     live_manifest=json.loads(MANIFEST.read_bytes())
     live_sources=live_manifest["sources"]
-    req(len(live_sources)==31 and sum(int(s["row_count"]) for s in live_sources)==4853,
-        "current Production scope must be ST 4629 + KL25 12 + MCX 196 + K32L2 16")
-    req(live_sources[28:]==[
+    req(len(live_sources)==32 and sum(int(s["row_count"]) for s in live_sources)==4975,
+        "current Production scope must remain ST 4629 + NXP 224 + Microchip 122")
+    req(live_sources[-1]=={
+        "manufacturer":"Microchip","family":"SAML1X",
+        "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
+        "row_count":122,
+        "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
+        "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
+    }, "unreviewed Microchip admission changes historical ST replay scope")
+    req(live_sources[28:31]==[
         {
             "manufacturer":"NXP","family":"KL25",
             "path":"../research/nxp-kl25-commercial-icpn.csv",
