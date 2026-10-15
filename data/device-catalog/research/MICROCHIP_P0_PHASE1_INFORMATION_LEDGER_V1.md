@@ -16,27 +16,29 @@ Each ICPN row has separately preserved source-replayed `partNumber` and `basePar
 
 ## Current Phase 1 field completeness (13 fields)
 
-The first three fields are source-linked identity observations; the other ten are **UNKNOWN** pending independently replayed official manufacturer exact-variant specifications, chart-cell applicability and datasheets.
+The first three fields are source-linked **VERIFIED identity observations**. The separately replayed official MicrochipDirect parametric **32-bit Base Device chart** enables **2,370 exact Base Device joins** with **family-scope PARTIAL** evidence for seven information fields; **67 P0 ICPNs have no chart Base Device match in this observed chart**. These are research evidence states, not exact variant qualifications.
+
+**Source replay checked:** GitHub Actions independently replayed the original 13-part MCP Research capture and the MicrochipDirect original HTML chart via the signed-by-hash portable bundle. Chart HTML original SHA-256: `164ec43257a3ea8046b8da10d5def0348878e34226190a5e9f942017c2dcf701`. This digest identifies one actual archived capture, not a permanent source-retention service.
 
 | Field | VERIFIED | PARTIAL | UNKNOWN | CONFLICT |
 | --- | ---: | ---: | ---: | ---: |
 | Manufacturer | 2,437 | 0 | 0 | 0 |
 | Exact ICPN | 2,437 | 0 | 0 | 0 |
 | Base Device (`basePartNumber`) | 2,437 | 0 | 0 | 0 |
-| Package | 0 | 0 | 2,437 | 0 |
-| Pin Count | 0 | 0 | 2,437 | 0 |
-| Flash | 0 | 0 | 2,437 | 0 |
-| RAM | 0 | 0 | 2,437 | 0 |
-| Working VDD | 0 | 0 | 2,437 | 0 |
+| Package | 0 | 2,370 | 67 | 0 |
+| Pin Count | 0 | 2,370 | 67 | 0 |
+| Flash | 0 | 2,370 | 67 | 0 |
+| RAM | 0 | 2,370 | 67 | 0 |
+| Working VDD | 0 | 2,370 | 67 | 0 |
 | I/O Supply | 0 | 0 | 2,437 | 0 |
 | VDDA | 0 | 0 | 2,437 | 0 |
-| Temperature | 0 | 0 | 2,437 | 0 |
+| Temperature | 0 | 2,370 | 67 | 0 |
 | Core Architecture | 0 | 0 | 2,437 | 0 |
-| Core Model | 0 | 0 | 2,437 | 0 |
+| Core Model | 0 | 2,370 | 67 | 0 |
 
 **Zero records have completed Phase 1 information evidence or internal Catalog admission.** Verified original `basePartNumber` does not prove flash/RAM/package voltage information, and a family datasheet without demonstrated exact commercial variant applicability may reach at most `PARTIAL` where supported.
 
-This deliberately conservatively classifies all unjoined Phase 1 values `UNKNOWN`. Some previous Microchip SAMD21 bounded research already includes certain **PARTIAL** family-level fields; this full 2,437-row ledger does **not** silently import the earlier two-row pilot as independently replayed exact commercial evidence. Pilot evidence should be merged in a distinct, keyed and source-replayed Phase 1 enrichment batch.
+The chart's Packages and Pin count columns describe **Base Device availability**, not the package or pin count of the **exact ordering suffix**. They are therefore `PARTIAL` even when numeric values are present. `VDDIO` / `VDDA` are not chart columns, so they remain `UNKNOWN`. No family-derived value becomes an exact ICPN `VERIFIED` field. The 67 chart-unmatched ICPNs are **source scope gaps**, not necessarily discontinued or unsupported ICs. The previous bounded two-SAMD21-ICPN pilot may contain additional family evidence, but it is not silently promoted into all 2,437 commercial variants.
 
 ### P0 CFG group sizes (Research candidate only)
 
@@ -70,7 +72,8 @@ python -m unittest discover -s data/device-catalog/research \
 
 python data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py \
   --upstream-cfg-report /path/to/source-replayed/microchip-full-reverse.json \
+  --chart-original-root /path/to/replayed/official-chart-directory \
   --output /path/to/new/research/microchip-p0-phase1-information-ledger.json
 ~~~
 
-For real manufacturer original-byte validation, run the existing `Microchip CFG-first Phase 1 Reverse Coverage` GitHub workflow. Its full-batch job retrieves the 13 historical archives, independently replays the original Microchip vendor responses and generates both the source-replayed 23,276-row upstream report and the new 2,437-row Phase 1 field evidence ledger. GitHub CI artifacts still expire in 90 days; this does not satisfy the separate durable custody gate.
+For real manufacturer original-byte validation, run the existing `Microchip CFG-first Phase 1 Reverse Coverage` GitHub workflow. Its full-batch job retrieves the 13 historical archives, independently replays the original Microchip vendor responses and generates both the source-replayed 23,276-row upstream report, independently replays the original 32-bit MCU chart, then produces the 2,437-row Phase 1 field evidence ledger with 2,370 chart partial joins. GitHub CI artifacts still expire in 90 days; this does not satisfy the separate durable custody gate.
