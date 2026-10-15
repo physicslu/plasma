@@ -111,6 +111,19 @@ class DeviceCatalogRecord:
         """Return an ICPN only when exact manufacturer part-number granularity is admitted."""
         return self.identifier if self.identifier_kind == "manufacturer_part_number" else None
 
+    @property
+    def phase1_identity_state(self) -> str:
+        """ADR-0002 Phase 1 identity state for the runtime Catalog record.
+
+        Production admission is only created from an exact manufacturer part number
+        with retained manufacturer identity evidence. Make that previously implicit
+        contract explicit so Phase 2 depends on Phase 1 semantics rather than on a
+        vendor-specific admission flag.
+        """
+        if self.production_admitted and self.identifier_kind == "manufacturer_part_number":
+            return "IDENTIFIED"
+        return "RESEARCH_ONLY"
+
     def to_payload(self) -> dict[str, object]:
         physical_engineering_status = "no_evidence" if self.production_admitted else self.validation_status
         return {
@@ -121,6 +134,12 @@ class DeviceCatalogRecord:
             "identifier": self.identifier,
             "identifier_kind": self.identifier_kind,
             "icpn": self.icpn,
+            "phase1": {
+                "identity_state": self.phase1_identity_state,
+                "information_state": "INFORMATION_COMPLETE"
+                if self.production_admitted and self.verification_status and self.verification_status.startswith("verified_")
+                else "INFORMATION_INCOMPLETE",
+            },
             "package": self.package,
             "pin_count": self.pin_count,
             "flash_size": self.flash_size,
