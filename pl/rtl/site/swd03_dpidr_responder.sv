@@ -25,7 +25,7 @@ module swd03_dpidr_responder (
     logic prev_swclk, drive_q, value_q, good_req;
     logic [6:0] ones_q;
     logic [1:0] zero_tail_q;
-    logic [HEADER_W-1:0] header_q;
+    logic [HEADER_W-2:0] header_q;
     logic [2:0] header_index, ack_index;
     logic [4:0] data_index;
 
@@ -76,7 +76,8 @@ module swd03_dpidr_responder (
                             drive_q <= 1'b0;
                             // Ignore low idle clocks; start bit must be host-driven 1.
                             if (host_oe && (host_out || header_index != 0)) begin
-                                header_q[header_index] <= host_out;
+                                if (header_index != HEADER_LAST)
+                                    header_q[header_index] <= host_out;
                                 if (header_index == HEADER_LAST) begin
                                     good_req <= ({host_out,header_q[6:0]} == DPIDR_HEADER);
                                     header_index <= '0;
