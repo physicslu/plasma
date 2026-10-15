@@ -35,7 +35,7 @@ test("mapped is green, candidate amber and no mapping neutral without granting p
   assert.match(css, /\.icSelectorStatusRow \.unmapped \{/);
   assert.match(source, /Backend Candidate Registry · 尚不可燒錄/);
   assert.match(source, /selected\.backend\.mapping_status/);
-  assert.match(source, /原廠料號 · 已確認/);
+  assert.match(source, /Phase 1 · IDENTIFIED/);
   assert.match(source, /selected\.backend_source_reference\.provider_name/);
   assert.match(source, /selected\.backend_source_reference\.source_version/);
   assert.match(source, /selected\.backend_source_reference\.source_commit/);
