@@ -9,8 +9,7 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/tests/test-adr0002-openocd-reverse-coverage.py"
-      - "docs/architecture/openocd-reverse-coverage-research-contract-v1.json"
+      - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
@@ -34,8 +33,7 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/tests/test-adr0002-openocd-reverse-coverage.py"
-      - "docs/architecture/openocd-reverse-coverage-research-contract-v1.json"
+      - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
@@ -114,8 +112,7 @@ jobs:
           documentation_exact = {
               "scripts/tests/test-public-doc-sanitization.sh",
               "scripts/tests/test-documentation-integrity.py",
-              "scripts/tests/test-adr0002-openocd-reverse-coverage.py",
-              "docs/architecture/openocd-reverse-coverage-research-contract-v1.json",
+              "scripts/tests/test-adr0002-cross-vendor-discovery.py",
               "scripts/plasmactl",
               "software/python/plasma_web/gateway_settings.py",
               "software/python/plasma_core/errors.py",
@@ -182,8 +179,8 @@ jobs:
         run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test documentation integrity
         run: python scripts/tests/test-documentation-integrity.py
-      - name: Enforce ADR-0002 OpenOCD reverse-coverage and research priority contract
-        run: python scripts/tests/test-adr0002-openocd-reverse-coverage.py
+      - name: Enforce ADR-0002 single cross-vendor Phase policy
+        run: python scripts/tests/test-adr0002-cross-vendor-discovery.py
 
   terminology:
     needs: route-contracts
