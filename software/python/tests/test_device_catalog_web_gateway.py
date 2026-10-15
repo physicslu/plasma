@@ -136,6 +136,31 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(qualification["operations"], {})
         self.assertIsNone(qualification["programming"])
 
+    def test_stm32f103_tr_ordering_variants_are_phase2_supported(self) -> None:
+        for icpn, expected_bytes, expected_pages in (
+            ("STM32F103C8T6TR", 64 * 1024, 64),
+            ("STM32F103CBT6TR", 128 * 1024, 128),
+        ):
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                result = payload["results"][0]
+                self.assertEqual(result["icpn"], icpn)
+                qualification = result["openocd_software_qualification"]
+                self.assertEqual(qualification["software_state"], "SUPPORTED")
+                self.assertTrue(qualification["reviewed"])
+                self.assertEqual(
+                    qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
+                    expected_bytes,
+                )
+                self.assertEqual(
+                    qualification["programming"]["flash_geometry"]["page_count"],
+                    expected_pages,
+                )
+                self.assertFalse(qualification["hardware_runtime_ready"])
+                self.assertFalse(qualification["physical_programming_qualified"])
+
     def test_stm32f103cb_is_phase2_supported_even_without_legacy_selected_profile(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103CBT6&limit=1")
         self.assertEqual(status, 200)

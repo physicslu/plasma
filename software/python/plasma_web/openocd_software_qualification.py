@@ -28,7 +28,8 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v1.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v2.json"
+EQUIVALENCE_REL = "release/openocd-qualification/stm32f103c-tr-ordering-equivalence-v1.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -66,6 +67,7 @@ class OpenOCDSoftwareQualificationRegistry:
         release = _read_json(root / RELEASE_REL)
         source_lock = _read_json(root / SOURCE_LOCK_REL)
         qualification = _read_json(root / QUALIFICATION_REL)
+        equivalence = _read_json(root / EQUIVALENCE_REL)
 
         provider = source_lock.get("provider", {})
         _require(
@@ -219,6 +221,69 @@ class OpenOCDSoftwareQualificationRegistry:
             "programming VDD qualification drift",
         )
 
+        _require(
+            qualification.get("ordering_equivalence_id") == equivalence.get("equivalence_id"),
+            "qualification/ordering-equivalence identity mismatch",
+        )
+        _require(
+            equivalence.get("manufacturer") == "STMicroelectronics"
+            and equivalence.get("phase") == "02_PROGRAMMING",
+            "ordering-equivalence authority drift",
+        )
+        ordering = equivalence.get("ordering_authority")
+        _require(isinstance(ordering, dict), "ordering authority missing")
+        ordering_path = ordering.get("path")
+        _require(isinstance(ordering_path, str) and ordering_path, "ordering authority path missing")
+        ordering_bytes = (root / ordering_path).read_bytes()
+        _require(
+            _git_blob_sha1(ordering_bytes) == ordering.get("git_blob_sha1"),
+            "ordering authority blob drift",
+        )
+        ordering_payload = json.loads(ordering_bytes.decode("utf-8"))
+        stm32f103 = ordering_payload.get("records", {}).get("STM32F103", {})
+        medium = next(
+            (
+                band
+                for band in stm32f103.get("bands", [])
+                if band.get("name") == ordering.get("band")
+            ),
+            None,
+        )
+        _require(
+            isinstance(medium, dict)
+            and medium.get("document") == ordering.get("document") == "DS5319 Rev 20"
+            and medium.get("allowed_tails") == ["", "TR"]
+            and ordering.get("suffix") == "TR"
+            and ordering.get("meaning") == "tape-and-reel",
+            "ST medium-density TR ordering semantics drift",
+        )
+        for item in equivalence.get("identity_evidence", []):
+            _require(isinstance(item, dict), "ordering identity evidence must be object")
+            rel = item.get("path")
+            _require(isinstance(rel, str) and rel, "ordering identity evidence path missing")
+            raw = (root / rel).read_bytes()
+            _require(
+                _git_blob_sha1(raw) == item.get("git_blob_sha1"),
+                f"ordering identity evidence blob drift: {rel}",
+            )
+            text = raw.decode("utf-8")
+            for marker in item.get("required_markers", []):
+                _require(
+                    isinstance(marker, str) and marker in text,
+                    f"ordering identity evidence marker missing: {rel}/{marker}",
+                )
+
+        equivalence_variants = {
+            item.get("icpn"): item
+            for item in equivalence.get("variants", [])
+            if isinstance(item, dict) and isinstance(item.get("icpn"), str)
+        }
+        _require(
+            set(equivalence_variants)
+            == {"STM32F103C8T6TR", "STM32F103CBT6TR"},
+            "ordering-equivalence scope expanded without review",
+        )
+
         self._records: dict[tuple[str, str], dict[str, Any]] = {}
         catalog_by_key = {(row.vendor, row.identifier): row for row in catalog.records}
         review_targets = review.get("targets", {})
@@ -242,15 +307,72 @@ class OpenOCDSoftwareQualificationRegistry:
                 and row.target_config == q_provider["target_config"],
                 f"qualified exact ICPN Production route drift: {key[1]}",
             )
-            target = review_targets.get(key[1])
-            _require(isinstance(target, dict), f"manufacturer review target missing: {key[1]}")
-            _require(
-                raw.get("base_device") == target.get("base_device")
-                and raw.get("memory_geometry_profile_id") == target.get("memory_geometry_profile_id")
-                and raw.get("main_flash_size_bytes") == target.get("main_flash_size_bytes")
-                and raw.get("page_count") == target.get("page_count"),
-                f"exact geometry/applicability drift: {key[1]}",
-            )
+            basis = raw.get("qualification_basis")
+            _require(isinstance(basis, dict), f"qualification basis missing: {key[1]}")
+            basis_kind = basis.get("kind")
+            if basis_kind == "direct_reference":
+                target = review_targets.get(key[1])
+                _require(isinstance(target, dict), f"manufacturer review target missing: {key[1]}")
+                _require(
+                    raw.get("base_device") == target.get("base_device")
+                    and raw.get("memory_geometry_profile_id") == target.get("memory_geometry_profile_id")
+                    and raw.get("main_flash_size_bytes") == target.get("main_flash_size_bytes")
+                    and raw.get("page_count") == target.get("page_count"),
+                    f"exact geometry/applicability drift: {key[1]}",
+                )
+            elif basis_kind == "ordering_equivalence":
+                eq = equivalence_variants.get(key[1])
+                _require(isinstance(eq, dict), f"ordering equivalence missing: {key[1]}")
+                source_icpn = basis.get("equivalent_to_icpn")
+                _require(
+                    source_icpn == eq.get("equivalent_to_icpn")
+                    and basis.get("ordering_equivalence_id") == equivalence.get("equivalence_id"),
+                    f"ordering equivalence identity drift: {key[1]}",
+                )
+                source_key = (key[0], source_icpn)
+                source = self._records.get(source_key)
+                source_row = catalog_by_key.get(source_key)
+                _require(
+                    isinstance(source, dict) and source.get("software_state") == "SUPPORTED",
+                    f"ordering-equivalence source not directly qualified first: {key[1]}",
+                )
+                _require(source_row is not None, f"ordering-equivalence source absent from Catalog: {source_icpn}")
+                for field in equivalence.get("inheritance_contract", {}).get(
+                    "required_equal_catalog_fields", []
+                ):
+                    _require(
+                        getattr(row, field) == getattr(source_row, field),
+                        f"ordering-equivalence Catalog field drift: {key[1]}/{field}",
+                    )
+                permitted = equivalence.get("inheritance_contract", {}).get(
+                    "permitted_commercial_difference", {}
+                )
+                _require(
+                    permitted.get("field") == "option_suffix"
+                    and (source_row.option_suffix or "") == permitted.get("reference")
+                    and row.option_suffix == permitted.get("variant") == "TR",
+                    f"ordering-equivalence packing suffix drift: {key[1]}",
+                )
+                for field in (
+                    "programming_profile_id",
+                    "memory_geometry_profile_id",
+                    "main_flash_size_bytes",
+                    "page_count",
+                    "operations",
+                ):
+                    _require(
+                        raw.get(field) == source.get(field),
+                        f"ordering-equivalence programming semantic drift: {key[1]}/{field}",
+                    )
+                _require(
+                    raw.get("base_device") == row.base_device == source.get("base_device"),
+                    f"ordering-equivalence Base Device drift: {key[1]}",
+                )
+            else:
+                raise DeviceCatalogIntegrityError(
+                    f"OpenOCD software qualification: unsupported qualification basis: {key[1]}/{basis_kind}"
+                )
+
             _require(
                 raw.get("programming_profile_id") == group.get("manufacturer_evidence", {}).get("programming_profile_id"),
                 f"Programming Profile mismatch: {key[1]}",
@@ -265,9 +387,11 @@ class OpenOCDSoftwareQualificationRegistry:
             set(self._records)
             == {
                 ("STMicroelectronics", "STM32F103C8T6"),
+                ("STMicroelectronics", "STM32F103C8T6TR"),
                 ("STMicroelectronics", "STM32F103CBT6"),
+                ("STMicroelectronics", "STM32F103CBT6TR"),
             },
-            "Phase 2A reference scope expanded without review",
+            "Phase 2 qualification scope expanded without review",
         )
         _require(
             all(record["software_state"] == "SUPPORTED" for record in self._records.values()),
@@ -400,7 +524,7 @@ class OpenOCDSoftwareQualificationRegistry:
 
 
 def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQualificationRegistry | None:
-    required = (RELEASE_REL, SOURCE_LOCK_REL, QUALIFICATION_REL)
+    required = (RELEASE_REL, SOURCE_LOCK_REL, QUALIFICATION_REL, EQUIVALENCE_REL)
     if not source_files_available(ROOT, required):
         return None
     return OpenOCDSoftwareQualificationRegistry(get_default_device_catalog(), ROOT)
