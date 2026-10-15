@@ -16,6 +16,7 @@ const testDevice = {
   identifier: testTargetIc,
   identifier_kind: "manufacturer_part_number",
   icpn: testTargetIc,
+  phase1: { identity_state: "IDENTIFIED" },
   package: "LQFP48",
   cpu_architectures: ["ARM Cortex-M3"],
   backend: {
