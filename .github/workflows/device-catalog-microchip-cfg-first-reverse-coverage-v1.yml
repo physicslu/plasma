@@ -18,6 +18,9 @@ on:
       - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P0_PHASE1_INFORMATION_LEDGER_V1.md'
       - 'data/device-catalog/research/MICROCHIP_P0_OFFICIAL_SOURCE_GAPS_V1.md'
+      - 'data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_s1_exact_identity_funnel_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md'
       - 'data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
@@ -401,6 +404,56 @@ jobs:
              "software_supported":False,
           },sort_keys=True,indent=2))
           PY
+      - name: Build exact-MCP manufacturer Phase 1 S1 identity funnel (independent of P0/P1/P2)
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_s1_exact_identity_funnel_v1.py' -v
+          root="${{ runner.temp }}"
+          python data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py \
+            --upstream-cfg-report "$root/microchip-full-reverse.json" \
+            --p0-information-ledger "$root/microchip-p0-phase1-information-ledger.json" \
+            --p1-information-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --output "$root/microchip-phase1-s1-exact-identity-funnel.json"
+          python data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py \
+            --upstream-cfg-report "$root/microchip-full-reverse.json" \
+            --p0-information-ledger "$root/microchip-p0-phase1-information-ledger.json" \
+            --p1-information-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --output "$root/microchip-phase1-s1-exact-identity-funnel.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/
+              "microchip-phase1-s1-exact-identity-funnel.json").read_text())
+          assert d["schema_version"]==1
+          assert d["source_subset_observed_distinct_commercial_icpns"]==23276
+          assert d["phase1_s1_identified"]+d["phase1_research_only_source_gaps"]+d["phase1_identity_disputed"]==23276
+          assert d["phase1_s1_complete"]<=d["phase1_s1_identified"]
+          assert d["legacy_research_priority_counts_separate_from_phases"]=={
+              "P0":2437,"P1":126,"P2":20713}
+          assert len(d["records"])==23276
+          assert len({x["icpn"] for x in d["records"]})==23276
+          assert all(x["internal_identity_admitted"] is False
+              and x["openocd_software_supported_asserted"] is False
+              and x["physical_hil_passed_asserted"] is False
+              for x in d["records"])
+          assert d["production_write_authorized"] is False
+          assert d["catalog_publication_authorized"] is False
+          assert d["phase2_programming_authorized"] is False
+          assert d["phase3_compatibility_authorized"] is False
+          print("MICROCHIP_PHASE1_S1_IDENTIFIED",d["phase1_s1_identified"])
+          print("MICROCHIP_PHASE1_S1_INFORMATION_COMPLETE",d["phase1_s1_complete"])
+          print("MICROCHIP_PHASE1_SOURCE_OBSERVATION_GAPS",
+                json.dumps(d["missing_identity_evidence_by_reason"],sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip original MCP Phase 1 S1 exact ICPNs: "+
+                      str(d["phase1_s1_identified"])+"\n")
+              f.write("S1 Information Complete: "+
+                      str(d["phase1_s1_complete"])+"\n")
+              f.write("Source observation evidence gaps: "+
+                      str(d["phase1_research_only_source_gaps"])+"\n")
+              f.write("Research P0/P1/P2 are separate from S1/S2/S3.\n")
+          PY
       - name: Validate P1 original-MCP ordering grammar audit offline fail-closed
         run: |
           set -euo pipefail
@@ -468,6 +521,7 @@ jobs:
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-p1-dfp-discovery.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
+            ${{ runner.temp }}/microchip-phase1-s1-exact-identity-funnel.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
           if-no-files-found: warn
           retention-days: 90
