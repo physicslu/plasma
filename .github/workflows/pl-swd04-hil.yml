@@ -1,0 +1,49 @@
+name: PL SWD-04 HIL host safety contracts
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/swd04/**"
+      - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_collect.py"
+      - "docs/development/swd04-z2-hil-runbook.md"
+      - ".github/workflows/pl-swd04-hil.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/swd04/**"
+      - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_collect.py"
+      - ".github/workflows/pl-swd04-hil.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swd04-host-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated Python test tools
+        run: python3 -m pip install 'pytest==8.4.2'
+      - name: Static source/CLI checks
+        run: |
+          python3 -m compileall -q pl/hil/swd04/
+          python3 -m pl.hil.swd04.preflight --help
+          python3 -m pl.hil.swd04.collect --help
+          python3 -m pl.hil.swd04.live --help
+          python3 -m pl.hil.swd04.restore --help
+      - name: SWD-04 offline synthetic regressions
+        run: |
+          python3 -m pytest -q \
+            pl/tests/test_swd04_hil_contract.py \
+            pl/tests/test_swd04_collect.py
+      - name: Explicit acceptance boundary
+        run: |
+          echo "SWD04_HOST_SAFETY_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Z2 connection, FPGA loading, live MMIO, service changes, electrical tests or IC programming performed." >> "$GITHUB_STEP_SUMMARY"
