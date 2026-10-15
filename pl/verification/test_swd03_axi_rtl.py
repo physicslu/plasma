@@ -17,6 +17,6 @@ def test_swd03_axi_register_contract():
         module="test_swd03_axi",
         compile_args=["-g2012"],
         timescale="1ns/1ps",
-        python_search=[str(PL / "verification/cocotb")],
+        python_search=[str(PL / "verification/cocotb"), str(PL / "verification/models")],
         sim_build=str(PL / "build/swd03/axi-sim"),
     )
