@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "subject": "NXP KL25 Phase 2 OpenOCD backend revision equivalence evidence",
+  "original_source_repository": "openocd-org/openocd",
+  "review_date": "2026-10-15",
+  "prior_software_prototype_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+  "current_plasma_openocd_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "per_file": [
+    {
+      "path": "tcl/target/kl25.cfg",
+      "prototype_git_blob": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+      "current_git_blob": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+      "identical_bytes": true
+    },
+    {
+      "path": "tcl/target/klx.cfg",
+      "prototype_git_blob": "b4014ba5b6de75e236e0a6b8780cf6448c991c2",
+      "current_git_blob": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+      "identical_bytes": false
+    },
+    {
+      "path": "src/flash/nor/kinetis.c",
+      "prototype_git_blob": "266b447c04376b529c44ac11cd9fd6acc31e0e8c",
+      "current_git_blob": "7137b4aa078719af31122f8276494f006589e8ab",
+      "identical_bytes": false
+    }
+  ],
+  "conclusions": {
+    "exact_cfg_file_unchanged": true,
+    "tcl_dependency_changed": true,
+    "flash_driver_source_changed": true,
+    "can_transfer_software_profile_admission": false,
+    "source_semantic_equivalence_proven": false,
+    "current_provider_exact_operations_qualified": false,
+    "safe_next_step": "Re-review KL25/klx Tcl include and Kinetis Flash driver on current approved provider; re-review FCF, longword programming, erase, security, silicon SDID and geometry before any Phase2 SUPPORTED claim"
+  },
+  "no_execution_no_production_no_hil": true
+}
