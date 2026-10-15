@@ -307,6 +307,12 @@ jobs:
           assert out["p1_target_only_icpn_count"] == 126
           assert len(out["records"]) == 126
           assert out["p1_unique_original_mcp_base_device_count"] == 12
+          assert out["p1_distinct_base_icpn_counts"] == {
+             "ATSAML10D14A":8, "ATSAML10D15A":10, "ATSAML10D16A":11,
+             "ATSAML10E14A":8, "ATSAML10E15A":12, "ATSAML10E16A":15,
+             "ATSAML11D14A":8, "ATSAML11D15A":10, "ATSAML11D16A":10,
+             "ATSAML11E14A":8, "ATSAML11E15A":12, "ATSAML11E16A":14,
+          }
           assert out["p1_openocd_target_cfg_research_only"] == "tcl/target/atsaml1x.cfg"
           assert out["p1_target_only_not_software_supported"] is True
           assert out["chart_original_bytes_replayed_by_upstream_chart_builder"] is True
