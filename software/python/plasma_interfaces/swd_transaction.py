@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from threading import RLock
+from threading import Event, RLock
 import time
 from typing import Callable, Protocol
 
@@ -159,6 +159,7 @@ class SWDTransactionDriver:
         self._clock, self._sleep = clock, sleep
         # Serialize transactions on this object's single-owned Site aperture.
         self._operation_lock = RLock()
+        self._cancel_requested = Event()
         self._poisoned = False
         self._launched = False
         self._write_issued = False
@@ -223,6 +224,7 @@ class SWDTransactionDriver:
         for _ in range(self.poll_budget):
             status, link = self._state()
             if status & self.RESP_VALID_BIT:
+                self._cancel_requested.clear()
                 meta = self._read(self.META)
                 data = self._read(self.RDATA)
                 check_status, check_link = self._state()
@@ -245,6 +247,11 @@ class SWDTransactionDriver:
                     data_valid=bool(meta & 0x80), attempts=attempts,
                     rdata=data, link_state=link,
                 )
+            if status & self.BUSY_BIT and self._cancel_requested.is_set():
+                # The *owner* polling thread performs ABORT: a second thread
+                # never writes MMIO concurrently or races response ACK.
+                self._cancel_requested.clear()
+                self._write(self.COMMAND, self.ABORT)
             if self._clock() >= deadline:
                 break
             if self.poll_interval_s:
@@ -261,6 +268,7 @@ class SWDTransactionDriver:
         # command. An AXI error while ACKing may mean it was consumed.
         self._write(self.COMMAND, self.ACK_RESPONSE)
         self._launched = False
+        self._cancel_requested.clear()
         self._write_issued = False
         current, _ = self._state()
         if current & (self.BUSY_BIT | self.RESP_VALID_BIT) \
@@ -316,6 +324,7 @@ class SWDTransactionDriver:
                 self._write(offset, value)
             # START may have reached hardware even if backend reports an error.
             self._write_issued = self._was_write
+            self._cancel_requested.clear()
             self._launched = True
             self._write(self.COMMAND, self.START)
             return self._finish()
@@ -363,6 +372,18 @@ class SWDTransactionDriver:
             raise SWDDriverError("SWD AP write: invalid successful metadata",
                                  uncertain_target_effects=True, response=result)
         return result
+
+    def request_abort(self) -> bool:
+        """Signal cancellation from another thread; never touches MMIO.
+
+        The owning poll loop issues ABORT if still BUSY. A race with target
+        completion may result in an AXI SLVERR and poisoned state; callers
+        must not treat cancellation as rollback of target-side writes.
+        """
+        if self._poisoned or not self._launched:
+            return False
+        self._cancel_requested.set()
+        return True
 
     def abort(self) -> SWDResponse:
         """Explicit local cancellation, *only* when STATUS confirms BUSY.
