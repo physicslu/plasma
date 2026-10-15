@@ -72,14 +72,17 @@ test("Phase 2 software qualification is projected independently from CFG mapping
   const selector = await source("../app/devices/ic-selector.tsx");
   const api = await source("../app/device-catalog-api.ts");
 
-  assert.match(api, /OpenOCDSoftwareQualification/);
-  assert.match(api, /openocd_software_qualification\?:\s*OpenOCDSoftwareQualification\s*\|\s*null/);
-  assert.match(api, /software_state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
-  assert.match(api, /public_catalog_visibility_changed:\s*false/);
+  assert.match(api, /ProgrammingQualification/);
+  assert.match(api, /phase1:\s*\{[\s\S]*identity_state:\s*"IDENTIFIED"\s*\|\s*"RESEARCH_ONLY"/);
+  assert.match(api, /programming_qualification\?:\s*ProgrammingQualification\s*\|\s*null/);
+  assert.match(api, /phase2_state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
+  assert.match(api, /visibility_authority:\s*"PHASE1_IDENTIFIED"/);
+  assert.match(api, /execution_authorized:\s*false/);
   assert.match(api, /hardware_runtime_ready:\s*false/);
   assert.match(api, /physical_programming_qualified:\s*false/);
+  assert.match(api, /openocd_software_qualification\?:\s*OpenOCDSoftwareQualification\s*\|\s*null/);
 
-  assert.match(selector, /softwareQualificationLabel\(device\.openocd_software_qualification\?\.software_state, zh\)/);
+  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.software_state, zh\)/);
   assert.match(selector, /軟體資格 ·/);
   assert.match(selector, /Software Qualification/);
   assert.match(selector, /Qualified Operations/);
@@ -87,7 +90,7 @@ test("Phase 2 software qualification is projected independently from CFG mapping
   assert.match(selector, /Programming Profile/);
   assert.match(selector, /CFG Mapping/);
   assert.match(selector, /CFG mapping 不能視為燒錄支援/);
-  assert.match(selector, /Phase 2 OpenOCD software qualification/);
+  assert.match(selector, /Phase 2 Programming qualification/);
   assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證/);
 });
 
