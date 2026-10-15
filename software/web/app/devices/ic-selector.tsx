@@ -146,6 +146,7 @@ const SEARCH_PAGE_SIZE = 30;
 export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorProps) {
   const { locale } = useI18n();
   const zh = locale === "zh-TW";
+  const selectorVisibility = usage === "lookup" ? "phase1" : "production";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -157,11 +158,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
 
   useEffect(() => {
     const controller = new AbortController();
-    void searchDevices("", { apiBase, limit: 1, signal: controller.signal })
+    void searchDevices("", { apiBase, limit: 1, visibility: selectorVisibility, signal: controller.signal })
       .then(payload => setCatalogSize(payload.catalog_size))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [apiBase]);
+  }, [apiBase, selectorVisibility]);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -176,6 +177,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
           apiBase,
           limit: SEARCH_PAGE_SIZE,
           offset: pageOffset,
+          visibility: selectorVisibility,
           signal: controller.signal,
         });
         setResults(payload.results);
@@ -195,7 +197,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, pageOffset, query]);
+  }, [apiBase, pageOffset, query, selectorVisibility]);
 
   function updateQuery(value: string) {
     setQuery(value);
@@ -217,18 +219,22 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       <div className="icSelectorSearchPanel">
         <div className="icSelectorSearchHead">
           <div>
-            <p className="icSelectorEyebrow">ICPN CATALOG · PRODUCTION ADMITTED</p>
+            <p className="icSelectorEyebrow">{usage === "lookup" ? "ICPN CATALOG · PHASE 1 IDENTIFIED" : "ICPN CATALOG · PRODUCTION ADMITTED"}</p>
             <h1>IC Selector</h1>
             <p>
               {zh
-                ? "搜尋已通過 admission 的 exact commercial ICPN。可輸入 ICPN、Vendor、Family 或其組合。"
-                : "Search admitted exact commercial ICPNs by ICPN, Vendor, Family, or a combination."}
+                ? (usage === "lookup"
+                    ? "搜尋已完成原廠身分確認（Phase 1 IDENTIFIED）的完整 ICPN；Phase 1 不代表已通過燒錄資格。"
+                    : "搜尋 Production 已收錄的 exact ICPN。燒錄資格另行驗證。")
+                : (usage === "lookup"
+                    ? "Search manufacturer-confirmed Phase 1 exact ICPNs. Visibility does not imply programming support."
+                    : "Search Production-admitted exact ICPNs; programming eligibility remains separate.")}
             </p>
           </div>
           <div className="icSelectorCatalogMeta">
-            <span>Admitted ICPNs</span>
+            <span>{usage === "lookup" ? "Searchable ICPNs" : "Admitted ICPNs"}</span>
             <b>{catalogSize?.toLocaleString() ?? "—"}</b>
-            <small>{zh ? "Server production catalog" : "server production catalog"}</small>
+            <small>{usage === "lookup" ? (zh ? "Production ＋ NXP Phase 1 已確認身分" : "Production + NXP Phase 1 identities") : (zh ? "Production Catalog" : "Production catalog")}</small>
           </div>
         </div>
 
@@ -240,7 +246,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             value={query}
             onChange={event => updateQuery(event.target.value)}
             placeholder="STM32F103C8T6 / STM32F4 / STMicroelectronics ..."
-            aria-label="Search admitted ICPN"
+            aria-label={usage === "lookup" ? "Search Phase 1 identified ICPN" : "Search admitted ICPN"}
           />
           <em>
             {loading
@@ -260,14 +266,20 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
         {!query.trim() && (
           <div className="icSelectorEmpty">
             {zh
-              ? "目前只列出已進入 production catalog 的 exact ICPN；research candidate 不會出現在這裡。"
-              : "Only exact ICPNs admitted to the production catalog are listed; research candidates are excluded."}
+              ? (usage === "lookup"
+                  ? "可搜尋已確認的 Phase 1 完整料號；未經原廠身分核實的研究候選不會顯示。"
+                  : "目前只列出已進入 Production Catalog 的 exact ICPN。")
+              : (usage === "lookup"
+                  ? "Find Phase 1 IDENTIFIED exact ICPNs; unverified research candidates remain hidden."
+                  : "Only Production-admitted exact ICPNs are listed.")}
           </div>
         )}
 
         {query.trim() && !loading && !error && results.length === 0 && (
           <div className="icSelectorEmpty">
-            {zh ? "Production catalog 中找不到符合的 admitted ICPN。" : "No matching admitted ICPN exists in the production catalog."}
+            {zh
+              ? (usage === "lookup" ? "已確認的 Phase 1 ICPN 中找不到符合的料號。" : "Production Catalog 中找不到符合的料號。")
+              : (usage === "lookup" ? "No matching Phase 1 identified ICPN." : "No matching Production ICPN.")}
           </div>
         )}
 
@@ -292,6 +304,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   {device.subfamily && <span>{device.subfamily}</span>}
                 </div>
                 <div className="icSelectorStatusStack">
+                  {device.catalog.scope === "phase1_identified" && (
+                    <div className="icSelectorStatusRow icSelectorStatusEvidence">
+                      <span className="pending">{zh ? "Phase 1 · 已確認身分（尚不可燒錄）" : "Phase 1 · Identified (not programming-qualified)"}</span>
+                    </div>
+                  )}
                   <div className="icSelectorStatusRow icSelectorStatusPhysical">
                     <span className={statusClass(device.physical_validation.ppu_status)}>
                       {physicalValidationLabel("PPU", device.physical_validation.ppu_status, zh)}
@@ -351,9 +368,16 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       <aside className="icSelectorDetail" aria-live="polite">
         {selected ? (
           <>
-            <p className="icSelectorEyebrow">SELECTED ADMITTED ICPN</p>
+            <p className="icSelectorEyebrow">{selected.catalog.scope === "phase1_identified" ? "PHASE 1 · IDENTIFIED · LOOKUP ONLY" : "SELECTED ADMITTED ICPN"}</p>
             <h2>{selected.icpn ?? selected.identifier}</h2>
             <span className="icSelectorKind">Exact ICPN · Catalog v{selected.catalog.version ?? "—"}</span>
+            {selected.catalog.scope === "phase1_identified" && (
+              <p className="icSelectorPhase1Notice" role="status">
+                {zh
+                  ? "Phase 1 已確認原廠完整料號。Phase 2 尚未取得軟體燒錄資格；不能據此啟動 Erase／Program／Verify。"
+                  : "Phase 1 manufacturer identity confirmed. Phase 2 programming qualification is not established; Erase/Program/Verify remain unavailable."}
+              </p>
+            )}
 
             <section className="icSelectorProfileSection" data-profile-section="device">
               <div className="icSelectorProfileHead">
