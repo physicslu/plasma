@@ -417,7 +417,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 {selected.microchip_phase1_ic_information && (
                   <>
                     <div><dt>Core Model</dt><dd>{selected.microchip_phase1_ic_information.core_model}</dd></div>
-                    <div><dt>Phase 1 Evidence</dt><dd>IDENTIFIED · S1_complete: NO · DS60001513G p.14 / p.16</dd></div>
+                    <div><dt>Phase 1 Evidence</dt><dd>IDENTIFIED · INFORMATION_COMPLETE: NO · DS60001513G p.14 / p.16</dd></div>
+                    <div><dt>Phase 2 Programming</dt><dd>UNKNOWN · {zh ? "未驗證軟體燒錄資格" : "Not software-qualified"}</dd></div>
+                    <div><dt>Phase 3 Compatibility</dt><dd>NOT_TESTED · {zh ? "未通過 PLASMA 實機配置測試" : "No validated PLASMA hardware configuration"}</dd></div>
                   </>
                 )}
               </dl>
