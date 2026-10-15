@@ -256,9 +256,12 @@ export type NXPManufacturerDeviceProfile = {
   physical_programming_qualified: false;
 };
 
-export type OpenOCDSoftwareQualification = {
-  schema_version: "1.0.0";
+export type ProgrammingQualification = {
+  schema_version: "1.1.0";
   registry_id: string;
+  phase1_identity_state: "IDENTIFIED" | "RESEARCH_ONLY";
+  phase2_state: "UNKNOWN" | "CANDIDATE" | "SUPPORTED" | "UNSUPPORTED";
+  /** @deprecated Compatibility alias; use phase2_state. */
   software_state: "UNKNOWN" | "CANDIDATE" | "SUPPORTED" | "UNSUPPORTED";
   reviewed: boolean;
   provider: {
@@ -293,12 +296,16 @@ export type OpenOCDSoftwareQualification = {
     blocked_operations: string[];
     backend_constraints: string[];
   } | null;
-  public_catalog_visibility_changed: false;
+  visibility_authority: "PHASE1_IDENTIFIED";
+  execution_authorized: false;
   job_batch_execution_changed: false;
   installed_runtime_attested: false;
   hardware_runtime_ready: false;
   physical_programming_qualified: false;
 };
+
+/** @deprecated Use ProgrammingQualification. */
+export type OpenOCDSoftwareQualification = ProgrammingQualification;
 
 export type DeviceSearchResult = {
   vendor: string;
@@ -308,6 +315,9 @@ export type DeviceSearchResult = {
   identifier: string;
   identifier_kind: DeviceIdentifierKind;
   icpn: string | null;
+  phase1: {
+    identity_state: "IDENTIFIED" | "RESEARCH_ONLY";
+  };
   package: string | null;
   pin_count: string | null;
   flash_size: string | null;
@@ -345,6 +355,8 @@ export type DeviceSearchResult = {
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
   selected_profile?: SelectedICProfile | null;
+  programming_qualification?: ProgrammingQualification | null;
+  /** @deprecated Compatibility alias; use programming_qualification. */
   openocd_software_qualification?: OpenOCDSoftwareQualification | null;
 };
 
