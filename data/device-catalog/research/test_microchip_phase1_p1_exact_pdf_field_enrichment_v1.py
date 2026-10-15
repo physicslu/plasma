@@ -108,6 +108,19 @@ class SAML1xExactFieldEvidence(unittest.TestCase):
         self.assertEqual(enh.EXCEPTIONS,4)
         self.assertEqual(enh.EXACT,122)
 
+    def test_adr0002_field_enrichment_never_becomes_phase1_gate(self):
+        # ADR-0002: the confirmed original MCP material identity is the
+        # Phase 1 visibility criterion; six optional exact information fields
+        # cannot be turned into another brand-specific admission status.
+        self.assertEqual(enh.EXPECTED, 2563)
+        self.assertEqual(enh.EXACT, 122)
+        self.assertEqual(enh.EXCEPTIONS, 4)
+        self.assertEqual(enh.CFG, "tcl/target/atsaml1x.cfg")
+        self.assertNotIn("working_vdd", enh.PROMOTE)
+        self.assertNotIn("io_supply", enh.PROMOTE)
+        self.assertNotIn("vdda", enh.PROMOTE)
+        self.assertEqual(enh.EXACT + enh.EXCEPTIONS, 126)
+
     def test_frozen_cohort_invariant(self):
         self.assertEqual(enh.FROZEN_SHA,
                          "0c37ad68c1db0a4fb50ff5a1d229faaca0ee6eac44cfb9d9b7de4e8a931daf2a")
