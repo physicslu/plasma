@@ -5,6 +5,9 @@ on:
     paths:
       - 'data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py'
       - 'data/device-catalog/research/test_microchip_openocd_reverse_coverage_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P0_PHASE1_INFORMATION_LEDGER_V1.md'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
       - '.github/workflows/device-catalog-microchip-cfg-first-reverse-coverage-v1.yml'
   workflow_dispatch:
@@ -27,6 +30,8 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_reverse_coverage_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p0_information_ledger_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_core_first_v1.py' -v
           python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
@@ -180,11 +185,41 @@ jobs:
                             "cfg_counts":data["icpn_by_cfg_candidate_counts"],
                             "historical_24051_complete":False},sort_keys=True,indent=2))
           PY
+      - name: Derive all 2437 P0 exact-ICPN Phase 1 field-evidence states and source gaps
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-p0-phase1-information-ledger.json"
+          python data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-p0-phase1-information-ledger.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/
+            "microchip-p0-phase1-information-ledger.json").read_text(encoding="utf-8"))
+          assert report["p0_icpn_count"] == 2437
+          assert len(report["records"]) == 2437
+          assert report["record_level_phase1_information_complete"] == 0
+          assert report["record_level_internal_identity_admitted"] == 0
+          for f in ("manufacturer","icpn","base_device"):
+            assert report["per_field_coverage"][f]["VERIFIED"] == 2437
+          for f in ("package","pin_count","flash","ram","vdd","io_supply","vdda",
+                    "temperature","core_architecture","core_model"):
+            assert report["per_field_coverage"][f]["UNKNOWN"] == 2437
+          assert not report["production_write_authorized"]
+          assert not report["catalog_publication_authorized"]
+          assert not report["phase1_p0_information_complete_claimed"]
+          print("MICROCHIP P0 FIELD GAPS: 2437 exact ICPNs; only identity fields verified; all other fields require source work")
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: microchip-phase1-full-original-mcp-cfg-reverse-coverage-v1
-          path: ${{ runner.temp }}/microchip-full-reverse.json
+          path: |
+            ${{ runner.temp }}/microchip-full-reverse.json
+            ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
           if-no-files-found: warn
           retention-days: 90
