@@ -21,7 +21,8 @@
         ".github/workflows/mock-cd.yml",
         ".github/workflows/mock-cd-browser.yml",
         ".github/workflows/persistent-integration-host.yml",
-        ".github/workflows/macos-control-station-installer.yml"
+        ".github/workflows/macos-control-station-installer.yml",
+        ".github/workflows/openocd-software-qualification.yml"
       ]
     },
     "icpn": {
