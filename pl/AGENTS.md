@@ -8,6 +8,7 @@ Read these documents before changing FPGA/PL behavior:
 
 - `docs/development/fpga-development-guide.md`
 - `docs/development/fpga-verification-guide.md`
+- `docs/development/fpga-systemverilog-style.md` (new RTL and substantive RTL changes)
 
 ## 1. RTL language and coding policy
 
