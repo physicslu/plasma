@@ -250,6 +250,9 @@ jobs:
           assert report["source_subset_original_mcp_exact_icpns"]==23276
           assert report["baseline_p0_exact_icpns_unchanged"]==2437
           assert report["baseline_p1_target_only_exact_icpns_unchanged"]==126
+          assert report["p1_discovery_exact_icpn_candidates"]==2065
+          assert report["manufacturer_dfp_matched_distinct_base_names"]==340
+          assert report["p1_expanded_research_queue_total"]==2191
           assert report["p1_expanded_research_queue_total"]==(
               report["p1_discovery_exact_icpn_candidates"]+126)
           assert report["baseline_p0_p1_records_reclassified"]==0
