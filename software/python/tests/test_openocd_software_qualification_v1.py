@@ -80,8 +80,8 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             root = Path(td)
             for rel in (
                 "release/openocd.json",
-                "data/ic-support/software-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-                "data/ic-support/software-qualification/openocd-0.12.0-stm32f103c-reference-v1.json",
+                "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
+                "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v1.json",
                 "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
                 "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
                 "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
