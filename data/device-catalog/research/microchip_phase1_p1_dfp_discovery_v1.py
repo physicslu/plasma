@@ -164,7 +164,7 @@ def classify(source, inventory):
                 for r in output),
             "DFP-only archive must not claim ADR-0002 P1 or software SUPPORTED")
     return {
-        "schema_version":1,
+        "schema_version":2,
         "policy":"ADR-0002 Microchip DFP-only P2 manufacturer identity archive",
         "manufacturer":"Microchip",
         "source_subset_original_mcp_exact_icpns":SOURCE_SUBSET,
