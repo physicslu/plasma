@@ -83,7 +83,8 @@ test("Phase 2 Programming qualification is vendor-neutral and independent from C
   assert.match(api, /physical_programming_qualified:\s*false/);
   assert.doesNotMatch(api, /openocd_software_qualification/);
 
-  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);\n  assert.match(selector, /state === "CANDIDATE" \|\| state === "BLOCKED"/);
+  assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);
+  assert.match(selector, /state === "CANDIDATE" \|\| state === "BLOCKED"/);
   assert.match(selector, /軟體資格 ·/);
   assert.match(selector, /Software Qualification/);
   assert.match(selector, /Qualified Operations/);
