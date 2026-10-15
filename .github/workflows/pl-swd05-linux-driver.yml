@@ -8,6 +8,7 @@ on:
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
+      - "docs/development/linux-mmio-backend-v1.md"
       - ".github/workflows/pl-swd05-linux-driver.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
+      - "docs/development/linux-mmio-backend-v1.md"
       - ".github/workflows/pl-swd05-linux-driver.yml"
   workflow_dispatch:
 
@@ -31,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
       - name: Install software package and host test dependencies
         run: |
           python3 -m pip install -e ./software/python
