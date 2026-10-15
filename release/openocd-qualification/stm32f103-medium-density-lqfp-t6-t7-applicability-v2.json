@@ -1,0 +1,239 @@
+{
+  "schema_version": 2,
+  "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32F1",
+  "series": "STM32F103",
+  "density_class": "medium",
+  "scope": "Bounded direct Phase 2 programming applicability for exact STM32F103 medium-density LQFP order codes already present in Production identity: existing R/V T6 plus C/R/V T7 targets. No exact ICPN is synthesized from ordering syntax.",
+  "manufacturer_authority": {
+    "ordering": {
+      "path": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+      "git_blob_sha1": "0c4b4b1d2e727726d0431ef89d687a6b6d2e98cf",
+      "document": "DS5319 Rev 20",
+      "band": "medium",
+      "required_flash_codes": [
+        "8",
+        "B"
+      ],
+      "required_pin_codes": {
+        "C": 48,
+        "R": 64,
+        "V": 100
+      },
+      "required_package_code": {
+        "T": "LQFP"
+      },
+      "required_temperature_codes": {
+        "6": "-40 to 85 C",
+        "7": "-40 to 105 C"
+      },
+      "temperature_programming_evidence": {
+        "document": "DS5319 Rev 20",
+        "section": "5.3.9 Memory characteristics / Table 28 Flash memory characteristics",
+        "statement": "Flash programming and erase characteristics are specified over TA = -40 to +105 C."
+      }
+    },
+    "production_exact_identity": {
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+      "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3",
+      "source_authority": "STMicroelectronics official"
+    },
+    "programming_review": {
+      "path": "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
+      "git_blob_sha1": "eb136aca6119c9d5b6696285fb57434b0c4c4f62",
+      "required_fact_ids": [
+        "stm32f103c-family-applicability",
+        "stm32f103c-medium-density-page-geometry",
+        "stm32f103c-program-granularity",
+        "stm32f103c-erase-capabilities",
+        "stm32f103c-standard-program-sequence"
+      ]
+    },
+    "programming_profile": {
+      "path": "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
+      "git_blob_sha1": "e869dd9e4494677080e3474ad9b55f4c00b3bea6",
+      "profile_id": "stm32f1-medium-density-flash-v0"
+    }
+  },
+  "targets": [
+    {
+      "icpn": "STM32F103R8T6",
+      "base_device": "STM32F103R8",
+      "package": "LQFP",
+      "pin_count": "64",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "851171147296f574dbe66ded56e2887db12d458e",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103RBT6",
+      "base_device": "STM32F103RB",
+      "package": "LQFP",
+      "pin_count": "64",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103V8T6",
+      "base_device": "STM32F103V8",
+      "package": "LQFP",
+      "pin_count": "100",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103v8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "9d1b1578b62225f144856f7aa4674d158fa34203",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103VBT6",
+      "base_device": "STM32F103VB",
+      "package": "LQFP",
+      "pin_count": "100",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "64799b571bb6a80258355f86c906d052b18dc242",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103C8T7",
+      "base_device": "STM32F103C8",
+      "package": "LQFP",
+      "pin_count": "48",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103c8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "80aa5ed4103f78bdd07a15045a093a44af3f317e",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103CBT7",
+      "base_device": "STM32F103CB",
+      "package": "LQFP",
+      "pin_count": "48",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103cb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "6603eca3490d09cb93ecee37008891f945b24dd9",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103R8T7",
+      "base_device": "STM32F103R8",
+      "package": "LQFP",
+      "pin_count": "64",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "851171147296f574dbe66ded56e2887db12d458e",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103RBT7",
+      "base_device": "STM32F103RB",
+      "package": "LQFP",
+      "pin_count": "64",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103VBT7",
+      "base_device": "STM32F103VB",
+      "package": "LQFP",
+      "pin_count": "100",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "64799b571bb6a80258355f86c906d052b18dc242",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    }
+  ],
+  "shared_programming_semantics": {
+    "openocd_device_id": "0x410",
+    "programming_profile_id": "stm32f1-medium-density-flash-v0",
+    "main_flash_start": "0x08000000",
+    "erase_unit_bytes": 1024,
+    "program_unit_bytes": 2,
+    "programming_vdd_v": {
+      "min": 2,
+      "max": 3.6
+    },
+    "external_vpp_required": false,
+    "operations": [
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ]
+  },
+  "non_claims": {
+    "unlisted_temperature_or_package_variants_qualified": false,
+    "bga_package_qualified": false,
+    "ufqfp_package_qualified": false,
+    "family_wide_qualification": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  },
+  "explicit_non_targets": [
+    {
+      "icpn": "STM32F103V8T7",
+      "reason": "not present in the locked Production exact-identity authority; ordering syntax alone is not admission evidence"
+    },
+    {
+      "scope": "UFQFPN/BGA package variants",
+      "reason": "package applicability is not reviewed in this transaction"
+    },
+    {
+      "scope": "STM32F103 high-density and XL-density variants",
+      "reason": "different density/programming geometry transaction"
+    }
+  ]
+}
