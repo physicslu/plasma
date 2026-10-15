@@ -184,6 +184,9 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         result = phase1.build(self.data, upstream_bytes_sha256=H, chart_report=chart)
         proof = result["p0_family_chart_evidence"]
         self.assertEqual(proof["p0_icpns_exact_manufacturer_base_joined_to_chart"], 1)
+        self.assertEqual(proof["p0_icpns_not_in_observed_chart"], 2436)
+        self.assertEqual(len(proof["chart_unmatched_exact_icpns"]), 2436)
+        self.assertEqual(sum(proof["chart_unmatched_by_research_cfg"].values()), 2436)
         self.assertTrue(result["chart_original_bytes_replayed_by_upstream_chart_builder"])
         for field in partials:
             self.assertEqual(result["per_field_coverage"][field]["PARTIAL"], 1)
