@@ -16,7 +16,7 @@ from .openocd_software_qualification import get_default_openocd_software_qualifi
 
 PHASE = "PROGRAMMING"
 PHASE1_IDENTIFIED = "IDENTIFIED"
-PROGRAMMING_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
+PROGRAMMING_STATES = frozenset({"UNKNOWN", "CANDIDATE", "BLOCKED", "SUPPORTED", "UNSUPPORTED"})
 
 
 class ProgrammingQualificationProvider(Protocol):
