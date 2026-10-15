@@ -44,6 +44,8 @@ jobs:
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p1_information_ledger_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_ordering_crosswalk_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p0_samr30_online_original_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_openocd_core_first_v1.py' -v
