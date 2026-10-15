@@ -53,6 +53,38 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         )
         self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103R8T6"))
 
+    def test_projection_separates_supported_from_unreviewed_mapping(self):
+        c8 = self.registry.describe("STMicroelectronics", "STM32F103C8T6")
+        self.assertEqual(c8["software_state"], "SUPPORTED")
+        self.assertTrue(c8["reviewed"])
+        self.assertEqual(c8["provider"]["version"], "0.12.0")
+        self.assertEqual(c8["provider"]["flash_driver"], "stm32f1x")
+        self.assertEqual(c8["operations"]["probe"]["state"], "SUPPORTED")
+        self.assertEqual(c8["operations"]["verify"]["state"], "SUPPORTED")
+        self.assertEqual(
+            c8["programming"]["electrical"]["vdd_programming_v"],
+            {"min": 2.0, "max": 3.6},
+        )
+        self.assertFalse(c8["programming"]["electrical"]["external_vpp_required"])
+        self.assertEqual(c8["programming"]["flash_geometry"]["main_flash_size_bytes"], 65536)
+        self.assertEqual(c8["programming"]["flash_geometry"]["page_count"], 64)
+
+        cb = self.registry.describe("STMicroelectronics", "STM32F103CBT6")
+        self.assertEqual(cb["software_state"], "SUPPORTED")
+        self.assertEqual(cb["programming"]["flash_geometry"]["main_flash_size_bytes"], 131072)
+        self.assertEqual(cb["programming"]["flash_geometry"]["page_count"], 128)
+
+        r8 = self.registry.describe("STMicroelectronics", "STM32F103R8T6")
+        self.assertEqual(r8["software_state"], "UNKNOWN")
+        self.assertFalse(r8["reviewed"])
+        self.assertIsNone(r8["provider"])
+        self.assertEqual(r8["operations"], {})
+        self.assertIsNone(r8["programming"])
+        self.assertFalse(r8["public_catalog_visibility_changed"])
+        self.assertFalse(r8["job_batch_execution_changed"])
+        self.assertFalse(r8["hardware_runtime_ready"])
+        self.assertFalse(r8["physical_programming_qualified"])
+
     def test_operation_qualification_is_source_bounded(self):
         opq = self.registry.operation_qualification
         self.assertEqual(set(opq), set(REQUIRED_OPERATIONS))
