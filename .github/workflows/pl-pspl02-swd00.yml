@@ -1,0 +1,58 @@
+name: PL PSPL-02 SWD-00 offline RTL
+
+on:
+  pull_request:
+    paths:
+      - "pl/rtl/bus/pl_control_axi_lite.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/verification/cocotb/test_pl_control.py"
+      - "pl/verification/cocotb/test_swd_waveform.py"
+      - "pl/verification/test_pspl02_swd00_rtl.py"
+      - "pl/projects/z2-control-waveform/**"
+      - ".github/workflows/pl-pspl02-swd00.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/rtl/bus/pl_control_axi_lite.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/verification/cocotb/test_pl_control.py"
+      - "pl/verification/cocotb/test_swd_waveform.py"
+      - "pl/verification/test_pspl02_swd00_rtl.py"
+      - ".github/workflows/pl-pspl02-swd00.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-rtl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offline simulators
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends verilator iverilog
+          python3 -m pip install pytest 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: RTL lint and elaboration
+        run: |
+          verilator --lint-only --sv -Wall -Wno-UNUSEDSIGNAL --top-module pl_control_axi_lite pl/rtl/bus/pl_control_axi_lite.sv
+          verilator --lint-only --sv -Wall -Wno-UNUSEDSIGNAL --top-module swd_waveform_engine pl/rtl/site/swd_waveform_engine.sv
+      - name: Real RTL simulation
+        run: python3 -m pytest -v pl/verification/test_pspl02_swd00_rtl.py
+      - name: Failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pspl02-swd00-failure-${{ github.run_id }}
+          path: pl/build/pspl02-swd00/sim/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Scope boundary
+        run: |
+          echo "PSPL-02 / SWD-00 host RTL tests PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "No Vivado synthesis/implementation, AXI system integration, JTAG, Z2 HIL, physical SWD or IC programming qualification." >> "$GITHUB_STEP_SUMMARY"
