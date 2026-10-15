@@ -165,3 +165,137 @@ async def axi_register_contract(dut):
     assert await b.write(REG_STATUS, 123) == SLVERR
 
     dut._log.info("SWD03_AXI_REGISTER_CONTRACT_PASS")
+
+
+# Wire-level fixture: the target only observes SWCLK edges, OE and SWDIO.
+# It has no knowledge of AXI register writes or the master's internal state.
+from virtual_swd_target import VirtualSWDTarget
+
+REG_COMMAND = 0x04
+REG_TURN = 0x14
+REG_IDLE = 0x18
+REG_RETRIES = 0x1C
+REG_TIMEOUT = 0x20
+REG_META = 0x28
+REG_RDATA = 0x2C
+STATUS_BUSY = 1 << 0
+STATUS_READY = 1 << 1
+STATUS_RESP_VALID = 1 << 2
+DPIDR = 0x2BA01477
+
+
+class SWDWireBench(AXIBench):
+    def __init__(self, dut):
+        super().__init__(dut)
+        self.target = VirtualSWDTarget()
+        self.old_swclk = 0
+        self.edge_count = 0
+
+    async def tick(self, count=1):
+        for _ in range(count):
+            self.d.s_axi_aclk.value = 0
+            await Timer(5, units="ns")
+            self.d.s_axi_aclk.value = 1
+            await Timer(1, units="ns")
+            clk = int(self.d.swclk.value)
+            oe = int(self.d.swdio_oe.value)
+            value = int(self.d.swdio_out.value)
+            if clk and not self.old_swclk:
+                self.target.rising(oe, value)
+                self.edge_count += 1
+            assert not (self.target.drive and oe), "SWDIO ownership collision"
+            self.d.swdio_in.value = (
+                self.target.value if self.target.drive
+                else value if oe else 1
+            )
+            self.old_swclk = clk
+            await Timer(4, units="ns")
+
+    async def wait_response(self, limit=20000):
+        for _ in range(limit):
+            valid = int(self.d.master_resp_valid.value)
+            if valid:
+                assert int(self.d.master_busy.value) == 0
+                return
+            await self.tick()
+        raise AssertionError("SWD master response timed out")
+
+    async def complete(self):
+        await self.wait_response()
+        meta = await self.read(REG_META)
+        data = await self.read(REG_RDATA)
+        assert meta[0] == OKAY and data[0] == OKAY
+        status = (await self.read(REG_STATUS))[1]
+        assert status & STATUS_RESP_VALID
+        assert not status & STATUS_READY
+        # Result must be preserved while the host is not acknowledging it.
+        for _ in range(15):
+            assert (await self.read(REG_META))[1] == meta[1]
+            assert (await self.read(REG_RDATA))[1] == data[1]
+        return meta[1], data[1]
+
+    async def acknowledge(self):
+        assert await self.write(REG_COMMAND, 4) == OKAY
+        state = (await self.read(REG_STATUS))[1]
+        assert not (state & STATUS_RESP_VALID)
+        assert state & STATUS_READY
+
+
+@cocotb.test()
+async def axi_to_virtual_swd_dpidr(dut):
+    b = SWDWireBench(dut)
+    await b.setup()
+    assert await b.read(REG_STATUS) == (OKAY, STATUS_READY)
+
+    # A transfer before line initialization returns NEED_RESET (2).
+    assert await b.write(REG_COMMAND, 1) == OKAY
+    meta, data = await b.complete()
+    assert meta & 0xF == 2
+    assert data == 0
+    await b.acknowledge()
+
+    # SWD line recovery: 64 released + 64 high + 8 low clocks.
+    assert await b.write(REG_CONFIG, 0x05) == OKAY
+    assert await b.write(REG_COMMAND, 1) == OKAY
+    assert (await b.write(REG_COMMAND, 1)) == SLVERR
+    assert (await b.write(REG_CONFIG, 0x04)) == SLVERR
+    meta, data = await b.complete()
+    assert meta & 0xF == 0 and data == 0
+    assert b.target.resets == 1
+    assert b.edge_count >= 136
+    assert (await b.write(REG_CONFIG, 0x04)) == SLVERR
+    await b.acknowledge()
+
+    # Read DP DPIDR via AXI: request, turnaround, ACK, data and parity.
+    assert await b.write(REG_CONFIG, 0x04) == OKAY
+    assert await b.write(REG_COMMAND, 1) == OKAY
+    meta, data = await b.complete()
+    assert (meta & 0xF) == 0
+    assert ((meta >> 4) & 7) == 1
+    assert ((meta >> 7) & 1) == 1
+    assert ((meta >> 8) & 0x1FF) == 1
+    assert data == DPIDR
+    assert b.target.headers[-1] == 0xA5
+    await b.acknowledge()
+
+    # Input configuration violations are reported by the transaction master,
+    # not silently coerced by the AXI adapter.
+    assert await b.write(REG_HALF, 1) == OKAY
+    assert await b.write(REG_COMMAND, 1) == OKAY
+    meta, data = await b.complete()
+    assert (meta & 0xF) == 1 and data == 0
+    await b.acknowledge()
+    assert await b.write(REG_HALF, 2) == OKAY
+
+    # A running write must be interrupted without automatic retry.
+    assert await b.write(REG_CONFIG, 0x00) == OKAY  # DP write ABORT
+    assert await b.write(REG_HALF, 9) == OKAY
+    assert await b.write(REG_COMMAND, 1) == OKAY
+    assert ((await b.read(REG_STATUS))[1] & STATUS_BUSY) != 0
+    assert await b.write(REG_WDATA, 0xDEADBEEF) == SLVERR
+    assert await b.write(REG_COMMAND, 2) == OKAY
+    meta, _ = await b.complete()
+    assert (meta & 0xF) == 8  # ABORTED; target effects are uncertain
+    await b.acknowledge()
+
+    dut._log.info("SWD03_AXI_TO_VIRTUAL_TARGET_PASS")
