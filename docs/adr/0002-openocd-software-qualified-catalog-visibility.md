@@ -29,46 +29,46 @@ Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣
 6. **執行授權仍分離**：Catalog 顯示不代表目前安裝的 PPU Runtime 已安裝相符的 OpenOCD Binary，也不代表 Socket 適配、電壓、安全、Flash 操作限制均滿足。Job/Batch 必須維持既有 runtime/配置/安全條件的 fail-closed 機制。
 7. OpenOCD 是**目前產品 Catalog 顯示門檻**，不是永久禁止未來 Vendor Backend / Plasma-native Backend。變更此政策需另行核准並版本化，不能透過暗中放寬篩選達成。
 
-## Implementation Phases — three IC detail sections (owner-directed; source-first funnel)
+## Implementation Phases — 三階段 IC Detail 與 Exact ICPN 驗收漏斗（修訂草案）
 
-The three IC Detail panels are **three distinct, independently auditable evidence products**. Their scope is also a progressive **exact-ICPN qualification funnel**, not P0/P1/P2 research-priority labels. The legacy P0/P1/P2 fields are retained as historical research prioritization metadata, **not a Phase completion state or phase-count denominator**.
+IC Detail 的三個區塊是**不同的證據產品**，同時形成「原廠身分 → 軟體燒錄資格 → 實機相容性」的逐層資格篩選。**P0／P1／P2 僅保留為既有 OpenOCD 研究排序欄位，不得再作為 Phase 完成狀態或階段數量。**
 
-**Project delivery history:** Phase 1 manufacturer-information baseline established; owner authorized Phase 2 Programming on 2026-10-15; Phase 3 remains deferred. This does **not** mean every researched exact ICPN has individually passed Phase 1 or that Phase 2 has certified it.
+**專案層級狀態（保留原決議）：**Phase 1 原廠資訊基礎架構已建立；Owner 於 2026-10-15 核准啟動 Phase 2 Programming；Phase 3 仍延後。此狀態**不代表**資料庫內每一個 ICPN 都已個別完成 Phase 1 或 Phase 2。
 
-| Phase | IC Detail panel | Inclusion/acceptance for a single exact commercial ICPN | Independent non-claim |
+| Phase | UI 區塊 | 個別 Exact ICPN 的進入／完成條件 | 不得推論 |
 | --- | --- | --- | --- |
-| **Phase 1 — IC Information** | **01 IC Information** | **`IDENTIFIED`**: a genuine, complete commercial manufacturer ICPN is individually evidenced by an official manufacturer part/material/ordering source, with family/base-device link and provenance. Register the identity first; continue filling package, pins, Flash, RAM, working VDD, I/O supply, analog supply, temperature and Core evidence. **`INFORMATION_COMPLETE`** is an additional, separately measured field-quality milestone, not the entrance requirement. | Being in Phase 1 does **not** prove applicability to the discovered OpenOCD CFG, programming support, public Catalog visibility or a physical PPU. |
-| **Phase 2 — Programming** | **02 Programming** | Subset of Phase 1 whose **exact ICPN** has version-pinned OpenOCD software qualification: applicable silicon identification/revisions, Target Config/include graph, Flash Driver, geometry/banks/security, and declared erase/program/read/verify behavior justified against the manufacturer Programming Guide/Reference Manual/Datasheet; store a scoped, reusable Programming Profile. Only independently qualified devices receive `openocd_software_support=SUPPORTED`. | A family CFG, Core, Flash Driver name, Phase 1 evidence or installed-runtime assumption alone never qualifies software support. |
-| **Phase 3 — PLASMA Compatibility** | **03 PLASMA Compatibility** | Subset of Phase 2 with **at least one explicitly identified PPU/Site/Socket/Adapter/target-package configuration** passing applicable power, pin-map, SWD/JTAG, safety and real-hardware HIL evidence; preserve hardware/software revision identifiers. | Phase 2 SUPPORTED does not imply HIL PASS, and neither Catalog visibility nor a past HIL PASS waives selected-site Job/Batch execution safety checks. |
+| **Phase 1 — IC Information** | **01 IC Information** | **`IDENTIFIED`**：NXP／ST／Microchip 等原廠的官方料號、物料或 Ordering 表明確確認**完整商用 ICPN**，並能連結其 Base Device／Family 與來源。先收錄身分；Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等資訊後續補齊。**`INFORMATION_COMPLETE`** 是獨立的欄位品質里程碑，不是 Phase 1 的入門門檻。 | Phase 1 收錄不代表該料號適用某個 CFG，更不代表 OpenOCD 已可燒錄、Catalog 可見或 PPU 實機通過。 |
+| **Phase 2 — Programming** | **02 Programming** | **Phase 1 的子集合**：對**精確 ICPN**依原廠 Programming Guide／Reference Manual／Datasheet 及鎖定版本 OpenOCD 驗證 Silicon ID/Revision、Target CFG/Include、Flash Driver、Bank/Geometry/Security 與宣告的 Erase／Program／Read／Verify 操作，完成可追溯的 Programming Profile。只有通過資格審核者為 `openocd_software_support=SUPPORTED`。 | 家族名稱、共用 Core、單獨 CFG 或 Driver 字串，都不足以取得軟體燒錄資格。 |
+| **Phase 3 — PLASMA Compatibility** | **03 PLASMA Compatibility** | **Phase 2 的子集合**：至少有一組明確版本化的 **IC／Package＋PPU／Site＋Socket／Adapter**，通過供電、Pin Mapping、SWD／JTAG、保護與實機 HIL。 | 軟體 `SUPPORTED` 不等於 HIL PASS；Catalog 可見或曾做過 HIL，也不能免除當次 Job／Batch 的安全檢查。 |
 
-### Phase count contract — use exact ICPNs, not CFG files or test runs
+### 三階段數量契約：統一以 Unique Exact ICPN 計算
 
-For a **fixed manufacturer, inventory snapshot and approved OpenOCD software-qualification scope**, define the sets of **unique exact commercial ICPNs**:
+在**同一廠商、同一研究庫 Snapshot 與相同 OpenOCD 軟體資格範圍**下：
 
-- `S1`: official-manufacturer identity `IDENTIFIED` in Phase 1.
-- `S1_complete`: Phase 1 identities whose required information fields independently meet the information-completeness contract. `S1_complete ⊆ S1`; this number must be **reported separately**.
-- `S2`: Phase 1 identities that have passed scoped **Phase 2 OpenOCD software qualification** (`SUPPORTED`).
-- `S3`: Phase 2 identities with at least one **Phase 3 physical HIL PASS** tied to a specific, immutable hardware/site/socket configuration.
+- **`S1`（Phase 1 Identified）**：已由原廠證實身分、可列入 Phase 1 的完整商用 ICPN 集合。
+- **`S1_complete`（Phase 1 Information Complete）**：其中必要 IC Information 欄位均通過證據驗收者；`S1_complete ⊆ S1`，**獨立統計**。
+- **`S2`（Phase 2 Supported）**：`S1` 中通過指定 OpenOCD 版本與宣告操作的精確料號軟體資格審核者。
+- **`S3`（Phase 3 HIL Passed）**：`S2` 中至少有**一組指定硬體配置**通過實機驗收的精確料號。
 
-**Mandatory invariant:** `S3 ⊆ S2 ⊆ S1`, therefore `|S1| ≥ |S2| ≥ |S3|`. Equality is permitted; mixing a family/Target/Driver count, raw Research candidate count or *number of HIL configurations* with exact ICPN counts is prohibited. Report the configuration-level HIL count as a **separate metric**.
+**強制不變量：`S3 ⊆ S2 ⊆ S1`，因此 `|S1| ≥ |S2| ≥ |S3|`。** 可以相等；不能把 CFG 數、家族數、Programming Profile 數、Research 候選數、或 HIL 測試次數混入 Exact ICPN 分母。**通過 HIL 的配置組合數另計。**
 
-Phase 2 **failure, unsupported-in-pinned-version, insufficient evidence or later regression removes/withholds the exact ICPN from `S2`** and consequently `S3`, **not** from `S1`. It must remain discoverable in internal Phase 1 Research with the reason and source/version retained. Phase 3 HIL failure removes/withholds **that configuration** and adjusts `S3` only when no qualifying configuration remains; it does not invalidate genuine IC identity or automatically revoke Phase 2 software evidence. A withdrawn/invalid manufacturer ICPN identity is handled by a **separate Phase 1 identity correction**, not by a Phase 2 rejection.
+Phase 2 若不符合、證據不足、在指定 OpenOCD 版本不支援，或日後軟體資格失效，**只是不列入／退出 `S2`，必要時同步退出 `S3`；仍保留在 `S1`**，並記錄不符合原因、Provider 版本及原廠證據。Phase 3 失敗只撤銷該硬體配置的 PASS；同一 ICPN 若無其他通過的配置，才退出 `S3`。唯有**原廠身分本身不成立**，才依獨立 Phase 1 身分修正流程處理。
 
-### Phase 1 — discovery entrypoint vs authoritative IC Information
+### Phase 1 — CFG 反向發現入口與原廠權威資料來源
 
-**OpenOCD CFG-first Reverse Discovery is the default *research discovery and work-selection entrypoint*, not an official manufacturer IC Information source.** A vendor-supported alternative provider/version requires separate approval under the existing provider policy.
+**OpenOCD CFG-first Reverse Discovery 是預設的「研究入口／選料策略」，不是 IC Information 的原廠規格證據。** 任何替代 Provider／版本應依既有政策獨立核准。
 
-1. **Discover candidate base devices/families** from the version-/commit-pinned OpenOCD `tcl/target/*.cfg` tree, recursively resolved Tcl includes, instantiated Target/Flash-bank configuration and actual Flash Driver source. Retain provider, commit, CFG and relevant Driver hash, and whether the route is concrete, generic, partial or missing. A CFG filename or a family substring **never alone demonstrates per-ICPN programming support**.
-2. **Reverse-map to the original manufacturer** using official Product/Package & Quality pages, original Parametric/Ordering tables, device datasheets or equivalent authoritative, scoped exports. Enumerate the **real, observed exact commercial ICPNs** across that manufacturer-confirmed family, including package/ordering variants. **Do not require an independent CFG file, Flash Driver match or verified silicon ID for every variant to enter `S1`.** Conversely, never synthesize order codes from prefixes, infer a material's Active state from a product header, or equate a family heading/DFP alias with an exact ICPN.
-3. **Phase 1 entry (`IDENTIFIED`)** requires at least: `manufacturer`, complete exact commercial `icpn`, manufacturer-verified base/family relationship, official source URI and source scope (material/order code vs family/product), acquisition/observation time, and explicit identity-evidence status. Dedupe on complete manufacturer commercial identity; preserve lifecycle and material variants separately. An incomplete, inferred, contradictory or fuzzy match remains `RESEARCH_ONLY` / `IDENTITY_DISPUTED`, **outside `S1`** until resolved.
-4. **Source custody is a separate evidence-quality metric.** Archive original official XLSX/PDF/HTML/API bytes with SHA-256 when obtainable. If access/retention prevents archival, retain the official URL, dated observation, scope and **`SOURCE_BYTES_NOT_ARCHIVED`** caveat; do not fabricate a manufacturer-binary hash or label this source independently byte-replay `VERIFIED`. Such a directly observed **unambiguous official exact material identity** can still be `IDENTIFIED` and counted in `S1`; count and report the custody gap separately. Internal Production identity admission and public Catalog publication remain **independent, stricter decisions**.
-5. **Enrich fields continuously**, not as a reason to delay `IDENTIFIED`: `base_device`, `package`, `pin_count`, `flash`, `ram`, `working_vdd`, `io_supply`, `vdda/analog_supply`, `temperature`, optional `core_architecture/core_model`. Keep exact units, operating modes, official document/revision/table, and source applicability. Per-field evidence is `VERIFIED / PARTIAL / UNKNOWN / CONFLICT`; a rail demonstrably absent on a device may be `NOT_APPLICABLE` **only with explicit source evidence**. Do not substitute Absolute Maximum Ratings for working VDD or confuse VREF with VDDA.
-6. **`INFORMATION_COMPLETE` gate:** all applicable mandatory Phase 1 fields must have sourced exact-part (or explicitly applicable family-wide) `VERIFIED` evidence, or properly sourced `NOT_APPLICABLE`. Any required `UNKNOWN`, `PARTIAL` or `CONFLICT` prevents information-complete status **without deleting the ICPN from `S1`**. Report per-field coverage and immutable-source custody separately.
-7. **Phase boundary:** no Phase 1 software `SUPPORTED`, Programming Profile qualification, erase/program/verify claims, Production/Public Selector mass admission, or physical HIL promotion. Current internal Production identity admission policy is preserved. Non-OpenOCD-started low-cost official manufacturer identities may still be retained in **Research**; this discovery priority is not a prohibition against legitimate source capture.
+1. **由 Config 反推候選 Family／Base Device**：使用指定 OpenOCD 版本／Commit 的 `tcl/target/*.cfg`，遞迴展開 Tcl Include，解析 Target、Flash Bank 與實際 Flash Driver。記錄 Provider、版本、CFG、Driver、來源雜湊，以及映射是否明確／通用／部分成立。單看 CFG 檔名或 Family 前綴不能證明精確 IC 可燒錄。
+2. **反查原廠完整料號**：由已辨識家族尋找原廠 Product、Package／Quality、Ordering Table、Datasheet 或官方 Parametric Export。把**該家族中原廠實際列出的各種封裝與商用後綴料號**逐一建檔。**Phase 1 不要求每一個封裝後綴都有獨立 OpenOCD CFG、Driver 或 Silicon ID 證據**；但不能拼湊不存在的料號、把 Product 標題的 Active 當成每個 Material 都 Active，或把只有 Family／DFP Alias 的紀錄冒充完整 ICPN。
+3. **`IDENTIFIED` 最低門檻**：`manufacturer`、**完整商用 `icpn`**、由原廠確認的 Base／Family 對應、官方 Source URI、來源證據作用範圍（Material／Ordering 與 Family／Product 必須分清）、觀察時間與身分證據狀態。同一完整商用身分去重；Lifecycle 與材料後綴分開記錄。猜測、模糊命中、衝突或不完整料號保持 `RESEARCH_ONLY`／`IDENTITY_DISPUTED`，**不進 `S1`**。
+4. **原始證據封存與 Phase 1 數量分開管理**：能取得時封存原廠 XLSX／PDF／HTML／API 原始 Bytes 與 SHA-256。若無法封存，必須標記 `SOURCE_BYTES_NOT_ARCHIVED`，保留官方 URL、觀察時間、Source Scope，**不可聲稱已保存原廠 Binary SHA 或完整的原始檔位元重播**。但是可由官方**個別物料紀錄直接確認且無歧義**的 ICPN，仍可計為 `IDENTIFIED`；未封存來源須另列缺口。Phase 1 收錄**不自動構成**內部 Production Admission 或公開 Catalog 資格。
+5. **欄位持續補強，不阻擋 `IDENTIFIED`**：補齊 `base_device / package / pin_count / flash / ram / working_vdd / io_supply / vdda_or_analog_supply / temperature`，以及適用的 Core／Architecture。保留原始單位、工作模式、文件版次／表格、Exact／Family 適用範圍與 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT`。如原廠明確證明沒有某個獨立電源軌，可使用附證據的 `NOT_APPLICABLE`；不得以 Absolute Maximum Ratings 當 Working VDD，亦不可將 VREF 混為 VDDA。
+6. **`INFORMATION_COMPLETE` 門檻**：所有適用的必要欄位均有精確料號或明確涵蓋該料號的 Family 官方證據，結果為 `VERIFIED` 或有來源的 `NOT_APPLICABLE`。必要欄位存在 `UNKNOWN／PARTIAL／CONFLICT` 時不得列為資訊完整，**但不從 `S1` 移除**。來源原檔封存覆蓋率再單獨呈現。
+7. **Phase 邊界**：Phase 1 不宣稱 Erase／Program／Verify 可用、不授權 `SUPPORTED`、不建立已驗證 Programming Profile，也不能批次提升 Production／公開 Selector 或實機 HIL。現行內部 Identity Admission 政策維持不變。不從 OpenOCD 開始取得的低成本原廠料號，也仍可保存在 Research；並非禁止保存其他合法來源。
 
-**Example:** A pinned `lpc8xx.cfg` family lead may generate manufacturer-source crosswalk work for official LPC811/812/822/824 **commercial ordering variants**. All **individually manufacturer-confirmed** variants can enter Phase 1 `IDENTIFIED` even if `lpc2000.c` does not recognize a particular silicon/revision. That exact route is evaluated only at Phase 2. One CFG does not equal one ICPN and does not make an entire family software `SUPPORTED`.
+**案例：** 從 `lpc8xx.cfg` 發現家族後，可反查 NXP 官方 LPC811／812／822／824 各自存在的完整商用後綴。每一筆**經原廠個別確認**者即可進入 Phase 1 `IDENTIFIED`；即使某個 Silicon Revision 尚無 `lpc2000.c` 支援證據，也是在 Phase 2 再檢查。**一個 CFG 不等於一個 ICPN，也不代表整個家族已 `SUPPORTED`。**
 
-**Phase 1 deliverables / acceptance:** an auditable `S1` exact-ICPN inventory, official source and acquisition metadata, family/variant crosswalk and discovery route, per-field evidence/coverage ledger, identity disputes, custody gaps, reproducible source locks where available, tests and a clearly separated `S1_complete` count. No automatic change to Production admission or default software-qualified Catalog visibility.
+**Phase 1 驗收輸出：** `S1` Exact ICPN 清單、官方來源與取得時間、Family／Ordering Variant Crosswalk、OpenOCD 研究入口、逐欄位覆蓋率、身分衝突、原始證據封存缺口、可重播的來源檢查，以及獨立的 `S1_complete` 數量。**不得藉此修改 Production／公開 Catalog 或 Phase 2／3 結果。**
 
 ### Phase 1 — official manufacturer bulk information acquisition (Microchip initial implementation)
 
@@ -92,22 +92,22 @@ Phase 2 **failure, unsupported-in-pinned-version, insufficient evidence or later
 
 **Acceptance / stop gates:** Test an original-byte replay; reject SHA/version mismatch, duplicate/ambiguous exact order codes, family→exact `VERIFIED` promotion, missing units/source locator, false completeness claims and any Production/Phase 2/3 write. If chart export, MCP capture or datasheet access fails, preserve `SOURCE_NOT_AVAILABLE`/coverage gaps and stop that lane or retry only by a permitted official mechanism. Completion is a **reviewable Phase 1 information cohort with quantified coverage**, not a programming qualification; subsequent cohorts and any identity admission remain separately reviewed. The existing Microchip Research inventory (24,051 source-linked candidates) is **not** automatically bulk-enriched or admitted by this decision.
 
-### Phase 2 — Programming implementation contract (active; filtered software qualification)
+### Phase 2 — Programming implementation contract（依原廠程式文件做軟體資格篩選）
 
-Phase 2 consumes the **Phase 1 `IDENTIFIED` exact ICPN set**, not the historical P0/P1 count. Verify manufacturer Programming Guide, Reference Manual and applicable Datasheet against the **PLASMA-pinned OpenOCD Provider and source/runtime version**, actual silicon ID/revision, Target/Flash-bank applicability, ROM IAP or controller, geometry/banks/security, reset/clock dependencies, and declared **erase/program/read/verify** operations. Build version-scoped reusable Programming Profiles and reviewed exact-ICPN applicability records.
+Phase 2 從 **Phase 1 `IDENTIFIED` 的 Exact ICPN 集合**選取候選，**不使用歷史 P0/P1 數量當作分母**。逐一核對原廠 Programming Guide／Reference Manual／Datasheet 與指定 OpenOCD Provider／版本，確認實際 Silicon ID／Revision、Target/Driver/Flash Bank、ROM IAP 或 Flash Controller、Geometry、Security、Reset/Clock 條件，及宣告的 **Erase／Program／Read／Verify** 操作，建立有版本與適用範圍的可重用 Programming Profile。
 
-- **`SUPPORTED`:** sufficient independent, exact-ICPN-scoped version-locked software evidence for the specifically claimed operations; add to `S2`. It does **not** assert physical PPU or Socket HIL.
-- **`CANDIDATE` / `UNKNOWN` / `BLOCKED`:** credible partial source leads or unavailable/conflicting essential evidence; remain in `S1` but do not enter `S2`.
-- **`UNSUPPORTED` (version/scope-specific):** an independently reviewed negative support outcome for the pinned Provider/version/operations; remain in `S1`, out of `S2`. Do not interpret it as globally or permanently unsupported by every backend.
-- **Software regressions:** revoke the affected `S2` software qualification after evidence review and recompute downstream `S3` ICPN eligibility; keep historical identities, sources, and negative findings.
+- **`SUPPORTED`**：精確 ICPN 的軟體燒錄適用性與宣告操作有足夠、可重播的版本鎖定證據，列入 `S2`；不宣稱 PPU／Socket HIL。
+- **`CANDIDATE／UNKNOWN／BLOCKED`**：只有部分 OpenOCD 線索，或必要文件／證據不足、相互衝突；保留在 `S1`，不計 `S2`。
+- **`UNSUPPORTED`（限定版本與操作範圍）**：經審核確定該 Provider／版本／操作不適用；保留在 `S1`，不計 `S2`，不可推論全世界任何後端都永遠無法燒錄。
+- **退版或資格回歸**：保留原廠料號與歷史證據，撤銷受影響的 `S2` 軟體資格，並重算相關 `S3` 資格。
 
-Phase 2A may establish qualification authority before the support-only public Catalog migration under Issue #849. **Only `S2` should be visible by default once that migration is implemented**; Source CFG, historical internal Production identity admission or `S1` membership alone do not authorize it.
+Phase 2A 可以先建立軟體資格權威，再由 Issue #849 完成公開 Catalog／IC Selector 的 **SUPPORTED-only** 顯示遷移。即使 Phase 1 已收錄、具備某家族 CFG 或已有內部 Production 身分，**也不得在尚未取得 `SUPPORTED` 前自動公開為可燒錄選項**。
 
-### Phase 3 — PLASMA Compatibility handoff (deferred; configuration-bound HIL)
+### Phase 3 — PLASMA Compatibility handoff（與軟體資格分離的實機相容性）
 
-Phase 3 may only count an `S2` exact ICPN after qualified **physical configuration-specific** evidence (device/package + Socket/Adapter model/revision + PPU/Site + pin mapping + voltage/current/protection + interface + firmware/PL/OpenOCD versions and actual HIL operations). Preserve full configuration identity and test result; `S3` counts **unique qualifying ICPNs**, and physical test configurations are separately counted.
+Phase 3 只把 `S2` 中具有**特定配置實機驗證**的 ICPN 計入 `S3`。驗收證據需鎖定 Device／Package、Socket／Adapter 型號及 Revision、PPU／Site、Pin Mapping、電壓／電流／保護、Debug Interface、PS／PL／OpenOCD 版本及實際 HIL 操作。
 
-Software `SUPPORTED` with Socket/PPU `NOT_TESTED` remains eligible for the **software-qualified Catalog**; it is not counted in `S3`. Job/Batch retains independent selected-site runtime/electrical/safety checks and fails closed. No Phase 1 or 2 artifact can synthesize a HIL PASS.
+`S3` 統計**唯一 Exact ICPN 數**；通過的實體配置或測試次數另外統計。軟體 `SUPPORTED` 而 Socket／PPU `NOT_TESTED` 的 IC，**仍可依既有政策顯示於軟體合格 Catalog**，但不計 `S3`。Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed；不得用 Phase 1／2 文件捏造 HIL PASS。
 
 ### Visibility and status boundary during phased migration
 
@@ -115,9 +115,11 @@ This ADR's already-accepted final **user-facing default selectable Catalog = exa
 
 ## Phase scope of the existing OpenOCD-first and Core/Driver requirements
 
-OpenOCD-first CFG/Target/Driver analysis provides the **default Phase 1 research discovery route** and supplies technical evidence for **Phase 2**. Original manufacturer **exact orderable identity** remains the Phase 1 source of truth; programming operation evidence and exact silicon applicability are Phase 2 gates, and configuration-specific physical HIL is Phase 3. The historical P0/P1/P2 OpenOCD-first classification is **internal research priority only** and SHALL NOT be used as `S1`/`S2`/`S3` progress.
+OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**，同時為**Phase 2 的燒錄資格**提供技術證據。Phase 1 的身分權威來源仍是原廠完整商用料號；Phase 2 才判定精確 Silicon／Programming Operation 相容性；Phase 3 才判定指定硬體配置的實機 HIL。P0／P1／P2 僅為舊有內部研究排序，**不得拿來當 `S1／S2／S3` 的 Phase KPI**。
 
-The global project baseline remains: Phase 1 framework established, Phase 2 Programming work authorized, Phase 3 deferred. These project statuses are not automatically per-ICPN passes. All preexisting original-source locks and unfinished exact/field qualification gaps remain intact; this policy does not retroactively mark them complete.
+目前整體專案狀態仍為：Phase 1 架構已建立、Phase 2 Programming 已核准執行、Phase 3 延後。專案階段進度**不代表**每顆 Exact ICPN 均已個別通過。舊研究資料、來源 Hash 與未完成的欄位／資格缺口均保留，不得因本次修訂而回溯視為 `IDENTIFIED`、`INFORMATION_COMPLETE` 或 `SUPPORTED`。
+
+
 
 ## Research prioritization — OpenOCD first (owner-approved)
 
@@ -205,13 +207,13 @@ Phase 進度 KPI 以 `|S1|`（原廠已確認完整 ICPN）、`|S1_complete|`（
 
 ## Validation / acceptance
 
-**Additional Phase-funnel contract tests required for subsequent implementation PRs:**
+**後續實作 PR 必須新增的 Phase Funnel 契約測試：**
 
-- Source-first example: one pinned OpenOCD CFG may discover a manufacturer family with several official exact commercial package/ordering variants; each manufacturer-attested code is individually eligible for `S1`, with no per-variant CFG prerequisite. An invented suffix or product-heading-only lifecycle must **not** be counted.
-- Separately report `S1` identities, `S1_complete` information-complete identities, archived-vs-observed-only original bytes and per-field evidence; missing VDDA or source archive is not silently `VERIFIED`.
-- Phase 2 insufficient evidence or unsupported-in-this-version keeps the exact identity in `S1` but excludes it from `S2` (and `S3`). A device is not removed from manufacturer research solely because OpenOCD programming is unqualified.
-- Count **distinct exact ICPNs** at each Phase, not CFG files, Base Devices, vendor family pages, Programming Profiles or HIL configuration runs. Independently assert `S3 ⊆ S2 ⊆ S1` on every snapshot. Keep `S1_complete` and physical configuration count as separate metrics.
-- Phase 3 `HIL PASSED` is configuration-specific; a software-qualified, socket-untested ICPN remains eligible for software Catalog but not `S3`; a failed configuration does not automatically revoke software qualification.
+- 一份 OpenOCD CFG 可反查原廠家族內多個官方完整商用封裝／Ordering Variant；每筆原廠個別證實者可獨立進入 `S1`，不需每筆各有 CFG；**臆造後綴、只有 Product Title 的 Active** 都不得計入。
+- 分別報告 `S1`、`S1_complete`、原檔已封存與僅觀察到原廠網頁的比例，以及逐欄位證據狀態；缺失的 VDDA 或原始 Binary 不得假裝 `VERIFIED`。
+- Phase 2 證據不足、指定版本不支援時仍保留 `S1`，但排除 `S2` 與 `S3`；不能只因 OpenOCD 不適用就刪除原廠有效料號。
+- 三階段均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 `S3 ⊆ S2 ⊆ S1`。資訊完整數和實體配置組合數獨立報告。
+- Phase 3 `HIL PASSED` 必須有指定配置；軟體 `SUPPORTED` 但 Socket 未測的 IC 可以依軟體資格顯示於 Catalog，卻不可列入 `S3`；單一硬體失敗不得直接撤銷 Phase 2。
 
 1. 使用完整 Production manifest 的實際 loaded rows，分別報告 **內部 admitted ICPNs** 與 **軟體已確認 SUPPORTED 的可見 ICPNs**，不手填或繼承歷史 coverage 數。
 2. 測試 exact ICPN 有原廠證據但 `no_mapping`、僅 family-matched CFG、只有 candidate source、缺乏可用 Flash driver/operation 證據的資料，皆不出現在預設產品搜尋、picker 和計數。
