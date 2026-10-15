@@ -436,6 +436,16 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             default_timeout_s=default_timeout_s,
             allow_inline_asset=allow_inline_asset,
         )
+        # Fail closed for raw target string submissions as well as the
+        # typed target_device payload. Otherwise a caller could bypass
+        # Phase 1 lookup-only guard by omitting target_device.
+        if isinstance(request.target, str):
+            direct = get_default_device_catalog().resolve("Microchip", request.target)
+            if direct is not None and direct.mapping_status == "no_mapping":
+                raise ValueError(
+                    "Microchip Phase 1 exact ICPN is lookup-only; "
+                    "no executable programming mapping exists"
+                )
         if execution_owner_id is not None:
             owner_kind = "engineering_session" if client_id == "plasma-web-engineering" else "rest_client"
             request = replace(
