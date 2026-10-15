@@ -78,7 +78,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
                 current["sources"].pop()
                 previous = (json.dumps(current, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 original = hashlib.sha1(
-                    f"blob {len(previous)}\\0".encode() + previous).hexdigest()
+                    f"blob {len(previous)}".encode() + bytes([0]) + previous).hexdigest()
                 self.assertEqual(original,self.summary["source_git_blobs"][label],label)
                 continue
             self.assertEqual(blob(path),
