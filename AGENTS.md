@@ -69,6 +69,81 @@ scripts/            integration/deployment and service-control scripts
 docs/               architecture, development, and deployment documentation
 ```
 
+## 1A. Prototype-first engineering policy (normative)
+
+**PLASMA is currently in the prototype / proof-of-concept stage.** The
+PYNQ-Z2 is a personally operated development board used to validate design
+ideas, especially PS -> AXI-Lite -> FPGA SWD -> external-target/OpenOCD
+feasibility. **A prototype is not a production appliance**: do not impose
+future manufacturing, fleet security, factory traceability, full qualification,
+or release governance on every daily lab iteration. Production requirements
+are introduced progressively when the architecture and target hardware have
+been validated.
+
+Stage-specific objectives:
+
+| Stage | Primary question | Default validation |
+| --- | --- | --- |
+| Prototype / PoC (current PYNQ-Z2) | Does the idea work on real hardware? | Smallest meaningful functional test / HIL smoke test; capture actual result and necessary recovery data |
+| Engineering validation (custom board) | Does the complete design meet its engineering requirements? | Integrated electrical, timing, recovery, and reliability qualification |
+| Production / release (PPU product) | Can it be manufactured, supported, and operated reliably? | Full production security, traceability, QA, maintainability, and acceptance controls |
+
+For prototype work, **Build -> Test -> Learn -> Iterate** is the
+default decision loop. Optimize for *time to a meaningful real-hardware
+observation*, not documents, ceremonies, approval counts or evidence volume:
+
+1. State the immediate hypothesis and first measurable pass/fail result.
+   Execute the shortest path to that result; do not open a new
+   enrollment, identity, documentation or audit milestone unless a concrete
+   dependency makes it necessary.
+2. Reuse already accepted enrollment, board identity, UART capabilities,
+   historical HIL results, artifacts and recovery qualification.
+   Previously proved capability is not a per-run qualification task.
+   Still check current, changeable facts that affect safe execution.
+3. Default PYNQ-Z2 internal-loopback HIL to the repository's
+   `--profile development` policy. Keep the stricter
+   `qualification` profile for deliberate qualification or release work.
+   A previous Identity PASS does not prove that a newly loaded candidate
+   image has the intended Build ID; a fast readback after load is reasonable,
+   not a new qualification project.
+4. Aim for **at most 180 seconds of pre-experiment checks** in the normal
+   healthy lab state. This is a latency objective, **not** permission
+   to assume PASS or bypass a real hazard. In one bounded pass automatically
+   check applicable access, current PL ownership/mappings, clock, artifact
+   integrity, and rollback image. On a genuine blocker, report all actionable
+   blockers together rather than repeatedly running known-failing preflight.
+5. Agents perform tool-accessible SSH/UART, host inspection, read-only
+   verification, builds and routine execution themselves. Avoid asking the
+   owner to relay commands or reconfirm electronically observable facts.
+   A missing sudo/SSH permission is an access limitation, **not a new approval
+   gate**; obtain an authorized execution path without leaking credentials,
+   modifying sudoers, or silently escalating privilege.
+6. After Gate 1, execute autonomously **within its approved scope**.
+   Do not invent per-stage approvals, new documentation gates, or a third
+   sign-off. Keep Gate 2 for merging, and request an expanded Gate 1 only
+   when materially new work or risk is outside the authorized scope.
+7. Prototype does **not** mean unsafe or unverifiable: preserve electrical
+   voltage/DUT safeguards, known firmware recovery, conflicting PL-driver
+   and MMIO ownership checks, applicable high-risk AXI-fault constraints,
+   and truthful PASS/FAIL/NOT RUN evidence. Stop on real hazards.
+   Do not confuse a SHA-256 file-integrity check with proof of hardware
+   electrical safety.
+8. Keep engineering records **proportionate to the experiment**. A short
+   reproducible command, tested image/commit, observed result, and recovery
+   outcome are usually sufficient for a development smoke test. Do not
+   retroactively alter immutable historical evidence. Formal reports,
+   extensive approval evidence, and manufacturing controls belong to
+   qualification/production work unless a current technical dependency
+   specifically demands them.
+
+This section governs agent priorities and operating style; it does not
+override repository source-of-truth rules, an active safety prohibition,
+the existing two Gate 1/Gate 2 workflow, or explicit task-specific hardware
+restrictions. When a lower-level procedure is unnecessarily stricter for a
+prototype, propose and implement a scoped Development Mode change through
+normal engineering review rather than fabricate evidence or silently bypass
+executable checks.
+
 ## 2. Programming data model
 
 Plasma separates source data, execution instructions, and target-memory data.
