@@ -91,7 +91,7 @@ test("Phase 2 Programming qualification is vendor-neutral and independent from C
   assert.match(selector, /Programming Profile/);
   assert.match(selector, /CFG Mapping/);
   assert.match(selector, /CFG mapping 不能視為燒錄支援/);
-  assert.match(selector, /Phase 2 OpenOCD software qualification/);
+  assert.match(selector, /Phase 2 Programming qualification/);
   assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證/);
 });
 
