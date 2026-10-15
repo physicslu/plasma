@@ -339,6 +339,7 @@ export type DeviceSearchResult = {
     revision_sha256: string | null;
   };
   catalog_origin: string;
+  phase1?: { identity_state: "IDENTIFIED"; information_complete: false };
   backend_candidate?: BackendCandidateEvidence | null;
   backend_source_reference?: BackendSourceReference | null;
   backend_providers?: VersionedOpenOCDProvider[];
@@ -352,6 +353,7 @@ export type DeviceSearchResponse = {
   ok: boolean;
   rest_contract_version?: string;
   query: string;
+  visibility?: "production" | "phase1";
   catalog_size: number;
   count: number;
   total_count: number;
@@ -364,6 +366,7 @@ export type DeviceSearchOptions = {
   apiBase: string;
   limit?: number;
   offset?: number;
+  visibility?: "production" | "phase1";
   signal?: AbortSignal;
 };
 
@@ -375,6 +378,7 @@ export async function searchDevices(
   const limit = options.limit ?? 20;
   const offset = options.offset ?? 0;
   const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+  if (options.visibility) params.set("visibility", options.visibility);
   const response = await fetch(`${apiBase}/api/devices/search?${params.toString()}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
