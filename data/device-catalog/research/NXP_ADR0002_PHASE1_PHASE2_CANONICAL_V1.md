@@ -1,6 +1,6 @@
 # NXP — ADR-0002 Phase 1 / Phase 2 Canonical Contract & Gap Audit v1
 
-**Scope:** NXP only. **Normative authority:** [ADR-0002](../../../../docs/adr/0002-openocd-software-qualified-catalog-visibility.md), as present on the same commit. Historical NXP research priority P0/P1/P2 ledgers remain immutable, but **shall not be used as new product Phase states, criteria, counters or scheduling gate**.
+**Scope:** NXP only. **Normative authority:** [ADR-0002](../../../docs/adr/0002-openocd-software-qualified-catalog-visibility.md), as present on the same commit. Historical NXP research priority P0/P1/P2 ledgers remain immutable, but **shall not be used as new product Phase states, criteria, counters or scheduling gate**.
 
 ## Findings: historical approach vs ADR-0002
 
