@@ -90,6 +90,7 @@
 - **Current** — [Multi-machine Development Guide](development/multi-machine-development-guide.md)
 - **Current** — [VS Code Remote Workspace Standard](development/vscode-remote-workspace.md)
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)
+- **Reference** — [Microchip Phase 1 SWPC Evidence Vault Handoff](development/microchip-phase1-swpc-evidence-vault-deployment-v1.md)：原廠 Artifact SHA-256 鎖定、SWPC 現場 Preflight、手動 Vault 存入與還原驗收；不宣稱已實際部署或完成異地保存。
 - **Current** — [Secure Gateway Deployment](development/secure-gateway-deployment.md)
 - **Current** — [Fleet Demo Deployment](development/fleet-demo.md)
 - **Current** — [Mock Continuous Delivery](development/mock-cd.md)
