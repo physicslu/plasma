@@ -256,6 +256,50 @@ export type NXPManufacturerDeviceProfile = {
   physical_programming_qualified: false;
 };
 
+export type OpenOCDSoftwareQualification = {
+  schema_version: "1.0.0";
+  registry_id: string;
+  software_state: "UNKNOWN" | "CANDIDATE" | "SUPPORTED" | "UNSUPPORTED";
+  reviewed: boolean;
+  provider: {
+    provider_id: string;
+    version: string;
+    source_commit: string;
+    runtime_id: string;
+    target_config: string;
+    flash_driver: string;
+  } | null;
+  operations: Record<string, {
+    state: "UNKNOWN" | "CANDIDATE" | "SUPPORTED" | "UNSUPPORTED";
+    scope: string | null;
+  }>;
+  programming: {
+    programming_profile_id: string;
+    memory_geometry_profile_id: string;
+    debug_transport: string[];
+    electrical: {
+      vdd_programming_v: { min: number; max: number };
+      external_vpp_required: boolean;
+    };
+    flash_geometry: {
+      main_flash_start: string;
+      main_flash_size_bytes: number;
+      page_count: number;
+      erase_unit: string;
+      erase_unit_bytes: number;
+      program_unit: string;
+      program_unit_bytes: number;
+    };
+    blocked_operations: string[];
+    backend_constraints: string[];
+  } | null;
+  public_catalog_visibility_changed: false;
+  job_batch_execution_changed: false;
+  installed_runtime_attested: false;
+  hardware_runtime_ready: false;
+  physical_programming_qualified: false;
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -301,6 +345,7 @@ export type DeviceSearchResult = {
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
   selected_profile?: SelectedICProfile | null;
+  openocd_software_qualification?: OpenOCDSoftwareQualification | null;
 };
 
 export type DeviceSearchResponse = {

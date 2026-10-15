@@ -51,7 +51,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(selector, /Authority/);
   assert.match(selector, /icSelectorStatusStack/);
   assert.match(selector, /icSelectorStatusPhysical[\s\S]*physicalValidationLabel\("PPU"[\s\S]*physicalValidationLabel\("Socket"/);
-  assert.match(selector, /icSelectorStatusEvidence[\s\S]*openOcdConfigLabel[\s\S]*manufacturerPartLabel/);
+  assert.match(selector, /icSelectorStatusEvidence[\s\S]*softwareQualificationLabel[\s\S]*openOcdConfigLabel[\s\S]*manufacturerPartLabel/);
   assert.match(selector, /OpenOCD 設定 · 已存在/);
   assert.match(selector, /原廠料號 · 已確認/);
   assert.match(selector, /未實機測試/);
@@ -66,6 +66,29 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.doesNotMatch(selector, /OCD Candidate/);
   assert.doesNotMatch(selector, /LPC845/);
   assert.doesNotMatch(selector, /nRF52840/);
+});
+
+test("Phase 2 software qualification is projected independently from CFG mapping and physical readiness", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const api = await source("../app/device-catalog-api.ts");
+
+  assert.match(api, /OpenOCDSoftwareQualification/);
+  assert.match(api, /openocd_software_qualification\?:\s*OpenOCDSoftwareQualification\s*\|\s*null/);
+  assert.match(api, /software_state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
+  assert.match(api, /public_catalog_visibility_changed:\s*false/);
+  assert.match(api, /hardware_runtime_ready:\s*false/);
+  assert.match(api, /physical_programming_qualified:\s*false/);
+
+  assert.match(selector, /softwareQualificationLabel\(device\.openocd_software_qualification\?\.software_state, zh\)/);
+  assert.match(selector, /軟體資格 ·/);
+  assert.match(selector, /Software Qualification/);
+  assert.match(selector, /Qualified Operations/);
+  assert.match(selector, /Flash Driver/);
+  assert.match(selector, /Programming Profile/);
+  assert.match(selector, /CFG Mapping/);
+  assert.match(selector, /CFG mapping 不能視為燒錄支援/);
+  assert.match(selector, /Phase 2 OpenOCD software qualification/);
+  assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證/);
 });
 
 test("shared PMode and EMode picker is constrained to admitted exact ICPNs", async () => {
