@@ -154,6 +154,7 @@ class Phase1S1IdentityTest(unittest.TestCase):
     def test_information_partial_not_s1_complete(self):
         self.p0["records"][0]["fields"]["flash"]={
             "status":"PARTIAL","value":64,
+            "source_locator":"official original chart TR 123 col Flash",
             "evidence_scope":"official_family_parametric_chart",
             "original_response_sha256_refs":[SHA]}
         result=self.build()
