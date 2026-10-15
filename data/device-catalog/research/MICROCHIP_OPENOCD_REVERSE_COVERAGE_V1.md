@@ -54,6 +54,31 @@ python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
 
 The report contains **per-CFG device-name rows**, **per-ICPN three-field rows**, precise **mapping status**, original response SHA-256 source reference and grouped counts. All fields related to production/silicon/programming qualification remain false. CI reports the actual join coverage after downloading and revalidating the original bytes. If any original archive is missing, expired, changed or inconsistent with the pinned DFP snapshot, the live mapping must **fail**, not silently show an invented zero.
 
+## Complete historical source sweep — actual independent replay (2026-10-15)
+
+[CI run 38664576255](https://github.com/physicslu/plasma/actions/runs/38664576255) fetched **the official original Microchip DFP index, the 16-batch MCP original research archive and 12 disjoint original MCP shard archives** from GitHub Actions. It did not issue new vendor network searches. All 13 source roots and their original response bytes were independently replayed using the established Microchip original-source replay validators, frozen DFP query plan and original-response SHA-256 checks.
+
+- **321** original batch directories existed: **313** had valid source attestation and **8** were quarantined. Preserve this distinction; the archived original batch count is not the count of validated batches.
+- Manufacturer source queries: **2,753** positive exact-prefix, **68** completely replayed zero-prefix, **297** source NOT_FOUND and **80** timeout/unverified (the latter two must not be reclassified as zero commercial products).
+- Historical source audit counted **23,427 raw source-linked candidate observations**; exact-ID-deduplicated replayed output has **23,276 original manufacturer commercial ICPN candidates**. The deduplicated per-ICPN output preserves **23,276 source-link references**, not the pre-dedup observation-event count. Do not merge these denominators.
+- **CFG-FIRST candidate mapping** of the 23,276 original-source-replayed ICPNs: **2,414** exact MCP Base Device ↔ DFP Device Name matches, **23** reviewed manufacturer SAMD21 Base/DFP alias candidates, **126** P1 target-only CFG candidates, and **20,713** with no match to the current DFP-name/CFG Research index. Therefore: **2,437 P0 candidate mappings**, **126 P1 candidates**, **2,563 total candidate mappings**, and **20,713 unresolved mappings**.
+- CFG distribution: `at91samdXX.cfg` **667**, `atsame5x.cfg` **354**, `atsamv.cfg` **175**, `pic32mx.cfg` **1,241**, and P1 target-only `atsaml1x.cfg` **126**. These are order-code candidates, not qualified Flash/erase/write support. Other CFG groups had zero matched commercial order codes **in this specific reconstructed original-source subset**, not proof of zero supported ICs.
+- Result and per-ICPN Research matrix: [full original-byte source replay Artifact 11940412265](https://github.com/physicslu/plasma/actions/runs/38664576255/artifacts/11940412265), expires **2027-01-13 01:14:41 UTC**. Separate [bounded 24-ICPN source cohort Artifact 11940521869](https://github.com/physicslu/plasma/actions/runs/38664576255/artifacts/11940521869) also passed.
+- **24,051** is a separate historical Research aggregate, not an independently established, identical population denominator to the **23,276** exact-source-replayed order codes. Do not subtract the two and call the difference a verified unsupported or missing set. Microchip-wide manufacturer commercial identity census is unknown.
+
+Run the same original-byte replay locally with all 13 disjoint source roots, never with a copied summary alone:
+
+~~~bash
+python data/device-catalog/research/microchip_openocd_reverse_coverage_v1.py \
+  --dfp-evidence-root /path/to/official-dfp-original \
+  --original-batch-source original-16-batches=/path/to/original-16-batches \
+  --original-batch-source shard-0=/path/to/shard-0 \
+  ...   --original-batch-source shard-11=/path/to/shard-11 \
+  --output /path/to/research/microchip-reverse-all-icpns.json
+~~~
+
+The operator must supply **every shard from 0 through 11**, even where a shard is partially quarantined; the script will reject an incomplete set. The `...` line above is a documentation abbreviation for the other numbered shard flags, not shell-executable syntax. The actual GitHub Actions workflow demonstrates the complete executable command.
+
 ## Next stage, separately reviewed
 
 Provide an original-source-replayed full Research MCP rollup, including actual `basePartNumber` per ICPN, to map the larger candidate population through this same **CFG-first index**. Record `SOURCE_NOT_AVAILABLE`, `NO_DFP_NAME_CFG_CROSSWALK` and per-CFG candidate counts separately. Only after a reviewer confirms the true rollup population and unqueried remainder should the dashboard show a coverage percentage.
