@@ -332,3 +332,93 @@ def test_live_backend_does_not_map_anything_when_outside_whitelist():
     with pytest.raises(c.SafetyError):
         backend.write32(0x40001000, 0)
     assert backend.fd is None and backend.pages == {}
+
+
+def live_session_fixture(tmp_path, monkeypatch):
+    from pl.hil.swd04 import live
+    import os
+    import platform
+    p0 = tmp_path / "p0.json"
+    p0.write_text(json.dumps({
+        "preflight": "PASS",
+        "candidate_source": c.SOURCE_SHA,
+        "sha256": {
+            "bit": c.BIT_SHA256,
+            "hwh": c.HWH_SHA256,
+            "recovery_bin": c.RECOVERY_BIN_SHA256,
+        },
+    }))
+    bin_file = tmp_path / "approved.bin"
+    bin_file.write_bytes(b"synthetic firmware; never flash")
+    session = tmp_path / "session.json"
+    fields = dict.fromkeys((
+        "confirmed_after_gate2_merge",
+        "live_fpga_manager_load_supervised",
+        "candidate_bitstream_loaded_and_verified",
+        "original_services_quiesced_for_pl_access",
+        "all_prior_pl_consumers_isolated",
+        "uios_unbound_or_ownership_reconciled",
+        "uart_console_verified",
+        "independent_power_recovery_verified",
+        "no_external_dut_connected",
+        "operator_present_at_console",
+        "original_metadata_backup_verified",
+    ), True)
+    fields.update({
+        "stage": "HIL01",
+        "candidate_source": c.SOURCE_SHA,
+        "candidate_bit_sha256": c.BIT_SHA256,
+        "candidate_hwh_sha256": c.HWH_SHA256,
+        "recovery_bin_sha256": c.RECOVERY_BIN_SHA256,
+        "p0_sha256": c.sha256_file(p0),
+        "candidate_bin_sha256": c.sha256_file(bin_file),
+        "supervised_load_log_sha256": "f" * 64,
+    })
+    session.write_text(json.dumps(fields))
+    monkeypatch.setattr(live.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(live.platform, "machine", lambda: "armv7l")
+    prior_text = Path.read_text
+    def read_text(path, *args, **kwargs):
+        if str(path) == "/sys/class/fpga_manager/fpga0/state":
+            return "operating\n"
+        return prior_text(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "read_text", read_text)
+    monkeypatch.setattr(
+        Path, "is_char_device", lambda self: str(self) == "/dev/mem"
+    )
+    return p0, session, bin_file, fields
+
+
+def test_live_preopen_gate_accepts_only_complete_synthetic_session(tmp_path, monkeypatch):
+    from pl.hil.swd04 import live
+    p0, session, bin_file, _ = live_session_fixture(tmp_path, monkeypatch)
+    live.require_live_session(
+        phase="HIL01", p0=p0, session=session,
+        candidate_bin=bin_file, previous=None,
+    )
+    assert not (tmp_path / "devmem-activity").exists()
+
+
+@pytest.mark.parametrize("tamper", [
+    "gate2", "ownership", "candidate", "preflight", "log",
+    "wrong_stage", "unexpected_previous"
+])
+def test_live_preopen_gate_denies_corrupt_session(tmp_path, monkeypatch, tamper):
+    from pl.hil.swd04 import live
+    p0, session, bin_file, fields = live_session_fixture(tmp_path, monkeypatch)
+    previous = None
+    if tamper == "gate2": fields["confirmed_after_gate2_merge"] = False
+    elif tamper == "ownership": fields["all_prior_pl_consumers_isolated"] = False
+    elif tamper == "candidate": fields["candidate_bin_sha256"] = "0" * 64
+    elif tamper == "preflight": fields["p0_sha256"] = "0" * 64
+    elif tamper == "log": fields["supervised_load_log_sha256"] = ""
+    elif tamper == "wrong_stage": fields["stage"] = "HIL02"
+    elif tamper == "unexpected_previous":
+        previous = tmp_path / "unexpected.json"
+        previous.write_text("{}")
+    session.write_text(json.dumps(fields))
+    with pytest.raises(c.SafetyError):
+        live.require_live_session(
+            phase="HIL01", p0=p0, session=session,
+            candidate_bin=bin_file, previous=previous,
+        )
