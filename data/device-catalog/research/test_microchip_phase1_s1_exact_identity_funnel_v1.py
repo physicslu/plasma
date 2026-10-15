@@ -73,7 +73,14 @@ def ledger(rows,selected):
                            ("manufacturer","icpn","base_device") else
                            (row["icpn"] if field=="icpn" else
                             (row["base_device"] if field=="base_device" else
-                             "Microchip"))}
+                             "Microchip")),
+                       "source_locator":("original manufacturer MCP exact material"
+                                         if field in ("manufacturer","icpn",
+                                                      "base_device") else None),
+                       "evidence_scope":("exact_mcp_response_row" if field in
+                           ("manufacturer","icpn","base_device") else None),
+                       "original_response_sha256_refs":([SHA] if field in
+                           ("manufacturer","icpn","base_device") else None)}
                 for field in FIELDS},
         } for row in rows if row["icpn"] in selected],
     }
@@ -153,6 +160,27 @@ class Phase1S1IdentityTest(unittest.TestCase):
         self.assertEqual(result["phase1_s1_complete"],0)
         self.assertEqual(result["phase1_information_coverage_all_source_observed_icpns"]
                          ["flash"]["PARTIAL"],1)
+
+    def test_unsupported_verified_spec_evidence_rejected(self):
+        self.p0["records"][0]["fields"]["flash"]={
+            "status":"VERIFIED","value":64,
+            "source_locator":None,
+            "evidence_scope":"guessed",
+            "original_response_sha256_refs":None}
+        with self.assertRaisesRegex(ValueError,"evidence"):
+            self.build()
+
+    def test_sourced_not_applicable_does_not_imply_full_completion(self):
+        self.p0["records"][0]["fields"]["vdda"]={
+            "status":"NOT_APPLICABLE","value":None,
+            "source_locator":"official original datasheet p.10 supply table",
+            "evidence_scope":"official_exact_icpn_applicability",
+            "original_response_sha256_refs":[SHA]}
+        report=self.build()
+        self.assertEqual(report["phase1_s1_complete"],0)
+        self.assertEqual(
+            report["phase1_information_coverage_all_source_observed_icpns"]
+                  ["vdda"]["NOT_APPLICABLE"],1)
 
     def test_wrong_p0_ledger_fails(self):
         self.p0["records"][0]["base_device"]="WRONG"
