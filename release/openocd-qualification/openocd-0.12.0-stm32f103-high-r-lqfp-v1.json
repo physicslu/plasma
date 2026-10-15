@@ -51,7 +51,8 @@
       "review_contract_path": "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v1.json",
       "programming_profile_id": "stm32f1-high-density-flash-v0",
       "programming_profile_path": "data/ic-support/profiles/programming/stm32f1-high-density-flash-v0.json",
-      "direct_applicability_id": "st-stm32f103-high-density-r-lqfp-t6-t7-applicability-v1"
+      "direct_applicability_id": "st-stm32f103-high-density-r-lqfp-t6-t7-applicability-v1",
+      "openocd_comparison_path": "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json"
     },
     "operation_qualification": {
       "probe": {
@@ -62,6 +63,9 @@
         ],
         "manufacturer_basis": [
           "stm32f103-high-density-family-applicability"
+        ],
+        "differential_basis": [
+          "high_density_device_id"
         ]
       },
       "erase": {
@@ -74,6 +78,10 @@
         "manufacturer_basis": [
           "stm32f103-high-density-page-geometry",
           "stm32f103-high-density-erase-capabilities"
+        ],
+        "differential_basis": [
+          "high_density_page_size",
+          "page_erase_core"
         ]
       },
       "program": {
@@ -87,6 +95,10 @@
         "manufacturer_basis": [
           "stm32f103-high-density-program-granularity",
           "stm32f103-high-density-standard-program-sequence"
+        ],
+        "differential_basis": [
+          "program_alignment",
+          "program_core"
         ]
       },
       "read": {
@@ -107,6 +119,9 @@
         ],
         "manufacturer_basis": [
           "stm32f103-high-density-standard-program-sequence"
+        ],
+        "differential_basis": [
+          "verify_layering"
         ]
       }
     },
@@ -131,7 +146,8 @@
     "data/ic-support/profiles/memory-geometry/stm32f103rc-256k-v0.json": "d74b95c9d4c338f834f78276dc7ffc8d24b38b3e",
     "data/ic-support/profiles/memory-geometry/stm32f103rd-384k-v0.json": "f3037bd6fb14d4bb3703fb294c9a41a1569ae27f",
     "data/ic-support/profiles/memory-geometry/stm32f103re-512k-v0.json": "b6f4504f42879f6b8d018750357a63840760d53f",
-    "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v1.json": "8401b676f7dbc8f23bac8ba54452b55f5ea1f2af"
+    "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v1.json": "8401b676f7dbc8f23bac8ba54452b55f5ea1f2af",
+    "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json": "e0f5d394064b2d12a69881dfe8644fcfe870284c"
   },
   "records": [
     {
