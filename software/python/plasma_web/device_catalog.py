@@ -136,9 +136,6 @@ class DeviceCatalogRecord:
             "icpn": self.icpn,
             "phase1": {
                 "identity_state": self.phase1_identity_state,
-                "information_state": "INFORMATION_COMPLETE"
-                if self.production_admitted and self.verification_status and self.verification_status.startswith("verified_")
-                else "INFORMATION_INCOMPLETE",
             },
             "package": self.package,
             "pin_count": self.pin_count,
