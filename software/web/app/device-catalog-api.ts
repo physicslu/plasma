@@ -306,6 +306,8 @@ export type MicrochipPhase1ICInformation = {
   icpn: string;
   phase1_identity_state: "IDENTIFIED";
   phase1_information_complete: false;
+  phase2_programming_state: "UNKNOWN";
+  phase3_compatibility_state: "NOT_TESTED";
   ram_size: string;
   core_model: string;
   working_vdd_v: null;
@@ -321,6 +323,9 @@ export type MicrochipPhase1ICInformation = {
     official_pdf_grammar_not_exact_material_list: true;
   };
   software_supported: false;
+  phase2_provider: null;
+  phase2_supported_operations: [];
+  phase3_verified_configurations: [];
   programming_profile_authority: false;
   hardware_runtime_ready: false;
 };
