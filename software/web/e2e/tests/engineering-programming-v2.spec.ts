@@ -245,6 +245,7 @@ async function installApi(
           identifier: "STM32F103C8T6",
           identifier_kind: "manufacturer_part_number",
           icpn: "STM32F103C8T6",
+          phase1: { identity_state: "IDENTIFIED" },
           package: null,
           cpu_architectures: ["ARM Cortex-M3"],
           backend: {
