@@ -184,6 +184,8 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         result = phase1.build(self.data, upstream_bytes_sha256=H, chart_report=chart)
         proof = result["p0_family_chart_evidence"]
         self.assertEqual(proof["p0_icpns_exact_manufacturer_base_joined_to_chart"], 1)
+        self.assertEqual(proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"], 0)
+        self.assertEqual(proof["p0_icpns_chart_linked_with_approved_identity"], 1)
         self.assertEqual(proof["p0_icpns_not_in_observed_chart"], 2436)
         self.assertEqual(len(proof["chart_unmatched_exact_icpns"]), 2436)
         self.assertEqual(sum(proof["chart_unmatched_by_research_cfg"].values()), 2436)
@@ -206,6 +208,68 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         broken["p0_family_records"][1]["base_device_chart_observation"] = "BASE000023"
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             phase1.build(self.data, upstream_bytes_sha256=H, chart_report=broken)
+
+    def test_reviewed_mcp_base_dfp_chart_alias_is_family_partial_only(self):
+        # 23 synthetic ICPNs are original-source-tagged as the *one* approved
+        # SAMD21 manufacturer Base/DFP alias. This test is not manufacturer
+        # original-byte replay; real CI uses the official chart and MCP data.
+        fields = {}
+        for n, name in enumerate(("package", "pin_count", "flash", "ram",
+                                  "vdd", "temperature", "core_model")):
+            fields[name] = {
+                "status": "PARTIAL", "value": 64,
+                "original_raw_value": "64", "original_header": name,
+                "original_unit": "KB" if name in ("flash","ram") else None,
+                "source_tr_ordinal": 10,
+                "source_column_number_1based": n+1,
+                "source_original_sha256": H,
+                "evidence_scope": "official_base_device_chart_not_exact_icpn",
+            }
+        empty_fields = {name:{**value,"status":"UNKNOWN","value":None}
+                        for name,value in fields.items()}
+        chart = {
+            "schema_version":1, "policy":"ADR-0002 Phase 1 - IC Information",
+            "manufacturer":"Microchip",
+            "chart_scope":"microchipdirect_chart_branchID_21_mid_3_only",
+            "chart_records":{"P0_source_leads":341},
+            "exact_icpn_fields_verified_from_chart":0,
+            "production_write_authorized":False,
+            "catalog_publication_authorized":False,
+            "source_original_sha256":H,
+            "source_url":"https://www.microchipdirect.com/chart.aspx?branchID=21&mid=3",
+            "p0_family_records":[
+                {"base_device_chart_observation":("ATSAMD21G18A" if n==0
+                      else f"CHARTUNRELATED{n:04d}"),
+                 "priority":"P0", "exact_icpn_verified_from_chart":False,
+                 "fields_family_scope_only":fields if n==0 else empty_fields}
+                for n in range(341)],
+        }
+        outcome=phase1.build(self.data, upstream_bytes_sha256=H, chart_report=chart)
+        proof=outcome["p0_family_chart_evidence"]
+        self.assertEqual(proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"],23)
+        self.assertEqual(proof["p0_icpns_exact_manufacturer_base_joined_to_chart"],0)
+        self.assertEqual(proof["p0_icpns_not_in_observed_chart"],2414)
+        self.assertEqual(proof["partial_field_observation_counts"]["flash"],23)
+        alias_rows=[r for r in outcome["records"] if
+            r["cfg_candidate_state"] ==
+                "REVIEWED_MANUFACTURER_ALIAS_CFG_CANDIDATE"]
+        self.assertEqual(len(alias_rows),23)
+        for item in alias_rows:
+            self.assertEqual(item["base_device"],"ATSAMD21G18")
+            self.assertEqual(item["dfp_name"],"ATSAMD21G18A")
+            self.assertEqual(item["fields"]["package"]["status"],"PARTIAL")
+            self.assertIn("reviewed_mcp_dfp_alias",
+                          item["fields"]["package"]["evidence_scope"])
+            self.assertFalse(item["software_supported_claimed"])
+        self.assertEqual(outcome["record_level_phase1_information_complete"],0)
+        fake=copy.deepcopy(self.data)
+        fake["icpn_rows"][0]["base_device"]="ATSAMD21G17"
+        with self.assertRaisesRegex(ValueError,"source-approved"):
+            phase1.build(fake,upstream_bytes_sha256=H,chart_report=chart)
+        fake=copy.deepcopy(self.data)
+        fake["icpn_rows"][0]["dfp_device_name"]="ATSAMD21G17A"
+        with self.assertRaisesRegex(ValueError,"source-approved"):
+            phase1.build(fake,upstream_bytes_sha256=H,chart_report=chart)
 
     def test_no_family_fields_promoted_or_fabricated(self):
         with self.assertRaisesRegex(ValueError, "invented"):
