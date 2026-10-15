@@ -1,0 +1,42 @@
+name: NXP ADR-0002 Phase 1 MCXN 31 exact operating rails v26
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-31-mcxn-operating-rails-official-source-v26.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxn-operating-rails-lock-v26.json"
+      - "data/device-catalog/research/nxp-501-phase1-mcxn-operating-rails-v26.csv"
+      - "data/device-catalog/research/nxp-phase1-mcxn-operating-rails-coverage-v26.json"
+      - "data/device-catalog/research/nxp_phase1_mcxn_rails_v26.py"
+      - "data/device-catalog/research/test_nxp_phase1_mcxn_rails_v26.py"
+      - "data/device-catalog/research/NXP_PHASE1_MCXN_OPERATING_RAILS_V26.md"
+      - "data/device-catalog/research/nxp-54-exact-ordering-rows-v21.csv"
+      - "data/device-catalog/research/nxp-501-phase1-k32l2b-vdd-partial-v25.csv"
+      - ".github/workflows/device-catalog-nxp-phase1-mcxn-v26.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp-phase1-mcxn-operating-rails-lock-v26.json"
+      - "data/device-catalog/research/nxp-501-phase1-mcxn-operating-rails-v26.csv"
+      - "data/device-catalog/research/nxp_phase1_mcxn_rails_v26.py"
+      - "data/device-catalog/research/test_nxp_phase1_mcxn_rails_v26.py"
+      - ".github/workflows/device-catalog-nxp-phase1-mcxn-v26.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-mcxn-v26:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay exact 31 MCXN Table 1 to Table 9 501-row Phase1 source ledger
+        run: python data/device-catalog/research/nxp_phase1_mcxn_rails_v26.py
+      - name: Reject unauthorized identity, source, rail, programming and physical claims
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_mcxn_rails_v26.py" -v
+      - name: Regression test K32L2B v25 working-VDD-only evidence boundary
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_k32l2b_vdd_v25.py" -v
