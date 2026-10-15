@@ -288,6 +288,7 @@ class OpenOCDSoftwareQualificationRegistry:
         self.source_lock_id = source_lock["source_lock_id"]
         self.qualification_id = qualification["qualification_id"]
         self.provider = deepcopy(q_provider)
+        self.programming_group = deepcopy(group)
         self.operation_qualification = deepcopy(opq)
         self.acceptance_boundary = deepcopy(boundary)
         self.default_unreviewed_state = qualification.get("default_unreviewed_software_state")
@@ -300,6 +301,76 @@ class OpenOCDSoftwareQualificationRegistry:
     def state_for(self, manufacturer: str, exact_icpn: str) -> str:
         record = self._records.get((manufacturer, exact_icpn))
         return record["software_state"] if record is not None else self.default_unreviewed_state
+
+    def describe(self, manufacturer: str, exact_icpn: str) -> dict[str, Any]:
+        """Return the read-only Phase 2 software-qualification projection.
+
+        UNKNOWN is explicit when the exact ICPN has not completed review. A
+        Catalog mapping or family relationship never fills provider, operation,
+        electrical, or geometry qualification fields for an unreviewed ICPN.
+        """
+
+        record = self._records.get((manufacturer, exact_icpn))
+        state = record["software_state"] if record is not None else self.default_unreviewed_state
+        payload: dict[str, Any] = {
+            "schema_version": "1.0.0",
+            "registry_id": self.qualification_id,
+            "software_state": state,
+            "reviewed": record is not None,
+            "provider": None,
+            "operations": {},
+            "programming": None,
+            "public_catalog_visibility_changed": False,
+            "job_batch_execution_changed": False,
+            "installed_runtime_attested": False,
+            "hardware_runtime_ready": False,
+            "physical_programming_qualified": False,
+        }
+        if record is None:
+            return payload
+
+        group = self.programming_group
+        shared_geometry = group["shared_flash_geometry"]
+        payload["provider"] = {
+            "provider_id": self.provider["provider_id"],
+            "version": self.provider["version"],
+            "source_commit": self.provider["source_commit"],
+            "runtime_id": self.provider["runtime_id"],
+            "target_config": self.provider["target_config"],
+            "flash_driver": self.provider["flash_driver"],
+        }
+        payload["operations"] = {
+            operation: {
+                "state": self.operation_qualification[operation]["state"],
+                "scope": self.operation_qualification[operation].get("scope"),
+            }
+            for operation in REQUIRED_OPERATIONS
+        }
+        payload["programming"] = {
+            "programming_profile_id": record["programming_profile_id"],
+            "memory_geometry_profile_id": record["memory_geometry_profile_id"],
+            "debug_transport": list(group["debug_transport"]),
+            "electrical": {
+                "vdd_programming_v": deepcopy(
+                    group["programming_electrical"]["vdd_programming_v"]
+                ),
+                "external_vpp_required": group["programming_electrical"][
+                    "external_vpp_required"
+                ],
+            },
+            "flash_geometry": {
+                "main_flash_start": shared_geometry["main_flash_start"],
+                "main_flash_size_bytes": record["main_flash_size_bytes"],
+                "page_count": record["page_count"],
+                "erase_unit": shared_geometry["erase_unit"],
+                "erase_unit_bytes": shared_geometry["erase_unit_bytes"],
+                "program_unit": shared_geometry["program_unit"],
+                "program_unit_bytes": shared_geometry["program_unit_bytes"],
+            },
+            "blocked_operations": list(group["blocked_operations"]),
+            "backend_constraints": list(group["backend_constraints"]),
+        }
+        return payload
 
     def supported_exact_icpns(self, manufacturer: str | None = None) -> tuple[str, ...]:
         values = [
