@@ -200,9 +200,17 @@ def enrich_from_replayed_chart(records, chart_report):
                "temperature", "core_model"}
     matched = 0
     filled = Counter()
+    not_in_chart = []
     for rec in records:
         found = by_base.get(rec["base_device"].upper())
         if found is None:
+            not_in_chart.append({
+                "icpn": rec["icpn"],
+                "manufacturer_base_device": rec["base_device"],
+                "openocd_target_cfg_research_only":
+                    rec["openocd_target_cfg_research_only"],
+                "gap": "NO_EXACT_BASE_NAME_IN_OBSERVED_32BIT_CHART",
+            })
             continue
         matched += 1
         source_fields = found.get("fields_family_scope_only", {})
@@ -242,6 +250,11 @@ def enrich_from_replayed_chart(records, chart_report):
         "source_chart_original_sha256": sha,
         "p0_manufacturer_chart_base_count": 341,
         "p0_icpns_exact_manufacturer_base_joined_to_chart": matched,
+        "p0_icpns_not_in_observed_chart": len(not_in_chart),
+        "chart_unmatched_by_research_cfg": dict(sorted(Counter(
+            r["openocd_target_cfg_research_only"] for r in not_in_chart).items())),
+        "chart_unmatched_exact_icpns": sorted(not_in_chart,
+                                            key=lambda row: row["icpn"].upper()),
         "partial_field_observation_counts": dict(sorted(filled.items())),
         "exact_variant_fields_promoted_by_chart": 0,
         "chart_family_scope_only": True,
