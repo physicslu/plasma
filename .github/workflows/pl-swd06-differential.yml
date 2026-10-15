@@ -6,6 +6,8 @@ on:
       - "pl/verification/cocotb/swd06_driver_cocotb.py"
       - "pl/verification/test_swd06_rtl_python.py"
       - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
       - "pl/rtl/site/swd_transaction_master.sv"
       - "pl/rtl/site/swd_waveform_engine.sv"
       - "pl/rtl/site/swd03_dpidr_responder.sv"
@@ -19,6 +21,8 @@ on:
       - "pl/verification/cocotb/swd06_driver_cocotb.py"
       - "pl/verification/test_swd06_rtl_python.py"
       - "software/python/plasma_interfaces/swd_transaction.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
       - "pl/rtl/site/swd_transaction_master.sv"
       - "pl/rtl/site/swd_waveform_engine.sv"
       - "pl/rtl/site/swd03_dpidr_responder.sv"
@@ -39,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
       - name: Install Icarus and Python co-simulation dependencies
         run: |
           sudo apt-get update -qq
@@ -54,7 +58,7 @@ jobs:
       - name: SWD-06 real RTL differential
         run: python3 -m pytest -vv -s pl/verification/test_swd06_rtl_python.py
       - name: Retained SWD-05 software driver mock regressions
-        run: python3 -m pytest -q software/python/tests/test_swd_transaction_driver.py
+        run: python3 -m pytest -q software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py
       - name: Retained SWD-03 AXI RTL regression
         run: python3 -m pytest -q pl/verification/test_swd03_axi_rtl.py
       - name: Preserve simulator failures for diagnosis
