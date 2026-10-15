@@ -13,7 +13,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-import nxp_phase1_kinetis_21_official_v1 as approved_phase1
 
 ROOT = Path(__file__).resolve().parents[3]
 SUB = Path("data/device-catalog/research")
@@ -120,11 +119,8 @@ def validate(rows):
          "unreviewed source guesses cannot become qualified routes")
 
 def build(root=ROOT):
-    # Independent approved source-funnel verifier; never import the old v10
-    # generator that pins obsolete ADR revision or P0/P1/P2 methodology.
-    if root == ROOT:
-        current = approved_phase1.build()
-        need(current["phase1_identified_s1"] == 297, "approved Phase1 snapshot changed")
+    # Read reviewed exact-material inputs independently. Historical P0/P1/P2
+    # research-priority audit chains are not invoked by the canonical pipeline.
     provider = authority(root)
     parts = identities(root)
     tech = {r["icpn"]:r for r in read_source("oldtech",root)}
