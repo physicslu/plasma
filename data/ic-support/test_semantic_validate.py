@@ -27,8 +27,12 @@ def expect_failure(module, rule_id: str, fn, *args) -> None:
     raise AssertionError(f"expected {rule_id} failure")
 
 
-def profile_by_kind(profiles, kind: str):
+def profile_by_kind(profiles, kind: str, profile_id: str | None = None):
     matches = [profile for profile in profiles.values() if profile.get("kind") == kind]
+    if profile_id is not None:
+        exact = [profile for profile in matches if profile.get("profile_id") == profile_id]
+        assert len(exact) == 1, (kind, profile_id, len(exact))
+        return exact[0]
     if kind == "memory_geometry":
         return matches[0]
     assert len(matches) == 1, (kind, len(matches))
@@ -44,9 +48,15 @@ def test_current_profiles_pass(module) -> None:
 
 def test_v001_rejects_qwen_bad_mask(module) -> None:
     profiles = module.load_profiles()
-    programming = copy.deepcopy(profile_by_kind(profiles, "programming"))
-    programming["data"]["operation_mode_mask"] = "0x3B"
-    expect_failure(module, "V001", module.validate_numeric_masks, programming)
+    for profile_id in (
+        "stm32f1-medium-density-flash-v0",
+        "stm32f1-high-density-flash-v0",
+    ):
+        programming = copy.deepcopy(
+            profile_by_kind(profiles, "programming", profile_id=profile_id)
+        )
+        programming["data"]["operation_mode_mask"] = "0x3B"
+        expect_failure(module, "V001", module.validate_numeric_masks, programming)
 
 
 def test_v007_rejects_representation_mix(module) -> None:
