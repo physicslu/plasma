@@ -36,6 +36,8 @@ REMAINING_BY_CFG={
     "tcl/target/atsaml1x.cfg":4,
 }
 FIRST_CODES_SHA="7a75e18a5f23cc2b80e10e1675918ce7da0601fe0d8d35664ebb78c4fb8d3b64"
+EXPECTED_REMAINING_IDS_SHA="fa29b7a2b739caad4aa8cd0bc6e8d6ee74a90aa50ea230b5e3c7a10b2eb81db6"
+EXPECTED_QUEUE_JSONL_SHA="965b7faaba2942cdadf982768236c7a666bce46733b2afc3a16ea3e03de824e8"
 PHASE_FIELDS=frozen.ST_FIELDS
 EVIDENCE_STATES=("VERIFIED","PARTIAL","UNKNOWN","CONFLICT","NOT_APPLICABLE")
 PDF_SHA=official_pdf.PDF_SHA
@@ -240,6 +242,9 @@ def main():
     content=("".join(json.dumps(r,sort_keys=True,ensure_ascii=False)+"\n"
                      for r in rows)).encode("utf-8")
     summary["remaining_source_queue_sha256"]=hashlib.sha256(content).hexdigest()
+    require(summary["remaining_icpn_names_sha256"]==EXPECTED_REMAINING_IDS_SHA
+            and summary["remaining_source_queue_sha256"]==EXPECTED_QUEUE_JSONL_SHA,
+            "2441 original-source material membership/payload SHA freeze drift")
     doc=(json.dumps(summary,indent=2,sort_keys=True,ensure_ascii=False)+"\n").encode("utf-8")
     if args.verify:
         require(args.output_jsonl.read_bytes()==content
