@@ -129,7 +129,7 @@ class MicrochipP0Phase1Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             phase1.build(source, upstream_bytes_sha256=H)
         source = copy.deepcopy(self.data)
-        source["icpn_rows"][0]["openocd_target_cfg"] = "tcl/target/pic32mx.cfg"
+        source["icpn_rows"][23]["openocd_target_cfg"] = "tcl/target/pic32mx.cfg"
         with self.assertRaisesRegex(ValueError, "distribution"):
             phase1.build(source, upstream_bytes_sha256=H)
 
