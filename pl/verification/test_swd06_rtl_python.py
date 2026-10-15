@@ -28,7 +28,7 @@ def _run(testcase: str, *, synth_fixture: bool) -> None:
         verilog_sources=sources,
         toplevel=("swd03_axi_fixture_tb" if synth_fixture
                   else "swd_transaction_axi_lite"),
-        module="test_swd06_rtl_python",
+        module="swd06_driver_cocotb",
         testcase=testcase,
         compile_args=["-g2012"],
         timescale="1ns/1ps",
