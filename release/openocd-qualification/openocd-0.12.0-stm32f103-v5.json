@@ -25,7 +25,7 @@
     {
       "qualification_id": "adr0002-phase2-openocd-012-stm32f103-high-r-lqfp-v1",
       "qualification_path": "release/openocd-qualification/openocd-0.12.0-stm32f103-high-r-lqfp-v1.json",
-      "git_blob_sha1": "1907820780cd3194080ba3f0c678e1f10ba745ff",
+      "git_blob_sha1": "8df2b9eb022b39502108f534440b0c127f9c0667",
       "role": "high_density_r_lqfp_extension",
       "supported_exact_icpn_count": 9
     }
