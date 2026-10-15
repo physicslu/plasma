@@ -159,6 +159,7 @@ class SWDTransactionDriver:
         self._poisoned = False
         self._launched = False
         self._write_issued = False
+        self._was_write = False
         # Never write or initialize a hardware register during construction.
         if self._read(self.ABI) != 1:
             raise SWDDriverError("SWD-03 AXI ABI mismatch; expected version 1")
@@ -367,5 +368,8 @@ class SWDTransactionDriver:
         status, _ = self._state()
         if not status & self.BUSY_BIT or status & self.RESP_VALID_BIT:
             raise SWDDriverError("ABORT only allowed for a known active command")
+        # Existing in-flight target effects cannot be excluded.
+        self._was_write = True
+        self._write_issued = True
         self._write(self.COMMAND, self.ABORT)
         return self._finish()
