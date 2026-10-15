@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 """Microchip exact MCP x DFP identity archive (legacy PR #909 filename).
 
-Per ADR-0002 a DFP support-name match alone is P2 archive-only, not a
-credible P1 OpenOCD Target/Driver family lead. This source-replayed subset
-is never OpenOCD software-supported or Product Catalog-admitted.
+Under ADR-0002 a manufacturer DFP support-name match alone is P2
+archive-only, not a credible P1 OpenOCD Target/Driver family lead.
+The 2,065 DFP-only identities remain Research with provenance.
 P0=2,437 and bounded Target-only P1=126 remain frozen.
-"""Source-only Microchip P1 candidate expansion from exact MCP x original DFP.
-
-The baseline P1 126 target-CFG cohort is FROZEN. This program introduces a
-separate P1_DFP_DISCOVERY *review queue*, sourced from manufacturer exact
-commercial basePartNumber and exact original DFP Support Device names in
-32bit PIC/SAM MCU packs, explicitly without an indexed OpenOCD Target CFG.
-
-A P1 discovery queue is not a CFG candidate, Flash support, Phase 2/3
-qualification, Production identity, or a whole-vendor coverage claim.
+No software support, Catalog admission, Production or hardware claims.
 """
 from __future__ import annotations
 
