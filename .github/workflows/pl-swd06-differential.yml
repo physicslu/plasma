@@ -3,7 +3,7 @@ name: PL SWD-06 RTL-Python differential co-simulation
 on:
   pull_request:
     paths:
-      - "pl/verification/cocotb/test_swd06_rtl_python.py"
+      - "pl/verification/cocotb/swd06_driver_cocotb.py"
       - "pl/verification/test_swd06_rtl_python.py"
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "pl/rtl/site/swd_transaction_master.sv"
@@ -16,7 +16,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "pl/verification/cocotb/test_swd06_rtl_python.py"
+      - "pl/verification/cocotb/swd06_driver_cocotb.py"
       - "pl/verification/test_swd06_rtl_python.py"
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "pl/rtl/site/swd_transaction_master.sv"
@@ -49,7 +49,7 @@ jobs:
       - name: Syntax of differential bridge and runner
         run: |
           python3 -m py_compile \
-            pl/verification/cocotb/test_swd06_rtl_python.py \
+            pl/verification/cocotb/swd06_driver_cocotb.py \
             pl/verification/test_swd06_rtl_python.py
       - name: SWD-06 real RTL differential
         run: python3 -m pytest -vv -s pl/verification/test_swd06_rtl_python.py
