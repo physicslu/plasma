@@ -30,6 +30,7 @@ REQUIRED = (
     "manufacturer", "icpn", "base_device", "package", "pin_count",
     "flash", "ram", "vdd", "io_supply", "vdda", "temperature")
 VALID_STATES = frozenset(("IDENTIFIED", "RESEARCH_ONLY", "IDENTITY_DISPUTED"))
+FIELD_STATES = tuple(STATUSES) + ("NOT_APPLICABLE",)
 BLOB_CAP = 64*1024*1024
 
 
@@ -74,14 +75,31 @@ def prepare_ledger(name, info, upstream_sha, expected):
         require(set(fields)==set(FIELDS),
                 "missing field coverage in "+name)
         for key,field in fields.items():
-            require(field.get("status") in STATUSES,
+            require(field.get("status") in FIELD_STATES,
                     "illegal exact-field evidence state")
-            if field["status"]=="PARTIAL":
-                require(field.get("value") is not None
-                        and field.get("evidence_scope")
-                        and field.get("original_response_sha256_refs"),
-                        "family partial field missing original source")
-            if field["status"]=="UNKNOWN":
+            status=field["status"]
+            if status in ("VERIFIED", "PARTIAL", "NOT_APPLICABLE"):
+                hashes=field.get("original_response_sha256_refs")
+                require(isinstance(field.get("source_locator"),str)
+                        and bool(field["source_locator"])
+                        and isinstance(field.get("evidence_scope"),str)
+                        and bool(field["evidence_scope"])
+                        and isinstance(hashes,list) and bool(hashes)
+                        and all(p0.valid_sha(h) for h in hashes),
+                        "sourced Phase 1 field missing original official evidence")
+                if status=="NOT_APPLICABLE":
+                    require(key not in ("manufacturer","icpn","base_device")
+                            and field.get("value") is None
+                            and "official" in field["evidence_scope"].lower(),
+                            "NOT_APPLICABLE requires explicit official applicability")
+                else:
+                    require(field.get("value") is not None,
+                            "VERIFIED/PARTIAL field has no source-derived value")
+                if status=="VERIFIED" and key in (
+                        "manufacturer","icpn","base_device"):
+                    require(field["evidence_scope"]=="exact_mcp_response_row",
+                            "exact identity fields require original MCP material proof")
+            if status=="UNKNOWN":
                 require(field.get("value") is None,
                         "unknown Phase 1 field filled without authority")
         result[icpn]=record
@@ -196,7 +214,8 @@ def create(source, p0_info, p1_info, original_upstream_sha):
             reasons[reason]+=1
         if state=="IDENTIFIED":
             included_by_base[row["base_device"].upper()]+=1
-            if all(fields[key]=="VERIFIED" for key in REQUIRED):
+            if all(fields[key] in ("VERIFIED","NOT_APPLICABLE")
+                   for key in REQUIRED):
                 complete+=1
         for key,val in fields.items():
             fields_count[key][val]+=1
@@ -213,7 +232,8 @@ def create(source, p0_info, p1_info, original_upstream_sha):
             "phase1_identity_status":state,
             "phase1_information_status":(
                 "INFORMATION_COMPLETE" if state=="IDENTIFIED" and
-                all(fields[key]=="VERIFIED" for key in REQUIRED)
+                all(fields[key] in ("VERIFIED","NOT_APPLICABLE")
+                    for key in REQUIRED)
                 else "INFORMATION_INCOMPLETE"),
             "phase1_identity_defects":defects,
             "material_official_source_uri":OFFICIAL_URI,
@@ -260,7 +280,7 @@ def create(source, p0_info, p1_info, original_upstream_sha):
         "legacy_research_priority_counts_separate_from_phases":
             dict(sorted(priority.items())),
         "phase1_information_coverage_all_source_observed_icpns":{
-            field:{status:fields_count[field][status] for status in STATUSES}
+            field:{status:fields_count[field][status] for status in FIELD_STATES}
             for field in FIELDS},
         "phase1_required_information_fields":list(REQUIRED),
         "source_original_mcp_evidence_is_product_catalog_admission":False,
