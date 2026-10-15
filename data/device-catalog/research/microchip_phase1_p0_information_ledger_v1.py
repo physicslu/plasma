@@ -277,6 +277,26 @@ def enrich_from_replayed_chart(records, chart_report):
                 "PARTIAL", value, locator=locator, hashes=evidence_hashes,
                 scope=scope, unit=unit, note=note)
             filled[field] += 1
+    groups = defaultdict(list)
+    for missing in not_in_chart:
+        groups[(missing["openocd_target_cfg_research_only"],
+                missing["manufacturer_base_device"])].append(missing["icpn"])
+    acquisition_queue = [{
+        "openocd_target_cfg_research_only": cfg,
+        "manufacturer_base_device": base,
+        "exact_icpn_count": len(parts),
+        "exact_icpns": sorted(parts),
+        "chart_status": "NO_APPROVED_BASE_OR_ALIAS_IN_OBSERVED_32BIT_CHART",
+        "official_exact_ordering_table_state": "NOT_REPLAYED",
+        "official_family_datasheet_state": "NOT_BOUND_TO_THIS_BASE",
+        "recommended_evidence_path": (
+            "Manufacturer ordering/SKU table for exact Package, Pin Count, "
+            "Temperature; official revisioned datasheet for family electrical "
+            "and memory evidence, with explicitly documented Base applicability."),
+        "field_inference_authorized": False,
+    } for (cfg, base), parts in sorted(groups.items())]
+    require(sum(x["exact_icpn_count"] for x in acquisition_queue) ==
+            len(not_in_chart), "gap acquisition queue loses exact ICPNs")
     return {
         "source_chart_scope": chart_report["chart_scope"],
         "source_chart_original_sha256": sha,
@@ -286,6 +306,8 @@ def enrich_from_replayed_chart(records, chart_report):
         "p0_icpns_chart_linked_with_approved_identity": (
             matched_exact + matched_reviewed_alias),
         "p0_icpns_not_in_observed_chart": len(not_in_chart),
+        "p0_unmatched_distinct_manufacturer_base_count": len(acquisition_queue),
+        "p0_official_source_acquisition_queue": acquisition_queue,
         "chart_unmatched_by_manufacturer_base": dict(sorted(Counter(
             r["manufacturer_base_device"] for r in not_in_chart).items())),
         "chart_unmatched_by_research_cfg": dict(sorted(Counter(
