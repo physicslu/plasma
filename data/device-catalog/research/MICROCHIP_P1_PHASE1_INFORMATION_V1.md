@@ -30,6 +30,20 @@ For each of the **13 ADR-0002 IC Information fields**:
 
 The existing parametric Chart source is a **chart-specific HTML snapshot**, not a universal source census or a revisioned datasheet. `p1_deferred_base_names` in the existing P0 chart parser are intentionally deferred: the P1 script independently binds their original HTML table row ordinal, column name and value before any `PARTIAL` field is created. No incorrect family-to-exact promotion is permitted.
 
+## Actual original-source replay result — 2026-10-15
+
+The real GitHub-hosted, offline original-byte replay of **all 13 Microchip MCP archives**, the official DFP original index, and the 32-bit MicrochipDirect Chart original HTML produced the following results in [CI run 38672984714](https://github.com/physicslu/plasma/actions/runs/38672984714):
+
+- **126** original-MCP exact commercial `partNumber` records with individually source-replayed `basePartNumber` and `atsaml1x.cfg` Target-only CFG Research link.
+- **12 distinct original manufacturer Base Devices**, which match **12 original DFP P1 names** and **12 original MicrochipDirect Chart P1 Base Device rows**.
+- **126/126 Base Device ↔ chart row links; 0 chart-absent exact ICPNs**. The seven source-observed chart fields **Package, Pin Count, Flash, RAM, Working VDD, Temperature, Core Model are all PARTIAL for 126 exact ICPNs**; none are exact-order-code VERIFIED from the parametric chart.
+- **Manufacturer, ICPN and Base Device: VERIFIED for 126** each. **I/O Supply, VDDA and Core Architecture: UNKNOWN for 126** each.
+- **Record-level Phase 1 fully verified: 0; software SUPPORTED: 0; Production/Selector admission: 0.**
+
+**Official document for the next evidence acquisition:** Microchip [SAM L10/L11 Family Data Sheet, DS60001513G](https://ww1.microchip.com/downloads/en/DeviceDoc/SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf), **Section 2 Ordering Information (datasheet page 16)**. The section explains the manufacturer's ordering-code conventions (family/series, pin group, Flash density, package/temperature grade and carrier). These conventions are a *research lookup aid*, **not authority to invent an exact ICPN or promote any field without the original PDF bytes, complete existing manufacturer order code and documented applicability**.
+
+**PDF status:** reference located, **original PDF bytes have NOT been archived and independently replayed into the PLASMA Research evidence vault in this PR**. Accordingly this PR contains **no new PDF-derived VERIFIED field**, no exact ordering-table claim and no vendor Programming Profile. Preserve the existing 126 manufacturer-MCP identities and their chart PARTIAL state until a dedicated reviewed PDF evidence enrichment PR.
+
 ## P1 Phase 1 next evidence acquisition
 
 1. Acquire the Microchip **official SAM L10/L11 Family Data Sheet, DS60001513G** (https://ww1.microchip.com/downloads/en/DeviceDoc/SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf) and any other officially required revision strictly matched to the 126 P1 Base Devices; use its **Ordering Information** section, in source-original bytes; record document identity, published revision, retrieval URL, original SHA-256, source date, table/page, field/units and exact ICPN applicability.
