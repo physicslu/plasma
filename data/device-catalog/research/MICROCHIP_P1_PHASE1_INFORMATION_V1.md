@@ -13,6 +13,8 @@ The original-source-replayed manufacturer MCP/DFP Research crosswalk covers 23,2
 | Not matched by these bounded CFG leads | 20,713 | Not automatically unsupported or nonexistent |
 | **Total original-source-replayed subset** | **23,276** | Not the same full denominator as historical 24,051 research aggregate |
 
+The P1 regex is pinned to **ATSAML1 / SAML1 (SAM L10/L11)**; **SAM L21/L22 are not automatically members of this P1 source-locked CFG cohort**. Never enlarge the 126-ICPN source set merely because another Microchip SAM L family has a datasheet.
+
 The P1 `atsaml1x.cfg` is from the **OpenOCD 0.12.0 source-pinned Target-only research lead** (pinned source commit `9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c`). The original DFP source contains **12** P1 candidate support names, which is **not the same unit** as 126 commercial order codes. The 126 original MCP rows must have an exact `basePartNumber` ↔ original DFP name match. There is no evidence-authorized name trimming, generic family alias, Flash Driver, `SUPPORTED`, or physical readiness claim.
 
 ## Source-evidence acceptance
@@ -30,7 +32,7 @@ The existing parametric Chart source is a **chart-specific HTML snapshot**, not 
 
 ## P1 Phase 1 next evidence acquisition
 
-1. Acquire Microchip **official SAM L10/L11/L21/L22**, as specifically applicable to the 126 P1 Base Devices, PDF device datasheets **including exact Ordering Information tables**, in source-original bytes; record document identity, published revision, retrieval URL, original SHA-256, source date, table/page, field/units and exact ICPN applicability.
+1. Acquire the Microchip **official SAM L10/L11 Family Data Sheet, DS60001513G** (https://ww1.microchip.com/downloads/en/DeviceDoc/SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf) and any other officially required revision strictly matched to the 126 P1 Base Devices; use its **Ordering Information** section, in source-original bytes; record document identity, published revision, retrieval URL, original SHA-256, source date, table/page, field/units and exact ICPN applicability.
 2. Verify each complete ordering code and its package/temperature against the exact manufacturer-MCP `partNumber`; do not infer ordering suffix semantics or backfill unrelated variants.
 3. Verify family Flash, RAM, working VDD, I/O Supply, VDDA, Temperature, CPU model and conditional electrical limits from official datasheet tables; separate base-level `PARTIAL` from exact-order-code `VERIFIED`, and keep `UNKNOWN`/ `CONFLICT` when source evidence is lacking.
 4. Submit source-enrichment as a **separate research PR** with independent PDF original-byte replay, exact-source SHA verification, negative tests for revision/identity/units mismatch, record-level claim controls, and counts that never silently change the 126/2,437 denominators.
