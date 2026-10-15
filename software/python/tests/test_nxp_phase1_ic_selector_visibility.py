@@ -80,6 +80,9 @@ class NxpPhase1ICSelectorVisibilityTests(unittest.TestCase):
         self.assertEqual(merged.size,self.production.size+EXPECTED_NEW_IDENTIFIED)
         self.assertEqual(EXPECTED_NEW_IDENTIFIED,73)
         self.assertEqual(sum(r.catalog_origin == PHASE1_CATALOG_ORIGIN for r in merged.records),73)
+        # This is the exact NXP Phase1 baseline: 224 previously admitted
+        # official ICPNs + 73 source-reviewed Research identities = 297.
+        self.assertEqual(sum(record.vendor == "NXP" for record in merged.records), 297)
         for q in ("LPC11U68JBD48E","NXP"):
             status, response = self.request(f"/api/devices/search?q={q}&visibility=phase1&limit=5&offset=0")
             self.assertEqual(status,200)
