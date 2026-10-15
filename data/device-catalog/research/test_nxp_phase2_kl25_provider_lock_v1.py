@@ -36,6 +36,30 @@ class TestNxpKl25Phase2ProviderLock(unittest.TestCase):
             if r["icpn"]!="MKL25Z128VLK4":
                 self.assertEqual(r["software_prototype_scope_only"],[])
 
+    def test_upstream_diff_proves_driver_and_include_changed(self):
+        d=self.result["upstream_source_diff"]
+        self.assertEqual(d["source_graph_reviewed"],3)
+        self.assertEqual(d["byte_identical_files"],1)
+        self.assertEqual(d["changed_files"],2)
+        self.assertEqual(d["changed_paths"],["tcl/target/klx.cfg",
+                                             "src/flash/nor/kinetis.c"])
+        self.assertFalse(d["source_semantics_requalified"])
+        self.assertFalse(d["current_provider_software_supported"])
+
+    def test_reject_fabricated_unchanged_kinetis_driver_claim(self):
+        delta=json.loads(audit.checked_bytes("upstream_delta"))
+        for item in delta["per_file"]:
+            if item["path"]=="src/flash/nor/kinetis.c":
+                item["identical_bytes"]=True
+        with self.assertRaisesRegex(ValueError,"Git blob evidence"):
+            audit.review_upstream_delta(delta,self.result["provider_boundary"])
+
+    def test_reject_source_diff_promoted_to_qualified(self):
+        delta=json.loads(audit.checked_bytes("upstream_delta"))
+        delta["conclusions"]["current_provider_exact_operations_qualified"]=True
+        with self.assertRaisesRegex(ValueError,"same CFG"):
+            audit.review_upstream_delta(delta,self.result["provider_boundary"])
+
     def test_openocd_lock_differs_from_current_approved_provider(self):
         b=self.result["provider_boundary"]
         self.assertEqual(b["benchmark_backend_commit"],audit.LEGACY_COMMIT)
