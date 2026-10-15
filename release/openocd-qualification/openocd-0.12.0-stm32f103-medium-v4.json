@@ -1,0 +1,739 @@
+{
+  "schema_version": 1,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-medium-v4",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "status": "medium_density_t7_expansion",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "flash_driver_source_path": "src/flash/nor/stm32f1x.c"
+  },
+  "manufacturer_programming_group": {
+    "group_id": "st-stm32f103-medium-density-programming-v1",
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "medium",
+    "silicon_identity": {
+      "openocd_device_id": "0x410",
+      "openocd_class": "STM32F10x medium-density",
+      "identity_assumption": "genuine STMicroelectronics silicon corresponding to the selected exact commercial ICPN",
+      "revision_policy": "The exact order code does not encode silicon revision. OpenOCD handles ST medium-density device ID 0x410 and reports recognized A/B/Z/Y revisions; clone-specific revision handling is not exact-ST identity evidence."
+    },
+    "debug_transport": [
+      "SWD",
+      "JTAG"
+    ],
+    "programming_electrical": {
+      "vdd_programming_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false
+    },
+    "shared_flash_geometry": {
+      "main_flash_start": "0x08000000",
+      "erase_unit": "page",
+      "erase_unit_bytes": 1024,
+      "program_unit": "halfword",
+      "program_unit_bytes": 2
+    },
+    "manufacturer_evidence": {
+      "source_lock": {
+        "st_ds5319_rev20": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
+        "st_pm0075_rev2": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a"
+      },
+      "review_contract_path": "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "programming_profile_path": "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
+      "direct_applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2",
+      "reference_binding_set_id": "stm32f103c-pilot-v0",
+      "reference_binding_path": "data/ic-support/bindings/stm32f103c-pilot-v0.json"
+    },
+    "operation_qualification": {
+      "probe": {
+        "state": "SUPPORTED",
+        "openocd_basis": [
+          "stm32x_probe",
+          "device ID 0x410 medium-density branch"
+        ],
+        "manufacturer_basis": [
+          "stm32f103c-family-applicability"
+        ]
+      },
+      "erase": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash",
+        "openocd_basis": [
+          "stm32x_erase",
+          "flash erase_address framework"
+        ],
+        "manufacturer_basis": [
+          "stm32f103c-medium-density-page-geometry",
+          "stm32f103c-erase-capabilities"
+        ]
+      },
+      "program": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash",
+        "implicit_erase": false,
+        "openocd_basis": [
+          "stm32x_write",
+          "flash write_image framework"
+        ],
+        "manufacturer_basis": [
+          "stm32f103c-program-granularity",
+          "stm32f103c-standard-program-sequence"
+        ]
+      },
+      "read": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash while security state permits debug read",
+        "openocd_basis": [
+          "default_flash_read",
+          "Flash read framework"
+        ],
+        "manufacturer_basis": [
+          "read_protection_debug_access"
+        ]
+      },
+      "verify": {
+        "state": "SUPPORTED",
+        "scope": "explicit readback/image verification while security state permits debug read",
+        "openocd_basis": [
+          "flash verify_image framework",
+          "flash_driver_read"
+        ],
+        "manufacturer_basis": [
+          "stm32f103c-standard-program-sequence"
+        ],
+        "differential_basis": [
+          "verify_layering"
+        ]
+      }
+    },
+    "blocked_operations": [
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE"
+    ],
+    "backend_constraints": [
+      "erase/program require a halted target",
+      "PROGRAM has no implicit erase",
+      "exact Main Flash size comes from the selected exact ICPN geometry and must not use the Blue Pill 128-KiB convenience override",
+      "debug read/verify is subject to read-protection state",
+      "protection/security mutation is outside this qualification"
+    ]
+  },
+  "local_evidence_locks": {
+    "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json": "0ca557438df1f9ae636177ce8085e2367469dcef",
+    "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json": "eb136aca6119c9d5b6696285fb57434b0c4c4f62",
+    "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json": "e869dd9e4494677080e3474ad9b55f4c00b3bea6",
+    "data/ic-support/bindings/stm32f103c-pilot-v0.json": "4cb9f27e1ae53b7d409ea99cfc9d0133bbf75611",
+    "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json": "fff134baad812004c60c1e0de48ff4175378a406",
+    "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json": "1be63701b4a5202d8cee71d50910b7287d92e84c",
+    "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json": "851171147296f574dbe66ded56e2887db12d458e",
+    "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
+    "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json": "9d1b1578b62225f144856f7aa4674d158fa34203",
+    "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json": "64799b571bb6a80258355f86c906d052b18dc242",
+    "data/ic-support/profiles/memory-geometry/stm32f103c8-64k-v0.json": "80aa5ed4103f78bdd07a15045a093a44af3f317e",
+    "data/ic-support/profiles/memory-geometry/stm32f103cb-128k-v0.json": "6603eca3490d09cb93ecee37008891f945b24dd9"
+  },
+  "records": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C8T6",
+      "base_device": "STM32F103C8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "semantic_comparison": "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
+        "real_binary_acceptance": "configuration_parse_only_noinit"
+      },
+      "qualification_basis": {
+        "kind": "direct_reference"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103CBT6",
+      "base_device": "STM32F103CB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "semantic_comparison": null,
+        "real_binary_acceptance": null,
+        "qualification_basis": "exact manufacturer applicability + exact geometry + shared medium-density programming group + pinned OpenOCD source review"
+      },
+      "qualification_basis": {
+        "kind": "direct_reference"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R8T6",
+      "base_device": "STM32F103R8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact medium-density ordering applicability + PM0075 programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RBT6",
+      "base_device": "STM32F103RB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact medium-density ordering applicability + PM0075 programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103V8T6",
+      "base_device": "STM32F103V8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103v8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact medium-density ordering applicability + PM0075 programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VBT6",
+      "base_device": "STM32F103VB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact medium-density ordering applicability + PM0075 programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C8T6TR",
+      "base_device": "STM32F103C8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103C8T6",
+        "qualification_basis": "commercial packing-only TR suffix; programming semantics inherited only after deterministic equivalence validation"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103C8T6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103CBT6TR",
+      "base_device": "STM32F103CB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103CBT6",
+        "qualification_basis": "commercial packing-only TR suffix; programming semantics inherited only after deterministic equivalence validation"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103CBT6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R8T6TR",
+      "base_device": "STM32F103R8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103R8T6",
+        "qualification_basis": "commercial packing-only TR suffix after direct manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103R8T6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RBT6TR",
+      "base_device": "STM32F103RB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RBT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RBT6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103V8T6TR",
+      "base_device": "STM32F103V8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103v8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103V8T6",
+        "qualification_basis": "commercial packing-only TR suffix after direct manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103V8T6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VBT6TR",
+      "base_device": "STM32F103VB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VBT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VBT6",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C8T7",
+      "base_device": "STM32F103C8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact T7 commercial applicability and Flash characteristics through +105 C + PM0075 medium-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103CBT7",
+      "base_device": "STM32F103CB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact T7 commercial applicability and Flash characteristics through +105 C + PM0075 medium-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R8T7",
+      "base_device": "STM32F103R8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact T7 commercial applicability and Flash characteristics through +105 C + PM0075 medium-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RBT7",
+      "base_device": "STM32F103RB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact T7 commercial applicability and Flash characteristics through +105 C + PM0075 medium-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VBT7",
+      "base_device": "STM32F103VB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+        "qualification_basis": "DS5319 Rev 20 exact T7 commercial applicability and Flash characteristics through +105 C + PM0075 medium-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C8T7TR",
+      "base_device": "STM32F103C8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103C8T7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact T7 manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103C8T7",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103CBT7TR",
+      "base_device": "STM32F103CB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103CBT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact T7 manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103CBT7",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R8T7TR",
+      "base_device": "STM32F103R8",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103R8T7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact T7 manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103R8T7",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RBT7TR",
+      "base_device": "STM32F103RB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RBT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact T7 manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RBT7",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VBT7TR",
+      "base_device": "STM32F103VB",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-medium-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VBT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact T7 manufacturer applicability qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VBT7",
+        "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3"
+      }
+    }
+  ],
+  "default_unreviewed_software_state": "UNKNOWN",
+  "acceptance_boundary": {
+    "public_catalog_visibility_changed": false,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "phase3_compatibility_claimed": false
+  },
+  "predecessor_qualification_id": "adr0002-phase2-openocd-012-stm32f103-medium-v3",
+  "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3",
+  "applicability_authority_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2",
+  "authority_artifact_locks": {
+    "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json": "de05533033fc627430b4cb9b477b2d9f240e03b7",
+    "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json": "5f674c23677061bf953d8ebe0c9ee75c066fbc05"
+  }
+}

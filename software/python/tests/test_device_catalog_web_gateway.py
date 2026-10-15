@@ -148,12 +148,12 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             64,
         )
 
-    def test_same_r8_base_device_t7_ordering_code_remains_unknown(self) -> None:
-        status, payload = self.request("/api/devices/search?q=STM32F103R8T7&limit=1")
+    def test_same_medium_density_base_with_unreviewed_bga_package_remains_unknown(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103V8H6&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
-        self.assertEqual(result["icpn"], "STM32F103R8T7")
+        self.assertEqual(result["icpn"], "STM32F103V8H6")
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
         qualification = result["openocd_software_qualification"]
         self.assertEqual(qualification["software_state"], "UNKNOWN")
@@ -162,12 +162,17 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(qualification["operations"], {})
         self.assertIsNone(qualification["programming"])
 
-    def test_stm32f103_rv_t6_direct_applicability_is_phase2_supported(self) -> None:
+    def test_stm32f103_bounded_direct_applicability_is_phase2_supported(self) -> None:
         cases = (
             ("STM32F103R8T6", "stm32f103r8-64k-v0", 64 * 1024, 64),
             ("STM32F103RBT6", "stm32f103rb-128k-v0", 128 * 1024, 128),
             ("STM32F103V8T6", "stm32f103v8-64k-v0", 64 * 1024, 64),
             ("STM32F103VBT6", "stm32f103vb-128k-v0", 128 * 1024, 128),
+            ("STM32F103C8T7", "stm32f103c8-64k-v0", 64 * 1024, 64),
+            ("STM32F103CBT7", "stm32f103cb-128k-v0", 128 * 1024, 128),
+            ("STM32F103R8T7", "stm32f103r8-64k-v0", 64 * 1024, 64),
+            ("STM32F103RBT7", "stm32f103rb-128k-v0", 128 * 1024, 128),
+            ("STM32F103VBT7", "stm32f103vb-128k-v0", 128 * 1024, 128),
         )
         for icpn, geometry_id, expected_bytes, expected_pages in cases:
             with self.subTest(icpn=icpn):
@@ -202,6 +207,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             ("STM32F103RBT6TR", 128 * 1024, 128),
             ("STM32F103V8T6TR", 64 * 1024, 64),
             ("STM32F103VBT6TR", 128 * 1024, 128),
+            ("STM32F103C8T7TR", 64 * 1024, 64),
+            ("STM32F103CBT7TR", 128 * 1024, 128),
+            ("STM32F103R8T7TR", 64 * 1024, 64),
+            ("STM32F103RBT7TR", 128 * 1024, 128),
+            ("STM32F103VBT7TR", 128 * 1024, 128),
         ):
             with self.subTest(icpn=icpn):
                 status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
