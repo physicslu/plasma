@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "profile_id": "stm32f103vb-128k-v0",
   "kind": "memory_geometry",
-  "status": "phase2-qualified",
+  "status": "pilot",
   "scope": {
     "manufacturer": "STMicroelectronics",
     "base_device": "STM32F103VB"
