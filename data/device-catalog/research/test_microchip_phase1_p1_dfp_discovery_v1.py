@@ -78,6 +78,7 @@ class DFPOnlyP2ArchiveTest(unittest.TestCase):
 
     def test_exact_mcp_and_dfp_32bit_only(self):
         report=discovery.classify(self.original,inventory())
+        self.assertEqual(report["schema_version"],2)
         self.assertEqual(report["dfp_only_p2_archive_exact_icpn_subset"],1)
         self.assertEqual(report["adr0002_p1_openocd_candidate_exact_icpns"],1)
         self.assertEqual(report["adr0002_p2_archive_exact_icpns"],3)
