@@ -1,15 +1,11 @@
 # IC Selector Architecture
 
-Status: legacy IC Selector Phase 1 implementation contract (not ADR-0002 IC Information Phase 1 acceptance)
+Status: current IC Selector runtime contract under ADR-0002
 
-> **ADR-0002 phased migration (2026-10-14):** This document's earlier
-> "Phase 1" label is the IC Selector's historical implementation milestone,
-> not the new three-panel ADR-0002 Phase 1. The latter applies only to
-> manufacturer-sourced **01 IC Information** evidence. Default public
-> software-`SUPPORTED` selection filtering and coherent counts remain
-> **Phase 2 Programming / Issue #849**, not a completed runtime guarantee.
-> Internal exact-ICPN metadata completeness and software programming
-> qualification must not be conflated.
+> **ADR-0002 canonical boundary (2026-10-15):** IC Selector visibility is owned by
+> **Phase 1 `IDENTIFIED` exact ICPN identity**. Phase 2 Programming and Phase 3
+> PLASMA Compatibility are independent displayed states and are not visibility
+> filters. Job/Batch execution remains a separate fail-closed policy surface.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
@@ -46,13 +42,9 @@ Production and Engineering workflows reuse the same `ICSelector` component in pi
 
 ## Canonical source and runtime service
 
-Phase 1 loads the checked-in canonical research snapshot:
+The runtime loads the checked-in Production exact-ICPN manifest and its content-locked manufacturer sources. Production rows have already passed authoritative exact-manufacturer-part-number admission, so the runtime projects them as Phase 1 `IDENTIFIED` without creating a second identity authority.
 
-```text
-data/device-catalog/research/openocd-parts-canonical.csv
-```
-
-The browser does not parse the CSV directly. The Python Web REST Gateway owns a read-only runtime catalog and exposes:
+The browser does not parse source CSV files directly. The Python Web REST Gateway owns the read-only runtime catalog and exposes:
 
 ```text
 GET /api/devices/search?q=<identifier>&limit=<1..100>
@@ -123,12 +115,13 @@ rejected
 
 The Production exact-ICPN UI uses **three display states within the existing OpenOCD Tag** (not a fifth Tag): `mapped` (green) when the Production Catalog backend says `mapped`; `candidate` (amber) only when Production remains `no_mapping` and independent, immutable, source-locked `backend_candidate` research evidence exists; `no_mapping` (neutral) otherwise. A source candidate is never an executable programming route; `backend.mapping_status` and `backend.target_config` remain the server's authority. The other three Tags (PPU, Socket, manufacturer part) are unaffected and never infer real hardware validation. Candidate evidence is optional in slim PPU bundles; missing evidence displays `no_mapping` without breaking catalog searches.
 
-ADR-0002 Phase 2B adds a separate **Software Qualification** badge. It is not a
-replacement for the OpenOCD CFG tag: `CFG mapped` answers whether a Catalog route exists,
+ADR-0002 Phase 2 adds a separate **Programming Qualification** badge. It is not a
+replacement for the OpenOCD CFG tag: `CFG mapped` answers whether a Provider route exists,
 while `SUPPORTED / CANDIDATE / UNKNOWN / UNSUPPORTED` answers whether that exact ICPN has
-completed the version-locked OpenOCD software qualification transaction. In particular,
+completed the version-locked Programming qualification transaction. In particular,
 a mapped CFG with an unreviewed exact ICPN must render `Software · UNKNOWN`, never
-`SUPPORTED`.
+`SUPPORTED`. The canonical API field is `programming_qualification`; the historical
+`openocd_software_qualification` field is compatibility-only.
 
 The older `mapping_candidate` relationship state remains a separate architecture concept; UI `candidate` is a **read-only projection**, not a change to the canonical mapping data.
 
@@ -162,10 +155,12 @@ The same search result can carry three independent additive projections:
 - `manufacturer_device_basic_profile` — operator-facing Basic Device information.
 - `selected_profile` — deeper manufacturer/programming composition, only where the
   Programming Profile evidence chain exists.
-- `openocd_software_qualification` — SW/PPU-owned Phase 2 exact-ICPN software
+- `programming_qualification` — canonical ADR-0002 Phase 2 exact-ICPN Programming
   qualification. It may be `SUPPORTED` even when `selected_profile` is absent, because
   the qualification ledger binds the reviewed Programming Profile and exact geometry
-  independently from the legacy deep-detail projection.
+  independently from the legacy deep-detail projection. The current Provider is OpenOCD;
+  future NXP/Microchip or other Brand qualifications must reuse this interface instead of
+  adding Brand-specific Phase 2 fields.
 
 For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
