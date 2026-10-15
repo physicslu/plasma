@@ -23,6 +23,14 @@ ORDER = re.compile(
     r"\A(ATSAML(10|11)(D|E)(14|15|16)A)-([AMUY])([UFZ])(T?)(KPH)?\Z"
 )
 PACKAGES = {"A":"TQFP", "M":"VQFN", "U":"WLCSP", "Y":"SSOP"}
+SPECIAL_VAO = re.compile(
+    r"\A(ATSAML(10|11)(D|E)(14|15|16)A)-([AMUY])([UFZ])(T?)(VAO)\Z"
+)
+AUTOMOTIVE_POLICY_URL = (
+    "https://www.microchip.com/en-us/solutions/"
+    "automotive-and-transportation/recommended-for-automotive"
+)
+
 GRAMMAR_FIELDS = ("package", "pin_count", "flash", "ram",
                   "temperature", "core_model")
 MEMORY = {
@@ -169,6 +177,26 @@ def interpret_one(row):
         "derived_ordering_observations":{},
     }
     if parsed is None:
+        special=SPECIAL_VAO.fullmatch(icpn)
+        if special is None:
+            return result
+        prefix,series,group,density,package_code,grade,carrier,vao=special.groups()
+        if base!=prefix:
+            result["status"]="BASE_PREFIX_IDENTITY_CONFLICT"
+            return result
+        # Manufacturer automotive policy independently documents 'VAO',
+        # but its original web bytes have NOT yet been source-replayed.
+        # The family PDF p.16 omits this extension. It is NOT a substitute
+        # for variant-specific electrical/production-source qualification.
+        result["status"]="MCP_VAO_SPECIAL_SUFFIX_SEPARATE_SOURCE_REVIEW_REQUIRED"
+        result["document_condition_notes"]=[
+            "MANUFACTURER_MCP_EXACT_SKU_ORIGINAL_SOURCE_VERIFIED",
+            "VAO_NOT_DEFINED_IN_DS60001513G_ORDERING_DIAGRAM",
+            "MICROCHIP_AUTOMOTIVE_POLICY_ORIGINAL_BYTES_NOT_REPLAYED",
+            "NO_PPAP_OR_BLANK_PROGRAMMING_ASSUMPTION"]
+        result["manufacturer_automotive_policy_reference_url"]=AUTOMOTIVE_POLICY_URL
+        result["conventional_order_code_prefix"]=prefix+"-"+package_code+grade+carrier
+        result["special_suffix_observed"]="VAO"
         return result
     prefix,series,group,density,package_code,grade,carrier,kph=parsed.groups()
     if base!=prefix:
