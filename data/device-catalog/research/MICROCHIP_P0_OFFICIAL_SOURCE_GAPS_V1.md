@@ -41,7 +41,20 @@ Microchip official online documentation offers a potentially more precise source
 
 The online tables explicitly describe four candidate order codes `ATSAMR30E18A-MU`, `ATSAMR30E18A-MUT`, `ATSAMR30G18A-MU`, `ATSAMR30G18A-MUT`, and exact ordering-row Flash/SRAM/Package values. **Do not assume these four strings are exactly the four ICPNs from the historical source replay until the commercial identity sets are compared.**
 
-`microchip_phase1_p0_samr30_online_original_v1.py` now attempts **bounded source capture** from the exact two manufacturer URLs, validates the original HTML table structure and four separate code rows, records HTML bytes and SHA-256, and replays those saved original bytes offline. It explicitly denies field `VERIFIED` promotion until independent manufacturer **PDF** consistency is demonstrated. If either official web page is blocked/unavailable or altered, the source receipt remains `SOURCE_NOT_AVAILABLE`, and any success claim fails.
+`microchip_phase1_p0_samr30_online_original_v1.py` now attempts **bounded source capture** from the exact two manufacturer URLs, validates the original HTML table structure and four separate code rows, records HTML bytes and SHA-256, and replays those saved original bytes offline. It explicitly denies field `VERIFIED` promotion until independent manufacturer **PDF** consistency is demonstrated. If either official online page is unavailable, malformed, or returns an HTML shell without ordering rows, the source receipt is `SOURCE_NOT_AVAILABLE` or `SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE`. Neither state authorizes a field promotion.
+
+### Actual original-source canary result — October 15, 2026
+
+[CI run 38671353398](https://github.com/physicslu/plasma/actions/runs/38671353398), [manufacturer original HTML and receipts Artifact 11944171994](https://github.com/physicslu/plasma/actions/runs/38671353398/artifacts/11944171994), independently recorded and SHA-256-audited both exact allowlisted official online documentation HTTP responses. **Neither response contained the expected exact ordering table.** Both source files even had the **same SHA-256** (`1904fb18b561d9c2400de06e291ceb3edf1c5e7b9487c0d57690bb33ba489a44`), consistent with an identical non-table shell response rather than independent E/G table data; this observation by itself does not establish why the publisher returned identical content.
+
+- SAM R30E: `SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE`.
+- SAM R30G: `SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE`.
+- Exact ordering-table observations qualified by this capture: **0**.
+- Newly `VERIFIED` Phase 1 ICPN fields: **0**; PDF crosscheck not performed.
+- Original archived bytes and failure diagnostics are kept for independent diagnosis; GitHub Artifact has only temporary retention, not durable storage.
+- The workflow's official live capture step **failed as expected** while its separate source-quality guard and synthetic tests passed. A green workflow **cannot** be read as successful original-ordering-table capture.
+
+**Engineering disposition:** do not parse an ordinary HTML shell as manufacturer table data. The next evidence path must use an alternate publisher-supported export/original PDF procedure and compare exact ICPNs, not bypass the source safeguard.
 
 ### How to evaluate a captured source
 
