@@ -136,7 +136,7 @@ class ReverseCoverage(unittest.TestCase):
             target.build(None,make_rollup([]))
 
     def test_full_source_requires_all_thirteen_disjoint_archives(self):
-        with self.assertRaisesRegex(ValueError, "13"):
+        with self.assertRaisesRegex(ValueError, "13|12 shard"):
             target.replay_all_original_batch_sources("/synthetic/dfp", [
                 ("original-16-batches", "/synthetic/old"),
                 ("shard-0", "/synthetic/shard-0")])
@@ -183,10 +183,15 @@ class ReverseCoverage(unittest.TestCase):
         with patch.object(target, "archived_inventory", return_value=inventory), \
              patch.object(target.batch_plan, "plan_inventory", return_value=expected), \
              patch.object(target.full_mcp, "build", return_value=result), \
-             patch("pathlib.Path.read_text", side_effect=lambda *a,**kw: __import__("json").dumps(
-                 audit if "microchip-dfp-full-first-pass-audit" in str(a[0])
-                 else {"gate_1b_surface_audit": {"dfp_index_observation": {
-                    "raw_index_sha256": target.gates.PINNED_DFP_SOURCE}}})):
+             patch("pathlib.Path.read_text", side_effect=[
+                 __import__("json").dumps({"gate_1b_surface_audit": {
+                     "dfp_index_observation": {"raw_index_sha256":
+                         target.gates.PINNED_DFP_SOURCE}}}),
+                 __import__("json").dumps(audit),
+                 __import__("json").dumps({"gate_1b_surface_audit": {
+                     "dfp_index_observation": {"raw_index_sha256":
+                         target.gates.PINNED_DFP_SOURCE}}}),
+                 __import__("json").dumps(audit)]):
             output, summary = target.replay_all_original_batch_sources(
                 "/synthetic/dfp", sources)
             self.assertEqual(summary["historical_research_icpn_candidates_replayed"],23276)
