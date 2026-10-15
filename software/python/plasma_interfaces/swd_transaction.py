@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+from threading import RLock
 import time
 from typing import Callable, Protocol
 
@@ -156,6 +157,8 @@ class SWDTransactionDriver:
         self.poll_interval_s = poll_interval_s
         self.max_poll_seconds = max_poll_seconds
         self._clock, self._sleep = clock, sleep
+        # Serialize transactions on this object's single-owned Site aperture.
+        self._operation_lock = RLock()
         self._poisoned = False
         self._launched = False
         self._write_issued = False
@@ -277,44 +280,45 @@ class SWDTransactionDriver:
 
     def _execute(self, *, op: int, ap: bool = False, read: bool = False,
                  address: int = 0, data: int = 0) -> SWDResponse:
-        link = self._require_ready()
-        if type(op) is not int or op not in (0, 1):
-            raise ValueError("op must be 0=transfer or 1=line reset")
-        if type(ap) is not bool or type(read) is not bool:
-            raise ValueError("AP/read flags must be bool")
-        if type(address) is not int or address not in (0, 4, 8, 12):
-            raise ValueError("SWD address must be aligned 0,4,8,12")
-        if type(data) is not int or not 0 <= data <= 0xFFFFFFFF:
-            raise ValueError("SWD write data must be u32")
-        if op == 0 and link is SWDLink.RESET_REQUIRED:
-            raise SWDDriverError("SWD link requires explicit line_reset()")
-        if op == 0 and link is SWDLink.DPIDR_REQUIRED \
-                and (ap or not read or address != 0):
-            raise SWDDriverError("SWD link requires DP DPIDR read first")
-        if op == 0 and link is SWDLink.CONNECTED and not read and ap:
-            # AP writes are supported by the transport; no automatic retry.
-            pass
-        config = (op | (int(ap) << 1) | (int(read) << 2)
-                  | (address << 3)
-                  | (int(self.timing.error_data_phase) << 7))
-        # A configuration write is only legal while hardware idle. Snapshot
-        # all registers; no concurrent software user may share this aperture.
-        self._was_write = (op == 0 and not read)
-        self._write_issued = False
-        for offset, value in (
-            (self.CONFIG, config), (self.WDATA, data),
-            (self.HALF, self.timing.half_period_cycles),
-            (self.TURN, self.timing.turnaround_cycles),
-            (self.IDLE, self.timing.idle_cycles),
-            (self.RETRIES, self.timing.max_wait_retries),
-            (self.TIMEOUT, self.timing.timeout_cycles),
-        ):
-            self._write(offset, value)
-        # START may have reached hardware even if backend reports an error.
-        self._write_issued = self._was_write
-        self._launched = True
-        self._write(self.COMMAND, self.START)
-        return self._finish()
+        with self._operation_lock:
+            link = self._require_ready()
+            if type(op) is not int or op not in (0, 1):
+                raise ValueError("op must be 0=transfer or 1=line reset")
+            if type(ap) is not bool or type(read) is not bool:
+                raise ValueError("AP/read flags must be bool")
+            if type(address) is not int or address not in (0, 4, 8, 12):
+                raise ValueError("SWD address must be aligned 0,4,8,12")
+            if type(data) is not int or not 0 <= data <= 0xFFFFFFFF:
+                raise ValueError("SWD write data must be u32")
+            if op == 0 and link is SWDLink.RESET_REQUIRED:
+                raise SWDDriverError("SWD link requires explicit line_reset()")
+            if op == 0 and link is SWDLink.DPIDR_REQUIRED \
+                    and (ap or not read or address != 0):
+                raise SWDDriverError("SWD link requires DP DPIDR read first")
+            if op == 0 and link is SWDLink.CONNECTED and not read and ap:
+                # AP writes are supported by the transport; no automatic retry.
+                pass
+            config = (op | (int(ap) << 1) | (int(read) << 2)
+                      | (address << 3)
+                      | (int(self.timing.error_data_phase) << 7))
+            # A configuration write is only legal while hardware idle. Snapshot
+            # all registers; no concurrent software user may share this aperture.
+            self._was_write = (op == 0 and not read)
+            self._write_issued = False
+            for offset, value in (
+                (self.CONFIG, config), (self.WDATA, data),
+                (self.HALF, self.timing.half_period_cycles),
+                (self.TURN, self.timing.turnaround_cycles),
+                (self.IDLE, self.timing.idle_cycles),
+                (self.RETRIES, self.timing.max_wait_retries),
+                (self.TIMEOUT, self.timing.timeout_cycles),
+            ):
+                self._write(offset, value)
+            # START may have reached hardware even if backend reports an error.
+            self._write_issued = self._was_write
+            self._launched = True
+            self._write(self.COMMAND, self.START)
+            return self._finish()
 
     def line_reset(self) -> SWDResponse:
         return self._execute(op=1)
@@ -346,8 +350,11 @@ class SWDTransactionDriver:
 
     def read_ap_posted(self, address: int) -> int:
         """Issue raw AP read then DP RDBUFF; not a memory-operation API."""
-        self.read_ap_raw(address)
-        return self.read_dp(12)
+        # Atomic two-wire-transfer sequence; no other thread may overwrite
+        # the posted AP result between AP READ and DP RDBUFF.
+        with self._operation_lock:
+            self.read_ap_raw(address)
+            return self.read_dp(12)
 
     def write_ap_raw(self, address: int, value: int) -> SWDResponse:
         result = self._execute(op=0, ap=True, address=address, data=value)
@@ -363,13 +370,14 @@ class SWDTransactionDriver:
         No auto-abort after poll/AXI error; those cases may require out-of-band
         hardware recovery. Aborted writes can have target-side effects.
         """
-        if self._poisoned:
-            raise SWDDriverError("Driver poisoned; cannot safely issue ABORT")
-        status, _ = self._state()
-        if not status & self.BUSY_BIT or status & self.RESP_VALID_BIT:
-            raise SWDDriverError("ABORT only allowed for a known active command")
-        # Existing in-flight target effects cannot be excluded.
-        self._was_write = True
-        self._write_issued = True
-        self._write(self.COMMAND, self.ABORT)
-        return self._finish()
+        with self._operation_lock:
+            if self._poisoned:
+                raise SWDDriverError("Driver poisoned; cannot safely issue ABORT")
+            status, _ = self._state()
+            if not status & self.BUSY_BIT or status & self.RESP_VALID_BIT:
+                raise SWDDriverError("ABORT only allowed for a known active command")
+            # Existing in-flight target effects cannot be excluded.
+            self._was_write = True
+            self._write_issued = True
+            self._write(self.COMMAND, self.ABORT)
+            return self._finish()
