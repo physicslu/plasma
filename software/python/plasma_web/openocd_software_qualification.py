@@ -27,8 +27,8 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 
 ROOT = default_runtime_evidence_root()
-SOURCE_LOCK_REL = "data/ic-support/software-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "data/ic-support/software-qualification/openocd-0.12.0-stm32f103c-reference-v1.json"
+SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v1.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
