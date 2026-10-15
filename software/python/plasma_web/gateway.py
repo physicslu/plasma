@@ -137,7 +137,7 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
         )
         item["programming_qualification"] = phase2
         # Compatibility alias. New clients must use programming_qualification.
-        item["openocd_software_qualification"] = deepcopy(phase2)
+        item["openocd_software_qualification"] = phase2
         results.append(item)
     return {
         "ok": True,
