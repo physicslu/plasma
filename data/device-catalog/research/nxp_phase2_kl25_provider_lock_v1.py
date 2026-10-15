@@ -30,7 +30,7 @@ FILES = {
     "runtime": (Path("release/openocd.json"),
                 "08c884b1bf6f5999c6d34c090992a8b59d85971d"),
     "upstream_delta": (RESEARCH/"nxp-kl25-openocd-provider-delta-v1.json",
-                       "b79ecd5f1f82a125bdedc3218d439db88bc30aa2"),
+                       "25ed0d2335f22021ae06b463dd7dbda0cb4fc25d"),
 }
 EXACT_PROTOTYPE = "MKL25Z128VLK4"
 LEGACY_COMMIT = "56b8d93fbe61a78dc903d770820d6d896b6d8134"
@@ -176,6 +176,18 @@ def review_upstream_delta(delta: dict, boundary: dict) -> dict:
         require((row["prototype_git_blob"],row["current_git_blob"],
                  row["identical_bytes"])==(old,current,same),
                 "reviewed OpenOCD source Git blob evidence mismatch: "+row["path"])
+    t=delta["transport_dependency_delta"]
+    require(t["prior_klx_directive"] ==
+            "transport select swd; swd newdap $_CHIPNAME cpu -expected-id $_CPUTAPID"
+            and t["approved_klx_directive"] ==
+            "source [find target/swj-dp.tcl]; swj_newdap $_CHIPNAME cpu -irlen 4 -expected-id $_CPUTAPID"
+            and t["approved_new_include_path"]=="tcl/target/swj-dp.tcl"
+            and t["approved_new_include_git_blob"] ==
+                "f2b233fb78133fd5e45395fd307674c16a65ed70"
+            and t["selection_changed_from_forced_swd_to_session_transport"] is True
+            and t["current_provider_transport_selection_independently_qualified"] is False
+            and t["operation_qualification_can_be_inherited"] is False,
+            "approved provider SWJ transport selection/extra Tcl include cannot be assumed safe")
     c=delta["conclusions"]
     require(c["exact_cfg_file_unchanged"] is True
             and c["tcl_dependency_changed"] is True
@@ -190,6 +202,9 @@ def review_upstream_delta(delta: dict, boundary: dict) -> dict:
             "byte_identical_files":1,
             "changed_files":2,
             "changed_paths":["tcl/target/klx.cfg","src/flash/nor/kinetis.c"],
+            "added_approved_include":"tcl/target/swj-dp.tcl",
+            "transport_policy_changed":True,
+            "runtime_transport_independently_qualified":False,
             "source_semantics_requalified":False,
             "current_provider_software_supported":False}
 
@@ -237,6 +252,7 @@ def build(*, root: Path=ROOT):
             "phase3_hil":"NOT_AUDITED",
             "next_required_evidence":(
                 ["CURRENT_PROVIDER_CODE_DIFF_AND_FCF_SECURITY_REVIEW",
+                 "SWD_ONLY_VS_SWJ_TRANSPORT_AND_ADAPTER_SESSION_REVIEW",
                  "PINNED_RUNTIME_MATCHING_EXACT_SILICON_REVISION_AND_FLASH_GEOMETRY",
                  "CURRENT_PROVIDER_FOUR_OPERATIONS_PROFILE_REVIEW"]
                 if prototype else
