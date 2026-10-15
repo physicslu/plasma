@@ -123,15 +123,31 @@ OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**�
 
 ## Research prioritization — OpenOCD first (owner-approved)
 
-**PLASMA 的研發資源首先用於目前指定／核准 OpenOCD 版本確實有機會燒錄的 IC。全面保留原廠資料是低成本的 Research Inventory 行為，不代表必須逐顆深入調查。** 這是整個 ST、NXP、Microchip 等廠商通用的持續作業原則，執行追蹤見 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
+**PLASMA 的研發資源首先用於目前指定／核准 OpenOCD 版本確實有機會燒錄的 IC。全面保留原廠資料是低成本的 Research Inventory 行為，不代表必須逐顆深入調查。** 此優先級與反向覆蓋流程 **不設 Manufacturer／Brand Allowlist**；適用目前與未來任何可由指定 OpenOCD Provider 取得可信 Flash Programming 來源線索的裝置、Core 及 Debug Transport。ST、NXP、Microchip 僅為既有研究案例，不是適用範圍邊界；執行追蹤見 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
 
 固定優先順序如下：
 
 | Priority | Criteria | Authorized research depth |
 |---|---|---|
-| **P0 — OpenOCD software-backed** | 指定版本 OpenOCD 的 Target + Flash Driver + 必要程式操作具版本鎖定來源證據，且具體 IC/variant 適用性可進一步驗證 | **優先**審核精確商業 ICPN、Flash geometry/operations、必要電氣條件、可重用 Profile、相關軟體測試；達到本 ADR 獨立的 software qualification 才准公開 Catalog |
-| **P1 — Bounded OpenOCD candidate** | OpenOCD 有可信的 Target/Driver 家族線索，但精確 IC 或 operation applicability 尚不完整 | **一次有界、明確範圍**的 Source/Driver/IC 相容性查核；證據不足便保留 Candidate/Unknown 並停止延伸，不自動變更支援宣告 |
-| **P2 — Archive only** | 無可信的指定 OpenOCD Flash programming 支援路徑，或不屬目前產品需要 | **只保存低成本來源資料**（名稱、來源、識別證據、既有原廠觀測與取得時間／雜湊）。停止一般性逐顆 datasheet 深究、訂購碼／EOL 全面追查、封裝／Socket／Programming Profile 建置；除非 OpenOCD 能力改變、客戶有需求或 Owner 明確要求 |
+| **P0 — Programming Path Established (research)** | 指定且鎖定的 OpenOCD Provider 有可解析的 Target CFG／Include Graph、明確 Flash Driver 連結、必要 probe／erase／write／read-or-verify 操作的可信**來源路徑**，及可再驗證的晶片 Part ID 或通用 probe 適用性線索；沒有已知明確反證 | **優先**查證精確商用 ICPN ↔ silicon/revision、Flash geometry／security／operation 與 Phase 2 Profile；**不是**正式 `SUPPORTED`，也不要求先有 HIL |
+| **P1 — Programming Path Incomplete** | 指定版本有可追溯的 Target、Driver、晶片或操作線索，但缺少完整路徑、ID、操作適用性或來源證據 | 依固定版本、裝置／家族及明確範圍執行**一次有界查核**；提出升 P0、維持 P1 並 `CLOSED_EVIDENCE_GAP`、或轉 P2 封存的處置及缺口；不得無期限重複搜尋 |
+| **P2 — No Established Programming Path / Archive** | 在**明示且固定的檢查範圍**沒有建立可信的 Flash Programming 路徑，**或**依獨立商業需求決策暫緩；不等於全版本永久不支援、非 Active 或 EOL | 保存低成本來源、查核範圍、缺口與暫緩原因；不再一般性逐顆深入研究，直到新的來源版本、原廠證據或核准需求觸發重新開案 |
+
+### Vendor-agnostic OpenOCD Reverse Coverage SOP（研究優先級標準程序）
+
+本節規範 **研究階段的 OpenOCD 能力索引與 P0/P1/P2 優先級**，僅供 Phase 1 CFG-first Reverse Discovery 確定研究入口、以及 Phase 2 重用技術線索。**P0/P1/P2 不是 Phase 1/2/3 的完成狀態；任何符合原廠身分門檻的 Exact ICPN，進入 Phase 1 `S1` 不需要先取得 P0，也不要求每筆料號都有獨立 CFG／Driver。** Phase 2 的 exact-ICPN Software Qualification 和 Phase 3 的 Physical Validation 仍各自獨立。本程序適用所有製造商；起點是 OpenOCD 能力來源，**不是**指定品牌的料號名錄。機器可檢查的政策契約為 [OpenOCD Reverse Research Contract v1](../architecture/openocd-reverse-coverage-research-contract-v1.json)，只鎖定流程和證據欄位，不構成既有資料自動升級的授權。
+
+1. **固定 Provider 與母體邊界：** 使用 `release/openocd.json` 或已核准的 Provider Registry，記錄 Provider、版本、Source Commit、Git Blob、檢查日期、搜尋範圍與明確排除範圍。其他 upstream `master`、Vendor Fork、舊版本各屬獨立 Capability Inventory，不可用未核准版本的結果代替目前版本。明確區分選到的 CFG／Driver 子集合和「所有 OpenOCD 裝置」或「全部原廠 Active 料號」。
+2. **先建 Capability Index（由軟體向外查）：** 解析 Target CFG、Tcl Include Graph、Core/Debug Transport、Flash Bank/Driver、Part ID／probe 規則與操作來源（`probe`、必要 `erase`、`write/program`、`read/verify`），保留原始路徑及對應 Git Blob／內容雜湊。主要能力索引鍵為 **`Provider + Version/Commit + Target + Flash Driver + Silicon Identity/Probe Rule`**；Manufacturer、Base Device、Exact ICPN 是後續身分對照，不是底層 Flash 能力主鍵。
+3. **反向解析原廠商用料號：** 從來源所指向的 Device/Silicon Family 反查任何製造商的官方 Base Device、**精確可訂購 ICPN**、封裝／物料尾碼、生命週期及原始頁面／文件。分清 `family`、`product`、`material`、`exact ICPN` 證據層級；未確認的訂購碼應保留研究狀態；原廠官方明確確認的 Exact ICPN 依 Phase 1 `IDENTIFIED` 入庫。原始網頁不可取得或未封存 SHA 時，另記錄 `SOURCE_BYTES_NOT_ARCHIVED` 等保管缺口，**不應把來源封存品質與原廠身分是否存在混淆**；不得補造身份或宣稱 Source Replay PASS。
+4. **依證據分流：** P0 必須具備版本鎖定的 **Target → Include → Flash Driver → 必要操作來源 → 可信 silicon 適用性** 路徑；通用 Driver probe 可以是待驗證的適用性線索，但單獨的 CFG、Core、SWD/JTAG、Driver symbol 或前綴命中不能構成 P0。P1 保留至少一項真實、可追溯的相關線索，並指出未完成環節。P2 只在本次**受限範圍**未建立可信路徑或有獨立產品排程理由時封存，不做全廠牌或永久不支援結論。優先級與 `UNKNOWN/CANDIDATE/SUPPORTED/UNSUPPORTED` 不是同一種狀態。
+5. **P1 僅作一次有界相容性查核：** 定義 `provider/source_commit + device/silicon group + searched CFG/Driver scope` 作為研究工作單位，開始前記錄範圍、接受條件、排除條件與停止條件；結論只能是 `PROPOSE_P0`（提供來源，**待獨立審核**）、`CLOSE_P1_EVIDENCE_GAP`（Priority 仍為 P1，調查狀態 `CLOSED_EVIDENCE_GAP`）、`ARCHIVE_P2`（Priority=P2，附原因）。**P1 調查結案不等於 P1 軟體支援已完成。** 未取得關鍵證據即停止無限期擴查，不以缺證據冒充已證實不可燒錄。
+6. **有條件重新開案：** 只因**固定 Provider／Source Commit 有實質變更**、取得新的可驗證原廠／晶片適用性證據，或出現核准的業務需求而重新開啟受影響的 P1/P2，不重跑所有已結案的料號。每次留存前次 Review ID、差異證據與重啟理由；單純要求更多候選數量不構成新證據。
+7. **交付與獨立驗收：** 每批輸出可追溯 Source Manifest、Capability Index、Device/Silicon ↔ Manufacturer Base ↔ Exact ICPN Crosswalk、每筆 P0/P1/P2 決策、P1 查核／停止／重啟紀錄及 `source-locked` 差異報告。CI 必須阻擋版本／Git Blob 漂移、假造原始檔雜湊、未經核對的 Exact ICPN、無操作證據升 P0、P1 已結案卻宣稱 `SUPPORTED`、無證據的全製造商覆蓋，以及未授權修改 Production／Selector／Job／HIL。
+
+**必要研究欄位：** `provider`、`provider_version/source_commit`、`target_config`、`include_graph`、`flash_bank_driver`、`operation_source_refs`、`core_model`、`debug_transport`、`silicon_part_id_or_probe_rule`、`manufacturer`（待辨識允許 Unknown）、`manufacturer_source_ref/scope`、`official_base_device`、`exact_orderable_icpn`（未取得不得捏造）、`ordering_identity_state`、`lifecycle_observation`、`evidence_hashes`、`research_priority`、`investigation_state`、`bounded_scope`、`source_checked_at`、`missing_evidence`、`stop_reason`、`reopen_triggers`、`research_owner` 及 `decision_source_ref`。允許部分研究欄位 Unknown，但**絕對不能因預設值自動補成驗證完成**。
+
+**衡量與限制：** 分開統計「每個新 P0 候選研究工時」、「P1 一次有界調查結案率」及「獨立通過 Phase 2 的精確 ICPN `SUPPORTED` 數」。未知全廠商母體不得填入 0%／100%。JTAG、NRND、產品需求及 HIL 與 P0-P1-P2 研究優先級分開紀錄；可影響商業排程，不能倒推成軟體不可用。**本修訂不重分類既有 ST/NXP/Microchip 或其他研究紀錄，不建立任何新的 `SUPPORTED`，不授權 Production、Catalog、Job/Batch 或硬體變更。**
 
 研究順序要**先核對固定 OpenOCD Source/Driver/Target 的可用能力，再將能力對應到 Manufacturer Device Family／Exact ICPN**，而不是先耗費大量時間完整調查所有商用料號後才反向找 OpenOCD 支援。僅用檔名、家族前綴或資料庫 `mapped` 欄位匹配，不得宣稱已達 P0 的正式 `SUPPORTED` 資格。
 
@@ -141,7 +157,7 @@ Phase 進度 KPI 以 `|S1|`（原廠已確認完整 ICPN）、`|S1_complete|`（
 
 ## Implementation requirements — Core / Transport / Flash-Driver classification (owner-approved)
 
-**MCU Core 是 Research 的搜尋索引與技術分類維度，不是 OpenOCD `SUPPORTED` 的證明或 Catalog 顯示門檻。** 此政策適用 Microchip、ST、NXP 及後續所有 MCU 廠商，並由 [Issue #851](https://github.com/physicslu/plasma/issues/851) 追蹤實作。
+**MCU Core 是 Research 的搜尋索引與技術分類維度，不是 OpenOCD `SUPPORTED` 的證明或 Catalog 顯示門檻。** 此政策不限定 Manufacturer、Core 架構或 Debug Transport（包含現有及未來可追溯來源的非 ARM Target），並由 [Issue #851](https://github.com/physicslu/plasma/issues/851) 追蹤實作。
 
 ### 1. Core-first Research Classification
 

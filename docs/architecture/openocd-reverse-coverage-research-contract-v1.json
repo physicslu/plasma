@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "contract_id": "ADR-0002_VENDOR_AGNOSTIC_OPENOCD_REVERSE_RESEARCH_V1",
+  "authority": "RESEARCH_PRIORITY_AND_EVIDENCE_ONLY",
+  "manufacturer_policy": "NO_MANUFACTURER_ALLOWLIST",
+  "backend_policy": "PINNED_APPROVED_OPENOCD_PROVIDER_ONLY",
+  "capability_index_key": [
+    "provider",
+    "provider_version_or_commit",
+    "target_config",
+    "flash_driver",
+    "silicon_identity_or_probe_rule"
+  ],
+  "device_link_key": [
+    "manufacturer",
+    "official_base_device",
+    "exact_orderable_icpn"
+  ],
+  "priority_states": [
+    "P0",
+    "P1",
+    "P2"
+  ],
+  "investigation_states": [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "CLOSED_EVIDENCE_GAP",
+    "P0_REVIEW_PROPOSED",
+    "P2_ARCHIVED",
+    "REOPENED"
+  ],
+  "software_qualification_states": [
+    "UNKNOWN",
+    "CANDIDATE",
+    "SUPPORTED",
+    "UNSUPPORTED"
+  ],
+  "hardware_validation": "INDEPENDENT",
+  "source_evidence_fields": [
+    "provider",
+    "provider_version",
+    "source_commit",
+    "target_config",
+    "include_graph",
+    "flash_bank_driver",
+    "operation_source_refs",
+    "core_model",
+    "debug_transport",
+    "silicon_part_id_or_probe_rule",
+    "manufacturer",
+    "manufacturer_source_ref",
+    "manufacturer_source_scope",
+    "official_base_device",
+    "exact_orderable_icpn",
+    "ordering_identity_state",
+    "lifecycle_observation",
+    "evidence_hashes"
+  ],
+  "review_control_fields": [
+    "research_priority",
+    "investigation_state",
+    "bounded_scope",
+    "source_checked_at",
+    "missing_evidence",
+    "stop_reason",
+    "reopen_triggers",
+    "research_owner",
+    "decision_source_ref"
+  ],
+  "p0_required_source_evidence": [
+    "pinned_provider",
+    "target_config",
+    "resolved_include_graph",
+    "flash_driver_linkage",
+    "operation_source_path",
+    "credible_silicon_applicability_path"
+  ],
+  "p1_positive_evidence": [
+    "bounded_target_or_driver_or_silicon_clue"
+  ],
+  "p2_stop_reasons": [
+    "NO_CREDIBLE_PINNED_FLASH_PATH",
+    "DEFERRED_PRODUCT_DEMAND"
+  ],
+  "p1_bounded_outcomes": [
+    "PROPOSE_P0",
+    "CLOSE_P1_EVIDENCE_GAP",
+    "ARCHIVE_P2"
+  ],
+  "p1_reopen_triggers": [
+    "PINNED_PROVIDER_OR_SOURCE_CHANGED",
+    "NEW_VERIFIABLE_MANUFACTURER_OR_DEVICE_EVIDENCE",
+    "NEW_APPROVED_BUSINESS_NEED"
+  ],
+  "not_proven_by_p0": [
+    "exact_icpn_software_supported",
+    "erase_write_read_verify_physically_passed",
+    "installed_ppu_runtime_binary_available",
+    "hardware_hil_passed",
+    "public_catalog_eligible",
+    "job_execution_authorized"
+  ],
+  "separation_invariants": [
+    "priority_is_not_qualification",
+    "closed_p1_is_not_software_supported",
+    "manufacturer_identity_is_not_silicon_support",
+    "flash_cfg_alone_is_not_p0",
+    "flash_driver_symbol_alone_is_not_supported",
+    "catalog_visibility_requires_separately_qualified_exact_icpn",
+    "no_automatic_production_or_hil_promotion"
+  ],
+  "metrics": [
+    "p1_one_bounded_review_closure_rate",
+    "research_hours_per_new_p0_candidate",
+    "qualified_exact_icpn_count_separate_from_candidates"
+  ],
+  "historical_evidence_policy": "PRESERVE_RECORDS_NO_BULK_RECLASSIFICATION",
+  "runtime_or_production_changed": false
+}
