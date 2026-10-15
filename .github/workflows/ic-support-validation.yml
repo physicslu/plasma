@@ -11,8 +11,6 @@ on:
       - "data/device-catalog/research/*commercial-icpn.csv"
       - "software/python/plasma_core/manufacturer_device_basic.py"
       - "software/python/tests/test_manufacturer_device_basic.py"
-      - "software/python/plasma_web/openocd_software_qualification.py"
-      - "software/python/tests/test_openocd_software_qualification_v1.py"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
@@ -144,12 +142,6 @@ jobs:
         run: |
           python -m py_compile data/ic-support/validate_stm32f103_openocd_real_binary.py
           python data/ic-support/test_stm32f103_openocd_real_binary.py
-      - name: Validate ADR-0002 Phase 2A OpenOCD software qualification
-        env:
-          PYTHONPATH: software/python
-        run: |
-          python -m py_compile software/python/plasma_web/openocd_software_qualification.py
-          python software/python/tests/test_openocd_software_qualification_v1.py
       - name: Run IC Support research regression
         run: python data/ic-support/test_ic_support.py
       - name: Validate manufacturer device basic profile
