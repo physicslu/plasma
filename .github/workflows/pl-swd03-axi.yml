@@ -1,0 +1,82 @@
+name: PL SWD-03 AXI transaction RTL
+
+on:
+  pull_request:
+    paths:
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/verification/cocotb/test_swd03_axi.py"
+      - "pl/verification/test_swd03_axi_rtl.py"
+      - "pl/verification/cocotb/test_swd_transaction.py"
+      - "pl/verification/models/**"
+      - "pl/verification/test_swd_transaction_rtl.py"
+      - ".github/workflows/pl-swd03-axi.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/verification/cocotb/test_swd03_axi.py"
+      - "pl/verification/test_swd03_axi_rtl.py"
+      - "pl/verification/cocotb/test_swd_transaction.py"
+      - "pl/verification/models/**"
+      - "pl/verification/test_swd_transaction_rtl.py"
+      - ".github/workflows/pl-swd03-axi.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swd03-host-rtl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install simulators and cocotb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends verilator iverilog
+          python3 -m pip install pytest 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: SWD-03 strict lint
+        run: |
+          verilator --lint-only --sv -Wall --top-module swd_transaction_axi_lite \
+            pl/rtl/bus/swd_transaction_axi_lite.sv \
+            pl/rtl/site/swd_transaction_master.sv \
+            pl/rtl/site/swd_waveform_engine.sv
+      - name: Icarus elaboration
+        run: |
+          mkdir -p pl/build/swd03
+          iverilog -g2012 -s swd_transaction_axi_lite -o pl/build/swd03/axi-elab.vvp \
+            pl/rtl/site/swd_waveform_engine.sv \
+            pl/rtl/site/swd_transaction_master.sv \
+            pl/rtl/bus/swd_transaction_axi_lite.sv
+      - name: Existing SWD and loopback regression
+        run: |
+          python3 -m pytest -q \
+            pl/tests/test_swd_reference.py \
+            pl/verification/test_swd_transaction_rtl.py \
+            pl/verification/test_pspl02_swd00_rtl.py \
+            pl/tests/test_z2_control_waveform_build.py
+      - name: SWD-03 AXI and transaction regression
+        run: python3 -m pytest -v pl/verification/test_swd03_axi_rtl.py
+      - name: Failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swd03-failure-${{ github.run_id }}
+          path: |
+            pl/build/swd03/
+            pl/build/pspl02-swd00/sim/
+            pl/build/swd01-02/sim/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Acceptance scope
+        run: |
+          echo "SWD-03 offline AXI RTL regression PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "No Vivado synthesis/implementation/timing, physical Z2 HIL, pin-level SWD, or real IC programming qualification." >> "$GITHUB_STEP_SUMMARY"
