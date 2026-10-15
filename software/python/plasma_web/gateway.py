@@ -26,6 +26,7 @@ from .openocd_software_qualification import (
     get_default_openocd_software_qualification_registry,
 )
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
+from .nxp_phase1_selector import PHASE1_CATALOG_ORIGIN, build_nxp_phase1_selector_catalog
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
@@ -81,8 +82,16 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str, Any]:
-    catalog = get_default_device_catalog()
+def _device_search_payload(
+    query: str, limit: int, offset: int = 0, *, visibility: str = "production"
+) -> dict[str, Any]:
+    if visibility not in {"production", "phase1"}:
+        raise ValueError("visibility must be production or phase1")
+    production_catalog = get_default_device_catalog()
+    catalog = (
+        build_nxp_phase1_selector_catalog(production_catalog)
+        if visibility == "phase1" else production_catalog
+    )
     matches, total_count = catalog.search_with_total(query, limit=limit, offset=offset)
     # Candidate evidence is an independent, read-only display projection.
     # It never modifies the authoritative backend mapping or Job resolution.
@@ -95,6 +104,20 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
     results = []
     for record in matches:
         item = record.to_payload()
+        if record.catalog_origin == PHASE1_CATALOG_ORIGIN:
+            # Phase 1 lookup-only evidence MUST NOT inherit Production routing,
+            # an IC Support profile, or executable OpenOCD claims from a family.
+            item["catalog"]["scope"] = "phase1_identified"
+            item["phase1"] = {"identity_state": "IDENTIFIED", "information_complete": False}
+            item["backend_candidate"] = None
+            item["backend_source_reference"] = None
+            item["backend_providers"] = []
+            item["manufacturer_device_basic_profile"] = None
+            item["nxp_manufacturer_device_profile"] = None
+            item["selected_profile"] = None
+            item["openocd_software_qualification"] = None
+            results.append(item)
+            continue
         candidate = candidates.lookup(record)
         item["backend_candidate"] = candidate
         item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
@@ -140,6 +163,7 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
         "query": query,
+        "visibility": visibility,
         "catalog_size": catalog.size,
         "count": len(matches),
         "total_count": total_count,
@@ -614,13 +638,14 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 query = params.get("q", [""])[0]
                 raw_limit = params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0]
                 raw_offset = params.get("offset", ["0"])[0]
+                visibility = params.get("visibility", ["production"])[0]
                 limit = int(raw_limit)
                 offset = int(raw_offset)
                 if limit < 1 or limit > MAX_SEARCH_LIMIT:
                     raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
                 if offset < 0:
                     raise ValueError("offset must be a non-negative integer")
-                self._json(HTTPStatus.OK, _device_search_payload(query, limit, offset))
+                self._json(HTTPStatus.OK, _device_search_payload(query, limit, offset, visibility=visibility))
             except (TypeError, ValueError) as exc:
                 self._json(
                     HTTPStatus.BAD_REQUEST,
