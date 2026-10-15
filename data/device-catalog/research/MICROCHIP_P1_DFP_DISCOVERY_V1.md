@@ -54,3 +54,43 @@ Next: review highest-population manufacturer DFP packs and then expand
 source-locked OpenOCD CFG coverage where justified. Do not artificially
 inflate source-bound counts or silently rename DFP-only research as Target
 CFG support.
+
+## Actual original-source replay result (2026-10-15)
+
+[PR #909 GitHub Actions run 38680931140](https://github.com/physicslu/plasma/actions/runs/38680931140)
+replayed all manufacturer-source-backed 23,276 distinct original MCP
+commercial order-code observations and the pinned original DFP index:
+
+| Research evidence cohort | Distinct original commercial ICPNs |
+|---|---:|
+| P0 baseline, unchanged | 2,437 |
+| P1 Target-only CFG baseline, unchanged | 126 |
+| P1 DFP-only discovery expansion, newly identified | **2,065** |
+| Combined P1 Phase 1 priority candidate queue | **2,191** |
+
+The **2,065** new research candidate ICPNs represent **340 distinct
+original DFP Base Device names** in eligible 32bit-pic-sam packs.
+No P0/old P1 records were reclassified; records without an exact
+manufacturer Base↔DFP support-name join are not invented.
+
+Largest original DFP-pack cohorts:
+
+| Manufacturer Device Pack | Exact commercial ICPNs |
+|---|---:|
+| PIC32MZ-EF_DFP | 463 |
+| PIC32CM-JH_DFP | 217 |
+| PIC32MZ-DA_DFP | 208 |
+| PIC32MK-GP_DFP | 105 |
+| PIC32MK-MC_DFP | 101 |
+| PIC32CM-PL_DFP | 94 |
+
+[CI original manufacturer source audit and research-only artifact](https://github.com/physicslu/plasma/actions/runs/38680931140/artifacts/11948341020).
+The archived CI original MCP/DFP sources and artifacts are historical,
+not a live/complete inventory of all Microchip market-orderable SKUs.
+
+**Do not summarize the combined 2,191 P1 queue as OpenOCD target-mapped,
+software-programmable, electrically approved, SWD-compatible, or
+Production-ready.** Only the original 126 have a bounded Target-only
+OpenOCD CFG research link. The newly identified 2,065 specifically do not.
+The next P1 task is to prioritize CFG reverse coverage of the largest
+manufacturer DFP families, not Phase 2 programming qualification.
