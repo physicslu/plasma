@@ -478,6 +478,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 information = item["microchip_phase1_ic_information"]
                 self.assertEqual(information["phase1_identity_state"], "IDENTIFIED")
                 self.assertFalse(information["phase1_information_complete"])
+                self.assertEqual(information["phase2_programming_state"], "UNKNOWN")
+                self.assertEqual(information["phase3_compatibility_state"], "NOT_TESTED")
+                self.assertIsNone(information["phase2_provider"])
+                self.assertEqual(information["phase2_supported_operations"], [])
+                self.assertEqual(information["phase3_verified_configurations"], [])
                 self.assertEqual(information["field_states"]["ram"], "VERIFIED")
                 self.assertEqual(information["field_states"]["working_vdd"], "PARTIAL")
                 self.assertEqual(information["field_states"]["io_supply"], "UNKNOWN")
@@ -486,7 +491,9 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(information["programming_profile_authority"])
                 self.assertFalse(information["hardware_runtime_ready"])
                 qualification = item["openocd_software_qualification"]
-                self.assertNotEqual(qualification["software_state"], "SUPPORTED")
+                self.assertEqual(qualification["software_state"], "UNKNOWN")
+                self.assertIsNone(qualification["provider"])
+                self.assertEqual(qualification["operations"], {})
         for blocked in (
             "ATSAML10D16A-MZTVAO", "ATSAML10E16A-MZTVAO",
             "ATSAML10E16A-MZVAO", "ATSAML11E16A-MZTVAO",
