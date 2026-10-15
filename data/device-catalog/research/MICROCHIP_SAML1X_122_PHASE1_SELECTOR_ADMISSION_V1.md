@@ -31,6 +31,8 @@ OpenOCD `SUPPORTED`、Programming Profile、PPU／Socket／Site HIL、量產燒�
 | 122 Exact ICPN 集合 SHA-256（排序，一行一筆） | `7a75e18a5f23cc2b80e10e1675918ce7da0601fe0d8d35664ebb78c4fb8d3b64` |
 | 原廠 DS60001513G PDF 原始 SHA-256 | `ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e` |
 
+**階段交付追蹤：凍結 Phase 1 目標 = 2,563；首批 122；首批完成後尚餘 2,441。** 這三個數量不包含 Phase 2／3 資格判定。
+
 Catalog 預期 4,853 → **4,975**：
 
 - ST 原有 4,629 不變；
@@ -82,20 +84,22 @@ Phase 1 `IDENTIFIED` 是唯一 IC Selector 可見性資格**。
 是否有 OpenOCD CFG、Phase 2 `SUPPORTED`、Phase 3 HIL
 均**不是 Phase 1 可見性的額外證據門檻**。
 
-**122 筆只是現有 Production Manifest 的第一批工程部署增量，
-不是另一種 Phase 1 研究分級，更不是排除其餘原廠已驗證 ICPN 的理由。**
-目前限定快照內 23,276 筆原廠 Exact ICPN 已通過 Phase 1
-`IDENTIFIED`，其中凍結 5-CFG 子集合 2,563 筆；本 PR 將其中
-122 筆接到正式 Catalog，仍有 **23,154 筆已 IDENTIFIED 尚未在
-Product IC Selector 上線**。這是跨 Brand canonical Phase 1
-可見性部署缺口，不是原廠身份或資訊完整度不合格。
+**目前 Microchip Phase 1 工程交付目標就是凍結的五組 OpenOCD CFG
+所對應的 2,563 筆原廠 Exact ICPN。**
+122 筆只是這 2,563 筆的第一批 Catalog／Selector 實作增量；
+若正式合併，**2,563 − 122 = 2,441 筆**仍待本階段開發交付。
+23,276 筆是較大範圍的原廠 MCP 身分觀測快照，其中其餘
+20,713 筆**不列入本階段交付缺口**，但原廠已證實身分不因此作廢。
+CFG 只決定這一階段「先做哪些」，不能當 Phase 1 身分
+或 Phase 2 SUPPORTED 的替代證明。
 
 舊版文件所稱「未來 SUPPORTED-only Selector 政策」
 已被最新 ADR-0002 取代，不得再做為 Microchip 開發依據。
 #924 只處理當前 122 筆受測試保護的增量；
-後續 migration 必須沿用相同身份證據門檻，完整追蹤
-`/api/devices/search`、`catalog_size`、`total_count` 與分頁，
-不得隱藏其他已確認的 Exact ICPN。
+後續須依凍結的 **2,563 目標清單**分批上線，持續以相同
+原廠 `IDENTIFIED` 門檻保護每一批，完整追蹤
+`/api/devices/search`、`catalog_size`、`total_count` 與分頁。
+其他來源身分紀錄保留，不得被錯誤改成失敗或不合格。
 
 P0／P1／P2 等歷史來源群組僅供原始資料重播與 SHA 稽核，
 不屬於現行 Phase 1／2／3 分類，也不得寫入 UI 的正式狀態欄位。
