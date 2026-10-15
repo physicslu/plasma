@@ -74,7 +74,7 @@ function softwareQualificationClass(state: string | undefined): string {
 
 function softwareQualificationLabel(state: string | undefined, zh: boolean): string {
   if (!state) return zh ? "軟體資格 · 未提供" : "Software · Unavailable";
-  return zh ? `軟體資格 · ${state}` : `Software · ${state}`;
+  return zh ? `Phase 2 · ${state}` : `Phase 2 · ${state}`;
 }
 
 function formatFlashBytes(value: number): string {
@@ -83,14 +83,9 @@ function formatFlashBytes(value: number): string {
   return `${value} bytes`;
 }
 
-function manufacturerPartLabel(status: string | null, zh: boolean): string {
-  if (status === "verified" || status === "engineering_verified" || status?.startsWith("verified_")) {
-    return zh ? "原廠料號 · 已確認" : "Manufacturer part · Confirmed";
-  }
-  if (status === "rejected" || status === "failed" || status === "blocked") {
-    return zh ? "原廠料號 · 未確認" : "Manufacturer part · Not confirmed";
-  }
-  return zh ? "原廠料號 · 待確認" : "Manufacturer part · Pending";
+function phase1IdentityLabel(state: string, zh: boolean): string {
+  if (state === "IDENTIFIED") return zh ? "Phase 1 · IDENTIFIED" : "Phase 1 · IDENTIFIED";
+  return zh ? `Phase 1 · ${state}` : `Phase 1 · ${state}`;
 }
 
 function physicalValidationLabel(kind: "PPU" | "Socket", status: string, zh: boolean): string {
@@ -301,14 +296,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </span>
                   </div>
                   <div className="icSelectorStatusRow icSelectorStatusEvidence">
-                    <span className={softwareQualificationClass(device.programming_qualification?.software_state)}>
-                      {softwareQualificationLabel(device.programming_qualification?.software_state, zh)}
+                    <span className={softwareQualificationClass(device.programming_qualification?.phase2_state)}>
+                      {softwareQualificationLabel(device.programming_qualification?.phase2_state, zh)}
                     </span>
                     <span className={openOcdTagState(device) === "mapped" ? "verified" : openOcdTagState(device) === "candidate" ? "pending" : "unmapped"}>
                       {openOcdConfigLabel(openOcdTagState(device), zh)}
                     </span>
-                    <span className={statusClass(device.catalog_verification.status)}>
-                      {manufacturerPartLabel(device.catalog_verification.status, zh)}
+                    <span className={device.phase1.identity_state === "IDENTIFIED" ? "verified" : "pending"}>
+                      {phase1IdentityLabel(device.phase1.identity_state, zh)}
                     </span>
                   </div>
                 </div>
@@ -423,7 +418,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <dl>
                     <div>
                       <dt>{zh ? "Software Qualification" : "Software Qualification"}</dt>
-                      <dd><strong>{selected.programming_qualification.software_state}</strong>{selected.programming_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Phase 2 審查" : " · exact ICPN not yet Phase 2 reviewed")}</dd>
+                      <dd><strong>{selected.programming_qualification.phase2_state}</strong>{selected.programming_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Phase 2 審查" : " · exact ICPN not yet Phase 2 reviewed")}</dd>
                     </div>
                     {selected.programming_qualification.provider && (
                       <>
@@ -545,7 +540,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
               {selected.programming_qualification && (
                 <>
-                  <div><dt>{zh ? "Software Qualification" : "Software Qualification"}</dt><dd><strong>{selected.programming_qualification.software_state}</strong></dd></div>
+                  <div><dt>{zh ? "Software Qualification" : "Software Qualification"}</dt><dd><strong>{selected.programming_qualification.phase2_state}</strong></dd></div>
                   <div><dt>{zh ? "Qualification Registry" : "Qualification Registry"}</dt><dd><code>{selected.programming_qualification.registry_id}</code></dd></div>
                   {selected.programming_qualification.provider && (
                     <>
@@ -638,11 +633,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               </div>
             )}
             <div className="icSelectorBoundary">
-              {selected.programming_qualification?.software_state === "SUPPORTED"
+              {selected.programming_qualification?.phase2_state === "SUPPORTED"
                 ? (zh
                   ? "此 exact ICPN 已完成 Phase 2 Programming qualification；這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
                   : "This exact ICPN has completed Phase 2 Programming qualification. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
-                : selected.programming_qualification?.software_state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
+                : selected.programming_qualification?.phase2_state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
                   ? (zh
                     ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Phase 2 Programming qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
                     : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 Programming qualification; CFG existence is not programming support.")
