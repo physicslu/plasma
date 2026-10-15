@@ -12,7 +12,7 @@ module pl_axi_waveform_checks (
     logic hold_r, hold_b;
     logic [31:0] previous_data;
     logic [1:0] previous_rresp, previous_bresp;
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!rst_n) begin
             hold_r <= 1'b0;
             hold_b <= 1'b0;

@@ -98,3 +98,43 @@ bitstreams are not committed. Building never executes ps7_init or loads FPGA.
 
 Current-source CI validates simulation/lint/artifact contracts on hosted runners.
 It does not run an unreviewed PR on the persistent SWPC runner or prove Vivado/HIL.
+
+## Retained LB-HOST baseline — 2026-10-15
+
+[Reviewed baseline record](baseline-host-2026-10-15.json) identifies the exact
+source commit, artifact hashes and original manifest hash. Full local evidence
+is retained at `pl/build/z2-control-waveform/run.NPA332Aw/` in the isolated
+feature checkout, including generated inputs, project, child logs and reports.
+Only reviewed metadata is published; raw logs contain workstation identifiers
+and bitstreams are large. Keep both this run and the earlier `run.HTZf27Ni/`.
+
+Final source `cbe2fb9d012d8ea3df3098ac9ceae0f3d2e468f9` passed 12 Cocotb cases
+across three runners and 10 artifact fault-injection tests before Vivado.
+Implemented setup slack is **0.719 ns**, hold slack **0.038 ns**; DRC and
+methodology each report **0 checks found**. Timing reports no missing clocks or
+unconstrained internal endpoints. Bitstream, HWH and manifest SHA256 checks
+passed; all evidence hashes were independently recomputed. LB-HOST is PASS;
+LB-Z2 and real SWD target remain NOT RUN. Later documentation and verification-only commits do
+not change which source commit produced this baseline. Production RTL and
+Vivado build inputs remain identical to that source; the final always_ff
+verification checker was independently rerun successfully after the build.
+
+### Explicit Vivado warning review
+
+No critical warning or error was found in the console or child run logs.
+No PSU-1..4 DDR warning occurred in either isolated build. The build generates
+PS7 configuration/handoff data but never executes DDR initialization or
+`ps7_init`; safe loading into an existing Linux runtime remains unqualified.
+
+| Warning | Assessment and evidence |
+|---|---|
+| IP_Flow 19-5101 | Vivado warns about SystemVerilog module packaging. Actual module references elaborated, synthesized and implemented; inferred AXI interfaces and HWH were checked. No suppression. |
+| BD 41-1627 | Automation initially proposes 4 GiB and shrinks to 1 GiB. Explicit assignment then replaces each with its disjoint 4 KiB segment; Tcl export and final HWH agree with each RTL decoder. |
+| BD 41-702 | Preset's USER-strength GP0 frequency annotation remains 10 MHz despite propagated 100 MHz. Actual GP0 ACLK and all slave clocks connect to FCLK0 at 100 MHz, verified in HWH and generated HDL. This stale annotation is retained transparently; future runtime checks must verify actual clocks. |
+| IP_Flow 19-4994 | IP generation regenerates the same automatic protocol-converter OOC constraint file inside this unique run. Previous artifacts/worktrees are untouched. |
+| Synth 8-7071 / 8-7023 | Intentionally unused Control sideband output, USB indication/power-selection outputs and unused reset outputs are omitted from generated instances. CONTROL/STATUS readback uses the internal register; none become external PL pins. Required peripheral reset is connected. |
+| Synth 8-7129 | Same-clock generated AXI interconnect/coupler optional per-port clock/reset inputs have no load. Generated logic uses shared ACLK/ARESETN tied to FCLK0/synchronized peripheral reset; slaves and GP0 are on that clock. Implemented timing has no unclocked or unconstrained internal endpoints. |
+
+The baseline is a regression gate before future SWD transaction changes. Its
+internal OE-low checks verify digital ownership only; physical Hi-Z, SWCLK
+accuracy at pins, voltage, turnaround and real target behavior are unqualified.
