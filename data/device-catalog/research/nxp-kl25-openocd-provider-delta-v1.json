@@ -34,5 +34,14 @@
     "current_provider_exact_operations_qualified": false,
     "safe_next_step": "Re-review KL25/klx Tcl include and Kinetis Flash driver on current approved provider; re-review FCF, longword programming, erase, security, silicon SDID and geometry before any Phase2 SUPPORTED claim"
   },
-  "no_execution_no_production_no_hil": true
+  "no_execution_no_production_no_hil": true,
+  "transport_dependency_delta": {
+    "prior_klx_directive": "transport select swd; swd newdap $_CHIPNAME cpu -expected-id $_CPUTAPID",
+    "approved_klx_directive": "source [find target/swj-dp.tcl]; swj_newdap $_CHIPNAME cpu -irlen 4 -expected-id $_CPUTAPID",
+    "approved_new_include_path": "tcl/target/swj-dp.tcl",
+    "approved_new_include_git_blob": "f2b233fb78133fd5e45395fd307674c16a65ed70",
+    "selection_changed_from_forced_swd_to_session_transport": true,
+    "current_provider_transport_selection_independently_qualified": false,
+    "operation_qualification_can_be_inherited": false
+  }
 }
