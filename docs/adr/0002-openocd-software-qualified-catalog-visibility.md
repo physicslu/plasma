@@ -1,6 +1,6 @@
-# ADR-0002: PLASMA Catalog 以 OpenOCD 軟體燒錄支援為顯示門檻，硬體驗證獨立管理
+# ADR-0002: PLASMA IC Discovery、Phase 狀態與 Catalog 可見性統一政策
 
-- **Status:** Accepted (product policy; Phase 1 baseline established; Phase 2 Programming active; public Catalog migration outstanding)
+- **Status:** Accepted (cross-vendor Phase 1/2/3 policy; Phase 1 identity visibility approved; Phase 2 Programming active)
 - **Date:** 2026-10-14
 - **Scope:** Manufacturer Research / Production Identity Catalog / Product IC Selector / OpenOCD software support / PPU-Site-Socket physical validation
 - **Owner decision:** 2026-10-14
@@ -13,21 +13,21 @@ PLASMA 現階段以 **OpenOCD** 為燒錄軟體 Backend。Manufacturer DFP、Pro
 
 Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣品與治具。若把 Socket HIL PASS 當作 Catalog 顯示條件，便會錯誤排除 OpenOCD 已支援、只是尚未備齊實體測試條件的 IC。反過來，若將所有 DFP 或 OpenOCD CFG 文字命中的 IC 直接列為 Supported，也會虛報實際軟體能力。
 
-目前 Production Identity Catalog 的 admission contract 允許 `no_mapping`；IC Selector 也可以呈現已收錄但尚未映射的 exact ICPN。現行產品顯示路徑因此**尚未符合**本 ADR 的「只顯示軟體支援」新規則。不能把決策方向寫成已完成的 runtime 保證。
+目前 Production Identity Catalog 的 admission contract 允許 `no_mapping`；IC Selector 也可呈現已收錄但尚未映射的 exact ICPN。Owner 於 2026-10-15 決議：**Selector visibility 不以 Phase 2 `SUPPORTED` 為門檻**。只要 Exact ICPN 已通過 Phase 1 `IDENTIFIED`，就應可被查詢並顯示其 Phase 1／2／3 狀態；真正的燒錄執行仍由 Phase 2、Runtime、電氣與安全 gate fail-closed。
 
 ## Decision
 
-> **PLASMA 面向一般使用者的 Catalog／IC Selector，僅列出有可追溯證據、由指定 OpenOCD 版本支援燒錄操作的精確原廠 ICPN。是否具有 Socket、Adapter、PPU、Site 實機 HIL 證據是獨立狀態，不是 Catalog 顯示資格。**
+> **PLASMA Catalog／IC Selector 以 Phase 1 `IDENTIFIED` 的精確原廠 ICPN 為可見性門檻，並分別顯示 Phase 1 IC Information、Phase 2 Programming、Phase 3 PLASMA Compatibility 狀態。Selector 可見不等於可燒錄；Job／Batch 執行權限必須由 Phase 2 `SUPPORTED`、已安裝 Runtime、電氣／安全條件與必要的 Phase 3 配置 gate 獨立決定。**
 
 具體規則：
 
-1. **Manufacturer Research Catalog** 保存原廠發現的候選 ICPN、DFP 裝置名稱、搜尋失敗、生命週期觀測與證據；不受 OpenOCD 支援與否限制，但不得直接進入公開可選擇的 Catalog。
-2. **Production Identity Store / Catalog Admission** 管理精確原廠商業 ICPN 與可驗證來源；資料可因歷史／審核用途保留 `no_mapping`，但內部 identity admission 不等於使用者可見、也不等於燒錄能力。
-3. **User-facing PLASMA Catalog View**（包括 `GET /api/devices/search` 的預設商品查詢、`catalog_size`、`total_count`、分頁、IC Selector、PMode／EMode picker、分類數量）**僅包含 OpenOCD software-qualified = SUPPORTED 的 exact ICPN**；各入口的數量與集合必須相同。Research-only、unknown、candidate、unsupported、unmapped 不出現在預設產品選料集合。
+1. **Manufacturer Research Catalog** 保存原廠發現的候選 ICPN、DFP 裝置名稱、搜尋失敗、生命週期觀測與證據；不受 OpenOCD 支援與否限制。只有通過 Phase 1 Exact ICPN identity gate 的 `IDENTIFIED` 記錄才取得 Selector visibility；`RESEARCH_ONLY`／`IDENTITY_DISPUTED` 不得冒充正式料號。
+2. **Canonical Phase 1 Identity / Information Store** 管理精確原廠商業 ICPN 與逐欄位可驗證來源。不同 Brand 可使用不同官方取得介面，但進入 PLASMA 後必須收斂成同一份 Phase 1 schema、field-state 與 provenance contract；不得因 Brand 改變證據門檻。
+3. **User-facing PLASMA Catalog / IC Selector View**（包括 `GET /api/devices/search`、`catalog_size`、`total_count`、分頁、IC Selector 與 picker）以 **Phase 1 `IDENTIFIED` exact ICPN** 為可見集合。Phase 2 `UNKNOWN／CANDIDATE／SUPPORTED／UNSUPPORTED` 與 Phase 3 `NOT_TESTED／PASSED／FAILED` 是顯示狀態，不是 Selector visibility filter。
 4. 軟體支援資格要鎖定 **OpenOCD Provider / 版本或 source commit、Target／Device 對應、Flash Driver、必要的 Flash geometry／bank 假設以及 program、必要 erase、read/verify 等實際宣告的 operation 能力**，保留證據與約束。只有 CFG 檔案名稱、家族字首、確定性 `mapped` 路徑或研究候選，**不足以單獨宣告 OpenOCD = SUPPORTED**。不能在無實體的條件下證成必要晶片特性時，維持 Candidate/Unknown。
-5. **硬體驗證獨立維度**：分開保存 IC/package、Socket／Adapter 型號與修訂版、PPU/Site 型號、供電與接腳映射、OpenOCD/PLASMA 軟體版本及測試結果。OpenOCD = SUPPORTED 且 Socket = NOT_TESTED 的 exact ICPN **仍應顯示於 Catalog**；UI 必須明示「尚未實機驗證」，不能標成 Hardware Passed。
-6. **執行授權仍分離**：Catalog 顯示不代表目前安裝的 PPU Runtime 已安裝相符的 OpenOCD Binary，也不代表 Socket 適配、電壓、安全、Flash 操作限制均滿足。Job/Batch 必須維持既有 runtime/配置/安全條件的 fail-closed 機制。
-7. OpenOCD 是**目前產品 Catalog 顯示門檻**，不是永久禁止未來 Vendor Backend / Plasma-native Backend。變更此政策需另行核准並版本化，不能透過暗中放寬篩選達成。
+5. **硬體驗證獨立維度**：分開保存 IC/package、Socket／Adapter 型號與修訂版、PPU/Site 型號、供電與接腳映射、Programming Provider／PLASMA 軟體版本及測試結果。Phase 3 尚未測試的 Exact ICPN 仍可顯示；UI 必須明示 `NOT_TESTED`，不能標成 Hardware Passed。
+6. **執行授權仍分離**：Catalog／IC Selector 顯示永遠不直接授權燒錄。Job/Batch 必須至少確認 Phase 2 `SUPPORTED`、相符已安裝 Runtime、電壓／操作／安全條件，並在產品執行政策要求時確認對應 Phase 3 硬體配置，全部 fail-closed。
+7. **OpenOCD 是目前 Phase 2 Provider，不是 Phase 1 visibility gate。** 未來 Vendor Backend / Plasma-native Backend 可透過版本化 Programming Qualification Provider contract 加入，不得修改 Phase 1 Exact ICPN identity 標準來取得特殊待遇。
 
 ## Implementation Phases — 三階段 IC Detail 與 Exact ICPN 驗收漏斗（修訂草案）
 
@@ -45,14 +45,14 @@ IC Detail 的三個區塊是**不同的證據產品**，同時形成「原廠身
 
 在**同一廠商、同一研究庫 Snapshot 與相同 OpenOCD 軟體資格範圍**下：
 
-- **`S1`（Phase 1 Identified）**：已由原廠證實身分、可列入 Phase 1 的完整商用 ICPN 集合。
-- **`S1_complete`（Phase 1 Information Complete）**：其中必要 IC Information 欄位均通過證據驗收者；`S1_complete ⊆ S1`，**獨立統計**。
-- **`S2`（Phase 2 Supported）**：`S1` 中通過指定 OpenOCD 版本與宣告操作的精確料號軟體資格審核者。
-- **`S3`（Phase 3 HIL Passed）**：`S2` 中至少有**一組指定硬體配置**通過實機驗收的精確料號。
+- **Phase 1 `IDENTIFIED`**：已由原廠證實身分、可列入 Phase 1 的完整商用 Exact ICPN。
+- **Phase 1 `INFORMATION_COMPLETE`**：Phase 1 `IDENTIFIED` 中必要 IC Information 欄位均通過證據驗收者；**獨立統計**。
+- **Phase 2 `SUPPORTED`**：Phase 1 `IDENTIFIED` 中通過指定 Programming Provider／版本與宣告操作之軟體資格審核者。
+- **Phase 3 `PASSED`**：Phase 2 `SUPPORTED` 中至少有**一組指定硬體配置**通過實機驗收的精確料號。
 
-**強制不變量：`S3 ⊆ S2 ⊆ S1`，因此 `|S1| ≥ |S2| ≥ |S3|`。** 可以相等；不能把 CFG 數、家族數、Programming Profile 數、Research 候選數、或 HIL 測試次數混入 Exact ICPN 分母。**通過 HIL 的配置組合數另計。**
+**強制不變量：Phase 3 `PASSED` ⊆ Phase 2 `SUPPORTED` ⊆ Phase 1 `IDENTIFIED`。** 三個 Phase 都以 Distinct Exact ICPN 計數；不能把 CFG 數、家族數、Programming Profile 數、Research 候選數或 HIL 測試次數混入分母。**通過 HIL 的配置組合數另計。**
 
-Phase 2 若不符合、證據不足、在指定 OpenOCD 版本不支援，或日後軟體資格失效，**只是不列入／退出 `S2`，必要時同步退出 `S3`；仍保留在 `S1`**，並記錄不符合原因、Provider 版本及原廠證據。Phase 3 失敗只撤銷該硬體配置的 PASS；同一 ICPN 若無其他通過的配置，才退出 `S3`。唯有**原廠身分本身不成立**，才依獨立 Phase 1 身分修正流程處理。
+Phase 2 若不符合、證據不足、在指定 Provider／版本不支援，或日後軟體資格失效，**只調整 Phase 2 狀態，必要時同步撤銷依賴它的 Phase 3 `PASSED`；Phase 1 `IDENTIFIED` 身分仍保留**，並記錄不符合原因、Provider 版本及原廠證據。Phase 3 失敗只撤銷該硬體配置的 PASS；唯有**原廠身分本身不成立**，才依獨立 Phase 1 身分修正流程處理。
 
 ### Phase 1 — CFG 反向發現入口與原廠權威資料來源
 
@@ -60,17 +60,36 @@ Phase 2 若不符合、證據不足、在指定 OpenOCD 版本不支援，或日
 
 1. **由 Config 反推候選 Family／Base Device**：使用指定 OpenOCD 版本／Commit 的 `tcl/target/*.cfg`，遞迴展開 Tcl Include，解析 Target、Flash Bank 與實際 Flash Driver。記錄 Provider、版本、CFG、Driver、來源雜湊，以及映射是否明確／通用／部分成立。單看 CFG 檔名或 Family 前綴不能證明精確 IC 可燒錄。
 2. **反查原廠完整料號**：由已辨識家族尋找原廠 Product、Package／Quality、Ordering Table、Datasheet 或官方 Parametric Export。把**該家族中原廠實際列出的各種封裝與商用後綴料號**逐一建檔。**Phase 1 不要求每一個封裝後綴都有獨立 OpenOCD CFG、Driver 或 Silicon ID 證據**；但不能拼湊不存在的料號、把 Product 標題的 Active 當成每個 Material 都 Active，或把只有 Family／DFP Alias 的紀錄冒充完整 ICPN。
-3. **`IDENTIFIED` 最低門檻**：`manufacturer`、**完整商用 `icpn`**、由原廠確認的 Base／Family 對應、官方 Source URI、來源證據作用範圍（Material／Ordering 與 Family／Product 必須分清）、觀察時間與身分證據狀態。同一完整商用身分去重；Lifecycle 與材料後綴分開記錄。猜測、模糊命中、衝突或不完整料號保持 `RESEARCH_ONLY`／`IDENTITY_DISPUTED`，**不進 `S1`**。
+3. **`IDENTIFIED` 最低門檻**：`manufacturer`、**完整商用 `icpn`**、由原廠確認的 Base／Family 對應、官方 Source URI、來源證據作用範圍（Material／Ordering 與 Family／Product 必須分清）、觀察時間與身分證據狀態。同一完整商用身分去重；Lifecycle 與材料後綴分開記錄。猜測、模糊命中、衝突或不完整料號保持 `RESEARCH_ONLY`／`IDENTITY_DISPUTED`，**不得標為 Phase 1 `IDENTIFIED`**。
 4. **原始證據封存與 Phase 1 數量分開管理**：能取得時封存原廠 XLSX／PDF／HTML／API 原始 Bytes 與 SHA-256。若無法封存，必須標記 `SOURCE_BYTES_NOT_ARCHIVED`，保留官方 URL、觀察時間、Source Scope，**不可聲稱已保存原廠 Binary SHA 或完整的原始檔位元重播**。但是可由官方**個別物料紀錄直接確認且無歧義**的 ICPN，仍可計為 `IDENTIFIED`；未封存來源須另列缺口。Phase 1 收錄**不自動構成**內部 Production Admission 或公開 Catalog 資格。
 5. **欄位持續補強，不阻擋 `IDENTIFIED`**：補齊 `base_device / package / pin_count / flash / ram / working_vdd / io_supply / vdda_or_analog_supply / temperature`，以及適用的 Core／Architecture。保留原始單位、工作模式、文件版次／表格、Exact／Family 適用範圍與 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT`。如原廠明確證明沒有某個獨立電源軌，可使用附證據的 `NOT_APPLICABLE`；不得以 Absolute Maximum Ratings 當 Working VDD，亦不可將 VREF 混為 VDDA。
-6. **`INFORMATION_COMPLETE` 門檻**：所有適用的必要欄位均有精確料號或明確涵蓋該料號的 Family 官方證據，結果為 `VERIFIED` 或有來源的 `NOT_APPLICABLE`。必要欄位存在 `UNKNOWN／PARTIAL／CONFLICT` 時不得列為資訊完整，**但不從 `S1` 移除**。來源原檔封存覆蓋率再單獨呈現。
+6. **`INFORMATION_COMPLETE` 門檻**：所有適用的必要欄位均有精確料號或明確涵蓋該料號的 Family 官方證據，結果為 `VERIFIED` 或有來源的 `NOT_APPLICABLE`。必要欄位存在 `UNKNOWN／PARTIAL／CONFLICT` 時不得列為資訊完整，**但不撤銷 Phase 1 `IDENTIFIED`**。來源原檔封存覆蓋率再單獨呈現。
 7. **Phase 邊界**：Phase 1 不宣稱 Erase／Program／Verify 可用、不授權 `SUPPORTED`、不建立已驗證 Programming Profile，也不能批次提升 Production／公開 Selector 或實機 HIL。現行內部 Identity Admission 政策維持不變。不從 OpenOCD 開始取得的低成本原廠料號，也仍可保存在 Research；並非禁止保存其他合法來源。
 
 **案例：** 從 `lpc8xx.cfg` 發現家族後，可反查 NXP 官方 LPC811／812／822／824 各自存在的完整商用後綴。每一筆**經原廠個別確認**者即可進入 Phase 1 `IDENTIFIED`；即使某個 Silicon Revision 尚無 `lpc2000.c` 支援證據，也是在 Phase 2 再檢查。**一個 CFG 不等於一個 ICPN，也不代表整個家族已 `SUPPORTED`。**
 
-**Phase 1 驗收輸出：** `S1` Exact ICPN 清單、官方來源與取得時間、Family／Ordering Variant Crosswalk、OpenOCD 研究入口、逐欄位覆蓋率、身分衝突、原始證據封存缺口、可重播的來源檢查，以及獨立的 `S1_complete` 數量。**不得藉此修改 Production／公開 Catalog 或 Phase 2／3 結果。**
+**Phase 1 驗收輸出：** Phase 1 `IDENTIFIED` Exact ICPN 清單、官方來源與取得時間、Family／Ordering Variant Crosswalk、OpenOCD 研究入口、逐欄位覆蓋率、身分衝突、原始證據封存缺口、可重播的來源檢查，以及獨立的 `INFORMATION_COMPLETE` 數量。**不得藉此修改 Phase 2／3 結果或 Job／Batch 執行權限。**
 
-### Phase 1 — official manufacturer bulk information acquisition (Microchip initial implementation)
+### Phase 1 — Cross-vendor canonical discovery method
+
+ST、NXP、Microchip 及未來 Brand 必須使用**同一套 discovery 判定流程與 canonical output**。差異只允許存在於原廠資料取得 adapter，不允許存在於 Phase 定義、欄位狀態、證據門檻或 Selector／execution 語意。
+
+固定流程：
+
+1. **Capability Seed**：從鎖定 Programming Provider（目前為 OpenOCD）的 Target／Include／Flash Driver／Silicon Probe Rule 建立技術研究入口；P0/P1/P2 只決定研究優先順序。
+2. **Official Manufacturer Identity Acquisition**：回到原廠官方 Material／Ordering／Product／Parametric／DFP／Datasheet 等來源取得 Exact ICPN；不得用 CFG、家族名稱或後綴規則創造商用料號。
+3. **Exact ICPN Crosswalk**：明確保存 `manufacturer + exact_icpn + base_device/family + source_scope`。只有無歧義官方完整商用料號可標為 Phase 1 `IDENTIFIED`。
+4. **IC Information Projection**：Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、VDDA、Temperature 等欄位各自使用 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT／NOT_APPLICABLE`；未知不得補零、不得跨 rail 複製、Family evidence 不得假裝 Exact evidence。
+5. **Programming Handoff**：Phase 1 `IDENTIFIED` 可進 Phase 2 review；只有經版本鎖定 Programming Provider + 原廠 programming evidence 完成 Exact ICPN qualification 才可標 `SUPPORTED`。
+6. **Selector / Execution Separation**：Phase 1 `IDENTIFIED` 決定是否可搜尋；Phase 2、Phase 3 只決定顯示的能力狀態與執行 gate，不得反向刪除有效的 Phase 1 身分。
+
+Canonical machine-readable contract 為 [IC Discovery Canonical Contract v1](../architecture/ic-discovery-canonical-contract-v1.json)。新的跨廠牌 consumer 必須使用 canonical Phase／field naming；既有 vendor-specific historical artifacts 可以保留，但不得成為新的 API/UI 分叉理由。
+
+### Vendor-specific official source adapters
+
+不同原廠的官方介面可以不同，例如 ST Product Selector/eStore、NXP Material/Buy-Parametrics、Microchip MCP/DFP/Parametric Chart。這些都只是 **source adapter**；輸出必須遵守上述共同 contract。
+
+### Phase 1 — official manufacturer bulk information acquisition — Microchip source-adapter example
 
 **Decision / implementation method:** Use the manufacturer's **Parametric Search chart export → official MCP exact-ordering crosswalk → targeted datasheet evidence** as the default Microchip Phase 1 acquisition pipeline. This is an **approved workflow contract**, not a statement that a chart exporter, unattended scraper, or all-Microchip complete ingestion already exists. Other manufacturers may use equivalent official, source-bound bulk exports under the same field-level contract.
 
@@ -96,26 +115,26 @@ Phase 2 若不符合、證據不足、在指定 OpenOCD 版本不支援，或日
 
 Phase 2 從 **Phase 1 `IDENTIFIED` 的 Exact ICPN 集合**選取候選，**不使用歷史 P0/P1 數量當作分母**。逐一核對原廠 Programming Guide／Reference Manual／Datasheet 與指定 OpenOCD Provider／版本，確認實際 Silicon ID／Revision、Target/Driver/Flash Bank、ROM IAP 或 Flash Controller、Geometry、Security、Reset/Clock 條件，及宣告的 **Erase／Program／Read／Verify** 操作，建立有版本與適用範圍的可重用 Programming Profile。
 
-- **`SUPPORTED`**：精確 ICPN 的軟體燒錄適用性與宣告操作有足夠、可重播的版本鎖定證據，列入 `S2`；不宣稱 PPU／Socket HIL。
-- **`CANDIDATE／UNKNOWN／BLOCKED`**：只有部分 OpenOCD 線索，或必要文件／證據不足、相互衝突；保留在 `S1`，不計 `S2`。
-- **`UNSUPPORTED`（限定版本與操作範圍）**：經審核確定該 Provider／版本／操作不適用；保留在 `S1`，不計 `S2`，不可推論全世界任何後端都永遠無法燒錄。
-- **退版或資格回歸**：保留原廠料號與歷史證據，撤銷受影響的 `S2` 軟體資格，並重算相關 `S3` 資格。
+- **`SUPPORTED`**：精確 ICPN 的軟體燒錄適用性與宣告操作有足夠、可重播的版本鎖定證據；不宣稱 PPU／Socket HIL。
+- **`CANDIDATE／UNKNOWN／BLOCKED`**：只有部分 Programming Provider 線索，或必要文件／證據不足、相互衝突；Phase 1 `IDENTIFIED` 身分仍保留，但 Phase 2 不得標為 `SUPPORTED`。
+- **`UNSUPPORTED`（限定版本與操作範圍）**：經審核確定該 Provider／版本／操作不適用；保留 Phase 1 `IDENTIFIED` 身分，不可推論全世界任何後端都永遠無法燒錄。
+- **退版或資格回歸**：保留原廠料號與歷史證據，撤銷受影響的 Phase 2 `SUPPORTED`，並重新評估依賴它的 Phase 3 `PASSED`。
 
-Phase 2A 可以先建立軟體資格權威，再由 Issue #849 完成公開 Catalog／IC Selector 的 **SUPPORTED-only** 顯示遷移。即使 Phase 1 已收錄、具備某家族 CFG 或已有內部 Production 身分，**也不得在尚未取得 `SUPPORTED` 前自動公開為可燒錄選項**。
+Phase 2 可以建立獨立的軟體資格權威並投影到同一 IC Selector。Phase 1 `IDENTIFIED` 即可被搜尋與檢視；在尚未取得 Phase 2 `SUPPORTED` 前，UI 必須清楚顯示 `UNKNOWN／CANDIDATE／UNSUPPORTED`，且 Job／Batch 不得把 Selector 可見性解讀為可燒錄授權。
 
 ### Phase 3 — PLASMA Compatibility handoff（與軟體資格分離的實機相容性）
 
-Phase 3 只把 `S2` 中具有**特定配置實機驗證**的 ICPN 計入 `S3`。驗收證據需鎖定 Device／Package、Socket／Adapter 型號及 Revision、PPU／Site、Pin Mapping、電壓／電流／保護、Debug Interface、PS／PL／OpenOCD 版本及實際 HIL 操作。
+Phase 3 僅能對 Phase 2 `SUPPORTED` 的 Exact ICPN 建立**特定配置實機驗證**。驗收證據需鎖定 Device／Package、Socket／Adapter 型號及 Revision、PPU／Site、Pin Mapping、電壓／電流／保護、Debug Interface、PS／PL／Programming Provider 版本及實際 HIL 操作。
 
-`S3` 統計**唯一 Exact ICPN 數**；通過的實體配置或測試次數另外統計。軟體 `SUPPORTED` 而 Socket／PPU `NOT_TESTED` 的 IC，**仍可依既有政策顯示於軟體合格 Catalog**，但不計 `S3`。Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed；不得用 Phase 1／2 文件捏造 HIL PASS。
+Phase 3 `PASSED` 統計**唯一 Exact ICPN 數**；通過的實體配置或測試次數另外統計。Phase 2 `SUPPORTED` 而 Socket／PPU `NOT_TESTED` 的 IC 仍可在 Selector 顯示其真實狀態，但不得標示 Phase 3 `PASSED`。Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed；不得用 Phase 1／2 文件捏造 HIL PASS。
 
-### Visibility and status boundary during phased migration
+### Visibility and execution boundary
 
-This ADR's already-accepted final **user-facing default selectable Catalog = exact software `SUPPORTED` only** policy remains unchanged, but it is **not implemented merely by adopting these phases**. Phase 1 IC Information may be examined in internal Research/admin detail views; this does not make incomplete or unqualified ICPNs eligible in the default product selector. The current IC Selector/API visibility migration belongs to Phase 2 (Issue #849) and remains explicitly outstanding. No existing `OpenOCD CFG exists` badge may be interpreted as an affirmative programming-qualification result.
+The IC Selector is a **status surface**, not an execution entitlement surface. Phase 1 `IDENTIFIED` Exact ICPNs are searchable and visible regardless of Phase 2/3 result. The same row must expose Phase 1 IC Information quality, Phase 2 Programming state and Phase 3 PLASMA Compatibility state independently. No existing `OpenOCD CFG exists` badge, Phase 1 identity, Production admission or Selector visibility may be interpreted as affirmative programming qualification. Job／Batch remains fail-closed on Phase 2 `SUPPORTED`, installed Runtime and required electrical／hardware safety gates.
 
 ## Phase scope of the existing OpenOCD-first and Core/Driver requirements
 
-OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**，同時為**Phase 2 的燒錄資格**提供技術證據。Phase 1 的身分權威來源仍是原廠完整商用料號；Phase 2 才判定精確 Silicon／Programming Operation 相容性；Phase 3 才判定指定硬體配置的實機 HIL。P0／P1／P2 僅為舊有內部研究排序，**不得拿來當 `S1／S2／S3` 的 Phase KPI**。
+OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**，同時為**Phase 2 的燒錄資格**提供技術證據。Phase 1 的身分權威來源仍是原廠完整商用料號；Phase 2 才判定精確 Silicon／Programming Operation 相容性；Phase 3 才判定指定硬體配置的實機 HIL。P0／P1／P2 僅為研究排序，**不得當作 Phase 1／2／3 的完成狀態或 KPI**。
 
 目前整體專案狀態仍為：Phase 1 架構已建立、Phase 2 Programming 已核准執行、Phase 3 延後。專案階段進度**不代表**每顆 Exact ICPN 均已個別通過。舊研究資料、來源 Hash 與未完成的欄位／資格缺口均保留，不得因本次修訂而回溯視為 `IDENTIFIED`、`INFORMATION_COMPLETE` 或 `SUPPORTED`。
 
@@ -135,7 +154,7 @@ OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**�
 
 ### Vendor-agnostic OpenOCD Reverse Coverage SOP（研究優先級標準程序）
 
-本節規範 **研究階段的 OpenOCD 能力索引與 P0/P1/P2 優先級**，僅供 Phase 1 CFG-first Reverse Discovery 確定研究入口、以及 Phase 2 重用技術線索。**P0/P1/P2 不是 Phase 1/2/3 的完成狀態；任何符合原廠身分門檻的 Exact ICPN，進入 Phase 1 `S1` 不需要先取得 P0，也不要求每筆料號都有獨立 CFG／Driver。** Phase 2 的 exact-ICPN Software Qualification 和 Phase 3 的 Physical Validation 仍各自獨立。本程序適用所有製造商；起點是 OpenOCD 能力來源，**不是**指定品牌的料號名錄。機器可檢查的政策契約為 [OpenOCD Reverse Research Contract v1](../architecture/openocd-reverse-coverage-research-contract-v1.json)，只鎖定流程和證據欄位，不構成既有資料自動升級的授權。
+本節規範 **研究階段的 OpenOCD 能力索引與 P0/P1/P2 優先級**，僅供 Phase 1 CFG-first Reverse Discovery 確定研究入口、以及 Phase 2 重用技術線索。**P0/P1/P2 不是 Phase 1/2/3 的完成狀態；任何符合原廠身分門檻的 Exact ICPN，進入 Phase 1 `IDENTIFIED` 不需要先取得 P0，也不要求每筆料號都有獨立 CFG／Driver。** Phase 2 的 exact-ICPN Software Qualification 和 Phase 3 的 Physical Validation 仍各自獨立。本程序適用所有製造商；起點是 OpenOCD 能力來源，**不是**指定品牌的料號名錄。機器可檢查的政策契約為 [OpenOCD Reverse Research Contract v1](../architecture/openocd-reverse-coverage-research-contract-v1.json)，只鎖定流程和證據欄位，不構成既有資料自動升級的授權。
 
 1. **固定 Provider 與母體邊界：** 使用 `release/openocd.json` 或已核准的 Provider Registry，記錄 Provider、版本、Source Commit、Git Blob、檢查日期、搜尋範圍與明確排除範圍。其他 upstream `master`、Vendor Fork、舊版本各屬獨立 Capability Inventory，不可用未核准版本的結果代替目前版本。明確區分選到的 CFG／Driver 子集合和「所有 OpenOCD 裝置」或「全部原廠 Active 料號」。
 2. **先建 Capability Index（由軟體向外查）：** 解析 Target CFG、Tcl Include Graph、Core/Debug Transport、Flash Bank/Driver、Part ID／probe 規則與操作來源（`probe`、必要 `erase`、`write/program`、`read/verify`），保留原始路徑及對應 Git Blob／內容雜湊。主要能力索引鍵為 **`Provider + Version/Commit + Target + Flash Driver + Silicon Identity/Probe Rule`**；Manufacturer、Base Device、Exact ICPN 是後續身分對照，不是底層 Flash 能力主鍵。
@@ -153,7 +172,7 @@ OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**�
 
 對既有 **Microchip 24,051 Research 候選 ICPN**，保留全部來源資料即可；目前不再以擴張候選總數或全面補完廠商生命週期為工作目標。**297 個 MCP `NOT_FOUND` 與 68 個 fuzzy-only 查詢**預設留在低優先 backlog，除非先證明其裝置家族屬於 P0/P1。P2 的 Research archival 不等於停產、OpenOCD 永久不支援或已被硬體驗證。
 
-Phase 進度 KPI 以 `|S1|`（原廠已確認完整 ICPN）、`|S1_complete|`（欄位資訊完整）、`|S2|`（OpenOCD software-qualified exact ICPN）、`|S3|`（至少一組 HIL PASS 的 exact ICPN）分別呈現，並檢查 `S3 ⊆ S2 ⊆ S1`。OpenOCD Target/Driver/Profile 數量和 HIL 組態數量另列，不得混入同一分母。工程指標應以「版本鎖定 OpenOCD 可證明的 Device/Driver/Operations → 通過精確 ICPN Software Qualification → Catalog 可見數量」為主要成果指標；24,051 等原始候選數是**獨立的背景庫存指標**，不得納入產品支援率分母或營運承諾。
+Phase 進度 KPI 分別呈現 **Phase 1 `IDENTIFIED` Exact ICPN 數、Phase 1 `INFORMATION_COMPLETE` 數、Phase 2 `SUPPORTED` Exact ICPN 數、Phase 3 `PASSED` Exact ICPN 數**，並檢查 Phase 3 `PASSED` ⊆ Phase 2 `SUPPORTED` ⊆ Phase 1 `IDENTIFIED`。OpenOCD Target/Driver/Profile 數量和 HIL 組態數量另列，不得混入同一分母。24,051 等原始候選數是**獨立的背景庫存指標**，不得納入產品支援率分母或營運承諾。
 
 ## Implementation requirements — Core / Transport / Flash-Driver classification (owner-approved)
 
@@ -225,11 +244,11 @@ Phase 進度 KPI 以 `|S1|`（原廠已確認完整 ICPN）、`|S1_complete|`（
 
 **後續實作 PR 必須新增的 Phase Funnel 契約測試：**
 
-- 一份 OpenOCD CFG 可反查原廠家族內多個官方完整商用封裝／Ordering Variant；每筆原廠個別證實者可獨立進入 `S1`，不需每筆各有 CFG；**臆造後綴、只有 Product Title 的 Active** 都不得計入。
-- 分別報告 `S1`、`S1_complete`、原檔已封存與僅觀察到原廠網頁的比例，以及逐欄位證據狀態；缺失的 VDDA 或原始 Binary 不得假裝 `VERIFIED`。
-- Phase 2 證據不足、指定版本不支援時仍保留 `S1`，但排除 `S2` 與 `S3`；不能只因 OpenOCD 不適用就刪除原廠有效料號。
-- 三階段均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 `S3 ⊆ S2 ⊆ S1`。資訊完整數和實體配置組合數獨立報告。
-- Phase 3 `HIL PASSED` 必須有指定配置；軟體 `SUPPORTED` 但 Socket 未測的 IC 可以依軟體資格顯示於 Catalog，卻不可列入 `S3`；單一硬體失敗不得直接撤銷 Phase 2。
+- 一份 OpenOCD CFG 可反查原廠家族內多個官方完整商用封裝／Ordering Variant；每筆原廠個別證實者可獨立成為 Phase 1 `IDENTIFIED`，不需每筆各有 CFG；**臆造後綴、只有 Product Title 的 Active** 都不得計入。
+- 分別報告 Phase 1 `IDENTIFIED`、Phase 1 `INFORMATION_COMPLETE`、原檔已封存與僅觀察到原廠網頁的比例，以及逐欄位證據狀態；缺失的 VDDA 或原始 Binary 不得假裝 `VERIFIED`。
+- Phase 2 證據不足、指定版本不支援時仍保留 Phase 1 `IDENTIFIED`；Phase 2 不得標為 `SUPPORTED`，Phase 3 不得標為 `PASSED`。不能只因 OpenOCD 不適用就刪除原廠有效料號。
+- 三階段均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 Phase 3 `PASSED` ⊆ Phase 2 `SUPPORTED` ⊆ Phase 1 `IDENTIFIED`。資訊完整數和實體配置組合數獨立報告。
+- Phase 3 `PASSED` 必須有指定配置；Phase 2 `SUPPORTED` 但 Socket 未測的 IC 仍可顯示於 Selector，但 Phase 3 狀態必須維持 `NOT_TESTED`；單一硬體失敗不得直接撤銷 Phase 2。
 
 1. 使用完整 Production manifest 的實際 loaded rows，分別報告 **內部 admitted ICPNs** 與 **軟體已確認 SUPPORTED 的可見 ICPNs**，不手填或繼承歷史 coverage 數。
 2. 測試 exact ICPN 有原廠證據但 `no_mapping`、僅 family-matched CFG、只有 candidate source、缺乏可用 Flash driver/operation 證據的資料，皆不出現在預設產品搜尋、picker 和計數。
