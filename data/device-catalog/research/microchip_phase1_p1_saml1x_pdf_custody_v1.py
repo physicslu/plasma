@@ -20,6 +20,7 @@ import urllib.request
 URL = ("https://ww1.microchip.com/downloads/en/DeviceDoc/"
        "SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf")
 REVISION = "DS60001513G"
+PINNED_ORIGINAL_SHA256 = "ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e"
 FILENAME = "original-saml10l11-ds60001513g.pdf"
 MAX_BYTES = 50 * 1024 * 1024
 MIN_BYTES = 10000
@@ -69,6 +70,8 @@ def validate_pdf_bytes(raw):
             "manufacturer PDF byte size out of bounds")
     require(raw.startswith(b"%PDF-") and b"%%EOF" in raw[-4096:],
             "source is not a complete original PDF (possibly HTML shell)")
+    require(hashlib.sha256(raw).hexdigest() == PINNED_ORIGINAL_SHA256,
+            "manufacturer PDF original bytes differ from source-reviewed SHA-256")
 
 
 def pdftotext_pages(path, page):
