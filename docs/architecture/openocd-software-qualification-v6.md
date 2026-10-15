@@ -100,4 +100,3 @@ v6 remains **software qualification only**:
 - `hardware_runtime_ready=false`;
 - `physical_programming_qualified=false`;
 - Phase 3 remains separate.
-
