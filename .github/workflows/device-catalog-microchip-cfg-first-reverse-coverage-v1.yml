@@ -244,6 +244,20 @@ jobs:
           proof = report["p0_family_chart_evidence"]
           assert proof["p0_icpns_exact_manufacturer_base_joined_to_chart"] == 2370
           assert 0 <= proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"] <= 23
+          assert proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"] == 0
+          assert proof["p0_icpns_not_in_observed_chart"] == 67
+          assert proof["p0_unmatched_distinct_manufacturer_base_count"] == 27
+          assert len(proof["p0_official_source_acquisition_queue"]) == 27
+          assert sum(x["exact_icpn_count"] for x in
+                     proof["p0_official_source_acquisition_queue"]) == 67
+          assert proof["chart_unmatched_by_research_cfg"] == {
+              "tcl/target/at91samdXX.cfg": 42,
+              "tcl/target/atsamv.cfg": 14,
+              "tcl/target/pic32mx.cfg": 11,
+          }
+          assert all(x["official_exact_ordering_table_state"] == "NOT_REPLAYED"
+                     and x["field_inference_authorized"] is False for x in
+                     proof["p0_official_source_acquisition_queue"])
           assert (proof["p0_icpns_exact_manufacturer_base_joined_to_chart"] +
                   proof["p0_icpns_reviewed_manufacturer_alias_joined_to_chart"] +
                   proof["p0_icpns_not_in_observed_chart"]) == 2437
