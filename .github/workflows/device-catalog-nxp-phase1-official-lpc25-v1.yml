@@ -1,0 +1,33 @@
+name: NXP Phase1 Official LPC 25 Exact Materials
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-25-lpc-exact-material-12nc-phase1-v1.csv"
+      - "data/device-catalog/research/nxp_phase1_official_lpc_25_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_official_lpc_25_v1.py"
+      - "data/device-catalog/research/NXP_PHASE1_LPC_25_OFFICIAL_MATERIALS_V1.md"
+      - ".github/workflows/device-catalog-nxp-phase1-official-lpc25-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp_phase1_official_lpc_25_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_official_lpc_25_v1.py"
+      - ".github/workflows/device-catalog-nxp-phase1-official-lpc25-v1.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nxp-official-lpc25:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay and verify historical NXP S1=251
+        run: python data/device-catalog/research/nxp_phase1_lpc11u_lpc83x_11_v1.py
+      - name: Verify 25 official 12NC material observations and Phase1 S1=276
+        run: python data/device-catalog/research/nxp_phase1_official_lpc_25_v1.py
+      - name: Reject fabricated identity, false source archive and false supported
+        run: python -m unittest discover -s data/device-catalog/research -p 'test_nxp_phase1_official_lpc_25_v1.py' -v
