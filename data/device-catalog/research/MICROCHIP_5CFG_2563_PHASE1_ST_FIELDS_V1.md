@@ -61,8 +61,11 @@ IC Information 欄位及獨立證據狀態。額外的 Family 欄目前只是
 凍結基準不是依 2,563 這個數字臆測：CI 對
 `(exact ICPN, manufacturer Base Device, Target CFG)` 排序後做 Canonical SHA-256，
 輸出 `cfg_identity_freeze_sha256`；並鎖定五組 CFG 的逐組人數與跨組唯一性。
-**當得到 CI 第一次正式 Digest 後，需再將 Digest 固定寫回驗證 Gate**。
-此文件不預先捏造尚未量測的 SHA。
+正式原廠 MCP/DFP/Chart 重播於 [GitHub Actions #38687715762](https://github.com/physicslu/plasma/actions/runs/38687715762) 取得並核對
+**Canonical exact ICPN + Base Device + CFG membership SHA-256**：
+`0c37ad68c1db0a4fb50ff5a1d229faaca0ee6eac44cfb9d9b7de4e8a931daf2a`。
+該 SHA 已固定在程式的 Fail-Closed Gate，後續即使仍是 2,563 筆，
+只要換了任一精確料號、Base 或 CFG 映射也將驗證失敗。
 
 ## Product/Selector 分離
 
