@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Microchip exact MCP x DFP identity archive (legacy PR #909 filename).
+
+Per ADR-0002 a DFP support-name match alone is P2 archive-only, not a
+credible P1 OpenOCD Target/Driver family lead. This source-replayed subset
+is never OpenOCD software-supported or Product Catalog-admitted.
+P0=2,437 and bounded Target-only P1=126 remain frozen.
 """Source-only Microchip P1 candidate expansion from exact MCP x original DFP.
 
 The baseline P1 126 target-CFG cohort is FROZEN. This program introduces a
@@ -27,7 +33,8 @@ P0_BASELINE = 2437
 P1_TARGET_BASELINE = 126
 DFP_SUPPORTED_NAMES = 3717
 ELIGIBLE_LANE = "32bit-pic-sam"
-STATE = "P1_DFP_DISCOVERY_NO_OPENOCD_CFG_REVIEW"
+STATE = "P2_ARCHIVE_DFP_IDENTITY_ONLY_NO_OPENOCD_LEAD"
+P2_BASELINE = SOURCE_SUBSET - P0_BASELINE - P1_TARGET_BASELINE
 NO_CFG = "NO_DFP_NAME_CFG_CROSSWALK"
 SHA_RE = re.compile(r"[a-f0-9]{64}\Z")
 MAX_BYTES = 64 * 1024 * 1024
@@ -133,7 +140,10 @@ def classify(source, inventory):
             "manufacturer_dfp_pack":match["manufacturer_pack"],
             "manufacturer_dfp_pack_version":match["pack_version"],
             "discovery_lane":ELIGIBLE_LANE,
-            "p1_research_state":STATE,
+            "dfp_identity_research_state":STATE,
+            "adr0002_research_priority":"P2",
+            "counts_as_adr0002_p1_candidate":False,
+            "source_mapping_state":NO_CFG,
             "manufacturer_base_exact_dfp_join":True,
             "source_original_mcp_response_sha256_refs":hashes,
             "source_original_dfp_index_sha256":
@@ -149,34 +159,41 @@ def classify(source, inventory):
     pcounts=Counter(r["manufacturer_dfp_pack"] for r in output)
     bcounts=Counter(r["base_device"] for r in output)
     require(sum(pcounts.values())==sum(bcounts.values())==len(output),
-            "P1 discovery group totals do not reconcile")
-    require(all(r["p1_research_state"]==STATE
+            "DFP archive group totals do not reconcile")
+    require(len(output) <= P2_BASELINE,
+            "DFP-only subset exceeds ADR-0002 P2 total")
+    require(all(r["dfp_identity_research_state"]==STATE
+                and r["adr0002_research_priority"]=="P2"
+                and r["counts_as_adr0002_p1_candidate"] is False
+                and r["source_mapping_state"]==NO_CFG
                 and r["openocd_target_cfg"] is None
                 and r["phase2_software_supported"] is False
                 and r["production_write_authorized"] is False
                 for r in output),
-            "new P1 DFP discovery cannot implicitly qualify OpenOCD")
+            "DFP-only archive must not claim ADR-0002 P1 or software SUPPORTED")
     return {
         "schema_version":1,
-        "policy":"ADR-0002 Microchip P1 Phase 1 Research discovery proposal",
+        "policy":"ADR-0002 Microchip DFP-only P2 manufacturer identity archive",
         "manufacturer":"Microchip",
         "source_subset_original_mcp_exact_icpns":SOURCE_SUBSET,
         "baseline_p0_exact_icpns_unchanged":P0_BASELINE,
         "baseline_p1_target_only_exact_icpns_unchanged":P1_TARGET_BASELINE,
-        "p1_discovery_cohort_not_target_cfg_p1":True,
-        "p1_discovery_exact_icpn_candidates":len(output),
-        "p1_expanded_research_queue_total":P1_TARGET_BASELINE+len(output),
+        "adr0002_p1_openocd_candidate_exact_icpns":P1_TARGET_BASELINE,
+        "adr0002_p2_archive_exact_icpns":P2_BASELINE,
+        "dfp_only_p2_archive_exact_icpn_subset":len(output),
+        "p2_other_archived_exact_icpns":P2_BASELINE-len(output),
+        "dfp_only_archive_not_adr0002_p1":True,
         "manufacturer_dfp_original_index_sha256":gates.PINNED_DFP_SOURCE,
         "original_dfp_all_lanes_counts":dfp_lanes,
         "manufacturer_32bit_mcu_dfp_names_in_scope":len(eligible),
         "manufacturer_dfp_matched_distinct_base_names":len(bcounts),
-        "candidate_exact_icpn_by_manufacturer_pack":
+        "dfp_archive_exact_icpn_by_manufacturer_pack":
             dict(sorted(pcounts.items())),
-        "candidate_exact_icpn_by_manufacturer_base":
+        "dfp_archive_exact_icpn_by_manufacturer_base":
             dict(sorted(bcounts.items())),
         "not_selected_mapping_gap_reasons":dict(sorted(gaps.items())),
         "source_replay_original_sha256_required":True,
-        "new_p1_discovery_all_original_mcp_and_dfp_bytes_replayed":True,
+        "dfp_archive_all_original_mcp_and_dfp_bytes_replayed":True,
         "baseline_p0_p1_records_reclassified":0,
         "new_phase1_fields_verified":0,
         "openocd_software_supported_count":0,
@@ -197,17 +214,17 @@ def main():
     args=cli.parse_args()
     require("production" not in {p.casefold()
             for p in args.output.resolve().parts},
-            "P1 research discovery cannot write to Production")
+            "DFP archive cannot write to Production")
     raw=args.upstream_cfg_report.read_bytes()
     require(0<len(raw)<=MAX_BYTES,"full original-MCP source report unavailable")
     result=classify(json.loads(raw),archived_inventory(args.dfp_evidence_root))
     if args.verify:
         require(json.loads(args.output.read_text(encoding="utf-8"))==result,
                 "source-bound P1 discovery report replay mismatch")
-        print("MICROCHIP P1 DISCOVERY SOURCE REPLAY PASS")
+        print("MICROCHIP DFP-ONLY P2 ARCHIVE SOURCE REPLAY PASS")
     else:
         require(not args.output.exists(),
-                "P1 Research results cannot be silently overwritten")
+                "DFP archive results cannot be silently overwritten")
         args.output.parent.mkdir(parents=True,exist_ok=True)
         with args.output.open("x",encoding="utf-8") as f:
             json.dump(result,f,indent=2,sort_keys=True)
