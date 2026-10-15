@@ -67,6 +67,7 @@ class ProgrammingQualificationRegistry:
         return {
             "schema_version": "1.0.0",
             "phase": PHASE,
+            "registry_id": None,
             "state": "UNKNOWN",
             "reviewed": False,
             "phase1_identity_state": phase1_state,
@@ -103,6 +104,7 @@ class ProgrammingQualificationRegistry:
         return {
             "schema_version": "1.0.0",
             "phase": PHASE,
+            "registry_id": raw.get("registry_id"),
             "state": state,
             "reviewed": bool(raw.get("reviewed")),
             "phase1_identity_state": PHASE1_IDENTIFIED,
