@@ -92,7 +92,7 @@ class NXPWave4ResearchTests(unittest.TestCase):
         self.assertEqual(len(old), 501)
         old.remove(next(iter(old)))
         old.add(self.doc["records"][0]["icpn"])
-        with self.assertRaisesRegex(ValueError, "previously reviewed"):
+        with self.assertRaisesRegex(ValueError, "duplicated by new candidates"):
             audit.validate(self.doc, baseline=old)
 
     def test_reject_relabelled_flash_target(self):
