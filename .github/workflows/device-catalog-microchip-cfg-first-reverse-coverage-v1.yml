@@ -7,6 +7,9 @@ on:
       - 'data/device-catalog/research/test_microchip_openocd_reverse_coverage_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_p1_ordering_crosswalk_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p1_ordering_crosswalk_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P1_ORDERING_APPLICABILITY_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p1_information_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P1_PHASE1_INFORMATION_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p0_information_ledger_v1.py'
@@ -40,6 +43,8 @@ jobs:
             -p 'test_microchip_phase1_p0_information_ledger_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p1_information_ledger_v1.py' -v
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_ordering_crosswalk_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
             -p 'test_microchip_phase1_p0_samr30_online_original_v1.py' -v
           python -m unittest discover -s data/device-catalog/research \
@@ -347,6 +352,63 @@ jobs:
              "software_supported":False,
           },sort_keys=True,indent=2))
           PY
+      - name: Validate P1 original-MCP ordering grammar audit offline fail-closed
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_ordering_crosswalk_v1.py' -v
+      - name: Restore archived official DS60001513G original PDF and check PDF extraction tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends poppler-utils
+          pdfroot="${{ runner.temp }}/microchip-p1-original-pdf"
+          mkdir -p "$pdfroot"
+          gh run download 38675761482 --repo "${{ github.repository }}" \
+            --name microchip-saml1x-ds60001513g-original-pdf-source-custody-v1 \
+            --dir "$pdfroot"
+          python data/device-catalog/research/microchip_phase1_p1_saml1x_pdf_custody_v1.py \
+            --replay "$pdfroot"
+          echo "MICROCHIP_P1_PDF_ROOT=$pdfroot" >> "$GITHUB_ENV"
+      - name: Cross-check all 126 original MCP P1 ICPNs against original PDF tables
+        run: |
+          set -euo pipefail
+          root="${{ runner.temp }}"
+          python data/device-catalog/research/microchip_phase1_p1_ordering_crosswalk_v1.py \
+            --p1-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --original-pdf-root "$MICROCHIP_P1_PDF_ROOT" \
+            --output "$root/microchip-p1-ordering-crosswalk.json"
+          python data/device-catalog/research/microchip_phase1_p1_ordering_crosswalk_v1.py \
+            --p1-ledger "$root/microchip-p1-phase1-information-ledger.json" \
+            --original-pdf-root "$MICROCHIP_P1_PDF_ROOT" \
+            --output "$root/microchip-p1-ordering-crosswalk.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"microchip-p1-ordering-crosswalk.json"
+          report=json.loads(p.read_text(encoding="utf-8"))
+          assert report["p1_original_mcp_exact_icpn_count"] == 126
+          assert report["p1_base_device_count"] == 12
+          assert sum(report["status_counts"].values()) == 126
+          assert report["p0_research_icpns_retained_separately"] == 2437
+          assert report["phase1_new_exact_icpn_field_verified_promotions"] == 0
+          assert report["software_supported_icpns"] == 0
+          assert report["internal_admitted_icpns"] == 0
+          assert report["production_write_authorized"] is False
+          assert report["catalog_publication_authorized"] is False
+          print("MANUFACTURER P1 EXACT ORDERING APPLICABILITY", report["status_counts"])
+          exceptions=[{"icpn":r["icpn"],"base_device":r["base_device"],"status":r["status"]}
+                      for r in report["records"] if r["status"] !=
+                      "MCP_EXACT_CODE_MATCHES_PDF_ORDERING_GRAMMAR"]
+          print("MANUFACTURER P1 EXCEPTION EXACT CODES",json.dumps(exceptions,sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip P1 original MCP x official PDF exact ICPNs: 126\n")
+              f.write("Original PDF pinned SHA: " + report["pdf_source_replay"]["original_pdf_sha256"] + "\n")
+              f.write("Per-code audit: " + json.dumps(report["status_counts"],sort_keys=True) + "\n")
+              f.write("No Phase1 field promotion, OpenOCD SUPPORTED or Catalog admission.\n")
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
@@ -356,6 +418,7 @@ jobs:
             ${{ runner.temp }}/microchip-full-reverse.json
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
+            ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
           if-no-files-found: warn
           retention-days: 90
 
