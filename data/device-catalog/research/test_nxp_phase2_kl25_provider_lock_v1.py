@@ -46,6 +46,20 @@ class TestNxpKl25Phase2ProviderLock(unittest.TestCase):
         self.assertFalse(d["source_semantics_requalified"])
         self.assertFalse(d["current_provider_software_supported"])
 
+    def test_swj_transport_is_new_current_provider_dependency(self):
+        d=self.result["upstream_source_diff"]
+        self.assertEqual(d["added_approved_include"],"tcl/target/swj-dp.tcl")
+        self.assertTrue(d["transport_policy_changed"])
+        self.assertFalse(d["runtime_transport_independently_qualified"])
+
+    def test_reject_switched_swd_transport_without_review(self):
+        delta=json.loads(audit.checked_bytes("upstream_delta"))
+        delta["transport_dependency_delta"][
+            "current_provider_transport_selection_independently_qualified"
+        ]=True
+        with self.assertRaisesRegex(ValueError,"SWJ transport"):
+            audit.review_upstream_delta(delta,self.result["provider_boundary"])
+
     def test_reject_fabricated_unchanged_kinetis_driver_claim(self):
         delta=json.loads(audit.checked_bytes("upstream_delta"))
         for item in delta["per_file"]:
