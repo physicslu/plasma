@@ -1,0 +1,54 @@
+{
+  "schema_version": 26,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "frozen_prior_501_v25_git_blob": "82fea1608200128805d597773e215f2dbc97f652",
+  "frozen_v21_exact_54_git_blob": "2a37d0f60085bdb1ca3021313039ebde39bf5857",
+  "official_31_source_git_blob": "2e5f5759769d86971dea3c00fba9bc971fd3ed49",
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research_only": 277,
+  "expected_new_exact_identifiers": 0,
+  "expected_exact_mcxn_existing": 31,
+  "document_exact_count": {
+    "MCXN23x": 6,
+    "MCXNP184M150F70": 25
+  },
+  "docs": {
+    "MCXN23x": {
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXN23x.pdf",
+      "rev": "Rev 3 2025-01-21",
+      "ordering_page": "4",
+      "normal_electrical": "Table 9, PDF physical pages 11–13 (normal operating), Table 8 p10 ABS MAX excluded",
+      "por": "POR sequencing PDF p10–11: secondary IO tied to VDD or ramp after VDD_SYS; core ramp after VDD; VDD_P4 and VDD_ANA same nominal; VBAT before/with SYS"
+    },
+    "MCXNP184M150F70": {
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXNP184M150F70.pdf",
+      "rev": "Rev 8.2 2026-06-11",
+      "ordering_pages": [
+        "5",
+        "6"
+      ],
+      "normal_electrical": "Table 9, PDF physical pages 15–16 (normal operating), Table 8 pp13–14 ABS MAX excluded",
+      "por": "POR sequencing PDF p14: secondary IO tied to VDD or ramp after VDD_SYS; core ramp after VDD; VDD_P4 and VDD_ANA same nominal; VBAT before/with SYS"
+    }
+  },
+  "approved_normal_vdd": "1.71 to 3.6",
+  "approved_voltage_unit": "V",
+  "allowed_changes": [
+    "working_vdd",
+    "working_vdd_unit",
+    "working_vdd_state",
+    "io_supply",
+    "io_supply_state",
+    "vdda",
+    "vdda_state"
+  ],
+  "expected_field_state": "VERIFIED",
+  "original_official_pdf_archive": false,
+  "original_official_pdf_sha256": null,
+  "software_supported_promoted": false,
+  "production_or_hardware_changed": false,
+  "semantic_note": "VDD is Port0/1/Flash, NOT VDD_SYS or VDD_CORE; VDD_P2/P3 have 1.14-1.32 restricted mode, VDD_P4 1.71-3.6, VDD_ANA nominal VDD_P4 ±0.1, sequenced power; no auto target I/O voltage selection"
+}
