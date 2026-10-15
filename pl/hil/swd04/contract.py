@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -144,6 +145,8 @@ def verify_inventory(inventory: dict[str, Any], attestation: dict[str, Any]) -> 
              "Inventory is not marked read-only")
     _require(inventory.get("device_model_confirmed") is True,
              "PYNQ-Z2 board identity not independently confirmed")
+    _require(bool(re.fullmatch(r"[0-9a-f]{64}", str(inventory.get("metadata_sha256", "")))),
+             "Original PYNQ overlay metadata checksum missing")
     services = inventory.get("services")
     _require(type(services) is dict, "Service snapshot missing")
     for service in REQUIRED_SERVICES:
