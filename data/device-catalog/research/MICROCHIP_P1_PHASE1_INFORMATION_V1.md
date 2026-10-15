@@ -81,3 +81,67 @@ python data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py
 ```
 
 Only the GitHub Actions original-byte replay validates these counts against actual archived manufacturer source; synthetic unit tests are not primary evidence. Even a green CI result **does not imply an official PDF has been captured or exact fields verified**, nor does a 90-day CI Artifact replace durable/offsite evidence custody.
+
+
+## Follow-on work: DS60001513G original PDF custody canary (separate PR)
+
+The original manufacturer PDF source has now been independently *located and visually
+reviewed*, but an online-readable PDF is **not** equivalent to original bytes
+successfully archived/replayed in the PLASMA CI custody ledger.
+
+- **DS60001513G, printed page 14, Table 1-1**: twelve source-listed
+  SAM L10/L11 Base Device family-feature rows (D14/D15/D16 and E14/E15/E16
+  for L10 and L11). These rows are not 126 exact commercial ICPN rows.
+- **DS60001513G, printed page 16, Section 2**: ordering-code conventions,
+  including D/E pin groups, flash density 14/15/16, package family A/M/Y/U,
+  temperature/grade U/F/Z, carrier T, and optional L11 KPH. Conditions
+  and availability notes constrain applicability: reading one suffix does
+  not establish an exact manufacturer's commercial part number.
+- New strictly **Research-only** probe:
+  `microchip_phase1_p1_saml1x_pdf_custody_v1.py`.
+  It captures manufacturer PDF original bytes (or records failure),
+  stores SHA-256, requires semantic consistency of pages 14 and 16,
+  and independently replays the archived original PDF and text digests.
+  It rejects HTML shells, incomplete downloads, wrong document revision,
+  source tampering, missing Base rows, altered receipts and fabricated support.
+- CI workflow: `.github/workflows/device-catalog-microchip-saml1x-pdf-custody-v1.yml`.
+  The *live source step outcome and archival receipt* must be inspected together:
+  a green job does not establish PDF acquisition when the live step is
+  `continue-on-error`.
+- Neither the original PDF parser nor its page-14/16 check certifies a
+  commercial ICPN. The tool intentionally reports **zero** Phase 1
+  exact-ICPN VERIFIED field promotions, regardless of capture success.
+
+**Next required gate before any Phase 1 field promotion:** acquire and
+replay actual source bytes on CI, independently review the captured official
+PDF's SHA-256/revision and pertinent electrical/configuration tables, then
+cross-join all 126 **existing source-replayed manufacturer MCP exact ICPNs**
+with the applicable official ordering grammar and document conditions. Preserve
+`PARTIAL`, `UNKNOWN` and `CONFLICT` per field until there is exact-variant
+manufacturer evidence. Keep 2,437 P0 and 126 P1 research cohorts separate.
+
+
+### Actual manufacturer-original PDF acquisition / replay result (2026-10-15)
+
+The dedicated [Microchip PDF custody CI run 38675617421](https://github.com/physicslu/plasma/actions/runs/38675617421)
+captured the **real, manufacturer-hosted DS60001513G original PDF** and
+independently replayed the PDF locally using Poppler after the first probe
+identified ordering-chart headings that are not contiguous in extracted text.
+The final probe validates source-replayable document revision, page 14's
+twelve Base Device names, page 16's ordering-code *values*, and its identity.
+
+- Original manufacturer URL: https://ww1.microchip.com/downloads/en/DeviceDoc/SAM-L10L11-Family-Data-Sheet-DS60001513G.pdf
+- Original bytes: **8,925,453**.
+- Independently repeated SHA-256 (pinned for future fail-closed replay):
+  `ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e`.
+- Source receipt: `SOURCE_BYTES_CAPTURED_AND_SEMANTICALLY_REPLAYED`.
+- [Real original PDF source and receipt CI artifact](https://github.com/physicslu/plasma/actions/runs/38675617421/artifacts/11946580947)
+  (GitHub retention is temporary, not durable evidence custody).
+- **Exact-variant Phase 1 VERIFIED field promotions: 0.** This PDF acquisition
+  is a document-source gate, **not** the 126-ICPN exact-order applicability gate.
+
+The initial CI run before the corrected text-layout parser intentionally
+preserved the original 8,925,453 PDF bytes while reporting
+`SOURCE_BYTES_CAPTURED_SEMANTICS_NOT_REPLAYABLE`; no data was promoted on that
+failure. Subsequent independent capture/replay passed without weakening the
+revision, page, twelve-Base, SHA or no-qualification gates.
