@@ -256,3 +256,79 @@ def test_poll_limit_does_not_initiate_recovery():
     with pytest.raises(c.SafetyError):
         m._response(m.RestrictedMMIO(hw), limit=3, sleep_seconds=0)
     assert not any(op == "write" for op, *_ in hw.events)
+
+
+def test_restore_accepts_only_full_recovery_evidence():
+    from pl.hil.swd04 import restore
+    before, _ = inventory_attestation()
+    after = json.loads(json.dumps(before))
+    evidence = {
+        "recovery_bin_sha256": c.RECOVERY_BIN_SHA256,
+        "base_bin_load_returned_operating": True,
+        "candidate_unloaded": True,
+        "uios_reconciled": True,
+        "public_key_ssh_verified": True,
+        "jupyter_http_verified": True,
+        "gateway_live_verified": True,
+        "gateway_ready_verified": True,
+        "no_new_kernel_axi_or_fpga_errors": True,
+        "no_ps7_init_or_ddr_reinitialization": True,
+    }
+    assert restore.verify_restoration(before, after, evidence)["restoration"] == "PASS"
+
+
+@pytest.mark.parametrize("fault", [
+    "metadata", "uio", "clock", "service", "manager", "bin",
+    "ssh", "gateway", "kernel",
+])
+def test_restore_fails_closed_on_missing_recovery(fault):
+    from pl.hil.swd04 import restore
+    before, _ = inventory_attestation()
+    after = json.loads(json.dumps(before))
+    evidence = {
+        "recovery_bin_sha256": c.RECOVERY_BIN_SHA256,
+        "base_bin_load_returned_operating": True,
+        "candidate_unloaded": True,
+        "uios_reconciled": True,
+        "public_key_ssh_verified": True,
+        "jupyter_http_verified": True,
+        "gateway_live_verified": True,
+        "gateway_ready_verified": True,
+        "no_new_kernel_axi_or_fpga_errors": True,
+        "no_ps7_init_or_ddr_reinitialization": True,
+    }
+    if fault == "metadata": after["metadata_sha256"] = "b" * 64
+    if fault == "uio": after["uio"][0]["address"] = "0x40001000"
+    if fault == "clock": after["fclk0_hz"] = 10000000
+    if fault == "service": after["services"]["plasma-server.service"] = "inactive"
+    if fault == "manager": after["fpga_manager_state"] = "unknown"
+    if fault == "bin": evidence["recovery_bin_sha256"] = "x" * 64
+    if fault == "ssh": evidence["public_key_ssh_verified"] = False
+    if fault == "gateway": evidence["gateway_ready_verified"] = False
+    if fault == "kernel": evidence["no_new_kernel_axi_or_fpga_errors"] = False
+    with pytest.raises(c.SafetyError):
+        restore.verify_restoration(before, after, evidence)
+
+
+def test_live_harness_is_inert_without_double_confirmation(tmp_path):
+    from pl.hil.swd04 import live
+    argv = [
+        "--stage", "HIL01",
+        "--p0-report", str(tmp_path / "missing-p0.json"),
+        "--session", str(tmp_path / "missing-session.json"),
+        "--candidate-bin", str(tmp_path / "missing-bin"),
+        "--output", str(tmp_path / "out.json"),
+    ]
+    assert live.main(argv) == 2
+    assert live.main([*argv, "--execute-live"]) == 2
+    assert not (tmp_path / "out.json").exists()
+
+
+def test_live_backend_does_not_map_anything_when_outside_whitelist():
+    from pl.hil.swd04.live import DevMemBackend
+    backend = DevMemBackend(readonly=True)
+    with pytest.raises(c.SafetyError):
+        backend.read32(0xDEADBEEF)
+    with pytest.raises(c.SafetyError):
+        backend.write32(0x40001000, 0)
+    assert backend.fd is None and backend.pages == {}
