@@ -689,13 +689,16 @@ jobs:
             --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
             --first-batch-pdf-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
             --output-jsonl "$root/microchip-adr0002-phase1-remaining2441.jsonl" \
-            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json"
+            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json" \
+            --output-identity-csv "$root/microchip-adr0002-phase1-remaining2441-identities.csv" \
+            --bootstrap-identity-csv-in-ci-log
           python data/device-catalog/research/microchip_adr0002_phase1_remaining2441_queue_v1.py \
             --canonical "$root/microchip-adr0002-canonical-phase-status.json" \
             --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
             --first-batch-pdf-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
             --output-jsonl "$root/microchip-adr0002-phase1-remaining2441.jsonl" \
-            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json" --verify
+            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json" \
+            --output-identity-csv "$root/microchip-adr0002-phase1-remaining2441-identities.csv" --verify
           python - <<'PY'
           import json,os
           from pathlib import Path
@@ -707,6 +710,16 @@ jobs:
           assert summary["first_proposed_122_exact_icpns"]==122
           assert summary["remaining_phase1_identified_exact_icpns"]==2441
           assert len(rows)==len({x["icpn"].upper() for x in rows})==2441
+          import csv
+          with (root/"microchip-adr0002-phase1-remaining2441-identities.csv").open() as f:
+              identities=list(csv.DictReader(f))
+          assert len(identities)==2441
+          assert len({r["icpn"].upper() for r in identities})==2441
+          assert all(r["phase1_identity_status"]=="IDENTIFIED"
+              and r["executable_mapping_status"]=="no_mapping"
+              and r["phase2_programming_state"]=="UNKNOWN"
+              and r["phase3_compatibility_state"]=="NOT_TESTED"
+              for r in identities)
           assert summary["remaining_cfg_counts"]=={
               "tcl/target/pic32mx.cfg":1241,
               "tcl/target/at91samdXX.cfg":667,
@@ -749,6 +762,7 @@ jobs:
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
             ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441.jsonl
             ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441-summary.json
+            ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441-identities.csv
           if-no-files-found: warn
           retention-days: 90
 
