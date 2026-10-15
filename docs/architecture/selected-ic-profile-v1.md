@@ -125,14 +125,23 @@ physical qualification.
 
 ## API
 
-`GET /api/devices/search` remains the stable route. Results may include two independent
+`GET /api/devices/search` remains the stable route. Results may include three independent
 additive projections:
 
 - `manufacturer_device_basic_profile` — basic IC Information facts; currently STM32F1 v1.
 - `selected_profile` — the deeper manufacturer/programming composition used only when
   Programming Profile evidence exists.
+- `openocd_software_qualification` — ADR-0002 Phase 2 exact-ICPN software
+  qualification from the SW/PPU-owned release authority. It is independent from both
+  Catalog mapping and the legacy deeper selected-profile composition.
 
 A Basic Profile does not imply that `selected_profile` exists.
+
+Likewise, an OpenOCD CFG mapping does not imply `openocd_software_qualification=SUPPORTED`.
+An exact ICPN that has not completed Phase 2 review is projected as `UNKNOWN`, even when
+the Production Catalog already carries a mapped target CFG. A reviewed exact ICPN may be
+`SUPPORTED` even when the historical `selected_profile` deep-composition payload is not
+available for that exact ordering code; the two projections answer different questions.
 
 For an exact ICPN with an admitted manufacturer profile, the projection includes:
 

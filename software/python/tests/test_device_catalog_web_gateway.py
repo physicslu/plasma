@@ -93,6 +93,26 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
 
+        qualification = result["openocd_software_qualification"]
+        self.assertIsNotNone(qualification)
+        self.assertEqual(qualification["software_state"], "SUPPORTED")
+        self.assertTrue(qualification["reviewed"])
+        self.assertEqual(qualification["provider"]["version"], "0.12.0")
+        self.assertEqual(qualification["provider"]["target_config"], "tcl/target/stm32f1x.cfg")
+        self.assertEqual(qualification["provider"]["flash_driver"], "stm32f1x")
+        self.assertEqual(qualification["operations"]["probe"]["state"], "SUPPORTED")
+        self.assertEqual(qualification["operations"]["erase"]["state"], "SUPPORTED")
+        self.assertEqual(qualification["operations"]["program"]["state"], "SUPPORTED")
+        self.assertEqual(qualification["operations"]["read"]["state"], "SUPPORTED")
+        self.assertEqual(qualification["operations"]["verify"]["state"], "SUPPORTED")
+        self.assertEqual(
+            qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
+            64 * 1024,
+        )
+        self.assertFalse(qualification["public_catalog_visibility_changed"])
+        self.assertFalse(qualification["hardware_runtime_ready"])
+        self.assertFalse(qualification["physical_programming_qualified"])
+
     def test_stm32f1_basic_profile_does_not_claim_programming_profile(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103R8T6&limit=1")
         self.assertEqual(status, 200)
@@ -107,6 +127,42 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(basic["operating_vdd_v"], {"min": 2.0, "max": 3.6})
         self.assertFalse(basic["programming_profile_authority"])
         self.assertIsNone(result["selected_profile"])
+
+        qualification = result["openocd_software_qualification"]
+        self.assertIsNotNone(qualification)
+        self.assertEqual(qualification["software_state"], "UNKNOWN")
+        self.assertFalse(qualification["reviewed"])
+        self.assertIsNone(qualification["provider"])
+        self.assertEqual(qualification["operations"], {})
+        self.assertIsNone(qualification["programming"])
+
+    def test_stm32f103cb_is_phase2_supported_even_without_legacy_selected_profile(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103CBT6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F103CBT6")
+        self.assertIsNone(result["selected_profile"])
+        qualification = result["openocd_software_qualification"]
+        self.assertIsNotNone(qualification)
+        self.assertEqual(qualification["software_state"], "SUPPORTED")
+        self.assertTrue(qualification["reviewed"])
+        self.assertEqual(
+            qualification["programming"]["programming_profile_id"],
+            "stm32f1-medium-density-flash-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["memory_geometry_profile_id"],
+            "stm32f103cb-128k-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
+            128 * 1024,
+        )
+        self.assertEqual(
+            qualification["programming"]["flash_geometry"]["page_count"],
+            128,
+        )
 
     def test_c0_and_g0_bulk_basic_profiles_are_exposed_without_programming_authority(self) -> None:
         cases = (
@@ -204,6 +260,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(payload["count"], 1)
         self.assertIsNone(payload["results"][0]["manufacturer_device_basic_profile"])
         self.assertIsNone(payload["results"][0]["selected_profile"])
+
+        qualification = payload["results"][0]["openocd_software_qualification"]
+        self.assertIsNotNone(qualification)
+        self.assertEqual(qualification["software_state"], "UNKNOWN")
+        self.assertFalse(qualification["reviewed"])
 
     def test_c8_selected_profile_does_not_use_blue_pill_128k_override(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=1")
