@@ -29,7 +29,7 @@ Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣
 6. **執行授權仍分離**：Catalog／IC Selector 顯示永遠不直接授權燒錄。Job/Batch 必須至少確認 Phase 2 `SUPPORTED`、相符已安裝 Runtime、電壓／操作／安全條件，並在產品執行政策要求時確認對應 Phase 3 硬體配置，全部 fail-closed。
 7. **OpenOCD 是目前 Phase 2 Provider，不是 Phase 1 visibility gate。** 未來 Vendor Backend / Plasma-native Backend 可透過版本化 Programming Qualification Provider contract 加入，不得修改 Phase 1 Exact ICPN identity 標準來取得特殊待遇。
 
-## Implementation Phases — 三階段 IC Detail 與 Exact ICPN 驗收漏斗（修訂草案）
+## Implementation Phases — 三階段 IC Detail 與 Exact ICPN 驗收漏斗（已採納規範）
 
 IC Detail 的三個區塊是**不同的證據產品**，形成唯一的「原廠身分 → 軟體燒錄資格 → 實機相容性」三階段模型。**現行 ADR 不再使用任何額外的數字型研究分級；所有正式狀態都必須歸屬 Phase 1／Phase 2／Phase 3。**
 
@@ -251,11 +251,28 @@ ST、NXP、Microchip 與未來 Brand 一律使用相同的 discovery 執行順�
 ## Decision summary
 
 ```text
-All manufacturer discovery/evidence → Research (retained)
-       ↓ authoritative exact ICPN identity
-Production internal identity admission (may include unmapped)
-       ↓ pinned OpenOCD software programming qualification
-User-facing PLASMA Catalog (SUPPORTED only)
-       ├── Socket / Adapter / PPU / Site physical validation (independent)
-       └── selected-site runtime and safety execution gate (fail closed)
+Original manufacturer discovery/evidence → Research (retained)
+       ↓ original manufacturer exact material identity gate
+Canonical Phase 1 IDENTIFIED Exact ICPN store
+       ↓ (independent of information-complete / software qualification)
+User-facing PLASMA IC Selector / Catalog (all IDENTIFIED)
+       ├── Phase 1 IC Information quality: VERIFIED / PARTIAL / UNKNOWN /
+       │   CONFLICT / source-backed NOT_APPLICABLE
+       ├── Phase 2 Programming state: UNKNOWN / CANDIDATE /
+       │   SUPPORTED / UNSUPPORTED (versioned provider + operations)
+       └── Phase 3 PLASMA Compatibility: NOT_TESTED / PASSED / FAILED
+                     ↓ separate runtime execution entitlement
+Job / Batch requires Phase 2 SUPPORTED + installed compatible Runtime
+    + electrical/safety gates + selected-site hardware requirements
+    → fail closed; Catalog or CFG presence is never authorization
 ```
+
+**Normative clarification (2026-10-15):** The former summary diagram
+placed software qualification *before* public Selector visibility and
+labeled the Catalog `SUPPORTED only`. That diagram contradicted
+the accepted Decision and Phase 1 visibility rules above, and is
+superseded by this corrected summary. No brand (including Microchip)
+may use CFG existence, historical priority partitions, information
+completeness, or internal Production ingestion batches as an additional
+Phase 1 identity qualification criterion. Original source custody and
+deployment migration remain independently gated.
