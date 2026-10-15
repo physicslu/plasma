@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "comparison_id": "stm32f103-high-density-openocd-v0.12.0-v1",
+  "target": {
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "high"
+  },
+  "backend_reference": {
+    "provider": "openocd-upstream",
+    "version": "0.12.0",
+    "source_tag": "v0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "files": [
+      "tcl/target/stm32f1x.cfg",
+      "src/flash/nor/stm32f1x.c",
+      "src/flash/nor/tcl.c"
+    ]
+  },
+  "manufacturer_reference": {
+    "programming_review": "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v1.json",
+    "programming_profile": "data/ic-support/profiles/programming/stm32f1-high-density-flash-v0.json"
+  },
+  "observations": [
+    {
+      "id": "high_density_device_id",
+      "classification": "exact_match",
+      "manufacturer_semantic": "STM32F103 high-density programming cohort",
+      "openocd_semantic": "device ID 0x414 selects STM32F10x high-density"
+    },
+    {
+      "id": "high_density_page_size",
+      "classification": "exact_match",
+      "manufacturer_semantic": "2 KiB page erase geometry",
+      "openocd_semantic": "0x414 branch uses page_size 2048"
+    },
+    {
+      "id": "high_density_max_flash",
+      "classification": "exact_match",
+      "manufacturer_semantic": "high-density range up to 512 KiB",
+      "openocd_semantic": "0x414 branch caps probed Flash at 512 KiB"
+    },
+    {
+      "id": "program_alignment",
+      "classification": "exact_match",
+      "manufacturer_semantic": "16-bit halfword programming",
+      "openocd_semantic": "program page size/alignment 2 bytes"
+    },
+    {
+      "id": "page_erase_core",
+      "classification": "exact_match",
+      "manufacturer_semantic": "page erase through FLASH_CR/PER and FLASH_AR",
+      "openocd_semantic": "stm32x_erase uses the STM32F1 page-erase controller path"
+    },
+    {
+      "id": "program_core",
+      "classification": "exact_match",
+      "manufacturer_semantic": "halfword programming with Flash controller status polling",
+      "openocd_semantic": "stm32x_write uses the STM32F1 programming path"
+    },
+    {
+      "id": "verify_layering",
+      "classification": "functionally_equivalent",
+      "manufacturer_semantic": "programmed contents require readback verification",
+      "openocd_semantic": "verification is provided by the OpenOCD flash framework above the device driver"
+    }
+  ],
+  "conclusions": {
+    "same_core_flash_programming_semantics": true,
+    "high_density_geometry_is_distinct_from_medium_density": true,
+    "medium_density_page_geometry_must_not_be_inherited": true,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}
