@@ -80,6 +80,36 @@ research script created no new qualifications*. Global S2/S3 must be
 computed separately from their own authoritative registries, not
 inferred from Research-only data.
 
+
+## Initial real original-source replay (2026-10-15)
+
+[GitHub Actions run 38685565870](https://github.com/physicslu/plasma/actions/runs/38685565870)
+replayed the pinned original MCP source captures and proved the following
+for this bounded historical source population:
+
+| Independent Phase 1 evidence metric | Exact ICPNs |
+|---|---:|
+| Source-observed, exact original manufacturer commercial part numbers | 23,276 |
+| **S1 `IDENTIFIED`** (original exact partNumber, vendor Base, SHA and capture timestamp) | **23,276** |
+| Original-MCP identity disputed or incomplete capture-time evidence | **0** |
+| **S1_complete `INFORMATION_COMPLETE`** | **0** |
+| Existing P0/P1 official-family Chart partial information observations (subset of S1) | **2,496** |
+| Exact ICPNs without those seven family Chart specification observations | **20,780** |
+
+The original MCP evidence may establish identity, but 2,496 family Chart
+observations are **PARTIAL** and 20,780 are **UNKNOWN** for Package,
+Pin Count, Flash, RAM, working VDD, Temperature and Core Model. I/O
+Supply and VDDA remain **UNKNOWN on all 23,276** in the current bounded
+ledger. These are independently reported Phase 1 coverage metrics and are
+not software-support qualification evidence.
+
+**S1 count is a source-bounded research evidence result; it does not
+constitute internal Identity Admission or official Microchip global
+commercial-SKU completeness.** The source archives' long-term custody
+is still a separate task. The new ADR funnel section on `main` is
+marked 修訂草案; this PR follows it as a proposed implementation but
+must not imply a policy/Production migration has been merged.
+
 ## Reproducibility
 
 In the Microchip CFG-first CI, the bounded offline test
