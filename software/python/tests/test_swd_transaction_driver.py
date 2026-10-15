@@ -130,10 +130,12 @@ class FakeAXI:
 
 
 def driver(hw=None, **kwargs):
-    return SWDTransactionDriver(
-        hw or FakeAXI(), poll_budget=20, poll_interval_s=0,
-        clock=lambda: 0.0, max_poll_seconds=2, **kwargs
-    )
+    defaults = {
+        "poll_budget": 20, "poll_interval_s": 0,
+        "clock": lambda: 0.0, "max_poll_seconds": 2,
+    }
+    defaults.update(kwargs)
+    return SWDTransactionDriver(hw or FakeAXI(), **defaults)
 
 
 def connect(d):
@@ -315,6 +317,7 @@ def test_explicit_abort_requires_busy_and_no_implicit_command():
     with pytest.raises(SWDDriverError, match="ABORT only"):
         d.abort()
     assert command_writes(hw) == []
+    hw.hang = True
     hw.busy = True
     with pytest.raises(SWDDriverError) as err:
         d.abort()
