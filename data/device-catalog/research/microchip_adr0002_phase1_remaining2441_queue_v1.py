@@ -15,6 +15,8 @@ IDENTIFIED in the 2,441 backlog with unqualified optional fields.
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 from collections import Counter
 import hashlib
 import json
@@ -225,6 +227,40 @@ def derive(original:dict, freeze:dict, first_audit:dict):
     return rows,summary
 
 
+IDENTITY_CSV_FIELDS=(
+    "manufacturer","icpn","base_device","phase1_identity_status",
+    "source_scope","official_material_source_uri",
+    "source_observed_at_utc_json","original_mcp_response_sha256_refs",
+    "openocd_cfg_research_only","phase2_programming_state",
+    "phase3_compatibility_state","executable_mapping_status",
+)
+
+
+def identity_csv(rows):
+    """Persist exact official identity without fabricating optional fields."""
+    buf=io.StringIO(newline="")
+    writer=csv.DictWriter(buf,fieldnames=IDENTITY_CSV_FIELDS,lineterminator="\n")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({
+            "manufacturer":"Microchip",
+            "icpn":r["icpn"],
+            "base_device":r["base_device"],
+            "phase1_identity_status":"IDENTIFIED",
+            "source_scope":r["source_scope"],
+            "official_material_source_uri":r["official_material_source_uri"],
+            "source_observed_at_utc_json":json.dumps(
+                r["source_observed_at_utc"],sort_keys=True,separators=(",",":")),
+            "original_mcp_response_sha256_refs":"|".join(
+                r["original_manufacturer_sha256_refs"]),
+            "openocd_cfg_research_only":r["research_only_cfg_lead"],
+            "phase2_programming_state":"UNKNOWN",
+            "phase3_compatibility_state":"NOT_TESTED",
+            "executable_mapping_status":"no_mapping",
+        })
+    return buf.getvalue()
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--canonical",type=Path,required=True)
@@ -232,9 +268,11 @@ def main():
     ap.add_argument("--first-batch-pdf-crosswalk",type=Path,required=True)
     ap.add_argument("--output-jsonl",type=Path,required=True)
     ap.add_argument("--summary-json",type=Path,required=True)
+    ap.add_argument("--output-identity-csv",type=Path)
+    ap.add_argument("--bootstrap-identity-csv-in-ci-log",action="store_true")
     ap.add_argument("--verify",action="store_true")
     args=ap.parse_args()
-    for path in (args.output_jsonl,args.summary_json):
+    for path in (args.output_jsonl,args.summary_json,*([args.output_identity_csv] if args.output_identity_csv else [])):
         require("production" not in {part.casefold() for part in path.resolve().parts},
                 "Phase 1 research pipeline cannot publish Production Catalog")
     rows, summary=derive(read(args.canonical),read(args.cfg_frozen),
@@ -242,6 +280,9 @@ def main():
     content=("".join(json.dumps(r,sort_keys=True,ensure_ascii=False)+"\n"
                      for r in rows)).encode("utf-8")
     summary["remaining_source_queue_sha256"]=hashlib.sha256(content).hexdigest()
+    canonical_csv=identity_csv(rows)
+    identity_csv_sha=hashlib.sha256(canonical_csv.encode("utf-8")).hexdigest()
+    summary["remaining_research_identity_csv_sha256"]=identity_csv_sha
     require(summary["remaining_icpn_names_sha256"]==EXPECTED_REMAINING_IDS_SHA
             and summary["remaining_source_queue_sha256"]==EXPECTED_QUEUE_JSONL_SHA,
             "2441 original-source material membership/payload SHA freeze drift")
@@ -250,6 +291,9 @@ def main():
         require(args.output_jsonl.read_bytes()==content
                 and args.summary_json.read_bytes()==doc,
                 "source-locked Phase 1 2441 queue nondeterministic")
+        if args.output_identity_csv:
+            require(args.output_identity_csv.read_text(encoding="utf-8")==canonical_csv,
+                    "source-locked 2441 research identity CSV drift")
     else:
         require(not args.output_jsonl.exists() and not args.summary_json.exists(),
                 "refuse overwrite of original-source Phase 1 report")
@@ -257,6 +301,15 @@ def main():
         args.summary_json.parent.mkdir(parents=True,exist_ok=True)
         args.output_jsonl.write_bytes(content)
         args.summary_json.write_bytes(doc)
+        if args.output_identity_csv:
+            require(not args.output_identity_csv.exists(),
+                    "refuse overwrite of exact original manufacturer identity index")
+            args.output_identity_csv.parent.mkdir(parents=True,exist_ok=True)
+            args.output_identity_csv.write_text(canonical_csv,encoding="utf-8")
+    print("MICROCHIP_ADR0002_2441_IDENTITIES_CSV_SHA256",identity_csv_sha)
+    if args.bootstrap_identity_csv_in_ci_log:
+        for line in canonical_csv.splitlines():
+            print("CANONICAL_2441_ROW|"+line)
     print(json.dumps({k:v for k,v in summary.items() if k!="phase1_field_coverage"},
                      indent=2,sort_keys=True,ensure_ascii=False))
 
