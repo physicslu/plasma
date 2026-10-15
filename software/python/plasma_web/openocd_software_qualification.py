@@ -28,9 +28,13 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v5.json"
+MEDIUM_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
 APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
 EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json"
+HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-r-lqfp-v1.json"
+HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-r-lqfp-t6-t7-applicability-v1.json"
+HIGH_EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-high-density-r-lqfp-tr-ordering-equivalence-v1.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -67,9 +71,13 @@ class OpenOCDSoftwareQualificationRegistry:
 
         release = _read_json(root / RELEASE_REL)
         source_lock = _read_json(root / SOURCE_LOCK_REL)
-        qualification = _read_json(root / QUALIFICATION_REL)
+        qualification_manifest = _read_json(root / QUALIFICATION_REL)
+        qualification = _read_json(root / MEDIUM_QUALIFICATION_REL)
         applicability = _read_json(root / APPLICABILITY_REL)
         equivalence = _read_json(root / EQUIVALENCE_REL)
+        high_qualification = _read_json(root / HIGH_QUALIFICATION_REL)
+        high_applicability = _read_json(root / HIGH_APPLICABILITY_REL)
+        high_equivalence = _read_json(root / HIGH_EQUIVALENCE_REL)
 
         provider = source_lock.get("provider", {})
         _require(
@@ -99,6 +107,37 @@ class OpenOCDSoftwareQualificationRegistry:
             and q_provider.get("target_config") == "tcl/target/stm32f1x.cfg"
             and q_provider.get("flash_driver") == "stm32f1x",
             "qualification provider drift",
+        )
+
+        _require(
+            qualification_manifest.get("provider_source_lock_id") == source_lock.get("source_lock_id")
+            and qualification_manifest.get("provider") == q_provider
+            and qualification_manifest.get("qualification_id")
+            == "adr0002-phase2-openocd-012-stm32f103-v5"
+            and qualification_manifest.get("predecessor_qualification_id")
+            == qualification.get("qualification_id")
+            and qualification_manifest.get("supported_exact_icpn_count") == 31,
+            "STM32F103 v5 qualification manifest drift",
+        )
+        manifest_cohorts = {
+            item.get("qualification_path"): item
+            for item in qualification_manifest.get("cohorts", [])
+            if isinstance(item, dict)
+        }
+        _require(
+            set(manifest_cohorts) == {MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL},
+            "STM32F103 v5 cohort manifest scope drift",
+        )
+        for rel in (MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL):
+            raw = (root / rel).read_bytes()
+            _require(
+                _git_blob_sha1(raw) == manifest_cohorts[rel].get("git_blob_sha1"),
+                f"STM32F103 v5 cohort lock drift: {rel}",
+            )
+        _require(
+            high_qualification.get("provider_source_lock_id") == source_lock.get("source_lock_id")
+            and high_qualification.get("provider") == q_provider,
+            "high-density qualification provider drift",
         )
 
         files = source_lock.get("files")
@@ -611,7 +650,426 @@ class OpenOCDSoftwareQualificationRegistry:
             "reference cohort must be explicitly SUPPORTED",
         )
 
-        boundary = qualification.get("acceptance_boundary", {})
+        high_group = high_qualification.get("manufacturer_programming_group")
+        _require(
+            isinstance(high_group, dict)
+            and high_group.get("manufacturer") == "STMicroelectronics"
+            and high_group.get("family") == "STM32F1"
+            and high_group.get("series") == "STM32F103"
+            and high_group.get("density_class") == "high"
+            and high_group.get("silicon_identity", {}).get("openocd_device_id") == "0x414"
+            and high_group.get("shared_flash_geometry", {}).get("main_flash_start") == "0x08000000"
+            and high_group.get("shared_flash_geometry", {}).get("erase_unit_bytes") == 2048
+            and high_group.get("shared_flash_geometry", {}).get("program_unit_bytes") == 2
+            and high_group.get("programming_electrical", {}).get("vdd_programming_v")
+            == {"min": 2.0, "max": 3.6}
+            and high_group.get("programming_electrical", {}).get("external_vpp_required") is False,
+            "STM32F103 high-density programming-group drift",
+        )
+        high_opq = high_group.get("operation_qualification")
+        _require(isinstance(high_opq, dict), "high-density operation qualification missing")
+        for operation in REQUIRED_OPERATIONS:
+            _require(
+                high_opq.get(operation, {}).get("state") == "SUPPORTED",
+                f"high-density operation not software-qualified: {operation}",
+            )
+
+        high_local_locks = high_qualification.get("local_evidence_locks")
+        _require(isinstance(high_local_locks, dict) and high_local_locks, "high-density local evidence locks missing")
+        for rel, expected_blob in high_local_locks.items():
+            evidence_path = root / rel
+            _require(evidence_path.is_file(), f"high-density local evidence missing: {rel}")
+            _require(
+                _git_blob_sha1(evidence_path.read_bytes()) == expected_blob,
+                f"high-density local evidence blob drift: {rel}",
+            )
+
+        high_authority_locks = high_qualification.get("authority_artifact_locks")
+        _require(
+            isinstance(high_authority_locks, dict)
+            and high_authority_locks.get(HIGH_APPLICABILITY_REL)
+            and high_authority_locks.get(HIGH_EQUIVALENCE_REL),
+            "high-density qualification authority artifact locks missing",
+        )
+        for rel in (HIGH_APPLICABILITY_REL, HIGH_EQUIVALENCE_REL):
+            _require(
+                _git_blob_sha1((root / rel).read_bytes()) == high_authority_locks[rel],
+                f"high-density qualification authority artifact drift: {rel}",
+            )
+        _require(
+            high_qualification.get("applicability_authority_id")
+            == high_applicability.get("applicability_id")
+            and high_qualification.get("ordering_equivalence_id")
+            == high_equivalence.get("equivalence_id"),
+            "high-density authority identity mismatch",
+        )
+
+        high_comparison_path = high_group.get("manufacturer_evidence", {}).get(
+            "openocd_comparison_path"
+        )
+        _require(
+            isinstance(high_comparison_path, str) and high_comparison_path,
+            "high-density OpenOCD comparison path missing",
+        )
+        high_comparison = _read_json(root / high_comparison_path)
+        high_observations = {
+            item.get("id"): item
+            for item in high_comparison.get("observations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        expected_high_observations = {
+            "high_density_device_id": "exact_match",
+            "high_density_page_size": "exact_match",
+            "high_density_max_flash": "exact_match",
+            "program_alignment": "exact_match",
+            "page_erase_core": "exact_match",
+            "program_core": "exact_match",
+            "verify_layering": "functionally_equivalent",
+        }
+        for observation_id, expected_class in expected_high_observations.items():
+            _require(
+                high_observations.get(observation_id, {}).get("classification")
+                == expected_class,
+                f"high-density OpenOCD semantic observation drift: {observation_id}",
+            )
+        high_conclusions = high_comparison.get("conclusions", {})
+        _require(
+            high_conclusions.get("same_core_flash_programming_semantics") is True
+            and high_conclusions.get("high_density_geometry_is_distinct_from_medium_density") is True
+            and high_conclusions.get("medium_density_page_geometry_must_not_be_inherited") is True
+            and high_conclusions.get("installed_runtime_attested") is False
+            and high_conclusions.get("hardware_runtime_ready") is False
+            and high_conclusions.get("physical_programming_qualified") is False,
+            "high-density OpenOCD differential qualification boundary drift",
+        )
+
+        _require(
+            high_applicability.get("manufacturer") == "STMicroelectronics"
+            and high_applicability.get("phase") == "02_PROGRAMMING"
+            and high_applicability.get("family") == "STM32F1"
+            and high_applicability.get("series") == "STM32F103"
+            and high_applicability.get("density_class") == "high",
+            "high-density manufacturer applicability authority drift",
+        )
+        high_app_authority = high_applicability.get("manufacturer_authority")
+        _require(isinstance(high_app_authority, dict), "high-density applicability sources missing")
+        for source_name in (
+            "ordering",
+            "production_exact_identity",
+            "programming_review",
+            "programming_profile",
+        ):
+            item = high_app_authority.get(source_name)
+            _require(isinstance(item, dict), f"high-density applicability source missing: {source_name}")
+            rel = item.get("path")
+            _require(isinstance(rel, str) and rel, f"high-density applicability path missing: {source_name}")
+            _require(
+                _git_blob_sha1((root / rel).read_bytes()) == item.get("git_blob_sha1"),
+                f"high-density applicability source blob drift: {source_name}/{rel}",
+            )
+
+        high_ordering = high_app_authority["ordering"]
+        high_ordering_payload = _read_json(root / high_ordering["path"])
+        high_stm32f103 = high_ordering_payload.get("records", {}).get("STM32F103", {})
+        high_band = next(
+            (
+                band
+                for band in high_stm32f103.get("bands", [])
+                if band.get("name") == high_ordering.get("band")
+            ),
+            None,
+        )
+        _require(
+            isinstance(high_band, dict)
+            and high_band.get("document") == high_ordering.get("document") == "DS5792 Rev 13"
+            and set(high_ordering.get("required_flash_codes", [])) == {"C", "D", "E"}
+            and high_band.get("flash_codes") == ["C", "D", "E"]
+            and high_band.get("pin_count", {}).get("R") == 64
+            and high_band.get("package", {}).get("T") == "LQFP"
+            and high_band.get("temperature_c", {}).get("6") == "-40 to 85 C"
+            and high_band.get("temperature_c", {}).get("7") == "-40 to 105 C"
+            and high_ordering.get("required_temperature_codes")
+            == {"6": "-40 to 85 C", "7": "-40 to 105 C"},
+            "STM32F103 high-density manufacturer applicability drift",
+        )
+
+        high_review = _read_json(root / high_app_authority["programming_review"]["path"])
+        _require(
+            high_review.get("shared", {}).get("programming_profile_id")
+            == "stm32f1-high-density-flash-v0"
+            and set(high_review.get("operations", {}).get("admitted", []))
+            == {"READ", "VERIFY", "PROGRAM", "ERASE"},
+            "high-density manufacturer programming review drift",
+        )
+        high_review_fact_ids = {
+            item.get("fact_id")
+            for item in high_review.get("review_facts", [])
+            if isinstance(item, dict)
+        }
+        for fact_id in high_app_authority["programming_review"].get("required_fact_ids", []):
+            _require(
+                fact_id in high_review_fact_ids,
+                f"high-density manufacturer review fact missing: {fact_id}",
+            )
+        high_profile = _read_json(root / high_app_authority["programming_profile"]["path"])
+        _require(
+            high_profile.get("profile_id")
+            == high_app_authority["programming_profile"].get("profile_id")
+            == "stm32f1-high-density-flash-v0"
+            and high_profile.get("scope", {}).get("density_class") == "high"
+            and high_profile.get("data", {}).get("program_granularity_bytes") == 2,
+            "high-density Programming Profile drift",
+        )
+
+        high_applicability_targets = {
+            item.get("icpn"): item
+            for item in high_applicability.get("targets", [])
+            if isinstance(item, dict) and isinstance(item.get("icpn"), str)
+        }
+        _require(
+            set(high_applicability_targets)
+            == {
+                "STM32F103RCT6",
+                "STM32F103RCT7",
+                "STM32F103RDT6",
+                "STM32F103RET6",
+                "STM32F103RET7",
+            },
+            "high-density manufacturer applicability scope expanded without review",
+        )
+        for target in high_applicability_targets.values():
+            geometry_path = target.get("memory_geometry_path")
+            _require(
+                isinstance(geometry_path, str) and geometry_path,
+                f"high-density memory geometry path missing: {target.get('icpn')}",
+            )
+            geometry_raw = (root / geometry_path).read_bytes()
+            _require(
+                _git_blob_sha1(geometry_raw)
+                == target.get("memory_geometry_git_blob_sha1"),
+                f"high-density memory geometry blob drift: {target.get('icpn')}",
+            )
+            geometry = json.loads(geometry_raw.decode("utf-8"))
+            data = geometry.get("data", {})
+            _require(
+                geometry.get("profile_id") == target.get("memory_geometry_profile_id")
+                and geometry.get("scope", {}).get("manufacturer") == "STMicroelectronics"
+                and geometry.get("scope", {}).get("base_device") == target.get("base_device")
+                and data.get("main_flash_start") == "0x08000000"
+                and data.get("main_flash_size_bytes") == target.get("main_flash_size_bytes")
+                and data.get("page_size_bytes") == 2048
+                and data.get("page_count") == target.get("page_count")
+                and data.get("erase_granularity_bytes") == 2048
+                and data.get("program_granularity_bytes") == 2,
+                f"high-density memory geometry content drift: {target.get('icpn')}",
+            )
+
+        high_ordering_authority = high_equivalence.get("ordering_authority")
+        _require(
+            isinstance(high_ordering_authority, dict)
+            and high_ordering_authority.get("band") == "high"
+            and high_ordering_authority.get("document") == "DS5792 Rev 13"
+            and high_ordering_authority.get("suffix") == "TR"
+            and high_ordering_authority.get("meaning") == "tape-and-reel"
+            and high_band.get("allowed_tails") == ["", "TR"],
+            "high-density TR ordering semantics drift",
+        )
+        _require(
+            _git_blob_sha1((root / high_ordering_authority["path"]).read_bytes())
+            == high_ordering_authority.get("git_blob_sha1"),
+            "high-density TR ordering authority blob drift",
+        )
+        high_eq_identity = high_equivalence.get("production_exact_identity")
+        _require(
+            isinstance(high_eq_identity, dict)
+            and _git_blob_sha1((root / high_eq_identity["path"]).read_bytes())
+            == high_eq_identity.get("git_blob_sha1"),
+            "high-density TR Production identity authority drift",
+        )
+        high_equivalence_variants = {
+            item.get("icpn"): item
+            for item in high_equivalence.get("variants", [])
+            if isinstance(item, dict) and isinstance(item.get("icpn"), str)
+        }
+        _require(
+            set(high_equivalence_variants)
+            == {
+                "STM32F103RCT6TR",
+                "STM32F103RCT7TR",
+                "STM32F103RDT6TR",
+                "STM32F103RET6TR",
+            },
+            "high-density ordering-equivalence scope expanded without review",
+        )
+
+        for raw in high_qualification.get("records", []):
+            _require(isinstance(raw, dict), "high-density qualification record must be object")
+            key = (raw.get("manufacturer"), raw.get("icpn"))
+            _require(
+                all(isinstance(v, str) and v for v in key)
+                and key not in self._records,
+                f"invalid/duplicate high-density qualification key: {key}",
+            )
+            _require(
+                raw.get("software_state") == "SUPPORTED",
+                f"high-density record not explicitly SUPPORTED: {key[1]}",
+            )
+            row = catalog_by_key.get(key)
+            _require(row is not None, f"high-density qualified ICPN missing from Production Catalog: {key}")
+            _require(
+                row.production_admitted
+                and row.identifier_kind == "manufacturer_part_number"
+                and row.family == "STM32F1"
+                and row.mapping_status == "mapped"
+                and row.target_config == q_provider["target_config"],
+                f"high-density exact ICPN Production route drift: {key[1]}",
+            )
+            basis = raw.get("qualification_basis")
+            _require(isinstance(basis, dict), f"high-density qualification basis missing: {key[1]}")
+            basis_kind = basis.get("kind")
+            if basis_kind == "manufacturer_applicability":
+                target = high_applicability_targets.get(key[1])
+                _require(
+                    isinstance(target, dict)
+                    and basis.get("applicability_id")
+                    == high_applicability.get("applicability_id"),
+                    f"high-density applicability target missing: {key[1]}",
+                )
+                expected_catalog = {
+                    "base_device": target.get("base_device"),
+                    "package": target.get("package"),
+                    "pin_count": target.get("pin_count"),
+                    "flash_size": target.get("flash_size"),
+                    "temperature_grade": target.get("temperature_grade"),
+                    "option_suffix": target.get("option_suffix"),
+                    "target_config": target.get("target_config"),
+                }
+                for field, expected in expected_catalog.items():
+                    actual = getattr(row, field)
+                    actual = actual or "" if field == "option_suffix" else actual
+                    _require(
+                        actual == expected,
+                        f"high-density applicability Catalog field drift: {key[1]}/{field}",
+                    )
+                _require(
+                    row.source_authority
+                    == high_app_authority["production_exact_identity"]["source_authority"]
+                    and row.verification_status,
+                    f"high-density exact identity evidence drift: {key[1]}",
+                )
+                _require(
+                    raw.get("base_device") == target.get("base_device")
+                    and raw.get("programming_profile_id")
+                    == high_applicability.get("shared_programming_semantics", {}).get(
+                        "programming_profile_id"
+                    )
+                    and raw.get("memory_geometry_profile_id")
+                    == target.get("memory_geometry_profile_id")
+                    and raw.get("main_flash_size_bytes")
+                    == target.get("main_flash_size_bytes")
+                    and raw.get("page_count") == target.get("page_count"),
+                    f"high-density programming geometry drift: {key[1]}",
+                )
+            elif basis_kind == "ordering_equivalence":
+                eq = high_equivalence_variants.get(key[1])
+                _require(isinstance(eq, dict), f"high-density ordering equivalence missing: {key[1]}")
+                source_icpn = basis.get("equivalent_to_icpn")
+                _require(
+                    source_icpn == eq.get("equivalent_to_icpn")
+                    and basis.get("ordering_equivalence_id")
+                    == high_equivalence.get("equivalence_id"),
+                    f"high-density ordering equivalence identity drift: {key[1]}",
+                )
+                source_key = (key[0], source_icpn)
+                source = self._records.get(source_key)
+                source_row = catalog_by_key.get(source_key)
+                _require(
+                    isinstance(source, dict) and source.get("software_state") == "SUPPORTED",
+                    f"high-density equivalence source not directly qualified first: {key[1]}",
+                )
+                _require(
+                    source_row is not None,
+                    f"high-density equivalence source absent from Catalog: {source_icpn}",
+                )
+                for field in high_equivalence.get("inheritance_contract", {}).get(
+                    "required_equal_catalog_fields", []
+                ):
+                    _require(
+                        getattr(row, field) == getattr(source_row, field),
+                        f"high-density equivalence Catalog field drift: {key[1]}/{field}",
+                    )
+                permitted = high_equivalence.get("inheritance_contract", {}).get(
+                    "permitted_commercial_difference", {}
+                )
+                _require(
+                    permitted.get("field") == "option_suffix"
+                    and (source_row.option_suffix or "") == permitted.get("reference")
+                    and row.option_suffix == permitted.get("variant") == "TR",
+                    f"high-density equivalence packing suffix drift: {key[1]}",
+                )
+                for field in (
+                    "programming_profile_id",
+                    "memory_geometry_profile_id",
+                    "main_flash_size_bytes",
+                    "page_count",
+                    "operations",
+                ):
+                    _require(
+                        raw.get(field) == source.get(field),
+                        f"high-density equivalence semantic drift: {key[1]}/{field}",
+                    )
+                _require(
+                    raw.get("base_device") == row.base_device == source.get("base_device"),
+                    f"high-density equivalence Base Device drift: {key[1]}",
+                )
+            else:
+                raise DeviceCatalogIntegrityError(
+                    "OpenOCD software qualification: unsupported high-density "
+                    f"qualification basis: {key[1]}/{basis_kind}"
+                )
+            _require(
+                raw.get("programming_profile_id")
+                == high_group.get("manufacturer_evidence", {}).get("programming_profile_id")
+                and raw.get("operations") == list(REQUIRED_OPERATIONS),
+                f"high-density operation/profile mismatch: {key[1]}",
+            )
+            self._records[key] = deepcopy(raw)
+
+        high_exact = {
+            ("STMicroelectronics", "STM32F103RCT6"),
+            ("STMicroelectronics", "STM32F103RCT6TR"),
+            ("STMicroelectronics", "STM32F103RCT7"),
+            ("STMicroelectronics", "STM32F103RCT7TR"),
+            ("STMicroelectronics", "STM32F103RDT6"),
+            ("STMicroelectronics", "STM32F103RDT6TR"),
+            ("STMicroelectronics", "STM32F103RET6"),
+            ("STMicroelectronics", "STM32F103RET6TR"),
+            ("STMicroelectronics", "STM32F103RET7"),
+        }
+        _require(
+            high_exact.issubset(self._records) and len(self._records) == 31,
+            "combined Phase 2 qualification scope expanded without review",
+        )
+
+        for qualification_name, boundary in (
+            ("medium-density", qualification.get("acceptance_boundary", {})),
+            ("high-density", high_qualification.get("acceptance_boundary", {})),
+            ("v5 manifest", qualification_manifest.get("acceptance_boundary", {})),
+        ):
+            for boundary_key in (
+                "public_catalog_visibility_changed",
+                "job_batch_execution_changed",
+                "installed_runtime_attested",
+                "hardware_runtime_ready",
+                "physical_programming_qualified",
+                "phase3_compatibility_claimed",
+            ):
+                _require(
+                    boundary.get(boundary_key) is False,
+                    f"unsafe {qualification_name} Phase 2A boundary: {boundary_key}",
+                )
+
+        boundary = qualification_manifest.get("acceptance_boundary", {})
         for key in (
             "public_catalog_visibility_changed",
             "job_batch_execution_changed",
@@ -623,12 +1081,22 @@ class OpenOCDSoftwareQualificationRegistry:
             _require(boundary.get(key) is False, f"unsafe Phase 2A boundary: {key}")
 
         self.source_lock_id = source_lock["source_lock_id"]
-        self.qualification_id = qualification["qualification_id"]
+        self.qualification_id = qualification_manifest["qualification_id"]
         self.provider = deepcopy(q_provider)
         self.programming_group = deepcopy(group)
         self.operation_qualification = deepcopy(opq)
+        self._programming_groups_by_profile = {
+            group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(group),
+            high_group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(high_group),
+        }
+        self._operation_qualification_by_profile = {
+            group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(opq),
+            high_group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(high_opq),
+        }
         self.acceptance_boundary = deepcopy(boundary)
-        self.default_unreviewed_state = qualification.get("default_unreviewed_software_state")
+        self.default_unreviewed_state = qualification_manifest.get(
+            "default_unreviewed_software_state"
+        )
         _require(self.default_unreviewed_state == "UNKNOWN", "unreviewed exact ICPNs must remain UNKNOWN")
 
     def lookup(self, manufacturer: str, exact_icpn: str) -> dict[str, Any] | None:
@@ -666,7 +1134,9 @@ class OpenOCDSoftwareQualificationRegistry:
         if record is None:
             return payload
 
-        group = self.programming_group
+        profile_id = record["programming_profile_id"]
+        group = self._programming_groups_by_profile[profile_id]
+        operation_qualification = self._operation_qualification_by_profile[profile_id]
         shared_geometry = group["shared_flash_geometry"]
         payload["provider"] = {
             "provider_id": self.provider["provider_id"],
@@ -678,8 +1148,8 @@ class OpenOCDSoftwareQualificationRegistry:
         }
         payload["operations"] = {
             operation: {
-                "state": self.operation_qualification[operation]["state"],
-                "scope": self.operation_qualification[operation].get("scope"),
+                "state": operation_qualification[operation]["state"],
+                "scope": operation_qualification[operation].get("scope"),
             }
             for operation in REQUIRED_OPERATIONS
         }
@@ -741,8 +1211,12 @@ def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQual
         RELEASE_REL,
         SOURCE_LOCK_REL,
         QUALIFICATION_REL,
+        MEDIUM_QUALIFICATION_REL,
         APPLICABILITY_REL,
         EQUIVALENCE_REL,
+        HIGH_QUALIFICATION_REL,
+        HIGH_APPLICABILITY_REL,
+        HIGH_EQUIVALENCE_REL,
     )
     if not source_files_available(ROOT, required):
         return None
