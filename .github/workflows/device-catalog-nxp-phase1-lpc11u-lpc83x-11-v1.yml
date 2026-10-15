@@ -1,0 +1,35 @@
+name: NXP Phase1 LPC11U LPC83x eleven exact materials
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp-11-lpc11u-lpc83x-phase1-official-material-v1.csv"
+      - "data/device-catalog/research/nxp_phase1_lpc11u_lpc83x_11_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_lpc11u_lpc83x_11_v1.py"
+      - "data/device-catalog/research/NXP_PHASE1_LPC11U_LPC83X_ELEVEN_OFFICIAL_V1.md"
+      - ".github/workflows/device-catalog-nxp-phase1-lpc11u-lpc83x-11-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp_phase1_lpc11u_lpc83x_11_v1.py"
+      - "data/device-catalog/research/test_nxp_phase1_lpc11u_lpc83x_11_v1.py"
+      - ".github/workflows/device-catalog-nxp-phase1-lpc11u-lpc83x-11-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-phase1-lpc11u-lpc83x-material:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Recheck historical NXP source-locked Phase1 funnel
+        run: python data/device-catalog/research/nxp_phase1_funnel_audit_v1.py
+      - name: Verify 11 official NXP material identities and incremental S1=251
+        run: python data/device-catalog/research/nxp_phase1_lpc11u_lpc83x_11_v1.py
+      - name: Verify negative gates for exact-ICPN 12NC source and qualification
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase1_lpc11u_lpc83x_11_v1.py" -v
