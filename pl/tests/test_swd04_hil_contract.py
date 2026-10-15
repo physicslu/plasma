@@ -59,9 +59,9 @@ def inventory_attestation():
             {"name": "fabric", "address": "0x40000000", "size": "0x00010000"},
             {"name": "audio-codec-ctrl", "address": "0x43C00000", "size": "0x00010000"},
         ],
-        "potential_pl_users_cleared": True,
     }, {
         "schema_version": 1,
+        "exclusive_pl_ownership_confirmed": True,
         "uart_console_verified": True,
         "independent_power_recovery_verified": True,
         "maintenance_window_confirmed": True,
@@ -122,7 +122,7 @@ def test_p0_rejects_inventory_and_operator_risk(tmp_path, monkeypatch, bad):
     elif bad == "clock": inv["fclk0_hz"] = 10000000
     elif bad == "services": inv["services"]["plasma-server.service"] = "failed"
     elif bad == "fabric": inv["uio"][0]["address"] = "0x40001000"
-    elif bad == "fd": inv["potential_pl_users_cleared"] = False
+    elif bad == "fd": att["exclusive_pl_ownership_confirmed"] = False
     elif bad == "serial": att["uart_console_verified"] = False
     elif bad == "power": att["independent_power_recovery_verified"] = False
     elif bad == "maintenance": att["maintenance_window_confirmed"] = False
