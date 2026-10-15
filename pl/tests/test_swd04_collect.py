@@ -24,20 +24,23 @@ def fake_z2(tmp_path):
     write(sysroot / "class/uio/uio1/name", "audio-codec-ctrl\n")
     write(sysroot / "class/uio/uio1/maps/map0/addr", "0x43c00000\n")
     write(sysroot / "class/uio/uio1/maps/map0/size", "0x10000\n")
-    return sysroot, dt, clock
+    metadata = tmp_path / "pynq-metadata.bin"
+    metadata.write_bytes(b"fixture metadata")
+    return sysroot, dt, clock, metadata
 
 
 def test_read_only_inventory_fake_z2(tmp_path):
-    sysroot, dt, clock = fake_z2(tmp_path)
+    sysroot, dt, clock, metadata = fake_z2(tmp_path)
     seen = []
     def service_status(name):
         seen.append(name)
         return "active"
     snap = collect(sysroot=sysroot, device_tree=dt, clock_summary=clock,
-                   service_status=service_status, architecture="armv7l",
+                   metadata_path=metadata, service_status=service_status, architecture="armv7l",
                    pynq_version="3.1.1")
     assert snap["fpga_manager_state"] == "operating"
     assert snap["fclk0_hz"] == 100000000
+    assert len(snap["metadata_sha256"]) == 64
     assert snap["device_model_confirmed"] is True
     assert len(snap["uio"]) == 2
     assert next(x for x in snap["uio"] if x["name"] == "fabric")["address"] == "0x40000000"
@@ -58,7 +61,7 @@ def test_inventory_fails_on_corrupt_observation(tmp_path, fault):
         (sysroot / "class/fpga_manager/fpga0/state").unlink()
     with pytest.raises((OSError, SafetyError)):
         collect(sysroot=sysroot, device_tree=dt, clock_summary=clock,
-                service_status=lambda _: "active", architecture="armv7l",
+                metadata_path=metadata, service_status=lambda _: "active", architecture="armv7l",
                 pynq_version="3.1.1")
 
 
