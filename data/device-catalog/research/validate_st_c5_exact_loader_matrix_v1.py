@@ -64,10 +64,18 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
     # changing the ST C5 identity/loader matrix.
     st_sources = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"]
     nxp_sources = [s for s in sources if s.get("manufacturer") == "NXP"]
+    microchip = [s for s in sources if s.get("manufacturer") == "Microchip"]
     ensure(len(st_sources) == 28 and sum(s["row_count"] for s in st_sources) == 4629
            and [(s["family"], s["row_count"]) for s in nxp_sources] ==
                [("KL25",12),("MCX",196),("K32L2",16)]
-           and len(sources)==31 and sum(s["row_count"] for s in sources)==4853
+           and len(sources)==32 and sum(s["row_count"] for s in sources)==4975
+           and microchip==[{
+               "manufacturer":"Microchip","family":"SAML1X",
+               "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
+               "row_count":122,
+               "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
+               "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
+           }]
            and all(s["manufacturer"]=="STMicroelectronics" for s in sources[:28]),
            "Production ST+C5 and bounded NXP three-source baseline drift")
     c5 = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"
