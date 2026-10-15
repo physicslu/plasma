@@ -14,7 +14,7 @@ OpenOCD `SUPPORTED`、Programming Profile、PPU／Socket／Site HIL、量產燒�
   訂購碼適用範圍證據，六個逐欄位 Exact SKU `VERIFIED`；4 筆特殊
   VAO 仍待查，保持 `PARTIAL`。需先通過獨立審核。
 - [#924](https://github.com/physicslu/plasma/pull/924)：將 **122 筆**
-  正式來源證明的 Exact ICPN 加入 Production Identity Manifest，
+  正式來源證明的 Exact ICPN 以**第一批實作增量**加入 Production Identity Manifest，
   由既有 IC Selector 查詢 API 搜尋與詳情顯示。
 
 兩個 PR **均不因本文件自動取得合併、燒錄或部署批准**。
@@ -73,17 +73,35 @@ Exact ICPN 存在性來自**原始 Microchip MCP**。
   362 筆 H5／C5 Research-only Candidate 與歷史 ST Replay
   必須維持原本的資料與語意。
 
-## ADR-0002 必須獨立決策的議題
+## ADR-0002 唯一政策：Phase 1 IDENTIFIED 即可查詢
 
 [ADR-0002](../../../docs/adr/0002-openocd-software-qualified-catalog-visibility.md)
-目前的最終政策文字表示預設公開可選 Catalog 應以 Phase 2
-`SUPPORTED` 過濾；而目前 ST／NXP 已提供未有軟體資格的
-Phase 1 Production Identity 查詢，遷移由 Issue #849 追蹤。
-**兩者仍未完成政策一致性修訂**。
+2026-10-15 已正式採用：**原廠獨立證實完整商業 Exact ICPN 的
+Phase 1 `IDENTIFIED` 是唯一 IC Selector 可見性資格**。
+`INFORMATION_COMPLETE`、內部 Production Admission 批次、
+是否有 OpenOCD CFG、Phase 2 `SUPPORTED`、Phase 3 HIL
+均**不是 Phase 1 可見性的額外證據門檻**。
 
-本 PR 保持既有行為，並將 Phase 1 Search 與 Job／Batch
-執行權限分開。不能把修改測試分母誤解成已獲批准更改 ADR
-或預設可燒錄選料政策；後續需另行核准政策及介面入口分離。
+**122 筆只是現有 Production Manifest 的第一批工程部署增量，
+不是另一種 Phase 1 研究分級，更不是排除其餘原廠已驗證 ICPN 的理由。**
+目前限定快照內 23,276 筆原廠 Exact ICPN 已通過 Phase 1
+`IDENTIFIED`，其中凍結 5-CFG 子集合 2,563 筆；本 PR 將其中
+122 筆接到正式 Catalog，仍有 **23,154 筆已 IDENTIFIED 尚未在
+Product IC Selector 上線**。這是跨 Brand canonical Phase 1
+可見性部署缺口，不是原廠身份或資訊完整度不合格。
+
+舊版文件所稱「未來 SUPPORTED-only Selector 政策」
+已被最新 ADR-0002 取代，不得再做為 Microchip 開發依據。
+#924 只處理當前 122 筆受測試保護的增量；
+後續 migration 必須沿用相同身份證據門檻，完整追蹤
+`/api/devices/search`、`catalog_size`、`total_count` 與分頁，
+不得隱藏其他已確認的 Exact ICPN。
+
+P0／P1／P2 等歷史來源群組僅供原始資料重播與 SHA 稽核，
+不屬於現行 Phase 1／2／3 分類，也不得寫入 UI 的正式狀態欄位。
+
+Selector 可查詢不代表可燒錄：Job／Batch 始終需要 Phase 2
+`SUPPORTED`、正確 Runtime、電氣與 Site 安全限制並 fail-closed。
 
 ## 驗收
 
