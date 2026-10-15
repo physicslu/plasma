@@ -161,6 +161,24 @@ def join_icpns(lock, indexed, rollup):
                 require(ICPN_RE.fullmatch(base.strip()),
                         "untrusted manufacturer base identity")
                 bases.add(base.strip().upper())
+        # Preserve original manufacturer material-level source observations.
+        # This is Phase 1 provenance only. A replay-time/generated timestamp is
+        # NOT a manufacturer observation time. Older synthetic/portable sources
+        # may omit retrieved_at_utc and remain non-qualifying for S1.
+        observations = [{
+            "manufacturer_official_source_uri":
+                "https://api.microchip.com/mcp/resources",
+            "source_scope": "official_mcp_search_products_exact_partNumber_row",
+            "exact_icpn": icpn,
+            "manufacturer_base_part_number": src.get("basePartNumber"),
+            "source_query": src.get("query"),
+            "original_response_sha256": src.get("response_sha256"),
+            "original_observed_at_utc": src.get("retrieved_at_utc"),
+            "original_product_uri": src.get("productUrl"),
+            "original_evidence_file": src.get("evidence_file"),
+        } for src in sources]
+        observations.sort(key=lambda e: (
+            str(e["original_response_sha256"]), str(e["source_query"])))
         base = next(iter(bases)) if len(bases)==1 else None
         if len(bases)>1:
             state, cfg, dfp = "CONFLICTING_MANUFACTURER_BASE", None, None
@@ -193,6 +211,8 @@ def join_icpns(lock, indexed, rollup):
             "dfp_device_name": dfp,
             "mapping_state": state,
             "original_mcp_response_sha256_refs": sorted(hashes),
+            "manufacturer_exact_material_source_observations": observations,
+            "manufacturer_raw_lifecycle_status": item.get("rawLifecycleStatus"),
             "manufacturer_base_identity_evidence": (
                 "MCP_ROLLUP_ORIGINAL_RESPONSE_LINKS_NOT_REPLAYED_IN_THIS_COMMAND"),
             "cfg_applicability_reviewed": False,
