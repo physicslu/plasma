@@ -85,6 +85,7 @@ def validate_workstream_registry() -> None:
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
         ".github/workflows/z2like-demo-qemu.yml": "sw_ppu",
         ".github/workflows/persistent-integration-host.yml": "sw_ppu",
+        ".github/workflows/openocd-software-qualification.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
         ".github/workflows/device-catalog-current-validation.yml": "icpn",
         ".github/workflows/device-catalog-stm32-family-validation.yml": "icpn",
@@ -116,6 +117,7 @@ def main() -> int:
     z2_release = read("z2-ps-release.yml")
     z2like_qemu = read("z2like-demo-qemu.yml")
     ai_support = read("ic-support-validation.yml")
+    openocd_qualification = read("openocd-software-qualification.yml")
 
     # Device Catalog owns user-selectable ICPN inventory. A data-only catalog
     # expansion must not fan out into the generic software or release domains.
@@ -224,6 +226,46 @@ def main() -> int:
     )
     for token in forbidden_ai_tokens:
         forbid(ai_support, token, owner="AI IC Support")
+
+    # ADR-0002 Phase 2 software qualification is a SW/PPU-owned promotion
+    # boundary. It may consume only explicit research/catalog inputs and must
+    # never turn the entire AI IC Support tree into runtime authority.
+    require(
+        openocd_qualification,
+        "name: OpenOCD software qualification",
+        owner="SW/PPU OpenOCD software qualification",
+    )
+    for token in (
+        '"release/openocd.json"',
+        '"release/openocd-qualification/**"',
+        '"software/python/plasma_web/openocd_software_qualification.py"',
+        '"software/python/tests/test_openocd_software_qualification_v1.py"',
+        '"data/device-catalog/research/stm32f1-commercial-icpn.csv"',
+        '"data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json"',
+        '"data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json"',
+        '"data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json"',
+        '"data/ic-support/bindings/stm32f103c-pilot-v0.json"',
+    ):
+        require(
+            openocd_qualification,
+            token,
+            owner="SW/PPU OpenOCD software qualification",
+        )
+    for token in (
+        '"data/ic-support/**"',
+        '"data/device-catalog/research/*-commercial-icpn.csv"',
+    ):
+        forbid(
+            openocd_qualification,
+            token,
+            owner="SW/PPU OpenOCD software qualification",
+        )
+    require_count(
+        repository_contracts,
+        '".github/workflows/openocd-software-qualification.yml"',
+        3,
+        owner="REPO OpenOCD qualification governance",
+    )
 
     print("CI workstream/domain-boundary contract PASS")
     return 0
