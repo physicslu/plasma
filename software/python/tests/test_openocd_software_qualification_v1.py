@@ -16,15 +16,17 @@ from plasma_web.openocd_software_qualification import (
 EVIDENCE_FILES = (
     "release/openocd.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-    "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v3.json",
-    "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json",
-    "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v2.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
+    "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
+    "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
     "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
     "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
     "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
     "data/ic-support/bindings/stm32f103c-pilot-v0.json",
     "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json",
     "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103c8-64k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103cb-128k-v0.json",
     "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
     "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
     "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json",
@@ -53,16 +55,26 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         expected = (
             "STM32F103C8T6",
             "STM32F103C8T6TR",
+            "STM32F103C8T7",
+            "STM32F103C8T7TR",
             "STM32F103CBT6",
             "STM32F103CBT6TR",
+            "STM32F103CBT7",
+            "STM32F103CBT7TR",
             "STM32F103R8T6",
             "STM32F103R8T6TR",
+            "STM32F103R8T7",
+            "STM32F103R8T7TR",
             "STM32F103RBT6",
             "STM32F103RBT6TR",
+            "STM32F103RBT7",
+            "STM32F103RBT7TR",
             "STM32F103V8T6",
             "STM32F103V8T6TR",
             "STM32F103VBT6",
             "STM32F103VBT6TR",
+            "STM32F103VBT7",
+            "STM32F103VBT7TR",
         )
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
@@ -80,6 +92,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103RBT6": ("STM32F103RB", "stm32f103rb-128k-v0", 128 * 1024, 128),
             "STM32F103V8T6": ("STM32F103V8", "stm32f103v8-64k-v0", 64 * 1024, 64),
             "STM32F103VBT6": ("STM32F103VB", "stm32f103vb-128k-v0", 128 * 1024, 128),
+            "STM32F103C8T7": ("STM32F103C8", "stm32f103c8-64k-v0", 64 * 1024, 64),
+            "STM32F103CBT7": ("STM32F103CB", "stm32f103cb-128k-v0", 128 * 1024, 128),
+            "STM32F103R8T7": ("STM32F103R8", "stm32f103r8-64k-v0", 64 * 1024, 64),
+            "STM32F103RBT7": ("STM32F103RB", "stm32f103rb-128k-v0", 128 * 1024, 128),
+            "STM32F103VBT7": ("STM32F103VB", "stm32f103vb-128k-v0", 128 * 1024, 128),
         }
         for icpn, (base, geometry, size, pages) in expected.items():
             with self.subTest(icpn=icpn):
@@ -99,6 +116,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             ("STM32F103RBT6TR", "STM32F103RBT6"),
             ("STM32F103V8T6TR", "STM32F103V8T6"),
             ("STM32F103VBT6TR", "STM32F103VBT6"),
+            ("STM32F103C8T7TR", "STM32F103C8T7"),
+            ("STM32F103CBT7TR", "STM32F103CBT7"),
+            ("STM32F103R8T7TR", "STM32F103R8T7"),
+            ("STM32F103RBT7TR", "STM32F103RBT7"),
+            ("STM32F103VBT7TR", "STM32F103VBT7"),
         )
         for variant_icpn, source_icpn in pairs:
             with self.subTest(icpn=variant_icpn):
@@ -120,9 +142,14 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                     self.assertEqual(variant[field], source[field])
 
     def test_same_base_or_cfg_without_exact_review_does_not_grant_supported(self):
-        # T7 is the same R8 Base Device but a different temperature ordering code.
+        # Same medium-density Base Device is not enough when the package was not reviewed.
         self.assertEqual(
-            self.registry.state_for("STMicroelectronics", "STM32F103R8T7"),
+            self.registry.state_for("STMicroelectronics", "STM32F103V8H6"),
+            "UNKNOWN",
+        )
+        # A syntactically plausible but non-admitted exact order code is never synthesized.
+        self.assertEqual(
+            self.registry.state_for("STMicroelectronics", "STM32F103V8T7"),
             "UNKNOWN",
         )
         # High-density F103 remains outside this medium-density transaction.
@@ -134,7 +161,8 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.registry.state_for("STMicroelectronics", "STM32F407VGT6"),
             "UNKNOWN",
         )
-        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103R8T7"))
+        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103V8H6"))
+        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103V8T7"))
 
     def test_projection_separates_supported_from_unreviewed_mapping(self):
         for icpn, expected_size, expected_pages in (
@@ -146,6 +174,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             ("STM32F103VBT6", 128 * 1024, 128),
             ("STM32F103R8T6TR", 64 * 1024, 64),
             ("STM32F103VBT6TR", 128 * 1024, 128),
+            ("STM32F103C8T7", 64 * 1024, 64),
+            ("STM32F103RBT7", 128 * 1024, 128),
+            ("STM32F103VBT7TR", 128 * 1024, 128),
         ):
             with self.subTest(icpn=icpn):
                 item = self.registry.describe("STMicroelectronics", icpn)
@@ -171,7 +202,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                     expected_pages,
                 )
 
-        unreviewed = self.registry.describe("STMicroelectronics", "STM32F103R8T7")
+        unreviewed = self.registry.describe("STMicroelectronics", "STM32F103V8H6")
         self.assertEqual(unreviewed["software_state"], "UNKNOWN")
         self.assertFalse(unreviewed["reviewed"])
         self.assertIsNone(unreviewed["provider"])
@@ -199,11 +230,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 12)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 12)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 22)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 22)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 12,
+            registry.summary["catalog_exact_icpns"] - 22,
         )
 
     def test_local_evidence_blob_drift_fails_closed(self):
@@ -223,7 +254,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             copy_evidence_tree(root)
             drift = (
                 root
-                / "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json"
+                / "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
             )
             drift.write_bytes(drift.read_bytes() + b"\n")
             with self.assertRaisesRegex(
