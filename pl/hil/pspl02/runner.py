@@ -29,16 +29,27 @@ def require_session(p0: Path, session: Path, stage: str, previous: Path | None):
     c._require(proof.get("qualification") == "PSPL-02/SWD-00"
                and proof.get("preflight") == "PASS" and proof.get("sha256") == c.HASHES,
                "Preflight not bound to reviewed baseline/recovery")
-    c.preflight(proof.get("inventory", {}), proof.get("attestation", {}))
+    profile = proof.get("profile", "qualification")
+    c.preflight(proof.get("inventory", {}), proof.get("attestation", {}), profile=profile)
+    if profile == "development":
+        c._require(stage in c.DEVELOPMENT_STAGES,
+                   "Development mode excludes ERROR/RESET due to AXI-stall recovery risk")
     c._require(record.get("board_identity_sha256") == identity.digest_report(
         proof["inventory"]["board_identity"]), "Session board identity mismatch")
     c._require(record.get("stage") == stage and record.get("p0_sha256") == c.sha256_file(p0),
                "Session stage/preflight mismatch")
     c.require_fresh(record.get("observed_utc"))
-    for key in ("candidate_loaded_and_verified", "original_uios_unbound",
-                "kernel_and_clocks_reviewed_after_load", "uart_login_verified_now",
-                "independent_power_recovery_ready", "operator_present",
-                "no_shared_service_changes", "no_asynchronous_pl_reconfiguration"):
+    session_required = (
+        "candidate_loaded_and_verified", "original_uios_unbound",
+        "kernel_and_clocks_reviewed_after_load",
+        "no_shared_service_changes", "no_asynchronous_pl_reconfiguration",
+    )
+    if profile == "qualification":
+        session_required += (
+            "uart_login_verified_now", "independent_power_recovery_ready",
+            "operator_present",
+        )
+    for key in session_required:
         c._require(record.get(key) is True, "Missing current observation: " + key)
     load_log = Path(record.get("load_log", ""))
     c._require(load_log.is_file() and load_log.stat().st_size > 0
@@ -55,6 +66,7 @@ def require_session(p0: Path, session: Path, stage: str, previous: Path | None):
                    and prior.get("p0_sha256") == c.sha256_file(p0)
                    and prior.get("load_log_sha256") == c.sha256_file(load_log)
                    and prior.get("sha256") == c.HASHES, "Invalid preceding stage")
+    record["profile"] = profile
     return record
 
 
@@ -128,6 +140,8 @@ class DevMem:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("verify", "preflight", "live"))
+    parser.add_argument("--profile", choices=c.PROFILES, default="qualification",
+                        help="Preflight mode; development allows only IDENTITY/PSPL02/SWD00")
     for key in c.HASHES:
         parser.add_argument("--" + key.replace(".", "-"), dest=key, type=Path, required=True)
     parser.add_argument("--inventory", type=Path)
@@ -155,15 +169,16 @@ def main(argv=None):
         elif args.action == "preflight":
             c._require(args.inventory and args.attestation, "Missing preflight inputs")
             inventory, attestation = c.json_object(args.inventory), c.json_object(args.attestation)
-            c.preflight(inventory, attestation)
-            report.update(preflight="PASS", inventory=inventory, attestation=attestation,
+            c.preflight(inventory, attestation, profile=args.profile)
+            report.update(profile=args.profile, preflight="PASS", inventory=inventory, attestation=attestation,
                           loading="NOT_RUN")
             c.write_record(args.output, report)
         else:
             record = require_session(args.p0, args.session, args.stage, args.previous)
             runtime_audit(record, board_options=identity.options(args))
             args.output.mkdir(exist_ok=False, mode=0o700)
-            common = dict(qualification="PSPL-02/SWD-00", stage=args.stage, sha256=c.HASHES,
+            common = dict(qualification="PSPL-02/SWD-00", profile=record["profile"],
+                          stage=args.stage, sha256=c.HASHES,
                           p0_sha256=c.sha256_file(args.p0), session_sha256=c.sha256_file(args.session),
                           load_log_sha256=record["load_log_sha256"], physical_swd="NOT_RUN",
                           ic_programming="NOT_RUN", restoration="NOT_RUN")
