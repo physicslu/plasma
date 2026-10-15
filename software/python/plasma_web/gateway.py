@@ -127,6 +127,8 @@ def _microchip_phase1_ic_information(record: Any) -> dict[str, Any] | None:
         "manufacturer":"Microchip","icpn":record.icpn,
         "phase1_identity_state":"IDENTIFIED",
         "phase1_information_complete":False,
+        "phase2_programming_state":"UNKNOWN",
+        "phase3_compatibility_state":"NOT_TESTED",
         "ram_size":f"{ram} KB",
         "core_model":"Arm Cortex-M23",
         "working_vdd_v":None,"io_supply_v":None,"vdda_v":None,
@@ -146,6 +148,9 @@ def _microchip_phase1_ic_information(record: Any) -> dict[str, Any] | None:
             "official_pdf_grammar_not_exact_material_list":True,
         },
         "software_supported":False,
+        "phase2_provider":None,
+        "phase2_supported_operations":[],
+        "phase3_verified_configurations":[],
         "programming_profile_authority":False,
         "hardware_runtime_ready":False,
     }
