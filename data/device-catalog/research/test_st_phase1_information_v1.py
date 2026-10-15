@@ -41,17 +41,16 @@ class STPhase1InformationBaselineTests(unittest.TestCase):
         self.assertEqual(summary["field_coverage"]["ram"]["UNKNOWN"], 3007)
         self.assertEqual(summary["field_coverage"]["working_vdd"]["UNKNOWN"], 3007)
 
-        # Exact Production identity fields remain independently useful for all ST rows.
-        for field in (
-            "manufacturer",
-            "icpn",
-            "base_device",
-            "package",
-            "pin_count",
-            "flash",
-            "temperature",
-        ):
+        # Exact Production values remain independently available. Manufacturer/ICPN are
+        # exact-admitted identity; the remaining catalog fields preserve the source row's
+        # authority quality instead of upgrading every historical source to VERIFIED.
+        for field in ("manufacturer", "icpn"):
             self.assertEqual(summary["field_coverage"][field]["VERIFIED"], 4629)
+        for field in ("base_device", "package", "pin_count", "flash", "temperature"):
+            states = summary["field_coverage"][field]
+            self.assertEqual(states["VERIFIED"] + states["PARTIAL"], 4629)
+            self.assertEqual(states["UNKNOWN"], 0)
+            self.assertEqual(states["CONFLICT"], 0)
 
     def test_preserves_known_fields_when_other_fields_are_unknown(self):
         f407 = exact(self.records, "STM32F407VGT6")
