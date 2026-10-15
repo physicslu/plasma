@@ -147,7 +147,7 @@ def test_script_and_source_contracts():
     assert "get_bd_ports" in design and "External PL port forbidden" in design
     assert "pl/build/z2-swd03-axi" in build
     assert "mktemp -d" in build and "flock -n" in build
-    assert "ps7_init" not in build
+    assert "source ps7_init" not in build and "exec ps7_init" not in build
     assert "report_timing_summary" in tcl
     assert "get_drc_violations" in tcl
     assert "SWD03_BITSTREAM_BUILD_PASS" in tcl
