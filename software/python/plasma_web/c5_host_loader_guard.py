@@ -10,6 +10,7 @@ from typing import Any
 
 from .backend_candidate_registry import BackendCandidateRegistry, EXPECTED_C5
 from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError
+from .microchip_phase1_admission_guard import admitted_microchip_phase1_count
 
 _ST_SOURCE_COMMIT = "c8d973bdad9a6fddb51459eda109b3b95d23b57a"
 _DFP_SOURCE_COMMIT = "a5f65bc64535cfa723e9d25f58d7ce23d0937aed"
@@ -28,7 +29,7 @@ class C5HostLoaderGuard:
     """Inspect an exact C5 research candidate, never generate a flash plan."""
 
     def __init__(self, catalog: DeviceCatalog, registry: BackendCandidateRegistry):
-        if (catalog.status != "production" or catalog.size != 4853 or
+        if (catalog.status != "production" or catalog.size != 4853 + admitted_microchip_phase1_count(catalog) or
                 sum(r.vendor == "STMicroelectronics" for r in catalog.records) != 4629 or
                 sum(r.vendor == "NXP" and r.family == "KL25" for r in catalog.records) != 12 or
                 sum(r.vendor == "NXP" and r.family == "MCX" and
