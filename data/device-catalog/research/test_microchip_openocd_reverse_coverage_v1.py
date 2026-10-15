@@ -157,6 +157,7 @@ class ReverseCoverage(unittest.TestCase):
             "planned_dfp_queries": 3198,
             "planned_batches": 321,
             "batch_archives_with_valid_capture_attestation": 313,
+            "batches_quarantined_due_to_missing_attestation_after_worker_timeouts": 8,
             "complete_positive_exact_prefix_queries": 2753,
             "fully_replayed_zero_exact_prefix_queries": 68,
             "unique_exact_prefix_candidates_without_conflicts": 23276,
@@ -168,14 +169,20 @@ class ReverseCoverage(unittest.TestCase):
             "batch_count": 321,
         }
         result = {
-            "observed_batch_archives": 313,
+            "observed_batch_archives": 321,
             "replayed_positive_exact_prefix_queries": 2753,
             "replayed_zero_exact_prefix_queries": 68,
             "unique_exact_prefix_research_candidates": 23276,
             "conflicting_lifecycle_identity_count": 0,
             "replayed_queries": 2821,
             "production_write_authorized": False,
-            "ordering_candidates": [{"sources": [{} for _ in range(23427)]}],
+            "ordering_candidates": [{"sources": [{}]} for _ in range(23276)],
+            "not_archived_batch_ids": [],
+            "batch_reports": (
+                [{"batch_id": f"valid-{n}", "state": "fully_replayed"}
+                 for n in range(313)] +
+                [{"batch_id": f"quarantine-{n}", "state": "entire_batch_quarantined"}
+                 for n in range(8)]),
         }
         sources = [("original-16-batches", "/synthetic/old")] + [
             (f"shard-{n}", f"/synthetic/shard-{n}") for n in range(12)]
