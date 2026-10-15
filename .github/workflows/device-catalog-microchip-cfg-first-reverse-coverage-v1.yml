@@ -247,6 +247,7 @@ jobs:
           from pathlib import Path
           report=json.loads((Path(os.environ["RUNNER_TEMP"])/
               "microchip-p2-dfp-identity-archive.json").read_text())
+          assert report["schema_version"]==2
           assert report["source_subset_original_mcp_exact_icpns"]==23276
           assert report["baseline_p0_exact_icpns_unchanged"]==2437
           assert report["baseline_p1_target_only_exact_icpns_unchanged"]==126
