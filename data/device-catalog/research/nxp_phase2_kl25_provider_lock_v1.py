@@ -29,6 +29,8 @@ FILES = {
                           "aa8424d05e5ac913dffa5f774befd284a0aa0776"),
     "runtime": (Path("release/openocd.json"),
                 "08c884b1bf6f5999c6d34c090992a8b59d85971d"),
+    "upstream_delta": (RESEARCH/"nxp-kl25-openocd-provider-delta-v1.json",
+                       "b79ecd5f1f82a125bdedc3218d439db88bc30aa2"),
 }
 EXACT_PROTOTYPE = "MKL25Z128VLK4"
 LEGACY_COMMIT = "56b8d93fbe61a78dc903d770820d6d896b6d8134"
@@ -147,6 +149,50 @@ def review_provider_boundary(backend: dict, adapter: dict, release: dict) -> dic
         "real_ic_execution_evidenced_here": False,
     }
 
+
+def review_upstream_delta(delta: dict, boundary: dict) -> dict:
+    require(delta["schema_version"]==1
+            and delta["original_source_repository"]=="openocd-org/openocd"
+            and delta["prior_software_prototype_commit"]==LEGACY_COMMIT
+            and delta["current_plasma_openocd_commit"]==APPROVED_COMMIT,
+            "upstream source-provenance provider commit mismatch")
+    expected={
+        "tcl/target/kl25.cfg":
+            ("916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+             "916edf6853c3f26a004d2ca5a2f0e08f43a24093",True),
+        "tcl/target/klx.cfg":
+            ("b4014ba5b6de75e236e0a6b8780cf6448c991c2",
+             "cd236b3395e42310f1475f3b64580758a7f3b9ea",False),
+        "src/flash/nor/kinetis.c":
+            ("266b447c04376b529c44ac11cd9fd6acc31e0e8c",
+             "7137b4aa078719af31122f8276494f006589e8ab",False),
+    }
+    reviewed=delta["per_file"]
+    require(len(reviewed)==3 and len({r["path"] for r in reviewed})==3
+            and {r["path"] for r in reviewed}==set(expected),
+            "upstream source include/driver file set changed")
+    for row in reviewed:
+        old,current,same=expected[row["path"]]
+        require((row["prototype_git_blob"],row["current_git_blob"],
+                 row["identical_bytes"])==(old,current,same),
+                "reviewed OpenOCD source Git blob evidence mismatch: "+row["path"])
+    c=delta["conclusions"]
+    require(c["exact_cfg_file_unchanged"] is True
+            and c["tcl_dependency_changed"] is True
+            and c["flash_driver_source_changed"] is True
+            and c["can_transfer_software_profile_admission"] is False
+            and c["source_semantic_equivalence_proven"] is False
+            and c["current_provider_exact_operations_qualified"] is False
+            and delta["no_execution_no_production_no_hil"] is True
+            and boundary["prototype_qualified_under_current_provider"] is False,
+            "same CFG cannot bypass changed Tcl dependency/Flash driver review")
+    return {"source_graph_reviewed":3,
+            "byte_identical_files":1,
+            "changed_files":2,
+            "changed_paths":["tcl/target/klx.cfg","src/flash/nor/kinetis.c"],
+            "source_semantics_requalified":False,
+            "current_provider_software_supported":False}
+
 def build(*, root: Path=ROOT):
     # The canonical validator is the *only* Phase 1/Phase 2 state authority.
     phase2 = canonical.build(root=root)
@@ -155,6 +201,8 @@ def build(*, root: Path=ROOT):
     backend=json.loads(checked_bytes("executor_backend",root=root))
     adapter=json.loads(checked_bytes("executor_contract",root=root))
     boundary=review_provider_boundary(backend,adapter,release)
+    upstream=review_upstream_delta(
+        json.loads(checked_bytes("upstream_delta",root=root)),boundary)
     rows=[]
     for r in materials(root=root):
         exact=r["icpn"]
@@ -200,6 +248,7 @@ def build(*, root: Path=ROOT):
     validate(rows,boundary)
     return {"rows":sorted(rows,key=lambda x:x["icpn"]),
             "provider_boundary":boundary,
+            "upstream_source_diff":upstream,
             "phase1_identified_global_nxp":297,
             "phase2_candidate_global_nxp":28,
             "phase2_supported_newly_qualified_by_this_review":0,
