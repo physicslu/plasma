@@ -166,6 +166,18 @@ the Z2 runtime state.
 The separate phases use a hard-coded 32-bit aligned MMIO whitelist.
 There is no CLI parameter to select arbitrary physical addresses.
 
+**MMIO width requirement (HIL-3 regression):** the SWD-04 live backend
+must use native aligned 32-bit word loads/stores for each allowlisted
+AXI4-Lite register, not `struct.pack_into("<I", ...)` or bytewise
+`memset`. On the PYNQ-Z2 ARMv7, the latter emitted STRB at register +1
+and caused SLVERR/external abort in PSPL-02. The reviewed native
+`memoryview(...).cast("I")` backend checks little-endian u32 width,
+address alignment, mapping lifetime and read-only HIL-01 access.
+Its offline file-backed RAM regression does not qualify the SWD-03
+aperture on real hardware: that remains an explicit SWD-04 HIL stage.
+Reconfirm target instructions when changing the PYNQ Python/toolchain.
+
+
 - **HIL-01:** `/dev/mem` read-only; Identity words and known reset values
   from the four 4 KiB AXI segments. No register writes.
 - **HIL-02:** only SWD-03 `COMMAND`=START/ACK,
