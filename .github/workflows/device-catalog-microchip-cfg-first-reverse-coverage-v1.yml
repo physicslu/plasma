@@ -428,6 +428,12 @@ jobs:
           assert d["schema_version"]==1
           assert d["source_subset_observed_distinct_commercial_icpns"]==23276
           assert d["phase1_s1_identified"]+d["phase1_research_only_source_gaps"]+d["phase1_identity_disputed"]==23276
+          assert d["phase1_s1_identified"]==23276
+          assert d["phase1_s1_complete"]==0
+          assert d["phase1_research_only_source_gaps"]==0
+          assert d["phase1_identity_disputed"]==0
+          assert d["phase1_information_coverage_all_source_observed_icpns"]["flash"]["PARTIAL"]==2496
+          assert d["phase1_information_coverage_all_source_observed_icpns"]["flash"]["UNKNOWN"]==20780
           assert d["phase1_s1_complete"]<=d["phase1_s1_identified"]
           assert d["legacy_research_priority_counts_separate_from_phases"]=={
               "P0":2437,"P1":126,"P2":20713}
