@@ -42,7 +42,7 @@ class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
         self.assertEqual(len(disallowed),277)
         self.assertTrue(admitted.issubset(self.by_part))
         self.assertFalse(disallowed.intersection(self.by_part))
-        self.assertEqual(len(self.by_part-admitted),73)
+        self.assertEqual(len(set(self.by_part)-admitted),73)
 
     def test_reject_fake_phase2_supported(self):
         rows=copy.deepcopy(self.rows)
