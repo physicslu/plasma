@@ -29,9 +29,9 @@ Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-1
 
 ## Catalog surface distinction
 
-There are two different concepts: **IC Information research/detail completeness** versus **default public IC Selector eligibility**. IC information in a research/admin detail view may be incomplete; it does not grant default product Catalog visibility.
+There are two different concepts: **Phase 1 identity visibility** versus **IC Information field completeness**. Under current ADR-0002, an Exact ICPN with Phase 1 `IDENTIFIED` is eligible for IC Selector visibility even when some IC Information fields remain `UNKNOWN / PARTIAL / CONFLICT`.
 
-Accepted ADR-0002 final policy stays: default product selectable Catalog is limited to qualified OpenOCD software `SUPPORTED` exact ICPNs. That filtering and consistent count migration is outstanding, tracked separately in Issue #849 and is **not** implemented merely by completing the Phase 1 baseline or the initial Phase 2A qualification registry. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
+Phase 2 Programming and Phase 3 PLASMA Compatibility are independent displayed states, not Selector filters. A Phase 1-visible ICPN may therefore show Phase 2 `UNKNOWN` or `UNSUPPORTED` and Phase 3 `NOT_TESTED`. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification, and Selector visibility never grants Job/Batch execution.
 
 ## Examples of excluded Phase 1 questions
 
