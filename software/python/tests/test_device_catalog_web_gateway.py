@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
 
 
 EXPECTED_PRODUCTION_CATALOG_SIZE = get_default_device_catalog().size
@@ -428,6 +428,21 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32g0x.cfg")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
+
+    def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
+        catalog = get_default_device_catalog()
+        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        self.assertEqual(len(rows), 122)
+        for row in rows:
+            with self.subTest(icpn=row.identifier):
+                with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
+                    _parse_target_device(
+                        {"vendor": "Microchip", "identifier": row.identifier},
+                        label="Engineering target_device")
+        with self.assertRaisesRegex(ValueError, "canonical Device Catalog"):
+            _parse_target_device(
+                {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
+                label="Batch target_device")
 
     def test_microchip_122_exact_phase1_ic_information_search_not_programming(self) -> None:
         catalog = get_default_device_catalog()
