@@ -109,6 +109,8 @@ def _response(io: RestrictedMMIO, *, limit: int = 10000,
             meta = io.read(META)
             data = io.read(RDATA)
             for _ in range(3):
+                _expect_equal(io.read(STATUS) & (READY | RESP_VALID), RESP_VALID,
+                              "Held response valid flag")
                 _expect_equal(io.read(META), meta, "Held response metadata")
                 _expect_equal(io.read(RDATA), data, "Held response data")
             return meta, data
