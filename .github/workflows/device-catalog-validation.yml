@@ -54,7 +54,7 @@ jobs:
         run: python data/device-catalog/research/test_device_catalog_evidence_framework.py
       - name: Validate ST ADR-0002 Phase 1 field-level baseline
         run: |
-          python data/device-catalog/research/test_adr0002_adr0002_st_phase1_information_v1.py
+          python data/device-catalog/research/test_adr0002_st_phase1_information_v1.py
           python data/device-catalog/research/adr0002_st_phase1_information_v1.py --summary /tmp/st-phase1-summary.json
           python - <<'PY'
           import json
