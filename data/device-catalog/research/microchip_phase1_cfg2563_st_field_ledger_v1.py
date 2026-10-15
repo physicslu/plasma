@@ -88,6 +88,16 @@ def normalize_field(old):
         if state == "VERIFIED":
             require(scope == "exact_mcp_response_row",
                     "family/CFG evidence cannot be promoted to VERIFIED")
+    elif state == "NOT_APPLICABLE":
+        # Explicit manufacturer evidence of a non-existent/inapplicable field;
+        # unknown/missing rails MUST remain UNKNOWN instead.
+        require(value is None and unit is None
+                and isinstance(locator,str) and bool(locator)
+                and isinstance(scope,str) and bool(scope)
+                and isinstance(hashes,list) and bool(hashes)
+                and all(is_sha(x) for x in hashes)
+                and "NOT_APPLICABLE" in (old.get("notes") or "").upper(),
+                "NOT_APPLICABLE requires explicit official source and absent value")
     else:
         # Conflict remains unresolved; do not select a winning value.
         require(value is None, "unresolved CONFLICT may not claim numeric value")
@@ -182,6 +192,9 @@ def from_ledgers(source, p0_info, p1_info, s1_info, upstream_sha):
             fields = {}
             for name in ST_FIELDS:
                 old = row["fields"][FROM_MICROCHIP[name]]
+                require(not (name in ("manufacturer","icpn","base_device")
+                             and old["status"]=="NOT_APPLICABLE"),
+                        "official exact material identity cannot be NOT_APPLICABLE")
                 normalized = normalize_field(old)
                 fields[name]=normalized
                 coverage[name][normalized["state"]]+=1
