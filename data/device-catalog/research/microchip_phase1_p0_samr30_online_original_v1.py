@@ -164,13 +164,24 @@ def capture(root, getter=fetch_exact):
                   "captured_at_utc": datetime.now(timezone.utc).isoformat()}
         try:
             raw = getter(uri, lane)
-            rows = parse_original_html(raw, lane)
+            require(0 < len(raw) <= MAX_BYTES and
+                    (b"<html" in raw[:50000].lower() or
+                     b"<!doctype html" in raw[:50000].lower()),
+                    "HTTP response not official HTML")
             target = f"manufacturer-{lane.lower()}-original.html"
             (root / target).write_bytes(raw)
-            record.update(status="SOURCE_BYTES_CAPTURED_AND_REPLAYED",
+            record.update(status="SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE",
                           file=target,
                           original_sha256=hashlib.sha256(raw).hexdigest(),
-                          bytes=len(raw), exact_ordering_row_count=len(rows))
+                          bytes=len(raw),
+                          manufacturer_order_code_tokens_present={
+                              key: key.encode() in raw for key in EXPECTED[lane]})
+            try:
+                rows = parse_original_html(raw, lane)
+                record.update(status="SOURCE_BYTES_CAPTURED_AND_REPLAYED",
+                              exact_ordering_row_count=len(rows))
+            except ValueError as exc:
+                record["error"] = f"ORIGINAL_HTML_SCHEMA_NOT_REPLAYABLE: {exc}"
         except (OSError, ValueError, TimeoutError, urllib.error.URLError) as exc:
             record["error"] = f"{type(exc).__name__}: {str(exc)[:250]}"
         sources.append(record)
@@ -188,14 +199,67 @@ def capture(root, getter=fetch_exact):
     }
     (root / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    audit_original_receipt(root)
     require(manifest["live_original_source_observation_complete"],
-            "SOURCE_NOT_AVAILABLE; check preserved original capture manifest")
+            "SOURCE_NOT_AVAILABLE_OR_UNREPLAYABLE; check preserved original HTML and receipt")
     return replay(root)
+
+
+def audit_original_receipt(root):
+    """Hash-audit any downloaded HTML, even if the semantic table was missing.
+
+    HTTP 200 from a publisher may return a JS-only shell. Keep those bytes
+    as diagnostics, but never count them as four exact ordering rows.
+    """
+    root = Path(root)
+    receipt = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    require(receipt.get("schema_version") == 1
+            and receipt.get("manufacturer") == "Microchip"
+            and receipt.get("production_write_authorized") is False
+            and receipt.get("phase1_icpn_fields_verified_by_this_source_only") is False
+            and receipt.get("pdf_semantic_crosscheck_completed") is False,
+            "untrusted original source-only receipt")
+    sources = receipt.get("sources")
+    require(isinstance(sources, list) and len(sources) == 2
+            and {x.get("lane") for x in sources} == set(URLS),
+            "incomplete original source receipt")
+    for event in sources:
+        lane = event["lane"]
+        require(event["url"] == URLS[lane], "source endpoint changed")
+        state = event["status"]
+        require(state in ("SOURCE_NOT_AVAILABLE",
+                          "SOURCE_BYTES_CAPTURED_TABLE_NOT_REPLAYABLE",
+                          "SOURCE_BYTES_CAPTURED_AND_REPLAYED"),
+                "unrecognized manufacturer source state")
+        if state == "SOURCE_NOT_AVAILABLE":
+            require(event["file"] is None and event["original_sha256"] is None
+                    and event["bytes"] is None
+                    and event["exact_ordering_row_count"] == 0,
+                    "failed source cannot claim captured original bytes")
+            continue
+        filename = f"manufacturer-{lane.lower()}-original.html"
+        path = root / filename
+        require(event["file"] == filename and path.is_file()
+                and not path.is_symlink(), "missing original HTML or altered filename")
+        raw = path.read_bytes()
+        require(0 < len(raw) <= MAX_BYTES
+                and event["original_sha256"] == hashlib.sha256(raw).hexdigest()
+                and event["bytes"] == len(raw), "original HTML SHA mismatch")
+        required = {k: k.encode() in raw for k in EXPECTED[lane]}
+        require(event.get("manufacturer_order_code_tokens_present") == required,
+                "observed exact SKU tokens differ from original HTML")
+        if state == "SOURCE_BYTES_CAPTURED_AND_REPLAYED":
+            require(len(parse_original_html(raw, lane)) ==
+                    event["exact_ordering_row_count"], "replayed source changed")
+        else:
+            require(event["exact_ordering_row_count"] == 0,
+                    "unreplayable HTML cannot claim exact manufacturer rows")
+    return receipt
 
 
 def replay(root):
     root = Path(root)
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    manifest = audit_original_receipt(root)
     require(manifest.get("schema_version") == 1
             and manifest.get("manufacturer") == "Microchip"
             and manifest.get("scope") ==
