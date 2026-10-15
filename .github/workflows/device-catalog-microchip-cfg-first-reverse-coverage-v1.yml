@@ -8,6 +8,9 @@ on:
       - 'data/device-catalog/research/microchip_phase1_p0_information_ledger_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p1_information_ledger_v1.py'
       - 'data/device-catalog/research/microchip_phase1_p1_ordering_crosswalk_v1.py'
+      - 'data/device-catalog/research/microchip_phase1_p1_dfp_discovery_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p1_dfp_discovery_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_P1_DFP_DISCOVERY_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p1_ordering_crosswalk_v1.py'
       - 'data/device-catalog/research/MICROCHIP_P1_ORDERING_APPLICABILITY_V1.md'
       - 'data/device-catalog/research/test_microchip_phase1_p1_information_ledger_v1.py'
@@ -226,6 +229,49 @@ jobs:
                             "cfg_counts":data["icpn_by_cfg_candidate_counts"],
                             "historical_24051_complete":False},sort_keys=True,indent=2))
           PY
+      - name: Audit expanded P1 exact-MCP and official DFP candidate discovery
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_dfp_discovery_v1.py' -v
+          python data/device-catalog/research/microchip_phase1_p1_dfp_discovery_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
+            --output "${{ runner.temp }}/microchip-p1-dfp-discovery.json"
+          python data/device-catalog/research/microchip_phase1_p1_dfp_discovery_v1.py \
+            --upstream-cfg-report "${{ runner.temp }}/microchip-full-reverse.json" \
+            --dfp-evidence-root "$MICROCHIP_DFP_ROOT" \
+            --output "${{ runner.temp }}/microchip-p1-dfp-discovery.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/
+              "microchip-p1-dfp-discovery.json").read_text())
+          assert report["source_subset_original_mcp_exact_icpns"]==23276
+          assert report["baseline_p0_exact_icpns_unchanged"]==2437
+          assert report["baseline_p1_target_only_exact_icpns_unchanged"]==126
+          assert report["p1_expanded_research_queue_total"]==(
+              report["p1_discovery_exact_icpn_candidates"]+126)
+          assert report["baseline_p0_p1_records_reclassified"]==0
+          assert report["new_phase1_fields_verified"]==0
+          assert report["openocd_software_supported_count"]==0
+          assert report["production_write_authorized"] is False
+          assert report["phase2_programming_authorized"] is False
+          print("P1_DISCOVERY_EXACT_ICPN_COUNT",
+                report["p1_discovery_exact_icpn_candidates"])
+          print("P1_DISCOVERY_DISTINCT_DFP_BASE_COUNT",
+                report["manufacturer_dfp_matched_distinct_base_names"])
+          print("P1_DISCOVERY_BY_PACK",
+                json.dumps(report["candidate_exact_icpn_by_manufacturer_pack"],
+                           sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip P1 baseline Target CFG: 126 exact MCP ICPNs\n")
+              f.write("Additional P1 DFP-only discovery candidates: "+
+                      str(report["p1_discovery_exact_icpn_candidates"])+"\n")
+              f.write("P1 research queue combined (non-equivalent evidence tiers): "+
+                      str(report["p1_expanded_research_queue_total"])+"\n")
+              f.write("No OpenOCD qualification, Phase 2, Catalog or Production.\n")
+          PY
       - name: Derive all 2437 P0 exact-ICPN Phase 1 field-evidence states and source gaps
         run: |
           set -euo pipefail
@@ -417,6 +463,7 @@ jobs:
           path: |
             ${{ runner.temp }}/microchip-full-reverse.json
             ${{ runner.temp }}/microchip-p0-phase1-information-ledger.json
+            ${{ runner.temp }}/microchip-p1-dfp-discovery.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
           if-no-files-found: warn
