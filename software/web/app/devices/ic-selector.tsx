@@ -301,8 +301,8 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </span>
                   </div>
                   <div className="icSelectorStatusRow icSelectorStatusEvidence">
-                    <span className={softwareQualificationClass(device.openocd_software_qualification?.software_state)}>
-                      {softwareQualificationLabel(device.openocd_software_qualification?.software_state, zh)}
+                    <span className={softwareQualificationClass(device.programming_qualification?.software_state)}>
+                      {softwareQualificationLabel(device.programming_qualification?.software_state, zh)}
                     </span>
                     <span className={openOcdTagState(device) === "mapped" ? "verified" : openOcdTagState(device) === "candidate" ? "pending" : "unmapped"}>
                       {openOcdConfigLabel(openOcdTagState(device), zh)}
@@ -414,40 +414,40 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <span>02</span>
                 <div>
                   <h3>{zh ? "Programming" : "Programming"}</h3>
-                  <p>{zh ? "Phase 2 軟體資格、燒錄介面、電氣條件、Flash geometry 與程序" : "Phase 2 software qualification, interfaces, electrical conditions, Flash geometry, and flow"}</p>
+                  <p>{zh ? "Phase 2 軟體資格、燒錄介面、電氣條件、Flash geometry 與程序" : "Phase 2 Programming qualification, interfaces, electrical conditions, Flash geometry, and flow"}</p>
                 </div>
               </div>
 
-              {selected.openocd_software_qualification ? (
+              {selected.programming_qualification ? (
                 <>
                   <dl>
                     <div>
                       <dt>{zh ? "Software Qualification" : "Software Qualification"}</dt>
-                      <dd><strong>{selected.openocd_software_qualification.software_state}</strong>{selected.openocd_software_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Phase 2 審查" : " · exact ICPN not yet Phase 2 reviewed")}</dd>
+                      <dd><strong>{selected.programming_qualification.software_state}</strong>{selected.programming_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Phase 2 審查" : " · exact ICPN not yet Phase 2 reviewed")}</dd>
                     </div>
-                    {selected.openocd_software_qualification.provider && (
+                    {selected.programming_qualification.provider && (
                       <>
-                        <div><dt>{zh ? "Provider" : "Provider"}</dt><dd>OpenOCD {selected.openocd_software_qualification.provider.version}</dd></div>
-                        <div><dt>Target CFG</dt><dd><code>{selected.openocd_software_qualification.provider.target_config}</code></dd></div>
-                        <div><dt>Flash Driver</dt><dd><code>{selected.openocd_software_qualification.provider.flash_driver}</code></dd></div>
+                        <div><dt>{zh ? "Provider" : "Provider"}</dt><dd>OpenOCD {selected.programming_qualification.provider.version}</dd></div>
+                        <div><dt>Target CFG</dt><dd><code>{selected.programming_qualification.provider.target_config}</code></dd></div>
+                        <div><dt>Flash Driver</dt><dd><code>{selected.programming_qualification.provider.flash_driver}</code></dd></div>
                       </>
                     )}
-                    {selected.openocd_software_qualification.programming && (
+                    {selected.programming_qualification.programming && (
                       <>
-                        <div><dt>{zh ? "Programming Profile" : "Programming Profile"}</dt><dd><code>{selected.openocd_software_qualification.programming.programming_profile_id}</code></dd></div>
-                        <div><dt>{zh ? "燒錄 VDD" : "Programming VDD"}</dt><dd>{voltageRange(selected.openocd_software_qualification.programming.electrical.vdd_programming_v)}</dd></div>
-                        <div><dt>External VPP</dt><dd>{selected.openocd_software_qualification.programming.electrical.external_vpp_required ? (zh ? "需要" : "Required") : (zh ? "不需要" : "Not required")}</dd></div>
-                        <div><dt>{zh ? "介面" : "Transports"}</dt><dd>{selected.openocd_software_qualification.programming.debug_transport.join(" · ")}</dd></div>
-                        <div><dt>{zh ? "Flash 容量" : "Flash size"}</dt><dd>{formatFlashBytes(selected.openocd_software_qualification.programming.flash_geometry.main_flash_size_bytes)}</dd></div>
-                        <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.openocd_software_qualification.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
-                        <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.openocd_software_qualification.programming.flash_geometry.program_unit} · {selected.openocd_software_qualification.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
-                        <div><dt>{zh ? "Page Count" : "Page count"}</dt><dd>{selected.openocd_software_qualification.programming.flash_geometry.page_count}</dd></div>
+                        <div><dt>{zh ? "Programming Profile" : "Programming Profile"}</dt><dd><code>{selected.programming_qualification.programming.programming_profile_id}</code></dd></div>
+                        <div><dt>{zh ? "燒錄 VDD" : "Programming VDD"}</dt><dd>{voltageRange(selected.programming_qualification.programming.electrical.vdd_programming_v)}</dd></div>
+                        <div><dt>External VPP</dt><dd>{selected.programming_qualification.programming.electrical.external_vpp_required ? (zh ? "需要" : "Required") : (zh ? "不需要" : "Not required")}</dd></div>
+                        <div><dt>{zh ? "介面" : "Transports"}</dt><dd>{selected.programming_qualification.programming.debug_transport.join(" · ")}</dd></div>
+                        <div><dt>{zh ? "Flash 容量" : "Flash size"}</dt><dd>{formatFlashBytes(selected.programming_qualification.programming.flash_geometry.main_flash_size_bytes)}</dd></div>
+                        <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.programming_qualification.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
+                        <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.programming_qualification.programming.flash_geometry.program_unit} · {selected.programming_qualification.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
+                        <div><dt>{zh ? "Page Count" : "Page count"}</dt><dd>{selected.programming_qualification.programming.flash_geometry.page_count}</dd></div>
                       </>
                     )}
-                    {Object.keys(selected.openocd_software_qualification.operations).length > 0 && (
+                    {Object.keys(selected.programming_qualification.operations).length > 0 && (
                       <div>
                         <dt>{zh ? "Qualified Operations" : "Qualified Operations"}</dt>
-                        <dd>{Object.entries(selected.openocd_software_qualification.operations).map(([name, op]) => `${name.toUpperCase()}=${op.state}`).join(" · ")}</dd>
+                        <dd>{Object.entries(selected.programming_qualification.operations).map(([name, op]) => `${name.toUpperCase()}=${op.state}`).join(" · ")}</dd>
                       </div>
                     )}
                     <div><dt>{zh ? "CFG Mapping" : "CFG Mapping"}</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
@@ -468,15 +468,15 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     )}
                   </dl>
 
-                  {!selected.openocd_software_qualification.reviewed && (
+                  {!selected.programming_qualification.reviewed && (
                     <div className="icSelectorProfileUnavailable">
                       {selected.backend.mapping_status === "mapped"
                         ? (zh
-                          ? "OpenOCD CFG 已存在，但此 exact ICPN 的 Phase 2 software qualification 仍為 UNKNOWN；CFG mapping 不能視為燒錄支援。"
-                          : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 software qualification; mapping alone is not programming support.")
+                          ? "OpenOCD CFG 已存在，但此 exact ICPN 的 Phase 2 Programming qualification 仍為 UNKNOWN；CFG mapping 不能視為燒錄支援。"
+                          : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 Programming qualification; mapping alone is not programming support.")
                         : (zh
-                          ? "此 exact ICPN 尚未完成 Phase 2 software qualification。"
-                          : "This exact ICPN has not completed Phase 2 software qualification.")}
+                          ? "此 exact ICPN 尚未完成 Phase 2 Programming qualification。"
+                          : "This exact ICPN has not completed Phase 2 Programming qualification.")}
                     </div>
                   )}
                 </>
@@ -501,7 +501,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 </dl>
               ) : (
                 <div className="icSelectorProfileUnavailable">
-                  {zh ? "此部署未提供 Phase 2 software qualification evidence；不能從 CFG mapping 推論燒錄支援。" : "Phase 2 software qualification evidence is unavailable in this deployment; programming support cannot be inferred from CFG mapping."}
+                  {zh ? "此部署未提供 Phase 2 Programming qualification evidence；不能從 CFG mapping 推論燒錄支援。" : "Phase 2 Programming qualification evidence is unavailable in this deployment; programming support cannot be inferred from CFG mapping."}
                 </div>
               )}
             </section>
@@ -543,14 +543,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)}</dd></div>
               <div><dt>Target CFG</dt><dd><code>{selected.backend.target_config}</code></dd></div>
               <div><dt>Mapping</dt><dd>{humanizeStatus(selected.backend.mapping_method)}</dd></div>
-              {selected.openocd_software_qualification && (
+              {selected.programming_qualification && (
                 <>
-                  <div><dt>{zh ? "Software Qualification" : "Software Qualification"}</dt><dd><strong>{selected.openocd_software_qualification.software_state}</strong></dd></div>
-                  <div><dt>{zh ? "Qualification Registry" : "Qualification Registry"}</dt><dd><code>{selected.openocd_software_qualification.registry_id}</code></dd></div>
-                  {selected.openocd_software_qualification.provider && (
+                  <div><dt>{zh ? "Software Qualification" : "Software Qualification"}</dt><dd><strong>{selected.programming_qualification.software_state}</strong></dd></div>
+                  <div><dt>{zh ? "Qualification Registry" : "Qualification Registry"}</dt><dd><code>{selected.programming_qualification.registry_id}</code></dd></div>
+                  {selected.programming_qualification.provider && (
                     <>
-                      <div><dt>{zh ? "Qualified Provider Commit" : "Qualified provider commit"}</dt><dd><code>{selected.openocd_software_qualification.provider.source_commit}</code></dd></div>
-                      <div><dt>{zh ? "Qualified Runtime ID" : "Qualified runtime ID"}</dt><dd><code>{selected.openocd_software_qualification.provider.runtime_id}</code></dd></div>
+                      <div><dt>{zh ? "Qualified Provider Commit" : "Qualified provider commit"}</dt><dd><code>{selected.programming_qualification.provider.source_commit}</code></dd></div>
+                      <div><dt>{zh ? "Qualified Runtime ID" : "Qualified runtime ID"}</dt><dd><code>{selected.programming_qualification.provider.runtime_id}</code></dd></div>
                     </>
                   )}
                 </>
@@ -638,14 +638,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               </div>
             )}
             <div className="icSelectorBoundary">
-              {selected.openocd_software_qualification?.software_state === "SUPPORTED"
+              {selected.programming_qualification?.software_state === "SUPPORTED"
                 ? (zh
-                  ? "此 exact ICPN 已完成 Phase 2 OpenOCD software qualification；這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
-                  : "This exact ICPN has completed Phase 2 OpenOCD software qualification. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
-                : selected.openocd_software_qualification?.software_state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
+                  ? "此 exact ICPN 已完成 Phase 2 Programming qualification；這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
+                  : "This exact ICPN has completed Phase 2 Programming qualification. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
+                : selected.programming_qualification?.software_state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
                   ? (zh
-                    ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Phase 2 software qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
-                    : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 software qualification; CFG existence is not programming support.")
+                    ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Phase 2 Programming qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
+                    : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 Programming qualification; CFG existence is not programming support.")
                   : selected.backend_candidate
                 ? (zh
                   ? "這顆 IC 已收錄於 Production Catalog，但目前沒有可執行的 OpenOCD Backend，無法視為已支援燒錄。"
