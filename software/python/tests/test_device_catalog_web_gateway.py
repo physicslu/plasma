@@ -199,6 +199,48 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(qualification["hardware_runtime_ready"])
                 self.assertFalse(qualification["physical_programming_qualified"])
 
+    def test_stm32f103_high_density_r_lqfp_is_phase2_supported(self) -> None:
+        cases = (
+            ("STM32F103RCT6", "stm32f103rc-256k-v0", 256 * 1024, 128),
+            ("STM32F103RCT7", "stm32f103rc-256k-v0", 256 * 1024, 128),
+            ("STM32F103RDT6", "stm32f103rd-384k-v0", 384 * 1024, 192),
+            ("STM32F103RET6", "stm32f103re-512k-v0", 512 * 1024, 256),
+            ("STM32F103RET7", "stm32f103re-512k-v0", 512 * 1024, 256),
+        )
+        for icpn, geometry_id, expected_bytes, expected_pages in cases:
+            with self.subTest(icpn=icpn):
+                status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["count"], 1)
+                qualification = payload["results"][0]["openocd_software_qualification"]
+                self.assertEqual(qualification["software_state"], "SUPPORTED")
+                self.assertTrue(qualification["reviewed"])
+                self.assertEqual(
+                    qualification["programming"]["programming_profile_id"],
+                    "stm32f1-high-density-flash-v0",
+                )
+                self.assertEqual(
+                    qualification["programming"]["memory_geometry_profile_id"],
+                    geometry_id,
+                )
+                flash = qualification["programming"]["flash_geometry"]
+                self.assertEqual(flash["main_flash_size_bytes"], expected_bytes)
+                self.assertEqual(flash["page_count"], expected_pages)
+                self.assertEqual(flash["erase_unit_bytes"], 2048)
+                self.assertEqual(flash["program_unit_bytes"], 2)
+                self.assertFalse(qualification["hardware_runtime_ready"])
+                self.assertFalse(qualification["physical_programming_qualified"])
+
+    def test_stm32f103_high_density_unreviewed_package_remains_unknown(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103RCY6TR&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        qualification = payload["results"][0]["openocd_software_qualification"]
+        self.assertEqual(qualification["software_state"], "UNKNOWN")
+        self.assertFalse(qualification["reviewed"])
+        self.assertIsNone(qualification["provider"])
+        self.assertIsNone(qualification["programming"])
+
     def test_stm32f103_tr_ordering_variants_are_phase2_supported(self) -> None:
         for icpn, expected_bytes, expected_pages in (
             ("STM32F103C8T6TR", 64 * 1024, 64),
@@ -212,6 +254,10 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             ("STM32F103R8T7TR", 64 * 1024, 64),
             ("STM32F103RBT7TR", 128 * 1024, 128),
             ("STM32F103VBT7TR", 128 * 1024, 128),
+            ("STM32F103RCT6TR", 256 * 1024, 128),
+            ("STM32F103RCT7TR", 256 * 1024, 128),
+            ("STM32F103RDT6TR", 384 * 1024, 192),
+            ("STM32F103RET6TR", 512 * 1024, 256),
         ):
             with self.subTest(icpn=icpn):
                 status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
