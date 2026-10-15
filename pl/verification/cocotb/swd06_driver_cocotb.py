@@ -256,3 +256,48 @@ async def python_driver_owner_thread_abort_against_real_axi(dut):
 
     await exercise()
     dut._log.info("SWD06_RTL_DRIVER_ABORT_AND_RECOVERY_PASS")
+
+
+@cocotb.test()
+async def python_driver_rtl_timeout_and_explicit_recovery(dut):
+    """SWD Master internal FCLK timeout surfaced through real AXI to Python."""
+    bench = AXIBench(dut)
+    await bench.setup()
+    bridge = simulated_mmio(bench)
+
+    @cocotb.external
+    def exercise():
+        # 20 FCLK cycles are deliberately insufficient for the 64+64+8
+        # SWCLK line reset: SWD-03 hardware, not Python polling, times out.
+        driver = make_driver(bridge, timing=SWDTiming(timeout_cycles=20))
+        before = len(started(bridge))
+        try:
+            driver.line_reset()
+        except SWDDriverError as exc:
+            assert exc.response is not None
+            assert exc.response.status == SWDStatus.TIMEOUT
+            assert exc.response.link_state == SWDLink.RESET_REQUIRED
+        else:
+            raise AssertionError("RTL timeout never propagated to SWD-05")
+        assert len(started(bridge)) == before + 1
+        assert len(acked(bridge)) == len(started(bridge))
+        assert not driver.poisoned
+
+        # No retry is performed automatically. Explicit caller decision
+        # to recover and update transport timing must precede another START.
+        driver.timing = SWDTiming(timeout_cycles=1_000_000)
+        assert driver.line_reset().status == SWDStatus.OK
+        assert driver.read_dp(0) == DPIDR
+        assert len(started(bridge)) == before + 3
+
+        # RTL rejects writes to read-only STATUS; the bridge must propagate
+        # B channel SLVERR, not silently translate it to a successful write.
+        try:
+            bridge.write32(BASE + 0x24, 1)
+        except OSError as exc:
+            assert "BRESP=2" in str(exc)
+        else:
+            raise AssertionError("Real RTL AXI SLVERR was swallowed")
+
+    await exercise()
+    dut._log.info("SWD06_RTL_TIMEOUT_EXPLICIT_RECOVERY_AND_AXI_SLVERR_PASS")
