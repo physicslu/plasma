@@ -49,7 +49,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
         extra = {r["icpn"] for r in csvrows(SOURCE_148)}
         self.assertEqual({r["icpn"] for r in self.queue}, original | extra)
         self.assertEqual(len(original & extra), 0)
-        self.assertEqual(self.catalog.size, 4853)
+        self.assertEqual(self.catalog.size, 4975)
         self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 224)
         self.assertTrue(all(self.catalog.resolve("NXP",r["icpn"]) is None
                             for r in self.queue))
