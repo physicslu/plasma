@@ -371,3 +371,66 @@ def test_not_a_flash_programming_api():
     d = driver()
     for name in ("erase", "flash", "program", "verify", "power_on", "reset_target"):
         assert not hasattr(d, name)
+
+
+def test_ap_posted_read_is_atomic_against_other_site_owner_thread():
+    """Two threads sharing one driver cannot interleave DP write and RDBUFF."""
+    import threading
+    import time
+
+    ap_ack_seen = threading.Event()
+    release_ap_ack = threading.Event()
+    other_thread_entered = threading.Event()
+    outcomes = []
+    errors = []
+
+    class StalledAPFake(FakeAXI):
+        def __init__(self):
+            super().__init__()
+            self.start_configs = []
+
+        def write32(self, address, value):
+            if address == self.base + 4 and value == 1:
+                self.start_configs.append(self.regs[0x08])
+            super().write32(address, value)
+            if (address == self.base + 4 and value == 4 and
+                    (self.regs[0x08] & 0x6) == 0x6):
+                ap_ack_seen.set()
+                if not release_ap_ack.wait(2):
+                    raise RuntimeError("test coordination timeout")
+
+    hw = StalledAPFake()
+    d = driver(hw)
+    connect(d)
+    hw.start_configs.clear()
+
+    def first():
+        try:
+            outcomes.append(("ap", d.read_ap_posted(8)))
+        except Exception as exc:
+            errors.append(exc)
+
+    def second():
+        other_thread_entered.set()
+        try:
+            outcomes.append(("dp_write", d.write_dp(4, 0xCAFEBABE).status))
+        except Exception as exc:
+            errors.append(exc)
+
+    a = threading.Thread(target=first)
+    b = threading.Thread(target=second)
+    a.start()
+    assert ap_ack_seen.wait(2)
+    b.start()
+    assert other_thread_entered.wait(2)
+    try:
+        time.sleep(0.03)
+        assert hw.start_configs == [0x46]  # AP read 0x08, not yet RDBUFF
+    finally:
+        release_ap_ack.set()
+        a.join(timeout=2)
+        b.join(timeout=2)
+    assert not a.is_alive() and not b.is_alive()
+    assert errors == []
+    assert hw.start_configs == [0x46, 0x64, 0x20]
+    assert outcomes == [("ap", 0xCAFE0008), ("dp_write", SWDStatus.OK)]
