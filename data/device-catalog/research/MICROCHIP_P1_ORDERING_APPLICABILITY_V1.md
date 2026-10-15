@@ -73,3 +73,34 @@ datasheet semantics (e.g. Data Flash separately from Main Flash). Publish
 individual field-level VERIFIED or CONFLICT states only in a new,
 owner-reviewed evidence promotion PR with exact-variant applicability and
 source locators; do not mass-promote from this report.
+
+
+## Actual 126-ICPN source replay and four automotive extensions
+
+The real original-MCP + PDF replay on
+[GitHub Actions run 38678052081](https://github.com/physicslu/plasma/actions/runs/38678052081)
+first found **122 ordinary DS60001513G ordering-grammar matches** and
+**4 exact manufacturer-MCP ICPNs that have an additional VAO suffix**:
+
+| Original manufacturer MCP exact ICPN | Base Device | Special suffix |
+|---|---|---|
+| ATSAML10D16A-MZTVAO | ATSAML10D16A | VAO |
+| ATSAML10E16A-MZTVAO | ATSAML10E16A | VAO |
+| ATSAML10E16A-MZVAO | ATSAML10E16A | VAO |
+| ATSAML11E16A-MZTVAO | ATSAML11E16A | VAO |
+
+Manufacturer's [Recommended for Automotive Designs / Automotive Ordering Codes](https://www.microchip.com/en-us/solutions/automotive-and-transportation/recommended-for-automotive)
+explicitly identifies **VAO** as an automotive-standard order-code suffix.
+The policy also says a VAO suffix does **not** include PPAP documentation;
+additional custom automotive ordering requirements use separate numbers.
+This official manufacturer policy is an online source located for further
+evidence capture, **not yet replayed from original publisher bytes in this
+crosswalk**. The family PDF p.16 does not contain the VAO extension.
+
+Engineering decision: classify these four exact original-MCP identities as
+**MCP_VAO_SPECIAL_SUFFIX_SEPARATE_SOURCE_REVIEW_REQUIRED**, not as missing
+commercial parts or ordinary PDF-only codes. Preserve both the original
+manufacturer Base identity and VAO warning, but produce **zero** exact-field
+VERIFIED promotions or hardware/programming compatibility claims. Separate
+automotive packaging, process qualification and blank-device assumptions
+require official source checks before Phase 2 programming decisions.
