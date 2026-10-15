@@ -12,7 +12,10 @@ module swd03_dpidr_responder (
 );
     localparam integer HEADER_W = 8;
     localparam integer DATA_W = 32;
-    localparam integer RESET_ONES = 50;
+    localparam logic [6:0] RESET_ONES = 7'd50;
+    localparam logic [6:0] RESET_LAST = 7'd49;
+    localparam logic [2:0] HEADER_LAST = 3'd7;
+    localparam logic [4:0] DATA_LAST = 5'd31;
     localparam logic [DATA_W-1:0] DP_IDCODE = 32'h2BA01477;
     localparam logic [HEADER_W-1:0] DPIDR_HEADER = 8'hA5;
     typedef enum logic [2:0] {
@@ -52,7 +55,7 @@ module swd03_dpidr_responder (
                     ones_q <= '0;
                 end
 
-                if (host_oe && host_out && ones_q >= RESET_ONES - 1) begin
+                if (host_oe && host_out && ones_q >= RESET_LAST) begin
                     state <= RESET_TAIL;
                     zero_tail_q <= '0;
                     drive_q <= 1'b0;
@@ -74,7 +77,7 @@ module swd03_dpidr_responder (
                             // Ignore low idle clocks; start bit must be host-driven 1.
                             if (host_oe && (host_out || header_index != 0)) begin
                                 header_q[header_index] <= host_out;
-                                if (header_index == HEADER_W - 1) begin
+                                if (header_index == HEADER_LAST) begin
                                     good_req <= ({host_out,header_q[6:0]} == DPIDR_HEADER);
                                     header_index <= '0;
                                     ack_index <= '0;
@@ -99,7 +102,7 @@ module swd03_dpidr_responder (
                         DATA: begin
                             drive_q <= 1'b1;
                             value_q <= DP_IDCODE[data_index];
-                            if (data_index == DATA_W - 1) begin
+                            if (data_index == DATA_LAST) begin
                                 data_index <= '0;
                                 state <= PARITY;
                             end else data_index <= data_index + 5'd1;
