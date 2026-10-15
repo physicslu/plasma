@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from microchip_phase1_information_v1 import FIELDS, STATUSES
+import microchip_phase1_p0_chart_batch_v1 as chart_batch
 
 EXPECTED_ALL = 23276
 EXPECTED_P0 = 2437
@@ -166,7 +167,88 @@ def make_entry(row):
     }
 
 
-def build(source, *, upstream_bytes_sha256):
+def enrich_from_replayed_chart(records, chart_report):
+    """Add only family-scope PARTIAL fields to exact-base-joined ICPNs.
+
+    The official chart does not prove exact-variant package, pins or temperature.
+    Do not infer missing supplies, core architecture or exact commercial SKU.
+    """
+    require(chart_report.get("schema_version") == 1
+            and chart_report.get("policy") == "ADR-0002 Phase 1 - IC Information"
+            and chart_report.get("manufacturer") == "Microchip"
+            and chart_report.get("chart_scope") ==
+                "microchipdirect_chart_branchID_21_mid_3_only"
+            and chart_report.get("chart_records", {}).get("P0_source_leads") == 341
+            and chart_report.get("exact_icpn_fields_verified_from_chart") == 0
+            and chart_report.get("production_write_authorized") is False
+            and chart_report.get("catalog_publication_authorized") is False,
+            "source-replayed original Microchip chart P0 proof absent")
+    sha = chart_report.get("source_original_sha256")
+    require(valid_sha(sha), "chart original bytes digest absent")
+    chart_rows = chart_report.get("p0_family_records")
+    require(isinstance(chart_rows, list) and len(chart_rows) == 341,
+            "missing/ambiguous source-locked Base Device chart rows")
+    by_base = {}
+    for r in chart_rows:
+        base = r.get("base_device_chart_observation")
+        require(isinstance(base, str) and base and base.upper() not in by_base
+                and r.get("priority") == "P0"
+                and r.get("exact_icpn_verified_from_chart") is False,
+                "ambiguous or incorrectly qualified chart base")
+        by_base[base.upper()] = r
+    allowed = {"package", "pin_count", "flash", "ram", "vdd",
+               "temperature", "core_model"}
+    matched = 0
+    filled = Counter()
+    for rec in records:
+        found = by_base.get(rec["base_device"].upper())
+        if found is None:
+            continue
+        matched += 1
+        source_fields = found.get("fields_family_scope_only", {})
+        require(isinstance(source_fields, dict), "invalid base chart fields")
+        for field in allowed:
+            observed = source_fields.get(field, {})
+            require(observed.get("status") in ("PARTIAL", "UNKNOWN")
+                    and observed.get("source_original_sha256") == sha
+                    and observed.get("evidence_scope") ==
+                        "official_base_device_chart_not_exact_icpn",
+                    "chart family-field provenance invalid")
+            if observed["status"] != "PARTIAL":
+                continue
+            value = observed.get("value")
+            raw = observed.get("original_raw_value")
+            head = observed.get("original_header")
+            unit = observed.get("original_unit")
+            tr = observed.get("source_tr_ordinal")
+            col = observed.get("source_column_number_1based")
+            require(value is not None and isinstance(raw, str) and raw
+                    and isinstance(head, str) and head
+                    and isinstance(tr, int) and tr > 0
+                    and isinstance(col, int) and col > 0,
+                    "chart PARTIAL value missing raw-unit/row/column evidence")
+            rec["fields"][field] = status_field(
+                "PARTIAL", value,
+                locator=(f"{chart_report['source_url']} / TR {tr} / "
+                         f"column {col}: {head} = {raw}"),
+                hashes=[sha], scope="official_base_device_chart_not_exact_icpn",
+                unit=unit, note=(
+                    "Manufacturer parametric Base Device row only. "
+                    "Exact ICPN applicability has not been proven. "
+                    "Original raw units are preserved."))
+            filled[field] += 1
+    return {
+        "source_chart_scope": chart_report["chart_scope"],
+        "source_chart_original_sha256": sha,
+        "p0_manufacturer_chart_base_count": 341,
+        "p0_icpns_exact_manufacturer_base_joined_to_chart": matched,
+        "partial_field_observation_counts": dict(sorted(filled.items())),
+        "exact_variant_fields_promoted_by_chart": 0,
+        "chart_family_scope_only": True,
+    }
+
+
+def build(source, *, upstream_bytes_sha256, chart_report=None):
     require(valid_sha(upstream_bytes_sha256), "upstream source report SHA256 required")
     rows = verify_upstream(source)
     selected = [make_entry(row) for row in rows
@@ -175,6 +257,8 @@ def build(source, *, upstream_bytes_sha256):
     selected.sort(key=lambda r:r["icpn"].upper())
     ids = [r["icpn"].upper() for r in selected]
     require(len(ids) == len(set(ids)), "duplicate P0 exact manufacturer ICPN")
+    chart_source = (enrich_from_replayed_chart(selected, chart_report)
+                    if chart_report is not None else None)
     cfg = Counter(r["openocd_target_cfg_research_only"] for r in selected)
     status = Counter(r["cfg_candidate_state"] for r in selected)
     require(dict(cfg) == P0_CFGS and dict(status) == P0_STATES,
@@ -194,6 +278,8 @@ def build(source, *, upstream_bytes_sha256):
         "scope": "microchip_p0_research_ic_information_evidence_gap_ledger",
         "manufacturer": "Microchip",
         "original_cfg_reverse_source_report_sha256": upstream_bytes_sha256,
+        "chart_original_bytes_replayed_by_upstream_chart_builder": chart_report is not None,
+        "p0_family_chart_evidence": chart_source,
         "input_original_evidence_replay_claim": "VERIFIED_BY_UPSTREAM_REVERSE_REPLAYER",
         "original_manufacturer_bytes_replayed_by_this_projection": False,
         "phase1_field_contract": list(FIELDS),
@@ -223,6 +309,8 @@ def build(source, *, upstream_bytes_sha256):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--upstream-cfg-report", type=Path, required=True)
+    p.add_argument("--chart-original-root", type=Path,
+                   help="original official chart HTML and manifest; independently replayed, family-scope PARTIAL only")
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--verify", action="store_true")
     args = p.parse_args()
@@ -231,7 +319,9 @@ def main():
             "Research P0 Phase 1 output cannot write Production")
     raw = args.upstream_cfg_report.read_bytes()
     require(len(raw) <= 64 * 1024 * 1024, "unexpectedly large upstream report")
-    result = build(json.loads(raw), upstream_bytes_sha256=hashlib.sha256(raw).hexdigest())
+    chart = chart_batch.build_report(args.chart_original_root) if args.chart_original_root else None
+    result = build(json.loads(raw), upstream_bytes_sha256=hashlib.sha256(raw).hexdigest(),
+                   chart_report=chart)
     if args.verify:
         require(json.loads(output.read_text(encoding="utf-8")) == result,
                 "P0 Phase 1 coverage differs from upstream original-source report")
