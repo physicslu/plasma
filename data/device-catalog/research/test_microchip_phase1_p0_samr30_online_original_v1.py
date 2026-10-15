@@ -60,7 +60,7 @@ class SAMR30OriginalSourceTests(unittest.TestCase):
             self.assertFalse(m["live_original_source_observation_complete"])
             self.assertEqual(m["sources"][1]["status"],"SOURCE_NOT_AVAILABLE")
             self.assertFalse(m["phase1_icpn_fields_verified_by_this_source_only"])
-            with self.assertRaisesRegex(ValueError,"untrusted original source-only receipt"):
+            with self.assertRaisesRegex(ValueError,"cannot establish"):
                 source.replay(root)
 
     def test_http200_html_shell_archived_but_never_verified(self):
@@ -109,7 +109,7 @@ class SAMR30OriginalSourceTests(unittest.TestCase):
             m=json.loads((root/"manifest.json").read_text())
             m["pdf_semantic_crosscheck_completed"]=True
             (root/"manifest.json").write_text(json.dumps(m))
-            with self.assertRaisesRegex(ValueError,"cannot establish"):
+            with self.assertRaisesRegex(ValueError,"untrusted original source-only receipt"):
                 source.replay(root)
 
 
