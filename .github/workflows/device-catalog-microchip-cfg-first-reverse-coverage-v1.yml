@@ -24,6 +24,9 @@ on:
       - 'data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_cfg2563_st_field_ledger_v1.py'
       - 'data/device-catalog/research/MICROCHIP_5CFG_2563_PHASE1_ST_FIELDS_V1.md'
+      - 'data/device-catalog/research/microchip_phase1_p1_exact_pdf_field_enrichment_v1.py'
+      - 'data/device-catalog/research/test_microchip_phase1_p1_exact_pdf_field_enrichment_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_SAML1X_EXACT_PDF_PHASE1_ENRICHMENT_V1.md'
       - 'data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
@@ -598,6 +601,67 @@ jobs:
               f.write("Per-code audit: " + json.dumps(report["status_counts"],sort_keys=True) + "\n")
               f.write("No Phase1 field promotion, OpenOCD SUPPORTED or Catalog admission.\n")
           PY
+      - name: Verify exact original-MCP x PDF SAM L10 L11 information field enrichment
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_phase1_p1_exact_pdf_field_enrichment_v1.py' -v
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_phase1_p1_exact_pdf_field_enrichment_v1.py \
+            --frozen-field-ledger "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --original-pdf-ordering-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
+            --output "$root/microchip-phase1-saml1x-exact-pdf-enriched.json"
+          python data/device-catalog/research/microchip_phase1_p1_exact_pdf_field_enrichment_v1.py \
+            --frozen-field-ledger "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --original-pdf-ordering-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
+            --output "$root/microchip-phase1-saml1x-exact-pdf-enriched.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/
+              "microchip-phase1-saml1x-exact-pdf-enriched.json").read_text())
+          assert d["source_2563_identity_freeze_sha256"]==(
+              "0c37ad68c1db0a4fb50ff5a1d229faaca0ee6eac44cfb9d9b7de4e8a931daf2a")
+          assert d["source_original_pdf_sha256"]==(
+              "ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e")
+          assert d["frozen_5cfg_exact_icpns"]==2563
+          assert d["ordinary_ordering_icpns_with_new_field_verifications"]==122
+          assert d["manufacturer_vao_special_suffix_pending"]==4
+          assert d["total_new_verified_exact_icpn_fields"]==732
+          assert d["phase1_s1_identified"]==2563
+          assert d["phase1_s1_complete"]==0
+          assert len(d["records"])==2563
+          assert len({r["icpn"] for r in d["records"]})==2563
+          assert set(d["verified_fields_promoted_exact_icpn"])=={
+              "package","pin_count","flash","ram","temperature","core_model"}
+          for key in d["verified_fields_promoted_exact_icpn"]:
+              assert d["verified_fields_promoted_exact_icpn"][key]==122
+              assert d["field_coverage"][key]["VERIFIED"]==122
+              assert d["field_coverage"][key]["PARTIAL"]==2374
+              assert d["field_coverage"][key]["UNKNOWN"]==67
+          for key in ("working_vdd",):
+              assert d["field_coverage"][key]["VERIFIED"]==0
+              assert d["field_coverage"][key]["PARTIAL"]==2496
+              assert d["field_coverage"][key]["UNKNOWN"]==67
+          for key in ("io_supply","vdda","core_architecture"):
+              assert d["field_coverage"][key]["UNKNOWN"]==2563
+          assert not any((d["production_write_authorized"],
+                          d["catalog_publication_authorized"],
+                          d["phase2_programming_authorized"],
+                          d["phase3_hil_authorized"]))
+          rows=d["records"]
+          assert all(r["non_claims"]["openocd_software_supported"] is False
+              and r["non_claims"]["public_selector_eligibility_changed"] is False
+              for r in rows)
+          print("MICROCHIP_SAML1X_122_EXACT_INFO_ENRICHMENT",
+                json.dumps(d["verified_fields_promoted_exact_icpn"],sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip SAM L10/L11 122 exact manufacturer ordering codes; "
+                      "6 source-crosswalk VERIFIED information fields each; "
+                      "732 field promotions; 4 VAO exceptions remain pending.\n")
+              f.write("Frozen 2563 ICPNs unchanged; S1_complete=0. "
+                      "No Catalog, OpenOCD SUPPORTED or HIL changes.\n")
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
@@ -610,6 +674,7 @@ jobs:
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-phase1-s1-exact-identity-funnel.json
             ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
+            ${{ runner.temp }}/microchip-phase1-saml1x-exact-pdf-enriched.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
           if-no-files-found: warn
           retention-days: 90
