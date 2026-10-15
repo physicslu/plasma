@@ -256,6 +256,33 @@ export type NXPManufacturerDeviceProfile = {
   physical_programming_qualified: false;
 };
 
+/** ADR-0002 Phase 1 manufacturer field evidence, not Programming authority. */
+export type NXPPhase1Field = {
+  value: string | null;
+  unit: string | null;
+  state: "VERIFIED" | "PARTIAL" | "UNKNOWN" | "CONFLICT";
+  source_url: string | null;
+  source_revision: string | null;
+  source_locator: string | null;
+};
+
+export type NXPPhase1Information = {
+  schema_version: 24;
+  icpn: string;
+  manufacturer: "NXP";
+  scope: "research_field_evidence_only";
+  fields: {
+    ram: NXPPhase1Field;
+    working_vdd: NXPPhase1Field;
+    io_supply: NXPPhase1Field;
+    vdda: NXPPhase1Field;
+  };
+  original_manufacturer_pdf_binary_sha256_qualified: false;
+  catalog_admission_changed: false;
+  software_programming_qualified: false;
+  physical_programming_qualified: false;
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -300,6 +327,7 @@ export type DeviceSearchResult = {
   backend_providers?: VersionedOpenOCDProvider[];
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
+  nxp_phase1_information?: NXPPhase1Information | null;
   selected_profile?: SelectedICProfile | null;
 };
 

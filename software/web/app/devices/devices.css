@@ -293,3 +293,25 @@
   margin: 0;
   line-height: 1.5;
 }
+
+
+/* ADR-0002 Phase 1: research field certainty is not a programming-ready badge. */
+.icSelectorPhase1Field { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 9px; }
+.icSelectorPhase1Field > span { min-width: 0; overflow-wrap: anywhere; }
+.icSelectorPhase1Field > a { font-size: 10px; color: var(--cyan); text-decoration: underline; }
+.icSelectorPhase1State {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  padding: 1px 5px;
+  font: 650 9px/1.4 var(--font-mono);
+}
+.icSelectorPhase1State[data-evidence-state="VERIFIED"] { color: var(--text-soft); }
+.icSelectorPhase1State[data-evidence-state="PARTIAL"] { color: var(--amber); }
+.icSelectorPhase1State[data-evidence-state="CONFLICT"] { color: var(--red); }
+.icSelectorPhase1Boundary {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}

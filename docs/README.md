@@ -49,6 +49,7 @@
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Plan / Accepted Policy** — [IC Information Phase 1 Evidence Contract](architecture/ic-information-phase1.md)：ADR-0002 三階段實作中，現階段只建構 IC Information 精確料號、逐欄原廠證據與完整度統計；Programming 與 PLASMA Compatibility 後續執行。
+- **Current** — [NXP Phase 1 IC Selector Read-only Projection](architecture/nxp-phase1-selector-projection-v1.md)：將已收錄 224 顆 NXP exact ICPN 的 RAM、VDD、I/O Supply 與 VDDA 原廠研究證據及欄位可信度唯讀顯示，與 Programming／硬體驗證分離。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Implementation / Proposal** — [Installed OpenOCD Evidence Root v1](architecture/runtime-evidence-root-implementation-v1.md)：修正 source-only H5/C5/OpenOCD Provider 顯示資訊在非 editable Python 安裝下的路徑解析，區分 Render full 與 Slim PPU 必備／可省略來源；不授權燒錄。
 - **Implementation / Proposal** — [KL25 Installed Backend Lock Root v1](architecture/kl25-runtime-backend-lock-root-v1.md)：以既有 IC Support Root 契約載入固定的 KL25 implementation lock，non-editable 安裝與 fail-closed 測試通過才能合併；不新增 KL25 Operation Admission。
