@@ -28,8 +28,9 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103c-reference-v2.json"
-EQUIVALENCE_REL = "release/openocd-qualification/stm32f103c-tr-ordering-equivalence-v1.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v3.json"
+APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-rv-t6-applicability-v1.json"
+EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v2.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -67,6 +68,7 @@ class OpenOCDSoftwareQualificationRegistry:
         release = _read_json(root / RELEASE_REL)
         source_lock = _read_json(root / SOURCE_LOCK_REL)
         qualification = _read_json(root / QUALIFICATION_REL)
+        applicability = _read_json(root / APPLICABILITY_REL)
         equivalence = _read_json(root / EQUIVALENCE_REL)
 
         provider = source_lock.get("provider", {})
@@ -123,6 +125,20 @@ class OpenOCDSoftwareQualificationRegistry:
             _require(
                 _git_blob_sha1(path.read_bytes()) == expected_blob,
                 f"local evidence blob drift: {rel}",
+            )
+
+        authority_locks = qualification.get("authority_artifact_locks")
+        _require(
+            isinstance(authority_locks, dict)
+            and authority_locks.get(APPLICABILITY_REL)
+            and authority_locks.get(EQUIVALENCE_REL),
+            "qualification authority artifact locks missing",
+        )
+        for rel in (APPLICABILITY_REL, EQUIVALENCE_REL):
+            raw = (root / rel).read_bytes()
+            _require(
+                _git_blob_sha1(raw) == authority_locks[rel],
+                f"qualification authority artifact drift: {rel}",
             )
 
         review = _read_json(
@@ -222,6 +238,121 @@ class OpenOCDSoftwareQualificationRegistry:
         )
 
         _require(
+            qualification.get("applicability_authority_id")
+            == applicability.get("applicability_id"),
+            "qualification/applicability authority identity mismatch",
+        )
+        _require(
+            applicability.get("manufacturer") == "STMicroelectronics"
+            and applicability.get("phase") == "02_PROGRAMMING"
+            and applicability.get("family") == "STM32F1"
+            and applicability.get("series") == "STM32F103"
+            and applicability.get("density_class") == "medium",
+            "manufacturer applicability authority drift",
+        )
+        app_authority = applicability.get("manufacturer_authority")
+        _require(isinstance(app_authority, dict), "manufacturer applicability sources missing")
+        for source_name in (
+            "ordering",
+            "production_exact_identity",
+            "programming_review",
+            "programming_profile",
+        ):
+            item = app_authority.get(source_name)
+            _require(isinstance(item, dict), f"applicability source missing: {source_name}")
+            rel = item.get("path")
+            _require(isinstance(rel, str) and rel, f"applicability source path missing: {source_name}")
+            raw = (root / rel).read_bytes()
+            _require(
+                _git_blob_sha1(raw) == item.get("git_blob_sha1"),
+                f"applicability source blob drift: {source_name}/{rel}",
+            )
+
+        app_ordering = app_authority["ordering"]
+        app_ordering_payload = _read_json(root / app_ordering["path"])
+        app_stm32f103 = app_ordering_payload.get("records", {}).get("STM32F103", {})
+        app_medium = next(
+            (
+                band
+                for band in app_stm32f103.get("bands", [])
+                if band.get("name") == app_ordering.get("band")
+            ),
+            None,
+        )
+        _require(
+            isinstance(app_medium, dict)
+            and app_medium.get("document") == app_ordering.get("document") == "DS5319 Rev 20"
+            and set(app_ordering.get("required_flash_codes", [])) == {"8", "B"}
+            and app_medium.get("flash_codes") == ["8", "B"]
+            and app_medium.get("pin_count", {}).get("R") == 64
+            and app_medium.get("pin_count", {}).get("V") == 100
+            and app_medium.get("package", {}).get("T") == "LQFP"
+            and app_medium.get("temperature_c", {}).get("6") == "-40 to 85 C",
+            "STM32F103 medium-density manufacturer applicability drift",
+        )
+
+        app_review = _read_json(root / app_authority["programming_review"]["path"])
+        app_review_fact_ids = {
+            item.get("fact_id")
+            for item in app_review.get("review_facts", [])
+            if isinstance(item, dict)
+        }
+        for fact_id in app_authority["programming_review"].get("required_fact_ids", []):
+            _require(
+                fact_id in app_review_fact_ids,
+                f"manufacturer applicability review fact missing: {fact_id}",
+            )
+        app_profile = _read_json(root / app_authority["programming_profile"]["path"])
+        _require(
+            app_profile.get("profile_id")
+            == app_authority["programming_profile"].get("profile_id")
+            == "stm32f1-medium-density-flash-v0",
+            "manufacturer applicability Programming Profile drift",
+        )
+
+        applicability_targets = {
+            item.get("icpn"): item
+            for item in applicability.get("targets", [])
+            if isinstance(item, dict) and isinstance(item.get("icpn"), str)
+        }
+        _require(
+            set(applicability_targets)
+            == {
+                "STM32F103R8T6",
+                "STM32F103RBT6",
+                "STM32F103V8T6",
+                "STM32F103VBT6",
+            },
+            "manufacturer applicability scope expanded without review",
+        )
+        for target in applicability_targets.values():
+            geometry_path = target.get("memory_geometry_path")
+            _require(
+                isinstance(geometry_path, str) and geometry_path,
+                f"memory geometry path missing: {target.get('icpn')}",
+            )
+            geometry_raw = (root / geometry_path).read_bytes()
+            _require(
+                _git_blob_sha1(geometry_raw)
+                == target.get("memory_geometry_git_blob_sha1"),
+                f"memory geometry blob drift: {target.get('icpn')}",
+            )
+            geometry = json.loads(geometry_raw.decode("utf-8"))
+            data = geometry.get("data", {})
+            _require(
+                geometry.get("profile_id") == target.get("memory_geometry_profile_id")
+                and geometry.get("scope", {}).get("manufacturer") == "STMicroelectronics"
+                and geometry.get("scope", {}).get("base_device") == target.get("base_device")
+                and data.get("main_flash_start") == "0x08000000"
+                and data.get("main_flash_size_bytes") == target.get("main_flash_size_bytes")
+                and data.get("page_size_bytes") == 1024
+                and data.get("page_count") == target.get("page_count")
+                and data.get("erase_granularity_bytes") == 1024
+                and data.get("program_granularity_bytes") == 2,
+                f"memory geometry content drift: {target.get('icpn')}",
+            )
+
+        _require(
             qualification.get("ordering_equivalence_id") == equivalence.get("equivalence_id"),
             "qualification/ordering-equivalence identity mismatch",
         )
@@ -257,22 +388,22 @@ class OpenOCDSoftwareQualificationRegistry:
             and ordering.get("meaning") == "tape-and-reel",
             "ST medium-density TR ordering semantics drift",
         )
-        for item in equivalence.get("identity_evidence", []):
-            _require(isinstance(item, dict), "ordering identity evidence must be object")
-            rel = item.get("path")
-            _require(isinstance(rel, str) and rel, "ordering identity evidence path missing")
-            raw = (root / rel).read_bytes()
-            _require(
-                _git_blob_sha1(raw) == item.get("git_blob_sha1"),
-                f"ordering identity evidence blob drift: {rel}",
-            )
-            text = raw.decode("utf-8")
-            for marker in item.get("required_markers", []):
-                _require(
-                    isinstance(marker, str) and marker in text,
-                    f"ordering identity evidence marker missing: {rel}/{marker}",
-                )
-
+        production_identity = equivalence.get("production_exact_identity")
+        _require(
+            isinstance(production_identity, dict),
+            "ordering-equivalence Production identity authority missing",
+        )
+        production_identity_path = production_identity.get("path")
+        _require(
+            isinstance(production_identity_path, str) and production_identity_path,
+            "ordering-equivalence Production identity path missing",
+        )
+        production_identity_raw = (root / production_identity_path).read_bytes()
+        _require(
+            _git_blob_sha1(production_identity_raw)
+            == production_identity.get("git_blob_sha1"),
+            "ordering-equivalence Production identity blob drift",
+        )
         equivalence_variants = {
             item.get("icpn"): item
             for item in equivalence.get("variants", [])
@@ -280,7 +411,14 @@ class OpenOCDSoftwareQualificationRegistry:
         }
         _require(
             set(equivalence_variants)
-            == {"STM32F103C8T6TR", "STM32F103CBT6TR"},
+            == {
+                "STM32F103C8T6TR",
+                "STM32F103CBT6TR",
+                "STM32F103R8T6TR",
+                "STM32F103RBT6TR",
+                "STM32F103V8T6TR",
+                "STM32F103VBT6TR",
+            },
             "ordering-equivalence scope expanded without review",
         )
 
@@ -319,6 +457,49 @@ class OpenOCDSoftwareQualificationRegistry:
                     and raw.get("main_flash_size_bytes") == target.get("main_flash_size_bytes")
                     and raw.get("page_count") == target.get("page_count"),
                     f"exact geometry/applicability drift: {key[1]}",
+                )
+            elif basis_kind == "manufacturer_applicability":
+                target = applicability_targets.get(key[1])
+                _require(
+                    isinstance(target, dict)
+                    and basis.get("applicability_id")
+                    == applicability.get("applicability_id"),
+                    f"manufacturer applicability target missing: {key[1]}",
+                )
+                expected_catalog = {
+                    "base_device": target.get("base_device"),
+                    "package": target.get("package"),
+                    "pin_count": target.get("pin_count"),
+                    "flash_size": target.get("flash_size"),
+                    "temperature_grade": target.get("temperature_grade"),
+                    "option_suffix": target.get("option_suffix"),
+                    "target_config": target.get("target_config"),
+                }
+                for field, expected in expected_catalog.items():
+                    actual = getattr(row, field)
+                    actual = actual or "" if field == "option_suffix" else actual
+                    _require(
+                        actual == expected,
+                        f"manufacturer applicability Catalog field drift: {key[1]}/{field}",
+                    )
+                _require(
+                    row.source_authority
+                    == app_authority["production_exact_identity"]["source_authority"]
+                    and row.verification_status,
+                    f"manufacturer applicability exact identity evidence drift: {key[1]}",
+                )
+                _require(
+                    raw.get("base_device") == target.get("base_device")
+                    and raw.get("programming_profile_id")
+                    == applicability.get("shared_programming_semantics", {}).get(
+                        "programming_profile_id"
+                    )
+                    and raw.get("memory_geometry_profile_id")
+                    == target.get("memory_geometry_profile_id")
+                    and raw.get("main_flash_size_bytes")
+                    == target.get("main_flash_size_bytes")
+                    and raw.get("page_count") == target.get("page_count"),
+                    f"manufacturer applicability programming geometry drift: {key[1]}",
                 )
             elif basis_kind == "ordering_equivalence":
                 eq = equivalence_variants.get(key[1])
@@ -390,6 +571,14 @@ class OpenOCDSoftwareQualificationRegistry:
                 ("STMicroelectronics", "STM32F103C8T6TR"),
                 ("STMicroelectronics", "STM32F103CBT6"),
                 ("STMicroelectronics", "STM32F103CBT6TR"),
+                ("STMicroelectronics", "STM32F103R8T6"),
+                ("STMicroelectronics", "STM32F103R8T6TR"),
+                ("STMicroelectronics", "STM32F103RBT6"),
+                ("STMicroelectronics", "STM32F103RBT6TR"),
+                ("STMicroelectronics", "STM32F103V8T6"),
+                ("STMicroelectronics", "STM32F103V8T6TR"),
+                ("STMicroelectronics", "STM32F103VBT6"),
+                ("STMicroelectronics", "STM32F103VBT6TR"),
             },
             "Phase 2 qualification scope expanded without review",
         )
@@ -524,7 +713,13 @@ class OpenOCDSoftwareQualificationRegistry:
 
 
 def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQualificationRegistry | None:
-    required = (RELEASE_REL, SOURCE_LOCK_REL, QUALIFICATION_REL, EQUIVALENCE_REL)
+    required = (
+        RELEASE_REL,
+        SOURCE_LOCK_REL,
+        QUALIFICATION_REL,
+        APPLICABILITY_REL,
+        EQUIVALENCE_REL,
+    )
     if not source_files_available(ROOT, required):
         return None
     return OpenOCDSoftwareQualificationRegistry(get_default_device_catalog(), ROOT)
