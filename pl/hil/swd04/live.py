@@ -16,7 +16,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import struct
 import sys
 
 from pl.hil.swd04 import contract as c
@@ -30,23 +29,33 @@ class DevMemBackend:
         self.readonly = readonly
         self.fd = None
         self.pages: dict[int, mmap.mmap] = {}
+        self.words: dict[int, memoryview] = {}
 
     def __enter__(self):
+        # A native unsigned-int memoryview must match the device's u32 ABI.
+        if sys.byteorder != "little":
+            raise c.SafetyError("MMIO requires little-endian native words")
         flags = os.O_RDONLY if self.readonly else os.O_RDWR
         self.fd = os.open("/dev/mem", flags | os.O_SYNC)
         return self
 
     def __exit__(self, *_):
-        for page in self.pages.values():
-            page.close()
-        self.pages.clear()
-        if self.fd is not None:
-            os.close(self.fd)
-            self.fd = None
+        # Release exported buffers before closing their mmap objects.
+        for words in self.words.values():
+            words.release()
+        self.words.clear()
+        try:
+            for page in self.pages.values():
+                page.close()
+            self.pages.clear()
+        finally:
+            if self.fd is not None:
+                os.close(self.fd)
+                self.fd = None
 
-    def _page(self, address: int, *, write: bool) -> tuple[mmap.mmap, int]:
-        if address & 3:
-            raise c.SafetyError("Unaligned MMIO access")
+    def _page(self, address: int, *, write: bool) -> tuple[memoryview, int]:
+        if type(address) is not int or address & 3:
+            raise c.SafetyError("Unaligned MMIO word address")
         if write and self.readonly:
             raise c.SafetyError("Write forbidden in HIL-01")
         base = address & ~(c.SEGMENT_SIZE - 1)
@@ -56,23 +65,38 @@ class DevMemBackend:
             raise c.SafetyError("MMIO backend not entered")
         if base not in self.pages:
             prot = mmap.PROT_READ | (0 if self.readonly else mmap.PROT_WRITE)
-            self.pages[base] = mmap.mmap(
+            page = mmap.mmap(
                 self.fd, c.SEGMENT_SIZE, flags=mmap.MAP_SHARED,
                 prot=prot, offset=base,
             )
-        return self.pages[base], address - base
+            words = None
+            try:
+                words = memoryview(page).cast("I")
+                if words.itemsize != 4:
+                    raise c.SafetyError("Native MMIO word is not 32 bits")
+            except BaseException:
+                if words is not None:
+                    words.release()
+                page.close()
+                raise
+            self.pages[base], self.words[base] = page, words
+        return self.words[base], (address - base) // 4
 
     def read32(self, address: int) -> int:
         if address not in c.READ_WHITELIST:
             raise c.SafetyError("Backend denied unlisted MMIO read")
-        page, offset = self._page(address, write=False)
-        return struct.unpack_from("<I", page, offset)[0]
+        words, index = self._page(address, write=False)
+        return words[index]
 
     def write32(self, address: int, value: int) -> None:
         if address not in c.WRITE_WHITELIST:
             raise c.SafetyError("Backend denied unlisted MMIO write")
-        page, offset = self._page(address, write=True)
-        struct.pack_into("<I", page, offset, value)
+        if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+            raise c.SafetyError("MMIO write requires unsigned 32-bit word")
+        words, index = self._page(address, write=True)
+        # ARMv7 bytewise pack_into/memset can write to base+1 and cause SLVERR.
+        # Native uint32 indexing was checked as STR/LDR on the Z2 in HIL-3.
+        words[index] = value
 
 
 def require_live_session(*, phase: str, p0: Path, session: Path,

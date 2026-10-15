@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import mmap
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -337,6 +339,84 @@ def test_live_backend_does_not_map_anything_when_outside_whitelist():
     with pytest.raises(c.SafetyError):
         backend.write32(0x40001000, 0)
     assert backend.fd is None and backend.pages == {}
+
+
+@pytest.fixture
+def ordinary_ram_mmio(tmp_path, monkeypatch):
+    """Exercise the actual backend on ordinary files, never /dev/mem or PL."""
+    from pl.hil.swd04 import live
+    real_mmap = mmap.mmap
+    opened, mappings = [], []
+    closed_fd = Mock()
+    monkeypatch.setattr(live.os, "open", lambda path, flags: 123)
+    monkeypatch.setattr(live.os, "close", closed_fd)
+
+    def map_ram(fd, length, *, flags, prot, offset):
+        assert fd == 123
+        assert length == c.SEGMENT_SIZE and flags == mmap.MAP_SHARED
+        image = tmp_path / f"ram-{offset:08x}.bin"
+        if not image.exists():
+            image.write_bytes(bytes.fromhex("aabbccdd") * (length // 4))
+        handle = image.open("r+b")
+        opened.append(handle)
+        page = real_mmap(handle.fileno(), length, flags=flags, prot=prot)
+        mappings.append((offset, page, prot, image))
+        return page
+
+    monkeypatch.setattr(live.mmap, "mmap", map_ram)
+    yield live, mappings, closed_fd
+    for handle in opened:
+        handle.close()
+
+
+def test_live_native_word_mmio_preserves_adjacent_registers(ordinary_ram_mmio):
+    live, mappings, closed = ordinary_ram_mmio
+    base = c.AXI_BASES["transaction_0"]
+    with live.DevMemBackend(readonly=False) as hw:
+        hw.write32(c.CONFIG, 0x12345678)  # +8, native word index 2
+        assert hw.read32(c.CONFIG) == 0x12345678
+        assert hw.read32(c.HALF) == 0xDDCCBBAA  # unrelated word unchanged
+        hw.write32(c.HALF, 0x87654321)
+        assert hw.read32(c.HALF) == 0x87654321
+        hw.write32(c.CONFIG, 0)
+        assert hw.read32(c.CONFIG) == 0
+        assert len(mappings) == 1
+        assert hw.words[base].itemsize == 4
+    assert mappings[0][1].closed
+    assert mappings[0][3].read_bytes()[8:20] == (
+        bytes.fromhex("00000000aabbccdd21436587")
+    )
+    closed.assert_called_once_with(123)
+
+
+def test_live_native_word_readonly_mapping_and_cleanup(ordinary_ram_mmio):
+    live, mappings, closed = ordinary_ram_mmio
+    with pytest.raises(RuntimeError, match="unwind"):
+        with live.DevMemBackend(readonly=True) as hw:
+            assert hw.read32(c.CONFIG) == 0xDDCCBBAA
+            assert hw.words[c.AXI_BASES["transaction_0"]].readonly
+            assert mappings[0][2] == mmap.PROT_READ
+            with pytest.raises(c.SafetyError, match="HIL-01"):
+                hw.write32(c.CONFIG, 0)
+            raise RuntimeError("unwind")
+    assert mappings[0][1].closed  # no BufferError from exported memoryview
+    closed.assert_called_once_with(123)
+
+
+def test_live_native_word_invalid_inputs_never_map(ordinary_ram_mmio):
+    live, mappings, closed = ordinary_ram_mmio
+    with live.DevMemBackend(readonly=False) as hw:
+        for bad in (c.CONFIG + 1, c.CONFIG + 2, c.CONFIG + 3,
+                    0x40004000, True, None):
+            with pytest.raises(c.SafetyError):
+                hw.write32(bad, 1)
+        for bad in (-1, 1 << 32, True, None, "0"):
+            with pytest.raises(c.SafetyError):
+                hw.write32(c.CONFIG, bad)
+        with pytest.raises(c.SafetyError):
+            hw.read32(c.CONFIG + 1)
+        assert mappings == []
+    closed.assert_called_once_with(123)
 
 
 def live_session_fixture(tmp_path, monkeypatch):
