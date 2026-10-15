@@ -123,16 +123,17 @@ def _ack(io: RestrictedMMIO) -> None:
                   "Response acknowledgment state")
 
 
-def _run_reset(io: RestrictedMMIO) -> None:
+def _run_reset(io: RestrictedMMIO) -> int:
     io.write(CONFIG, 5)
     io.write(COMMAND, 1)
     meta, data = _response(io)
     _expect_equal(meta & 0xF, 0, "Line reset completion")
     _expect_equal(data, 0, "Line reset RDATA")
     _ack(io)
+    return meta
 
 
-def _run_dpidr(io: RestrictedMMIO) -> None:
+def _run_dpidr(io: RestrictedMMIO) -> tuple[int, int]:
     io.write(CONFIG, 4)
     io.write(COMMAND, 1)
     meta, data = _response(io)
@@ -142,13 +143,16 @@ def _run_dpidr(io: RestrictedMMIO) -> None:
     _expect_equal((meta >> 8) & 0x1FF, 1, "DPIDR transfer attempts")
     _expect_equal(data, DPIDR, "DPIDR response")
     _ack(io)
+    return meta, data
 
 
 def hil02_dpidr(io: RestrictedMMIO) -> dict[str, object]:
     _expect_equal(io.read(STATUS), READY, "Initial SWD-03 status")
-    _run_reset(io)
-    _run_dpidr(io)
-    return {"line_reset": "PASS", "dpidr": f"0x{DPIDR:08X}",
+    line_meta = _run_reset(io)
+    dp_meta, dp_data = _run_dpidr(io)
+    return {"line_reset": "PASS", "line_reset_meta": line_meta,
+            "dpidr": f"0x{dp_data:08X}", "dpidr_meta": dp_meta,
+            "dpidr_data_valid": (dp_meta >> 7) & 1,
             "response_retention": "PASS"}
 
 
@@ -167,11 +171,13 @@ def hil03_recovery(io: RestrictedMMIO) -> dict[str, object]:
     _expect_equal(meta & 0xF, 8, "ABORTED transport status")
     _ack(io)
     io.write(HALF, 2)
-    _run_reset(io)
-    for _ in range(3):
-        _run_dpidr(io)
-    return {"abort": "PASS", "line_reset_recovery": "PASS",
-            "repeated_dpidr": 3}
+    reset_meta = _run_reset(io)
+    dp_responses = [_run_dpidr(io) for _ in range(3)]
+    return {"abort": "PASS", "aborted_meta": meta,
+            "line_reset_recovery": "PASS", "line_reset_meta": reset_meta,
+            "repeated_dpidr": len(dp_responses),
+            "repeat_meta": [x[0] for x in dp_responses],
+            "repeat_rdata": [f"0x{x[1]:08X}" for x in dp_responses]}
 
 
 def run_all(io: RestrictedMMIO, *, include_hil03: bool = False) -> dict[str, object]:
