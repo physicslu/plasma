@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "equivalence_id": "st-stm32f103-high-density-r-lqfp-tr-ordering-equivalence-v1",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "manufacturer": "STMicroelectronics",
+  "scope": "Commercial packing-only TR equivalence for directly qualified STM32F103 high-density R-pin LQFP exact order codes.",
+  "ordering_authority": {
+    "path": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+    "git_blob_sha1": "0c4b4b1d2e727726d0431ef89d687a6b6d2e98cf",
+    "series": "STM32F103",
+    "band": "high",
+    "document": "DS5792 Rev 13",
+    "suffix": "TR",
+    "meaning": "tape-and-reel"
+  },
+  "production_exact_identity": {
+    "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+    "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3",
+    "source_authority": "STMicroelectronics official"
+  },
+  "inheritance_contract": {
+    "required_equal_catalog_fields": [
+      "base_device",
+      "package",
+      "pin_count",
+      "flash_size",
+      "temperature_grade",
+      "target_config"
+    ],
+    "permitted_commercial_difference": {
+      "field": "option_suffix",
+      "reference": "",
+      "variant": "TR",
+      "meaning": "tape-and-reel"
+    },
+    "inherited_phase2_semantics": [
+      "programming_profile_id",
+      "memory_geometry_profile_id",
+      "main_flash_size_bytes",
+      "page_count",
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ]
+  },
+  "variants": [
+    {
+      "icpn": "STM32F103RCT6TR",
+      "equivalent_to_icpn": "STM32F103RCT6",
+      "base_device": "STM32F103RC",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103RCT7TR",
+      "equivalent_to_icpn": "STM32F103RCT7",
+      "base_device": "STM32F103RC",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103RDT6TR",
+      "equivalent_to_icpn": "STM32F103RDT6",
+      "base_device": "STM32F103RD",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103RET6TR",
+      "equivalent_to_icpn": "STM32F103RET6",
+      "base_device": "STM32F103RE",
+      "packing_suffix": "TR"
+    }
+  ],
+  "non_claims": {
+    "family_wide_equivalence": false,
+    "temperature_grade_equivalence": false,
+    "package_code_equivalence": false,
+    "silicon_revision_equivalence_inferred_from_suffix": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}
