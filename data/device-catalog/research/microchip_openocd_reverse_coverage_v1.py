@@ -17,7 +17,11 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import tempfile
+import zipfile
 
+import microchip_phase1_portable_custody_v1 as portable
+import microchip_phase1_p0_second_cohort_v1 as second
 import microchip_openocd_core_first_v1 as gates
 from microchip_dfp_index_inventory_v1 import archived_inventory
 
@@ -197,8 +201,61 @@ def join_icpns(lock, indexed, rollup):
     return results, dict(sorted(states.items())), dict(sorted(cfg_count.items()))
 
 
-def build(dfp_root=None, mcp_rollup=None):
+
+
+def portable_original_icpn_rollup(path):
+    """Reconstruct bounded ICPN observations from source-replayed original MCP bytes.
+
+    Does NOT enumerate 24,051 candidates or the full family SKU population.
+    """
+    original = portable.verify(path)
+    require(original["offline_bundle_verification"] == "PASS"
+            and original["original_mcp_dual_pagination_replayed"] is True
+            and original["source_to_phase1_chart_report_replayed"] is True
+            and original["source_file_count"] >= 10,
+            "original two-query Microchip bundle has not independently replayed")
+    with tempfile.TemporaryDirectory() as td:
+        with zipfile.ZipFile(path) as archive:
+            # portable.verify rejects zip traversal, symlinks, duplicates, size.
+            archive.extractall(td)
+        root = Path(td)
+        source_report = second.build(
+            root / "chart",
+            {"sam-e5-d5": root / "mcp-e5",
+             "pic32mx": root / "mcp-pic32"},
+            {"sam-e5-d5": "REPLAYED", "pic32mx": "REPLAYED"})
+    rows = []
+    for entry in source_report["exact_mcp_source_observed_not_admitted"]:
+        rows.append({
+            "icpn": entry["source_part_number"],
+            "sources": [{
+                "query": entry["query"],
+                "basePartNumber": entry["source_base_part_number"],
+                "response_sha256": entry["source_sha256"],
+                "evidence_file": entry["source_file"],
+            }],
+        })
+    require(rows and
+            source_report["mcp_state_counts"]["CURRENT_REPLAYED_MATCH"] == 2,
+            "empty/incomplete original-source Microchip cohort")
+    return {
+        "type": "microchip-source-pinned-disjoint-dfp-evidence-merger",
+        "manufacturer": "Microchip",
+        "original_dfp_index_sha256": gates.PINNED_DFP_SOURCE,
+        "manufacturer_population_complete": False,
+        "global_active_denominator": None,
+        "production_write_authorized": False,
+        "commercial_sku_denominator_established": False,
+        "unique_exact_prefix_research_candidates": len(rows),
+        "ordering_candidates": rows,
+    }
+
+
+def build(dfp_root=None, mcp_rollup=None, portable_bundle=None):
     lock, observation = source_lock()
+    if portable_bundle is not None:
+        require(mcp_rollup is None, "only one exact-ICPN evidence input is allowed")
+        mcp_rollup = portable_original_icpn_rollup(portable_bundle)
     if mcp_rollup is not None:
         require(dfp_root is not None,
                 "ICPN join requires actual pinned original DFP source; no heuristic-only join")
@@ -224,7 +281,7 @@ def build(dfp_root=None, mcp_rollup=None):
         "icpn_rows": [],
         "icpn_mapping_state_counts": {},
         "icpn_by_cfg_candidate_counts": {},
-        "all_icpn_original_bytes_replayed_in_this_command": False,
+        "all_icpn_original_bytes_replayed_in_this_command": portable_bundle is not None,
         "base_device_from_suffix_inference": False,
         "cfg_software_supported_claimed": False,
         "production_write_authorized": False,
@@ -241,6 +298,10 @@ def build(dfp_root=None, mcp_rollup=None):
             g["dfp_device_name_count"] for g in groups if g["priority"]=="P1")
         if mcp_rollup is not None:
             rows, states, counts = join_icpns(lock, indexed, mcp_rollup)
+            if portable_bundle is not None:
+                for row in rows:
+                    row["manufacturer_base_identity_evidence"] = (
+                        "ORIGINAL_MICROCHIP_MCP_RESPONSE_REPLAYED_IN_THIS_COMMAND")
             report["icpn_rows"] = rows
             report["icpn_mapping_state_counts"] = states
             report["icpn_by_cfg_candidate_counts"] = counts
@@ -256,6 +317,8 @@ def build(dfp_root=None, mcp_rollup=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dfp-evidence-root", type=Path)
+    p.add_argument("--portable-bundle", type=Path,
+                   help="verified original two-query Microchip source ZIP from PR #878")
     p.add_argument("--mcp-rollup", type=Path,
                    help="previously generated source-linked 23k Research rollup; not independent raw replay")
     p.add_argument("--output", type=Path, required=True)
@@ -265,7 +328,7 @@ def main():
     require("production" not in {part.casefold() for part in output.parts},
             "Research report must not write Production")
     raw = json.loads(args.mcp_rollup.read_text(encoding="utf-8")) if args.mcp_rollup else None
-    report = build(args.dfp_evidence_root, raw)
+    report = build(args.dfp_evidence_root, raw, args.portable_bundle)
     if args.verify:
         require(json.loads(output.read_text(encoding="utf-8")) == report,
                 "reverse CFG mapping report differs from original-source replay")
