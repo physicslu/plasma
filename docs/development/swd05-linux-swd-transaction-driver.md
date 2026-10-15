@@ -18,9 +18,14 @@ One PPU Site-owned Python SWDTransactionDriver
     -> internal test fixture only until Z2/physical HIL
 ```
 
-Software deliberately cannot access `/dev/mem`, UIO or PYNQ Overlay
-unless a **separately qualified, explicitly injected** MMIO implementation
-is provided under a later approved integration. Creating a driver object
+The SWD-05 driver never directly opens `/dev/mem`, UIO or PYNQ Overlay.
+The separate, explicit `LinuxMMIO` candidate in
+[Linux MMIO Backend v1](linux-mmio-backend-v1.md) can now be injected
+via an aperture-scoped Site lease. **This is NOT an assertion of physical
+Z2 qualification.** Raw Linux /dev/mem cannot reliably surface AXI
+SLVERR/DECERR as catchable Python exceptions; that remains a deliberate
+qualification and hardware-fault policy gap. The existing Cocotb AXI BFM
+does report AXI responses and exercises the production SWD driver. Creating a driver object
 reads only the ABI register (must be 1); it does not write any register,
 configure clocks, reset the chip, or load an FPGA.
 
