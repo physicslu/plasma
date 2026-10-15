@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
+from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
 
 
 EXPECTED_PRODUCTION_CATALOG_SIZE = get_default_device_catalog().size
@@ -443,6 +443,13 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             _parse_target_device(
                 {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
                 label="Batch target_device")
+        # Untyped Job.target string cannot bypass target_device's same guard.
+        for row in rows:
+            with self.subTest(raw_target=row.identifier):
+                with self.assertRaisesRegex(ValueError, "lookup-only"):
+                    _reject_unmapped_microchip_raw_job_target(row.identifier)
+        for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
+            _reject_unmapped_microchip_raw_job_target(other)
 
     def test_microchip_122_exact_phase1_ic_information_search_not_programming(self) -> None:
         catalog = get_default_device_catalog()
