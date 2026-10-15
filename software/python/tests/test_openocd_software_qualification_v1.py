@@ -16,17 +16,17 @@ from plasma_web.openocd_software_qualification import (
 EVIDENCE_FILES = (
     "release/openocd.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-    "release/openocd-qualification/openocd-0.12.0-stm32f103-v5.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-v6.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
     "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
     "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
-    "release/openocd-qualification/openocd-0.12.0-stm32f103-high-r-lqfp-v1.json",
-    "release/openocd-qualification/stm32f103-high-density-r-lqfp-t6-t7-applicability-v1.json",
-    "release/openocd-qualification/stm32f103-high-density-r-lqfp-tr-ordering-equivalence-v1.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rv-lqfp-v2.json",
+    "release/openocd-qualification/stm32f103-high-density-rv-lqfp-t6-t7-applicability-v2.json",
+    "release/openocd-qualification/stm32f103-high-density-rv-lqfp-tr-ordering-equivalence-v2.json",
     "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
     "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json",
     "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
-    "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v1.json",
+    "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v2.json",
     "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
     "data/ic-support/profiles/programming/stm32f1-high-density-flash-v0.json",
     "data/ic-support/bindings/stm32f103c-pilot-v0.json",
@@ -41,6 +41,9 @@ EVIDENCE_FILES = (
     "data/ic-support/profiles/memory-geometry/stm32f103rc-256k-v0.json",
     "data/ic-support/profiles/memory-geometry/stm32f103rd-384k-v0.json",
     "data/ic-support/profiles/memory-geometry/stm32f103re-512k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103vc-256k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103vd-384k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103ve-512k-v0.json",
     "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
     "data/device-catalog/research/stm32f1-commercial-icpn.csv",
 )
@@ -94,6 +97,16 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103VBT6TR",
             "STM32F103VBT7",
             "STM32F103VBT7TR",
+            "STM32F103VCT6",
+            "STM32F103VCT6TR",
+            "STM32F103VDT6",
+            "STM32F103VDT6TR",
+            "STM32F103VDT7",
+            "STM32F103VDT7TR",
+            "STM32F103VET6",
+            "STM32F103VET6TR",
+            "STM32F103VET7",
+            "STM32F103VET7TR",
         )
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
@@ -134,6 +147,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103RDT6": ("STM32F103RD", "stm32f103rd-384k-v0", 384 * 1024, 192),
             "STM32F103RET6": ("STM32F103RE", "stm32f103re-512k-v0", 512 * 1024, 256),
             "STM32F103RET7": ("STM32F103RE", "stm32f103re-512k-v0", 512 * 1024, 256),
+            "STM32F103VCT6": ("STM32F103VC", "stm32f103vc-256k-v0", 256 * 1024, 128),
+            "STM32F103VDT6": ("STM32F103VD", "stm32f103vd-384k-v0", 384 * 1024, 192),
+            "STM32F103VDT7": ("STM32F103VD", "stm32f103vd-384k-v0", 384 * 1024, 192),
+            "STM32F103VET6": ("STM32F103VE", "stm32f103ve-512k-v0", 512 * 1024, 256),
+            "STM32F103VET7": ("STM32F103VE", "stm32f103ve-512k-v0", 512 * 1024, 256),
         }
         for icpn, (base, geometry, size, pages) in expected.items():
             with self.subTest(icpn=icpn):
@@ -171,6 +189,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             ("STM32F103RCT7TR", "STM32F103RCT7"),
             ("STM32F103RDT6TR", "STM32F103RDT6"),
             ("STM32F103RET6TR", "STM32F103RET6"),
+            ("STM32F103VCT6TR", "STM32F103VCT6"),
+            ("STM32F103VDT6TR", "STM32F103VDT6"),
+            ("STM32F103VDT7TR", "STM32F103VDT7"),
+            ("STM32F103VET6TR", "STM32F103VET6"),
+            ("STM32F103VET7TR", "STM32F103VET7"),
         )
         for variant_icpn, source_icpn in pairs:
             with self.subTest(icpn=variant_icpn):
@@ -202,7 +225,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.registry.state_for("STMicroelectronics", "STM32F103V8T7"),
             "UNKNOWN",
         )
-        # High-density qualification is bounded to R-pin LQFP; WLCSP remains UNKNOWN.
+        # High-density qualification is bounded to R/V-pin LQFP; WLCSP remains UNKNOWN.
         self.assertEqual(
             self.registry.state_for("STMicroelectronics", "STM32F103RCY6TR"),
             "UNKNOWN",
@@ -210,6 +233,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         # Ordering syntax must not synthesize exact commercial identities.
         self.assertEqual(
             self.registry.state_for("STMicroelectronics", "STM32F103RDT7"),
+            "UNKNOWN",
+        )
+        # Z-pin high-density LQFP is intentionally outside the current bounded cohort.
+        self.assertEqual(
+            self.registry.state_for("STMicroelectronics", "STM32F103ZET6"),
             "UNKNOWN",
         )
         self.assertEqual(
@@ -239,6 +267,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             ("STM32F103RCT6", 256 * 1024, 128),
             ("STM32F103RDT6TR", 384 * 1024, 192),
             ("STM32F103RET7", 512 * 1024, 256),
+            ("STM32F103VCT6", 256 * 1024, 128),
+            ("STM32F103VDT7TR", 384 * 1024, 192),
+            ("STM32F103VET7", 512 * 1024, 256),
         ):
             with self.subTest(icpn=icpn):
                 item = self.registry.describe("STMicroelectronics", icpn)
@@ -292,15 +323,15 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 31)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 31)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 41)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 41)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 31,
+            registry.summary["catalog_exact_icpns"] - 41,
         )
         self.assertEqual(
             registry.summary["qualification_id"],
-            "adr0002-phase2-openocd-012-stm32f103-v5",
+            "adr0002-phase2-openocd-012-stm32f103-v6",
         )
 
     def test_local_evidence_blob_drift_fails_closed(self):
@@ -333,7 +364,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             copy_evidence_tree(root)
             drift = (
                 root
-                / "release/openocd-qualification/stm32f103-high-density-r-lqfp-t6-t7-applicability-v1.json"
+                / "release/openocd-qualification/stm32f103-high-density-rv-lqfp-t6-t7-applicability-v2.json"
             )
             drift.write_bytes(drift.read_bytes() + b"\n")
             with self.assertRaisesRegex(

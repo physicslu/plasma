@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103ve-512k-v0",
+  "kind": "memory_geometry",
+  "status": "pilot",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "base_device": "STM32F103VE"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5792_rev13",
+      "sections": [
+        "Features",
+        "Table 1. Device summary",
+        "Ordering information"
+      ]
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "sections": [
+        "1.2 Flash module organization",
+        "Table 4. Flash module organization (high-density devices)"
+      ]
+    }
+  ],
+  "data": {
+    "main_flash_start": "0x08000000",
+    "main_flash_size_bytes": 524288,
+    "main_flash_end": "0x0807FFFF",
+    "page_size_bytes": 2048,
+    "page_count": 256,
+    "erase_granularity_bytes": 2048,
+    "program_granularity_bytes": 2
+  }
+}
