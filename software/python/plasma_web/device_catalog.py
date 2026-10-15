@@ -111,6 +111,28 @@ class DeviceCatalogRecord:
         """Return an ICPN only when exact manufacturer part-number granularity is admitted."""
         return self.identifier if self.identifier_kind == "manufacturer_part_number" else None
 
+    @property
+    def phase1_identity_state(self) -> str:
+        """Project ADR-0002 Phase 1 identity without inventing a second authority.
+
+        Production admission already requires an exact manufacturer part number plus
+        authoritative source provenance and a verified identity status. Runtime names
+        that accepted identity state explicitly as IDENTIFIED; legacy/test-only rows
+        without that evidence remain RESEARCH_ONLY.
+        """
+        if (
+            self.production_admitted
+            and self.identifier_kind == "manufacturer_part_number"
+            and self.icpn is not None
+            and bool(self.source_reference)
+            and bool(self.source_authority)
+            and bool(self.source_type)
+            and isinstance(self.verification_status, str)
+            and self.verification_status.startswith("verified_")
+        ):
+            return "IDENTIFIED"
+        return "RESEARCH_ONLY"
+
     def to_payload(self) -> dict[str, object]:
         physical_engineering_status = "no_evidence" if self.production_admitted else self.validation_status
         return {
@@ -121,6 +143,9 @@ class DeviceCatalogRecord:
             "identifier": self.identifier,
             "identifier_kind": self.identifier_kind,
             "icpn": self.icpn,
+            "phase1": {
+                "identity_state": self.phase1_identity_state,
+            },
             "package": self.package,
             "pin_count": self.pin_count,
             "flash_size": self.flash_size,
