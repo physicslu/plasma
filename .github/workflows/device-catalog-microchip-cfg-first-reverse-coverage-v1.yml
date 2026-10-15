@@ -27,6 +27,7 @@ on:
       - 'data/device-catalog/research/microchip_adr0002_phase1_remaining2441_queue_v1.py'
       - 'data/device-catalog/research/test_microchip_adr0002_phase1_remaining2441_queue_v1.py'
       - 'data/device-catalog/research/MICROCHIP_ADR0002_2441_PHASE1_DELIVERY_QUEUE_V1.md'
+      - 'data/device-catalog/research/microchip-phase1-remaining2441-exact-identity-v1.csv'
       - 'data/device-catalog/research/MICROCHIP_ADR0002_PHASE_CONFORMANCE_V1.md'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md'
       - 'data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py'
@@ -714,6 +715,11 @@ jobs:
           with (root/"microchip-adr0002-phase1-remaining2441-identities.csv").open() as f:
               identities=list(csv.DictReader(f))
           assert len(identities)==2441
+          assert summary["remaining_research_identity_csv_sha256"]==(
+              "ecec8112d52d3d5b3b7313e2316da67e6dc670794713abf49b5b8fdeb6f0688d")
+          assert (root/"microchip-adr0002-phase1-remaining2441-identities.csv").read_bytes()==(
+              Path("data/device-catalog/research/"
+                   "microchip-phase1-remaining2441-exact-identity-v1.csv").read_bytes())
           assert len({r["icpn"].upper() for r in identities})==2441
           assert all(r["phase1_identity_status"]=="IDENTIFIED"
               and r["executable_mapping_status"]=="no_mapping"
