@@ -105,6 +105,7 @@
 - **Current** — [Operator Acceptance Test Matrix](development/operator-acceptance-test-matrix.md)
 - **Current** — [Programming Image Observability Test Plan](development/programming-image-observability-test-plan.md)
 - **Current** — [Runtime Acceptance](testing/runtime-acceptance.md)
+- **Current / Prototype Execution Contract** — [PYNQ-Z2 Codex Autonomous HIL Command](development/codex-z2-hil-development-command.md)：可重複使用的 Codex 任務指令、私有 SSH／sudo 認證介面與 PSPL-02／SWD-00 實機測試／復原驗收標準；文件不代表實機測試已完成。
 - **Current** — [FPGA Development Guide](development/fpga-development-guide.md)
 - **Current** — [FPGA Verification Guide](development/fpga-verification-guide.md)
 - **Current** — [PLASMA FPGA SystemVerilog Coding Standard](development/fpga-systemverilog-style.md)：規範新 RTL 的可移植語法、FSM／Type／Width、AXI/Response 與 SWD／Programming Site 驗證標準。
