@@ -53,6 +53,11 @@ fixture tests distinct; neither fixture is a production IC.
 - In-flight Python `request_abort()` is translated by the owner thread
   to AXI COMMAND ABORT. Real RTL reports ABORTED, response is consumed,
   then explicit line-reset and DPIDR recovery succeeds.
+- Configure an intentionally insufficient SWD hardware FCLK timeout;
+  verify real RTL returns TIMEOUT, does not trigger implicit software retry,
+  and the caller can explicitly change timing, reset link and read DPIDR.
+  Verify AXI SLVERR for an RTL read-only register write crosses the Cocotb
+  bridge as an exception, rather than appearing to the driver as AXI OKAY.
 - Simulators must exit cleanly; tests and CI must preserve a failing
   build/log. Do not weaken assertions to obtain green checks.
 - SWD-03 existing Cocotb regressions and SWD-05 61 Python fake-MMIO
