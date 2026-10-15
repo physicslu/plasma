@@ -114,7 +114,9 @@ class NxpPhase1ICSelectorVisibilityTests(unittest.TestCase):
             root=Path(temp)
             source_dir=root/"data/device-catalog/research"
             source_dir.mkdir(parents=True)
-            original=audit._repository_root()/"data/device-catalog/research"
+            evidence_root=audit.default_runtime_evidence_root()
+            self.assertIsNotNone(evidence_root)
+            original=evidence_root/"data/device-catalog/research"
             for fn,*_ in SOURCE_BLOBS:
                 (source_dir/fn).write_bytes((original/fn).read_bytes())
             (source_dir/SOURCE_BLOBS[2][0]).write_text("icpn,manufacturer_12nc\nFORGED,012345678901\n",encoding="utf-8")
