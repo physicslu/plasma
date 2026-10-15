@@ -241,6 +241,9 @@ jobs:
             assert states["CONFLICT"] == 0
           assert report["chart_original_bytes_replayed_by_upstream_chart_builder"]
           assert report["p0_family_chart_evidence"]["p0_manufacturer_chart_base_count"] == 341
+          assert report["p0_family_chart_evidence"]["p0_icpns_exact_manufacturer_base_joined_to_chart"] == 2370
+          assert report["p0_family_chart_evidence"]["p0_icpns_not_in_observed_chart"] == 67
+          assert len(report["p0_family_chart_evidence"]["chart_unmatched_exact_icpns"]) == 67
           for f in ("io_supply","vdda","core_architecture"):
             assert report["per_field_coverage"][f]["UNKNOWN"] == 2437
           assert not report["production_write_authorized"]
