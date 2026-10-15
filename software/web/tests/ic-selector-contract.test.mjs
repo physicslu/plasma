@@ -62,7 +62,9 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.doesNotMatch(selector, /無實體證據/);
   assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*display:\s*grid/);
   assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*gap:\s*5px/);
-  assert.match(selector, /research candidate 不會出現在這裡/);
+  assert.match(selector, /未經原廠身分核實的研究候選不會顯示/);
+  assert.match(selector, /ICPN CATALOG · PHASE 1 IDENTIFIED/);
+  assert.match(selector, /usage === "lookup" \? "phase1" : "production"/);
   assert.doesNotMatch(selector, /OCD Candidate/);
   assert.doesNotMatch(selector, /LPC845/);
   assert.doesNotMatch(selector, /nRF52840/);

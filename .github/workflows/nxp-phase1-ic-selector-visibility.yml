@@ -1,0 +1,46 @@
+name: NXP Phase1 IC Selector Visibility and Execution Separation
+on:
+  pull_request:
+    paths:
+      - "software/python/plasma_web/nxp_phase1_selector.py"
+      - "software/python/plasma_web/gateway.py"
+      - "software/python/tests/test_nxp_phase1_ic_selector_visibility.py"
+      - "software/web/app/device-catalog-api.ts"
+      - "software/web/app/devices/ic-selector.tsx"
+      - "software/web/tests/nxp-phase1-selector-visibility.test.mjs"
+      - "docs/adr/0002-openocd-software-qualified-catalog-visibility.md"
+      - "docs/architecture/ic-information-phase1.md"
+      - "docs/architecture/ic-selector.md"
+      - ".github/workflows/nxp-phase1-ic-selector-visibility.yml"
+  push:
+    branches: [main]
+    paths:
+      - "software/python/plasma_web/nxp_phase1_selector.py"
+      - "software/python/plasma_web/gateway.py"
+      - "software/python/tests/test_nxp_phase1_ic_selector_visibility.py"
+      - "software/web/app/device-catalog-api.ts"
+      - "software/web/app/devices/ic-selector.tsx"
+      - "software/web/tests/nxp-phase1-selector-visibility.test.mjs"
+      - ".github/workflows/nxp-phase1-ic-selector-visibility.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phase1-selector-source-and-runtime-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gateway test dependency
+        run: python -m pip install PyYAML
+      - name: Validate NXP source-locked Phase1 297 snapshot
+        run: python data/device-catalog/research/nxp_phase1_kinetis_21_official_v1.py
+      - name: NXP read-only lookup API, pagination, forged source, execution gate
+        env:
+          PYTHONPATH: software/python
+        run: python -m unittest discover -s software/python/tests -p "test_nxp_phase1_ic_selector_visibility.py" -v
+      - name: Validate relevant web selector UI contracts
+        run: node --test software/web/tests/nxp-phase1-selector-visibility.test.mjs software/web/tests/ic-selector-contract.test.mjs

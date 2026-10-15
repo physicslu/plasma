@@ -1,6 +1,17 @@
 # IC Selector Architecture
 
-Status: legacy IC Selector Phase 1 implementation contract (not ADR-0002 IC Information Phase 1 acceptance)
+Status: IC Selector Phase1 visibility update 2026-10-15; historical implementation details preserved below.
+
+## 2026-10-15 — Phase 1 source-confirmed IC lookup, without programming admission
+
+Owner decision: **Once an exact commercial ICPN has manufacturer-confirmed Phase 1 `IDENTIFIED` evidence, it must be searchable and inspectable in the IC Selector.** Phase 1 does not require `INFORMATION_COMPLETE` or OpenOCD software `SUPPORTED`. The previous **SUPPORTED-only public visibility** policy is superseded for **lookup** (see ADR-0002). Research-only candidate aliases, CFG-family strings and identity disputes are not `IDENTIFIED`.
+
+The first incremental NXP implementation is an **explicit, independent search projection**, `GET /api/devices/search?visibility=phase1`, composing existing Production Manifest exact identities with 73 new official material/12NC-validated NXP Phase 1 identities from five source-locked research CSV ledgers. Among them, `LPC11U68JBD48E` (manufacturer NXP, base `LPC11U68JBD48`, LQFP48) **must** be found and labeled `catalog.scope=phase1_identified`. These rows are read-only, `no_mapping`, cannot carry a fabricated `selected_profile`, software `SUPPORTED` or HIL PASS, and are **not** written to the Production Manifest.
+
+`ICSelector usage="lookup"` requests `visibility=phase1` and shows a prominent Phase 1 lookup-only warning. `ICSelector usage="picker"` and the execution `ICPickerField` continue using the existing Production query for now; Job/Batch's `_parse_target_device` still resolves **only** the Production Catalog and rejects the new NXP Phase1-only identity. This intentionally distinguishes lookup from execution and avoids silent API compatibility/security regressions.
+
+The `catalog_size`, `total_count` and pagination of the `visibility=phase1` API all derive from the **same** combined index; the default endpoint's historic `catalog_size` remains the Production size, with no fake count. Vendor rollout beyond this NXP cohort, Packaging of the source ledgers and deployment of the updated application are independent acceptance/release steps. Historical text below about production-only searches describes the old behavior or execution view, and must not override this newer policy.
+
 
 > **ADR-0002 phased migration (2026-10-14):** This document's earlier
 > "Phase 1" label is the IC Selector's historical implementation milestone,

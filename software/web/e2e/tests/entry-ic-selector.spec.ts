@@ -240,7 +240,7 @@ test("IC Selector first enriched result renders without page error and paginatio
   });
 
   await page.goto("/devices");
-  const search = page.getByRole("textbox", { name: "Search admitted ICPN" });
+  const search = page.getByRole("textbox", { name: "Search Phase 1 identified ICPN" });
   await search.fill("STM32F");
 
   await expect(page.getByText("顯示 1–30 / 共 31 筆")).toBeVisible();

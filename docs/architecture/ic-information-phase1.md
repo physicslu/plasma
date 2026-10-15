@@ -24,14 +24,22 @@ Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-1
 1. Rebuild a deterministic manufacturer-data ledger from pinned original inputs, without reading Programming or PLASMA Compatibility records as metadata sources.
 2. Count `VERIFIED/PARTIAL/UNKNOWN/CONFLICT` for every attribute, with independent admitted/candidate denominators; count unresolved identity separately.
 3. Record original manufacturer evidence SHA or source ref when it exists. A `PARTIAL` observation does not qualify a software profile; a missing attribute does not create an unsupported software decision.
-4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by this phase.
+4. Phase 1 `IDENTIFIED` grants read-only IC Selector lookup. It does **not** grant `openocd_software_support=SUPPORTED`, Hardware Ready, Job/Batch, Production admission, execution picker eligibility or physical PASS.
 5. The distinct owner transition to Phase 2 Programming was approved on 2026-10-15. Phase 1 evidence may be backfilled while reviewing the same official manufacturer documents, but Programming qualification owns the current work. Phase 3 separately validates concrete Site/Adapter/Socket/PPU configurations.
 
-## Catalog surface distinction
+## Catalog surface distinction (owner updated 2026-10-15)
+
+**IC Selector 身分查詢以 `S1 IDENTIFIED` 為資格門檻，非 OpenOCD `SUPPORTED`。**
+可查詢／檢視 ≠ Production Admission ≠ 可執行燒錄 ≠ PPU/Socket HIL PASS。
+NXP 已驗證之 73 筆新 Phase 1 物料使用獨立的 `visibility=phase1` 身分查詢索引，
+未帶參數 API 與 Job/Batch 解析仍只讀 Production Manifest。
+`INFORMATION_COMPLETE` 不構成 `IDENTIFIED` 的顯示前提。
+其他 Manufacturer 的 Phase 1 索引尚待獨立接入；不得宣稱全面遷移。
+
 
 There are two different concepts: **IC Information research/detail completeness** versus **default public IC Selector eligibility**. IC information in a research/admin detail view may be incomplete; it does not grant default product Catalog visibility.
 
-Accepted ADR-0002 final policy stays: default product selectable Catalog is limited to qualified OpenOCD software `SUPPORTED` exact ICPNs. That filtering and consistent count migration is outstanding, tracked separately in Issue #849 and is **not** implemented merely by completing the Phase 1 baseline or the initial Phase 2A qualification registry. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
+Earlier `SUPPORTED-only` public visibility policy was **superseded** by the owner's 2026-10-15 decision: `S1 IDENTIFIED` is searchable, while programming/production execution remains separately gated by Phase 2 and runtime. Issue #849 remains for the wider visibility/deployment migration. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
 
 ## Examples of excluded Phase 1 questions
 
