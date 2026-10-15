@@ -280,24 +280,47 @@ def replay_all_original_batch_sources(dfp_root, source_specs):
     result = full_mcp.build(expected, inventory, digest, source_specs)
     audit = json.loads((gates.HERE / 
         "microchip-dfp-full-first-pass-audit-20261013.json").read_text(encoding="utf-8"))
+    # The historical 23,427 is an *observation-event* count, not the number
+    # of per-identity links retained by the deduplicated 23,276-row rollup.
+    # Likewise 321 original batch dirs include eight source-attestation
+    # quarantines. Preserve these denominators independently.
+    reports = result["batch_reports"]
+    not_archived = set(result["not_archived_batch_ids"])
+    observed_ids = {r["batch_id"] for r in reports} - not_archived
+    quarantined = {r["batch_id"] for r in reports
+                   if r.get("state") == "entire_batch_quarantined"}
+    attested = len(observed_ids - quarantined)
+    retained_links = sum(len(v["sources"])
+                         for v in result["ordering_candidates"])
     actual_replay = {
         "original_dfp_index_sha256": digest,
         "planned_dfp_queries": expected["supported_text_search_seeds"],
         "planned_batches": expected["batch_count"],
-        "batch_archives_with_valid_capture_attestation": result["observed_batch_archives"],
+        "batch_archives_with_valid_capture_attestation": attested,
+        "batches_quarantined_due_to_missing_attestation_after_worker_timeouts": len(quarantined),
         "complete_positive_exact_prefix_queries": result["replayed_positive_exact_prefix_queries"],
         "fully_replayed_zero_exact_prefix_queries": result["replayed_zero_exact_prefix_queries"],
         "unique_exact_prefix_candidates_without_conflicts": result["unique_exact_prefix_research_candidates"],
         "raw_lifecycle_conflicts": result["conflicting_lifecycle_identity_count"],
         "replayed_queries": result["replayed_queries"],
-        "verified_original_source_response_links": sum(
-            len(v["sources"]) for v in result["ordering_candidates"]),
+        "original_batch_directories_observed": result["observed_batch_archives"],
+        "deduplicated_rollup_retained_source_links": retained_links,
     }
     expected_replay = {k: audit[k] for k in actual_replay
-                       if k != "replayed_queries"}
-    expected_replay["replayed_queries"] = (
-        audit["complete_positive_exact_prefix_queries"] +
-        audit["fully_replayed_zero_exact_prefix_queries"])
+                       if k not in ("replayed_queries",
+                                    "original_batch_directories_observed",
+                                    "deduplicated_rollup_retained_source_links")}
+    expected_replay.update({
+        "replayed_queries":
+            audit["complete_positive_exact_prefix_queries"] +
+            audit["fully_replayed_zero_exact_prefix_queries"],
+        "original_batch_directories_observed": expected["batch_count"],
+        # Every row must carry at least one original MCP response source.
+        # This historical rollup retains one link per distinct candidate;
+        # do not confuse it with audit's pre-dedup 23,427 event count.
+        "deduplicated_rollup_retained_source_links":
+            result["unique_exact_prefix_research_candidates"],
+    })
     drift = {key: {"observed": value, "frozen_expected": expected_replay[key]}
              for key, value in actual_replay.items()
              if value != expected_replay[key]}
@@ -306,7 +329,11 @@ def replay_all_original_batch_sources(dfp_root, source_specs):
             json.dumps(drift, sort_keys=True))
     return result, {
         "original_source_count": len(source_specs),
-        "original_batch_archives_replayed": result["observed_batch_archives"],
+        "original_batch_directories_observed": result["observed_batch_archives"],
+        "original_batch_archives_replayed": attested,
+        "quarantined_batch_archives_not_admitted": len(quarantined),
+        "source_linked_observations_in_prior_audit": audit["verified_original_source_response_links"],
+        "deduplicated_rollup_source_links_retained": retained_links,
         "exact_prefix_queries_replayed": result["replayed_queries"],
         "positive_exact_prefix_queries": result["replayed_positive_exact_prefix_queries"],
         "zero_exact_prefix_queries": result["replayed_zero_exact_prefix_queries"],
