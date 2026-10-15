@@ -9,9 +9,7 @@ timeouts and subprocess timeouts do not make that safe.
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack
 from datetime import datetime, timezone
-import hashlib
 import json
 import mmap
 import os
@@ -191,6 +189,11 @@ def main(argv: list[str] | None = None) -> int:
             "utc_finished": datetime.now(timezone.utc).isoformat(),
             "observations": result,
             "mmio_ops": len(io.audit),
+            "mmio_audit": [
+                {"op": op, "address": f"0x{address:08X}",
+                 "value": f"0x{value:08X}"}
+                for op, address, value in io.audit
+            ],
             "physical_swd": "NOT_RUN",
             "real_ic_programming": "NOT_RUN",
             "recovery_restoration": "NOT_RUN",
