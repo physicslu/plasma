@@ -443,7 +443,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                     f"/api/devices/search?q={record.identifier}&limit=5")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["catalog_size"], 4975)
-                self.assertEqual(payload["total_count"], 1)
+                self.assertGreaterEqual(payload["total_count"], 1)
+                # Prefix results may include e.g. -MF and -MFT; exact match ranks first.
                 item = payload["results"][0]
                 self.assertEqual(item["icpn"], record.identifier)
                 self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
