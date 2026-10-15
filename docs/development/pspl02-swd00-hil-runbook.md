@@ -57,13 +57,20 @@ evidence and precedents. Neither the CLI nor Development Mode loads firmware,
 unbinds drivers, restarts services, or powers hardware automatically.
 
 **Root remains a technical prerequisite.** A successful sudo invocation in
-one SSH/TTY session does not grant Codex's other SSH session elevated rights.
-Do not change sudoers or inject credentials to make a test pass. To avoid
-repeated access requests, execute a reviewed bounded hardware session via one
-operator-authenticated root console, collect its evidence, then let the
-engineering agent inspect the results. It must still stop on a failed current
-privileged check; a 180-second preparation budget is a target, never an
-automatic permission to bypass safety.
+one SSH/TTY session does not grant another SSH session elevated rights.
+For this owner-authorized prototype experiment, Codex may independently
+authenticate with the **private, owner-provided** SSH/sudo credentials per
+`AGENTS.md` and
+`docs/development/codex-z2-hil-development-command.md`.
+Use a bounded authenticated session and `sudo -S` stdin when necessary;
+never pass passwords as command arguments, commit them, print them in logs,
+or change sudoers. Run the current privileged hardware audit only once
+per viable session rather than replaying a known access failure. If an
+end-to-end load/test/recovery orchestrator is missing, the agent must
+prepare the smallest bounded execution path and its recovery action; the
+existing `runner` still does **not** load/restore firmware by itself.
+The 180-second preparation budget is an objective, not permission to bypass
+a real technical hazard.
 
 ## Authorization and current status
 
