@@ -258,7 +258,7 @@ def test_pinned_resource_drift_rejected_before_device_open(fixture, field, bad):
 
 def test_driver_identity_changed_fails_before_open(fixture):
     (fixture["platform"] / "driver").unlink()
-    with pytest.raises(MMIOError, match="binding"):
+    with pytest.raises(MMIOError, match="bound UIO symlink"):
         backend(fixture).open()
 
 
