@@ -16,6 +16,7 @@ from plasma_core.diagnostics import (
     ECHO_TRANSFORM,
     LOOPBACK_DIAGNOSTIC_TYPE,
     PS_LOOPBACK_ENDPOINT,
+    PL_LOOPBACK_ENDPOINT,
     crc32_hex,
     require_crc32,
     require_nonnegative_int,
@@ -40,11 +41,21 @@ from plasma_core.protocol import (
     read_frame,
 )
 
+from plasma_interfaces.mmio_loop_test import LoopTestDriver, MAX_CASE_BYTES
+
 from .site_manager import SiteManager
 
 
 class PlasmaServer:
-    def __init__(self, config: PlasmaConfig, manager: SiteManager | None = None) -> None:
+    def __init__(
+        self, config: PlasmaConfig, manager: SiteManager | None = None,
+        *, lt02_driver: LoopTestDriver | None = None,
+    ) -> None:
+        if lt02_driver is not None and not isinstance(lt02_driver, LoopTestDriver):
+            raise TypeError("PL diagnostics require a production LoopTestDriver instance")
+        # No implicit /dev/mem open, overlay load, service activation or mock fallback.
+        self.lt02_driver = lt02_driver
+        self._lt02_poisoned = False
         self.config = config
         self.manager = manager or SiteManager(config)
         self._server: asyncio.Server | None = None
@@ -205,13 +216,18 @@ class PlasmaServer:
                 f"unsupported diagnostic version: {metadata.get('diagnostic_version')!r}",
             )
         endpoint = metadata.get("endpoint")
-        if endpoint != PS_LOOPBACK_ENDPOINT:
+        if endpoint not in (PS_LOOPBACK_ENDPOINT, PL_LOOPBACK_ENDPOINT):
             raise PlasmaError(
                 ErrorCode.OPERATION_UNSUPPORTED,
                 f"real-path loopback endpoint is not implemented: {endpoint!r}",
             )
+        if endpoint == PL_LOOPBACK_ENDPOINT and (self.lt02_driver is None or self._lt02_poisoned):
+            raise PlasmaError(
+                ErrorCode.OPERATION_UNSUPPORTED,
+                "PL diagnostic hardware driver is unavailable or quarantined",
+            )
         if metadata.get("transform") != ECHO_TRANSFORM:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "PS loopback requires echo transform")
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "loopback requires echo transform")
 
         test_id = require_test_id(metadata.get("test_id"))
         sequence = require_nonnegative_int(metadata.get("sequence"), "sequence")
@@ -236,9 +252,37 @@ class PlasmaServer:
             if value is not None and (not isinstance(value, str) or len(value) > 128):
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, f"{field} must be a string of at most 128 characters")
 
+        # One hardware driver at a time, explicitly injected by the PPU owner.
+        # The default PS endpoint retains its pure Protocol-v3.3 echo behavior.
+        result = None
+        output = frame.binary
+        if endpoint == PL_LOOPBACK_ENDPOINT:
+            if payload_length > MAX_CASE_BYTES:
+                raise PlasmaError(ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE,
+                                  "LT02 hardware case exceeds 1 MiB")
+            assert self.lt02_driver is not None
+            try:
+                result = self.lt02_driver.echo(frame.binary)
+                if (result.payload != frame.binary
+                        or result.payload_length != payload_length
+                        or result.tx_crc32 != actual_crc32
+                        or result.rx_crc32 != crc32_hex(result.payload)
+                        or result.data_word_writes != result.data_word_reads
+                        or result.chunks < 1 or result.elapsed_ns < 0):
+                    raise ValueError("LT02 response, CRC or hardware counters mismatch")
+                output = result.payload
+            except Exception as exc:
+                # No automatic replay of uncertain physical MMIO writes.
+                self._lt02_poisoned = True
+                raise PlasmaError(
+                    ErrorCode.INTERFACE_FAILURE,
+                    "PL diagnostic failed; driver quarantined until explicit recovery",
+                    original_exception=exc,
+                ) from exc
+
         self.manager.server_log.event(
             "INFO",
-            "diagnostic_loopback_ps",
+            "diagnostic_loopback_" + endpoint,
             peer=peer,
             ppu_id=self.config.ppu.id,
             facility_id=self.config.ppu.facility_id,
@@ -254,18 +298,25 @@ class PlasmaServer:
                 "ok": True,
                 "diagnostic_type": LOOPBACK_DIAGNOSTIC_TYPE,
                 "diagnostic_version": DIAGNOSTIC_PROTOCOL_VERSION,
-                "endpoint": PS_LOOPBACK_ENDPOINT,
-                "source": PS_LOOPBACK_ENDPOINT,
+                "endpoint": endpoint,
+                "source": endpoint,
                 "test_id": test_id,
                 "sequence": sequence,
                 "transform": ECHO_TRANSFORM,
                 "payload_length": payload_length,
                 "tx_crc32": actual_crc32,
-                "rx_crc32": actual_crc32,
+                "rx_crc32": crc32_hex(output),
+                **({
+                    "site_id": 1,
+                    "lt02_data_word_writes": result.data_word_writes,
+                    "lt02_data_word_reads": result.data_word_reads,
+                    "lt02_chunks": result.chunks,
+                    "lt02_elapsed_ns": result.elapsed_ns,
+                } if result is not None else {}),
                 **({"pattern": metadata["pattern"]} if "pattern" in metadata else {}),
                 **({"seed": metadata["seed"]} if "seed" in metadata else {}),
             },
-            binary=frame.binary,
+            binary=output,
         )
 
     async def _dispatch(self, frame: Frame, peer: Any) -> Frame:
