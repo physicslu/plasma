@@ -77,6 +77,7 @@ class LoopTestDriver:
         loopback_aperture(base)
         self._port = port
         self.base = base
+        self.site_id = site_id
         self._case_lock = Lock()
         self._poisoned = False
         for offset, expected in (
