@@ -174,6 +174,67 @@ def validate_programming(profile: dict[str, Any]) -> None:
     require(registers["FLASH_CR"] == "0x40022010", "unexpected FLASH_CR")
 
 
+def validate_package_hardware(profile: dict[str, Any]) -> None:
+    data = profile["data"]
+    package = data.get("package")
+    require(isinstance(package, dict), "package hardware profile must contain package object")
+    require(package.get("type") == "LQFP", "package hardware type must be LQFP")
+    require(package.get("variant") == "LQFP48", "package hardware variant must be LQFP48")
+    require(package.get("pin_count") == 48, "package hardware pin count must be 48")
+    require(package.get("pitch_mm") == 0.50, "LQFP48 pitch must be 0.50 mm")
+    require(package.get("body_mm") == {"x": 7.0, "y": 7.0, "basis": "BSC"}, "LQFP48 body geometry drift")
+
+    pins = data.get("physical_pin_map")
+    require(isinstance(pins, dict), "physical_pin_map is required")
+    required_pin_names = {
+        "7": "NRST",
+        "8": "VSSA",
+        "9": "VDDA",
+        "23": "VSS_1",
+        "24": "VDD_1",
+        "34": "PA13",
+        "35": "VSS_2",
+        "36": "VDD_2",
+        "37": "PA14",
+        "44": "BOOT0",
+        "47": "VSS_3",
+        "48": "VDD_3",
+    }
+    for pin, name in required_pin_names.items():
+        require(pins.get(pin, {}).get("name") == name, f"package pin {pin} must be {name}")
+
+    swd = data.get("programming_interface", {}).get("swd", {})
+    require(swd.get("swdio", {}).get("package_pin") == 34, "SWDIO must resolve to package pin 34 / PA13")
+    require(swd.get("swclk", {}).get("package_pin") == 37, "SWCLK must resolve to package pin 37 / PA14")
+    require(swd.get("reset", {}).get("package_pin") == 7, "NRST must resolve to package pin 7")
+    require(swd.get("target_voltage_reference", {}).get("required") is True, "target VDD reference must be required")
+
+    power = data.get("power", {})
+    require(power.get("required_supply_pins") == [24, 36, 48], "all three VDD pins must be required")
+    require(power.get("required_ground_pins") == [23, 35, 47], "all three VSS pins must be required")
+    require(power.get("all_main_power_and_ground_required") is True, "all main power/ground pins must be mandatory")
+    require(power.get("external_vpp_required") is False, "STM32F103 SWD programming must not require external VPP")
+    require(power.get("analog_supply", {}).get("pin") == 9, "VDDA must resolve to package pin 9")
+    require(power.get("analog_ground", {}).get("pin") == 8, "VSSA must resolve to package pin 8")
+
+    contacts = data.get("minimum_swd_programming_contacts")
+    require(isinstance(contacts, list) and contacts, "minimum SWD programming contacts are required")
+    contact_pins = [item.get("package_pin") for item in contacts if isinstance(item, dict)]
+    require(
+        contact_pins == [7, 8, 9, 23, 24, 34, 35, 36, 37, 47, 48],
+        "minimum SWD programming contact set drift",
+    )
+    require(44 not in contact_pins, "BOOT0 must not be promoted into the minimum SWD contact set")
+
+    boundary = data.get("design_boundary", {})
+    require(boundary.get("socket_design_input_ready") is True, "socket design input must be marked ready")
+    require(boundary.get("schematic_design_input_ready") is True, "schematic design input must be marked ready")
+    require(boundary.get("hardware_runtime_ready") is False, "hardware runtime readiness must remain false")
+    require(boundary.get("physical_programming_qualified") is False, "physical programming qualification must remain false")
+    require(boundary.get("socket_hil_passed") is False, "socket HIL must remain false")
+    require(boundary.get("execution_authorized") is False, "hardware profile must never authorize execution")
+
+
 def validate_option(profile: dict[str, Any]) -> None:
     data = profile["data"]
     require(data["region_start"] == "0x1FFFF800", "unexpected option-byte base")
@@ -253,11 +314,7 @@ def main() -> int:
         package_data = selected["package_hardware"]["data"]
         require(package_data["package"] == row["package"], f"{icpn}: package profile mismatch")
         require(str(package_data["pin_count"]) == row["pin_count"], f"{icpn}: pin-count profile mismatch")
-        minimum_hw = package_data["pin_level_minimum_programming_hardware"]
-        require(
-            minimum_hw == {"status": "pending_evidence", "required_before_runtime_use": True},
-            f"{icpn}: Phase A must remain fail-closed on minimum pin-level hardware",
-        )
+        validate_package_hardware(selected["package_hardware"])
         resolved[icpn] = selected
 
     require(set(seen) == {"STM32F103C8T6", "STM32F103CBT6"}, "pilot target set drifted")
