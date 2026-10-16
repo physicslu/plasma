@@ -159,6 +159,7 @@ class ProgrammingQualificationRegistry:
             "provider": deepcopy(raw.get("provider")),
             "operations": deepcopy(raw.get("operations", {})),
             "programming": deepcopy(raw.get("programming")),
+            "qualification_gaps": deepcopy(raw.get("qualification_gaps", [])),
             "selector_visible": True,
             "job_selectable": programmable,
             "execution_authorized": False,
