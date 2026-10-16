@@ -90,7 +90,7 @@ def test_current_production_metrics() -> None:
     assert metrics["family_exact_icpns"] == expected_family_counts
     assert metrics["base_devices"] == len(expected_base_devices)
     assert metrics["deterministic_openocd_exact_icpns"] == 4193
-    assert metrics["openocd_unmapped_exact_icpns"] == 799
+    assert metrics["openocd_unmapped_exact_icpns"] == 1692
     assert (
         metrics["deterministic_openocd_exact_icpns"]
         + metrics["openocd_unmapped_exact_icpns"]
@@ -123,6 +123,13 @@ def test_current_production_metrics() -> None:
         expected_exact_icpns - metrics["ic_support_bound_exact_icpns"]
     )
     assert metrics["evidence_backed_programming_profiles"] == 1
+    pic = [row for row in inventory["exact_icpns"]
+           if row["manufacturer"] == "Microchip" and row["family"] == "PIC32MX"]
+    assert len(pic) == 893
+    assert all(row["pin_count"] is None and row["flash_size"] is None
+               and row["package"] == "" and row["openocd"]["state"] == "unresolved"
+               and row["programming_profile"]["state"] == "unresolved"
+               and row["native_ppu"]["runtime_ready"] is False for row in pic)
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
     assert metrics["manufacturer_enrichment_m1_or_higher_exact_icpns"] == 1622
     assert metrics["manufacturer_enrichment_m4_or_higher_exact_icpns"] == 1
