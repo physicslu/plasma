@@ -1,0 +1,301 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103c8t6-lqfp48-swd-socket-v1",
+  "kind": "package_hardware",
+  "status": "pilot_design_input",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "icpn": "STM32F103C8T6",
+    "base_device": "STM32F103C8",
+    "package": "LQFP",
+    "pin_count": 48,
+    "programming_interface": "SWD"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "Figure 8. STM32F103xx performance line LQFP48 pinout",
+        "2.3.9 Power supply schemes",
+        "5.1.6 Power supply scheme",
+        "Table 6. Voltage characteristics",
+        "Table 39. NRST pin characteristics",
+        "6.9 LQFP48 package information (5B)",
+        "Table 62. LQFP48 mechanical data"
+      ]
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "sections": [
+        "Flash programming and erase over the product supply range"
+      ]
+    }
+  ],
+  "data": {
+    "design_input_state": "socket_schematic_ready_not_physically_qualified",
+    "physical_validation": {
+      "socket_model": null,
+      "socket_revision": null,
+      "fixture_qualified": false,
+      "hardware_runtime_ready": false,
+      "physical_programming_qualified": false,
+      "hil_pass": false
+    },
+    "package_mechanical": {
+      "package": "LQFP48",
+      "terminal_count": 48,
+      "body_size_mm": {
+        "x": 7,
+        "y": 7
+      },
+      "overall_span_mm": {
+        "x": 9,
+        "y": 9
+      },
+      "lead_pitch_mm": 0.5,
+      "max_package_height_mm": 1.6,
+      "pin1_orientation": {
+        "rule": "pin 1 is the first terminal after the package pin-1 identifier; numbering proceeds counterclockwise in the manufacturer top-view pinout",
+        "manufacturer_figure": "Figure 8 / Figure 55"
+      }
+    },
+    "pin_map": {
+      "1": {
+        "name": "VBAT",
+        "role": "backup_supply"
+      },
+      "7": {
+        "name": "NRST",
+        "role": "reset"
+      },
+      "8": {
+        "name": "VSSA",
+        "role": "analog_ground"
+      },
+      "9": {
+        "name": "VDDA",
+        "role": "analog_supply"
+      },
+      "23": {
+        "name": "VSS_1",
+        "role": "ground"
+      },
+      "24": {
+        "name": "VDD_1",
+        "role": "main_supply"
+      },
+      "34": {
+        "name": "PA13",
+        "role": "SWDIO"
+      },
+      "35": {
+        "name": "VSS_2",
+        "role": "ground"
+      },
+      "36": {
+        "name": "VDD_2",
+        "role": "main_supply"
+      },
+      "37": {
+        "name": "PA14",
+        "role": "SWCLK"
+      },
+      "44": {
+        "name": "BOOT0",
+        "role": "boot_strap"
+      },
+      "47": {
+        "name": "VSS_3",
+        "role": "ground"
+      },
+      "48": {
+        "name": "VDD_3",
+        "role": "main_supply"
+      }
+    },
+    "programming_interface": {
+      "interface": "SWD",
+      "signals": {
+        "SWDIO": {
+          "package_pin": 34,
+          "mcu_pin": "PA13",
+          "direction": "bidirectional",
+          "io_domain": "VDD",
+          "mandatory": true
+        },
+        "SWCLK": {
+          "package_pin": 37,
+          "mcu_pin": "PA14",
+          "direction": "programmer_to_target",
+          "io_domain": "VDD",
+          "mandatory": true
+        },
+        "NRST": {
+          "package_pin": 7,
+          "mcu_pin": "NRST",
+          "direction": "programmer_to_target",
+          "mandatory": true,
+          "drive_policy": "assert low; release rather than drive above VDD",
+          "internal_pullup_ohm": {
+            "min": 30000,
+            "typ": 40000,
+            "max": 50000
+          }
+        }
+      },
+      "connect_under_reset_capable": true,
+      "manufacturer_swd_clock_limit_hz": null,
+      "manufacturer_swd_clock_limit_status": "not_specified_in_locked_sources"
+    },
+    "power": {
+      "programming_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false,
+      "mandatory_supply_contacts": [
+        {
+          "package_pin": 24,
+          "name": "VDD_1",
+          "rail": "VDD"
+        },
+        {
+          "package_pin": 36,
+          "name": "VDD_2",
+          "rail": "VDD"
+        },
+        {
+          "package_pin": 48,
+          "name": "VDD_3",
+          "rail": "VDD"
+        },
+        {
+          "package_pin": 9,
+          "name": "VDDA",
+          "rail": "VDDA"
+        }
+      ],
+      "mandatory_ground_contacts": [
+        {
+          "package_pin": 23,
+          "name": "VSS_1",
+          "rail": "VSS"
+        },
+        {
+          "package_pin": 35,
+          "name": "VSS_2",
+          "rail": "VSS"
+        },
+        {
+          "package_pin": 47,
+          "name": "VSS_3",
+          "rail": "VSS"
+        },
+        {
+          "package_pin": 8,
+          "name": "VSSA",
+          "rail": "VSSA"
+        }
+      ],
+      "rail_rules": [
+        "all VDD and VDDA pins must be connected to an external supply in the permitted range",
+        "all VSS and VSSA pins must be connected to ground",
+        "VDDA and VSSA must be connected to VDD and VSS respectively for this bare-IC SWD fixture"
+      ],
+      "decoupling": {
+        "main_vdd": {
+          "local_per_vdd_pin": {
+            "capacitance_nf": 100
+          },
+          "bulk": {
+            "capacitance_uf": 4.7,
+            "required_node": "VDD_3"
+          }
+        },
+        "vdda": {
+          "capacitors": [
+            {
+              "capacitance_uf": 1
+            },
+            {
+              "capacitance_nf": 10
+            }
+          ],
+          "connection": "between VDDA and VSSA"
+        }
+      }
+    },
+    "fixture_contact_contract": {
+      "mandatory_contacts": [
+        {
+          "package_pin": 24,
+          "signal": "VDD_1"
+        },
+        {
+          "package_pin": 36,
+          "signal": "VDD_2"
+        },
+        {
+          "package_pin": 48,
+          "signal": "VDD_3"
+        },
+        {
+          "package_pin": 9,
+          "signal": "VDDA"
+        },
+        {
+          "package_pin": 23,
+          "signal": "VSS_1"
+        },
+        {
+          "package_pin": 35,
+          "signal": "VSS_2"
+        },
+        {
+          "package_pin": 47,
+          "signal": "VSS_3"
+        },
+        {
+          "package_pin": 8,
+          "signal": "VSSA"
+        },
+        {
+          "package_pin": 34,
+          "signal": "SWDIO"
+        },
+        {
+          "package_pin": 37,
+          "signal": "SWCLK"
+        },
+        {
+          "package_pin": 7,
+          "signal": "NRST"
+        }
+      ],
+      "optional_recovery_contacts": [
+        {
+          "package_pin": 44,
+          "signal": "BOOT0",
+          "reason": "optional boot-mode/recovery control; not required by the admitted SWD programming route"
+        },
+        {
+          "package_pin": 1,
+          "signal": "VBAT",
+          "reason": "backup-domain power contact; VDD supplies the backup domain while VDD is present"
+        }
+      ],
+      "minimum_contact_count": 11
+    },
+    "boot_policy": {
+      "SWD_route_requires_BOOT0_contact": false,
+      "recovery_recommendation": "provide BOOT0 access when fixture economics allow, but do not make SWD L2 qualification depend on it"
+    },
+    "non_claims": [
+      "no commercial socket vendor/model has been selected",
+      "no contact force or pogo/socket lifecycle has been qualified",
+      "no signal-integrity limit has been physically measured",
+      "no PLASMA PPU/Site/Socket/Adapter combination has passed HIL",
+      "this profile is design input and does not grant execution authorization or L3"
+    ]
+  }
+}
