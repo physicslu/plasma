@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'data/device-catalog/research/microchip_l1_admission_queue_v1.py'
+      - 'data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py'
       - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
       - 'software/python/plasma_web/route_evidence_admission.py'
       - 'software/python/plasma_web/programming_qualification.py'
@@ -68,6 +69,48 @@ jobs:
                      and r["job_selectable"] is False
                      and r["execution_authorized"] is False for r in q["rows"])
           PY
+      - name: Read pinned PIC32MX upstream flash-driver source
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://raw.githubusercontent.com/openocd-org/openocd/9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c/src/flash/nor/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx.c"
+      - name: Reconcile PIC32MX device-ID applicability per exact commercial ICPN
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json"
+          python data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1"
+          evidence = json.loads((base / "pic32mx-devid-route-review.json").read_text())
+          assert evidence["route_review_counts"] == {
+              "DIRECT_DRIVER_DEVID_ROUTE_EVIDENCE": 893,
+              "DRIVER_DEVID_NOT_LISTED_REVIEW_REQUIRED": 348,
+          }
+          assert evidence["base_device_review_counts"] == {
+              "DIRECT_DRIVER_DEVID_ROUTE_EVIDENCE": 85,
+              "DRIVER_DEVID_NOT_LISTED_REVIEW_REQUIRED": 31,
+          }
+          from sys import path
+          path.insert(0, "data/device-catalog/research")
+          from microchip_pic32mx_devid_route_review_v1 import build
+          ledger = json.loads((base / "microchip-l1-review-queue.json").read_text())
+          driver = (base / "pic32mx.c").read_bytes()
+          try:
+              build(ledger, driver + b"\n#tampered\n")
+          except ValueError as exc:
+              assert "source" in str(exc) or "bytes" in str(exc)
+          else:
+              raise AssertionError("Tampered upstream Flash Driver was accepted")
+          PY
       - name: Confirm tampered manufacturer replay is rejected
         run: |
           set -euo pipefail
@@ -92,5 +135,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: microchip-l1-2563-review-queue
-          path: ${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json
+          path: |
+            ${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json
+            ${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json
           retention-days: 30
