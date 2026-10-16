@@ -37,6 +37,41 @@ class KL25PlanTests(unittest.TestCase):
         with self.assertRaisesRegex(PlasmaError, "Flash Configuration Field"):
             self.compile(request(Operation.PROGRAM, image=b"x" * 0x401))
 
+    def test_program_rejects_entire_fcf_sector_even_when_not_touching_fcf_bytes(self):
+        # OpenOCD kinetis_write() can synthesize FCF when any part of
+        # the 1 KiB sector containing 0x400-0x40F is programmed.
+        for address, size in (
+            (0x400, 4),      # Direct FCF
+            (0x410, 4),      # After FCF, still inside the same sector
+            (0x7FC, 4),      # Last longword in FCF-containing sector
+            (0x3FC, 8),      # Image straddles 0x400 boundary
+            (0x3FC, 0x405),  # Image spans across the entire FCF sector
+            (0, 0x401),      # Image from flash base overlaps FCF sector
+        ):
+            with self.subTest(address=hex(address), size=size):
+                with self.assertRaisesRegex(PlasmaError, "Flash Configuration Field sector"):
+                    self.compile(request(Operation.PROGRAM, image=b"x" * size,
+                                         map_data={"address": address}))
+
+    def test_program_boundary_0x400_is_exclusive_and_0x800_is_allowed(self):
+        # A write ending just before the sector must be allowed; touching
+        # even its first byte must not. The next sector starts at 0x800.
+        first = self.compile(request(Operation.PROGRAM, image=b"x" * 0x400))
+        self.assertTrue(any(cmd.startswith("flash write_image") for cmd in first.commands))
+        second = self.compile(request(Operation.PROGRAM, image=b"abcd",
+                                      map_data={"address": 0x800}))
+        self.assertIn("flash write_image ${PLASMA_IMAGE_BIN} 0x00000800 bin", second.commands)
+
+    def test_invalid_fcf_sector_geometry_fails_closed(self):
+        lock = {
+            "flash_configuration_field_start": "0x00000400",
+            "flash_configuration_field_size_bytes": 16,
+            "flash_configuration_field_sector_start": "0x00000800",
+            "flash_configuration_field_sector_size_bytes": 1024,
+        }
+        with self.assertRaisesRegex(PlasmaError, "sector geometry is invalid"):
+            self.compiler._reject_fcf_intersection(0, 4, lock)
+
     def test_aligned_program_segment_after_fcf_is_admitted(self):
         plan = self.compile(request(Operation.PROGRAM, image=b"abc", map_data={"address": 0x800}))
         self.assertIn("flash write_image ${PLASMA_IMAGE_BIN} 0x00000800 bin", plan.commands)

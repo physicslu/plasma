@@ -137,6 +137,25 @@ class KL25OpenOCDPlanCompiler(OpenOCDPlanCompiler):
 
     @staticmethod
     def _reject_fcf_intersection(start: int, size: int, constraints: dict[str, Any]) -> None:
+        """Reject the ENTIRE flash sector containing the FCF, not just 0x400-0x40F.
+
+        OpenOCD kinetis_write() may synthesize/rewrite FCF when a PROGRAM
+        intersects any byte of its sector, even when the payload itself
+        excludes the 16-byte FCF. The immutable KL25 backend lock defines
+        both the FCF and that sector; preserving the lock does not imply
+        software qualification for a new provider revision.
+        """
         fcf_start = int(constraints["flash_configuration_field_start"], 0)
-        fcf_end = fcf_start + int(constraints["flash_configuration_field_size_bytes"])
-        _require(start + size <= fcf_start or start >= fcf_end, "Flash Configuration Field programming is not admitted")
+        fcf_size = int(constraints["flash_configuration_field_size_bytes"])
+        sector_start = int(constraints["flash_configuration_field_sector_start"], 0)
+        sector_size = int(constraints["flash_configuration_field_sector_size_bytes"])
+        _require(
+            fcf_size > 0 and sector_size > 0 and sector_start <= fcf_start
+            and fcf_start + fcf_size <= sector_start + sector_size,
+            "Flash Configuration Field sector geometry is invalid",
+        )
+        _require(
+            size > 0 and (start + size <= sector_start or start >= sector_start + sector_size),
+            "Flash Configuration Field sector programming is not admitted: "
+            "OpenOCD can synthesize FCF for any write touching its sector",
+        )

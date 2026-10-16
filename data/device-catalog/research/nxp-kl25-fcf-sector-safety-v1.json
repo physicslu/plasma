@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "audit_scope": "NXP KL25 exact MKL25Z128VLK4 Software Executor (ADR-0002 Phase2 CANDIDATE; no SUPPORTED)",
+  "source_repository": "https://github.com/openocd-org/openocd",
+  "historical_prototype_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+  "approved_provider_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+  "kinetis_c_blobs": {
+    "historical": "266b447c04376b529c44ac11cd9fd6acc31e0e8c",
+    "approved": "7137b4aa078719af31122f8276494f006589e8ab"
+  },
+  "source_comparison_scope": "Function text inspection at pinned Git commits; source binaries not checked into PLASMA; no compiled provider attestation",
+  "source_function_observations": {
+    "verbatim_unchanged": [
+      "kinetis_write",
+      "kinetis_write_inner",
+      "kinetis_write_sections",
+      "kinetis_erase",
+      "kinetis_ftfx_command"
+    ],
+    "kinetis_probe_chip": "Only unsigned int versus unsigned local declarations changed in inspected function; exact KL25 runtime matching unproven",
+    "kinetis_fill_fcf": "Historical guarded zero protection blocks and null prot_blocks with diagnostics/continue; approved provider uses assert(bank_iter->prot_blocks); no real hardware evaluation",
+    "kinetis_write_fcf_path": "If any PROGRAM range overlaps the FCF-containing sector and allow_fcf_writes is false, the driver can invoke kinetis_fill_fcf and optionally kinetis_write_inner for FCF, even when the user payload excludes 0x400–0x40F"
+  },
+  "safety_issue": {
+    "prior_compiler_restriction": "Only direct payload overlap with [0x400,0x410) forbidden",
+    "insufficiency": "Payload touching [0x410,0x800) may enter kinetis_write set_fcf branch without intersecting 16-byte FCF",
+    "expected_safe_compiler_restriction": "Reject any nonempty PROGRAM payload overlapping [0x400,0x800), using immutable backend lock FCF sector geometry; do not alter readonly/verify or already-blocked 0x400 sector erase",
+    "authorized_non_fc_sectors": "PROGRAM entirely below 0x400 or entirely from 0x800 onwards is not rejected by this specific gate, subject to other existing checks"
+  },
+  "result": {
+    "code_gate": "Fail closed on entire FCF-containing sector, no attempt to configure kinetis fcf_source",
+    "all_nxp_phase2_supported_new_from_this_change": 0,
+    "source_semantic_equivalence_certified": false,
+    "current_provider_operation_qualification_certified": false,
+    "phase3_real_hil": "NOT_AUDITED",
+    "production_admission_changed": false
+  }
+}
