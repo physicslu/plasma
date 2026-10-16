@@ -53,8 +53,8 @@ def main()->int:
     # Historical v6.21 ST source-only postimage remains exactly frozen.
     # The new NXP KL25 source is independently validated and intentionally
     # omitted from the historical ST-specific route partition.
-    req(len(manifest["sources"])==33,"Production source count drift")
-    req(sum(int(s["row_count"]) for s in manifest["sources"])==4983,
+    req(len(manifest["sources"])==35,"Production source count drift")
+    req(sum(int(s["row_count"]) for s in manifest["sources"])==4992,
         "Production exact total drift")
     req(manifest["sources"][-1]=={
         "manufacturer":"Microchip","family":"SAML1X",
@@ -81,6 +81,20 @@ def main()->int:
         "git_blob_sha":"7eb882262d6f907022d3aaa4e5bd8c656f641a54",
         "sha256":"39cf41e7bf67ee076c19ad53c388c3d9b61b556767c1a7b8ec9420cc1542ad77",
     },"unexpected new NXP L1 source in historical ST replay")
+    new_nxp_admissions = [
+        {"manufacturer":"NXP","family":"LPC81X",
+         "path":"../research/nxp-lpc81x-8-commercial-l1-v1.csv",
+         "row_count":8,
+         "git_blob_sha":"37f4f86ddfd2d0c04555af8629977316e9d1572c",
+         "sha256":"6567f3e85758d1b7073d4d9f6f340849d0e95c20e9d618408e166056608cda87"},
+        {"manufacturer":"NXP","family":"LPC11U2X",
+         "path":"../research/nxp-lpc11u24-1-commercial-l1-v1.csv",
+         "row_count":1,
+         "git_blob_sha":"0298ee4f8dac009588069adfda932efa7960bcdc",
+         "sha256":"ef7dc9ab7f35c5998099ff3eb1245323f74ddabed3b4a574539cf09d36c65abb"},
+    ]
+    req(manifest["sources"][32:34] == new_nxp_admissions,
+        "new NXP LPC81X/LPC11U2X source scope drift in historical ST replay")
     req(len(manifest["sources"][:28])==28 and
         all(s["manufacturer"]=="STMicroelectronics" for s in manifest["sources"][:28]),
         "historical ST 28-source contract drift")

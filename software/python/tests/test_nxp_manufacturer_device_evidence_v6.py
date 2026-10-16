@@ -25,9 +25,9 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         cls.new = [r for r in cls.nxp if r.family in {"MCX", "K32L2"}]
 
     def test_bounded_212_admitted_exact_and_source_verified(self) -> None:
-        self.assertEqual(self.catalog.size, 4983)
+        self.assertEqual(self.catalog.size, 4992)
         self.assertEqual(self.evidence.size, 212)
-        self.assertEqual(len(self.nxp), 232)
+        self.assertEqual(len(self.nxp), 241)
         self.assertEqual(len(self.new), 212)
         self.assertEqual(sum(r.family == "MCX" for r in self.new), 196)
         self.assertEqual(sum(r.family == "K32L2" for r in self.new), 16)
@@ -82,10 +82,10 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["levels"], [1, 2, 3])
         self.assertLess(payload["catalog_size"], self.catalog.size)
-        self.assertEqual(payload["total_count"], 20)
-        self.assertEqual(len(payload["results"]), 20)
+        self.assertEqual(payload["total_count"], 29)
+        self.assertEqual(len(payload["results"]), 29)
         for item in payload["results"]:
-            self.assertIn(item["family"], {"KL25", "LPC11U6X"})
+            self.assertIn(item["family"], {"KL25", "LPC11U6X", "LPC81X", "LPC11U2X"})
             self.assertEqual(item["catalog_level"], 1)
             self.assertEqual(item["catalog_level_state"], "PROGRAMMING_CANDIDATE")
             self.assertFalse(item["job_selectable"])

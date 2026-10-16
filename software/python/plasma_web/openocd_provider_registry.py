@@ -150,20 +150,24 @@ class OpenOCDProviderRegistry:
         st = [r for r in catalog.records if r.vendor == "STMicroelectronics"]
         nxp = [r for r in catalog.records if r.vendor == "NXP"]
         microchip = admitted_microchip_phase1_count(catalog)
-        _require(catalog.status == "production" and catalog.size == 4861 + microchip and
-                 len(st) == 4629 and len(nxp) == 232 and
+        _require(catalog.status == "production" and catalog.size == 4870 + microchip and
+                 len(st) == 4629 and len(nxp) == 241 and
                  Counter((r.family,r.mapping_status) for r in nxp) == {
                      ("KL25","mapped"):12,
                      ("MCX","no_mapping"):196,
                      ("K32L2","no_mapping"):16,
                      ("LPC11U6X","mapped"):8,
+                     ("LPC81X","mapped"):8,
+                     ("LPC11U2X","mapped"):1,
                  } and
                  all(r.production_admitted and
-                     (r.target_config == ("tcl/target/kl25.cfg" if r.family=="KL25"
-                                         else "tcl/target/lpc11xx.cfg")
-                      if r.family in {"KL25","LPC11U6X"} else not r.target_config)
+                     (r.target_config == {"KL25": "tcl/target/kl25.cfg",
+                                         "LPC11U6X": "tcl/target/lpc11xx.cfg",
+                                         "LPC81X": "tcl/target/lpc8xx.cfg",
+                                         "LPC11U2X": "tcl/target/lpc11xx.cfg"}[r.family]
+                      if r.family in {"KL25","LPC11U6X","LPC81X","LPC11U2X"} else not r.target_config)
                      for r in nxp),
-                 "canonical ST 4629 + NXP KL25 12 + MCX 196 + K32L2 16 + LPC11U6X 8 required")
+                 "canonical ST 4629 + NXP 241 (KL25 12; MCX 196; K32L2 16; LPC11U6X 8; LPC81X 8; LPC11U2X 1) required")
         upstream, gap = load_source_authorities(root)
         fork = gap["candidate_st_fork"]
         _require(fork["commit"] == ST_COMMIT and upstream["source_commit"] == UPSTREAM_COMMIT
@@ -213,10 +217,10 @@ class OpenOCDProviderRegistry:
                 else:
                     cnt["no_candidate"] += 1
             self._routes[key] = self._guard_distinct_providers(entries)
-        _require(cnt == {"mapped": 4184, "STM32H5": 190,
+        _require(cnt == {"mapped": 4193, "STM32H5": 190,
                          "STM32C5": 172, "no_candidate": 315 + microchip},
                  f"Unexpected catalog/backend baseline {dict(cnt)}")
-        _require(len(self._routes) == 4861 + microchip, "full exact-ICPN graph incomplete")
+        _require(len(self._routes) == 4870 + microchip, "full exact-ICPN graph incomplete")
 
     @staticmethod
     def _guard_distinct_providers(values: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:

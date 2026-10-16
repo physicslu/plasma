@@ -28,13 +28,13 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         return self.provider.describe("STMicroelectronics", part)
 
     def test_all_4629_exact_icpns_and_independent_states(self):
-        self.assertEqual(self.catalog.size, 4983)
+        self.assertEqual(self.catalog.size, 4992)
         self.assertEqual(sum(row.vendor == "STMicroelectronics" for row in self.catalog.records), 4629)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "KL25" for row in self.catalog.records), 12)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "MCX" and row.mapping_status == "no_mapping" for row in self.catalog.records),196)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "K32L2" and row.mapping_status == "no_mapping" for row in self.catalog.records),16)
         self.assertEqual(self.provider.inventory, {
-            "openocd-upstream": 4184,
+            "openocd-upstream": 4193,
             "openocd-st-h5-research": 190,
             "openocd-st-c5-stldr-research": 172,
         })

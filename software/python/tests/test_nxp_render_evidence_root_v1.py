@@ -46,10 +46,10 @@ class NXPInstalledWheelDataRootTests(unittest.TestCase):
     def test_nxp_customer_selector_exposes_routes_but_hides_level0_identity(self) -> None:
         found = _device_search_payload("NXP", limit=100)
         self.assertEqual(found["levels"], [1, 2, 3])
-        self.assertEqual(found["total_count"], 20)
+        self.assertEqual(found["total_count"], 29)
         self.assertTrue(found["results"])
         self.assertTrue(all(item["vendor"] == "NXP" for item in found["results"]))
-        self.assertTrue(all(item["family"] in {"KL25", "LPC11U6X"} for item in found["results"]))
+        self.assertTrue(all(item["family"] in {"KL25", "LPC11U6X", "LPC81X", "LPC11U2X"} for item in found["results"]))
         self.assertTrue(all(item["catalog_level"] == 1 for item in found["results"]))
 
         # MCX remains source-verified/admitted identity data, but is active Level 0

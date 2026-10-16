@@ -67,8 +67,8 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
     microchip = [s for s in sources if s.get("manufacturer") == "Microchip"]
     ensure(len(st_sources) == 28 and sum(s["row_count"] for s in st_sources) == 4629
            and [(s["family"], s["row_count"]) for s in nxp_sources] ==
-               [("KL25",12),("MCX",196),("K32L2",16),("LPC11U6X",8)]
-           and len(sources)==33 and sum(s["row_count"] for s in sources)==4983
+               [("KL25",12),("MCX",196),("K32L2",16),("LPC11U6X",8),("LPC81X",8),("LPC11U2X",1)]
+           and len(sources)==35 and sum(s["row_count"] for s in sources)==4992
            and microchip==[{
                "manufacturer":"Microchip","family":"SAML1X",
                "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
@@ -77,7 +77,7 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
                "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
            }]
            and all(s["manufacturer"]=="STMicroelectronics" for s in sources[:28]),
-           "Production ST+C5 and bounded NXP four-source baseline drift")
+           "Production ST+C5 and bounded NXP six-source baseline drift")
     c5 = [s for s in sources if s.get("manufacturer") == "STMicroelectronics"
           and s.get("family") == "STM32C5"]
     ensure(len(c5) == 1 and c5[0]["path"] == CSV_REL and c5[0]["row_count"] == 172,
