@@ -173,14 +173,15 @@
       "backup_supply": {
         "pin": 1,
         "name": "VBAT",
-        "required_for_swd_programming": true,
         "fixture_policy": "tie_to_vdd_when_no_external_battery",
         "decoupling_nF": 100,
         "operating_v": {
           "min": 1.8,
           "max": 3.6
         },
-        "basis": "AN2586 Rev 8 recommends VBAT be connected externally to VDD with 100 nF when no external battery is used"
+        "basis": "AN2586 Rev 8 recommends VBAT be connected externally to VDD with 100 nF when no external battery is used",
+        "required_for_primary_swd_signal_path": false,
+        "required_for_batteryless_socket_fixture": true
       },
       "all_main_power_and_ground_required": true,
       "external_vpp_required": false,
@@ -223,7 +224,47 @@
         "reason": "not required by the qualified SWD/OpenOCD programming route; useful for deterministic boot/recovery policies"
       }
     },
-    "minimum_swd_programming_contacts": [
+    "optional_fixture_contacts": [
+      {
+        "package_pin": 44,
+        "signal": "BOOT0",
+        "purpose": "boot-mode control / recovery"
+      }
+    ],
+    "design_boundary": {
+      "socket_interface_design_input_ready": true,
+      "electrical_schematic_design_input_ready": true,
+      "pcb_footprint_design_input_ready": false,
+      "socket_mechanical_selection_complete": false,
+      "socket_implementation_ready": false,
+      "programmer_transport_route": "SWD",
+      "hardware_runtime_ready": false,
+      "physical_programming_qualified": false,
+      "socket_hil_passed": false,
+      "execution_authorized": false,
+      "note": "Evidence-backed electrical and package design input is ready. A specific socket vendor/part, its PCB footprint, Site connector assignment, signal-integrity implementation, and physical HIL remain required before hardware implementation can be called ready."
+    },
+    "pin_count": 48,
+    "package_variant": "LQFP48",
+    "package_mechanical": {
+      "type": "LQFP",
+      "variant": "LQFP48",
+      "pin_count": 48,
+      "body_mm": {
+        "x": 7,
+        "y": 7,
+        "basis": "BSC"
+      },
+      "lead_span_mm": {
+        "x": 9,
+        "y": 9,
+        "basis": "BSC"
+      },
+      "pitch_mm": 0.5,
+      "max_height_mm": 1.6,
+      "pin1_reference": "DS5319 Rev 20 Figure 8 top view; pin 1 is VBAT at the upper-left corner adjacent to the pin-1 marker"
+    },
+    "minimum_batteryless_swd_fixture_contacts": [
       {
         "package_pin": 1,
         "signal": "VBAT",
@@ -284,46 +325,6 @@
         "signal": "VDD_3",
         "purpose": "required main supply / bulk decoupling node"
       }
-    ],
-    "optional_fixture_contacts": [
-      {
-        "package_pin": 44,
-        "signal": "BOOT0",
-        "purpose": "boot-mode control / recovery"
-      }
-    ],
-    "design_boundary": {
-      "socket_interface_design_input_ready": true,
-      "electrical_schematic_design_input_ready": true,
-      "pcb_footprint_design_input_ready": false,
-      "socket_mechanical_selection_complete": false,
-      "socket_implementation_ready": false,
-      "programmer_transport_route": "SWD",
-      "hardware_runtime_ready": false,
-      "physical_programming_qualified": false,
-      "socket_hil_passed": false,
-      "execution_authorized": false,
-      "note": "Evidence-backed electrical and package design input is ready. A specific socket vendor/part, its PCB footprint, Site connector assignment, signal-integrity implementation, and physical HIL remain required before hardware implementation can be called ready."
-    },
-    "pin_count": 48,
-    "package_variant": "LQFP48",
-    "package_mechanical": {
-      "type": "LQFP",
-      "variant": "LQFP48",
-      "pin_count": 48,
-      "body_mm": {
-        "x": 7,
-        "y": 7,
-        "basis": "BSC"
-      },
-      "lead_span_mm": {
-        "x": 9,
-        "y": 9,
-        "basis": "BSC"
-      },
-      "pitch_mm": 0.5,
-      "max_height_mm": 1.6,
-      "pin1_reference": "DS5319 Rev 20 Figure 8 top view; pin 1 is VBAT at the upper-left corner adjacent to the pin-1 marker"
-    }
+    ]
   }
 }
