@@ -365,8 +365,8 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
                       : selected.nxp_manufacturer_device_profile
                         ? (zh ? "NXP 官方單料號規格；未知欄位不推估，不代表燒錄資格" : "NXP exact-part evidence; unknown fields are not inferred or programming-qualified")
-                        : selected.microchip_phase1_ic_information
-                          ? (zh ? "Microchip 原廠 MCP 精確料號 + DS60001513G 訂購規則；Phase 1 IDENTIFIED，Phase 2 尚未驗證" : "Microchip official MCP exact part + DS60001513G ordering evidence; Phase 1 IDENTIFIED, Phase 2 unqualified")
+                        : selected.microchip_ic_information
+                          ? (zh ? "Microchip 原廠 MCP 精確料號 + DS60001513G 訂購規則；Catalog Level 0 DISCOVERED，Programming 尚未驗證" : "Microchip official MCP exact part + DS60001513G ordering evidence; Catalog Level 0 DISCOVERED, Programming unqualified")
                           : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
                   </p>
                 </div>
@@ -377,12 +377,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <div><dt>Package</dt><dd>{selected.package ?? "—"}</dd></div>
                 <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
                 <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
-                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? selected.nxp_manufacturer_device_profile?.ram_size ?? selected.microchip_phase1_ic_information?.ram_size ?? "—"}</dd></div>
+                <div><dt>RAM</dt><dd>{selected.manufacturer_device_basic_profile?.ram_size ?? selected.nxp_manufacturer_device_profile?.ram_size ?? selected.microchip_ic_information?.ram_size ?? "—"}</dd></div>
                 <div>
                   <dt>{zh ? "工作 VDD" : "Operating VDD"}</dt>
                   <dd>{selected.manufacturer_device_basic_profile
                     ? voltageRange(selected.manufacturer_device_basic_profile.operating_vdd_v)
-                    : selected.microchip_phase1_ic_information
+                    : selected.microchip_ic_information
                         ? (zh ? "PARTIAL（家族資料，未確認料號工作電壓）" : "PARTIAL (family only; exact working voltage unknown)")
                         : voltageRange(selected.nxp_manufacturer_device_profile?.operating_vdd_v ?? undefined)}</dd>
                 </div>
@@ -392,7 +392,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     ? voltageRange(selected.manufacturer_device_basic_profile.io_supply_v)
                     : selected.nxp_manufacturer_device_profile
                       ? (zh ? "未有個別原廠證據" : "Not independently sourced")
-                      : selected.microchip_phase1_ic_information
+                      : selected.microchip_ic_information
                         ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
                         : "—"}</dd>
                 </div>
@@ -402,7 +402,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     ? voltageRange(selected.manufacturer_device_basic_profile.vdda_v)
                     : selected.nxp_manufacturer_device_profile
                       ? (zh ? "未有個別原廠證據" : "Not independently sourced")
-                      : selected.microchip_phase1_ic_information
+                      : selected.microchip_ic_information
                         ? (zh ? "UNKNOWN（無獨立原廠證據）" : "UNKNOWN (no independent manufacturer evidence)")
                         : "—"}</dd>
                 </div>
@@ -414,9 +414,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       ? `${selected.nxp_manufacturer_device_profile.operating_temperature_c.min}–${selected.nxp_manufacturer_device_profile.operating_temperature_c.max} °C`
                       : (selected.temperature_grade ?? "—")}</dd>
                 </div>
-                {selected.microchip_phase1_ic_information && (
+                {selected.microchip_ic_information && (
                   <>
-                    <div><dt>Core Model</dt><dd>{selected.microchip_phase1_ic_information.core_model}</dd></div>
+                    <div><dt>Core Model</dt><dd>{selected.microchip_ic_information.core_model}</dd></div>
                     <div><dt>Phase 1 Evidence</dt><dd>IDENTIFIED · INFORMATION_COMPLETE: NO · DS60001513G p.14 / p.16</dd></div>
                     <div><dt>Phase 2 Programming</dt><dd>UNKNOWN · {zh ? "未驗證軟體燒錄資格" : "Not software-qualified"}</dd></div>
                     <div><dt>Phase 3 Compatibility</dt><dd>NOT_TESTED · {zh ? "未通過 PLASMA 實機配置測試" : "No validated PLASMA hardware configuration"}</dd></div>
