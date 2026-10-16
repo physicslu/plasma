@@ -6,7 +6,7 @@ on:
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "software/python/plasma_interfaces/linux_mmio.py"
       - "pl/hil/swd04/native_qualify.py"
-      - "pl/tests/test_mmio_z2_qualification.py"
+      - "software/python/tests/test_mmio_z2_qualification.py"
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
@@ -18,7 +18,7 @@ on:
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "software/python/plasma_interfaces/linux_mmio.py"
       - "pl/hil/swd04/native_qualify.py"
-      - "pl/tests/test_mmio_z2_qualification.py"
+      - "software/python/tests/test_mmio_z2_qualification.py"
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
@@ -48,7 +48,7 @@ jobs:
           python3 -m pl.hil.swd04.native_qualify --help
       - name: SWD-05, native MMIO and supervised Z2 qualification (host only)
         run: |
-          python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py pl/tests/test_mmio_z2_qualification.py
+          python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py software/python/tests/test_mmio_z2_qualification.py
       - name: Explicit acceptance boundary
         run: |
           echo "SWD05_HOST_MMIO_AND_Z2_GATE_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
