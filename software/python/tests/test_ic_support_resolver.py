@@ -41,9 +41,15 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(c8.profile("package_hardware").profile_id, cb.profile("package_hardware").profile_id)
         self.assertEqual(
             c8.profile("package_hardware").profile_id,
+            "stm32f103-lqfp48-debug-v0",
+        )
+        self.assertIsNotNone(c8.socket_programming_hardware_profile)
+        assert c8.socket_programming_hardware_profile is not None
+        self.assertEqual(
+            c8.socket_programming_hardware_profile.profile_id,
             "stm32f103-lqfp48-programming-hardware-v1",
         )
-        hardware = c8.profile("package_hardware").data
+        hardware = c8.socket_programming_hardware_profile.data
         self.assertEqual(hardware["programming_interface"]["swd"]["swdio"]["package_pin"], 34)
         self.assertEqual(hardware["programming_interface"]["swd"]["swclk"]["package_pin"], 37)
         self.assertEqual(hardware["reset"]["package_pin"], 7)
@@ -76,6 +82,10 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(selected_hw["data"]["minimum_swd_programming_contacts"][5]["signal"], "SWDIO")
         self.assertTrue(selected_hw["data"]["design_boundary"]["socket_design_input_ready"])
         self.assertFalse(selected_hw["data"]["design_boundary"]["execution_authorized"])
+        self.assertEqual(
+            selected["ic_support"]["socket_design"]["contract_id"],
+            "stm32f103c8t6-lqfp48-swd-socket-design-v1",
+        )
 
     def test_runtime_payload_separates_profile_resolution_from_backend_implementation(self) -> None:
         payload = ICSupportResolver.from_root(IC_SUPPORT_ROOT).require_exact(
