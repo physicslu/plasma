@@ -329,6 +329,8 @@ def execute() -> int:
     except ValueError:
         results["ssh"] = "BLOCKED_PRIVATE_CREDENTIAL_OR_HOST_KEY"
         results["uart"] = "BLOCKED_PRIVATE_CREDENTIAL"
+        print("[SSH] " + results["ssh"], flush=True)
+        print("[UART] " + results["uart"], flush=True)
     else:
         print("[SSH] Password authentication / read-only id: starting", flush=True)
         results["ssh"] = ssh_login(record)
@@ -348,7 +350,8 @@ def self_test() -> None:
     assert DEVICE_ID == ("0403", "6010")
     assert LOGIN == "xilinx"
     assert LOGIN == "xilinx" and SSH_MARK.endswith("=")
-    assert "ssh-keygen" in creds.__code__.co_consts or KNOWN_HOSTS.name.endswith("known_hosts")
+    assert FILE.name == "z2-login-smoke.json"
+    assert KNOWN_HOSTS.name == "z2-login-known_hosts"
     assert uart_candidates(root=Path("/this-path-does-not-exist")) == []
     print("Z2 login smoke offline self-test PASS")
 
