@@ -31,6 +31,7 @@ class RouteEvidence:
     route_source_blob: str
     applicability_source: str
     applicability: str
+    route_source_sha256: str = ""  # Official non-Git programming documents
 
 
 class AdmittedRouteCandidateRegistry:
@@ -60,23 +61,43 @@ class AdmittedRouteCandidateRegistry:
             self._require(_SHA256.fullmatch(item.identity_sha256) is not None, "invalid identity source digest")
             self._require(bool(item.provider_id.strip()) and bool(item.provider_version.strip()),
                           "missing provider identity/version")
-            self._require(_SHA1.fullmatch(item.provider_source_commit) is not None,
-                          "provider source commit not locked")
+            if item.route_kind == "OFFICIAL_PATH":
+                self._require(not item.provider_source_commit or
+                              _SHA1.fullmatch(item.provider_source_commit) is not None,
+                              "invalid optional provider commit")
+            else:
+                self._require(_SHA1.fullmatch(item.provider_source_commit) is not None,
+                              "provider source commit not locked")
             self._require(item.route_kind in {"TARGET", "DRIVER", "ALGORITHM", "ROM_IAP", "OFFICIAL_PATH"},
                           "unrecognized route kind")
-            self._require(bool(item.route_source_path.strip()) and
-                          _SHA1.fullmatch(item.route_source_blob) is not None,
-                          "route source path/blob must be immutable")
+            if item.route_kind == "OFFICIAL_PATH":
+                self._require(item.route_source_path.startswith("https://")
+                              and _SHA256.fullmatch(item.route_source_sha256) is not None
+                              and not item.route_source_blob,
+                              "official route must have immutable HTTPS/document SHA-256 evidence")
+            else:
+                self._require(bool(item.route_source_path.strip()) and
+                              _SHA1.fullmatch(item.route_source_blob) is not None
+                              and not item.route_source_sha256,
+                              "Git route source path/blob must be immutable")
             self._require(item.applicability in {"EXACT_ICPN", "VERIFIED_BASE_DEVICE", "VERIFIED_FAMILY"},
                           "route applicability has not been validated")
             self._require(bool(item.applicability_source.strip()), "missing applicability provenance")
+            if catalog.status == "production":
+                self._require(isinstance(row.source_reference, str)
+                              and item.identity_sha256 in row.source_reference
+                              and f"basePartNumber={item.base_device}" in row.source_reference
+                              and bool(row.source_authority),
+                              "production route identity provenance not bound to canonical row")
             self._by_key[key] = {
                 "status": "research_only",
                 "family": row.family,
                 "provider_id": item.provider_id,
                 "source_commit": item.provider_source_commit,
                 "target_config_source_path": item.route_source_path,
-                "target_config_git_blob": item.route_source_blob,
+                "target_config_git_blob": item.route_source_blob or None,
+                "route_source_sha256": item.route_source_sha256 or None,
+                "route_source_url": item.route_source_path if item.route_kind == "OFFICIAL_PATH" else None,
                 "route_kind": item.route_kind,
                 "applicability": item.applicability,
                 "applicability_source": item.applicability_source,
