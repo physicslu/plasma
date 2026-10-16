@@ -57,7 +57,7 @@ def _require(ok: bool, reason: str) -> None:
 
 def _read_locked(root: Path, rel: str) -> bytes:
     raw = (root / rel).read_bytes()
-    blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+    blob = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + bytes((0,)) + raw).hexdigest()
     _require(blob == BLOBS[rel], "evidence Git blob mismatch: " + rel)
     return raw
 
