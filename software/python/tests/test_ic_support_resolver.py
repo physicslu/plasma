@@ -55,7 +55,9 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(hardware["reset"]["package_pin"], 7)
         self.assertEqual(hardware["power"]["required_supply_pins"], [24, 36, 48])
         self.assertEqual(hardware["power"]["required_ground_pins"], [23, 35, 47])
-        self.assertTrue(hardware["design_boundary"]["socket_design_input_ready"])
+        self.assertTrue(hardware["design_boundary"]["socket_interface_design_input_ready"])
+        self.assertFalse(hardware["design_boundary"]["pcb_footprint_design_input_ready"])
+        self.assertFalse(hardware["design_boundary"]["socket_implementation_ready"])
         self.assertFalse(hardware["design_boundary"]["hardware_runtime_ready"])
         self.assertFalse(hardware["design_boundary"]["physical_programming_qualified"])
         self.assertNotEqual(
@@ -79,8 +81,15 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
         selected_hw = selected["ic_support"]["programming_hardware"]
         self.assertEqual(selected_hw["profile_id"], "stm32f103-lqfp48-programming-hardware-v1")
-        self.assertEqual(selected_hw["data"]["minimum_swd_programming_contacts"][5]["signal"], "SWDIO")
-        self.assertTrue(selected_hw["data"]["design_boundary"]["socket_design_input_ready"])
+        contact_map = {
+            item["signal"]: item["package_pin"]
+            for item in selected_hw["data"]["minimum_swd_programming_contacts"]
+        }
+        self.assertEqual(contact_map["VBAT"], 1)
+        self.assertEqual(contact_map["SWDIO"], 34)
+        self.assertEqual(contact_map["SWCLK"], 37)
+        self.assertTrue(selected_hw["data"]["design_boundary"]["socket_interface_design_input_ready"])
+        self.assertFalse(selected_hw["data"]["design_boundary"]["pcb_footprint_design_input_ready"])
         self.assertFalse(selected_hw["data"]["design_boundary"]["execution_authorized"])
         self.assertEqual(
             selected["ic_support"]["socket_design"]["contract_id"],
