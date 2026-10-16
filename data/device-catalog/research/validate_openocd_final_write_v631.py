@@ -109,8 +109,8 @@ def validate()->dict:
     # from the in-memory replay. Never rewrite the historical receipt.
     live_manifest=json.loads(MANIFEST.read_bytes())
     live_sources=live_manifest["sources"]
-    req(len(live_sources)==32 and sum(int(s["row_count"]) for s in live_sources)==4975,
-        "current Production scope must remain ST 4629 + NXP 224 + Microchip 122")
+    req(len(live_sources)==33 and sum(int(s["row_count"]) for s in live_sources)==4983,
+        "current Production scope must remain ST 4629 + NXP 232 + Microchip 122")
     req(live_sources[-1]=={
         "manufacturer":"Microchip","family":"SAML1X",
         "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
@@ -129,6 +129,13 @@ def validate()->dict:
         {"manufacturer": "NXP","family": "MCX","path": "../research/nxp-mcx-196-commercial-v5.csv","row_count": 196,"git_blob_sha": "688ce427e2b7cf0189d7216884d897734aba49e0","sha256": "0a8986096b8c2c1db4b731c07d4ea4aee313505dd480f7fcda4a73dca8ba6639"},
         {"manufacturer": "NXP","family": "K32L2","path": "../research/nxp-k32l2-16-commercial-v5.csv","row_count": 16,"git_blob_sha": "6413149e6be0e9af504b644ccceb030d4d851582","sha256": "0228c6a077ea02d868ca53c6f82a8df81cf96d6f6306724852c3614b0b9727e5"},
     ],"unexpected new NXP source/identity scope in historical ST replay")
+    req(live_sources[31]=={
+        "manufacturer":"NXP","family":"LPC11U6X",
+        "path":"../research/nxp-lpc11u6x-8-commercial-l1-v1.csv",
+        "row_count":8,
+        "git_blob_sha":"7eb882262d6f907022d3aaa4e5bd8c656f641a54",
+        "sha256":"39cf41e7bf67ee076c19ad53c388c3d9b61b556767c1a7b8ec9420cc1542ad77",
+    }, "unreviewed LPC11U6X admission in historical ST replay")
     manifest=deepcopy(live_manifest)
     manifest["sources"]=live_sources[:28]
     manifest_raw=(json.dumps(manifest,indent=2)+"\n").encode("utf-8")

@@ -114,14 +114,16 @@ class BackendCandidateRegistry:
             (not nxp and catalog.size == 4629) or
             (catalog.size == 4641 and len(nxp) == 12 and
              all(r.family == "KL25" and r.production_admitted for r in nxp)) or
-            (catalog.size == 4853 + microchip and len(nxp) == 224 and
+            (catalog.size == 4861 + microchip and len(nxp) == 232 and
              Counter((r.family,r.mapping_status) for r in nxp) == {
                  ("KL25","mapped"):12,
                  ("MCX","no_mapping"):196,
                  ("K32L2","no_mapping"):16,
+                 ("LPC11U6X","mapped"):8,
              } and
              all(r.production_admitted and
-                 (r.target_config if r.family=="KL25" else not r.target_config)
+                 (r.target_config == ("tcl/target/kl25.cfg" if r.family=="KL25" else "tcl/target/lpc11xx.cfg")
+                  if r.family in {"KL25","LPC11U6X"} else not r.target_config)
                  for r in nxp)),
             "unexpected Production Catalog size or unreviewed NXP family",
         )
