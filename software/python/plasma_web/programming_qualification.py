@@ -54,9 +54,13 @@ class ProgrammingQualificationRegistry:
         self._catalog = catalog
         self._providers = providers
         self._candidate_registry = candidate_registry
-        self._identity_by_key = {
+        self._record_by_key = {
             (row.vendor.casefold(), row.identifier.casefold()): row
             for row in catalog.records
+        }
+        self._identity_by_key = {
+            key: row
+            for key, row in self._record_by_key.items()
             if row.identity_state == IDENTIFIED
         }
 
@@ -65,7 +69,8 @@ class ProgrammingQualificationRegistry:
             for key in provider.reviewed_exact_keys:
                 _require(key not in seen, f"multiple providers claim the same reviewed exact ICPN: {key}")
                 seen.add(key)
-                row = self._identity_record(key[0], key[1])
+                normalized_key = (key[0].strip().casefold(), key[1].strip().casefold())
+                row = self._record_by_key.get(normalized_key)
                 _require(row is not None, f"reviewed exact ICPN missing from canonical identity store: {key}")
                 _require(
                     row.identity_state == IDENTIFIED,
