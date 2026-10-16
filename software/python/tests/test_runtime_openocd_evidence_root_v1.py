@@ -30,6 +30,7 @@ from plasma_web.runtime_evidence_root import (
     default_runtime_evidence_root,
     source_files_available,
 )
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 REPO = Path(__file__).resolve().parents[3]
 EXPECTED_PROVIDERS = {
@@ -63,9 +64,15 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
         ):
             with self.subTest(part=exact):
                 search = _device_search_payload(exact, limit=1)
-                self.assertEqual(search["catalog_size"], 4975)
+                expected_size = sum(
+                    get_default_programming_qualification_registry().summary["catalog_level_counts"][str(level)]
+                    for level in (1, 2, 3)
+                )
+                self.assertEqual(search["catalog_size"], expected_size)
                 self.assertEqual(search["count"], 1)
                 row = search["results"][0]
+                self.assertEqual(row["catalog_level"], 1)
+                self.assertFalse(row["job_selectable"])
                 self.assertEqual(row["icpn"], exact)
                 self.assertEqual(row["backend"]["mapping_status"], "no_mapping")
                 self.assertEqual(row["backend_candidate"]["provider_id"], provider_id)
@@ -79,8 +86,14 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
                     self.assertFalse(provider["production_write_authorized"])
                     self.assertIsNone(provider["installed_binary_sha256"])
                 self.assertEqual(row["physical_validation"]["socket_status"], "no_evidence")
-        nxp = _device_search_payload("NXP", limit=1)
-        self.assertEqual(nxp["total_count"], 224)
+        nxp = _device_search_payload("NXP", limit=100)
+        self.assertEqual(nxp["total_count"], 12)
+        self.assertTrue(all(
+            row["family"] == "KL25"
+            and row["catalog_level"] == 1
+            and row["job_selectable"] is False
+            for row in nxp["results"]
+        ))
 
     def test_explicit_empty_and_partially_missing_roots_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -134,7 +147,9 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
         self.assertIn("get_default_openocd_provider_registry()", script)
         self.assertIn("STM32H503CBT6", script)
         self.assertIn("STM32C531CBT6", script)
-        self.assertIn('if nxp_search.get("total_count", 0) < 1', script)
+        self.assertIn("MKL25Z128VFM4&levels=1", script)
+        self.assertIn("internal-only NXP L0 leaked into public IC Selector", script)
+        self.assertIn("get_default_nxp_manufacturer_device_evidence", script)
 
 
 if __name__ == "__main__":
