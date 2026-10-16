@@ -35,5 +35,7 @@ foreach violation [get_drc_violations -quiet] {
         error "Blocking MS01 DRC: $violation"
     }
 }
+puts "LT02_IMPLEMENTED_TIMING_PASS setup=$setup_slack hold=$hold_slack"
 puts "MS01_IMPLEMENTED_TIMING_PASS setup=$setup_slack hold=$hold_slack"
+puts "LT02_BITSTREAM_BUILD_PASS"
 puts "MS01_BITSTREAM_BUILD_PASS"
