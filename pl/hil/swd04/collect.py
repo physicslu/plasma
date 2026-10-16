@@ -40,9 +40,12 @@ def _text(path: Path) -> str:
 def collect(*, sysroot: Path, device_tree: Path, clock_summary: Path,
             metadata_path: Path,
             service_status, architecture: str,
-            pynq_version: str) -> dict[str, object]:
+            pynq_version: str, board_identity_check=None) -> dict[str, object]:
+    # Existing SWD-04 callers retain the original strict model behavior. Only
+    # explicit PSPL-02 callers opt into their separately verified identity policy.
     manager = _text(sysroot / "class/fpga_manager/fpga0/state")
-    model = _text(device_tree / "model")
+    identity = board_identity_check() if board_identity_check is not None else None
+    model = _text(device_tree / "model") if board_identity_check is None else None
     clock = fclk0_from_summary(clock_summary.read_text())
     uios = []
     for entry in sorted((sysroot / "class/uio").glob("uio[0-9]*")):
@@ -57,7 +60,7 @@ def collect(*, sysroot: Path, device_tree: Path, clock_summary: Path,
             "address": f"0x{addr:08X}",
             "size": f"0x{size:08X}",
         })
-    return {
+    result = {
         "architecture": architecture,
         "pynq_version": pynq_version,
         "fpga_manager_state": manager,
@@ -65,12 +68,16 @@ def collect(*, sysroot: Path, device_tree: Path, clock_summary: Path,
         "metadata_sha256": sha256_file(metadata_path),
         "sysfs_read_only": True,
         "device_model_confirmed": (
-            "pynq-z2" in model.lower() or "pynq z2" in model.lower()
+            ("pynq-z2" in model.lower() or "pynq z2" in model.lower())
+            if board_identity_check is None else identity.get("board") == "PYNQ-Z2"
         ),
         "services": {name: service_status(name) for name in REQUIRED_SERVICES},
         "uio": uios,
         "pl_consumer_exclusivity": "UNVERIFIED_REQUIRES_OPERATOR_ATTESTATION",
     }
+    if board_identity_check is not None:
+        result["board_identity"] = identity
+    return result
 
 
 def systemctl_status(name: str) -> str:
