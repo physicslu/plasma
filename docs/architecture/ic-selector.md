@@ -1,11 +1,16 @@
 # IC Selector Architecture
 
-Status: current ADR-0002 IC Selector runtime contract
+Status: current runtime plus accepted ADR-0002 Catalog Level migration target
 
-> **ADR-0002 policy (2026-10-15):** Phase 1 `IDENTIFIED` Exact ICPN is the
-> Selector visibility boundary. Phase 2 Programming and Phase 3 PLASMA
-> Compatibility are independent displayed states and never act as visibility
-> filters. Selector visibility does not authorize Job/Batch execution.
+> **ADR-0002 policy (2026-10-16):** Catalog Level 1 `IDENTIFIED` Exact ICPNs
+> belong to the Canonical Device Registry. Only Catalog Level 2
+> `PROGRAMMABLE` ICPNs belong to the Programming Catalog / general IC Selector.
+> Catalog Level 3 `PLASMA_VERIFIED` is an additive verified-configuration
+> status. Selector visibility never authorizes Job/Batch execution.
+>
+> **Migration gap:** the current runtime `GET /api/devices/search` still reflects
+> the earlier Production Catalog projection and may expose Level 1-only rows.
+> This document does not claim that the runtime split is already complete.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
@@ -17,17 +22,20 @@ IC Selector is a shared Plasma capability for finding and inspecting IC catalog 
 The same catalog and search semantics serve three contexts:
 
 ```text
-Device Catalog
+Canonical Device Registry (Level 1+)
     |
-IC Search Service
+Canonical Catalog Service
+    +-- Engineering Device Registry lookup
+    |
+Programming Catalog projection (Level 2+)
     |
 IC Selector
-    +-- standalone lookup (/devices)
+    +-- standalone programming lookup (/devices after migration)
     +-- Production Mode picker
     +-- Engineering Mode picker
 ```
 
-The Selector answers **which IC record did the user mean?** Product-mode policy separately answers **may this configuration execute in this mode?**
+The Device Registry answers **which exact IC identity exists in PLASMA?** The IC Selector answers **which programming-qualified IC may the user choose?** Product-mode policy separately answers **may this exact runtime/hardware configuration execute now?**
 
 ## Product-mode boundary
 
@@ -42,7 +50,7 @@ Production and Engineering workflows reuse the same `ICSelector` component in pi
 
 ## Canonical source and runtime service
 
-Phase 1 loads the checked-in canonical research snapshot:
+The legacy current runtime loads the checked-in canonical research snapshot:
 
 ```text
 data/device-catalog/research/openocd-parts-canonical.csv
@@ -62,7 +70,9 @@ Search responses also distinguish pagination from filtered cardinality:
 - `total_count` = number of admitted rows matching the query before pagination;
 - `offset` = zero-based position of the first requested row in the deterministic ranked result set;
 - `limit` = maximum rows requested for this page;
-- `catalog_size` = total number of admitted rows in the Production Catalog.
+- `catalog_size` = total rows in the current legacy Production Catalog projection.
+
+Under the accepted Catalog Level target, Registry totals (Level 1+) and Programming Catalog / Selector totals (Level 2+) are separate denominators and must not be reported as one number.
 
 The browser must present the visible range and total matches separately, for example `1–30 / 1,400`, and provide explicit previous/next navigation when `total_count > limit`. Changing the query resets `offset=0`; changing pages clears a prior selection so the detail panel never implies that an off-page row is still selected. The ranked ordering contract is stable across pages, so repeated `query + offset + limit` requests must return the same identifiers while the underlying catalog revision is unchanged.
 
@@ -72,7 +82,7 @@ The research CSV is an import/source artifact, not a permanent storage contract.
 
 `ICPN` means **IC Part Number**.
 
-The source column historically named `part_number` contains identifiers at different granularities, so Phase 1 normalizes it as:
+The source column historically named `part_number` contains identifiers at different granularities, so the current normalization layer represents it as:
 
 ```text
 identifier
@@ -102,7 +112,7 @@ Search is case-insensitive and ranks identifier matches in this order:
 
 Within the same match rank, exact manufacturer part numbers receive priority over broader identifier kinds.
 
-Phase 1 deliberately searches the normalized identifier field first. Vendor/family filters and broader fuzzy search can be added later without changing the exact/prefix/partial precedence.
+The current search implementation deliberately searches the normalized identifier field first. Vendor/family filters and broader fuzzy search can be added later without changing the exact/prefix/partial precedence.
 
 ## Evidence and status boundary
 
@@ -119,10 +129,10 @@ rejected
 
 The Production exact-ICPN UI uses **three display states within the existing OpenOCD Tag** (not a fifth Tag): `mapped` (green) when the Production Catalog backend says `mapped`; `candidate` (amber) only when Production remains `no_mapping` and independent, immutable, source-locked `backend_candidate` research evidence exists; `no_mapping` (neutral) otherwise. A source candidate is never an executable programming route; `backend.mapping_status` and `backend.target_config` remain the server's authority. The other three Tags (PPU, Socket, manufacturer part) are unaffected and never infer real hardware validation. Candidate evidence is optional in slim PPU bundles; missing evidence displays `no_mapping` without breaking catalog searches.
 
-ADR-0002 Phase 2 Programming adds a separate **Software Qualification** badge. It is not a
+ADR-0002 Catalog Level 2 derives `PROGRAMMABLE` from the vendor-neutral **Programming Qualification** contract. It is not a
 replacement for the OpenOCD CFG tag: `CFG mapped` answers whether a Catalog route exists,
-while `SUPPORTED / CANDIDATE / UNKNOWN / UNSUPPORTED` answers whether that exact ICPN has
-completed the version-locked OpenOCD software qualification transaction. In particular,
+while `SUPPORTED / CANDIDATE / UNKNOWN / BLOCKED / UNSUPPORTED` is detailed
+Programming Qualification state. Only `SUPPORTED` derives Catalog Level 2 `PROGRAMMABLE`. In particular,
 a mapped CFG with an unreviewed exact ICPN must render `Software · UNKNOWN`, never
 `SUPPORTED`.
 
@@ -141,13 +151,13 @@ The new optional backend_providers array allows the detail panel to list indepen
 This UI evidence is read-only metadata and must not be copied into Job/Batch, resolver or execution admission. Future multi-provider support must preserve independent source, runtime and per-configuration qualification identities.
 
 
-PPU and Socket verification require physical evidence for a specific Programming Configuration. The current canonical research catalog does not contain that evidence, so Phase 1 returns and displays `no_evidence` for both instead of inferring support from OpenOCD data.
+PPU and Socket verification require physical evidence for a specific Programming Configuration. The current catalog does not contain that evidence, so the runtime returns and displays `no_evidence` for both instead of inferring Catalog Level 3 from Programming Provider data.
 
 A future physical validation record binds at least the relevant device/ICPN, package, programming interface/profile, PPU model and hardware revision, Site interface, Socket model/revision, voltage/settings, software and algorithm revisions.
 
 ## Package boundary
 
-Package is part of the target domain model because Socket compatibility depends on it. The current canonical research snapshot does not reliably provide package data. Phase 1 therefore exposes `package = null` rather than deriving package from an ICPN suffix heuristically.
+Package is part of the target domain model because Socket compatibility depends on it. The current canonical research snapshot does not reliably provide package data. The runtime therefore exposes `package = null` rather than deriving package from an ICPN suffix heuristically.
 
 Package enrichment is a separate authoritative-data task.
 
@@ -158,11 +168,12 @@ The same search result can carry three independent additive projections:
 - `manufacturer_device_basic_profile` — operator-facing Basic Device information.
 - `selected_profile` — deeper manufacturer/programming composition, only where the
   Programming Profile evidence chain exists.
-- `programming_qualification` — vendor-neutral ADR-0002 Phase 2 exact-ICPN
-  qualification. Provider-specific evidence (currently OpenOCD for the qualified ST
+- `programming_qualification` — vendor-neutral ADR-0002 Programming Qualification
+  for deriving Catalog Level 2. Provider-specific evidence (currently OpenOCD for the qualified ST
   cohort) is normalized behind this payload. It may be `SUPPORTED` even when
   `selected_profile` is absent, because Phase 2 binds the reviewed Programming Profile
-  and exact geometry independently from the legacy deep-detail projection.
+  and exact geometry independently from the legacy deep-detail projection. `SUPPORTED`
+  derives Catalog Level 2 `PROGRAMMABLE`; other states remain Level 1-only.
 
 For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
@@ -185,11 +196,11 @@ for execution-oriented research.
 
 The browser presents three primary information layers:
 
-1. IC Information — the Basic Device Profile above.
-2. Programming — Phase 2 software qualification state first, then qualified
-   Provider/operations/electrical/Flash geometry, with deeper manufacturer interface/pin
-   and programming-flow detail where `selected_profile` exists.
-3. PLASMA Compatibility — Site/Socket/electrical/hardware/physical qualification state.
+1. IC Information — Catalog Level 1 identity and information quality.
+2. Programming — detailed Programming Qualification; `SUPPORTED` derives Catalog Level 2
+   `PROGRAMMABLE`, followed by Provider/operations/electrical/Flash geometry.
+3. PLASMA Compatibility — verified configuration evidence; HIL `PASSED` on at least one
+   qualified configuration derives Catalog Level 3 `PLASMA_VERIFIED`.
 
 A Basic Device Profile does **not** imply Programming Profile authority. Thus an STM32F1,
 STM32C0, STM32G0, or STM32G4 target may have `manufacturer_device_basic_profile != null` while
@@ -221,13 +232,13 @@ picker
 
 `lookup` is the standalone `/devices` experience.
 
-`picker` exposes the same search/results/evidence presentation and an `onSelect` callback for Production or Engineering workflows. Mode-specific eligibility must be evaluated by the calling workflow/policy layer, not by hiding catalog records in the shared Selector.
+`picker` exposes the same search/results/evidence presentation and an `onSelect` callback for Production or Engineering workflows. The shared Selector itself is a Level 2+ Programming Catalog projection. Mode-specific execution eligibility is still evaluated by the calling workflow/policy layer and must not be inferred from Selector membership.
 
-## Phase 1 non-goals
+## Catalog Level migration non-goals
 
-Phase 1 does not:
+This migration does not:
 
-- claim that all 7,657 canonical identifiers are exact ICPNs;
+- promote Research identifiers or Level 1-only identities into Level 2;
 - create PPU or Socket verification evidence;
 - infer package from naming conventions;
 - make the IC Selector a Product Mode;
