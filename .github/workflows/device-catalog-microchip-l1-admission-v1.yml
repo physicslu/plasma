@@ -66,6 +66,26 @@ jobs:
                      and r["job_selectable"] is False
                      and r["execution_authorized"] is False for r in q["rows"])
           PY
+      - name: Confirm tampered manufacturer replay is rejected
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          original = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/microchip-full-reverse.json"
+          tampered = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/tampered.json"
+          data = original.read_bytes()
+          assert b'"manufacturer": "Microchip"' in data
+          tampered.write_bytes(data.replace(b'"manufacturer": "Microchip"',
+                                            b'"manufacturer": "Micr0chip"', 1))
+          PY
+          if python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/tampered.json" \
+            --output "${{ runner.temp }}/microchip-l1/tampered-review.json"; then
+            echo "ERROR: tampered source report unexpectedly accepted" >&2
+            exit 1
+          fi
+          test ! -e "${{ runner.temp }}/microchip-l1/tampered-review.json"
       - name: Upload research-only review ledger
         uses: actions/upload-artifact@v4
         with:
