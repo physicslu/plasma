@@ -39,6 +39,19 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(c8.profile("option").profile_id, cb.profile("option").profile_id)
         self.assertEqual(c8.profile("security").profile_id, cb.profile("security").profile_id)
         self.assertEqual(c8.profile("package_hardware").profile_id, cb.profile("package_hardware").profile_id)
+        self.assertEqual(
+            c8.profile("package_hardware").profile_id,
+            "stm32f103-lqfp48-programming-hardware-v1",
+        )
+        hardware = c8.profile("package_hardware").data
+        self.assertEqual(hardware["programming_interface"]["swd"]["swdio"]["package_pin"], 34)
+        self.assertEqual(hardware["programming_interface"]["swd"]["swclk"]["package_pin"], 37)
+        self.assertEqual(hardware["reset"]["package_pin"], 7)
+        self.assertEqual(hardware["power"]["required_supply_pins"], [24, 36, 48])
+        self.assertEqual(hardware["power"]["required_ground_pins"], [23, 35, 47])
+        self.assertTrue(hardware["design_boundary"]["socket_design_input_ready"])
+        self.assertFalse(hardware["design_boundary"]["hardware_runtime_ready"])
+        self.assertFalse(hardware["design_boundary"]["physical_programming_qualified"])
         self.assertNotEqual(
             c8.memory_geometry_profile.profile_id,
             cb.memory_geometry_profile.profile_id,
@@ -58,6 +71,11 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertIsNone(selected["programming"]["interfaces"]["SWD"]["clock_hz"]["manufacturer_max"])
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
+        selected_hw = selected["ic_support"]["programming_hardware"]
+        self.assertEqual(selected_hw["profile_id"], "stm32f103-lqfp48-programming-hardware-v1")
+        self.assertEqual(selected_hw["data"]["minimum_swd_programming_contacts"][5]["signal"], "SWDIO")
+        self.assertTrue(selected_hw["data"]["design_boundary"]["socket_design_input_ready"])
+        self.assertFalse(selected_hw["data"]["design_boundary"]["execution_authorized"])
 
     def test_runtime_payload_separates_profile_resolution_from_backend_implementation(self) -> None:
         payload = ICSupportResolver.from_root(IC_SUPPORT_ROOT).require_exact(
