@@ -41,7 +41,7 @@ Manufacturer-specific Research / Discovery
         ↓
 Common Phase 1 / Phase 2 / Phase 3 Qualification Gates
         ↓
-Vendor-neutral Canonical PLASMA Data Model
+Manufacturer-neutral Canonical PLASMA Data Model
         ↓
 Common Product Catalog / API / IC Selector UI
 ```
@@ -54,14 +54,14 @@ Common Product Catalog / API / IC Selector UI
 6. **Product payload 不得長期暴露 Manufacturer-specific schema。** 既有 `nxp_manufacturer_device_profile`、`microchip_phase1_ic_information`、以及將 OpenOCD provider identity 當成 Phase 2 Product schema 的歷史介面，均視為 **migration debt**。可在 migration 期間維持相容性，但不得再擴張其語意或新增同類 contract。
 7. **UI 只理解 canonical Phase contract。** IC Selector／IC Detail 可以顯示 Manufacturer 名稱與 Manufacturer-specific evidence，但不得以 ST／NXP／Microchip 分支決定 Phase semantics、Selector visibility 或 execution entitlement。
 8. **Programming Provider 與 Manufacturer 都不是 Product schema。** OpenOCD、未來 Manufacturer backend 或 PLASMA-native backend 都只能作為版本化 Phase 2 Provider；Provider-specific evidence 必須 normalize 成共用 `ProgrammingQualification`。
-9. **Migration 不得改寫已核准 evidence。** Vendor-specific historical artifact 可以保留供 forensic replay；後續 migration 只改 canonical projection／API boundary，不得因 schema normalization 自動晉升或降級任何 ICPN 的 Phase 狀態。
+9. **Migration 不得改寫已核准 evidence。** Manufacturer-specific historical artifact 可以保留供 forensic replay；後續 migration 只改 canonical projection／API boundary，不得因 schema normalization 自動晉升或降級任何 ICPN 的 Phase 狀態。
 
 **架構不變量：**
 
 ```text
 Manufacturer-specific Research
     → Common Qualification Gates
-    → Vendor-neutral Canonical Production Data
+    → Manufacturer-neutral Canonical Production Data
 
 Phase 3 PASSED ⊆ Phase 2 SUPPORTED ⊆ Phase 1 IDENTIFIED
 ```
@@ -76,7 +76,7 @@ IC Detail 的三個區塊是**不同的證據產品**，形成唯一的「原廠
 
 | Phase | UI 區塊 | 個別 Exact ICPN 的進入／完成條件 | 不得推論 |
 | --- | --- | --- | --- |
-| **Phase 1 — IC Information** | **01 IC Information** | **`IDENTIFIED`**：任何 Brand 都必須由原廠官方料號、物料或 Ordering 證據明確確認**完整商用 Exact ICPN**，並保存 Base Device／Family 與來源關係。Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等欄位可後續補強；**`INFORMATION_COMPLETE`** 是獨立的欄位品質里程碑，不是 Selector visibility 門檻。 | Phase 1 `IDENTIFIED` 允許 Catalog／IC Selector 顯示；但不代表某 CFG 適用、Phase 2 `SUPPORTED`、Job／Batch 可執行或 PPU 實機通過。 |
+| **Phase 1 — IC Information** | **01 IC Information** | **`IDENTIFIED`**：任何 Manufacturer 都必須由原廠官方料號、物料或 Ordering 證據明確確認**完整商用 Exact ICPN**，並保存 Base Device／Family 與來源關係。Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等欄位可後續補強；**`INFORMATION_COMPLETE`** 是獨立的欄位品質里程碑，不是 Selector visibility 門檻。 | Phase 1 `IDENTIFIED` 允許 Catalog／IC Selector 顯示；但不代表某 CFG 適用、Phase 2 `SUPPORTED`、Job／Batch 可執行或 PPU 實機通過。 |
 | **Phase 2 — Programming** | **02 Programming** | **Phase 1 的子集合**：對**精確 ICPN**依原廠 Programming Guide／Reference Manual／Datasheet 及鎖定版本 OpenOCD 驗證 Silicon ID/Revision、Target CFG/Include、Flash Driver、Bank/Geometry/Security 與宣告的 Erase／Program／Read／Verify 操作，完成可追溯的 Programming Profile。只有通過資格審核者為 `openocd_software_support=SUPPORTED`。 | 家族名稱、共用 Core、單獨 CFG 或 Driver 字串，都不足以取得軟體燒錄資格。 |
 | **Phase 3 — PLASMA Compatibility** | **03 PLASMA Compatibility** | **Phase 2 的子集合**：至少有一組明確版本化的 **IC／Package＋PPU／Site＋Socket／Adapter**，通過供電、Pin Mapping、SWD／JTAG、保護與實機 HIL。 | 軟體 `SUPPORTED` 不等於 HIL PASS；Catalog 可見或曾做過 HIL，也不能免除當次 Job／Batch 的安全檢查。 |
 
@@ -254,7 +254,7 @@ OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**�
 ## Migration gap and ownership
 
 - **Accepted now:** 跨 Manufacturer Phase 1／2／3 定義、Phase 1 `IDENTIFIED` Selector visibility、Phase 2／3 與 execution 的獨立 fail-closed 邊界。
-- **Not yet fully normalized:** ST／NXP／Microchip 的歷史資料仍分散於不同 artifact／resolver；後續 migration 要把它們投影成相同 Phase 欄位與 UI payload，而不是再建立 Brand-specific policy。
+- **Not yet fully normalized:** ST／NXP／Microchip 的歷史資料仍分散於不同 artifact／resolver；後續 migration 要把它們投影成相同 Phase 欄位與 UI payload，而不是再建立 Manufacturer-specific policy。
 - 現行 `docs/architecture/icpn-catalog-admission-policy.json` 的 `requires_deterministic_backend_route_or_explicit_mapping_state`，是內部 **identity admission** 契約，**不得被誤讀為 Public Catalog 可見規則**。
 - 現行 `backend.mapping_status=mapped` 主要表示確定性路由，尚不能概括為已做所有 software qualification；`no_mapping` 更不能當 Supported。Research `backend_candidate` 不可轉為可執行路由。
 - 保留既有 Production exact ICPN 資料與研究證據，不透過本 ADR 刪除或大規模匯入 Production rows。
