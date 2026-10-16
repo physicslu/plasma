@@ -7,6 +7,8 @@ on:
       - 'data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py'
       - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
       - 'software/python/plasma_web/route_evidence_admission.py'
+      - 'software/python/plasma_web/microchip_saml1x_route_evidence.py'
+      - 'software/python/tests/test_microchip_saml1x_route_evidence.py'
       - 'software/python/plasma_web/programming_qualification.py'
       - 'software/python/tests/test_route_evidence_admission.py'
       - '.github/workflows/device-catalog-microchip-l1-admission-v1.yml'
@@ -32,6 +34,8 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s software/python/tests \
             -p 'test_route_evidence_admission.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_microchip_saml1x_route_evidence.py' -v
           python -m unittest discover -s software/python/tests \
             -p 'test_catalog_promotion_framework.py' -v
           python -m unittest discover -s software/python/tests \
