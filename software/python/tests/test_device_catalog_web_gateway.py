@@ -242,15 +242,45 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(qualification["hardware_runtime_ready"])
                 self.assertFalse(qualification["physical_programming_qualified"])
 
-    def test_stm32f103_high_density_unreviewed_package_remains_unknown(self) -> None:
+    def test_stm32f103_high_density_wlcsp_package_is_l2_supported(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103RCY6TR&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
-        qualification = payload["results"][0]["programming_qualification"]
+        result = payload["results"][0]
+        self.assertEqual(result["catalog_level"], 2)
+        self.assertTrue(result["job_selectable"])
+        qualification = result["programming_qualification"]
+        self.assertEqual(qualification["state"], "SUPPORTED")
+        self.assertTrue(qualification["reviewed"])
+        self.assertEqual(
+            qualification["programming"]["programming_profile_id"],
+            "stm32f1-high-density-flash-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["memory_geometry_profile_id"],
+            "stm32f103rc-256k-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
+            256 * 1024,
+        )
+        self.assertFalse(qualification["execution_authorized"])
+        self.assertFalse(qualification["hardware_runtime_ready"])
+        self.assertFalse(qualification["physical_programming_qualified"])
+
+    def test_stm32f103_xl_density_remains_l1_unknown(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103RFT6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["catalog_level"], 1)
+        self.assertFalse(result["job_selectable"])
+        qualification = result["programming_qualification"]
         self.assertEqual(qualification["state"], "UNKNOWN")
         self.assertFalse(qualification["reviewed"])
         self.assertIsNone(qualification["provider"])
         self.assertIsNone(qualification["programming"])
+        self.assertFalse(qualification["execution_authorized"])
 
     def test_stm32f103_tr_ordering_variants_are_phase2_supported(self) -> None:
         for icpn, expected_bytes, expected_pages in (
@@ -478,7 +508,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
             _reject_unmapped_microchip_raw_job_target(other)
 
-    def test_microchip_level0_identity_is_internal_and_not_public_selector_visible(self) -> None:
+    def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
         registry = get_default_programming_qualification_registry()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
@@ -491,20 +521,30 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             with self.subTest(icpn=record.identifier):
                 qualification = registry.describe(record.vendor, record.identifier)
                 self.assertEqual(qualification["identity_state"], "IDENTIFIED")
-                self.assertEqual(qualification["catalog_level"], 0)
-                self.assertEqual(qualification["catalog_level_state"], "DISCOVERED")
-                self.assertFalse(qualification["selector_visible"])
+                self.assertEqual(qualification["catalog_level"], 1)
+                self.assertEqual(qualification["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+                self.assertEqual(qualification["state"], "CANDIDATE")
+                self.assertEqual(qualification["route_evidence"], "backend_candidate_registry")
+                self.assertTrue(qualification["selector_visible"])
                 self.assertFalse(qualification["job_selectable"])
+                self.assertFalse(qualification["execution_authorized"])
 
                 status, payload = self.request(
-                    f"/api/devices/search?q={record.identifier}&limit=5")
+                    f"/api/devices/search?q={record.identifier}&limit=20")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["scope"], "customer_ic_selector")
                 self.assertEqual(payload["levels"], [1, 2, 3])
                 self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
-                self.assertEqual(payload["total_count"], 0)
-                self.assertEqual(payload["count"], 0)
-                self.assertEqual(payload["results"], [])
+                found = [x for x in payload["results"] if x["icpn"] == record.identifier]
+                self.assertEqual(len(found), 1)
+                self.assertEqual(found[0]["catalog_level"], 1)
+                self.assertFalse(found[0]["job_selectable"])
+                self.assertEqual(found[0]["backend"]["mapping_status"], "no_mapping")
+
+                status, excluded = self.request(
+                    f"/api/devices/search?q={record.identifier}&levels=2&limit=20")
+                self.assertEqual(status, 200)
+                self.assertEqual(excluded["total_count"], 0)
 
         status, payload = self.request("/api/devices/search?q=ATSAML10E16A-MU&levels=0")
         self.assertEqual(status, 400)
