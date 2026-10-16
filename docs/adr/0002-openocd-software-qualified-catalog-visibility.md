@@ -53,7 +53,7 @@ Level 3 PLASMA_VERIFIED ⊆ Level 2 PROGRAMMABLE ⊆ Level 1 PROGRAMMING_CANDIDA
 
 **Microchip 典型案例：** 原廠已確認、但目前沒有 OpenOCD 或其他 Provider programming route 的大量 Exact ICPN 應停在 Level 0。它們保留在 Research Registry，未來有新 Provider、CFG、driver、algorithm 或官方 programming path 時可升到 Level 1；不得因「原廠料號存在」就進 IC Selector。
 
-**舊術語 migration：** 歷史 artifact、欄位名、測試名稱與檔名中的 `phase1_*`／`phase2_*`／`phase3_*` 可保留以確保 forensic replay 與相容性，但自本決議起它們是 **legacy identifiers**，不得作為新文件、API 或 domain model 的正式術語。新功能必須使用 Catalog Level 與對應 qualification contract。
+**舊術語 migration：** Active schema／API／runtime payload **不得保留** `phase1_*`／`phase2_*`／`phase3_*` 欄位，也不得提供 compatibility alias。Source-locked historical artifact 的原始 bytes、歷史檔名或內部欄位可以原樣保存作 forensic input，但 canonical parser 必須轉成 Catalog Level／Programming Qualification 欄位後才可進 Product domain。
 
 ### Cross-Manufacturer canonical production boundary（規範性）
 
@@ -76,7 +76,7 @@ Canonical Device Registry + Programming Catalog / API / IC Selector UI
 3. **通過 gate 後不得再建立 Manufacturer-specific Product schema。** Canonical identity 使用 `(manufacturer, exact_icpn)` 作為邏輯唯一鍵；所有 Manufacturer 共用相同 Catalog Level 定義、field-state、provenance、Programming Qualification 與 Compatibility contract。
 4. **Catalog Level store 可以分離，identity 必須共用。** Catalog Level 0、Catalog Level 1、Catalog Level 2、Catalog Level 3 可因 lifecycle、版本化與 evidence 特性採不同實體 Store／Repository，但必須引用同一 Canonical Identity。此 ADR 所稱「共用資料」指 **Common Canonical Data Model + Common Repository / Service Boundary**，不要求所有 evidence 塞入單一資料表。
 5. **Product API 必須是共用 contract。** Device Registry 與 Programming Catalog 可採不同 projection／endpoint，但都必須引用同一 canonical identity + Catalog Level contract；不得新增 `/api/st/*`、`/api/nxp/*`、`/api/microchip/*` 等 Manufacturer-specific Product API 來繞過共同模型。現有 `GET /api/devices/search` 的 Level 1 visibility 行為列為 migration debt。
-6. **Product payload 不得長期暴露 Manufacturer-specific schema。** 既有 `nxp_manufacturer_device_profile`、`microchip_phase1_ic_information`、以及將 OpenOCD provider identity 當成 Catalog Level 2 Product schema 的歷史介面，均視為 **migration debt**。可在 migration 期間維持相容性，但不得再擴張其語意或新增同類 contract。
+6. **Product payload 不得暴露舊 Phase schema。** `phase1_*`／`phase2_*`／`phase3_*` active 欄位與 compatibility alias 一律移除。Manufacturer-specific payload（例如既有 NXP profile）仍是後續 canonical normalization debt，但不得以 Phase 命名重新包裝。Microchip active payload改用 `microchip_ic_information`，不再提供 `microchip_phase1_ic_information`。
 7. **UI 只理解 canonical Catalog Level contract。** IC Selector／IC Detail 可以顯示 Manufacturer 名稱與 Manufacturer-specific evidence，但不得以 ST／NXP／Microchip 分支決定 Catalog Level semantics、Selector visibility 或 execution entitlement。
 8. **Programming Provider 與 Manufacturer 都不是 Product schema。** OpenOCD、未來 Manufacturer backend 或 PLASMA-native backend 都只能作為版本化 Catalog Level 2 Provider；Provider-specific evidence 必須 normalize 成共用 `ProgrammingQualification`。
 9. **Migration 不得改寫已核准 evidence。** Manufacturer-specific historical artifact 可以保留供 forensic replay；後續 migration 只改 canonical projection／API boundary，不得因 schema normalization 自動晉升或降級任何 ICPN 的 Catalog Level 狀態。
@@ -280,9 +280,9 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 
 ## Migration gap and ownership
 
-- **Accepted now:** 跨 Manufacturer Catalog Level 1／2／3 定義、Level 1 Device Registry／Level 2 Programming Catalog & IC Selector 邊界、以及 Catalog Level 與 execution entitlement 的獨立 fail-closed 邊界。
+- **Accepted now:** 跨 Manufacturer Catalog Level 0／1／2／3 定義、Level 0 Research Registry／Level 1 Programming Candidate／Level 2 Programming Catalog & IC Selector／Level 3 PLASMA Verified 邊界，以及 Catalog Level 與 execution entitlement 的獨立 fail-closed 邊界。
 - **Migration debt — current Selector behavior:** 現有 `GET /api/devices/search`／IC Selector 仍可能包含只應屬 Level 0／1 的既有 Production rows。這是 2026-10-15 舊 visibility policy 的相容性遺留；後續 migration 必須拆出 Level 0/1 Research/Engineering Registry projection 與 Level 2 Programming Catalog projection，**不得刪除 Level 0 identity evidence**。
-- **Migration debt — legacy naming:** 現有 `phase1_*`／`phase2_*`／`phase3_*` API、artifact、測試與檔名暫時保留；新 domain/API contract 不得再新增 Phase 命名。
+- **Migration rule — no active Phase fields:** active API／runtime／canonical output 不得出現 `phase1_*`／`phase2_*`／`phase3_*` 欄位；不提供 alias。只有 immutable/source-locked historical evidence 可原樣保留舊欄位作 input，且不得直接投影到 Product payload。
 - **Not yet fully normalized:** ST／NXP／Microchip 的歷史資料仍分散於不同 artifact／resolver；後續 migration 要把它們投影成相同 Catalog Level／qualification 欄位與 UI payload，而不是再建立 Manufacturer-specific policy。
 - 現行 `docs/architecture/icpn-catalog-admission-policy.json` 的 `requires_deterministic_backend_route_or_explicit_mapping_state`，是內部 **identity admission** 契約，**不得被誤讀為 Public Catalog 可見規則**。
 - 現行 `backend.mapping_status=mapped` 主要表示確定性路由，尚不能概括為已做所有 software qualification；`no_mapping` 更不能當 Supported。Research `backend_candidate` 不可轉為可執行路由。
@@ -294,10 +294,10 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 **後續實作 PR 必須新增的 Catalog Level Funnel 契約測試：**
 
 - 一份 OpenOCD CFG 可反查原廠家族內多個官方完整商用封裝／Ordering Variant；每筆原廠個別證實者可獨立成為 Catalog Level 0 `DISCOVERED`，不需每筆各有 CFG；**臆造後綴、只有 Product Title 的 Active** 都不得計入。
-- 分別報告 Catalog Level 0 `DISCOVERED`、Catalog Level 1 `INFORMATION_COMPLETE`、原檔已封存與僅觀察到原廠網頁的比例，以及逐欄位證據狀態；缺失的 VDDA 或原始 Binary 不得假裝 `VERIFIED`。
-- Catalog Level 2 證據不足、指定版本不支援時仍保留 Catalog Level 0 `DISCOVERED`；Catalog Level 2 不得標為 `SUPPORTED`，Catalog Level 3 不得標為 `PASSED`。不能只因 OpenOCD 不適用就刪除原廠有效料號。
-- 三級均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 Catalog Level 3 `PLASMA_VERIFIED` ⊆ Catalog Level 2 `PROGRAMMABLE` ⊆ Catalog Level 0 `DISCOVERED`。資訊完整數和實體配置組合數獨立報告。
-- Catalog Level 3 `PLASMA_VERIFIED` 必須有指定配置；Catalog Level 2 `SUPPORTED` 但 Socket 未測的 IC 仍可顯示於 Selector，但 Catalog Level 3 狀態必須維持 `NOT_TESTED`；單一硬體失敗不得直接撤銷 Catalog Level 2。
+- 分別報告 Catalog Level 0 `DISCOVERED`、Level 1 `PROGRAMMING_CANDIDATE`、Level 2 `PROGRAMMABLE`、Level 3 `PLASMA_VERIFIED`；`INFORMATION_COMPLETE`、原檔封存率與逐欄位證據狀態另行統計，不能當作 Catalog Level。
+- Programming Qualification 證據不足或指定 Provider／版本不支援時，Exact ICPN 仍保留 Level 0 `DISCOVERED`；若 source-backed programming route 仍成立可留在 Level 1。只有 qualification `SUPPORTED` 才升到 Level 2；只有指定 configuration HIL `PASSED` 才升到 Level 3。
+- 四級均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 `L3 ⊆ L2 ⊆ L1 ⊆ L0`。資訊完整數和實體配置組合數獨立報告。
+- Catalog Level 3 `PLASMA_VERIFIED` 必須有指定配置；Level 2 `PROGRAMMABLE` 但 Socket／PPU 未測的 IC 仍可顯示於 Selector，但不得標成 Level 3；單一硬體失敗不得直接撤銷 Level 2。
 
 1. 使用實際 Catalog Level 0 `DISCOVERED` rows 計算 **Research Registry** 的結果總數；使用 Level 1 `PROGRAMMING_CANDIDATE` rows 計算 qualification queue；使用 Level 2 `PROGRAMMABLE` rows 獨立計算 **Programming Catalog／IC Selector** 的結果總數，不手填或繼承歷史 coverage 數。
 2. 測試 Catalog Level 0 `DISCOVERED` 但 未達 `SUPPORTED` 的 Exact ICPN **只存在於 Level 0／1 Registry、但不出現在一般 IC Selector**；任何 CFG／family/source candidate 都不得自行導出 `PROGRAMMABLE`。
@@ -319,28 +319,22 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 ## Decision summary
 
 ```text
-Original manufacturer discovery/evidence → Research (retained)
-       ↓ original manufacturer exact material identity gate
-Canonical Device Registry — Catalog Level 1 IDENTIFIED
-       ↓ (independent of information-complete / software qualification)
-User-facing PLASMA IC Selector / Catalog (all IDENTIFIED)
-       ├── Catalog Level 1 IC Information quality: VERIFIED / PARTIAL / UNKNOWN /
-       │   CONFLICT / source-backed NOT_APPLICABLE
-       ├── Catalog Level 2 Programming state: UNKNOWN / CANDIDATE /
-       │   SUPPORTED / UNSUPPORTED (versioned provider + operations)
-       └── Catalog Level 3 PLASMA Compatibility: NOT_TESTED / PASSED / FAILED
-                     ↓ separate runtime execution entitlement
-Job / Batch requires Catalog Level 2 PROGRAMMABLE + currently applicable SUPPORTED qualification + installed compatible Runtime
-    + electrical/safety gates + selected-site hardware requirements
-    → fail closed; Catalog or CFG presence is never authorization
+Manufacturer Research / Discovery
+       ↓ exact Manufacturer ICPN confirmed
+Catalog Level 0 — DISCOVERED
+Research Registry
+       ↓ source-backed programming route exists
+Catalog Level 1 — PROGRAMMING_CANDIDATE
+Qualification Queue
+       ↓ ProgrammingQualification.state == SUPPORTED
+Catalog Level 2 — PROGRAMMABLE
+Programming Catalog / IC Selector
+       ↓ specific PLASMA configuration HIL PASSED
+Catalog Level 3 — PLASMA_VERIFIED
+       ↓ separate runtime execution entitlement
+Job / Batch still requires applicable qualification + installed Runtime
+    + route + electrical/safety + selected-site requirements
+    → fail closed
 ```
 
-**Normative clarification (2026-10-15):** The former summary diagram
-placed software qualification *before* public Selector visibility and
-labeled the Catalog `SUPPORTED only`. That diagram contradicted
-the accepted Decision and Catalog Level 1 visibility rules above, and is
-superseded by this corrected summary. No brand (including Microchip)
-may use CFG existence, historical priority partitions, information
-completeness, or internal Production ingestion batches as an additional
-Catalog Level 0 identity qualification criterion. Original source custody and
-deployment migration remain independently gated.
+**Normative clarification (2026-10-16):** Exact ICPN identity alone is Level 0 and does not create IC Selector visibility. Source-backed programming relevance is Level 1. General IC Selector visibility begins at Level 2 `PROGRAMMABLE`. Level 3 is configuration-specific HIL evidence and never replaces execution-time safety gates.
