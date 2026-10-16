@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter_ns
+from threading import Lock
 from typing import Protocol
 import zlib
 
@@ -72,6 +73,7 @@ class LoopTestDriver:
         loopback_aperture(base)
         self._port = port
         self.base = base
+        self._case_lock = Lock()
         for offset, expected in (
             (REG_MAGIC, MAGIC), (REG_ABI, ABI_VERSION),
             (REG_CAPABILITIES, CAPABILITIES), (REG_CAPACITY, CAPACITY),
@@ -97,6 +99,11 @@ class LoopTestDriver:
         self._port.write32(self.base + offset, word)
 
     def echo(self, payload: bytes) -> LoopTestResult:
+        """Exclusive case lease: overlapping cases must not reuse the buffer."""
+        with self._case_lock:
+            return self._echo_exclusive(payload)
+
+    def _echo_exclusive(self, payload: bytes) -> LoopTestResult:
         """Write once, read once and verify PL counters for each bounded chunk.
 
         Raises on the FIRST mismatch. Never retry, even on an MMIO exception:
