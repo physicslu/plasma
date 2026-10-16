@@ -91,7 +91,7 @@ Phase 為**工作分段，不新增 Approval Gate**。每個 Phase 的 Gate 1 �
 
 | Phase | 工程成果／Codex 工作 | 必須保留的驗收證據 | 狀態 |
 | --- | --- | --- | --- |
-| **0：既有 MS01 安全收尾** | PR #972 的 B1 Fabric UIO Ownership、B2 六 Aperture／殘留 mmap Guard、B3 六 Aperture Supervisor；完成 Host Fault Injection／CI | 原始 Host Vivado Artifact Hash、B1/B2/B3 Trace、PASS／BLOCKED；不可把 Host Tests 當 Real Z2 HIL | **進行中（另 PR）** |
+| **0：既有 MS01 安全收尾** | PR #972 的 B1 Fabric UIO Ownership、B2 六 Aperture／殘留 mmap Guard、B3 六 Aperture Supervisor；Host-only 安全修正收尾 | Runtime HEAD `e9ac002480f53dc89a95d71990f6757b2f6a69b9`；530 PASS + 10 subtests、其中 Fault Injection 75 PASS，RTL 18 PASS，PR CI 記錄 20 SUCCESS／1 SKIPPED；B1 實機 BLOCKED、B2 Host PASS、B3 Host PASS；HIL-B／C NOT RUN | **Host Safety Remediation PASS；Real Z2 HIL NO-GO（#972 Draft、未合併）** |
 | **1：Driver & Hardware ABI Architecture** | 現況盤點、比較 UIO／devmem／Kernel Driver、UIO Device Tree、Site Leasing、固定 ABI v1 與 Image Compatibility；提出 Architecture Decision | Driver 選型理由、實際 Z2 Kernel／UIO Inventory、ABI／Address Map、相容性與破壞性變更策略；Architecture Review | **Plan** |
 | **2：UIO Runtime Backend** | 與既有 DevMem Backend 同 API、UIO sysfs Map 解碼、合法 u32 read/write、所有權與清理、Fault Injection；先 Host 後已授權 Z2 HIL | Host Regression、UIO-01 mapping、UIO-02 identity、UIO-03 合法 access、UIO-04 Site 1/2 isolation、UIO-05 cleanup、UIO-06 lease、UIO-07 reload exclusion；無無效實機 AXI 探測 | **Plan** |
 | **3：Generic FPGA Supervisor** | 將 Phase 0 Development Supervisor 演進為通用 Image Registry／ABI admission／Reload／Recovery，與 Runtime Backend 整合 | SUP-01..10：正常狀態轉移、busy／mmap／Driver conflict、hash fail、load fail、recovery fail、Process／Supervisor crash、預設 inert；全部 Host-only | **Plan** |
@@ -139,7 +139,7 @@ Phase 為**工作分段，不新增 Approval Gate**。每個 Phase 的 Gate 1 �
 | ST／NXP／Microchip exact ICPN discovery、L0／L1／L2 Software Qualification | **可以** | 僅資料／軟體證據，不主張 Physical HIL／L3 |
 | OpenOCD target／Flash Algo 的 Software-only tests | **可以** | 不預先固定未核准的 PL Adapter 介面 |
 | Console、Mock、API 與無實體 PL 依賴的開發 | **可以** | 保留既有 contracts，不冒用新的 FPGA Capability |
-| 現有 PR #972 B1～B3 Host 安全收尾 | **繼續** | 獨立 Gate／PR，不因新 Roadmap 打斷 |
+| 現有 PR #972 B1～B3 Host 安全收尾 | **Host-only 已完成** | B2/B3 離線 PASS；B1 實機 BLOCKED，HIL-B/C NOT RUN；#972 仍 Draft／未合併 |
 | 正式 8-Site RTL 大規模實作、產品級 Register Map Freeze | **阻擋至 Phase 1 Architecture Freeze** | 必須依照共同硬體 ABI／Driver 決策 |
 | 新的實體 PL Programming Adapter、Site Power／Reset 介面整合 | **先限於模擬／契約研究** | 實體整合必須依據核准 ABI、Driver、安全控制契約 |
 | 實際 Runtime Bitstream Switching／UIO HIL | **需 Phase 2／3 的 Safety Readiness** | 仍受各工作 Gate 1 的實機操作授權約束 |
@@ -155,8 +155,8 @@ Phase 為**工作分段，不新增 Approval Gate**。每個 Phase 的 Gate 1 �
 
 ## 6. 既有事實、未知與證據邊界
 
-- **PR #972**：MMIO-MS-01 Dual-Site six-aperture Candidate，SWPC Host-only Vivado Implementation、BIT／HWH／Manifest 與 Candidate BIN 已有證據；B1／B2／B3 Remediation 在獨立 PR 收尾。不要在此 Roadmap 宣稱已完成實機 dual-site HIL 或 merge。
-- **HIL-A**：已回報 BLOCKED／HIL-B NO-GO。Fabric UIO 擁有 `0x40000000–0x4000FFFF`，Site 2 fd-close／retained /dev/mem mmap Guard 有 Host 可重現漏檢；尚缺六 Aperture Supervisor 的實機 Load／Recovery 證據。
+- **PR #972**：MMIO-MS-01 Dual-Site six-aperture Candidate；Host-only Safety Remediation 已由 Codex 交付並完成離線驗證：B2 retained mmap Guard PASS、B3 Supervisor Host PASS；B1 真正 UIO Ownership 交接仍 BLOCKED／未執行。Runtime HEAD `e9ac002480f53dc89a95d71990f6757b2f6a69b9`，FPGA Build Source `404d2ef0152c50e9b2d6599f093752064198e895`，原 BIT／HWH／Manifest／BIN SHA256 未改變；530 PASS + 10 subtests、Fault Injection 75 PASS（subset）、RTL 18 PASS；PR #972 仍 Draft／未合併、HIL-B／C NOT RUN。
+- **HIL-A**：既有唯讀 Preflight BLOCKED／HIL-B NO-GO。Fabric UIO 綁定覆蓋 `0x40000000–0x4000FFFF`，此為尚未在實機解除的 B1；原 Site 2 fd-close／retained `/dev/mem` mmap 漏檢已完成 B2 Host 修正，但**不能把舊失敗描述成目前仍未修正的程式錯誤**。B3 六 Aperture Supervisor 已完成 Host 測試，仍缺實機 Load／Recovery 及獨立遠端驗證證據。
 - **過去五 Aperture HIL**：之前的 Base Image Restore PASS 不可視為新六 Aperture Supervisor PASS。
 - **待證明：** Kernel UIO 是否適用、PS↔PL Hardware Bridge、fixed ABI 共用成本、Zynq-7010 邏輯資源、FPGA Reload 期間的外部 DUT 硬體安全狀態。
 - **沒有實體 DUT 的 HIL** 不等於 SWD/JTAG/SPI/ICSP IC Programming 能力，也不能等同 ICPN L3 `PLASMA_VERIFIED`。
