@@ -171,7 +171,7 @@ The same search result can carry three independent additive projections:
 - `programming_qualification` — vendor-neutral ADR-0002 Programming Qualification
   for deriving Catalog Level 2. Provider-specific evidence (currently OpenOCD for the qualified ST
   cohort) is normalized behind this payload. It may be `SUPPORTED` even when
-  `selected_profile` is absent, because Phase 2 binds the reviewed Programming Profile
+  `selected_profile` is absent, because the Programming Qualification contract binds the reviewed Programming Profile
   and exact geometry independently from the legacy deep-detail projection. `SUPPORTED`
   derives Catalog Level 2 `PROGRAMMABLE`; other states remain Level 1-only.
 
