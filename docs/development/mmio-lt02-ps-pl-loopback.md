@@ -62,6 +62,21 @@ If AXI AW and W arrive on different cycles, the slave must wait for both. BVALID
 
 **LT02-05 and LT02-06 are NOT RUN until built and actually tested.** Existing 2026-10-16 SWD-03 MMIO-13–15 Development Hardware Acceptance remains valid for its *own* four-aperture image but does not qualify LT02.
 
+## LT02-05 host-only preflight candidate
+
+A separate, inert [LT02 HIL P0 runbook](../../pl/hil/lt02/README.md)
+and `pl.hil.lt02.preflight` check exact approved BIT/HWH/manifest/BIN and
+known-good PYNQ recovery hashes, validate the five real HWH address segments
+and ABI, and fail closed on missing read-only inventory/operator prerequisites.
+The `pl.hil.lt02.cases` helper reuses the production Python
+`LoopTestDriver` through an injected Site-owned word port; no test harness
+opens real `/dev/mem` or loads the FPGA. P0 only verifies the *supplied*
+evidence: it is not physical operator/UART/power attestation, and cannot
+authorize Z2 loading, live MMIO or UI enablement.
+
+LT02-HIL01, LT02-HIL02 and LT02-R0 remain NOT RUN until separately executed
+and evidenced on the physical PYNQ-Z2 with supervised original restoration.
+
 ## Performance policy
 
 Report `bytes / elapsed seconds` and operations/s as observed, not as AXI theoretical bandwidth. Establish a measurement baseline first; there is no arbitrary mandatory throughput threshold. Test a fixed seed and duration to compare revisions. A Python stopwatch does not isolate FPGA service time from Linux scheduling or AXI bridge overhead. No claim about signal-integrity, external SWD, DMA, multi-Site concurrency, or factory stress qualification.

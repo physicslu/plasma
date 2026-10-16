@@ -1,0 +1,47 @@
+name: PL LT02-05 HIL P0 offline contracts
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/lt02/**"
+      - "pl/tests/test_lt02_hil_preflight.py"
+      - "pl/tests/test_lt02_hil_vectors.py"
+      - ".github/workflows/pl-lt02-hil-p0.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/lt02/**"
+      - "pl/tests/test_lt02_hil_preflight.py"
+      - "pl/tests/test_lt02_hil_vectors.py"
+      - ".github/workflows/pl-lt02-hil-p0.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lt02-p0-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python dependencies
+        run: python3 -m pip install -e software/python pytest
+      - name: Compile offline contracts (no hardware)
+        run: |
+          python3 -m py_compile pl/hil/lt02/contract.py pl/hil/lt02/preflight.py pl/hil/lt02/cases.py
+          PYTHONPATH="$PWD:$PWD/software/python" python3 -m pl.hil.lt02.preflight --help
+      - name: Fault injection and production driver acceptance vectors
+        env:
+          PYTHONPATH: ".:software/python"
+        run: |
+          python3 -m pytest -v \
+            pl/tests/test_lt02_hil_preflight.py \
+            pl/tests/test_lt02_hil_vectors.py \
+            pl/tests/test_z2_lt02_axi_build.py
+      - name: Qualification boundary
+        run: |
+          echo "LT02-05 P0 host-only artifact/rollback/inventory/owner/ABI/HWH safety contracts PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "No PYNQ-Z2, FPGA load, /dev/mem access, or native HIL. LT02-HIL01/HIL02/R0 remain NOT RUN." >> "$GITHUB_STEP_SUMMARY"
