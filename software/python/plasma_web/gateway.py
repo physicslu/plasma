@@ -156,20 +156,77 @@ def _microchip_ic_information(record: Any) -> dict[str, Any] | None:
     }
 
 
-def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str, Any]:
+def _parse_public_catalog_levels(raw: str | None) -> tuple[int, ...]:
+    """Parse the customer-facing IC Selector level filter.
+
+    Level 0 is intentionally not exposed by this public Product API.
+    """
+    if raw is None or not raw.strip():
+        return (1, 2, 3)
+    values: list[int] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            level = int(token)
+        except ValueError as exc:
+            raise ValueError("levels must be a comma-separated subset of 1,2,3") from exc
+        if level not in {1, 2, 3}:
+            raise ValueError("public IC Selector levels must be a subset of 1,2,3; Level 0 is internal-only")
+        if level not in values:
+            values.append(level)
+    if not values:
+        raise ValueError("levels must include at least one of 1,2,3")
+    return tuple(sorted(values))
+
+
+def _device_search_payload(
+    query: str,
+    limit: int,
+    offset: int = 0,
+    *,
+    levels: tuple[int, ...] = (1, 2, 3),
+) -> dict[str, Any]:
     catalog = get_default_device_catalog()
-    matches, total_count = catalog.search_with_total(query, limit=limit, offset=offset)
+    programming_qualification = get_default_programming_qualification_registry()
+    qualification_cache: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def qualification_for(record: Any) -> dict[str, Any]:
+        exact_icpn = record.icpn or record.identifier
+        key = (record.vendor, exact_icpn)
+        qualification = qualification_cache.get(key)
+        if qualification is None:
+            qualification = programming_qualification.describe(record.vendor, exact_icpn)
+            qualification_cache[key] = qualification
+        return qualification
+
+    def visible(record: Any) -> bool:
+        level = qualification_for(record).get("catalog_level")
+        return isinstance(level, int) and level in levels and level >= 1
+
+    matches, total_count = catalog.search_with_total(
+        query,
+        limit=limit,
+        offset=offset,
+        predicate=visible,
+    )
+
     # Candidate evidence is an independent, read-only display projection.
-    # It never modifies the authoritative backend mapping or Job resolution.
+    # It never modifies authoritative backend routing or Job admission.
     candidates = get_default_backend_candidate_registry()
     upstream = default_pinned_upstream()
     versioned_providers = get_default_openocd_provider_registry()
-    programming_qualification = get_default_programming_qualification_registry()
     ic_support = get_default_ic_support_resolver()
     device_basic = get_default_manufacturer_device_basic_resolver()
     results = []
     for record in matches:
         item = record.to_payload()
+        qualification = qualification_for(record)
+        item["catalog_level"] = qualification["catalog_level"]
+        item["catalog_level_state"] = qualification["catalog_level_state"]
+        item["job_selectable"] = bool(qualification.get("job_selectable", False))
+
         candidate = candidates.lookup(record)
         item["backend_candidate"] = candidate
         item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
@@ -192,39 +249,36 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
         item["manufacturer_device_basic_profile"] = (
             basic.to_payload() if basic is not None else None
         )
-        # Read-only per-exact-NXP manufacturer data; this is NOT a Programming
-        # Profile and must never change backend routes or job admission.
         item["nxp_manufacturer_device_profile"] = (
             get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
             if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
             else None
         )
-        item["microchip_ic_information"] = (
-            _microchip_ic_information(record)
-        )
+        item["microchip_ic_information"] = _microchip_ic_information(record)
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()
             if support is not None
             else None
         )
-        item["programming_qualification"] = programming_qualification.describe(
-            record.vendor,
-            exact_icpn,
-        )
+        item["programming_qualification"] = qualification
         results.append(item)
+
+    level_counts = programming_qualification.summary["catalog_level_counts"]
+    catalog_size = sum(int(level_counts[str(level)]) for level in levels)
     return {
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
+        "scope": "customer_ic_selector",
         "query": query,
-        "catalog_size": catalog.size,
-        "count": len(matches),
+        "levels": list(levels),
+        "catalog_size": catalog_size,
+        "count": len(results),
         "total_count": total_count,
         "limit": limit,
         "offset": offset,
         "results": results,
     }
-
 
 def _require_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -709,13 +763,18 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 query = params.get("q", [""])[0]
                 raw_limit = params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0]
                 raw_offset = params.get("offset", ["0"])[0]
+                raw_levels = params.get("levels", [None])[0]
                 limit = int(raw_limit)
                 offset = int(raw_offset)
+                levels = _parse_public_catalog_levels(raw_levels)
                 if limit < 1 or limit > MAX_SEARCH_LIMIT:
                     raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
                 if offset < 0:
                     raise ValueError("offset must be a non-negative integer")
-                self._json(HTTPStatus.OK, _device_search_payload(query, limit, offset))
+                self._json(
+                    HTTPStatus.OK,
+                    _device_search_payload(query, limit, offset, levels=levels),
+                )
             except (TypeError, ValueError) as exc:
                 self._json(
                     HTTPStatus.BAD_REQUEST,
