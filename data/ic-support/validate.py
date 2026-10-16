@@ -220,19 +220,35 @@ def validate_package_hardware(profile: dict[str, Any]) -> None:
     require(power.get("external_vpp_required") is False, "STM32F103 SWD programming must not require external VPP")
     require(power.get("analog_supply", {}).get("pin") == 9, "VDDA must resolve to package pin 9")
     require(power.get("analog_ground", {}).get("pin") == 8, "VSSA must resolve to package pin 8")
+    backup = power.get("backup_supply", {})
+    require(backup.get("pin") == 1, "VBAT must resolve to package pin 1")
+    require(backup.get("required_for_swd_programming") is True, "batteryless Socket profile must contact VBAT")
+    require(
+        backup.get("fixture_policy") == "tie_to_vdd_when_no_external_battery",
+        "batteryless Socket profile must tie VBAT to VDD",
+    )
+    require(backup.get("decoupling_nF") == 100, "VBAT batteryless tie must retain 100 nF decoupling")
+    vdda_caps = power.get("decoupling", {}).get("vdda", {}).get("capacitors")
+    require(
+        vdda_caps == [{"value_nF": 100}, {"value_uF": 1}],
+        "VDDA decoupling must follow AN2586 Rev 8 100 nF + 1 uF guidance",
+    )
 
     contacts = data.get("minimum_swd_programming_contacts")
     require(isinstance(contacts, list) and contacts, "minimum SWD programming contacts are required")
     contact_pins = [item.get("package_pin") for item in contacts if isinstance(item, dict)]
     require(
-        contact_pins == [7, 8, 9, 23, 24, 34, 35, 36, 37, 47, 48],
+        contact_pins == [1, 7, 8, 9, 23, 24, 34, 35, 36, 37, 47, 48],
         "minimum SWD programming contact set drift",
     )
     require(44 not in contact_pins, "BOOT0 must not be promoted into the minimum SWD contact set")
 
     boundary = data.get("design_boundary", {})
-    require(boundary.get("socket_design_input_ready") is True, "socket design input must be marked ready")
-    require(boundary.get("schematic_design_input_ready") is True, "schematic design input must be marked ready")
+    require(boundary.get("socket_interface_design_input_ready") is True, "socket interface design input must be marked ready")
+    require(boundary.get("electrical_schematic_design_input_ready") is True, "electrical schematic design input must be marked ready")
+    require(boundary.get("pcb_footprint_design_input_ready") is False, "specific Socket PCB footprint must remain unresolved")
+    require(boundary.get("socket_mechanical_selection_complete") is False, "specific Socket mechanical selection must remain unresolved")
+    require(boundary.get("socket_implementation_ready") is False, "Socket implementation readiness must remain false")
     require(boundary.get("hardware_runtime_ready") is False, "hardware runtime readiness must remain false")
     require(boundary.get("physical_programming_qualified") is False, "physical programming qualification must remain false")
     require(boundary.get("socket_hil_passed") is False, "socket HIL must remain false")
