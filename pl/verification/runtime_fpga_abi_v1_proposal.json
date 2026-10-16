@@ -1,0 +1,468 @@
+{
+  "contract": "plasma-runtime-fpga-abi-v1-proposal",
+  "status": "proposed_not_implemented",
+  "generated": "2026-10-16",
+  "ppu_window": {
+    "base": "0x40000000",
+    "size_bytes": 65536,
+    "aperture_size_bytes": 4096,
+    "max_sites": 8
+  },
+  "wire": {
+    "endianness": "little",
+    "register_access_width_bits": 32,
+    "alignment_bytes": 4
+  },
+  "magics": {
+    "ppu_identity_word": "0x4D534C50",
+    "description": "bytes P L S M in little-endian; proposed, not in RTL"
+  },
+  "abi_major": 1,
+  "abi_minor": 0,
+  "site_ready_requires_verified_image": true,
+  "regions": [
+    {
+      "name": "identity",
+      "base": "0x40000000",
+      "size_bytes": 4096,
+      "role": "identity",
+      "registers": [
+        {
+          "name": "magic",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "image_id_w0",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "image_id_w1",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "image_id_w2",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "image_id_w3",
+          "offset": "0x014",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "build_id_w0",
+          "offset": "0x018",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "build_id_w1",
+          "offset": "0x01C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "build_id_w2",
+          "offset": "0x020",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "build_id_w3",
+          "offset": "0x024",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "capabilities_lo",
+          "offset": "0x028",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "capabilities_hi",
+          "offset": "0x02C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_present_bitmap",
+          "offset": "0x030",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_ready_bitmap",
+          "offset": "0x034",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "ppu_status",
+          "offset": "0x038",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "hardware_revision",
+          "offset": "0x03C",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "ppu_control_reserved",
+      "base": "0x40001000",
+      "size_bytes": 4096,
+      "role": "reserved",
+      "registers": []
+    },
+    {
+      "name": "shared_engine_0_reserved",
+      "base": "0x40002000",
+      "size_bytes": 4096,
+      "role": "reserved",
+      "registers": []
+    },
+    {
+      "name": "shared_engine_1_reserved",
+      "base": "0x40003000",
+      "size_bytes": 4096,
+      "role": "reserved",
+      "registers": []
+    },
+    {
+      "name": "site_01",
+      "base": "0x40004000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 1,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_02",
+      "base": "0x40005000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 2,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_03",
+      "base": "0x40006000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 3,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_04",
+      "base": "0x40007000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 4,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_05",
+      "base": "0x40008000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 5,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_06",
+      "base": "0x40009000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 6,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_07",
+      "base": "0x4000A000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 7,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    },
+    {
+      "name": "site_08",
+      "base": "0x4000B000",
+      "size_bytes": 4096,
+      "role": "site",
+      "site_id": 8,
+      "registers": [
+        {
+          "name": "site_id",
+          "offset": "0x000",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_abi_version",
+          "offset": "0x004",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_capabilities",
+          "offset": "0x008",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_status",
+          "offset": "0x00C",
+          "access": "ro",
+          "width_bits": 32
+        },
+        {
+          "name": "site_error",
+          "offset": "0x010",
+          "access": "ro",
+          "width_bits": 32
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "No hardware IO, bitstream, driver or current FPGA map is changed by this proposal.",
+    "Reserved regions are NOT readable by software; must never probe undocumented offsets.",
+    "Actual MS01 site_01 at 0x40004000 and site_02 at 0x40005000 are LT02 HIL units and do not implement this proposed register ABI.",
+    "Proposed site count 8 is capacity, not claimed physical inventory."
+  ]
+}

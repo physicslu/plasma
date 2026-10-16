@@ -1,0 +1,48 @@
+name: PLASMA Runtime FPGA Phase 1 Host ABI Contract
+
+on:
+  pull_request:
+    paths:
+      - "docs/architecture/runtime-fpga-hardware-abi-v1.md"
+      - "docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md"
+      - "docs/development/runtime-fpga-switching-hil-plan-v1.md"
+      - "pl/tools/runtime_fpga_phase1.py"
+      - "pl/tests/test_runtime_fpga_phase1.py"
+      - "pl/verification/runtime_fpga_abi_v1_proposal.json"
+      - ".github/workflows/pl-runtime-fpga-phase1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/architecture/runtime-fpga-hardware-abi-v1.md"
+      - "docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md"
+      - "docs/development/runtime-fpga-switching-hil-plan-v1.md"
+      - "pl/tools/runtime_fpga_phase1.py"
+      - "pl/tests/test_runtime_fpga_phase1.py"
+      - "pl/verification/runtime_fpga_abi_v1_proposal.json"
+      - ".github/workflows/pl-runtime-fpga-phase1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  abi-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install host-only pytest
+        run: python3 -m pip install pytest
+      - name: Validate proposed ABI and synthetic UIO inventory
+        run: python3 -m pytest -q pl/tests/test_runtime_fpga_phase1.py
+      - name: Preserve evidence boundaries
+        if: always()
+        run: |
+          {
+            echo "Runtime FPGA Phase 1: contract + fake-sysfs **host only**."
+            echo "Proposed ABI v1 is NOT an implemented FPGA register map."
+            echo "Actual Z2 kernel/UIO/DT/FPGA Bridge inspection: NOT RUN."
+            echo "No FPGA load, driver bind/unbind, MMIO, real DUT or physical HIL was performed."
+          } >> "$GITHUB_STEP_SUMMARY"
