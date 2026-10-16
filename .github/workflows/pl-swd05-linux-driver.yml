@@ -5,6 +5,8 @@ on:
     paths:
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "software/python/plasma_interfaces/linux_mmio.py"
+      - "pl/hil/swd04/native_qualify.py"
+      - "software/python/tests/test_mmio_z2_qualification.py"
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
@@ -15,6 +17,8 @@ on:
     paths:
       - "software/python/plasma_interfaces/swd_transaction.py"
       - "software/python/plasma_interfaces/linux_mmio.py"
+      - "pl/hil/swd04/native_qualify.py"
+      - "software/python/tests/test_mmio_z2_qualification.py"
       - "software/python/tests/test_swd_transaction_driver.py"
       - "software/python/tests/test_linux_mmio.py"
       - "docs/development/swd05-linux-swd-transaction-driver.md"
@@ -38,12 +42,14 @@ jobs:
         run: |
           python3 -m pip install -e ./software/python
           python3 -m pip install 'pytest==8.4.2'
-      - name: Compile host-only driver and native MMIO backend
-        run: python3 -m py_compile software/python/plasma_interfaces/swd_transaction.py software/python/plasma_interfaces/linux_mmio.py
-      - name: SWD-05 protocol and native file-backed MMIO regressions
+      - name: Compile SWD-05, native MMIO and Z2 qualification CLI
         run: |
-          python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py
+          python3 -m py_compile software/python/plasma_interfaces/swd_transaction.py software/python/plasma_interfaces/linux_mmio.py pl/hil/swd04/native_qualify.py
+          python3 -m pl.hil.swd04.native_qualify --help
+      - name: SWD-05, native MMIO and supervised Z2 qualification (host only)
+        run: |
+          python3 -m pytest -v software/python/tests/test_swd_transaction_driver.py software/python/tests/test_linux_mmio.py software/python/tests/test_mmio_z2_qualification.py
       - name: Explicit acceptance boundary
         run: |
-          echo "SWD05_HOST_AND_MMIO_RAM_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
-          echo "No FPGA load, physical Z2 MMIO, OpenOCD adapter registration, external SWD pins or IC operations performed." >> "$GITHUB_STEP_SUMMARY"
+          echo "SWD05_HOST_MMIO_AND_Z2_GATE_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Host-only synthetic files / test doubles. No FPGA load, physical Z2 MMIO, OpenOCD adapter registration, external SWD pins or IC operations performed." >> "$GITHUB_STEP_SUMMARY"

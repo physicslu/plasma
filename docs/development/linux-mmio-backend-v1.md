@@ -2,7 +2,7 @@
 
 **Scope:** production Python module, host-only acceptance and SWD-05 adapter
 injection. The current PYNQ-Z2 SWD-03 image implements **one** transaction
-aperture, not eight. **Real Z2 MMIO on this branch: NOT RUN.**
+aperture, not eight. **Real Z2 MMIO qualification: NOT RUN pending live evidence.**
 
 ## Runtime and layering
 
@@ -117,3 +117,91 @@ bitstream**, for the first short supervised Z2 HIL. Build a dedicated
 MMIO-LT-01 test fixture only if the existing CONTROL/STATUS path cannot
 reveal a required failure mode. The physical SWD-03 HIL remains independently
 qualified and is not inferred from previous PSPL-02 tests.
+
+## MMIO-13/14/15 — Native PYNQ-Z2 HIL adapter (new integration)
+
+The next hardware candidate uses the **four-aperture SWD-03 design**, NOT the
+three-aperture PSPL-02/SWD-00 image. Its source / verified artifact hashes
+are specified by `pl/hil/swd04/contract.py`. Keep the physical SWD pins
+and external DUT disconnected. Do not use the old SWD-00 firmware for SWD-05.
+
+The safe execution entrypoint is
+`python -m pl.hil.swd04.native_qualify`, using the **actual**
+`/opt/plasma/python/3.12.13/bin/python3` runtime. The separate
+`software/python` package must be installed into that runtime and the
+`pl` source modules must be available on the Python import path. The
+entrypoint is inert by default. It does **not** change FPGA Manager firmware,
+stop/start services, or perform original-image recovery.
+
+Use the existing [SWD-04 offline kit and candidate/recovery runbook](
+swd04-offline-execution-checklist.md) to verify the source SHA and hashes,
+create current hardware inventory, isolate PL consumers, prove UART/independent
+power recovery, and produce a real P0 report, supervised candidate load log
+and **actual** stage session evidence. A historical previous HIL result does
+not validate the currently loaded candidate.
+
+After the four-aperture candidate is **actually** loaded and identified,
+the two native stages are:
+
+1. `HIL01`: `LinuxMMIO(..., readonly=True)`, exact SWD-04
+   Identity/Build ID/ABI/Control STATUS register readback. The native backend
+   is used through the prior SWD-04 read-only checks, not the old HIL
+   `DevMemBackend`. No writes.
+2. `HIL02`: independently recheck Build ID and initial state; use
+   `LinuxMMIO` at approved CONTROL offsets to write/read six full-word
+   non-destructive echo patterns, ending at zero; claim the SWD-03 Site 1
+   aperture and invoke the **production** `SWDTransactionDriver.line_reset()`
+   and `read_dp(0)` against the synthetic DPIDR fixture. This does not
+   connect any external IC or program flash.
+
+Both stages require `--execute-live` **and**
+`--ack-unrecoverable-axi-stall-risk`, current root/ARMv7/FPGA Manager
+eligibility and the reviewed SWD-04 candidate, recovery, session and
+prior-stage evidence. HIL02 additionally requires `HIL01` PASS from the
+**native** tool with the same P0 digest. An unsupported Python version,
+runtime path or architecture fails **before opening /dev/mem**.
+
+Example command skeleton (paths must be resolved from actual retained private
+files; do not execute with placeholders):
+
+```sh
+/opt/plasma/python/3.12.13/bin/python3 -m pl.hil.swd04.native_qualify \
+  --stage HIL01 --p0-report "$P0" --session "$HIL01_SESSION" \
+  --candidate-bin "$CANDIDATE_BIN" --output "$EVIDENCE/hil01" \
+  --execute-live --ack-unrecoverable-axi-stall-risk
+
+/opt/plasma/python/3.12.13/bin/python3 -m pl.hil.swd04.native_qualify \
+  --stage HIL02 --p0-report "$P0" --session "$HIL02_SESSION" \
+  --candidate-bin "$CANDIDATE_BIN" \
+  --previous "$EVIDENCE/hil01/result.json" --output "$EVIDENCE/hil02" \
+  --execute-live --ack-unrecoverable-axi-stall-risk
+```
+
+**These commands must only run inside the previously verified, supervised
+hardware maintenance procedure.** Use an approved root execution channel;
+do not alter system Python or sudoers and do not write credentials to logs.
+STOP on preflight failures; never bypass checks by inventing attestation
+flags. A `started.json` is written before the first physical register
+access; no `result.json` after an AXI abort/stall means **NO PASS**, not a
+timeout. If a register operation fails, do not automatically retry or
+touch the hardware again.
+
+After either stage, the external supervisor must restore the **original**
+FPGA image and verify its identity, clock, kernel state, services, and
+UIO/PL ownership. The native CLI records
+`recovery_restoration: NOT_RUN` regardless of its functional outcome.
+A stage's functional PASS is **not** a hardware qualification PASS until
+original-image restoration is independently observed.
+
+Validation command for the PR and future host CI (NO device I/O):
+
+```sh
+python3 -m pytest -q software/python/tests/test_linux_mmio.py \
+    software/python/tests/test_swd_transaction_driver.py \
+    software/python/tests/test_mmio_z2_qualification.py
+```
+
+The test file uses a **sparse regular file** at the reviewed AXI offset
+layout for read-only native mappings, and controlled Python test doubles
+for CONTROL and SWD command semantics. It cannot prove Linux device memory
+attributes, ARMv7 instruction width or hardware electrical behavior.
