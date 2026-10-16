@@ -45,8 +45,8 @@ jobs:
           )
           from plasma_web.device_catalog import get_default_device_catalog
           catalog=get_default_device_catalog()
-          assert catalog.size == 4992
-          assert sum(r.vendor=="Microchip" for r in catalog.records)==122
+          assert catalog.size == 5885
+          assert sum(r.vendor=="Microchip" for r in catalog.records)==1015
           assert all(r.mapping_status == "no_mapping" and not r.target_config for r in catalog.records if r.vendor=="Microchip")
           assert evidence().size == 212
           assert sum(r.vendor=="NXP" for r in catalog.records)==241

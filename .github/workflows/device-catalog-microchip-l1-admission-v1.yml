@@ -1,0 +1,175 @@
+name: Microchip 2563 L1 admission review
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_l1_admission_queue_v1.py'
+      - 'data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py'
+      - 'data/device-catalog/research/microchip_pic32mx_l1_canonical_dryrun_v1.py'
+      - 'data/device-catalog/research/microchip_pic32mx_893_production_source_gate_v1.py'
+      - 'data/device-catalog/research/microchip-pic32mx-893-commercial-l1-v1.csv'
+      - 'data/device-catalog/research/microchip-pic32mx-85-devid-route-v1.json'
+      - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - 'software/python/plasma_web/route_evidence_admission.py'
+      - 'software/python/plasma_web/microchip_saml1x_route_evidence.py'
+      - 'software/python/plasma_web/microchip_pic32mx_route_evidence.py'
+      - 'software/python/plasma_web/microchip_phase1_admission_guard.py'
+      - 'software/python/tests/test_microchip_pic32mx_893_l1_admission.py'
+      - 'software/python/tests/test_microchip_saml1x_route_evidence.py'
+      - 'software/python/plasma_web/programming_qualification.py'
+      - 'software/python/tests/test_route_evidence_admission.py'
+      - '.github/workflows/device-catalog-microchip-l1-admission-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  source-replayed-l1-review-queue:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate canonical L1 admission boundaries
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s software/python/tests \
+            -p 'test_route_evidence_admission.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_microchip_saml1x_route_evidence.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_microchip_pic32mx_893_l1_admission.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_catalog_promotion_framework.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_programming_qualification.py' -v
+      - name: Fetch source-replayed original-byte report artifact (NOT raw manufacturer captures)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/microchip-l1"
+          gh run download 38664576255 --repo "${{ github.repository }}" \
+            --name microchip-phase1-full-original-mcp-cfg-reverse-coverage-v1 \
+            --dir "${{ runner.temp }}/microchip-l1"
+          test -s "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json"
+      - name: Validate all 2563 candidate rows against frozen source replay
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json"
+          python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/microchip-l1-review-queue.json"
+          q = json.loads(p.read_text(encoding="utf-8"))
+          assert q["research_cfg_candidates"] == len(q["rows"]) == 2563
+          assert q["base_device_review_units"] == 262
+          assert sum(q["by_cfg_base_device_counts"].values()) == 262
+          assert q["identity_canonical_admitted_by_this_tool"] == 0
+          assert q["route_canonical_admitted_by_this_tool"] == 0
+          assert all(r["catalog_level"] is None
+                     and r["job_selectable"] is False
+                     and r["execution_authorized"] is False for r in q["rows"])
+          PY
+      - name: Read pinned PIC32MX upstream flash-driver source
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://raw.githubusercontent.com/openocd-org/openocd/9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c/src/flash/nor/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx.c"
+      - name: Independently prove 893 Production ICPNs from original manufacturer identity plus OpenOCD driver
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_pic32mx_893_production_source_gate_v1.py \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c"
+      - name: Reconcile PIC32MX device-ID applicability per exact commercial ICPN
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json"
+          python data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1"
+          evidence = json.loads((base / "pic32mx-devid-route-review.json").read_text())
+          assert evidence["route_review_counts"] == {
+              "DIRECT_DRIVER_DEVID_ROUTE_EVIDENCE": 893,
+              "DRIVER_DEVID_NOT_LISTED_REVIEW_REQUIRED": 348,
+          }
+          assert evidence["base_device_review_counts"] == {
+              "DIRECT_DRIVER_DEVID_ROUTE_EVIDENCE": 85,
+              "DRIVER_DEVID_NOT_LISTED_REVIEW_REQUIRED": 31,
+          }
+          from sys import path
+          path.insert(0, "data/device-catalog/research")
+          from microchip_pic32mx_devid_route_review_v1 import build
+          ledger = json.loads((base / "microchip-l1-review-queue.json").read_text())
+          driver = (base / "pic32mx.c").read_bytes()
+          try:
+              build(ledger, driver + b"\n#tampered\n")
+          except ValueError as exc:
+              assert "source" in str(exc) or "bytes" in str(exc)
+          else:
+              raise AssertionError("Tampered upstream Flash Driver was accepted")
+          PY
+      - name: Exercise real canonical Registry with 893 PIC32MX Exact-ICPN L1 dry-run fixtures
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_pic32mx_l1_canonical_dryrun_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --prior-review "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-l1-canonical-dryrun.json"
+          python data/device-catalog/research/microchip_pic32mx_l1_canonical_dryrun_v1.py \
+            --ledger "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c" \
+            --prior-review "${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json" \
+            --output "${{ runner.temp }}/microchip-l1/pic32mx-l1-canonical-dryrun.json" --verify
+      - name: Confirm tampered manufacturer replay is rejected
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          original = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/microchip-full-reverse.json"
+          tampered = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/tampered.json"
+          data = original.read_bytes()
+          assert b'"manufacturer": "Microchip"' in data
+          tampered.write_bytes(data.replace(b'"manufacturer": "Microchip"',
+                                            b'"manufacturer": "Micr0chip"', 1))
+          PY
+          if python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/tampered.json" \
+            --output "${{ runner.temp }}/microchip-l1/tampered-review.json"; then
+            echo "ERROR: tampered source report unexpectedly accepted" >&2
+            exit 1
+          fi
+          test ! -e "${{ runner.temp }}/microchip-l1/tampered-review.json"
+      - name: Upload research-only review ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-l1-2563-review-queue
+          path: |
+            ${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json
+            ${{ runner.temp }}/microchip-l1/pic32mx-devid-route-review.json
+            ${{ runner.temp }}/microchip-l1/pic32mx-l1-canonical-dryrun.json
+          retention-days: 30

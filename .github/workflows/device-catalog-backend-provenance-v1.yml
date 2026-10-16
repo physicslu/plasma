@@ -54,12 +54,12 @@ jobs:
           root = Path(os.environ['RUNNER_TEMP']) / 'icpn-backend-provenance'
           summary = json.loads((root / 'icpn-backend-provenance-v1-summary.json').read_text())
           blob = (root / 'icpn-backend-provenance-v1.jsonl').read_bytes()
-          assert len(blob.splitlines()) == summary['total_exact_icpns'] == 4992
+          assert len(blob.splitlines()) == summary['total_exact_icpns'] == 5885
           assert summary['production_mapped'] == 4193
-          assert summary['production_no_mapping'] == 799
+          assert summary['production_no_mapping'] == 1692
           assert summary['research_candidates_not_mapped'] == {'STM32C5': 172, 'STM32H5': 190}
           assert summary['production_mapped'] == 4193
-          assert summary['production_no_mapping'] == 799
+          assert summary['production_no_mapping'] == 1692
           assert summary['research_candidates_not_mapped'] == {'STM32C5': 172, 'STM32H5': 190}
           assert hashlib.sha256(blob).hexdigest() == summary['records_jsonl_sha256']
           h5 = json.loads((root / 'h5-example.json').read_text())

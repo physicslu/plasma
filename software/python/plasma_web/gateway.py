@@ -90,10 +90,61 @@ _MICROCHIP_IDENTITY_PDF_SHA = (
 )
 
 
-def _microchip_ic_information(record: Any) -> dict[str, Any] | None:
-    """Read-only Microchip identity/information overlay; source-locked exact ICPN only."""
+def _microchip_ic_information(
+    record: Any, qualification: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Read-only manufacturer information; canonical Qualification owns Level."""
     if record.vendor != "Microchip":
         return None
+    if record.family == "PIC32MX":
+        ref = record.source_reference or ""
+        if (not record.production_admitted
+            or record.mapping_status != "no_mapping" or record.target_config
+            or not record.base_device or not record.identifier.startswith("PIC32MX")
+            or record.source_authority != "Microchip Technology official"
+            or record.verification_status !=
+                "verified_microchip_mcp_exact_ordering_and_pinned_openocd_devid"
+            or f"partNumber={record.icpn}" not in ref
+            or f"basePartNumber={record.base_device}" not in ref
+            or "original_response_sha256=" not in ref
+            or "expected_devid=" not in ref
+            or qualification["catalog_level"] != 1
+            or qualification["state"] != "CANDIDATE"
+            or qualification["job_selectable"]
+            or qualification["execution_authorized"]):
+            raise ValueError("Microchip PIC32MX exact identity/route evidence boundary changed")
+        return {
+            "status": "manufacturer_exact_material_identity_route_candidate",
+            "manufacturer": "Microchip", "icpn": record.icpn,
+            "identity_state": "IDENTIFIED", "information_complete": False,
+            "catalog_level": qualification["catalog_level"],
+            "catalog_level_state": qualification["catalog_level_state"],
+            "programming_state": qualification["state"],
+            "compatibility_state": "NOT_TESTED",
+            "ram_size": None, "core_model": None,
+            "working_vdd_v": None, "io_supply_v": None, "vdda_v": None,
+            "field_states": {
+                "manufacturer": "VERIFIED", "icpn": "VERIFIED",
+                "base_device": "VERIFIED", "package": "UNKNOWN",
+                "pin_count": "UNKNOWN", "flash": "UNKNOWN",
+                "ram": "UNKNOWN", "temperature": "UNKNOWN",
+                "core_model": "UNKNOWN", "working_vdd": "UNKNOWN",
+                "io_supply": "UNKNOWN", "vdda": "UNKNOWN",
+                "core_architecture": "UNKNOWN",
+            },
+            "source": {
+                "authority": "Microchip Technology official",
+                "exact_mcp_material_source": ref,
+                "provider_route_evidence": "OpenOCD v0.12.0 pinned driver DEVID",
+                "official_pdf_grammar_not_exact_material_list": False,
+            },
+            "software_supported": False,
+            "programming_provider": None,
+            "supported_operations": [],
+            "verified_configurations": [],
+            "programming_profile_authority": False,
+            "hardware_runtime_ready": False,
+        }
     match = _MICROCHIP_IDENTITY_ORDER.fullmatch(record.icpn or "")
     if match is None or record.family != "SAML1X" or not record.production_admitted:
         raise ValueError("unknown Microchip exact SKU in admitted Product Catalog")
@@ -125,9 +176,9 @@ def _microchip_ic_information(record: Any) -> dict[str, Any] | None:
         "manufacturer":"Microchip","icpn":record.icpn,
         "identity_state":"IDENTIFIED",
         "information_complete":False,
-        "catalog_level":0,
-        "catalog_level_state":"DISCOVERED",
-        "programming_state":"UNKNOWN",
+        "catalog_level": qualification["catalog_level"],
+        "catalog_level_state": qualification["catalog_level_state"],
+        "programming_state": qualification["state"],
         "compatibility_state":"NOT_TESTED",
         "ram_size":f"{ram} KB",
         "core_model":"Arm Cortex-M23",
@@ -254,7 +305,7 @@ def _device_search_payload(
             if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
             else None
         )
-        item["microchip_ic_information"] = _microchip_ic_information(record)
+        item["microchip_ic_information"] = _microchip_ic_information(record, qualification)
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()

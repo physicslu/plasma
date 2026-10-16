@@ -68,13 +68,19 @@ def get_catalog() -> tuple[list[dict[str, str]], dict]:
     ensure(len(st_sources) == 28 and sum(s["row_count"] for s in st_sources) == 4629
            and [(s["family"], s["row_count"]) for s in nxp_sources] ==
                [("KL25",12),("MCX",196),("K32L2",16),("LPC11U6X",8),("LPC81X",8),("LPC11U2X",1)]
-           and len(sources)==35 and sum(s["row_count"] for s in sources)==4992
+           and len(sources)==36 and sum(s["row_count"] for s in sources)==5885
            and microchip==[{
                "manufacturer":"Microchip","family":"SAML1X",
                "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
                "row_count":122,
                "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
                "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
+           },{
+               "manufacturer":"Microchip","family":"PIC32MX",
+               "path":"../research/microchip-pic32mx-893-commercial-l1-v1.csv",
+               "row_count":893,
+               "git_blob_sha":"9eba3e0898a42ef1129a572c5c3a6b0613e01166",
+               "sha256":"b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8",
            }]
            and all(s["manufacturer"]=="STMicroelectronics" for s in sources[:28]),
            "Production ST+C5 and bounded NXP six-source baseline drift")

@@ -742,8 +742,24 @@ def build_inventory() -> dict[str, Any]:
                 "icpn": row["icpn"],
                 "base_device": base_device,
                 "package": row["package"],
-                "pin_count": parse_pin_count(row["pin_count"], row["package"]),
-                "flash_size": row["flash_size"],
+                # ADR-0002 L1 requires exact identity and programming-route
+                # relevance, not fabricated physical package or memory data.
+                # Only the source-pinned PIC32MX identity cohort may have
+                # unknown optional dimensions; all other family invariants
+                # retain their historical strict pin-count validation.
+                "pin_count": (
+                    None
+                    if (manufacturer == "Microchip" and family == "PIC32MX"
+                        and mapping_status == "no_mapping"
+                        and not row["package"] and not row["pin_count"])
+                    else parse_pin_count(row["pin_count"], row["package"])
+                ),
+                "flash_size": (
+                    None
+                    if (manufacturer == "Microchip" and family == "PIC32MX"
+                        and not row["flash_size"])
+                    else row["flash_size"]
+                ),
                 "openocd": {
                     "state": "deterministic_target_mapped" if deterministic_openocd else "unresolved",
                     "target_config": openocd_target or None,

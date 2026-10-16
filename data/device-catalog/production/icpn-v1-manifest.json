@@ -284,6 +284,14 @@
       "row_count": 122,
       "git_blob_sha": "0eb9c765e78e93686629b17576b122a14dfa60ab",
       "sha256": "2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e"
+    },
+    {
+      "manufacturer": "Microchip",
+      "family": "PIC32MX",
+      "path": "../research/microchip-pic32mx-893-commercial-l1-v1.csv",
+      "row_count": 893,
+      "git_blob_sha": "9eba3e0898a42ef1129a572c5c3a6b0613e01166",
+      "sha256": "b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8"
     }
   ]
 }

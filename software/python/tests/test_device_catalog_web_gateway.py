@@ -5,6 +5,7 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
@@ -489,7 +490,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
-        self.assertEqual(len(rows), 122)
+        self.assertEqual(len(rows), 1015)
         for row in rows:
             with self.subTest(icpn=row.identifier):
                 with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
@@ -508,10 +509,10 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
             _reject_unmapped_microchip_raw_job_target(other)
 
-    def test_microchip_level0_identity_is_internal_and_not_public_selector_visible(self) -> None:
+    def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
         registry = get_default_programming_qualification_registry()
-        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        rows = [r for r in catalog.records if r.vendor == "Microchip" and r.family == "SAML1X"]
         self.assertEqual(len(rows), 122)
         self.assertEqual(len({r.identifier for r in rows}), 122)
         self.assertTrue(all(r.family == "SAML1X" and
@@ -521,20 +522,30 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             with self.subTest(icpn=record.identifier):
                 qualification = registry.describe(record.vendor, record.identifier)
                 self.assertEqual(qualification["identity_state"], "IDENTIFIED")
-                self.assertEqual(qualification["catalog_level"], 0)
-                self.assertEqual(qualification["catalog_level_state"], "DISCOVERED")
-                self.assertFalse(qualification["selector_visible"])
+                self.assertEqual(qualification["catalog_level"], 1)
+                self.assertEqual(qualification["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+                self.assertEqual(qualification["state"], "CANDIDATE")
+                self.assertEqual(qualification["route_evidence"], "backend_candidate_registry")
+                self.assertTrue(qualification["selector_visible"])
                 self.assertFalse(qualification["job_selectable"])
+                self.assertFalse(qualification["execution_authorized"])
 
                 status, payload = self.request(
-                    f"/api/devices/search?q={record.identifier}&limit=5")
+                    f"/api/devices/search?q={record.identifier}&limit=20")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["scope"], "customer_ic_selector")
                 self.assertEqual(payload["levels"], [1, 2, 3])
                 self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
-                self.assertEqual(payload["total_count"], 0)
-                self.assertEqual(payload["count"], 0)
-                self.assertEqual(payload["results"], [])
+                found = [x for x in payload["results"] if x["icpn"] == record.identifier]
+                self.assertEqual(len(found), 1)
+                self.assertEqual(found[0]["catalog_level"], 1)
+                self.assertFalse(found[0]["job_selectable"])
+                self.assertEqual(found[0]["backend"]["mapping_status"], "no_mapping")
+
+                status, excluded = self.request(
+                    f"/api/devices/search?q={record.identifier}&levels=2&limit=20")
+                self.assertEqual(status, 200)
+                self.assertEqual(excluded["total_count"], 0)
 
         status, payload = self.request("/api/devices/search?q=ATSAML10E16A-MU&levels=0")
         self.assertEqual(status, 400)
@@ -549,6 +560,40 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 status, payload = self.request(f"/api/devices/search?q={blocked}&limit=5")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["total_count"], 0)
+
+    def test_pic32mx_admitted_l1_candidate_visible_but_not_job_selectable(self) -> None:
+        catalog = get_default_device_catalog()
+        registry = get_default_programming_qualification_registry()
+        rows = [r for r in catalog.records
+                if r.vendor == "Microchip" and r.family == "PIC32MX"]
+        self.assertEqual(len(rows), 893)
+        self.assertEqual(len({r.identifier for r in rows}), 893)
+        for record in rows:
+            with self.subTest(icpn=record.identifier):
+                self.assertEqual(record.mapping_status, "no_mapping")
+                self.assertFalse(record.target_config)
+                q = registry.describe("Microchip", record.identifier)
+                self.assertEqual(q["catalog_level"], 1)
+                self.assertEqual(q["state"], "CANDIDATE")
+                self.assertTrue(q["selector_visible"])
+                self.assertFalse(q["job_selectable"])
+                self.assertFalse(q["execution_authorized"])
+                self.assertFalse(q["physical_programming_qualified"])
+        # Verify actual customer-facing gateway and L2 isolation for a bounded
+        # sample. Job rejection of all 1015 Microchip codes is a separate test.
+        for code in (rows[0].identifier, rows[len(rows) // 2].identifier,
+                     rows[-1].identifier):
+            status, payload = self.request(
+                f"/api/devices/search?q={quote(code, safe='')}&limit=100")
+            self.assertEqual(status, 200)
+            found = [r for r in payload["results"] if r["icpn"] == code]
+            self.assertEqual(len(found), 1)
+            self.assertEqual(found[0]["catalog_level"], 1)
+            self.assertFalse(found[0]["job_selectable"])
+            status, l2 = self.request(
+                f"/api/devices/search?q={quote(code, safe='')}&levels=2&limit=100")
+            self.assertEqual(status, 200)
+            self.assertEqual(l2["total_count"], 0)
 
     def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
         status, l1 = self.request("/api/devices/search?q=STM32F103V8H6&levels=1&limit=5")
