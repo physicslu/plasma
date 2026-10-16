@@ -1,0 +1,1276 @@
+{
+  "schema_version": 1,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-high-rvz-package-v4",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "status": "high_density_rvz_package_expansion",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "flash_driver_source_path": "src/flash/nor/stm32f1x.c"
+  },
+  "manufacturer_programming_group": {
+    "group_id": "st-stm32f103-high-density-rvz-package-programming-v4",
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "high",
+    "silicon_identity": {
+      "openocd_device_id": "0x414",
+      "openocd_class": "STM32F10x high-density",
+      "identity_assumption": "genuine STMicroelectronics silicon corresponding to the selected exact commercial ICPN",
+      "revision_policy": "The exact order code does not encode silicon revision; software qualification is bounded to the OpenOCD high-density device-ID class and exact Production identity."
+    },
+    "debug_transport": [
+      "SWD",
+      "JTAG"
+    ],
+    "programming_electrical": {
+      "vdd_programming_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false
+    },
+    "shared_flash_geometry": {
+      "main_flash_start": "0x08000000",
+      "erase_unit": "page",
+      "erase_unit_bytes": 2048,
+      "program_unit": "halfword",
+      "program_unit_bytes": 2
+    },
+    "manufacturer_evidence": {
+      "source_lock": {
+        "st_pm0075_rev2": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a"
+      },
+      "review_contract_path": "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v3.json",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "programming_profile_path": "data/ic-support/profiles/programming/stm32f1-high-density-flash-v0.json",
+      "direct_applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4",
+      "openocd_comparison_path": "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json"
+    },
+    "operation_qualification": {
+      "probe": {
+        "state": "SUPPORTED",
+        "openocd_basis": [
+          "stm32x_probe",
+          "device ID 0x414 high-density branch"
+        ],
+        "manufacturer_basis": [
+          "stm32f103-high-density-family-applicability"
+        ],
+        "differential_basis": [
+          "high_density_device_id"
+        ]
+      },
+      "erase": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash",
+        "openocd_basis": [
+          "stm32x_erase",
+          "flash erase_address framework"
+        ],
+        "manufacturer_basis": [
+          "stm32f103-high-density-page-geometry",
+          "stm32f103-high-density-erase-capabilities"
+        ],
+        "differential_basis": [
+          "high_density_page_size",
+          "page_erase_core"
+        ]
+      },
+      "program": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash",
+        "implicit_erase": false,
+        "openocd_basis": [
+          "stm32x_write",
+          "flash write_image framework"
+        ],
+        "manufacturer_basis": [
+          "stm32f103-high-density-program-granularity",
+          "stm32f103-high-density-standard-program-sequence"
+        ],
+        "differential_basis": [
+          "program_alignment",
+          "program_core"
+        ]
+      },
+      "read": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash while security state permits debug read",
+        "openocd_basis": [
+          "default_flash_read",
+          "Flash read framework"
+        ],
+        "manufacturer_basis": []
+      },
+      "verify": {
+        "state": "SUPPORTED",
+        "scope": "explicit readback/image verification while security state permits debug read",
+        "openocd_basis": [
+          "flash verify_image framework",
+          "flash_driver_read"
+        ],
+        "manufacturer_basis": [
+          "stm32f103-high-density-standard-program-sequence"
+        ],
+        "differential_basis": [
+          "verify_layering"
+        ]
+      }
+    },
+    "blocked_operations": [
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE"
+    ],
+    "backend_constraints": [
+      "erase/program require a halted target",
+      "PROGRAM has no implicit erase",
+      "exact Main Flash size comes from the selected exact ICPN geometry",
+      "high-density page erase geometry is 2 KiB and must never inherit the medium-density 1-KiB page size",
+      "debug read/verify is subject to read-protection state",
+      "protection/security mutation is outside this qualification"
+    ]
+  },
+  "local_evidence_locks": {
+    "data/ic-support/profiles/programming/stm32f1-high-density-flash-v0.json": "3d358b39237bf6e43886e5a61c4ef6ac1860f9a3",
+    "data/ic-support/profiles/memory-geometry/stm32f103rc-256k-v0.json": "d74b95c9d4c338f834f78276dc7ffc8d24b38b3e",
+    "data/ic-support/profiles/memory-geometry/stm32f103rd-384k-v0.json": "f3037bd6fb14d4bb3703fb294c9a41a1569ae27f",
+    "data/ic-support/profiles/memory-geometry/stm32f103re-512k-v0.json": "b6f4504f42879f6b8d018750357a63840760d53f",
+    "data/ic-support/profiles/memory-geometry/stm32f103vc-256k-v0.json": "d17dfefaf2b422ab05261f3464397dc8335a9b74",
+    "data/ic-support/profiles/memory-geometry/stm32f103vd-384k-v0.json": "f94426c67dcdb500b7849d5011ba0faaca1a5690",
+    "data/ic-support/profiles/memory-geometry/stm32f103ve-512k-v0.json": "c9f598529968dd83dc3cd0956d59e2192ba41354",
+    "data/ic-support/profiles/memory-geometry/stm32f103zc-256k-v0.json": "779a8be808b470838dc610ed870ffffde9014f07",
+    "data/ic-support/profiles/memory-geometry/stm32f103zd-384k-v0.json": "0e69eb429e5e2ed0c97b5ae4de15eb0c4cb2fa57",
+    "data/ic-support/profiles/memory-geometry/stm32f103ze-512k-v0.json": "4c15a15e45ffd63a3ee836966823de633440547f",
+    "data/ic-support/benchmarks/stm32f103-high-density/programming-review-v3.json": "d67e9e96495e4cfad9a04a004dab90e3a3a162c7",
+    "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json": "e0f5d394064b2d12a69881dfe8644fcfe870284c"
+  },
+  "records": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RCT6",
+      "base_device": "STM32F103RC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RCT7",
+      "base_device": "STM32F103RC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RDT6",
+      "base_device": "STM32F103RD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RET6",
+      "base_device": "STM32F103RE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103re-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RET7",
+      "base_device": "STM32F103RE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103re-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RCT6TR",
+      "base_device": "STM32F103RC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RCT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RCT6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RCT7TR",
+      "base_device": "STM32F103RC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RCT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RCT7",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RDT6TR",
+      "base_device": "STM32F103RD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RDT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RDT6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RET6TR",
+      "base_device": "STM32F103RE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103re-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103RET6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103RET6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VCT6",
+      "base_device": "STM32F103VC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDT6",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDT7",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VET6",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VET7",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VCT6TR",
+      "base_device": "STM32F103VC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VCT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VCT6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDT6TR",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VDT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VDT6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDT7TR",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VDT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VDT7",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VET6TR",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VET6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VET6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VET7TR",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103VET7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103VET7",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZCT6",
+      "base_device": "STM32F103ZC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZCT7",
+      "base_device": "STM32F103ZC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZDT6",
+      "base_device": "STM32F103ZD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZET6",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZET7",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZCT6TR",
+      "base_device": "STM32F103ZC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103ZCT6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103ZCT6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZCT7TR",
+      "base_device": "STM32F103ZC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103ZCT7",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103ZCT7",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZET6TR",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "ordering_equivalence": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
+        "equivalent_to_icpn": "STM32F103ZET6",
+        "qualification_basis": "commercial packing-only TR suffix after direct exact high-density qualification"
+      },
+      "qualification_basis": {
+        "kind": "ordering_equivalence",
+        "equivalent_to_icpn": "STM32F103ZET6",
+        "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RCY6TR",
+      "base_device": "STM32F103RC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RDY6TR",
+      "base_device": "STM32F103RD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103REY6TR",
+      "base_device": "STM32F103RE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103re-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VCH6",
+      "base_device": "STM32F103VC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDH6",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VDH6TR",
+      "base_device": "STM32F103VD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VEH6",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VEH6TR",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VEH7",
+      "base_device": "STM32F103VE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ve-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZCH6",
+      "base_device": "STM32F103ZC",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zc-256k-v0",
+      "main_flash_size_bytes": 262144,
+      "page_count": 128,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZDH6",
+      "base_device": "STM32F103ZD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZDH6TR",
+      "base_device": "STM32F103ZD",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zd-384k-v0",
+      "main_flash_size_bytes": 393216,
+      "page_count": 192,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZEH6",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZEH6TR",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZEH7",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZEH7TR",
+      "base_device": "STM32F103ZE",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-high-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103ze-512k-v0",
+      "main_flash_size_bytes": 524288,
+      "page_count": 256,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "supplemental_independent_evidence": {
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
+        "qualification_basis": "DS5792 Rev 13 exact high-density package/order-code applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
+      },
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
+      }
+    }
+  ],
+  "default_unreviewed_software_state": "UNKNOWN",
+  "acceptance_boundary": {
+    "public_catalog_visibility_changed": false,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "phase3_compatibility_claimed": false
+  },
+  "predecessor_qualification_id": "adr0002-phase2-openocd-012-stm32f103-high-rvz-lqfp-v3",
+  "ordering_equivalence_id": "st-stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3",
+  "applicability_authority_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4",
+  "authority_artifact_locks": {
+    "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json": "4e6e2a1d80114c9b28c77abdd61a12670bf5c332",
+    "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json": "6658bc7b79e3574fb0692ef349ff5d7dd4703921"
+  },
+  "architecture_note": "v4 preserves the reviewed STM32F103 high-density 0x414 / 2-KiB-page software semantics and adds 16 exact Production H/Y package identities through a separate source-locked package applicability authority; no package grammar or family-wide support is inferred."
+}
