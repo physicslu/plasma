@@ -75,6 +75,7 @@ pl/
 - [PYNQ-Z2 SWD EMIO GPIO + PL Identity 工程](projects/z2-swd-gpio/README.md)：Site 1 的 SWD GPIO proof-of-path、AXI4-Lite Identity ABI v1、Bitstream + HWH + Manifest、SWPC 一鍵 Vivado Build；尚未完成 Vivado/HIL 實證。
 - `rtl/site/swd_emio_bridge.sv` 是 PS EMIO GPIO 的 PL 腳位橋接；**不是**高速 FPGA SWD Master。
 - `rtl/bus/pl_identity_axi_lite.sv` 是首個 PS 可讀的 PL Identity register block。
+- [LT02 five-aperture PS↔PL MMIO Loopback Vivado candidate](projects/z2-lt02-axi/README.md)：保留原四個內部 Fixture Apertures，新增獨立 2 KiB AXI Scratchpad；僅建立 source、HWH 驗證與 SWPC Build，未宣稱新 Bitstream 或 Z2 HIL PASS。
 - `btled` 仍保留獨立教學範例，不作 Production IC programming qualification。
 
 ## 快速測試
