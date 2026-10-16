@@ -26,6 +26,17 @@
         "6.9 LQFP48 package information (5B)",
         "Table 62. LQFP48 mechanical data"
       ]
+    },
+    {
+      "source_id": "st_an2586_rev8",
+      "sections": [
+        "2.1.2 Battery backup",
+        "2.2 Power supply schemes",
+        "2.3 Reset and power supply supervisor",
+        "4 Boot configuration",
+        "5 Debug management",
+        "6 Recommendations"
+      ]
     }
   ],
   "data": {
@@ -33,7 +44,8 @@
     "physical_pin_map": {
       "1": {
         "name": "VBAT",
-        "role": "backup_supply"
+        "role": "backup_supply",
+        "fixture_policy": "tie_to_vdd_when_no_external_battery"
       },
       "7": {
         "name": "NRST",
@@ -161,12 +173,14 @@
       "backup_supply": {
         "pin": 1,
         "name": "VBAT",
-        "required_for_swd_programming": false,
+        "required_for_swd_programming": true,
+        "fixture_policy": "tie_to_vdd_when_no_external_battery",
+        "decoupling_nF": 100,
         "operating_v": {
           "min": 1.8,
           "max": 3.6
         },
-        "note": "backup-domain supply when VDD is not present; not part of the minimum SWD programming contact set"
+        "basis": "AN2586 Rev 8 recommends VBAT be connected externally to VDD with 100 nF when no external battery is used"
       },
       "all_main_power_and_ground_required": true,
       "external_vpp_required": false,
@@ -179,12 +193,13 @@
         "vdda": {
           "capacitors": [
             {
-              "value_nF": 10
+              "value_nF": 100
             },
             {
               "value_uF": 1
             }
-          ]
+          ],
+          "basis": "AN2586 Rev 8 power-supply scheme"
         }
       }
     },
@@ -209,6 +224,11 @@
       }
     },
     "minimum_swd_programming_contacts": [
+      {
+        "package_pin": 1,
+        "signal": "VBAT",
+        "purpose": "backup-domain supply tied to VDD for batteryless programming fixture"
+      },
       {
         "package_pin": 7,
         "signal": "NRST",
@@ -270,23 +290,20 @@
         "package_pin": 44,
         "signal": "BOOT0",
         "purpose": "boot-mode control / recovery"
-      },
-      {
-        "package_pin": 1,
-        "signal": "VBAT",
-        "purpose": "backup-domain test or explicit backup supply"
       }
     ],
     "design_boundary": {
-      "socket_design_input_ready": true,
-      "schematic_design_input_ready": true,
-      "pcb_footprint_design_input_ready": true,
+      "socket_interface_design_input_ready": true,
+      "electrical_schematic_design_input_ready": true,
+      "pcb_footprint_design_input_ready": false,
+      "socket_mechanical_selection_complete": false,
+      "socket_implementation_ready": false,
       "programmer_transport_route": "SWD",
       "hardware_runtime_ready": false,
       "physical_programming_qualified": false,
       "socket_hil_passed": false,
       "execution_authorized": false,
-      "note": "This profile is evidence-backed engineering input for a Socket PCB. It does not certify a specific socket, adapter, Site, PPU, signal-integrity implementation, or production programming configuration."
+      "note": "Evidence-backed electrical and package design input is ready. A specific socket vendor/part, its PCB footprint, Site connector assignment, signal-integrity implementation, and physical HIL remain required before hardware implementation can be called ready."
     },
     "pin_count": 48,
     "package_variant": "LQFP48",
