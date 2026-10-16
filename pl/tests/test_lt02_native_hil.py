@@ -216,6 +216,72 @@ def test_production_driver_hil_case_matrix_injected_host():
     assert bus.claims == [(1, n.LT02)]
 
 
+def test_repeated_production_driver_matrix_uses_distinct_deterministic_payloads():
+    source = "0123456789abcdef" * 2 + "12345678"
+    bus = FakeMMIO(source)
+    cases = n.run_cases(bus, source, repeats=3)
+    assert len(cases) == 3 * len(n.LENGTHS)
+    assert [case["repeat_index"] for case in cases] == [
+        repetition for repetition in range(3) for _ in n.LENGTHS
+    ]
+    assert [case["bytes"] for case in cases] == list(n.LENGTHS) * 3
+    for index, case in enumerate(cases):
+        assert case["case_index"] == index % len(n.LENGTHS)
+        assert case["crc32"] == f"{zlib.crc32(n.case_payload(case['bytes'], index)):08x}"
+        expected_words = sum((min(2048, case["bytes"] - origin) + 3) // 4
+                             for origin in range(0, case["bytes"], 2048))
+        assert case["write_words"] == case["read_words"] == expected_words
+    assert bus.claims == [(1, n.LT02)]
+    assert bus.writes == bus.reads == 4872 * 3
+
+
+@pytest.mark.parametrize("bad", [0, -1, 9, True, 1.5, "3"])
+def test_invalid_repeat_count_rejected_without_identity_or_data_mmio(bad):
+    source = "0123456789abcdef" * 2 + "12345678"
+    bus = FakeMMIO(source)
+    with pytest.raises(n.LT02SafetyError, match="repeats"):
+        n.run_cases(bus, source, repeats=bad)
+    assert bus.writes == bus.reads == 0
+    assert bus.claims == []
+
+
+def test_performance_summary_is_observational_not_a_pass_threshold():
+    cases = [
+        dict(bytes=10, write_words=3, read_words=3, elapsed_ns=10),
+        dict(bytes=20, write_words=5, read_words=5, elapsed_ns=20),
+        dict(bytes=30, write_words=8, read_words=8, elapsed_ns=30),
+        dict(bytes=40, write_words=10, read_words=10, elapsed_ns=40),
+    ]
+    result = n.summarize_cases(cases, wall_elapsed_ns=1_000_000_000)
+    assert result["case_count"] == 4
+    assert result["total_bytes"] == 100
+    assert result["data_write_words"] == 26
+    assert result["data_read_words"] == 26
+    assert result["sum_driver_elapsed_ns"] == 100
+    assert result["effective_bytes_per_s"] == 100
+    assert result["effective_data_word_ops_per_s"] == 52
+    assert result["case_latency_p50_ns"] == 20
+    assert result["case_latency_p95_ns"] == 40
+    assert result["case_latency_max_ns"] == 40
+    assert n.summarize_cases(cases, wall_elapsed_ns=0)["effective_bytes_per_s"] is None
+    with pytest.raises(n.LT02SafetyError):
+        n.summarize_cases([], wall_elapsed_ns=10)
+
+
+def test_bad_cli_repeats_rejected_before_live_preflight(monkeypatch, tmp_path):
+    argv = []
+    for name in ("manifest", "bit", "hwh", "candidate-bin",
+                 "recovery-bin", "recovery-hwh", "receipt", "output"):
+        argv.extend(["--" + name, str(tmp_path / name)])
+    argv += ["--expected-manifest-sha256", "0" * 64,
+             "--execute-live", "--ack-unrecoverable-axi-stall-risk",
+             "--repeats", "9"]
+    monkeypatch.setattr(n, "check_runtime",
+                        lambda: (_ for _ in ()).throw(AssertionError("no live preflight")))
+    assert n.main(argv) == 2
+    assert not (tmp_path / "output").exists()
+
+
 def test_wrong_candidate_build_id_stops_before_data_writes():
     source = "0123456789abcdef" * 2 + "12345678"
     bus = FakeMMIO(source)
