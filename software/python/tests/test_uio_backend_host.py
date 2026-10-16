@@ -315,7 +315,7 @@ def test_invalid_runtime_configuration_fails_before_open(fixture, bad):
     if bad == "overlap":
         aps = (ap(), ap())
     elif bad == "missing":
-        aps = tuple()
+        vals["apertures"] = tuple()
     elif bad == "generation":
         vals["generation"] = 0
     else:
