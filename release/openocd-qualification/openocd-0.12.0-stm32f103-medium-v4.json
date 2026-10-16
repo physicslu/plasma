@@ -135,9 +135,9 @@
   },
   "local_evidence_locks": {
     "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json": "0ca557438df1f9ae636177ce8085e2367469dcef",
-    "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json": "eb136aca6119c9d5b6696285fb57434b0c4c4f62",
+    "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json": "73b69154d34969d089c032583d9970179149a3e8",
     "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json": "e869dd9e4494677080e3474ad9b55f4c00b3bea6",
-    "data/ic-support/bindings/stm32f103c-pilot-v0.json": "4cb9f27e1ae53b7d409ea99cfc9d0133bbf75611",
+    "data/ic-support/bindings/stm32f103c-pilot-v0.json": "be547e6b90744b8f2279deb06b3301778290748b",
     "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json": "fff134baad812004c60c1e0de48ff4175378a406",
     "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json": "1be63701b4a5202d8cee71d50910b7287d92e84c",
     "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json": "851171147296f574dbe66ded56e2887db12d458e",
@@ -733,7 +733,7 @@
   "ordering_equivalence_id": "st-stm32f103-medium-density-tr-ordering-equivalence-v3",
   "applicability_authority_id": "st-stm32f103-medium-density-lqfp-t6-t7-applicability-v2",
   "authority_artifact_locks": {
-    "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json": "de05533033fc627430b4cb9b477b2d9f240e03b7",
+    "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json": "a0db8ef85991a131da4cf3efa59cf4891e486418",
     "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json": "5f674c23677061bf953d8ebe0c9ee75c066fbc05"
   }
 }
