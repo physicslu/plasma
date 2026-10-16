@@ -1,0 +1,164 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "stm32f103c8t6-lqfp48-swd-socket-design-v1",
+  "status": "engineering_design_input",
+  "target": {
+    "manufacturer": "STMicroelectronics",
+    "icpn": "STM32F103C8T6",
+    "base_device": "STM32F103C8",
+    "package": "LQFP48",
+    "pin_count": 48,
+    "catalog_level": 2
+  },
+  "canonical_profiles": {
+    "programming": "stm32f1-medium-density-flash-v0",
+    "memory_geometry": "stm32f103c8-64k-v0",
+    "package_hardware": "stm32f103-lqfp48-programming-hardware-v1",
+    "option": "stm32f1-option-bytes-v0",
+    "security": "stm32f1-medium-density-security-v0"
+  },
+  "provider_route": {
+    "provider": "openocd-upstream",
+    "version": "0.12.0",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "operations": [
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ]
+  },
+  "socket_interface": {
+    "primary_transport": "SWD",
+    "mandatory_contacts": [
+      {
+        "pin": 7,
+        "signal": "NRST"
+      },
+      {
+        "pin": 8,
+        "signal": "VSSA"
+      },
+      {
+        "pin": 9,
+        "signal": "VDDA"
+      },
+      {
+        "pin": 23,
+        "signal": "VSS_1"
+      },
+      {
+        "pin": 24,
+        "signal": "VDD_1"
+      },
+      {
+        "pin": 34,
+        "signal": "SWDIO"
+      },
+      {
+        "pin": 35,
+        "signal": "VSS_2"
+      },
+      {
+        "pin": 36,
+        "signal": "VDD_2"
+      },
+      {
+        "pin": 37,
+        "signal": "SWCLK"
+      },
+      {
+        "pin": 47,
+        "signal": "VSS_3"
+      },
+      {
+        "pin": 48,
+        "signal": "VDD_3"
+      }
+    ],
+    "recommended_optional_contacts": [
+      {
+        "pin": 44,
+        "signal": "BOOT0"
+      },
+      {
+        "pin": 1,
+        "signal": "VBAT"
+      }
+    ],
+    "target_voltage_reference": "VDD",
+    "nominal_engineering_voltage_v": 3.3,
+    "allowed_programming_voltage_v": {
+      "min": 2,
+      "max": 3.6
+    },
+    "external_vpp_required": false
+  },
+  "software_design_input": {
+    "flash_start": "0x08000000",
+    "flash_size_bytes": 65536,
+    "page_size_bytes": 1024,
+    "page_count": 64,
+    "program_unit_bytes": 2,
+    "erase_modes": [
+      "page",
+      "mass"
+    ],
+    "verify": "readback",
+    "execution_ir": "stm32f103c-programming-execution-ir-v0"
+  },
+  "hardware_design_input": {
+    "package_body_mm": {
+      "x": 7,
+      "y": 7
+    },
+    "lead_span_mm": {
+      "x": 9,
+      "y": 9
+    },
+    "pitch_mm": 0.5,
+    "max_height_mm": 1.6,
+    "decoupling": {
+      "per_vdd_nF": 100,
+      "bulk_uF": 4.7,
+      "bulk_node": "VDD_3",
+      "vdda": [
+        {
+          "value_nF": 10
+        },
+        {
+          "value_uF": 1
+        }
+      ]
+    },
+    "reset": {
+      "active": "low",
+      "pin": 7,
+      "internal_pullup_ohm": {
+        "min": 30000,
+        "typ": 40000,
+        "max": 50000
+      }
+    }
+  },
+  "implementation_decisions_pending": [
+    "specific LQFP48 programming socket manufacturer and part number",
+    "socket-to-Site connector pin assignment",
+    "target power switch, current-limit and discharge implementation",
+    "SWD level-driver/series-resistor implementation for the selected PPU/Site electrical topology",
+    "fixture insertion detection and orientation/keying mechanism",
+    "PCB stack-up, trace geometry and signal-integrity verification",
+    "production ESD and operator-safety implementation"
+  ],
+  "qualification_boundary": {
+    "sufficient_for_socket_schematic_and_layout_design": true,
+    "sufficient_for_openocd_programmer_software_development": true,
+    "sufficient_for_native_swd_transport_implementation": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "hil_verified": false,
+    "execution_authorized": false
+  }
+}
