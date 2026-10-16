@@ -327,7 +327,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         self.assertIsNone(unreviewed["provider"])
         self.assertEqual(unreviewed["operations"], {})
         self.assertIsNone(unreviewed["programming"])
-        self.assertFalse(unreviewed["public_catalog_visibility_changed"])
+        self.assertEqual(unreviewed["selector_visibility_authority"], "PHASE1_IDENTIFIED")
         self.assertFalse(unreviewed["job_batch_execution_changed"])
         self.assertFalse(unreviewed["hardware_runtime_ready"])
         self.assertFalse(unreviewed["physical_programming_qualified"])
@@ -340,7 +340,6 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.assertTrue(opq[operation]["openocd_basis"])
             self.assertTrue(opq[operation]["manufacturer_basis"])
 
-        self.assertFalse(self.registry.acceptance_boundary["public_catalog_visibility_changed"])
         self.assertFalse(self.registry.acceptance_boundary["job_batch_execution_changed"])
         self.assertFalse(self.registry.acceptance_boundary["installed_runtime_attested"])
         self.assertFalse(self.registry.acceptance_boundary["hardware_runtime_ready"])
@@ -359,6 +358,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             registry.summary["qualification_id"],
             "adr0002-phase2-openocd-012-stm32f103-v7",
         )
+        self.assertEqual(
+            registry.summary["selector_visibility_authority"],
+            "PHASE1_IDENTIFIED",
+        )
+        self.assertEqual(len(registry.reviewed_exact_keys), 49)
 
     def test_local_evidence_blob_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)
