@@ -154,6 +154,15 @@ def main(argv: list[str] | None = None) -> int:
             phase=args.stage, p0=args.p0_report, session=args.session,
             candidate_bin=args.candidate_bin, previous=args.previous,
         )
+        if args.stage == "HIL02":
+            prior = json.loads(args.previous.read_text(encoding="utf-8"))
+            c._require(
+                type(prior) is dict and prior.get("scope") == "MMIO-13-15"
+                and prior.get("stage") == "HIL01"
+                and prior.get("result") == "PASS"
+                and prior.get("p0_sha256") == c.sha256_file(args.p0_report),
+                "HIL02 requires this candidate's native LinuxMMIO HIL01 PASS",
+            )
     except (OSError, ValueError, KeyError, c.SafetyError) as exc:
         print("MMIO_Z2_NO_GO: " + str(exc), file=sys.stderr)
         return 2
@@ -165,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
         "qualification": "SWD-04", "scope": "MMIO-13-15",
         "stage": args.stage, "source_git_sha": c.SOURCE_SHA,
         "candidate_bin_sha256": c.CANDIDATE_BIN_SHA256,
+        "p0_sha256": c.sha256_file(args.p0_report),
+        "session_sha256": c.sha256_file(args.session),
         "python": platform.python_version(),
         "python_executable": sys.executable,
         "physical_swd": "NOT_RUN", "real_ic_programming": "NOT_RUN",
