@@ -69,6 +69,148 @@ scripts/            integration/deployment and service-control scripts
 docs/               architecture, development, and deployment documentation
 ```
 
+## 1A. Prototype-first engineering policy (normative)
+
+**PLASMA is currently in the prototype / proof-of-concept stage.** The
+PYNQ-Z2 is a personally operated development board used to validate design
+ideas, especially PS -> AXI-Lite -> FPGA SWD -> external-target/OpenOCD
+feasibility. **A prototype is not a production appliance**: do not impose
+future manufacturing, fleet security, factory traceability, full qualification,
+or release governance on every daily lab iteration. Production requirements
+are introduced progressively when the architecture and target hardware have
+been validated.
+
+Stage-specific objectives:
+
+| Stage | Primary question | Default validation |
+| --- | --- | --- |
+| Prototype / PoC (current PYNQ-Z2) | Does the idea work on real hardware? | Smallest meaningful functional test / HIL smoke test; capture actual result and necessary recovery data |
+| Engineering validation (custom board) | Does the complete design meet its engineering requirements? | Integrated electrical, timing, recovery, and reliability qualification |
+| Production / release (PPU product) | Can it be manufactured, supported, and operated reliably? | Full production security, traceability, QA, maintainability, and acceptance controls |
+
+For prototype work, **Build -> Test -> Learn -> Iterate** is the
+default decision loop. Optimize for *time to a meaningful real-hardware
+observation*, not documents, ceremonies, approval counts or evidence volume:
+
+1. State the immediate hypothesis and first measurable pass/fail result.
+   Execute the shortest path to that result; do not open a new
+   enrollment, identity, documentation or audit milestone unless a concrete
+   dependency makes it necessary.
+2. Reuse already accepted enrollment, board identity, UART capabilities,
+   historical HIL results, artifacts and recovery qualification.
+   Previously proved capability is not a per-run qualification task.
+   Still check current, changeable facts that affect safe execution.
+3. Default PYNQ-Z2 internal-loopback HIL to the repository's
+   `--profile development` policy. Keep the stricter
+   `qualification` profile for deliberate qualification or release work.
+   A previous Identity PASS does not prove that a newly loaded candidate
+   image has the intended Build ID; a fast readback after load is reasonable,
+   not a new qualification project.
+4. Aim for **at most 180 seconds of pre-experiment checks** in the normal
+   healthy lab state. This is a latency objective, **not** permission
+   to assume PASS or bypass a real hazard. In one bounded pass automatically
+   check applicable access, current PL ownership/mappings, clock, artifact
+   integrity, and rollback image. On a genuine blocker, report all actionable
+   blockers together rather than repeatedly running known-failing preflight.
+5. Agents perform tool-accessible SSH/UART, host inspection, read-only
+   verification, builds and routine execution themselves. Avoid asking the
+   owner to relay commands or reconfirm electronically observable facts.
+   A missing sudo/SSH permission is an access limitation, **not a new approval
+   gate**; obtain an authorized execution path without leaking credentials,
+   modifying sudoers, or silently escalating privilege.
+6. After Gate 1, execute autonomously **within its approved scope**.
+   Do not invent per-stage approvals, new documentation gates, or a third
+   sign-off. Keep Gate 2 for merging, and request an expanded Gate 1 only
+   when materially new work or risk is outside the authorized scope.
+7. Prototype does **not** mean unsafe or unverifiable: preserve electrical
+   voltage/DUT safeguards, known firmware recovery, conflicting PL-driver
+   and MMIO ownership checks, applicable high-risk AXI-fault constraints,
+   and truthful PASS/FAIL/NOT RUN evidence. Stop on real hazards.
+   Do not confuse a SHA-256 file-integrity check with proof of hardware
+   electrical safety.
+8. Keep engineering records **proportionate to the experiment**. A short
+   reproducible command, tested image/commit, observed result, and recovery
+   outcome are usually sufficient for a development smoke test. Do not
+   retroactively alter immutable historical evidence. Formal reports,
+   extensive approval evidence, and manufacturing controls belong to
+   qualification/production work unless a current technical dependency
+   specifically demands them.
+
+This section governs agent priorities and operating style; it does not
+override repository source-of-truth rules, an active safety prohibition,
+the existing two Gate 1/Gate 2 workflow, or explicit task-specific hardware
+restrictions. When a lower-level procedure is unnecessarily stricter for a
+prototype, propose and implement a scoped Development Mode change through
+normal engineering review rather than fabricate evidence or silently bypass
+executable checks.
+
+## 1B. Canonical Codex task/SSH execution contract (normative)
+
+**A Codex instruction is an execution assignment, not an invitation to
+re-plan the same approved work.** For every task already covered by Gate 1,
+the agent must carry out *all* authorized steps through actual acceptance or
+a truthful, actionable blocker, without transferring routine SSH/sudo,
+building, staging, test execution, restore, CI repair or status checking to
+the owner. Explicit Gate 2 approval still controls merging.
+
+The standard input packet for hardware tasks is
+`docs/development/codex-z2-hil-development-command.md`. Its fixed sections
+are: objective, already-approved scope, target/repository, credentials,
+autonomous sequence, stop/recovery policy and PASS/FAIL/NOT RUN evidence.
+For non-hardware work use the same pattern, with the task's actual acceptance
+criteria; do not invent hardware stages.
+
+**Z2 development SSH/sudo authentication:**
+
+- The standard PYNQ-Z2 development-image SSH account is `xilinx`.
+  A factory-image account name is not an authorization token. Resolve the
+  actual target hostname/IP from current, owner-authorized lab config;
+  never guess a network target or select another device solely by hostname.
+- The SSH password and (unless explicitly different) sudo password come
+  from the owner's approved **local** credential source, not from Git.
+  Canonical per-user file on the **integration host**:
+  `~/.config/plasma/z2-dev-credentials.json` containing
+  `ssh_host`, `ssh_username`, `ssh_password`, `sudo_password`.
+  The file/directory must be owner-only (`0600`/`0700`), outside the
+  repository, never committed, copied to a PR/CI artifact, logged, printed,
+  or transmitted to unrelated endpoints. A password reused for SSH and
+  sudo is acceptable for this owner-authorized lab prototype.
+- The owner has authorized the agent to use the supplied development-board
+  credentials for bounded PYNQ-Z2 SSH/sudo HIL within the approved Gate 1
+  scope. **Do not introduce a redundant manual sudo approval.** Prefer
+  existing SSH agent/key or owner-approved credential store when usable;
+  otherwise read the local secret in memory and feed sudo through stdin
+  (e.g., `sudo -S`), never via shell arguments or a committed script.
+  Redact secrets from errors and logs. Never edit sudoers to avoid a prompt.
+- If the approved credential store is absent but the owner supplied the
+  credential in the agent's active authorized session, initialize/use the
+  private store without asking again. If the credential genuinely is
+  unavailable to the execution environment, request it **once**, as a
+  concrete access blocker, rather than looping through failed SSH/sudo
+  preflights. Do not assume a chat secret magically appears on the host.
+- Agent permission/sandbox boundaries still apply. A text prompt or
+  stored credential cannot create SSH access or override a real sandbox
+  denial. Never state that a physical action ran unless it was observed.
+
+**Default end-to-end Z2 prototype-HIL sequence, when hardware execution is
+within the approved task:** safely synchronize code, identify actual board
+and known-good candidate/recovery artifacts, perform one bounded
+Development Mode preflight, obtain the authorized root channel, perform
+supervised candidate load, check its new-build identity, execute PSPL-02
+Control/Status and SWD-00 internal loopback, **always attempt original FPGA
+recovery even on test failure**, verify restored board state, and publish
+the observed results with evidence paths. If current tooling stops at
+preflight or live-MMIO primitives, the agent must implement/stage a minimal
+bounded orchestration path in the approved scope rather than misrepresent
+those tools as a one-command hardware runner. Never claim a promised
+automation is already implemented.
+
+For this internal-loopback development milestone, do **not** run the
+intentional AXI-fault `ERROR`/`RESET` stages or external SWD/DUT operations.
+Stop on genuine ownership, artifact, electrical, recovery or access
+hazards. Distinguish *candidate loaded*, *functional PASS* and *original
+image recovered*; all must be actually observed.
+
 ## 2. Programming data model
 
 Plasma separates source data, execution instructions, and target-memory data.
@@ -685,7 +827,7 @@ Treat `$PLASMA_REPO` as the normal workspace boundary for AI-assisted developmen
 - Read/create/modify/delete files only inside the repository unless the task genuinely requires an already-authorized external resource.
 - Keep ordinary development commands inside the repository or subdirectories.
 - Do not inspect unrelated repositories, personal files, credentials, SSH configuration, container data, or system configuration as ordinary Plasma work.
-- Do not commit usernames, private hostnames, workstation inventory, keys, tokens, or other operator-specific infrastructure metadata into public guidance.
+- Do not commit personal usernames, private hostnames, workstation inventory, passwords, keys, tokens, or other operator-specific infrastructure metadata into public guidance. An intentionally documented vendor-default lab image account name (such as the PYNQ-Z2 development account) is not a personal username or credential secret.
 - If a task cannot be completed without leaving the workspace boundary, stop and explain the required external resource.
 
 This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.

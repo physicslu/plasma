@@ -7,7 +7,7 @@ the already merged 2,563-member exact-ICPN/CFG
 [freeze](MICROCHIP_5CFG_2563_PHASE1_ST_FIELDS_V1.md), and ST's per-field
 `VERIFIED / PARTIAL / UNKNOWN / CONFLICT` evidence structure.
 
-**Do not widen the 2,563 exact ICPN frozen cohort or recalculate P0/P1/P2.**
+**本批欄位補強維持 2,563 筆的來源凍結集合，不變更原始 MCP/CFG 身分及 SHA。** 舊 P0／P1／P2 是封存資料的歷史研究群組名稱，僅用於原始資料可重播性，不是 ADR-0002 的 Phase 狀態，也不是 IC Selector 可見性門檻。Phase 1 一律由精確原廠物料身分 `IDENTIFIED` 判定。
 
 In the `tcl/target/atsaml1x.cfg` group there are 126 original
 Microchip MCP exact commercial order codes and twelve original Base Devices.
@@ -97,13 +97,24 @@ tests.
 
 ## IC Selector / Catalog policy boundary
 
-ST and NXP currently display exact ICPNs in the default IC Selector after
-manufacturer identity evidence and **independent Production Admission**,
-even if a software-qualification profile is not `SUPPORTED`.
-This existing product behavior differs from ADR-0002's accepted but
-**not yet implemented** eventual `SUPPORTED-only` public-display
-policy. The discrepancy must be reconciled in a separate owner-approved
-policy/UI migration before Microchip's first Production admission.
+**2026-10-15 ADR-0002 authoritative decision:** all original-manufacturer
+exact ICPNs that passed Phase 1 `IDENTIFIED` are eligible for IC Selector
+search, independently of Phase 1 `INFORMATION_COMPLETE`, Phase 2
+`SUPPORTED` or Phase 3 `PASSED`. A Production Identity Manifest is the
+current implementation's persistence/admission mechanism, **not an
+additional manufacturer or software evidence threshold** that may
+silently hide valid Phase 1 identities.
+
+This PR covers **122 ordinary commercial ICPNs for exact-field enrichment**
+and does not remove the remaining `IDENTIFIED` materials from Phase 1.
+The source-replayed Microchip bounded snapshot contains 23,276 Phase 1
+`IDENTIFIED` identities; 2,563 belong to the historical 5-CFG research
+subset. The entire Phase 1 visibility migration is **not implemented** by
+this focused research PR. Missing ingestion is tracked as an implementation
+gap, not an ADR rule or a disqualifying status.
+
+Microchip remains Phase 2 `UNKNOWN` until independent provider-specific
+Programming qualification; Job/Batch must fail closed.
 
 This PR only extends manufacturer **Phase 1 IC Information evidence**.
 No direct Production Admission, Catalog manifest/API/Selector, Job/Batch,

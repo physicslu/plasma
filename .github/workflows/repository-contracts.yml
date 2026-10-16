@@ -9,11 +9,11 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/tests/test-adr0002-openocd-reverse-coverage.py"
-      - "docs/architecture/openocd-reverse-coverage-research-contract-v1.json"
+      - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
+      - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -33,11 +33,11 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/tests/test-adr0002-openocd-reverse-coverage.py"
-      - "docs/architecture/openocd-reverse-coverage-research-contract-v1.json"
+      - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
+      - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
@@ -112,8 +112,7 @@ jobs:
           documentation_exact = {
               "scripts/tests/test-public-doc-sanitization.sh",
               "scripts/tests/test-documentation-integrity.py",
-              "scripts/tests/test-adr0002-openocd-reverse-coverage.py",
-              "docs/architecture/openocd-reverse-coverage-research-contract-v1.json",
+              "scripts/tests/test-adr0002-cross-vendor-discovery.py",
               "scripts/plasmactl",
               "software/python/plasma_web/gateway_settings.py",
               "software/python/plasma_core/errors.py",
@@ -128,6 +127,7 @@ jobs:
               ".github/device-catalog-ci-trigger-debt.json",
               "scripts/tests/test-ci-domain-boundaries.py",
               "scripts/ci/device-catalog-trigger-governance.py",
+              "scripts/ci/ppu-network-trigger.py",
               ".github/workflows/python-tests.yml",
               ".github/workflows/ic-support-validation.yml",
               ".github/workflows/ppu-release.yml",
@@ -179,8 +179,8 @@ jobs:
         run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test documentation integrity
         run: python scripts/tests/test-documentation-integrity.py
-      - name: Enforce ADR-0002 OpenOCD reverse-coverage and research priority contract
-        run: python scripts/tests/test-adr0002-openocd-reverse-coverage.py
+      - name: Enforce ADR-0002 single cross-vendor Phase policy
+        run: python scripts/tests/test-adr0002-cross-vendor-discovery.py
 
   terminology:
     needs: route-contracts
@@ -215,6 +215,8 @@ jobs:
           python-version: "3.12"
       - name: Lock Device Catalog / AI research / software CI boundaries
         run: python scripts/tests/test-ci-domain-boundaries.py
+      - name: Self-test PPU network heavy-gate routing
+        run: python scripts/ci/ppu-network-trigger.py --self-test
       - name: Enforce Device Catalog CI trigger governance
         env:
           PLASMA_CI_GOVERNANCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}

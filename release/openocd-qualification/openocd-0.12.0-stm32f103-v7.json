@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v7",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "status": "multi_density_bounded_qualification",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "flash_driver_source_path": "src/flash/nor/stm32f1x.c"
+  },
+  "cohorts": [
+    {
+      "qualification_id": "adr0002-phase2-openocd-012-stm32f103-medium-v4",
+      "qualification_path": "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
+      "git_blob_sha1": "db7c4f190da7a9ea5acaf7eb564a5a405db52d0d",
+      "role": "medium_density_existing_authority",
+      "supported_exact_icpn_count": 22
+    },
+    {
+      "qualification_id": "adr0002-phase2-openocd-012-stm32f103-high-rvz-lqfp-v3",
+      "qualification_path": "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-lqfp-v3.json",
+      "git_blob_sha1": "17eed9238c3b0ed4a7048be171d113ea2c1494cc",
+      "role": "high_density_rvz_lqfp_extension",
+      "supported_exact_icpn_count": 27
+    }
+  ],
+  "default_unreviewed_software_state": "UNKNOWN",
+  "acceptance_boundary": {
+    "public_catalog_visibility_changed": false,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "phase3_compatibility_claimed": false
+  },
+  "predecessor_qualification_id": "adr0002-phase2-openocd-012-stm32f103-v6",
+  "supported_exact_icpn_count": 49,
+  "architecture_note": "v7 keeps medium/high density as separate cohort authorities and expands the reviewed high-density LQFP surface from R/V-pin to R/V/Z-pin exact identities; BGA/WLCSP and XL-density remain unreviewed."
+}

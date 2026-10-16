@@ -153,6 +153,16 @@ async def axi_register_contract(dut):
     assert await b.write(REG_WDATA, 0xFFFFFFFF, strb=0) == OKAY
     assert await b.read(REG_WDATA) == (OKAY, 0x11BB33DD)
 
+    # Regression for ARMv7 byte-store/MMIO bug: AXI address +1 is not an
+    # aligned word register, even when the corresponding byte lane is set.
+    # Exercise these errors ONLY in RTL simulation, never as live Z2 probes.
+    for lane in (1, 2, 3):
+        assert await b.write(REG_WDATA + lane, 0, strb=1 << lane) == SLVERR
+        assert await b.read(REG_WDATA) == (OKAY, 0x11BB33DD)
+    # Aligned native 32-bit transaction still works after rejected writes.
+    assert await b.write(REG_WDATA, 0x87654321, strb=0b1111) == OKAY
+    assert await b.read(REG_WDATA) == (OKAY, 0x87654321)
+
     # Reserved bits are rejected, preserving old values.
     assert await b.write(REG_CONFIG, 0x100) == SLVERR
     assert await b.read(REG_CONFIG) == (OKAY, 4)

@@ -121,3 +121,21 @@ async def response_reset_and_half_write_reset(dut):
     await cycle(dut)
     dut.s_axi_bready.value = 0
     await read_reg(dut, BASE, 0xAAAA5555)
+
+
+@cocotb.test()
+async def arm_byte_clear_vs_native_word_store(dut):
+    """Reproduce pack_into's ARM memset byte-address sequence offline only."""
+    await setup(dut)
+    await write(dut, BASE, 0x12345678)
+    # ARM memset first clears byte 0 at the valid CONTROL word address.
+    await write(dut, BASE, 0, strobe=0b0001)
+    await read_reg(dut, BASE, 0x12345600)
+    # Subsequent byte addresses are not CONTROL: real RTL emits SLVERR.
+    for lane in (1, 2, 3):
+        await write(dut, BASE + lane, 0, strobe=1 << lane, response=2)
+        await read_reg(dut, BASE, 0x12345600)
+    # A native aligned word store uses the accepted address and all lanes.
+    await write(dut, BASE, 0x87654321, strobe=0b1111)
+    await read_reg(dut, BASE, 0x87654321)
+    await read_reg(dut, BASE + 4, 0x87654321 ^ MASK)

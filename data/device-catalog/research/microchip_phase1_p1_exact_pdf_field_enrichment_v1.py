@@ -235,8 +235,11 @@ def enrich(frozen_report, ordering):
             and promoted==Counter({name:EXACT for name in PROMOTE})
             and frozen.freeze_digest(results)==FROZEN_SHA,
             "freeze or exact manufacturer information promotion drift")
-    field_summary={name:{status:0 for status in
-                   ("VERIFIED","PARTIAL","UNKNOWN","CONFLICT")}
+    # ADR-0002 canonical field states are cross-vendor, including a
+    # source-attested NOT_APPLICABLE. No SAM L10/L11 rail has such proof:
+    # zero NOT_APPLICABLE records is intentional; never infer absence.
+    canonical_states=("VERIFIED","PARTIAL","UNKNOWN","CONFLICT","NOT_APPLICABLE")
+    field_summary={name:{status:0 for status in canonical_states}
                    for name in frozen.ST_FIELDS}
     for row in results:
         for field in frozen.ST_FIELDS:

@@ -3,6 +3,11 @@
 Host-only integrated candidate; Z2 loading is not qualified. HIL-PSPL-01,
 its Identity-only design, evidence and artifacts remain unchanged.
 
+The [PSPL-02/SWD-00 HIL runbook](../../../docs/development/pspl02-swd00-hil-runbook.md)
+provides baseline-pinned staging, read-only inventory, inert-by-default MMIO
+tests and offline recovery acceptance. Hardware remains NO-GO until current
+independent UART/power recovery, privileged ownership and loading checks pass.
+
 PS7 GP0, FCLK0 100 MHz and synchronized active-low reset serve three disjoint
 4 KiB segments: Identity `0x40000000` (unchanged ABI v1, flags 0), Control
 `0x40001000`, and SWD command `0x40002000`. Only DDR/FIXED_IO are external.
