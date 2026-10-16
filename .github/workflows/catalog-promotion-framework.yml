@@ -1,0 +1,87 @@
+name: Catalog cross-manufacturer promotion framework
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "software/python/plasma_web/catalog_promotion_framework.py"
+      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/backend_candidate_registry.py"
+      - "software/python/plasma_web/openocd_software_qualification.py"
+      - "software/python/plasma_web/device_catalog.py"
+      - "software/python/tests/test_catalog_promotion_framework.py"
+      - "data/device-catalog/production/**"
+      - "data/device-catalog/research/**"
+      - "release/openocd.json"
+      - "release/openocd-qualification/**"
+      - "docs/adr/0002-openocd-software-qualified-catalog-visibility.md"
+      - ".github/workflows/catalog-promotion-framework.yml"
+  pull_request:
+    paths:
+      - "software/python/plasma_web/catalog_promotion_framework.py"
+      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/backend_candidate_registry.py"
+      - "software/python/plasma_web/openocd_software_qualification.py"
+      - "software/python/plasma_web/device_catalog.py"
+      - "software/python/tests/test_catalog_promotion_framework.py"
+      - "data/device-catalog/production/**"
+      - "data/device-catalog/research/**"
+      - "release/openocd.json"
+      - "release/openocd-qualification/**"
+      - "docs/adr/0002-openocd-software-qualified-catalog-visibility.md"
+      - ".github/workflows/catalog-promotion-framework.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  promotion-framework:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check promotion framework diff whitespace
+        run: git diff --check HEAD^1 HEAD
+      - name: Validate cross-manufacturer promotion framework
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m py_compile \
+            software/python/plasma_web/catalog_promotion_framework.py \
+            software/python/plasma_web/programming_qualification.py
+          python software/python/tests/test_catalog_promotion_framework.py
+      - name: Emit deterministic coverage and blocker report
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m plasma_web.catalog_promotion_framework > catalog-promotion-report.json
+          cat catalog-promotion-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("catalog-promotion-report.json").read_text())
+          assert report["framework"] == "ADR-0002-cross-manufacturer-promotion"
+          assert report["execution_authorized_by_framework"] is False
+          assert sum(report["catalog_level_counts"].values()) == report["discovered_exact_icpns"]
+          assert report["selector_visible_exact_icpns"] == (
+              report["catalog_level_counts"]["1"]
+              + report["catalog_level_counts"]["2"]
+              + report["catalog_level_counts"]["3"]
+          )
+          assert report["job_selectable_exact_icpns"] == (
+              report["catalog_level_counts"]["2"]
+              + report["catalog_level_counts"]["3"]
+          )
+          print("CROSS_MANUFACTURER_PROMOTION_FRAMEWORK_PASS")
+          PY
