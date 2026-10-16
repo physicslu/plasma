@@ -6,9 +6,16 @@ on:
       - 'data/device-catalog/research/microchip_l1_admission_queue_v1.py'
       - 'data/device-catalog/research/microchip_pic32mx_devid_route_review_v1.py'
       - 'data/device-catalog/research/microchip_pic32mx_l1_canonical_dryrun_v1.py'
+      - 'data/device-catalog/research/microchip_pic32mx_893_production_source_gate_v1.py'
+      - 'data/device-catalog/research/microchip-pic32mx-893-commercial-l1-v1.csv'
+      - 'data/device-catalog/research/microchip-pic32mx-85-devid-route-v1.json'
+      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
       - 'software/python/plasma_web/route_evidence_admission.py'
       - 'software/python/plasma_web/microchip_saml1x_route_evidence.py'
+      - 'software/python/plasma_web/microchip_pic32mx_route_evidence.py'
+      - 'software/python/plasma_web/microchip_phase1_admission_guard.py'
+      - 'software/python/tests/test_microchip_pic32mx_893_l1_admission.py'
       - 'software/python/tests/test_microchip_saml1x_route_evidence.py'
       - 'software/python/plasma_web/programming_qualification.py'
       - 'software/python/tests/test_route_evidence_admission.py'
@@ -37,6 +44,8 @@ jobs:
             -p 'test_route_evidence_admission.py' -v
           python -m unittest discover -s software/python/tests \
             -p 'test_microchip_saml1x_route_evidence.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_microchip_pic32mx_893_l1_admission.py' -v
           python -m unittest discover -s software/python/tests \
             -p 'test_catalog_promotion_framework.py' -v
           python -m unittest discover -s software/python/tests \
@@ -80,6 +89,11 @@ jobs:
           curl --fail --location --retry 3 --silent --show-error \
             "https://raw.githubusercontent.com/openocd-org/openocd/9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c/src/flash/nor/pic32mx.c" \
             --output "${{ runner.temp }}/microchip-l1/pic32mx.c"
+      - name: Independently prove 893 Production ICPNs from original manufacturer identity plus OpenOCD driver
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_pic32mx_893_production_source_gate_v1.py \
+            --driver-source "${{ runner.temp }}/microchip-l1/pic32mx.c"
       - name: Reconcile PIC32MX device-ID applicability per exact commercial ICPN
         run: |
           set -euo pipefail
