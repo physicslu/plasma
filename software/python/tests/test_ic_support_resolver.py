@@ -39,6 +39,37 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(c8.profile("option").profile_id, cb.profile("option").profile_id)
         self.assertEqual(c8.profile("security").profile_id, cb.profile("security").profile_id)
         self.assertEqual(c8.profile("package_hardware").profile_id, cb.profile("package_hardware").profile_id)
+        self.assertEqual(
+            c8.profile("package_hardware").profile_id,
+            "stm32f103-lqfp48-programming-hardware-v1",
+        )
+        hardware = c8.profile("package_hardware").data
+        pin_map = {row["pin"]: row["name"] for row in hardware["physical_pin_map"]}
+        self.assertEqual(len(pin_map), 48)
+        self.assertEqual(pin_map[7], "NRST")
+        self.assertEqual(pin_map[34], "PA13")
+        self.assertEqual(pin_map[37], "PA14")
+        self.assertEqual(pin_map[44], "BOOT0")
+        self.assertEqual(
+            hardware["programming_route"]["signals"]["SWDIO"]["pin"],
+            34,
+        )
+        self.assertEqual(
+            hardware["programming_route"]["signals"]["SWCLK"]["pin"],
+            37,
+        )
+        self.assertTrue(
+            hardware["hardware_readiness_boundary"]["socket_design_input_complete"]
+        )
+        self.assertFalse(
+            hardware["hardware_readiness_boundary"]["physical_socket_qualified"]
+        )
+        self.assertFalse(
+            hardware["hardware_readiness_boundary"]["hardware_runtime_ready"]
+        )
+        self.assertFalse(
+            hardware["hardware_readiness_boundary"]["execution_authorized"]
+        )
         self.assertNotEqual(
             c8.memory_geometry_profile.profile_id,
             cb.memory_geometry_profile.profile_id,
