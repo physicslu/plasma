@@ -1,0 +1,45 @@
+name: PLASMA Phase 2A UIO Backend Host-only
+
+on:
+  pull_request:
+    paths:
+      - "software/python/plasma_interfaces/uio_backend.py"
+      - "software/python/tests/test_uio_backend_host.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
+      - "docs/development/uio-runtime-backend-host-v1.md"
+      - ".github/workflows/pl-uio-runtime-phase2a.yml"
+  push:
+    branches: [main]
+    paths:
+      - "software/python/plasma_interfaces/uio_backend.py"
+      - "software/python/tests/test_uio_backend_host.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
+      - "docs/development/uio-runtime-backend-host-v1.md"
+      - ".github/workflows/pl-uio-runtime-phase2a.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  host-uio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python test dependencies
+        run: python3 -m pip install -e software/python pytest pytest-asyncio
+      - name: UIO Phase 2A synthetic host tests and legacy driver regression
+        run: python3 -m pytest -q software/python/tests/test_uio_backend_host.py software/python/tests/test_linux_mmio.py
+      - name: Safety/evidence boundary
+        if: always()
+        run: |
+          {
+            echo "Phase 2A test backend maps only ordinary regular files."
+            echo "No /dev/uioX, /dev/mem, FPGA, SWD real target or Z2 MMIO accessed."
+            echo "ABI v1 remains Proposed; M1 Architecture Freeze remains NO-GO."
+          } >> "$GITHUB_STEP_SUMMARY"
