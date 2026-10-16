@@ -141,6 +141,44 @@ def verify_receipt(receipt: dict, *, boot_id: str, last_load_line: str,
         require(receipt.get(key) == value, "Current load receipt mismatch: " + key)
 
 
+def capture_load_receipt(output: Path, candidate_bin: Path,
+                         artifact: dict) -> dict:
+    """Capture current actual FPGA Manager load. Does NOT load an image.
+
+    Runs only after the external supervised Z2 load and with root-owned
+    staged candidate/recovery artifacts. Creates immutable evidence once.
+    """
+    require(os.geteuid() == 0, "Root required to record hardware load")
+    require(not output.exists(), "Never overwrite a load receipt")
+    for path in (candidate_bin, candidate_bin.parent, output.parent):
+        info = path.stat()
+        require(info.st_uid == 0 and not info.st_mode & 0o022,
+                "Firmware and receipt paths must be protected root-owned")
+    require(digest(candidate_bin) == artifact["candidate_bin_sha256"],
+            "Candidate BIN changed since verification")
+    require(Path("/sys/class/fpga_manager/fpga0/state").read_text().strip()
+            == "operating", "FPGA Manager not operating")
+    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    log = subprocess.run(["dmesg", "--color=never"], check=True,
+                         capture_output=True, text=True, timeout=10).stdout
+    line = last_load(log)
+    require(f": writing {candidate_bin.name} to " in line,
+            "Last FPGA Manager load does not match candidate BIN")
+    receipt = dict(
+        boot_id=boot_id, load_line=line,
+        candidate_bin_sha256=artifact["candidate_bin_sha256"],
+        manifest_sha256=artifact["manifest_sha256"],
+        build_id=artifact["build_id"],
+        axi_address_map=dict(AXI_BASES),
+        site_id=1, external_pl_io=False,
+    )
+    fd = os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(receipt, f, sort_keys=True, indent=2)
+        f.write("\\n")
+    return receipt
+
+
 def verify_live_environment(receipt_path: Path, candidate_bin: Path,
                             artifact: dict) -> None:
     """Read-only live checks before any LinuxMMIO opens /dev/mem."""
@@ -299,9 +337,28 @@ def main(argv: list[str] | None = None) -> int:
                  "recovery-hwh", "receipt", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--expected-manifest-sha256", required=True)
+    parser.add_argument("--record-loaded-image", action="store_true",
+                        help="After supervised external load, capture protected current-boot receipt only")
     parser.add_argument("--execute-live", action="store_true")
     parser.add_argument("--ack-unrecoverable-axi-stall-risk", action="store_true")
     args = parser.parse_args(argv)
+    if args.record_loaded_image:
+        if args.execute_live or args.ack_unrecoverable_axi_stall_risk:
+            print("LT02_NO_GO: receipt mode cannot execute MMIO", file=sys.stderr)
+            return 2
+        try:
+            check_runtime()
+            artifact = verify_artifacts(
+                args.manifest, args.bit, args.hwh, args.candidate_bin,
+                args.recovery_bin, args.recovery_hwh,
+                args.expected_manifest_sha256)
+            capture_load_receipt(args.receipt, args.candidate_bin, artifact)
+        except (OSError, ValueError, TypeError, KeyError, LT02SafetyError,
+                old.SafetyError, subprocess.SubprocessError) as exc:
+            print("LT02_NO_GO: " + str(exc), file=sys.stderr)
+            return 2
+        print("LT02_CURRENT_BOOT_LOAD_RECEIPT_RECORDED_NO_MMIO")
+        return 0
     if not (args.execute_live and args.ack_unrecoverable_axi_stall_risk):
         print("LT02_NO_GO: inert without both live flags", file=sys.stderr)
         return 2
