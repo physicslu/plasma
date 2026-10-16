@@ -1,0 +1,36 @@
+name: NXP ADR-0002 Phase2 KL25 Provider Revision Gate
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/nxp_phase2_kl25_provider_lock_v1.py"
+      - "data/device-catalog/research/test_nxp_phase2_kl25_provider_lock_v1.py"
+      - "data/device-catalog/research/nxp-kl25-openocd-provider-delta-v1.json"
+      - "data/device-catalog/research/NXP_PHASE2_KL25_PROVIDER_LOCK_AUDIT_V1.md"
+      - ".github/workflows/device-catalog-nxp-phase2-kl25-provider-lock-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp_phase2_kl25_provider_lock_v1.py"
+      - "data/device-catalog/research/test_nxp_phase2_kl25_provider_lock_v1.py"
+      - "data/device-catalog/research/nxp-kl25-openocd-provider-delta-v1.json"
+      - ".github/workflows/device-catalog-nxp-phase2-kl25-provider-lock-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-kl25-phase2-provider-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay sole authoritative NXP ADR-0002 297/28 Phase1/2 snapshot
+        run: python data/device-catalog/research/nxp_adr0002_phase1_phase2_canonical_v1.py
+      - name: Audit KL25 12 exact manufacturer ICPNs, 2 OpenOCD revisions and Tcl/Flash source deltas
+        run: python data/device-catalog/research/nxp_phase2_kl25_provider_lock_v1.py
+      - name: Reject unsupported current-provider, cross-device, FCF and SWJ claims
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_phase2_kl25_provider_lock_v1.py" -v
