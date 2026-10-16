@@ -44,7 +44,7 @@ chmod 0660 "$socket"
 # process has its own timeout so loss of Actions cannot leave Codex infinite.
 elapsed=0
 while test "$elapsed" -lt 960; do
-  if test -f "$out/exit_code"; then
+  if test -f "$out/complete"; then
     rc="$(cat "$out/exit_code")"
     [[ "$rc" =~ ^[0-9]{1,3}$ ]] || { echo "Malformed Codex exit code" >&2; exit 1; }
     echo "Codex actual exit code: $rc"
