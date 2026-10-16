@@ -13,6 +13,7 @@ PROFILE_ROOT = HERE / "profiles"
 BINDING_FILE = HERE / "bindings" / "stm32f103c-pilot-v0.json"
 SOURCE_FILE = HERE / "evidence" / "sources.json"
 SCHEMA_FILE = HERE / "schema" / "ic-support-v0.schema.json"
+SOCKET_DESIGN_FILE = HERE / "socket-design" / "stm32f103c8t6-lqfp48-swd-v1.json"
 
 EXPECTED_KINDS = {
     "programming",
@@ -317,7 +318,11 @@ def main() -> int:
         package_data = selected["package_hardware"]["data"]
         require(package_data["package"] == row["package"], f"{icpn}: package profile mismatch")
         require(str(package_data["pin_count"]) == row["pin_count"], f"{icpn}: pin-count profile mismatch")
-        validate_package_hardware(selected["package_hardware"])
+        minimum_hw = package_data["pin_level_minimum_programming_hardware"]
+        require(
+            minimum_hw == {"status": "pending_evidence", "required_before_runtime_use": True},
+            f"{icpn}: frozen Phase A package profile must remain fail-closed",
+        )
         resolved[icpn] = selected
 
     require(set(seen) == {"STM32F103C8T6", "STM32F103CBT6"}, "pilot target set drifted")
@@ -334,6 +339,29 @@ def main() -> int:
     validate_programming(c8["programming"])
     validate_option(c8["option"])
     validate_security(c8["security"])
+
+    socket_contract = load_json(SOCKET_DESIGN_FILE)
+    require(socket_contract.get("status") == "engineering_design_input", "Socket Design Contract status drift")
+    target = socket_contract.get("target", {})
+    require(target.get("icpn") == "STM32F103C8T6", "Socket Design Contract exact ICPN drift")
+    hardware_id = socket_contract.get("canonical_profiles", {}).get("package_hardware")
+    require(hardware_id in profiles, "Socket Design Contract package hardware profile is missing")
+    socket_hardware = profiles[hardware_id]
+    validate_package_hardware(socket_hardware)
+    require(
+        socket_contract["canonical_profiles"]["programming"] == c8["programming"]["profile_id"]
+        and socket_contract["canonical_profiles"]["memory_geometry"] == c8["memory_geometry"]["profile_id"]
+        and socket_contract["canonical_profiles"]["option"] == c8["option"]["profile_id"]
+        and socket_contract["canonical_profiles"]["security"] == c8["security"]["profile_id"],
+        "Socket Design Contract canonical profile references drift",
+    )
+    boundary = socket_contract.get("qualification_boundary", {})
+    require(boundary.get("sufficient_for_socket_schematic_and_layout_design") is True, "Socket design input readiness missing")
+    require(boundary.get("hardware_runtime_ready") is False, "Socket contract must not claim hardware runtime readiness")
+    require(boundary.get("physical_programming_qualified") is False, "Socket contract must not claim physical qualification")
+    require(boundary.get("hil_verified") is False, "Socket contract must not claim HIL")
+    require(boundary.get("execution_authorized") is False, "Socket contract must not authorize execution")
+
     print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles")
     return 0
 
