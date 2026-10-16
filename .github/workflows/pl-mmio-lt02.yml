@@ -1,0 +1,55 @@
+name: PL LT02 MMIO Loopback RTL and Python
+
+on:
+  pull_request:
+    paths:
+      - "pl/rtl/bus/pl_mmio_loopback_axi_lite.sv"
+      - "pl/verification/test_mmio_lt02_rtl.py"
+      - "pl/verification/cocotb/test_mmio_lt02.py"
+      - "software/python/plasma_interfaces/mmio_loop_test.py"
+      - "software/python/tests/test_mmio_loop_test.py"
+      - ".github/workflows/pl-mmio-lt02.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/rtl/bus/pl_mmio_loopback_axi_lite.sv"
+      - "pl/verification/test_mmio_lt02_rtl.py"
+      - "pl/verification/cocotb/test_mmio_lt02.py"
+      - "software/python/plasma_interfaces/mmio_loop_test.py"
+      - "software/python/tests/test_mmio_loop_test.py"
+      - ".github/workflows/pl-mmio-lt02.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lt02-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install simulation and Python tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog verilator
+          python3 -m pip install pytest 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: LinuxMMIO / LT02 host-only tests
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python3 -m pytest -q software/python/tests/test_mmio_loop_test.py software/python/tests/test_linux_mmio.py
+      - name: Synthesis-source Verilator lint
+        run: |
+          verilator --lint-only --sv -Wall -Wno-UNUSEDSIGNAL --top-module pl_mmio_loopback_axi_lite pl/rtl/bus/pl_mmio_loopback_axi_lite.sv
+      - name: Real LT02 RTL / production driver Cocotb
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python3 -m pytest -v pl/verification/test_mmio_lt02_rtl.py
+      - name: Evidence boundary
+        run: |
+          echo "LT02 host word-port and real RTL AXI/Cocotb tests PASS when previous steps succeed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Vivado, new five-aperture FPGA image, real Z2, Manager PL routing and browser PL source proof are NOT RUN." >> "$GITHUB_STEP_SUMMARY"
