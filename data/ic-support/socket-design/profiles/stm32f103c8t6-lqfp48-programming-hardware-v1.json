@@ -1,0 +1,257 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32f103c8t6-lqfp48-programming-hardware-v1",
+  "kind": "package_hardware",
+  "status": "pilot_socket_design_input_ready",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "exact_icpn": "STM32F103C8T6",
+    "base_device": "STM32F103C8",
+    "series": "STM32F103",
+    "package": "LQFP",
+    "package_variant": "LQFP48",
+    "pin_count": 48
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "2.3.8 Boot modes",
+        "2.3.9 Power supply schemes",
+        "Figure 8. STM32F103xx performance line LQFP48 pinout",
+        "Table 5. Medium-density STM32F103xx pin definitions",
+        "5.1.6 Power supply scheme / Figure 14",
+        "5.3.14 NRST pin characteristics / Figure 31",
+        "6.9 LQFP48 package information",
+        "Table 62. LQFP48 mechanical data"
+      ]
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "sections": [
+        "Flash program/erase supply range",
+        "Debug-programming Flash semantics"
+      ]
+    },
+    {
+      "source_id": "st_an2586_rev8",
+      "sections": [
+        "2.1.2 Battery backup",
+        "2.2 Power supply schemes"
+      ]
+    }
+  ],
+  "data": {
+    "purpose": "programming_socket_design_input",
+    "design_readiness": "socket_design_input_ready",
+    "package": {
+      "type": "LQFP48",
+      "pin_count": 48,
+      "body_size_mm": {
+        "x": 7,
+        "y": 7
+      },
+      "lead_span_mm": {
+        "x": 9,
+        "y": 9
+      },
+      "lead_pitch_mm": 0.5,
+      "max_package_height_mm": 1.6,
+      "pin1_reference": "top-view package drawing dot adjacent to pin 1",
+      "numbering_direction_top_view": "counterclockwise"
+    },
+    "debug_programming_interfaces": [
+      "SWD",
+      "JTAG"
+    ],
+    "primary_programming_route": {
+      "interface": "SWD",
+      "provider_route": "OpenOCD stm32f1x",
+      "normal_flash_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "external_vpp_required": false
+    },
+    "pin_level_minimum_programming_hardware": {
+      "status": "socket_design_input_ready",
+      "required_before_runtime_use": true,
+      "mandatory_contacts": [
+        {
+          "package_pin": 1,
+          "pin_name": "VBAT",
+          "signal": "VBAT",
+          "role": "backup_domain_power_required",
+          "connect_to": "TARGET_VDD",
+          "condition": "no_external_battery_in_programming_socket",
+          "decoupling_to_ground_nf": 100
+        },
+        {
+          "package_pin": 24,
+          "pin_name": "VDD_1",
+          "role": "target_power",
+          "connect_to": "TARGET_VDD"
+        },
+        {
+          "package_pin": 36,
+          "pin_name": "VDD_2",
+          "role": "target_power",
+          "connect_to": "TARGET_VDD"
+        },
+        {
+          "package_pin": 48,
+          "pin_name": "VDD_3",
+          "role": "target_power",
+          "connect_to": "TARGET_VDD"
+        },
+        {
+          "package_pin": 23,
+          "pin_name": "VSS_1",
+          "role": "target_ground",
+          "connect_to": "TARGET_GND"
+        },
+        {
+          "package_pin": 35,
+          "pin_name": "VSS_2",
+          "role": "target_ground",
+          "connect_to": "TARGET_GND"
+        },
+        {
+          "package_pin": 47,
+          "pin_name": "VSS_3",
+          "role": "target_ground",
+          "connect_to": "TARGET_GND"
+        },
+        {
+          "package_pin": 9,
+          "pin_name": "VDDA",
+          "role": "analog_power_required",
+          "connect_to": "TARGET_VDD"
+        },
+        {
+          "package_pin": 8,
+          "pin_name": "VSSA",
+          "role": "analog_ground_required",
+          "connect_to": "TARGET_GND"
+        },
+        {
+          "package_pin": 34,
+          "pin_name": "PA13",
+          "signal": "SWDIO",
+          "role": "debug_data_bidirectional",
+          "io_level": "FT"
+        },
+        {
+          "package_pin": 37,
+          "pin_name": "PA14",
+          "signal": "SWCLK",
+          "role": "debug_clock_input",
+          "io_level": "FT"
+        },
+        {
+          "package_pin": 7,
+          "pin_name": "NRST",
+          "signal": "NRST",
+          "role": "recovery_reset_active_low"
+        }
+      ],
+      "recovery_contacts": [
+        {
+          "package_pin": 44,
+          "pin_name": "BOOT0",
+          "signal": "BOOT0",
+          "role": "boot_mode_control",
+          "required_for_normal_swd_route": false,
+          "contact_recommended_for_recovery": true,
+          "drive_policy": "site_policy_required_before_hil"
+        }
+      ],
+      "mandatory_contact_count": 12
+    },
+    "power_and_reset": {
+      "target_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "target_io_reference": "TARGET_VDD",
+      "all_main_power_and_ground_contacts_required": true,
+      "vdda": {
+        "package_pin": 9,
+        "connect_to": "TARGET_VDD",
+        "allowed_v": {
+          "min": 2,
+          "max": 3.6
+        },
+        "adc_specific_min_v": 2.4,
+        "adc_specific_limit_relevant_to_swd_programming": false
+      },
+      "vssa": {
+        "package_pin": 8,
+        "connect_to": "TARGET_GND"
+      },
+      "decoupling": {
+        "main_vdd": {
+          "per_present_vdd_pin": {
+            "capacitance_nf": 100,
+            "derived_count_for_lqfp48": 3
+          },
+          "bulk": {
+            "min_capacitance_uF": 4.7,
+            "typical_capacitance_uF": 10,
+            "connect_at_package_pin": 48,
+            "pin_name": "VDD_3"
+          }
+        },
+        "vdda": {
+          "capacitors_to_vssa": [
+            {
+              "capacitance_nf": 100
+            },
+            {
+              "capacitance_uF": 1
+            }
+          ]
+        }
+      },
+      "nrst": {
+        "package_pin": 7,
+        "active_level": "low",
+        "internal_pullup_ohms": {
+          "min": 30000,
+          "typ": 40000,
+          "max": 50000
+        },
+        "recommended_external_capacitor_to_ground_uF": 0.1,
+        "programmer_requirement": "must be able to assert NRST low independently for recovery/connect-under-reset workflows"
+      },
+      "vbat": {
+        "package_pin": 1,
+        "normal_socket_policy": "connect_to_TARGET_VDD_when_no_external_battery",
+        "decoupling_to_ground_nf": 100,
+        "external_battery_range_v": {
+          "min": 1.8,
+          "max": 3.6
+        }
+      }
+    },
+    "design_boundaries": {
+      "socket_design_input_complete": true,
+      "socket_model_selected": false,
+      "site_electrical_compatibility": "not_evaluated",
+      "socket_compatibility": "not_evaluated",
+      "hardware_runtime_ready": false,
+      "physical_programming_qualified": false,
+      "hil_required_before_l3": true,
+      "unresolved_before_hil": [
+        "final Site current-limit policy",
+        "validated SWD clock setting for the PLASMA physical path",
+        "signal-integrity validation for the selected Socket/adapter/layout",
+        "actual Socket model/revision and schematic/netlist identity",
+        "continuity/short-test evidence"
+      ]
+    }
+  }
+}
