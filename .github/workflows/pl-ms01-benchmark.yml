@@ -7,6 +7,8 @@ on:
       - "pl/tests/test_ms01_benchmark.py"
       - "software/python/plasma_interfaces/mmio_loop_test.py"
       - "software/python/tests/test_mmio_loop_test.py"
+      - "pl/projects/z2-ms01-axi/**"
+      - "pl/tests/test_z2_ms01_axi_build.py"
       - ".github/workflows/pl-ms01-benchmark.yml"
   push:
     branches: [main]
@@ -31,10 +33,11 @@ jobs:
         run: python3 -m pip install -e software/python pytest
       - name: Compile and run Host-only concurrent benchmarking
         run: |
-          python3 -m py_compile pl/hil/ms01/benchmark.py
+          python3 -m py_compile pl/hil/ms01/benchmark.py pl/projects/z2-ms01-axi/artifact.py
           python3 -m pytest -q pl/tests/test_ms01_benchmark.py \
             software/python/tests/test_mmio_loop_test.py \
-            software/python/tests/test_linux_mmio.py
+            software/python/tests/test_linux_mmio.py \
+            pl/tests/test_z2_ms01_axi_build.py
       - name: Evidence limitation
         run: |
           echo "Host file-backed, synthetic WordPort and Process-IPC only." >> "$GITHUB_STEP_SUMMARY"
