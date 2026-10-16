@@ -28,11 +28,13 @@ def test_stm32f103c8_socket_contract_matches_resolved_ic_support() -> None:
     refs = contract["canonical_profiles"]
     assert refs["programming"] == resolved.programming_profile.profile_id
     assert refs["memory_geometry"] == resolved.memory_geometry_profile.profile_id
-    assert refs["package_hardware"] == resolved.profile("package_hardware").profile_id
+    assert resolved.socket_programming_hardware_profile is not None
+    assert refs["package_hardware"] == resolved.socket_programming_hardware_profile.profile_id
     assert refs["option"] == resolved.profile("option").profile_id
     assert refs["security"] == resolved.profile("security").profile_id
 
-    hardware = resolved.profile("package_hardware").data
+    assert resolved.socket_programming_hardware_profile is not None
+    hardware = resolved.socket_programming_hardware_profile.data
     mandatory_from_profile = [
         {"pin": item["package_pin"], "signal": item["signal"]}
         for item in hardware["minimum_swd_programming_contacts"]
