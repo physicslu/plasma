@@ -49,7 +49,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
         extra = {r["icpn"] for r in csvrows(SOURCE_148)}
         self.assertEqual({r["icpn"] for r in self.queue}, original | extra)
         self.assertEqual(len(original & extra), 0)
-        self.assertEqual(self.catalog.size, 4992)
+        self.assertEqual(self.catalog.size, 5885)
         self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 241)
         self.assertTrue(all(self.catalog.resolve("NXP",r["icpn"]) is None
                             for r in self.queue))
@@ -67,7 +67,15 @@ class Nxp277GapReviewTests(unittest.TestCase):
                 # Microchip publication, not treat an amended manifest as
                 # the old immutable source.
                 current = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(len(current["sources"]), 35)
+                self.assertEqual(len(current["sources"]), 36)
+                self.assertEqual(current["sources"][-1], {
+                    "manufacturer":"Microchip","family":"PIC32MX",
+                    "path":"../research/microchip-pic32mx-893-commercial-l1-v1.csv",
+                    "row_count":893,
+                    "git_blob_sha":"9eba3e0898a42ef1129a572c5c3a6b0613e01166",
+                    "sha256":"b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8",
+                })
+                current["sources"].pop()
                 self.assertEqual(current["sources"][-1], {
                     "manufacturer":"Microchip","family":"SAML1X",
                     "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
