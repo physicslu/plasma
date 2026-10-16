@@ -83,7 +83,35 @@ Gate A is **approved for implementation only**. Gate B (merge to main) has
   Production identity admission and the source-locked registry binding are
   still outstanding.
 
-**Crucial status:** Successfully producing the 2,563-row review ledger is
-**not** a completed L1 promotion. Microchip Production remains 122 L0-only,
-0 L1-only, 0 L2-only, 0 L3-only until the independent canonical gates pass.
-No consumer may use a `PENDING` research ledger row as Product authority.
+**Gate A branch proposal:** The 2,563-row Research ledger remains pending.
+In the same approved PR, however, the *already-admitted* 122 SAML1X exact
+ICPNs have an independently reviewed official programming route through
+Microchip DS60001513G printed page 3 and §16.7 printed page 121.
+The existing PDF SHA-256 is
+`ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e`.
+The vendor-specific evidence adapter produces the **same vendor-neutral**
+`BACKEND_CANDIDATE_ROUTE` class and therefore makes these 122 source-backed
+ICPNs **L1 only on PR #965 branch**, pending CI/owner Gate B. The Microchip
+122-row identity freeze and `mapping_status=no_mapping` remain unchanged;
+the Product API must expose them as Programming Candidates but not Jobs.
+There is **no** claim that `atsaml1x.cfg` provides flash erase/write support.
+
+The four extra target-only Research ICPNs are NOT yet Production-admitted:
+`ATSAML10D16A-MZTVAO`, `ATSAML10E16A-MZTVAO`,
+`ATSAML10E16A-MZVAO`, and `ATSAML11E16A-MZTVAO`.
+They must remain outside Customer Product projections until independent exact
+identity admission; the official family programming path alone is not identity
+authority.
+
+**Important distinction:** A passed Research review ledger does not promote
+any of the remaining 2,441 non-Production PIC32MX/SAMD/SAME5x/SAMV candidates;
+PIC32MX upstream OpenOCD v0.12.0 driver
+(`src/flash/nor/pic32mx.c`, blob
+`9a1a6341256039bf9fd68e41a109e7483a5f694e`)
+contains explicit DEVID name matches for 893 of the 1,241 PIC32MX
+ordering codes (85 of 116 Base Devices); 348 ordering codes
+(31 Base Devices) have no direct DEVID table match. This is a review
+classification, **not** software `SUPPORTED` or executable programming.
+No Research `PENDING` row may be treated as Product authority.
+
+No change is merged to `main` without explicit Gate B approval.
