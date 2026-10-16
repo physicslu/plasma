@@ -110,7 +110,9 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
             64 * 1024,
         )
-        self.assertEqual(qualification["selector_visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertEqual(qualification["catalog_level"], 2)
+        self.assertEqual(qualification["catalog_level_state"], "PROGRAMMABLE")
+        self.assertTrue(qualification["selector_visible"])
         self.assertFalse(qualification["hardware_runtime_ready"])
         self.assertFalse(qualification["physical_programming_qualified"])
 
@@ -476,14 +478,14 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(item["backend_providers"])
                 self.assertIsNone(item["backend_candidate"])
                 self.assertIsNone(item["backend_source_reference"])
-                information = item["microchip_phase1_ic_information"]
-                self.assertEqual(information["phase1_identity_state"], "IDENTIFIED")
-                self.assertFalse(information["phase1_information_complete"])
-                self.assertEqual(information["phase2_programming_state"], "UNKNOWN")
-                self.assertEqual(information["phase3_compatibility_state"], "NOT_TESTED")
-                self.assertIsNone(information["phase2_provider"])
-                self.assertEqual(information["phase2_supported_operations"], [])
-                self.assertEqual(information["phase3_verified_configurations"], [])
+                information = item["microchip_ic_information"]
+                self.assertEqual(information["identity_state"], "IDENTIFIED")
+                self.assertFalse(information["information_complete"])
+                self.assertEqual(information["programming_state"], "UNKNOWN")
+                self.assertEqual(information["compatibility_state"], "NOT_TESTED")
+                self.assertIsNone(information["programming_provider"])
+                self.assertEqual(information["supported_operations"], [])
+                self.assertEqual(information["verified_configurations"], [])
                 self.assertEqual(information["field_states"]["ram"], "VERIFIED")
                 self.assertEqual(information["field_states"]["working_vdd"], "PARTIAL")
                 self.assertEqual(information["field_states"]["io_supply"], "UNKNOWN")
@@ -492,10 +494,11 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(information["programming_profile_authority"])
                 self.assertFalse(information["hardware_runtime_ready"])
                 qualification = item["programming_qualification"]
-                self.assertEqual(qualification["phase"], "PROGRAMMING")
-                self.assertEqual(qualification["phase1_identity_state"], "IDENTIFIED")
+                self.assertEqual(qualification["identity_state"], "IDENTIFIED")
+                self.assertEqual(qualification["catalog_level"], 0)
+                self.assertEqual(qualification["catalog_level_state"], "DISCOVERED")
                 self.assertEqual(qualification["state"], "UNKNOWN")
-                self.assertEqual(qualification["selector_visibility_authority"], "PHASE1_IDENTIFIED")
+                self.assertFalse(qualification["selector_visible"])
                 self.assertFalse(qualification["execution_authorized"])
                 self.assertIsNone(qualification["provider"])
                 self.assertEqual(qualification["operations"], {})
