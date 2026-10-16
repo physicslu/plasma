@@ -40,8 +40,11 @@ BLOBS = {
         "aa8424d05e5ac913dffa5f774befd284a0aa0776",
 }
 # All research records must be present together or wholly absent in a slim
-# installation. The release pin is checked separately after source availability.
-RESEARCH_FILES = tuple(rel for rel in BLOBS if rel != "release/openocd.json")
+# installation. The Production Catalog CSV and release pin are checked after source availability.
+RESEARCH_FILES = tuple(rel for rel in BLOBS if rel not in (
+    "release/openocd.json",
+    "data/device-catalog/research/nxp-kl25-commercial-icpn.csv",
+))
 BLOCKERS = (
     "CURRENT_OPENOCD_TRANSPORT_DRIVER_SEMANTICS_NOT_REQUALIFIED",
     "EXACT_SILICON_REVISION_FLASH_GEOMETRY_NOT_QUALIFIED",
