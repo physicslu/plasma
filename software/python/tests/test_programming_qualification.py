@@ -82,7 +82,7 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertFalse(result["hardware_runtime_ready"])
         self.assertFalse(result["physical_programming_qualified"])
 
-    def test_default_registry_preserves_st_49_and_projects_unreviewed_as_level0(self):
+    def test_default_registry_preserves_st_49_and_derives_levels_from_routes(self):
         registry = get_default_programming_qualification_registry()
         self.assertEqual(registry.summary["reviewed_exact_icpns"], 49)
         self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 49)
@@ -99,6 +99,14 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertTrue(st["selector_visible"])
         self.assertEqual(st["provider"]["provider_id"], "openocd-upstream")
         self.assertFalse(st["execution_authorized"])
+
+        routed = registry.describe("STMicroelectronics", "STM32F407VGT6")
+        self.assertEqual(routed["identity_state"], "IDENTIFIED")
+        self.assertEqual(routed["catalog_level"], 1)
+        self.assertEqual(routed["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+        self.assertEqual(routed["state"], "UNKNOWN")
+        self.assertFalse(routed["selector_visible"])
+        self.assertIsNone(routed["provider"])
 
         nxp = registry.describe("NXP", "MCXA132VFM")
         self.assertEqual(nxp["identity_state"], "IDENTIFIED")
