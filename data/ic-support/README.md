@@ -36,6 +36,20 @@ Device Catalog -------------------------------> User-selectable ICPN
 
 Research output is not automatically promoted into production software. A future runtime capability/driver promotion must have its own explicit contract, implementation and validation boundary.
 
+### Programming Hardware / Socket design-input boundary
+
+The STM32F103C pilot now contains a reviewed LQFP48 programming-hardware profile and an exact
+`STM32F103C8T6` SWD Socket Profile. These artifacts answer a narrower hardware-engineering
+question: whether the package pin map, mandatory supply/ground contacts, SWD/NRST contacts,
+package geometry and voltage range are complete enough to start fixture schematic and pin
+assignment.
+
+They deliberately do **not** claim that a physical socket, signal-integrity margin, current limit,
+contact resistance, socket vendor, production cycle life, runtime hardware path or HIL result has
+been qualified. Socket design-input readiness is therefore orthogonal to Catalog Level 2 software
+qualification and does not grant execution.
+
+
 The Phase A target is `STM32F103C8T6` + `STM32F103CBT6`. The pair is deliberately chosen to test profile reuse: they share the programming behavior under test while their Flash geometries differ.
 
 ## Layout
