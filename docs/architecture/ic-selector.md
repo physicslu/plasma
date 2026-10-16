@@ -2,15 +2,16 @@
 
 Status: current runtime plus accepted ADR-0002 Catalog Level migration target
 
-> **ADR-0002 policy (2026-10-16):** Catalog Level 1 `IDENTIFIED` Exact ICPNs
-> belong to the Canonical Device Registry. Only Catalog Level 2
-> `PROGRAMMABLE` ICPNs belong to the Programming Catalog / general IC Selector.
-> Catalog Level 3 `PLASMA_VERIFIED` is an additive verified-configuration
-> status. Selector visibility never authorizes Job/Batch execution.
+> **ADR-0002 policy (2026-10-16):** Level 0 `DISCOVERED` is the exact-ICPN
+> Research Registry. Level 1 `PROGRAMMING_CANDIDATE` means a source-backed
+> programming route exists and the device belongs in the qualification queue.
+> Only Level 2 `PROGRAMMABLE` belongs to the general Programming Catalog / IC Selector.
+> Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status.
+> Selector visibility never authorizes Job/Batch execution.
 >
 > **Migration gap:** the current runtime `GET /api/devices/search` still reflects
-> the earlier Production Catalog projection and may expose Level 1-only rows.
-> This document does not claim that the runtime split is already complete.
+> the earlier Production Catalog projection and may expose Level 0/1 rows.
+> This document does not claim that the runtime visibility split is already complete.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
@@ -22,10 +23,11 @@ IC Selector is a shared Plasma capability for finding and inspecting IC catalog 
 The same catalog and search semantics serve three contexts:
 
 ```text
-Canonical Device Registry (Level 1+)
+Research Registry (Level 0+)
     |
 Canonical Catalog Service
-    +-- Engineering Device Registry lookup
+    +-- Engineering Research / qualification lookup
+    +-- Level 1+ programming-candidate queue
     |
 Programming Catalog projection (Level 2+)
     |
@@ -35,7 +37,7 @@ IC Selector
     +-- Engineering Mode picker
 ```
 
-The Device Registry answers **which exact IC identity exists in PLASMA?** The IC Selector answers **which programming-qualified IC may the user choose?** Product-mode policy separately answers **may this exact runtime/hardware configuration execute now?**
+The Research Registry answers **which exact IC identity exists in PLASMA?** The Level 1 queue answers **which devices have a concrete programming route worth qualifying?** The IC Selector answers **which programming-qualified IC may the user choose?** Product-mode policy separately answers **may this exact runtime/hardware configuration execute now?**
 
 ## Product-mode boundary
 
@@ -72,7 +74,7 @@ Search responses also distinguish pagination from filtered cardinality:
 - `limit` = maximum rows requested for this page;
 - `catalog_size` = total rows in the current legacy Production Catalog projection.
 
-Under the accepted Catalog Level target, Registry totals (Level 1+) and Programming Catalog / Selector totals (Level 2+) are separate denominators and must not be reported as one number.
+Under the accepted Catalog Level target, Level 0 Research Registry, Level 1 qualification queue, and Level 2 Programming Catalog / Selector are separate denominators and must not be reported as one number.
 
 The browser must present the visible range and total matches separately, for example `1–30 / 1,400`, and provide explicit previous/next navigation when `total_count > limit`. Changing the query resets `offset=0`; changing pages clears a prior selection so the detail panel never implies that an off-page row is still selected. The ranked ordering contract is stable across pages, so repeated `query + offset + limit` requests must return the same identifiers while the underlying catalog revision is unchanged.
 
@@ -173,7 +175,7 @@ The same search result can carry three independent additive projections:
   cohort) is normalized behind this payload. It may be `SUPPORTED` even when
   `selected_profile` is absent, because the Programming Qualification contract binds the reviewed Programming Profile
   and exact geometry independently from the legacy deep-detail projection. `SUPPORTED`
-  derives Catalog Level 2 `PROGRAMMABLE`; other states remain Level 1-only.
+  derives Catalog Level 2 `PROGRAMMABLE`; reviewed non-supported routes remain Level 1, while exact identities with no qualifying route remain Level 0.
 
 For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
@@ -196,7 +198,7 @@ for execution-oriented research.
 
 The browser presents three primary information layers:
 
-1. IC Information — Catalog Level 1 identity and information quality.
+1. IC Information — Catalog Level 0 exact identity and information quality.
 2. Programming — detailed Programming Qualification; `SUPPORTED` derives Catalog Level 2
    `PROGRAMMABLE`, followed by Provider/operations/electrical/Flash geometry.
 3. PLASMA Compatibility — verified configuration evidence; HIL `PASSED` on at least one
@@ -238,7 +240,7 @@ picker
 
 This migration does not:
 
-- promote Research identifiers or Level 1-only identities into Level 2;
+- promote pre-Level aliases, Level 0 identities, or Level 1 candidates into Level 2 without `SUPPORTED` qualification;
 - create PPU or Socket verification evidence;
 - infer package from naming conventions;
 - make the IC Selector a Product Mode;
