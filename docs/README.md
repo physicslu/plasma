@@ -15,7 +15,7 @@
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
-- **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 Catalog Level 1 `IDENTIFIED` → Level 2 `PROGRAMMABLE` → Level 3 `PLASMA_VERIFIED`；Level 1 進 Canonical Device Registry，Level 2 才進 Programming Catalog／一般 IC Selector，Level 3 表示至少一組版本化 PLASMA configuration 已通過 HIL；Job／Batch 執行仍由 Programming Qualification、Runtime、route、電氣與硬體安全條件獨立 fail-closed。
+- **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Exact ICPN Research Registry、L1 是具體 programming route 的 qualification queue、L2 才進一般 IC Selector、L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
 
 ## Operator
 
@@ -48,7 +48,7 @@
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
-- **Plan / Accepted Policy** — [IC Information Catalog Level 1 Evidence Contract](architecture/ic-information-phase1.md)：檔名保留 legacy `phase1`；正式術語為 Catalog Level 1 IC Identity。Exact ICPN 身分與逐欄證據進 Device Registry，Programming Qualification 與 PLASMA Compatibility 分別對應 Level 2／3。
+- **Plan / Accepted Policy** — [IC Information Catalog Level 0 Evidence Contract](architecture/ic-information-phase1.md)：歷史檔名保留 `phase1`，但正式語意為 Level 0 Exact ICPN identity/evidence；具 programming route 才升 L1，qualification `SUPPORTED` 才升 L2，HIL PASS 才升 L3。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Implementation / Proposal** — [Installed OpenOCD Evidence Root v1](architecture/runtime-evidence-root-implementation-v1.md)：修正 source-only H5/C5/OpenOCD Provider 顯示資訊在非 editable Python 安裝下的路徑解析，區分 Render full 與 Slim PPU 必備／可省略來源；不授權燒錄。
 - **Implementation / Proposal** — [KL25 Installed Backend Lock Root v1](architecture/kl25-runtime-backend-lock-root-v1.md)：以既有 IC Support Root 契約載入固定的 KL25 implementation lock，non-editable 安裝與 fail-closed 測試通過才能合併；不新增 KL25 Operation Admission。
@@ -71,8 +71,8 @@
 - **Historical expansion** — [OpenOCD Software Qualification v3](architecture/openocd-software-qualification-v3.md)：把 STM32F103 medium-density direct applicability 擴到 R8/RB/V8/VB T6，並只對已直接資格化的 T6 exact ICPN 展開 TR packing equivalence。
 - **Historical expansion** — [OpenOCD Software Qualification v4](architecture/openocd-software-qualification-v4.md)：在 exact Production identity 與 DS5319 Flash characteristics 證據下，直接資格化 C8/CB/R8/RB/VB 的 T7 LQFP cohort，再對其 TR packing variant 做 deterministic inheritance；總計 22 個 exact ICPN SUPPORTED。
 - **Historical expansion** — [OpenOCD Software Qualification v5](architecture/openocd-software-qualification-v5.md)：建立 multi-density umbrella authority，加入 STM32F103 high-density R-pin/LQFP bounded cohort，合計 31 個 exact ICPN SUPPORTED。
-- **Historical expansion** — [OpenOCD Software Qualification v6](architecture/openocd-software-qualification-v6.md)：legacy Phase 命名文件；以現行術語解讀為 ST Level 1 identity set 維持 4,629 exact ICPN，41 個 exact ICPN 具 `SUPPORTED` qualification、可導出 Level 2 `PROGRAMMABLE`。
-- **Current** — [OpenOCD Software Qualification v7](architecture/openocd-software-qualification-v7.md)：ST Level 1 identity set 維持 4,629 exact ICPN；49 個 exact ICPN 的 Programming Qualification 為 `SUPPORTED`，因此可導出 Level 2 `PROGRAMMABLE`；BGA/WLCSP、XL-density 與 Level 3 `PLASMA_VERIFIED` 仍未宣告。
+- **Historical expansion** — [OpenOCD Software Qualification v6](architecture/openocd-software-qualification-v6.md)：legacy Phase 命名文件；以現行術語解讀為 ST Level 0 identity set 維持 4,629 exact ICPN，41 個 exact ICPN 具 `SUPPORTED` qualification、可導出 Level 2 `PROGRAMMABLE`。
+- **Current** — [OpenOCD Software Qualification v7](architecture/openocd-software-qualification-v7.md)：ST Level 0 identity set 維持 4,629 exact ICPN；49 個 exact ICPN 的 Programming Qualification 為 `SUPPORTED`，因此可導出 Level 2 `PROGRAMMABLE`；其餘 ICPN 的 L1 programming-candidate coverage 另由 route projection 決定；Level 3 `PLASMA_VERIFIED` 仍未宣告。
 - **Current** — [OpenOCD Compiled-Plan Executor](architecture/ic-support-openocd-plan-executor.md)：驗證 PS-side canonical OpenOCD plan → isolated software subprocess boundary；production hardware gate 仍關閉，PL/native programming 不在本階段範圍。
 - **Current** — [Vendor-neutral IC admission governance](architecture/vendor-neutral-ic-admission.md)：以 content-addressed artifact、review、disposition、canonical envelope、operation admission 與 backend binding 建立通用治理邊界；尚未接入 production runtime。
 - **Current** — [IC Support Architecture Freeze v1](architecture/ic-support-architecture-freeze-v1.md)：凍結 PR-A／PR-B／PR-C／PR-D 後的 vendor-neutral trust、operation admission、Compiler Registry 與 software/hardware readiness 邊界；不宣稱 HIL 或實體燒錄 readiness。
