@@ -66,7 +66,7 @@ The checker reports **prerequisites** only. Codex CLI version/help success is NO
 ## Dedicated GitHub Actions Runner enrollment
 
 1. As the repository owner, open `https://github.com/physicslu/plasma/settings/actions/runners/new` and use the **official GitHub Actions x64 Linux runner instructions**, including the exact version-pinned runner download + official SHA256 verification. Do **not** install into the existing runner directory.
-2. Extract the verified runner under `/home/plasma-codex/actions-runner`, owned by `plasma-codex`, mode `0700`. Do not make it group/world writable or share the other runner's HOME.
+2. Determine the worker HOME using `getent passwd plasma-codex` (sixth field), then extract the verified runner under `<dedicated-worker-home>/actions-runner`, owned by `plasma-codex`, mode `0700`. Do not make it group/world writable or share the other runner's HOME.
 3. Register via the official `./config.sh` procedure **as the `plasma-codex` account**:
    - Repository URL: `https://github.com/physicslu/plasma`
    - Runner name: `SWPC-plasma-codex`
