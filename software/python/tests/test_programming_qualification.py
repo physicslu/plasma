@@ -7,6 +7,9 @@ from plasma_web.device_catalog import (
     DeviceCatalogIntegrityError,
     DeviceCatalogRecord,
 )
+from plasma_web.openocd_software_qualification import (
+    get_default_openocd_software_qualification_registry,
+)
 from plasma_web.programming_qualification import (
     ProgrammingQualificationRegistry,
     get_default_programming_qualification_registry,
@@ -82,6 +85,17 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertFalse(result["execution_authorized"])
         self.assertFalse(result["hardware_runtime_ready"])
         self.assertFalse(result["physical_programming_qualified"])
+
+    def test_default_registries_are_process_cached(self):
+        provider_first = get_default_openocd_software_qualification_registry()
+        provider_second = get_default_openocd_software_qualification_registry()
+        self.assertIsNotNone(provider_first)
+        self.assertIs(provider_first, provider_second)
+
+        registry_first = get_default_programming_qualification_registry()
+        registry_second = get_default_programming_qualification_registry()
+        self.assertIs(registry_first, registry_second)
+        self.assertIs(registry_first.summary, registry_first.summary)
 
     def test_default_registry_preserves_st_49_and_derives_levels_from_routes(self):
         registry = get_default_programming_qualification_registry()

@@ -957,6 +957,19 @@ def serve(
     static_root: Path | None = None,
     gateway_settings_path: Path | None = None,
 ) -> None:
+    # Catalog/qualification registries are immutable for one Gateway process.
+    # Build and validate them before binding the HTTP socket so readiness never
+    # advertises a selector endpoint whose first request still performs cold
+    # evidence loading and integrity hashing.
+    qualification_registry = get_default_programming_qualification_registry()
+    qualification_summary = qualification_registry.summary
+    print(
+        "Device Selector qualification registry ready: "
+        f"L0={qualification_summary['catalog_level_counts']['0']} "
+        f"L1={qualification_summary['catalog_level_counts']['1']} "
+        f"L2={qualification_summary['catalog_level_counts']['2']} "
+        f"L3={qualification_summary['catalog_level_counts']['3']}"
+    )
     settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
     network_settings = PPUNetworkSettingsController(output_root / "ppu-network-settings.yaml")
     PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))
