@@ -1,0 +1,78 @@
+[
+  {
+    "result": "PASS",
+    "requested_frequency_Hz": 1000,
+    "requested_duty_percent": 50,
+    "samplerate_Hz": 1000000,
+    "actual_sample_count": 102386,
+    "duration_samples_over_rate_ms": 102.386,
+    "edge_count": 205,
+    "rising_edge_count": 103,
+    "falling_edge_count": 102,
+    "complete_cycles": 102,
+    "frequency_Hz": 1000.0,
+    "period_us": 1000,
+    "high_us": 500,
+    "low_us": 500,
+    "duty_cycle_percent": 50.0,
+    "period_samples_min_max": [
+      1000,
+      1000
+    ],
+    "high_samples_min_max": [
+      500,
+      500
+    ],
+    "window_high_sample_fraction_percent": 50.05567167386166,
+    "shutdown_command": "PASS",
+    "off_sample_count": 22496,
+    "off_edge_count": 0,
+    "off_high_sample_count": 0,
+    "off_observed_constant_low": true,
+    "threshold_V": 1.4,
+    "nominal_PWM_high_V": 3.3,
+    "analog_voltage_measurement": "NOT RUN",
+    "capture_sha256": "01951dbac767c54b19dad79a323d6717f00124544a591b0838b77492cddc8526",
+    "capture_file": "1khz-50pct/on.sr",
+    "off_capture_file": "1khz-50pct/off.sr",
+    "off_capture_sha256": "cee057a94b3c96807c5324e08f92465e962a41595d4cf8bbac171b8934b37f02"
+  },
+  {
+    "result": "PASS",
+    "requested_frequency_Hz": 2000,
+    "requested_duty_percent": 25,
+    "samplerate_Hz": 1000000,
+    "actual_sample_count": 101645,
+    "duration_samples_over_rate_ms": 101.645,
+    "edge_count": 406,
+    "rising_edge_count": 203,
+    "falling_edge_count": 203,
+    "complete_cycles": 202,
+    "frequency_Hz": 2000.0,
+    "period_us": 500,
+    "high_us": 125,
+    "low_us": 375,
+    "duty_cycle_percent": 25.0,
+    "period_samples_min_max": [
+      500,
+      500
+    ],
+    "high_samples_min_max": [
+      125,
+      125
+    ],
+    "window_high_sample_fraction_percent": 24.964336661911556,
+    "shutdown_command": "PASS",
+    "off_sample_count": 22496,
+    "off_edge_count": 0,
+    "off_high_sample_count": 0,
+    "off_observed_constant_low": true,
+    "threshold_V": 1.4,
+    "nominal_PWM_high_V": 3.3,
+    "analog_voltage_measurement": "NOT RUN",
+    "capture_sha256": "a4ab4d3c8cb2a95cc583548ec641d740d5c05780e1f03eed3e70d5593b133225",
+    "capture_file": "2khz-25pct/on.sr",
+    "off_capture_file": "2khz-25pct/off.sr",
+    "off_capture_sha256": "78582d646aad3e3704c06b669b4f0fec961c703fa377c934fc445ddafded87da"
+  }
+]

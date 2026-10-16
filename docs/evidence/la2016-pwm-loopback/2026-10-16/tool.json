@@ -1,0 +1,12 @@
+{
+  "sigrok_cli": "0.8.0-git-f44dd91",
+  "libsigrok": "0.6.0-git-883c2ac",
+  "appimage_sha256": "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475",
+  "driver": "kingst-la2016",
+  "device": "Kingst LA2016",
+  "usb_vid_pid": "77a1:01a2",
+  "experiment_source_tree_commit": "6b451b73f670010537c5cdd8e40ab04494923172",
+  "parent_observation_pr": 961,
+  "wiring": "KINGST PWM1 -> same KINGST CH0; common internal ground",
+  "provenance": "Unmodified raw SR archives; derived measurements and execution records omit operator paths and transient USB identifiers. Original private evidence is retained unchanged."
+}
