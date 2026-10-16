@@ -490,7 +490,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
-        self.assertEqual(len(rows), 1015)
+        self.assertEqual(len(rows), 1907)
         for row in rows:
             with self.subTest(icpn=row.identifier):
                 with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
@@ -580,7 +580,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(q["execution_authorized"])
                 self.assertFalse(q["physical_programming_qualified"])
         # Verify actual customer-facing gateway and L2 isolation for a bounded
-        # sample. Job rejection of all 1015 Microchip codes is a separate test.
+        # sample. Job rejection of all 1907 Microchip codes is a separate test.
         for code in (rows[0].identifier, rows[len(rows) // 2].identifier,
                      rows[-1].identifier):
             status, payload = self.request(
