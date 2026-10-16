@@ -60,6 +60,8 @@ jobs:
           p = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/microchip-l1-review-queue.json"
           q = json.loads(p.read_text(encoding="utf-8"))
           assert q["research_cfg_candidates"] == len(q["rows"]) == 2563
+          assert q["base_device_review_units"] == 262
+          assert sum(q["by_cfg_base_device_counts"].values()) == 262
           assert q["identity_canonical_admitted_by_this_tool"] == 0
           assert q["route_canonical_admitted_by_this_tool"] == 0
           assert all(r["catalog_level"] is None
