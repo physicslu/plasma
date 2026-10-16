@@ -94,6 +94,96 @@ def current_groups(user: str) -> list[str]:
     return sorted(grp.getgrgid(i).gr_name for i in os.getgrouplist(user, account.pw_gid))
 
 
+
+def unix_mode_rw(meta: os.stat_result, uid: int, gids: set[int]) -> bool:
+    """POSIX mode projection only; cannot account for ACLs or LSM controls."""
+    mode = stat.S_IMODE(meta.st_mode)
+    if uid == meta.st_uid:
+        return (mode & 0o600) == 0o600
+    if meta.st_gid in gids:
+        return (mode & 0o060) == 0o060
+    return (mode & 0o006) == 0o006
+
+
+def device_dac_comparison() -> dict:
+    """Compare operator and worker mode bits with no device opens or IDs leaked."""
+    try:
+        users = {}
+        for name in (OPERATOR, WORKER):
+            entry = pwd.getpwnam(name)
+            users[name] = (entry.pw_uid, set(os.getgrouplist(name, entry.pw_gid)))
+    except KeyError:
+        return {"status": "ACCOUNT_UNAVAILABLE"}
+
+    observed: dict[str, list[dict]] = {
+        "z2_ft2232": [], "usb_hub_companions": [], "kingst_la2016": [],
+        "ft2232_tty": [],
+    }
+
+    def append_metadata(label: str, node: Path) -> None:
+        try:
+            metadata = node.stat()
+            if not stat.S_ISCHR(metadata.st_mode):
+                return
+            observed[label].append({
+                "operator_mode_rw": unix_mode_rw(metadata, *users[OPERATOR]),
+                "worker_mode_rw": unix_mode_rw(metadata, *users[WORKER]),
+            })
+        except OSError:
+            return
+
+    root = Path("/sys/bus/usb/devices")
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return {"status": "USB_SYSFS_UNAVAILABLE"}
+    mapping = {
+        ("0403", "6010"): "z2_ft2232",
+        ("8564", "4100"): "usb_hub_companions",
+        ("77a1", "01a2"): "kingst_la2016",
+    }
+    for entry in entries:
+        try:
+            key = (entry / "idVendor").read_text().strip().lower(), (
+                entry / "idProduct"
+            ).read_text().strip().lower()
+            label = mapping.get(key)
+            if label is None:
+                continue
+            bus = int((entry / "busnum").read_text())
+            device = int((entry / "devnum").read_text())
+            append_metadata(label, Path(f"/dev/bus/usb/{bus:03d}/{device:03d}"))
+        except (OSError, ValueError):
+            continue
+
+    for tty in Path("/sys/class/tty").glob("ttyUSB*"):
+        try:
+            parent = (tty / "device").resolve(strict=True)
+            for component in (parent, *parent.parents):
+                if component == Path("/sys"):
+                    break
+                try:
+                    vid = (component / "idVendor").read_text().strip().lower()
+                    pid = (component / "idProduct").read_text().strip().lower()
+                except OSError:
+                    continue
+                if (vid, pid) == ("0403", "6010"):
+                    append_metadata("ft2232_tty", Path("/dev") / tty.name)
+                break
+        except OSError:
+            continue
+
+    return {
+        label: {
+            "node_count": len(results),
+            "operator_rw_by_mode_only": sum(x["operator_mode_rw"] for x in results),
+            "worker_rw_by_mode_only": sum(x["worker_mode_rw"] for x in results),
+            "actual_open_or_acl": "NOT_CHECKED",
+        }
+        for label, results in observed.items()
+    }
+
+
 def check_credentials_metadata(user: str) -> str:
     # Does not open, parse or read secret contents or keys. Directory traversal
     # may be denied to the dedicated user; this is reported rather than escalated.
@@ -138,6 +228,7 @@ def audit() -> dict:
             "administrator" if os.geteuid() == 0 else "other"
         ),
         "groups": groups,
+        "device_mode_comparison": device_dac_comparison(),
         "worker_io_group_present": GROUP in groups.get(WORKER, []),
         "operator_io_group_present": GROUP in groups.get(OPERATOR, []),
         "udev_rules": file_state(RULE_FILE, render_rules()),
