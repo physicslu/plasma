@@ -173,12 +173,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -198,12 +198,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -223,12 +223,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -248,12 +248,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -273,12 +273,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -406,12 +406,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -431,12 +431,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -456,12 +456,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -481,12 +481,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -506,12 +506,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -666,12 +666,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -691,12 +691,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -716,12 +716,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -741,12 +741,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
@@ -766,12 +766,12 @@
         "verify"
       ],
       "supplemental_independent_evidence": {
-        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+        "applicability": "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
         "qualification_basis": "DS5792 Rev 13 exact high-density ordering applicability + PM0075 high-density programming semantics + pinned OpenOCD 0.12.0 source review"
       },
       "qualification_basis": {
         "kind": "manufacturer_applicability",
-        "applicability_id": "st-stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3"
+        "applicability_id": "st-stm32f103-high-density-rvz-package-t6-t7-applicability-v4"
       }
     },
     {
