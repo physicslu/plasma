@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'software/python/plasma_interfaces/kl25_openocd_plan.py'
+      - 'software/python/tests/test_kl25_openocd_plan.py'
+      - 'data/device-catalog/research/NXP_KL25_FCF_SECTOR_SAFETY_V1.md'
+      - 'data/device-catalog/research/nxp-kl25-fcf-sector-safety-v1.json'
       - 'software/python/tests/test_kl25_runtime_root_contract_v1.py'
       - '.github/workflows/kl25-installed-backend-lock-root-v1.yml'
       - 'docs/architecture/kl25-runtime-backend-lock-root-v1.md'
