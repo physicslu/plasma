@@ -135,3 +135,11 @@ def test_broken_kernel_driver_link_fails_closed(trees):
     driver=trees[0]/'bus/platform/devices/40005000.lt02/driver'
     driver.parent.mkdir();driver.symlink_to(driver.parent/'missing')
     with pytest.raises(lt.LT02SafetyError):guard(trees)
+
+
+@pytest.mark.parametrize('retained', ['maps','fd'])
+def test_deleted_uio_cannot_use_reused_number_as_proof_of_unrelated_range(trees,retained):
+    uio(trees,0x43c00000)  # Current uio7 does not prove the old inode's physical range.
+    if retained=='maps':mapping(trees,0,device='/dev/uio7 (deleted)')
+    else:(trees[1]/'123/fd/4').symlink_to('/dev/uio7 (deleted)')
+    with pytest.raises(lt.LT02SafetyError):guard(trees)

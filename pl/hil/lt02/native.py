@@ -277,6 +277,8 @@ def check_ownership(*, sysroot: Path = Path("/sys"),
                     "Conflicting kernel PL resource: " + device.name)
 
         def blocked_device(path: str) -> bool:
+            if path.startswith("/dev/uio") and path.endswith(" (deleted)"):
+                return True  # A reused UIO number cannot identify the old mapping.
             path = path.removesuffix(" (deleted)")
             if path.startswith("/dev/uio"):
                 return full_reconfiguration or path not in unrelated_uio
@@ -299,10 +301,11 @@ def check_ownership(*, sysroot: Path = Path("/sys"),
                     lo, hi = (int(v, 16) for v in fields[0].split("-"))
                     offset = int(fields[2], 16)
                     require(hi > lo and offset >= 0, "Invalid process mapping")
-                    device = fields[5].removesuffix(" (deleted)") if len(fields) == 6 else ""
+                    device = fields[5] if len(fields) == 6 else ""
                     if not blocked_device(device):
                         continue
-                    require(device == "/dev/mem" and not overlaps(offset, offset + hi - lo),
+                    require(device.removesuffix(" (deleted)") == "/dev/mem"
+                            and not overlaps(offset, offset + hi - lo),
                             "Conflicting retained PL mapping: PID " + pid.name)
             except (FileNotFoundError, ProcessLookupError):
                 require(not pid.exists(), "Ownership process disappeared incompletely: PID " + pid.name)
