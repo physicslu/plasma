@@ -392,8 +392,6 @@ class DeviceCatalog:
         tokens = normalized.split()
         ranked: list[tuple[int, int, int, str, str, DeviceCatalogRecord]] = []
         for record in self._records:
-            if predicate is not None and not predicate(record):
-                continue
             identifier = record.identifier.casefold()
             taxonomy = " ".join(
                 value.casefold()
@@ -408,6 +406,8 @@ class DeviceCatalog:
             )
             searchable = f"{identifier} {taxonomy}"
             if not all(token in searchable for token in tokens):
+                continue
+            if predicate is not None and not predicate(record):
                 continue
             if identifier == normalized:
                 match_rank = 0
