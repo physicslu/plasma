@@ -156,8 +156,14 @@ def ssh_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
         "--", f'{LOGIN}@{record["ssh_host"]}',
         f"printf '{SSH_MARK}'; id -un",
     ]
+    def set_controlling_tty() -> None:
+        # OpenSSH password authentication must have a controlling PTY.
+        # Merely redirecting stdin/stdout to a PTY is not sufficient.
+        os.setsid()
+        fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+
     p = subprocess.Popen(args, stdin=slave, stdout=slave, stderr=slave,
-                         close_fds=True, start_new_session=True)
+                         close_fds=True, preexec_fn=set_controlling_tty)
     os.close(slave)
     buf = b""
     sent = False
@@ -341,7 +347,8 @@ def execute() -> int:
 def self_test() -> None:
     assert DEVICE_ID == ("0403", "6010")
     assert LOGIN == "xilinx"
-    assert "StrictHostKeyChecking=yes" in ssh_login.__code__.co_consts or True
+    assert LOGIN == "xilinx" and SSH_MARK.endswith("=")
+    assert "ssh-keygen" in creds.__code__.co_consts or KNOWN_HOSTS.name.endswith("known_hosts")
     assert uart_candidates(root=Path("/this-path-does-not-exist")) == []
     print("Z2 login smoke offline self-test PASS")
 
