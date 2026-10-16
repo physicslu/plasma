@@ -15,7 +15,7 @@
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
-- **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 僅供 Internal Research Registry，一般 User 的 IC Selector 顯示 L1–L3 並可依 Level Filter，Job Picker 只顯示 L2/L3。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
+- **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
 
 ## Operator
 
@@ -48,7 +48,7 @@
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
-- **Plan / Accepted Policy** — [IC Information Catalog Level 0 Evidence Contract](architecture/ic-information-phase1.md)：歷史檔名保留 `phase1`，但正式語意為 Level 0 Exact ICPN identity/evidence；具 programming route 才升 L1，qualification `SUPPORTED` 才升 L2，HIL PASS 才升 L3。
+- **Plan / Accepted Policy** — [IC Information Catalog Level 0 Evidence Contract](architecture/ic-information-phase1.md)：歷史檔名保留 `phase1`，但正式語意為 Level 0 Exact ICPN identity/evidence；具 programming route 才升 L1，qualification `SUPPORTED` 才升 L2，HIL PASS 才升 L3；L0 僅供 Internal Research，Customer IC Selector 從 L1 開始。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Implementation / Proposal** — [Installed OpenOCD Evidence Root v1](architecture/runtime-evidence-root-implementation-v1.md)：修正 source-only H5/C5/OpenOCD Provider 顯示資訊在非 editable Python 安裝下的路徑解析，區分 Render full 與 Slim PPU 必備／可省略來源；不授權燒錄。
 - **Implementation / Proposal** — [KL25 Installed Backend Lock Root v1](architecture/kl25-runtime-backend-lock-root-v1.md)：以既有 IC Support Root 契約載入固定的 KL25 implementation lock，non-editable 安裝與 fail-closed 測試通過才能合併；不新增 KL25 Operation Admission。
@@ -114,7 +114,8 @@
 - **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
 - **Host-only / Execution Preparation** — [SWD-04 Offline Execution Checklist](development/swd04-offline-execution-checklist.md)：真實 Artifact、BIN 格式、離線工具包、服務隔離與 HIL／Recovery 操作單；缺少復原檔案時禁止載入。
 - **Host-only software integration** — [SWD-05 Linux PS SWD Transaction Driver](development/swd05-linux-swd-transaction-driver.md)：基於 SWD-03 AXI ABI 的單 Site Driver、注入式 MMIO、Response ACK、WAIT/FAULT/ABORT、posted AP read 與故障隔離；目前無 Z2 實機資格。
-- **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；尚未完成 Z2 Python 3.12.13 實機驗證。
+- **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；已完成 SWD-03 Development HIL（2026-10-16），但未涵蓋 LT02 新 IP。
+- **Implementation candidate / NO Z2 HIL** — [LT02 PS–PL MMIO Loopback ABI](development/mmio-lt02-ps-pl-loopback.md)：新增 FPGA AXI4-Lite Scratchpad／LinuxMMIO 分塊資料比對契約；尚未產生新五區段 Bitstream，PL UI Endpoint 仍停用。
 - **Host-only differential** — [SWD-06 RTL ↔ Python Differential Verification](development/swd06-rtl-python-differential.md)：由 SWD-05 Python Driver 操作 SWD-03 真實 RTL 的 Cocotb AXI4-Lite Bus，僅驗證模擬硬體，Z2 實機尚未執行。
 - **Reference** — [Mock Runtime Foundation Notes](development/mock-runtime-foundation-notes.md)
 - **Plan** — [Device Support Catalog Implementation Plan](development/device-support-implementation-plan.md)
