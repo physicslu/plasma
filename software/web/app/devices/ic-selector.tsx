@@ -86,6 +86,7 @@ function catalogLevelLabel(level: 1 | 2 | 3, zh: boolean): string {
 
 function catalogLevelClass(level: 1 | 2 | 3): string {
   if (level === 1) return "pending";
+  if (level === 2) return "mapped";
   return "verified";
 }
 
