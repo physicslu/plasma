@@ -99,10 +99,10 @@ def _make_snapshot(tmp_path):
     release.write_text("6.8.0-synthetic")
     board = sysroot / "firmware/devicetree/base/model"
     board.parent.mkdir(parents=True)
-    board.write_bytes(b"Fake Zynq board\\x00")
+    board.write_bytes(b"Fake Zynq board\x00")
     platform = sysroot / "bus/platform/devices/40000000.fabric"
     platform.mkdir(parents=True)
-    (platform / "resource").write_text("40000000 4000ffff 00000200\\n")
+    (platform / "resource").write_text("40000000 4000ffff 00000200\n")
     return sysroot, procroot, map0
 
 
@@ -210,7 +210,7 @@ def test_malformed_or_missing_sysfs_fails_closed(tmp_path, bad):
 def test_malformed_kernel_platform_resources_block_inventory(tmp_path, proposal):
     sysroot, procroot, _ = _make_snapshot(tmp_path)
     resource = sysroot / "bus/platform/devices/40000000.fabric/resource"
-    resource.write_text("broken-resource\\n")
+    resource.write_text("broken-resource\n")
     with pytest.raises(Phase1Error, match="Malformed"):
         collect_inventory(sysroot, procroot, proposal)
 
