@@ -139,8 +139,6 @@ def test_two_sites_same_exact_ic_and_word_permissions(host):
                     o.claim_site(3, SITES[2], exact_ic="LPC812 / SWD")
                 with pytest.raises(OwnerError, match="already"):
                     o.claim_site(1, SITES[0], exact_ic="STM32F103C8T6 / SWD")
-                with pytest.raises(Exception):
-                    s1.read32(SITES[1] + 4)
                 assert o.status().active_sites == (1, 2)
         assert o.status().batch_ic is None
         with o.claim_site(1, SITES[0], exact_ic="LPC812 / SWD") as replacement:
@@ -433,3 +431,15 @@ def test_close_retirement_invalidates_all_jobs_and_host_mapping(host):
     assert o.status().phase is Phase.CLOSED
     with pytest.raises(OwnerClosed):
         port.read32(SITES[0] + 4)
+
+def test_cross_site_mmio_escape_poisoned_and_all_admission_blocked(host):
+    o, _ = running(host)
+    try:
+        first = o.claim_site(1, SITES[0], exact_ic="IC-A")
+        with pytest.raises(OwnerError, match="Uncertain"):
+            first.read32(SITES[1] + 4)
+        assert o.status().phase is Phase.FAULT
+        with pytest.raises(OwnerError):
+            o.claim_site(2, SITES[1], exact_ic="IC-A")
+    finally:
+        o.close()
