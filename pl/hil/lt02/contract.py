@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import hashlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -150,6 +151,27 @@ def verify_candidate(candidate: Candidate, approved: dict[str, Any]) -> dict[str
         "Z2_HIL": "NOT_RUN", "physical_swd": "NOT_RUN",
         "real_ic_programming": "NOT_RUN",
     }, "Manifest acceptance improperly claims hardware evidence")
+    slack = manifest.get("implemented_slack_ns")
+    require(type(slack) is dict and set(slack) == {"setup", "hold"},
+            "Implemented setup/hold timing evidence missing")
+    for edge in ("setup", "hold"):
+        value = slack[edge]
+        require(type(value) in (int, float) and math.isfinite(value) and value >= 0,
+                "Nonpassing/invalid implemented timing: " + edge)
+    evidence = manifest.get("evidence_sha256")
+    required_logs = {
+        "logs/legacy-regression.log", "logs/host-regression.log",
+        "logs/lt02-regression.log", "logs/artifact-regression.log",
+        "logs/vivado-console.log", "reports/timing_summary.rpt",
+        "reports/drc.rpt", "reports/methodology.rpt",
+        "reports/utilization.rpt", "reports/check_timing.rpt",
+    }
+    require(type(evidence) is dict and required_logs <= set(evidence),
+            "Original Vivado/RTL/DRC evidence receipts missing")
+    for logname in required_logs:
+        require(sha256_text(evidence[logname]),
+                "Malformed original Vivado report digest: " + logname)
+    # Checks record integrity, NOT that raw private logs were independently read.
     actual_map = verify_hwh(candidate.hwh)
     require(manifest.get("axi_address_map") == actual_map,
             "Manifest and actual HWH five-aperture map differ")
