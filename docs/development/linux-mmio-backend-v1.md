@@ -120,6 +120,74 @@ qualified and is not inferred from previous PSPL-02 tests.
 
 ## MMIO-13/14/15 — Native PYNQ-Z2 HIL adapter (new integration)
 
+### Explicit development profile
+
+`native_qualify --profile development` is for the dedicated single-developer
+Z2 and pinned internal-only four-aperture SWD-03 image. The default remains
+`qualification`. The existing comprehensive P0, operator, UART, independent
+power recovery and stage-session checks remain unchanged for qualification.
+
+Development uses automated checks rather than operator Boolean assertions:
+
+- Exact ARMv7 little-endian PLASMA CPython 3.12.13 runtime.
+- FPGA Manager operating, enabled 100MHz FCLK0, and a protected loader
+  receipt matching the current boot and **last** FPGA Manager load.
+- Pinned BIN digest and internal-fixture Build ID/ABI/address-map provenance
+  before MMIO; actual Identity/ABI readback before any writes.
+- Kernel resources overlapping the four apertures, relevant UIO bindings,
+  PL device fds and retained mappings. Only fd symlinks and relevant mapping
+  ranges are inspected; no process-command inventory or unrelated services.
+  Unknown retained UIO mappings are conservatively treated as conflicts.
+- Production `LinuxMMIO` allowlists/native aligned u32 accesses and the
+  production SWD-05 driver with bounded polling.
+
+There is no development Qualification P0, fresh UART login, operator-presence,
+maintenance-window, single-developer or repeated no-DUT attestation. Firmware
+provenance pins an image with **no external PL I/O**. No arbitrary addresses,
+external DUT operations, deliberate AXI faults or HIL03 are supported.
+Polling limits cannot interrupt a stalled physical AXI access.
+
+Prefer a compatible already-loaded image with its accepted protected receipt.
+Do not reload simply to reset registers: development Identity checks accept
+non-reset operational register values while still enforcing exact Build ID and
+all three ABIs. Reconfiguration invalidates previous HIL01 evidence.
+
+If the image is incompatible or provenance unavailable, verify the candidate
+BIT/HWH/manifest/BIN and usable original firmware/recovery method **before**
+a supervised load. Preserve metadata, driver bindings and any service state
+that must change. Stop if recovery cannot be established. After testing,
+always attempt restoration (also after failure), and verify the original
+image, bindings, metadata and service state. The native test runner never
+loads or restores firmware itself. Do not reload with a surviving MMIO user.
+
+Immediately after a successful supervised load, the loader can record the
+actual firmware named in the last FPGA Manager log (use root-owned firmware
+and a private root-owned receipt directory):
+
+```bash
+sudo /opt/plasma/python/3.12.13/bin/python3 -m pl.hil.swd04.development \
+  --candidate-bin /lib/firmware/approved-internal-swd03.bin \
+  --output /private/loaded-image.json
+sudo /opt/plasma/python/3.12.13/bin/python3 -m pl.hil.swd04.native_qualify \
+  --profile development --stage HIL01 \
+  --session /private/loaded-image.json \
+  --candidate-bin /lib/firmware/approved-internal-swd03.bin \
+  --output /private/hil01 \
+  --execute-live --ack-unrecoverable-axi-stall-risk
+```
+
+For HIL02 use the same receipt and candidate, a new output directory and
+`--previous /private/hil01/result.json`. No `--p0-report` is needed.
+The receipt is trusted loading evidence, not cryptographic readback of FPGA
+configuration memory. Capture it at load time; do not manufacture historical
+receipts from filenames. Loss of the current-boot load log is a fail-closed
+provenance blocker. A receipt is never physical HIL PASS.
+
+STARTED is written before MMIO; PASS/FAIL records describe observed stages.
+Missing results after a started SIGBUS/stall are incomplete, never PASS.
+Actual development measurements and restoration are recorded in
+[2026-10-16 evidence](../evidence/mmio-development/2026-10-16.md).
+
 The next hardware candidate uses the **four-aperture SWD-03 design**, NOT the
 three-aperture PSPL-02/SWD-00 image. Its source / verified artifact hashes
 are specified by `pl/hil/swd04/contract.py`. Keep the physical SWD pins

@@ -11,6 +11,7 @@ on:
       - "pl/sim/swd03_axi_fixture_tb.sv"
       - "pl/verification/cocotb/test_swd03_axi.py"
       - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_development.py"
       - "pl/tests/test_swd04_collect.py"
       - "pl/tests/test_swd04_staging.py"
       - "pl/verification/test_swd04_hil_rtl.py"
@@ -29,6 +30,7 @@ on:
       - "pl/sim/swd03_axi_fixture_tb.sv"
       - "pl/verification/cocotb/test_swd03_axi.py"
       - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_development.py"
       - "pl/tests/test_swd04_collect.py"
       - "pl/tests/test_swd04_staging.py"
       - "pl/verification/test_swd04_hil_rtl.py"
@@ -69,6 +71,7 @@ jobs:
         run: |
           python3 -m pytest -q \
             pl/tests/test_swd04_hil_contract.py \
+            pl/tests/test_swd04_development.py \
             pl/tests/test_swd04_collect.py \
             pl/tests/test_swd04_staging.py
       - name: Exact HIL-02/03 functions against actual RTL

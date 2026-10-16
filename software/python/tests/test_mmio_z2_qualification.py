@@ -30,7 +30,9 @@ def test_explicit_stage_apertures_match_reviewed_four_segment_build():
         q.apertures("HIL03")
 
 
-def test_runtime_validation_rejects_wrong_python_or_cpu():
+def test_runtime_validation_rejects_wrong_python_or_cpu(monkeypatch):
+    # Supplied runtime metadata is synthetic, independent of host /opt symlinks.
+    monkeypatch.setattr(Path, "resolve", lambda path: path)
     kwargs = {
         "version": (3, 12, 13),
         "executable": "/opt/plasma/python/3.12.13/bin/python3",
@@ -45,6 +47,13 @@ def test_runtime_validation_rejects_wrong_python_or_cpu():
     ):
         with pytest.raises(c.SafetyError):
             q.check_runtime(**(kwargs | change))
+
+
+def test_runtime_rejects_interpreter_symlink_outside_owned_prefix(monkeypatch):
+    monkeypatch.setattr(Path, "resolve", lambda path: Path("/usr/bin/python3"))
+    with pytest.raises(c.SafetyError, match="PLASMA-owned"):
+        q.check_runtime(version=(3, 12, 13), machine="armv7l", endian="little",
+                        executable="/opt/plasma/python/3.12.13/bin/python3")
 
 
 def test_default_cli_without_both_flags_stays_inert(monkeypatch, tmp_path, capsys):
@@ -230,3 +239,42 @@ def test_started_and_result_evidence_never_overwritten(tmp_path):
     assert json.loads(path.read_text())["restoration"] == "NOT_RUN"
     with pytest.raises(FileExistsError):
         q._record(path, {"result": "PASS"})
+
+
+def test_development_reuse_does_not_require_reset_values(fake_image):
+    device, lock = fake_image
+    _put32(Path(device), q.TRANSACTION + 8, 5)
+    _put32(Path(device), q.TRANSACTION + 0x2C, c.DPIDR)
+    result = q.run_stage('HIL01', device=device, owner_lock=lock, development_mode=True)
+    assert result['read_only'] is True
+    _put32(Path(device), q.TRANSACTION, 99)
+    with pytest.raises(c.SafetyError, match='Identity/ABI'):
+        q.run_stage('HIL01', device=device, owner_lock=lock, development_mode=True)
+
+
+def test_development_cli_calls_automated_guard_without_qualification(monkeypatch, tmp_path):
+    record = tmp_path/'loaded.json'; record.write_text('{}')
+    candidate = tmp_path/'candidate.bin'; candidate.write_bytes(b'not-live')
+    observed = []
+    monkeypatch.setattr(q, 'check_runtime', lambda: None)
+    monkeypatch.setattr(q.development, 'preflight', lambda *args: observed.append(args))
+    def forbid(**kwargs):
+        raise AssertionError('Development must not require qualification attestations')
+    monkeypatch.setattr(q, 'require_live_session', forbid)
+    def run(stage, **kwargs):
+        assert kwargs['development_mode'] is True
+        return {'source': 'injected unit test; no physical MMIO'}
+    monkeypatch.setattr(q, 'run_stage', run)
+    args = ['--profile', 'development', '--stage', 'HIL01', '--session', str(record),
+            '--candidate-bin', str(candidate), '--output', str(tmp_path/'HIL01'),
+            '--execute-live', '--ack-unrecoverable-axi-stall-risk']
+    assert q.main(args) == 0
+    assert observed == [(record, candidate)]
+    prior = tmp_path/'HIL01/result.json'
+    args[args.index('HIL01')] = 'HIL02'
+    args[args.index(str(tmp_path/'HIL01'))] = str(tmp_path/'HIL02')
+    assert q.main(args + ['--previous', str(prior)]) == 0
+    record.write_text('{"changed":true}')
+    args[args.index(str(tmp_path/'HIL02'))] = str(tmp_path/'wrong-receipt')
+    assert q.main(args + ['--previous', str(prior)]) == 2
+    assert not (tmp_path/'wrong-receipt').exists()

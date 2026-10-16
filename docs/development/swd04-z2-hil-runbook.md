@@ -6,6 +6,16 @@ window. See the [offline execution checklist](swd04-offline-execution-checklist.
 for verified staging commands, missing-recovery NO-GO and current HIL procedure.
 No SWD-04 physical qualification is claimed.
 
+The MMIO-13–15 native entrypoint supports `--profile development` for the
+dedicated single-developer internal fixture. It uses automated provenance,
+clock and targeted ownership checks without Qualification P0 or repeated
+operator attestations. A compatible verified image is reused. Reconfiguration
+requires a usable original-image recovery path and observed restoration.
+See [the development commands](linux-mmio-backend-v1.md#explicit-development-profile).
+The comprehensive **qualification** procedure below is unchanged; historical
+post-merge/window restrictions below describe that procedure. Explicit Gate 1
+hardware scope governs development execution; Gate 2 still controls merging.
+
 ## Provenance and scope
 
 - SWD-03 source commit:

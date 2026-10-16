@@ -6,7 +6,7 @@ this program. Stages are strictly HIL01 (read-only Identity) and HIL02
 (safe CONTROL echo + production SWD-05 synthetic DPIDR).
 
 DEFAULT IS INERT. Never touch real /dev/mem except after an authorized loaded
-candidate, exact runtime, supervised board isolation and two live flags.
+candidate, exact runtime, resource ownership checks and two live flags.
 Kernel AXI faults may SIGBUS or hang indefinitely; a Python timeout, SIGBUS
 handler or try/except is not a recovery mechanism.
 """
@@ -18,11 +18,13 @@ import json
 import os
 from pathlib import Path
 import platform
+import subprocess
 import sys
 
 from pl.hil.swd04 import contract as c
 from pl.hil.swd04 import mmio_contract as swd04
 from pl.hil.swd04.live import require_live_session
+from pl.hil.swd04 import development
 
 from plasma_interfaces.linux_mmio import LinuxMMIO, MMIOAperture, swd03_aperture
 from plasma_interfaces.swd_transaction import SWDTransactionDriver
@@ -103,7 +105,7 @@ def synthetic_dpidr(port) -> dict[str, object]:
 
 
 def run_stage(stage: str, *, device: str,
-              owner_lock: str) -> dict[str, object]:
+              owner_lock: str, development_mode: bool = False) -> dict[str, object]:
     """Real backend defaults; tests may inject a *regular file* as device.
 
     A caller MUST supply a deliberate device and lock path. The live CLI
@@ -114,7 +116,7 @@ def run_stage(stage: str, *, device: str,
                    readonly=(stage == "HIL01")) as mmio:
         audit = swd04.RestrictedMMIO(mmio)
         # Exact Build ID, reset values and ABI checks before any writes.
-        identity = swd04.hil01_registers(audit)
+        identity = development_identity(audit) if development_mode else swd04.hil01_registers(audit)
         if stage == "HIL01":
             return {"identity": identity, "read_only": True}
         with mmio.claim_site(site_id=1, base=CONTROL) as port:
@@ -122,6 +124,22 @@ def run_stage(stage: str, *, device: str,
         with mmio.claim_site(site_id=1, base=TRANSACTION) as port:
             swd = synthetic_dpidr(port)
         return {"identity": identity, "control": control, "swd05": swd}
+
+
+def development_identity(audit) -> dict[str, int]:
+    """Check identity/ABIs without assuming that a reused image is at reset."""
+    expected = {IDENTITY + 4*i: value for i, value in enumerate((
+        0x504C534D, 0x100, 1, 0,
+        *(int(c.SOURCE_SHA[i:i+8], 16) for i in range(0, 32, 8)),
+    ))}
+    expected.update({WAVEFORM: 1, TRANSACTION: 1})
+    values = {}
+    for address, word in expected.items():
+        actual = audit.read(address)
+        c._require(actual == word, f"Identity/ABI mismatch at {address:#x}; STOP")
+        values[f"0x{address:08X}"] = actual
+    values["control_status"] = audit.read(CONTROL + 4)
+    return values
 
 
 def _record(path: Path, data: dict[str, object]) -> None:
@@ -132,9 +150,11 @@ def _record(path: Path, data: dict[str, object]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", choices=("qualification", "development"), default="qualification")
     parser.add_argument("--stage", choices=("HIL01", "HIL02"), required=True)
-    parser.add_argument("--p0-report", type=Path, required=True)
-    parser.add_argument("--session", type=Path, required=True)
+    parser.add_argument("--p0-report", type=Path, help="Qualification P0 report")
+    parser.add_argument("--session", type=Path, required=True,
+                        help="Qualification session or protected development load receipt")
     parser.add_argument("--candidate-bin", type=Path, required=True)
     parser.add_argument("--previous", type=Path)
     parser.add_argument("--output", type=Path, required=True,
@@ -150,20 +170,33 @@ def main(argv: list[str] | None = None) -> int:
     try:
         c._require(not args.output.exists(), "Evidence destination already exists")
         check_runtime()
-        require_live_session(
-            phase=args.stage, p0=args.p0_report, session=args.session,
-            candidate_bin=args.candidate_bin, previous=args.previous,
-        )
+        if args.profile == "development":
+            development.preflight(args.session, args.candidate_bin)
+        else:
+            c._require(args.p0_report is not None, "Qualification requires --p0-report")
+            require_live_session(
+                phase=args.stage, p0=args.p0_report, session=args.session,
+                candidate_bin=args.candidate_bin, previous=args.previous,
+            )
+        c._require(args.stage != "HIL01" or args.previous is None,
+                   "Unexpected previous stage for HIL01")
         if args.stage == "HIL02":
+            c._require(args.previous is not None, "HIL02 requires --previous")
             prior = json.loads(args.previous.read_text(encoding="utf-8"))
             c._require(
                 type(prior) is dict and prior.get("scope") == "MMIO-13-15"
                 and prior.get("stage") == "HIL01"
                 and prior.get("result") == "PASS"
-                and prior.get("p0_sha256") == c.sha256_file(args.p0_report),
+                and prior.get("profile", "qualification") == args.profile
+                and (args.profile != "development" or
+                     prior.get("session_sha256") == c.sha256_file(args.session))
+                and prior.get("candidate_bin_sha256") == c.CANDIDATE_BIN_SHA256
+                and (args.profile == "development" or
+                     prior.get("p0_sha256") == c.sha256_file(args.p0_report)),
                 "HIL02 requires this candidate's native LinuxMMIO HIL01 PASS",
             )
-    except (OSError, ValueError, KeyError, c.SafetyError) as exc:
+    except (OSError, ValueError, KeyError, c.SafetyError,
+            subprocess.SubprocessError) as exc:
         print("MMIO_Z2_NO_GO: " + str(exc), file=sys.stderr)
         return 2
 
@@ -172,9 +205,10 @@ def main(argv: list[str] | None = None) -> int:
     args.output.mkdir(mode=0o700, parents=False, exist_ok=False)
     base = {
         "qualification": "SWD-04", "scope": "MMIO-13-15",
+        "profile": args.profile,
         "stage": args.stage, "source_git_sha": c.SOURCE_SHA,
         "candidate_bin_sha256": c.CANDIDATE_BIN_SHA256,
-        "p0_sha256": c.sha256_file(args.p0_report),
+        "p0_sha256": c.sha256_file(args.p0_report) if args.p0_report else None,
         "session_sha256": c.sha256_file(args.session),
         "python": platform.python_version(),
         "python_executable": sys.executable,
@@ -187,7 +221,8 @@ def main(argv: list[str] | None = None) -> int:
     })
     try:
         observation = run_stage(args.stage, device="/dev/mem",
-                                owner_lock="/run/lock/plasma-mmio.lock")
+                                owner_lock="/run/lock/plasma-mmio.lock",
+                                development_mode=args.profile == "development")
         result = {"result": "PASS", "observations": observation}
     except (OSError, ValueError, c.SafetyError, RuntimeError) as exc:
         # No repeated hardware access, no implicit recover/reset after error.
