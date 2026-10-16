@@ -25,7 +25,7 @@
     {
       "qualification_id": "adr0002-phase2-openocd-012-stm32f103-high-rvz-package-v4",
       "qualification_path": "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-package-v4.json",
-      "git_blob_sha1": "f874deb288140778ef1228a27e2e54ce3ab91963",
+      "git_blob_sha1": "b4b461e005b5441744769428f90e4bfda46962f8",
       "role": "high_density_rvz_package_extension",
       "supported_exact_icpn_count": 43
     }
