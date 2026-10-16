@@ -97,10 +97,10 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertIs(registry_first, registry_second)
         self.assertIs(registry_first.summary, registry_first.summary)
 
-    def test_default_registry_preserves_st_49_and_derives_levels_from_routes(self):
+    def test_default_registry_preserves_st_65_and_derives_levels_from_routes(self):
         registry = get_default_programming_qualification_registry()
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 49)
-        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 49)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 65)
+        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 65)
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_1_OR_HIGHER",
@@ -118,6 +118,13 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertTrue(st["selector_visible"])
         self.assertEqual(st["provider"]["provider_id"], "openocd-upstream")
         self.assertFalse(st["execution_authorized"])
+
+        packaged = registry.describe("STMicroelectronics", "STM32F103RCY6TR")
+        self.assertEqual(packaged["catalog_level"], 2)
+        self.assertEqual(packaged["state"], "SUPPORTED")
+        self.assertTrue(packaged["job_selectable"])
+        self.assertEqual(packaged["programming"]["flash_geometry"]["main_flash_size_bytes"], 256 * 1024)
+        self.assertFalse(packaged["execution_authorized"])
 
         routed = registry.describe("STMicroelectronics", "STM32F407VGT6")
         self.assertEqual(routed["identity_state"], "IDENTIFIED")
