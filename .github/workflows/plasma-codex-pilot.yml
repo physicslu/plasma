@@ -94,8 +94,8 @@ jobs:
           test -d /run/plasma-codex
           test -w /run/plasma-codex
           test "$(stat -c %U /run/plasma-codex)" = plasma-codex
+          test "$(stat -c %G /run/plasma-codex)" = plasma-monitor
           git diff --exit-code
-          test "$(git branch --show-current)" = main || true # detached checkout is permitted
       - name: Execute read-only Codex in a live tmux session
         shell: bash
         run: bash scripts/plasma-codex-pilot.sh
