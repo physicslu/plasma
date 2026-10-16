@@ -85,7 +85,7 @@ jobs:
           output="$RUNNER_TEMP/plasma-codex-swpc-preflight-981.json"
           python3 scripts/plasma-codex-swpc-preflight.py inspect "$output"
           sha256sum "$output" > "$output.sha256"
-          echo "SWPC prerequisite inventory completed. No Codex invocation, runner registration, sudo, hardware or service modification." >> "$GITHUB_STEP_SUMMARY"
+          echo "SWPC prerequisite inventory completed. No Codex agent execution, runner registration, sudo, hardware or service modification." >> "$GITHUB_STEP_SUMMARY"
           echo "Dedicated runner registration and authentication remain NOT CHECKED." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload non-sensitive prerequisite report
         if: always()
