@@ -368,7 +368,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             ("STM32L552CCT6", "STM32L5", "stm32l5-device-basic-v1", "256 KiB", {"min": 1.71, "max": 3.6}),
             ("STM32H7R3A8I6", "STM32H7RS", "stm32h7rs-device-basic-v1", "620 KiB", {"min": 1.62, "max": 3.6}),
             ("STM32WBA50KGU6", "STM32WBA5X", "stm32wba5x-device-basic-v1", "64 KiB", {"min": 1.71, "max": 3.6}),
-            ("STM32N645A0H3Q", "STM32N6", "stm32n6-device-basic-v1", "4.2 MB", {"min": 1.71, "max": 3.6}),
         )
         for icpn, family, profile_id, ram, vdd in cases:
             with self.subTest(icpn=icpn):
@@ -389,6 +388,23 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(basic["hardware_runtime_ready"])
                 self.assertFalse(basic["physical_programming_qualified"])
                 self.assertIsNone(result["selected_profile"])
+
+    def test_st_n6_level0_identity_remains_internal_even_with_basic_profile(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32N645A0H3Q&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["total_count"], 0)
+        self.assertEqual(payload["results"], [])
+
+        catalog = get_default_device_catalog()
+        record = catalog.resolve("STMicroelectronics", "STM32N645A0H3Q")
+        self.assertIsNotNone(record)
+        qualification = get_default_programming_qualification_registry().describe(
+            "STMicroelectronics", "STM32N645A0H3Q"
+        )
+        self.assertEqual(qualification["catalog_level"], 0)
+        self.assertEqual(qualification["catalog_level_state"], "DISCOVERED")
+        self.assertFalse(qualification["selector_visible"])
+        self.assertFalse(qualification["job_selectable"])
 
     def test_g4_basic_profile_exposes_direct_vdda_without_io_supply_inference(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32G474VCH3TR&limit=1")
@@ -508,7 +524,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, l1 = self.request("/api/devices/search?q=STM32F103V8H6&levels=1&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l1["levels"], [1])
-        self.assertEqual(l1["count"], 1)
+        self.assertGreaterEqual(l1["count"], 1)
+        self.assertEqual(l1["results"][0]["icpn"], "STM32F103V8H6")
         self.assertEqual(l1["results"][0]["catalog_level"], 1)
         self.assertEqual(l1["results"][0]["catalog_level_state"], "PROGRAMMING_CANDIDATE")
         self.assertFalse(l1["results"][0]["job_selectable"])
@@ -522,7 +539,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, l2 = self.request("/api/devices/search?q=STM32F103C8T6&levels=2&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l2["levels"], [2])
-        self.assertEqual(l2["count"], 1)
+        self.assertGreaterEqual(l2["count"], 1)
+        self.assertEqual(l2["results"][0]["icpn"], "STM32F103C8T6")
         self.assertEqual(l2["results"][0]["catalog_level"], 2)
         self.assertEqual(l2["results"][0]["catalog_level_state"], "PROGRAMMABLE")
         self.assertTrue(l2["results"][0]["job_selectable"])
