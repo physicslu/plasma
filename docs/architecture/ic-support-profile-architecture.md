@@ -80,9 +80,27 @@ It must not own package pins or commercial suffixes.
 
 Owns address ranges, sizes, page/sector geometry, bank topology and erase/program granularity that vary independently from the programming algorithm.
 
-### 4.3 Package / Minimum Hardware Profile
+### 4.3 Package / Programming Hardware Profile
 
-Owns package-dependent physical requirements and programming interfaces. Phase A intentionally stops before pin-level minimum hardware because the pilot has not yet retained/pinned the required pin/electrical evidence. That field is fail-closed as `pending_evidence`.
+Owns package-dependent physical requirements and programming interfaces. The profile may exist at different evidence depths for exact ICPNs that otherwise share the same package.
+
+The baseline LQFP48 profile remains fail-closed as `pending_evidence`. An exact ICPN may bind to a stronger source-backed hardware profile only when pin mapping, power/ground contacts, programming-interface contacts, package mechanics and electrical requirements are explicitly retained and validated.
+
+For STM32F103C8T6, the first design-input profile is:
+
+`stm32f103c8t6-lqfp48-swd-socket-v1`
+
+It establishes a machine-readable bare-IC SWD socket design contract:
+
+- LQFP48, 7 x 7 mm body, 0.5 mm lead pitch and manufacturer pin-1 orientation;
+- package pin 34 = PA13/SWDIO;
+- package pin 37 = PA14/SWCLK;
+- package pin 7 = NRST;
+- all main VDD/VSS contacts plus VDDA/VSSA are mandatory fixture contacts;
+- BOOT0 and VBAT are optional/recovery contacts for the admitted SWD route;
+- manufacturer power/decoupling requirements remain part of the design input.
+
+This state means **socket schematic/design input is complete enough to design a fixture**. It does not identify or qualify a commercial socket, does not prove signal integrity/contact life, does not set `hardware_runtime_ready`, and does not create Level 3 evidence.
 
 ### 4.4 Option Profile
 
@@ -113,7 +131,7 @@ Expected decomposition:
 |---|---|
 | Programming | shared |
 | Memory Geometry | different |
-| Package / Hardware | shared at current LQFP48/debug-interface evidence depth |
+| Package / Hardware | intentionally different: C8T6 has exact SWD socket design input; CBT6 remains pending-evidence |
 | Option | shared |
 | Security | shared |
 | Revision Override | none admitted yet |
@@ -164,7 +182,8 @@ The checked-in `ground-truth.json` is now explicitly bound to `stm32f103c-source
 - profile-kind/reference mismatch;
 - invalid geometry arithmetic;
 - C8/CB incorrectly sharing Memory Geometry;
-- C8/CB unnecessarily splitting Programming/Package/Option/Security profiles;
+- C8/CB unnecessarily splitting Programming/Option/Security profiles;
+- accidental propagation of the C8 exact socket design profile to CBT6 or other same-package ICPNs;
 - invented revision overrides;
 - promotion of incomplete pin-level minimum hardware into runtime-ready status.
 
@@ -204,10 +223,35 @@ Before expanding the architecture beyond the current STM32F103C pilot, the follo
 1. **Source lock — satisfied for the current C8/CB benchmark.** The exact DS5319 Rev 20, PM0075 Rev 2 and retained catalog inputs are content/blob pinned.
 2. **Deterministic validation — satisfied for the current pilot contract.** Ordinary benchmark validation remains offline and deterministic.
 3. **Independent extraction — not yet satisfied.** A fresh Harness/AI run must execute without Ground Truth/profile/binding leakage and produce a candidate carrying the exact source lock.
-4. **Unresolved fields remain explicit.** Missing minimum pin-level hardware evidence remains fail-closed rather than inferred.
-5. **Profile reuse has positive and negative tests.** Shared behavior and intentionally different memory geometry are both regression tested.
+4. **Unresolved fields remain explicit.** CBT6 still retains the baseline `pending_evidence` package profile; the C8 socket design profile is exact-ICPN evidence and is not inferred across same-package parts.
+5. **Profile reuse has positive and negative tests.** Programming/Option/Security remain shared, while Memory Geometry and exact Package/Programming Hardware evidence may differ.
 
 The next scientific step is therefore **not** bulk STM32F1 expansion. It is one isolated extraction run against the locked STM32F103C benchmark. Only after that result is understood should the target expand to STM32F103R/V or another density class that forces a meaningful profile-boundary decision.
+
+## 9.1 STM32F103C8T6 Socket-design vertical slice
+
+The post-Phase-A vertical slice tests the boundary from software-programmable L2 data to physical fixture design input without collapsing that distinction.
+
+```text
+L2 Programming Qualification
+        +
+Exact Programming Hardware Profile
+        |
+        v
+Socket schematic / pin-contact design input
+        |
+        X  no automatic promotion
+        |
+Commercial Socket + Adapter + Site + PPU + voltage config
+        |
+        v
+Physical HIL evidence
+        |
+        v
+L3 PLASMA_VERIFIED
+```
+
+The C8 design profile intentionally leaves `fixture_qualified=false`, `hardware_runtime_ready=false`, `physical_programming_qualified=false`, and `hil_pass=false`. A complete design input is therefore a prerequisite for physical work, not proof that physical work succeeded.
 
 ## 10. Non-goals of Phase A
 
