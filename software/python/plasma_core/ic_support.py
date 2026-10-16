@@ -286,12 +286,19 @@ class ResolvedICSupport:
             "pin_count": self.expected_catalog["pin_count"],
             "flash_size": self.expected_catalog["flash_size"],
         }
+        hardware = self.profile("package_hardware")
         payload["ic_support"] = {
             "binding_set_id": self.binding_set_id,
             "binding_status": self.binding_status,
             "profiles": {
                 kind: self.profiles[kind].to_summary()
                 for kind in EXPECTED_PROFILE_KINDS
+            },
+            "programming_hardware": {
+                "profile_id": hardware.profile_id,
+                "status": hardware.status,
+                "scope": copy.deepcopy(hardware.scope),
+                "data": copy.deepcopy(hardware.data),
             },
         }
         return payload
