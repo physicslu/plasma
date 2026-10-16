@@ -74,8 +74,10 @@ module pl_mmio_loopback_axi_lite #(
     wire read_window = s_axi_araddr >= MEM_START && s_axi_araddr < MEM_END
                        && s_axi_araddr[1:0] == 2'b00;
 
-    wire [8:0] write_index = (write_addr - MEM_START) >> 2;
-    wire [8:0] read_index = (s_axi_araddr - MEM_START) >> 2;
+    // 2KiB window is exactly 512 words. The 9-bit word-index subtraction
+    // intentionally wraps across 0x800, avoiding a wide/truncated index.
+    wire [8:0] write_index = write_addr[10:2] - MEM_START[10:2];
+    wire [8:0] read_index = s_axi_araddr[10:2] - MEM_START[10:2];
 
     assign s_axi_awready = s_axi_aresetn && !aw_pending && !s_axi_bvalid;
     assign s_axi_wready = s_axi_aresetn && !w_pending && !s_axi_bvalid;
