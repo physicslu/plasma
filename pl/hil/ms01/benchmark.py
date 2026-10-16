@@ -82,6 +82,9 @@ class _Sampler:
         self.rss_bytes_peak: int | None = None
         self.pss_bytes_peak: int | None = None
         self.pss_available = False
+        self.rss_samples: list[int] = []
+        self.pss_samples: list[int] = []
+        self.cpu_samples: list[float] = []
 
     def start(self) -> None:
         self._thread.start()
@@ -105,10 +108,12 @@ class _Sampler:
                 pss = [r[2] for r in available]
                 if all(v is not None for v in rss):
                     total_rss = sum(rss)
+                    self.rss_samples.append(total_rss)
                     self.rss_bytes_peak = max(
                         self.rss_bytes_peak or 0, total_rss)
                 if all(v is not None for v in pss):
                     self.pss_available = True
+                    self.pss_samples.append(sum(pss))
                     self.pss_bytes_peak = max(
                         self.pss_bytes_peak or 0, sum(pss))
                 if self._previous is not None:
@@ -116,6 +121,7 @@ class _Sampler:
                     if now > earlier:
                         percent = max(0.0, 100 * (cpu - earlier_cpu)
                                       / (now - earlier))
+                        self.cpu_samples.append(percent)
                         self.cpu_percent_peak = max(
                             self.cpu_percent_peak or 0.0, percent)
                 self._previous = (now, cpu)
@@ -127,6 +133,13 @@ def _child_rusage() -> float:
     child_usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     return sum((self_usage.ru_utime, self_usage.ru_stime,
                 child_usage.ru_utime, child_usage.ru_stime))
+
+
+def _context_switches() -> int:
+    own = resource.getrusage(resource.RUSAGE_SELF)
+    children = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return sum((own.ru_nvcsw, own.ru_nivcsw,
+                children.ru_nvcsw, children.ru_nivcsw))
 
 
 def _case(driver: LoopTestDriver, site: int, sequence: int,
@@ -251,6 +264,7 @@ def run_benchmark(
             conn.close()
 
     cpu_before = _child_rusage()
+    switches_before = _context_switches()
     start_ns = time.perf_counter_ns()
     try:
         if mode == "thread":
@@ -334,6 +348,9 @@ def run_benchmark(
         "data_word_ops_per_s": operations / elapsed_s,
         "cpu_percent_one_core_100": cpu_seconds / elapsed_s * 100,
         "cpu_percent_peak_sampled_one_core_100": sampler.cpu_percent_peak,
+        "cpu_percent_avg_sampled_one_core_100": (
+            statistics.mean(sampler.cpu_samples) if sampler.cpu_samples else None),
+        "context_switches": max(0, _context_switches() - switches_before),
         "cpu_percent_machine_normalized": cpu_seconds / elapsed_s * 100 /
                                           (os.cpu_count() or 1),
         "ram_rss_peak_mib": (sampler.rss_bytes_peak / 1048576
@@ -341,6 +358,10 @@ def run_benchmark(
         "ram_pss_peak_mib": (sampler.pss_bytes_peak / 1048576
                              if sampler.pss_available else None),
         "ram_samples": sampler.samples,
+        "ram_rss_avg_mib": (statistics.mean(sampler.rss_samples) / 1048576
+                             if sampler.rss_samples else None),
+        "ram_pss_avg_mib": (statistics.mean(sampler.pss_samples) / 1048576
+                             if sampler.pss_samples else None),
         "latency_p50_us": _percentile(durations, 50) / 1000,
         "latency_p95_us": _percentile(durations, 95) / 1000,
         "latency_p99_us": _percentile(durations, 99) / 1000,
@@ -362,7 +383,8 @@ def save_reports(runs: list[dict], output: Path) -> None:
         "mode", "site_count", "payload_bytes", "iterations_per_site",
         "elapsed_s", "throughput_mib_per_s", "data_word_ops_per_s",
         "cpu_percent_one_core_100", "cpu_percent_peak_sampled_one_core_100",
-        "ram_rss_peak_mib", "ram_pss_peak_mib", "latency_p95_us",
+        "ram_rss_peak_mib", "ram_pss_peak_mib", "ram_rss_avg_mib",
+        "ram_pss_avg_mib", "context_switches", "latency_p95_us",
     )
     with (output / "benchmark.csv").open("x", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=columns)
