@@ -97,6 +97,18 @@ Catalog Level 3 PLASMA_VERIFIED ⊆ Catalog Level 2 PROGRAMMABLE ⊆ Catalog Lev
 
 Catalog Level 的 authority 仍是 canonical `ProgrammingQualificationRegistry`；coverage/reporting 層**不得自行升降級**。Cross-Manufacturer Promotion Framework 只讀 canonical qualification 結果，負責兩件事：按 Manufacturer 對帳 L0/L1/L2/L3 數量，以及用同一套 blocker vocabulary 說明每顆 Exact ICPN 下一個 promotion edge 為何尚未通過。
 
+Canonical promotion evidence class 先將不同 Manufacturer／Provider 的來源正規化成共同語意：
+
+| Evidence class | 意義 |
+|---|---|
+| `IDENTITY_ONLY` | 只有 canonical Exact ICPN identity；沒有已 admitted programming route |
+| `CATALOG_MAPPED_ROUTE` | Canonical Catalog 已有 mapped target route |
+| `BACKEND_CANDIDATE_ROUTE` | 已有 source-backed backend candidate，但仍是 research-only |
+| `REVIEWED_PROGRAMMING_PROVIDER` | 已進入版本化 Programming Provider review／qualification |
+| `PLASMA_VERIFIED_CONFIGURATION` | 已有版本化 PLASMA configuration HIL PASS authority |
+
+Manufacturer-specific evidence 名稱、DFP terminology、CFG naming 或 vendor tool 狀態只能由 adapter 映射到上述共同 evidence class；**不得直接成為 Product Level enum 或 visibility rule。**
+
 Promotion edge 與 canonical blocker taxonomy：
 
 | Promotion edge | Blocker code | 意義 |
@@ -115,6 +127,7 @@ Framework report 必須至少輸出：
 
 - 全域與逐 Manufacturer 的 L0/L1/L2/L3 Unique Exact ICPN counts；
 - Customer IC Selector 可見數（L1–L3）與 Job Picker 可選數（L2–L3）；
+- canonical promotion evidence class counts；
 - 各 promotion edge 的 blocker counts；
 - Catalog revision identity；
 - `execution_authorized_by_framework=false`，明示 report/Level 永遠不是 execution grant。
