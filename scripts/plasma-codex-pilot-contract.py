@@ -113,12 +113,16 @@ def check() -> None:
         assert piece in shell, f"missing monitor contract: {piece}"
     for piece in (
         "--sandbox read-only",
-        "--ask-for-approval never",
+        "codex --ask-for-approval never exec",
         "timeout --signal=TERM --kill-after=10s 900s",
         "codex exec",
         'rc="${PIPESTATUS[0]}"',
     ):
         assert piece in inner, f"missing bounded Codex contract: {piece}"
+    # This is a global CLI flag. In Codex CLI 0.162.1, placing it AFTER
+    # `exec` causes clap argument parsing to exit 2 before the pilot runs.
+    assert "codex exec" not in inner, "Codex approval flag must precede exec"
+    assert inner.index("codex --ask-for-approval never exec") < inner.index("--sandbox read-only")
     for prohibited in (
         "pull_request_target:",
         "permissions: write-all",
