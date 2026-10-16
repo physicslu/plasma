@@ -1,0 +1,99 @@
+name: PLASMA Codex SWPC bootstrap preflight (Issue 981)
+
+# Owner-triggered, read-only inventory using the EXISTING trusted main-only
+# integration runner. This never executes Codex or changes SWPC settings.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-swpc-preflight.yml"
+      - "scripts/plasma-codex-swpc-preflight.py"
+      - "docs/development/plasma-codex-swpc-bootstrap-preflight.md"
+      - "docs/README.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-swpc-preflight.yml"
+      - "scripts/plasma-codex-swpc-preflight.py"
+      - "docs/development/plasma-codex-swpc-bootstrap-preflight.md"
+      - "docs/README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-swpc-preflight-981
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify issue authorization and safe workflow scope
+        run: python3 scripts/plasma-codex-swpc-preflight.py self-test
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex preflight 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check trusted complete GitHub event metadata
+        run: python3 scripts/plasma-codex-swpc-preflight.py event "$GITHUB_EVENT_PATH"
+
+  observe:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, plasma-integration]
+    timeout-minutes: 10
+    steps:
+      - name: Fail closed unless expected SWPC CI observer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$RUNNER_NAME" = SWPC-plasma-ci
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-ci
+          test "$(id -u)" -ne 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Collect read-only bootstrap prerequisites without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/plasma-codex-swpc-preflight-981.json"
+          python3 scripts/plasma-codex-swpc-preflight.py inspect "$output"
+          sha256sum "$output" > "$output.sha256"
+          echo "SWPC prerequisite inventory completed. No Codex invocation, runner registration, sudo, hardware or service modification." >> "$GITHUB_STEP_SUMMARY"
+          echo "Dedicated runner registration and authentication remain NOT CHECKED." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload non-sensitive prerequisite report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-swpc-preflight-981-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-codex-swpc-preflight-981.json
+            ${{ runner.temp }}/plasma-codex-swpc-preflight-981.json.sha256
+          if-no-files-found: warn
+          retention-days: 14
