@@ -39,6 +39,17 @@ class ParityTests(unittest.TestCase):
                 p.install_exact(link, p.render_wrapper(), 0o755)
             self.assertEqual(existing.read_text(), "owner-managed rules\n")
 
+
+    def test_unix_mode_comparison_is_not_an_acl_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "usb-mock"
+            path.write_bytes(b"")
+            path.chmod(0o660)
+            m = path.stat()
+            self.assertTrue(p.unix_mode_rw(m, m.st_uid, set()))
+            self.assertTrue(p.unix_mode_rw(m, m.st_uid + 1, {m.st_gid}))
+            self.assertFalse(p.unix_mode_rw(m, m.st_uid + 1, set()))
+
     def test_install_exact_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             f = Path(root) / "udev" / "rules"
