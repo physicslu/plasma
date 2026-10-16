@@ -198,7 +198,7 @@ Validation command for the PR and future host CI (NO device I/O):
 ```sh
 python3 -m pytest -q software/python/tests/test_linux_mmio.py \
     software/python/tests/test_swd_transaction_driver.py \
-    pl/tests/test_mmio_z2_qualification.py
+    software/python/tests/test_mmio_z2_qualification.py
 ```
 
 The test file uses a **sparse regular file** at the reviewed AXI offset
