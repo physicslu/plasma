@@ -284,7 +284,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               </button>
             ))}
           </div>
-        ))}
+        )}
 
         <label className="icSelectorSearchBox">
           <span>ICPN / Vendor / Family</span>
@@ -745,7 +745,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
         ) : (
           <div className="icSelectorDetailEmpty">
             <b>{zh ? "尚未選擇 ICPN" : "No ICPN selected"}</b>
-            <p>{zh ? "從 production catalog 搜尋結果選擇一筆以查看 admission 與 mapping 證據。" : "Choose a production-catalog result to inspect admission and mapping evidence."}</p>
+            <p>{zh ? "從 L1–L3 IC Selector 搜尋結果選擇一筆查看資格與驗證證據。" : "Choose an L1–L3 IC Selector result to inspect qualification and validation evidence."}</p>
           </div>
         )}
       </aside>
