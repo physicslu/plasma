@@ -36,10 +36,12 @@ per-phase, exact `ConfigurationPin` / evidence checks to the transition:
    consumed and cleared. A newly created regular-file backend must explicitly
    attach with the incremented generation before `READY` is restored.
 
-Incorrect phase/order, missing evidence, foreign owner epoch, stale generation,
-false/unknown condition, candidate digest mismatch, or an inconsistent
-receipt cannot publish a generation. Failures are terminal `FAULT` in the
-host model; no automatic retry, restore, rebind or FPGA load is attempted.
+Out-of-order method calls are rejected by the existing state guard without
+advancing the transition. Missing or rejected stage evidence, foreign owner
+epoch, stale generation, false/unknown claims, candidate digest mismatch,
+or inconsistent receipts poison the active transaction as terminal `FAULT`;
+none can publish a generation. There is no automatic retry, restore,
+rebind or FPGA load.
 The Owner's RLock serializes gate submission and Site admission.
 
 **Claim limits:** Neither HostAudit nor Phase 2A.2 booleans are hardware
