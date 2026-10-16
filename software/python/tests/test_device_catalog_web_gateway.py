@@ -8,9 +8,11 @@ from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = get_default_device_catalog().size
+_LEVEL_COUNTS = get_default_programming_qualification_registry().summary["catalog_level_counts"]
+EXPECTED_CUSTOMER_SELECTOR_SIZE = sum(_LEVEL_COUNTS[str(level)] for level in (1, 2, 3))
 
 
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
@@ -39,7 +41,9 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["scope"], "customer_ic_selector")
+        self.assertEqual(payload["levels"], [1, 2, 3])
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertGreaterEqual(payload["total_count"], 1)
         self.assertEqual(payload["count"], payload["total_count"])
         result = payload["results"][0]
@@ -110,9 +114,13 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
             64 * 1024,
         )
+        self.assertEqual(result["catalog_level"], 2)
+        self.assertEqual(result["catalog_level_state"], "PROGRAMMABLE")
+        self.assertTrue(result["job_selectable"])
         self.assertEqual(qualification["catalog_level"], 2)
         self.assertEqual(qualification["catalog_level_state"], "PROGRAMMABLE")
         self.assertTrue(qualification["selector_visible"])
+        self.assertTrue(qualification["job_selectable"])
         self.assertFalse(qualification["hardware_runtime_ready"])
         self.assertFalse(qualification["physical_programming_qualified"])
 
@@ -454,8 +462,9 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
             _reject_unmapped_microchip_raw_job_target(other)
 
-    def test_microchip_122_exact_phase1_ic_information_search_not_programming(self) -> None:
+    def test_microchip_level0_identity_is_internal_and_not_public_selector_visible(self) -> None:
         catalog = get_default_device_catalog()
+        registry = get_default_programming_qualification_registry()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
         self.assertEqual(len(rows), 122)
         self.assertEqual(len({r.identifier for r in rows}), 122)
@@ -464,44 +473,28 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                             r.target_config == "" for r in rows))
         for record in rows:
             with self.subTest(icpn=record.identifier):
-                status, payload = self.request(
-                    f"/api/devices/search?q={record.identifier}&limit=5")
-                self.assertEqual(status, 200)
-                self.assertEqual(payload["catalog_size"], 4975)
-                self.assertGreaterEqual(payload["total_count"], 1)
-                # Prefix results may include e.g. -MF and -MFT; exact match ranks first.
-                item = payload["results"][0]
-                self.assertEqual(item["icpn"], record.identifier)
-                self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
-                self.assertFalse(item["backend"]["target_config"])
-                self.assertIsNone(item["selected_profile"])
-                self.assertFalse(item["backend_providers"])
-                self.assertIsNone(item["backend_candidate"])
-                self.assertIsNone(item["backend_source_reference"])
-                information = item["microchip_ic_information"]
-                self.assertEqual(information["identity_state"], "IDENTIFIED")
-                self.assertFalse(information["information_complete"])
-                self.assertEqual(information["programming_state"], "UNKNOWN")
-                self.assertEqual(information["compatibility_state"], "NOT_TESTED")
-                self.assertIsNone(information["programming_provider"])
-                self.assertEqual(information["supported_operations"], [])
-                self.assertEqual(information["verified_configurations"], [])
-                self.assertEqual(information["field_states"]["ram"], "VERIFIED")
-                self.assertEqual(information["field_states"]["working_vdd"], "PARTIAL")
-                self.assertEqual(information["field_states"]["io_supply"], "UNKNOWN")
-                self.assertEqual(information["field_states"]["vdda"], "UNKNOWN")
-                self.assertFalse(information["software_supported"])
-                self.assertFalse(information["programming_profile_authority"])
-                self.assertFalse(information["hardware_runtime_ready"])
-                qualification = item["programming_qualification"]
+                qualification = registry.describe(record.vendor, record.identifier)
                 self.assertEqual(qualification["identity_state"], "IDENTIFIED")
                 self.assertEqual(qualification["catalog_level"], 0)
                 self.assertEqual(qualification["catalog_level_state"], "DISCOVERED")
-                self.assertEqual(qualification["state"], "UNKNOWN")
                 self.assertFalse(qualification["selector_visible"])
-                self.assertFalse(qualification["execution_authorized"])
-                self.assertIsNone(qualification["provider"])
-                self.assertEqual(qualification["operations"], {})
+                self.assertFalse(qualification["job_selectable"])
+
+                status, payload = self.request(
+                    f"/api/devices/search?q={record.identifier}&limit=5")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["scope"], "customer_ic_selector")
+                self.assertEqual(payload["levels"], [1, 2, 3])
+                self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
+                self.assertEqual(payload["total_count"], 0)
+                self.assertEqual(payload["count"], 0)
+                self.assertEqual(payload["results"], [])
+
+        status, payload = self.request("/api/devices/search?q=ATSAML10E16A-MU&levels=0")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
+        self.assertIn("Level 0 is internal-only", payload["error"]["message"])
+
         for blocked in (
             "ATSAML10D16A-MZTVAO", "ATSAML10E16A-MZTVAO",
             "ATSAML10E16A-MZVAO", "ATSAML11E16A-MZTVAO",
@@ -510,6 +503,34 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 status, payload = self.request(f"/api/devices/search?q={blocked}&limit=5")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["total_count"], 0)
+
+    def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
+        status, l1 = self.request("/api/devices/search?q=STM32F103V8H6&levels=1&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(l1["levels"], [1])
+        self.assertEqual(l1["count"], 1)
+        self.assertEqual(l1["results"][0]["catalog_level"], 1)
+        self.assertEqual(l1["results"][0]["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+        self.assertFalse(l1["results"][0]["job_selectable"])
+        self.assertTrue(l1["results"][0]["programming_qualification"]["selector_visible"])
+
+        status, l1_as_l2 = self.request("/api/devices/search?q=STM32F103V8H6&levels=2&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(l1_as_l2["count"], 0)
+        self.assertEqual(l1_as_l2["total_count"], 0)
+
+        status, l2 = self.request("/api/devices/search?q=STM32F103C8T6&levels=2&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(l2["levels"], [2])
+        self.assertEqual(l2["count"], 1)
+        self.assertEqual(l2["results"][0]["catalog_level"], 2)
+        self.assertEqual(l2["results"][0]["catalog_level_state"], "PROGRAMMABLE")
+        self.assertTrue(l2["results"][0]["job_selectable"])
+
+        status, l2_as_l1 = self.request("/api/devices/search?q=STM32F103C8T6&levels=1&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(l2_as_l1["count"], 0)
+        self.assertEqual(l2_as_l1["total_count"], 0)
 
     def test_search_is_case_insensitive(self) -> None:
         status, payload = self.request("/api/devices/search?q=stm32f103c8t6")
@@ -569,7 +590,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 100)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual({item["family"] for item in payload["results"]}, {"STM32F4"})
         self.assertTrue(all(item["icpn"] for item in payload["results"]))
 
@@ -723,7 +744,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_phase41_rt_batch2_icpn_is_exposed_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F405RGT7TR&limit=5")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F405RGT7TR")
@@ -733,7 +754,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_phase41_rt_batch3_icpn_is_exposed_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F413RGT6TR&limit=5")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F413RGT6TR")
@@ -743,7 +764,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_phase41_rt_batch4_icpn_is_exposed_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F446RET7TR&limit=5")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F446RET7TR")
@@ -756,7 +777,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_phase42b_stm32f410cb_icpn_is_exposed_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F410CBT6&limit=5")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F410CBT6")
@@ -769,7 +790,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_phase42f_stm32f412rg_ptr_icpn_is_exposed_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F412RGY6PTR&limit=5")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F412RGY6PTR")
@@ -790,7 +811,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_empty_query_is_valid_for_catalog_metadata_idle_state(self) -> None:
         status, payload = self.request("/api/devices/search?q=")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["catalog_size"], EXPECTED_CUSTOMER_SELECTOR_SIZE)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["total_count"], 0)
         self.assertEqual(payload["results"], [])
