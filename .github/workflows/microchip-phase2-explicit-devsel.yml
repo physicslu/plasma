@@ -5,6 +5,12 @@ on:
     paths:
       - 'data/device-catalog/research/microchip_phase2_explicit_devsel_audit_v1.py'
       - '.github/workflows/microchip-phase2-explicit-devsel.yml'
+      - 'software/python/plasma_web/microchip_sam_phase2_route_evidence.py'
+      - 'software/python/plasma_web/microchip_phase1_admission_guard.py'
+      - 'software/python/plasma_web/programming_qualification.py'
+      - 'software/python/tests/test_microchip_sam_phase2_892_l1.py'
+      - 'data/device-catalog/research/microchip-phase2-samdcrl0-538-commercial-l1-v1.csv'
+      - 'data/device-catalog/research/microchip-phase2-samd5e5-354-commercial-l1-v1.csv'
   workflow_dispatch:
 
 permissions:
@@ -42,7 +48,7 @@ jobs:
             --driver-d "$RUNNER_TEMP/microchip-phase2/at91samd.c" \
             --driver-e "$RUNNER_TEMP/microchip-phase2/atsame5.c" \
             --output "$RUNNER_TEMP/microchip-phase2/phase2-1548-devsel-review.json" --verify
-      - name: Assert fail-closed under source tampering and unchanged Product levels
+      - name: Assert fail-closed under source tampering and check 892 canonical L1-only admissions
         env:
           PYTHONPATH: software/python
         run: |
@@ -90,13 +96,38 @@ jobs:
                   raise AssertionError('Modified upstream/original source accepted')
           catalog = get_default_device_catalog()
           microchip = [r for r in catalog.records if r.vendor == 'Microchip']
-          assert len(microchip) == 1015
-          actual = get_default_programming_qualification_registry().summary
+          from plasma_web.microchip_sam_phase2_route_evidence import SAM_EXPLICIT_DEVSEL
+          assert len(microchip) == 1907
+          assert len(SAM_EXPLICIT_DEVSEL) == 84
+          registry = get_default_programming_qualification_registry()
+          actual = registry.summary
           by_level = actual['catalog_level_counts']
-          assert by_level['1'] >= 1015
-          assert all(catalog.resolve('Microchip', r['exact_icpn']) is None
-                     for r in queue['rows'])
+          assert by_level['1'] >= 1907
+          for item in queue['rows']:
+              hit = catalog.resolve('Microchip', item['exact_icpn'])
+              if item['research_review_state'] == 'EXACT_DRIVER_PART_DEVSEL_REVIEW_CANDIDATE':
+                  assert hit is not None
+                  family, devsel = SAM_EXPLICIT_DEVSEL[item['official_base_device']]
+                  assert family == hit.family and devsel == item['driver_devsel']
+                  result = registry.describe('Microchip', item['exact_icpn'])
+                  assert result['catalog_level'] == 1
+                  assert result['state'] == 'CANDIDATE'
+                  assert result['selector_visible'] is True
+                  assert result['job_selectable'] is False
+                  assert result['execution_authorized'] is False
+              else:
+                  assert hit is None
+          assert all(r['mapping_status'] == 'no_mapping' and not r['target_config']
+                     for r in microchip)
           PY
+      - name: Run source-bound SAM L1 and historical Microchip regression tests
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s software/python/tests -p 'test_microchip_sam_phase2_892_l1.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_microchip_saml1x_route_evidence.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_microchip_pic32mx_893_l1_admission.py' -v
       - name: Upload read-only admission review ledger
         uses: actions/upload-artifact@v4
         with:
