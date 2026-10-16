@@ -1,0 +1,124 @@
+name: PLASMA Codex isolated read-only pilot (Issue 981)
+
+# Bootstrap only: a separately reviewed main-branch workflow. No PR code runs on SWPC.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-pilot.yml"
+      - "scripts/plasma-codex-pilot*.sh"
+      - "scripts/plasma-codex-pilot-contract.py"
+      - "docs/development/plasma-codex-pilot.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-pilot.yml"
+      - "scripts/plasma-codex-pilot*.sh"
+      - "scripts/plasma-codex-pilot-contract.py"
+      - "docs/development/plasma-codex-pilot.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-pilot-981
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify pilot authorization and execution contracts
+        run: |
+          python3 scripts/plasma-codex-pilot-contract.py check
+          bash -n scripts/plasma-codex-pilot.sh scripts/plasma-codex-pilot-inner.sh
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex pilot 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify the exact trusted owner comment, issue and default branch
+        run: python3 scripts/plasma-codex-pilot-contract.py event "$GITHUB_EVENT_PATH"
+
+  pilot:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    # Must be a NEW dedicated runner with a Linux account that cannot control Z2.
+    # Do not add this label to the existing plasma-integration/plasma-ci runner.
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out reviewed main only (no persisted Git credentials)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+          clean: true
+      - name: Validate dedicated SWPC Linux identity and monitor provision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "Dedicated Codex identity belongs to a prohibited privileged group" >&2
+            exit 1
+          fi
+          command -v codex
+          command -v tmux
+          command -v timeout
+          test -d /run/plasma-codex
+          test -w /run/plasma-codex
+          test "$(stat -c %U /run/plasma-codex)" = plasma-codex
+          test "$(stat -c %G /run/plasma-codex)" = plasma-monitor
+          git diff --exit-code
+      - name: Execute read-only Codex in a live tmux session
+        shell: bash
+        run: bash scripts/plasma-codex-pilot.sh
+      - name: Write truthful evidence summary
+        if: always()
+        shell: bash
+        run: |
+          output="$RUNNER_TEMP/plasma-codex-981-$GITHUB_RUN_ID"
+          if test -f "$output/exit_code"; then
+            echo "Codex pilot actual exit code: $(cat "$output/exit_code")" >> "$GITHUB_STEP_SUMMARY"
+            echo "Only public checkout files were in the fixed pilot prompt; no HIL or code modification authorized." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Codex pilot did not produce a completion marker (NOT RUN or interrupted)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload read-only pilot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-pilot-981-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/exit_code
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/last-message.txt
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/SHA256SUMS
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/metadata.txt
+          if-no-files-found: warn
+          retention-days: 14
