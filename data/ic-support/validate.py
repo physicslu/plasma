@@ -222,7 +222,8 @@ def validate_package_hardware(profile: dict[str, Any]) -> None:
     require(power.get("analog_ground", {}).get("pin") == 8, "VSSA must resolve to package pin 8")
     backup = power.get("backup_supply", {})
     require(backup.get("pin") == 1, "VBAT must resolve to package pin 1")
-    require(backup.get("required_for_swd_programming") is True, "batteryless Socket profile must contact VBAT")
+    require(backup.get("required_for_primary_swd_signal_path") is False, "VBAT must not be modeled as an SWD signal requirement")
+    require(backup.get("required_for_batteryless_socket_fixture") is True, "batteryless Socket profile must contact VBAT")
     require(
         backup.get("fixture_policy") == "tie_to_vdd_when_no_external_battery",
         "batteryless Socket profile must tie VBAT to VDD",
@@ -234,7 +235,7 @@ def validate_package_hardware(profile: dict[str, Any]) -> None:
         "VDDA decoupling must follow AN2586 Rev 8 100 nF + 1 uF guidance",
     )
 
-    contacts = data.get("minimum_swd_programming_contacts")
+    contacts = data.get("minimum_batteryless_swd_fixture_contacts")
     require(isinstance(contacts, list) and contacts, "minimum SWD programming contacts are required")
     contact_pins = [item.get("package_pin") for item in contacts if isinstance(item, dict)]
     require(
