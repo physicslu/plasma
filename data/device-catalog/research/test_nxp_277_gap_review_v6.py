@@ -49,8 +49,8 @@ class Nxp277GapReviewTests(unittest.TestCase):
         extra = {r["icpn"] for r in csvrows(SOURCE_148)}
         self.assertEqual({r["icpn"] for r in self.queue}, original | extra)
         self.assertEqual(len(original & extra), 0)
-        self.assertEqual(self.catalog.size, 4975)
-        self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 224)
+        self.assertEqual(self.catalog.size, 4983)
+        self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 232)
         self.assertTrue(all(self.catalog.resolve("NXP",r["icpn"]) is None
                             for r in self.queue))
 
@@ -67,7 +67,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
                 # Microchip publication, not treat an amended manifest as
                 # the old immutable source.
                 current = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(len(current["sources"]), 32)
+                self.assertEqual(len(current["sources"]), 33)
                 self.assertEqual(current["sources"][-1], {
                     "manufacturer":"Microchip","family":"SAML1X",
                     "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
@@ -76,6 +76,18 @@ class Nxp277GapReviewTests(unittest.TestCase):
                     "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
                 })
                 current["sources"].pop()
+                # Replay the sealed historical manifest after removing ONLY
+                # the later exact LPC11U6X additive source and Microchip append.
+                nxp_lpc = [s for s in current["sources"]
+                           if s["manufacturer"] == "NXP" and s["family"] == "LPC11U6X"]
+                self.assertEqual(nxp_lpc, [{
+                    "manufacturer": "NXP", "family": "LPC11U6X",
+                    "path": "../research/nxp-lpc11u6x-8-commercial-l1-v1.csv",
+                    "row_count": 8,
+                    "git_blob_sha": "7eb882262d6f907022d3aaa4e5bd8c656f641a54",
+                    "sha256": "39cf41e7bf67ee076c19ad53c388c3d9b61b556767c1a7b8ec9420cc1542ad77",
+                }])
+                current["sources"].remove(nxp_lpc[0])
                 previous = (json.dumps(current, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 original = hashlib.sha1(
                     f"blob {len(previous)}".encode() + bytes([0]) + previous).hexdigest()
