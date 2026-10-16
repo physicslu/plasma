@@ -268,8 +268,11 @@ class ConfigurationOwner:
             if not lease._active or self._leases.get(lease.site_id) is not lease \
                     or lease.generation != self.generation:
                 raise OwnerClosed("Old or revoked Site lease")
-            return (lease._port.write32(address, value) if write else
-                    lease._port.read32(address))
+            try:
+                return (lease._port.write32(address, value) if write else
+                        lease._port.read32(address))
+            except (MMIOError, MMIOClosed, OSError, ValueError) as exc:
+                self._fault(f"Uncertain Host MMIO access: {type(exc).__name__}")
 
     def _release_site(self, lease: ManagedSite) -> None:
         with self._mutex:
