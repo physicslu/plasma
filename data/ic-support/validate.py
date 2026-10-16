@@ -355,6 +355,12 @@ def main() -> int:
         and socket_contract["canonical_profiles"]["security"] == c8["security"]["profile_id"],
         "Socket Design Contract canonical profile references drift",
     )
+    composition = socket_contract.get("composition_policy", {})
+    require(composition.get("mode") == "additive_hardware_overlay", "Socket overlay composition mode drift")
+    require(composition.get("mutates_software_admission_authority") is False, "Socket overlay must not mutate software admission")
+    require(composition.get("mutates_catalog_level_authority") is False, "Socket overlay must not mutate Catalog Level authority")
+    require(composition.get("requires_exact_icpn_match") is True, "Socket overlay must require exact ICPN matching")
+
     boundary = socket_contract.get("qualification_boundary", {})
     require(boundary.get("sufficient_for_socket_schematic_and_layout_design") is True, "Socket design input readiness missing")
     require(boundary.get("hardware_runtime_ready") is False, "Socket contract must not claim hardware runtime readiness")
