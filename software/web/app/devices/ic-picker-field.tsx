@@ -39,6 +39,7 @@ export function ICPickerField({
         const response = await searchDevices(normalized, {
           apiBase,
           limit: 8,
+          levels: [2, 3],
           signal: controller.signal,
         });
         if (!controller.signal.aborted) {
@@ -105,7 +106,7 @@ export function ICPickerField({
               <b>{device.icpn ?? device.identifier}</b>
               <span>{device.vendor} · {device.family}</span>
               <small>
-                Exact ICPN · {device.backend.mapping_status === "mapped" ? "OCD Mapped" : device.backend.mapping_status}
+                L{device.catalog_level} · Exact ICPN · {device.backend.mapping_status === "mapped" ? "OCD Mapped" : device.backend.mapping_status}
               </small>
             </button>
           ))}
