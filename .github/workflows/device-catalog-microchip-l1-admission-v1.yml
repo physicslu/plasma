@@ -9,7 +9,6 @@ on:
       - 'data/device-catalog/research/microchip_pic32mx_893_production_source_gate_v1.py'
       - 'data/device-catalog/research/microchip-pic32mx-893-commercial-l1-v1.csv'
       - 'data/device-catalog/research/microchip-pic32mx-85-devid-route-v1.json'
-      - 'data/device-catalog/production/icpn-v1-manifest.json'
       - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
       - 'software/python/plasma_web/route_evidence_admission.py'
       - 'software/python/plasma_web/microchip_saml1x_route_evidence.py'
