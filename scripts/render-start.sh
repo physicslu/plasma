@@ -81,7 +81,7 @@ if get_default_backend_candidate_registry().size != 362:
     raise SystemExit("[render-start] H5/C5 research candidates not fully present")
 provider = get_default_openocd_provider_registry()
 if provider is None or provider.inventory != {
-    "openocd-upstream": 4184,
+    "openocd-upstream": 4193,
     "openocd-st-h5-research": 190,
     "openocd-st-c5-stldr-research": 172,
 }:
