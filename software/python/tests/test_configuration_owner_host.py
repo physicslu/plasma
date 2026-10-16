@@ -19,6 +19,10 @@ from plasma_interfaces.configuration_owner import (
     ConfigurationOwner, HostAudit, HostSafety, HostVerification,
     OwnerClosed, OwnerError, Phase,
 )
+from plasma_interfaces.configuration_safety_contract import (
+    ConfigurationPin, OwnershipEvidence, IsolationEvidence, RetirementEvidence,
+    VerificationEvidence, SyntheticTransitionReceipt,
+)
 
 BASE = 0x40000000
 SITES = [BASE + 0x4000 + i * 0x1000 for i in range(8)]
@@ -66,7 +70,7 @@ def owner(host, generation=3):
     return ConfigurationOwner(
         config_lock=host["owner_lock"], generation=generation,
         boot_id="synthetic-boot-123", resource_id="synthetic-dt-and-map-v1",
-        source_id="synthetic-runtime-revision",
+        source_id="a" * 40,
     )
 
 
@@ -101,11 +105,32 @@ def verification(o, candidate="mock-image-B"):
     )
 
 
+def pin_for(o):
+    return ConfigurationPin(o.boot_id, o.source_id, o.resource_id, "b" * 64,
+                            "c" * 64, o.generation, o.epoch)
+
+
+def ownership(o):
+    return OwnershipEvidence(pin_for(o), True, True, True, True, True, True, True)
+
+
+def isolation(o):
+    return IsolationEvidence(pin_for(o), True, True, True, True)
+
+
+def retirement(o):
+    return RetirementEvidence(pin_for(o), True, True, True)
+
+
+def contract_verification(o):
+    return VerificationEvidence(pin_for(o), True, True, True, True)
+
+
 def reach_release(o):
-    o.begin_quiesce()
+    o.begin_quiesce(pin=pin_for(o))
     o.confirm_sites_idle()
-    o.submit_synthetic_audit(audit(o))
-    o.submit_synthetic_safe_io(safety())
+    o.submit_synthetic_audit(audit(o), ownership=ownership(o))
+    o.submit_synthetic_safe_io(safety(), isolation=isolation(o))
     assert o.status().phase is Phase.RELEASE
 
 
@@ -182,8 +207,9 @@ def test_synthetic_full_transition_retires_old_map_and_requires_new_backend(host
         assert o.status().phase is Phase.MODEL_LOAD
         with pytest.raises(OwnerClosed):
             old.read32(SITES[0] + 4)
-        o.simulate_image_switch("mock-image-B")
-        o.submit_synthetic_verification(verification(o))
+        o.confirm_synthetic_retirement(retirement(o))
+        o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
+        o.submit_synthetic_verification(verification(o), contract=contract_verification(o))
         assert o.status().phase is Phase.NEW_MAPPING_GENERATION
         assert o.publish_host_generation() == 4
         assert o.status().phase is Phase.IDLE
@@ -241,9 +267,9 @@ def test_audit_unknown_owner_dma_vma_kernel_or_source_fails_closed(host, field, 
 def test_isolation_or_dut_state_unknown_fails_closed(host, field, value):
     o, _ = running(host)
     try:
-        o.begin_quiesce()
+        o.begin_quiesce(pin=pin_for(o))
         o.confirm_sites_idle()
-        o.submit_synthetic_audit(audit(o))
+        o.submit_synthetic_audit(audit(o), ownership=ownership(o))
         with pytest.raises(OwnerError, match="safe-IO"):
             o.submit_synthetic_safe_io(replace(safety(), **{field: value}))
         assert o.status().phase is Phase.FAULT
@@ -263,7 +289,8 @@ def test_image_health_identity_recovery_mismatch_never_publishes_ready(host, fie
     try:
         reach_release(o)
         o.release_host_mapping()
-        o.simulate_image_switch("mock-image-B")
+        o.confirm_synthetic_retirement(retirement(o))
+        o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
         with pytest.raises(OwnerError, match="identity/health/recovery"):
             o.submit_synthetic_verification(replace(
                 verification(o), **{field: value}))
@@ -459,3 +486,199 @@ def test_close_error_still_retires_backend_other_leases_and_config_lock(host, mo
     # The configuration lock cannot remain held following a cleanup error.
     with owner(host) as fresh:
         assert fresh.status().phase is Phase.IDLE
+
+
+def test_audit_without_bound_pin_never_advances_to_safe_io(host):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce()
+        o.confirm_sites_idle()
+        with pytest.raises(OwnerError, match="Missing"):
+            o.submit_synthetic_audit(audit(o), ownership=ownership(o))
+        assert o.status().phase is Phase.FAULT
+        assert o.status().generation == 3
+    finally:
+        o.close()
+
+
+def test_missing_contract_ownership_fails_closed(host):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce(pin=pin_for(o))
+        o.confirm_sites_idle()
+        with pytest.raises(OwnerError, match="Missing"):
+            o.submit_synthetic_audit(audit(o))
+        assert o.status().phase is Phase.FAULT
+        assert not o.status().admissions_open
+    finally:
+        o.close()
+
+
+def test_missing_isolation_contract_fails_closed(host):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce(pin=pin_for(o))
+        o.confirm_sites_idle()
+        o.submit_synthetic_audit(audit(o), ownership=ownership(o))
+        with pytest.raises(OwnerError, match="Missing"):
+            o.submit_synthetic_safe_io(safety())
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+@pytest.mark.parametrize("field", [
+    "admission_sealed", "no_site_leases", "all_processes_enumerated",
+    "no_retained_vmas", "no_kernel_consumers", "no_dma_masters",
+    "no_external_mmio_owners",
+])
+def test_owner_rejects_any_unproven_ownership_claim(host, field):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce(pin=pin_for(o))
+        o.confirm_sites_idle()
+        with pytest.raises(OwnerError, match="synthetic gate rejected"):
+            o.submit_synthetic_audit(
+                audit(o), ownership=replace(ownership(o), **{field: False}))
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+@pytest.mark.parametrize("field", [
+    "safe_io_verified", "axi_transactions_drained",
+    "axi_isolation_verified", "external_recovery_available",
+])
+def test_owner_rejects_any_unproven_isolation_claim(host, field):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce(pin=pin_for(o))
+        o.confirm_sites_idle()
+        o.submit_synthetic_audit(audit(o), ownership=ownership(o))
+        with pytest.raises(OwnerError, match="synthetic gate rejected"):
+            o.submit_synthetic_safe_io(
+                safety(), isolation=replace(isolation(o), **{field: False}))
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+def test_retirement_gate_required_before_model_image_switch(host):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        with pytest.raises(OwnerError, match="retirement"):
+            o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
+        assert o.status().phase is Phase.FAULT
+        assert o.status().generation == 3
+    finally:
+        o.close()
+
+
+@pytest.mark.parametrize("field", [
+    "old_mapping_retired", "no_live_handles", "no_outstanding_site_io",
+])
+def test_bad_retirement_claim_never_reaches_model_load_completion(host, field):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        with pytest.raises(OwnerError, match="synthetic gate rejected"):
+            o.confirm_synthetic_retirement(
+                replace(retirement(o), **{field: False}))
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+def test_wrong_candidate_digest_blocks_model_transition(host):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        o.confirm_synthetic_retirement(retirement(o))
+        with pytest.raises(OwnerError, match="digest"):
+            o.simulate_image_switch("mock-image-B", candidate_sha256="d" * 64)
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+@pytest.mark.parametrize("field", [
+    "exact_candidate_verified", "resources_verified",
+    "independent_health_verified", "recovery_receipt_verified",
+])
+def test_verification_contract_must_be_complete(host, field):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        o.confirm_synthetic_retirement(retirement(o))
+        o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
+        with pytest.raises(OwnerError, match="synthetic gate rejected"):
+            o.submit_synthetic_verification(
+                verification(o), contract=replace(
+                    contract_verification(o), **{field: False}))
+        assert o.status().phase is Phase.FAULT
+        assert o.status().generation == 3
+    finally:
+        o.close()
+
+
+def test_generation_never_published_without_verified_contract(host):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        o.confirm_synthetic_retirement(retirement(o))
+        o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
+        with pytest.raises(OwnerError, match="Missing"):
+            o.submit_synthetic_verification(verification(o))
+        assert o.status().generation == 3
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+def test_old_epoch_rejected_before_quiesce_transaction(host):
+    o, _ = running(host)
+    try:
+        with pytest.raises(OwnerError, match="Invalid exact"):
+            o.begin_quiesce(pin=replace(pin_for(o), owner_epoch="foreign-owner"))
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
+
+
+def test_generation_receipt_cannot_be_forged_or_reused(host):
+    o, _ = running(host)
+    try:
+        reach_release(o)
+        o.release_host_mapping()
+        o.confirm_synthetic_retirement(retirement(o))
+        o.simulate_image_switch("mock-image-B", candidate_sha256="c" * 64)
+        o.submit_synthetic_verification(verification(o),
+                                        contract=contract_verification(o))
+        # A corrupt/foreign simulated receipt is detected at the publish boundary.
+        o._receipt = SyntheticTransitionReceipt(pin_for(o), 99)
+        with pytest.raises(OwnerError, match="receipt"):
+            o.publish_host_generation()
+        assert o.status().phase is Phase.FAULT
+        assert o.status().generation == 3
+        assert o._receipt is None
+    finally:
+        o.close()
+
+
+def test_contract_evidence_with_foreign_owner_epoch_is_terminal(host):
+    o, _ = running(host)
+    try:
+        o.begin_quiesce(pin=pin_for(o))
+        o.confirm_sites_idle()
+        foreign = replace(ownership(o), pin=replace(pin_for(o), owner_epoch="foreign"))
+        with pytest.raises(OwnerError, match="synthetic gate rejected"):
+            o.submit_synthetic_audit(audit(o), ownership=foreign)
+        assert o.status().phase is Phase.FAULT
+    finally:
+        o.close()
