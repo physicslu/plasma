@@ -1,11 +1,11 @@
 # OpenOCD Software Qualification v7 — STM32F103 high-density Z-pin LQFP expansion
 
-Status: **Current ADR-0002 Phase 2 software qualification authority**
+Status: **Current ADR-0002 Programming Qualification authority for Catalog Level 2 derivation**
 
 ## Scope
 
 v7 preserves the v4 medium-density authority and replaces the v6 high-density R/V-pin
-cohort authority with a bounded R/V/Z-pin LQFP authority. No Phase 1 identity is added.
+cohort authority with a bounded R/V/Z-pin LQFP authority. No Catalog Level 1 identity is added.
 
 The combined registry contains **49 exact ICPNs**:
 
@@ -13,8 +13,8 @@ The combined registry contains **49 exact ICPNs**:
 - 19 previously qualified high-density R/V-pin LQFP exact ICPNs;
 - 8 newly qualified high-density Z-pin LQFP exact ICPNs.
 
-The ST Phase 1 frozen denominator remains **4,629 exact ICPNs**. This transaction changes
-only Phase 2 software qualification.
+The ST Catalog Level 1 frozen denominator remains **4,629 exact ICPNs** in the Device Registry. This transaction changes
+only Programming Qualification; `SUPPORTED` rows derive Catalog Level 2 `PROGRAMMABLE`.
 
 ## New Z-pin direct cohort
 
@@ -38,11 +38,11 @@ from the locked exact-identity authority:
 - `STM32F103ZDT7TR`
 - `STM32F103ZET7TR`
 
-Ordering grammar alone is not Phase 2 evidence.
+Ordering grammar alone is not Programming Qualification evidence.
 
 ## Z-pin packing-only inheritance
 
-The following exact `TR` variants inherit Phase 2 semantics only from their directly
+The following exact `TR` variants inherit Programming Qualification semantics only from their directly
 qualified non-TR exact ICPN:
 
 - `STM32F103ZCT6TR` ← `STM32F103ZCT6`
@@ -86,7 +86,7 @@ This transaction does **not** qualify:
 - syntactically plausible but non-admitted Z-pin order codes listed above;
 - XL-density F/G devices;
 - option-byte, RDP or write-protection mutation;
-- any Phase 3 PPU/Site/Socket/Adapter/HIL configuration.
+- any Catalog Level 3 PPU/Site/Socket/Adapter/HIL verified configuration.
 
 ## Evidence boundary
 
@@ -95,15 +95,15 @@ repository authorities are content-addressed. The raw DS5792 manufacturer PDF by
 still not held as a canonical content-pinned evidence-vault object. v7 therefore does not
 claim full raw-source custody for that document.
 
-## Phase boundary
+## Catalog Level boundary
 
-v7 remains **provider-specific Phase 2 evidence only**:
+v7 remains **provider-specific Programming Qualification evidence only**:
 
-- Phase 1 ST remains frozen at 4,629 exact ICPNs and is the Selector visibility authority;
+- Catalog Level 1 ST remains frozen at 4,629 exact ICPNs and is the Device Registry identity authority;
 - the canonical runtime API is `programming_qualification`, not an OpenOCD-specific UI contract;
-- these 49 reviewed exact ICPNs remain Phase 2 `SUPPORTED`; all other exact ICPNs default to `UNKNOWN` until independently reviewed;
+- these 49 reviewed exact ICPNs have `ProgrammingQualification.state == SUPPORTED` and therefore derive Catalog Level 2 `PROGRAMMABLE`; all other Level 1 exact ICPNs remain `UNKNOWN` until independently reviewed;
 - Job/Batch execution authorization is unchanged and remains fail-closed outside the qualification projection;
 - installed-runtime attestation is unchanged;
 - `hardware_runtime_ready=false`;
 - `physical_programming_qualified=false`;
-- Phase 3 remains separate.
+- Catalog Level 3 `PLASMA_VERIFIED` remains separate.
