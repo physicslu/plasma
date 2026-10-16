@@ -10,7 +10,7 @@ from plasma_interfaces.configuration_safety_contract import (
 
 @pytest.fixture
 def evidence():
-    p = ConfigurationPin("boot-a", "source-a", "dt-a", "old-a", "candidate-b", 3, "epoch-a")
+    p = ConfigurationPin("boot-a", "a" * 40, "dt-a", "b" * 64, "c" * 64, 3, "epoch-a")
     return (
         p,
         OwnershipEvidence(p, True, True, True, True, True, True, True),
@@ -64,11 +64,11 @@ def test_unknown_evidence_kind_rejected(evidence, index):
 
 def test_bad_pin_identity_or_generation_rejected():
     with pytest.raises(ContractRejected):
-        ConfigurationPin("boot", "src", "dt", "old", "new", 0, "epoch")
+        ConfigurationPin("boot", "a" * 40, "dt", "b" * 64, "c" * 64, 0, "epoch")
     with pytest.raises(ContractRejected):
-        ConfigurationPin("boot", "src", "dt", "old", "new", True, "epoch")
+        ConfigurationPin("boot", "a" * 40, "dt", "b" * 64, "c" * 64, True, "epoch")
     with pytest.raises(ContractRejected):
-        ConfigurationPin("boot", "src", "dt", "old", "new", 1, " ")
+        ConfigurationPin("boot", "a" * 40, "dt", "b" * 64, "c" * 64, 1, " ")
 
 
 def test_no_physical_io_api_exposed():
@@ -76,3 +76,35 @@ def test_no_physical_io_api_exposed():
     for name in ("load_bitstream", "open_uio", "rebind_driver", "write_mmio",
                  "authorize_hardware", "recover_device"):
         assert not hasattr(contract, name)
+
+
+@pytest.mark.parametrize("field,invalid", [
+    ("source_sha", "not-a-sha"), ("source_sha", "A" * 40),
+    ("source_sha", "a" * 39), ("source_sha", "g" * 40),
+    ("old_image_sha256", "b" * 63), ("old_image_sha256", "B" * 64),
+    ("candidate_sha256", "c" * 65), ("candidate_sha256", "g" * 64),
+])
+def test_synthetic_digest_must_have_canonical_hex_shape(evidence, field, invalid):
+    with pytest.raises(ContractRejected):
+        replace(evidence[0], **{field: invalid})
+
+
+@pytest.mark.parametrize("field", [
+    "boot_id", "source_sha", "resource_id", "old_image_sha256",
+    "candidate_sha256", "mapping_generation", "owner_epoch",
+])
+def test_each_evidence_pin_field_must_match(evidence, field):
+    original = evidence[0]
+    other = {
+        "boot_id": "other-boot",
+        "source_sha": "d" * 40,
+        "resource_id": "other-resource",
+        "old_image_sha256": "d" * 64,
+        "candidate_sha256": "e" * 64,
+        "mapping_generation": 4,
+        "owner_epoch": "other-epoch",
+    }[field]
+    altered = replace(evidence[2], pin=replace(original, **{field: other}))
+    with pytest.raises(ContractRejected, match="pin mismatch"):
+        validate_synthetic_transition(original, evidence[1], altered,
+                                      evidence[3], evidence[4])
