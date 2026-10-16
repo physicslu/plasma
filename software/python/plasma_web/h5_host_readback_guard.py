@@ -36,13 +36,16 @@ class H5HostReadbackGuard:
     """
 
     def __init__(self, catalog: DeviceCatalog, candidates: BackendCandidateRegistry):
-        if (catalog.status != "production" or catalog.size != 4853 + admitted_microchip_phase1_count(catalog) or
+        if (catalog.status != "production" or catalog.size != 4861 + admitted_microchip_phase1_count(catalog) or
                 sum(r.vendor == "STMicroelectronics" for r in catalog.records) != 4629 or
                 sum(r.vendor == "NXP" and r.family == "KL25" for r in catalog.records) != 12 or
                 sum(r.vendor == "NXP" and r.family == "MCX" and
                     r.mapping_status == "no_mapping" for r in catalog.records) != 196 or
                 sum(r.vendor == "NXP" and r.family == "K32L2" and
                     r.mapping_status == "no_mapping" for r in catalog.records) != 16 or
+                sum(r.vendor == "NXP" and r.family == "LPC11U6X" and
+                    r.mapping_status == "mapped" and r.target_config == "tcl/target/lpc11xx.cfg"
+                    for r in catalog.records) != 8 or
                 candidates.catalog_revision_sha256 != catalog.revision_sha256 or
                 candidates.size != 362 or not candidates.evidence_available):
             raise DeviceCatalogIntegrityError(
