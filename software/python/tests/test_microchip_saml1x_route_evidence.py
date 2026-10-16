@@ -22,7 +22,7 @@ from plasma_web.programming_qualification import (
 class MicrochipSAML1XOfficialL1Tests(unittest.TestCase):
     def test_source_pinned_mcp_identity_with_official_programming_path_is_l1(self):
         catalog = get_default_device_catalog()
-        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        rows = [r for r in catalog.records if r.vendor == "Microchip" and r.family == "SAML1X"]
         self.assertEqual(len(rows), 122)
         candidates = admitted_saml1x_official_programming_routes(catalog)
         registry = get_default_programming_qualification_registry()
@@ -50,7 +50,7 @@ class MicrochipSAML1XOfficialL1Tests(unittest.TestCase):
         summary = next(x for x in observer.report["manufacturers"]
                        if x["manufacturer"] == "Microchip")
         self.assertEqual(summary["catalog_level_counts"],
-                         {"0": 0, "1": 122, "2": 0, "3": 0})
+                         {"0": 0, "1": 1015, "2": 0, "3": 0})
         self.assertEqual(summary["job_selectable_exact_icpns"], 0)
 
     def test_legacy_unadmitted_research_icpns_remain_out_of_product(self):
