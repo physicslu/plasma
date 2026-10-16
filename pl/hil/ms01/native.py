@@ -236,7 +236,8 @@ def _record(path: Path, data: dict) -> None:
 
 
 def run_live(artifact: dict, output: Path, *,
-             iterations: int, payload_sizes: tuple[int, ...]) -> None:
+             iterations: int, payload_sizes: tuple[int, ...],
+             trials: int = 3) -> None:
     """A physical Z2 test; assumes independently admitted supervised load."""
     output.mkdir(mode=0o700, parents=False, exist_ok=False)
     common = {
@@ -273,13 +274,19 @@ def run_live(artifact: dict, output: Path, *,
                         mmio.claim_site(site_id=site, base=base))
                     drivers[site] = LoopTestDriver(port, base=base,
                                                    site_id=site)
-                for mode in ("thread", "process-ipc"):
-                    for length in payload_sizes:
-                        result = run_benchmark(
-                            drivers, mode=mode, payload_bytes=length,
-                            iterations=iterations)
-                        result["source"] = "real-supervised-z2"
-                        runs.append(result)
+                # Compare single-Site reference and dual-Site load using
+                # identical per-Site payloads/iterations. No counter reset.
+                for trial in range(trials):
+                    for count in (1, 2):
+                        selected = {site: drivers[site] for site in range(1, count + 1)}
+                        for mode in ("thread", "process-ipc"):
+                            for length in payload_sizes:
+                                result = run_benchmark(
+                                    selected, mode=mode, payload_bytes=length,
+                                    iterations=iterations)
+                                result["trial"] = trial
+                                result["source"] = "real-supervised-z2"
+                                runs.append(result)
                 stats = mmio.stats()
         save_reports(runs, output / "performance")
         outcome = {
@@ -313,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--expected-manifest-sha256", required=True)
     p.add_argument("--expected-candidate-bin-sha256", required=True)
     p.add_argument("--iterations", type=int, default=8)
+    p.add_argument("--trials", type=int, default=3)
     p.add_argument("--payload-sizes", nargs="+", type=int,
                    default=[2048, 8192, 65536])
     p.add_argument("--record-loaded-image", action="store_true")
@@ -320,6 +328,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ack-unrecoverable-axi-stall-risk", action="store_true")
     args = p.parse_args(argv)
     if (not 1 <= args.iterations <= 10000 or
+            not 1 <= args.trials <= 3 or
             not 1 <= len(args.payload_sizes) <= 3 or
             any(not 1 <= n <= 1048576 for n in args.payload_sizes)):
         print("MS01_NO_GO: bounded iteration/payload limits exceeded",
@@ -350,7 +359,8 @@ def main(argv: list[str] | None = None) -> int:
             require(not args.output.exists(), "Never overwrite existing evidence")
             verify_live_environment(args.receipt, args.candidate_bin, artifact)
             run_live(artifact, args.output, iterations=args.iterations,
-                     payload_sizes=tuple(args.payload_sizes))
+                     payload_sizes=tuple(args.payload_sizes),
+                     trials=args.trials)
             print("MS01_REAL_DATA_CASES_PASS_RECOVERY_NOT_RUN")
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
