@@ -717,14 +717,18 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               </div>
             )}
             <div className="icSelectorBoundary">
-              {selected.catalog_level === 1
+              {selected.catalog_level === 3
+                ? (zh
+                  ? "L3 PLASMA Verified：至少一組版本化 PLASMA configuration 已通過 HIL。實際 Job 仍需符合目前 Site、Adapter、Runtime、電氣與安全條件。"
+                  : "L3 PLASMA Verified: at least one versioned PLASMA configuration has passed HIL. The current Site, Adapter, Runtime, electrical, and safety gates still apply.")
+                : selected.catalog_level === 1
                 ? (zh
                   ? "L1 Programming Candidate：已有具體、可追溯的 programming route，但尚未完成 qualification。這類 IC 可作為客戶委託 Programming Qualification 的候選，不能直接建立燒錄 Job。"
                   : "L1 Programming Candidate: a concrete source-backed programming route exists, but qualification is incomplete. It may be a support-request candidate and cannot directly create a programming job.")
                 : selected.programming_qualification?.state === "SUPPORTED"
                 ? (zh
-                  ? "此 exact ICPN 已完成 Catalog Level 2 Programming qualification；Provider 與版本證據見上方。這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Catalog Level 3 驗證。"
-                  : "This exact ICPN has completed Catalog Level 2 Programming qualification. Provider/version evidence is shown above. This proves software programming capability only; PPU, Site, Socket, and real-IC Catalog Level 3 validation remain separate.")
+                  ? "L2 Programmable：此 exact ICPN 已完成軟體 Programming Qualification，可作為客戶委託 PLASMA hardware/HIL validation 的候選；尚未等同 L3 PLASMA Verified。"
+                  : "L2 Programmable: software Programming Qualification is complete. It may be a candidate for PLASMA hardware/HIL validation, but it is not yet equivalent to L3 PLASMA Verified.")
                 : selected.programming_qualification?.state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
                   ? (zh
                     ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Programming Qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
