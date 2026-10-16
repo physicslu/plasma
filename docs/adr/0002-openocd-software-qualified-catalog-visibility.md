@@ -133,7 +133,7 @@ Catalog Level 2 若不符合、證據不足、在指定 Provider／版本不支�
 
 ### Catalog Level 1 — Cross-vendor canonical discovery method
 
-現階段的 ST、NXP、Microchip 及未來任何 Manufacturer 必須使用**同一套 discovery 判定流程與 canonical output**。差異只允許存在於原廠資料取得 adapter，不允許存在於 Phase 定義、欄位狀態、證據門檻或 Selector／execution 語意。
+現階段的 ST、NXP、Microchip 及未來任何 Manufacturer 必須使用**同一套 discovery 判定流程與 canonical output**。差異只允許存在於原廠資料取得 adapter，不允許存在於 Catalog Level 定義、欄位狀態、證據門檻或 Selector／execution 語意。
 
 固定流程：
 
