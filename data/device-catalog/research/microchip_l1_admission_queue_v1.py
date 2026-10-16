@@ -8,7 +8,7 @@ Production rows, executable mappings, or an actual Catalog Level promotion.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +21,13 @@ EXPECTED_CFG = {
     "tcl/target/atsame5x.cfg": 354,
     "tcl/target/atsamv.cfg": 175,
     "tcl/target/atsaml1x.cfg": 126,
+}
+EXPECTED_BASE_COUNTS = {
+    "tcl/target/pic32mx.cfg": 116,
+    "tcl/target/at91samdXX.cfg": 70,
+    "tcl/target/atsame5x.cfg": 25,
+    "tcl/target/atsamv.cfg": 39,
+    "tcl/target/atsaml1x.cfg": 12,
 }
 EXPECTED_STATES = {
     "EXACT_DFP_NAME_CFG_CANDIDATE": 2414,
@@ -98,6 +105,7 @@ def build(report: dict, lock: dict, *, report_sha256: str) -> dict:
     seen = set()
     candidates = []
     counts = Counter()
+    base_devices = defaultdict(set)
     states = Counter()
     for row in all_rows:
         icpn = row.get("icpn")
@@ -135,6 +143,7 @@ def build(report: dict, lock: dict, *, report_sha256: str) -> dict:
         require(is_target_only == (state == "P1_TARGET_ONLY_CFG_CANDIDATE"),
                 "target-only route misclassified")
         counts[cfg] += 1
+        base_devices[cfg].add(row["base_device"].upper())
         candidates.append({
             "manufacturer": "Microchip",
             "exact_icpn": icpn,
@@ -159,6 +168,9 @@ def build(report: dict, lock: dict, *, report_sha256: str) -> dict:
         })
     require(dict(counts) == EXPECTED_CFG and dict(states) == EXPECTED_STATES
             and len(candidates) == 2563, "five-CFG per-ICPN reconciliation failed")
+    observed_bases = {cfg: len(keys) for cfg, keys in base_devices.items()}
+    require(observed_bases == EXPECTED_BASE_COUNTS,
+            "manufacturer Base Device population drift")
     candidates.sort(key=lambda x: x["exact_icpn"].casefold())
     return {
         "schema_version": 1,
@@ -168,6 +180,8 @@ def build(report: dict, lock: dict, *, report_sha256: str) -> dict:
         "research_source_icpns": 23276,
         "research_cfg_candidates": 2563,
         "by_cfg": dict(sorted(counts.items())),
+        "base_device_review_units": sum(observed_bases.values()),
+        "by_cfg_base_device_counts": dict(sorted(observed_bases.items())),
         "identity_canonical_admitted_by_this_tool": 0,
         "route_canonical_admitted_by_this_tool": 0,
         "production_write_authorized": False,
