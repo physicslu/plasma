@@ -1,5 +1,7 @@
 """LT02 host transport tests use a synthetic WordPort, never /dev/mem/FPGA."""
 import zlib
+from concurrent.futures import ThreadPoolExecutor
+from time import sleep
 
 import pytest
 
@@ -90,6 +92,13 @@ def test_mismatch_fails_without_retry(flag, error):
     with pytest.raises(LoopTestError, match=error):
         runner.echo(b"wrong-data")
     assert set(port.ram) == {WINDOW_START, WINDOW_START + 4, WINDOW_START + 8}
+    assert runner.poisoned
+    # Clearing the synthetic fault is NOT implicit recovery. No second write.
+    written_before = port.writes
+    port.corrupt = port.miss_write = port.miss_read = False
+    with pytest.raises(LoopTestError, match="poisoned"):
+        runner.echo(b"must-not-replay")
+    assert port.writes == written_before
 
 
 @pytest.mark.parametrize("offset,bad", [
@@ -115,6 +124,7 @@ def test_site_1_only_and_payload_bounds():
     with pytest.raises(TypeError):
         runner.echo(bytearray(b"x"))
     assert port.ram == {}
+    assert not runner.poisoned  # rejected inputs did not access hardware
 
 
 def test_aperture_allowlist_and_address_alignment():
@@ -139,3 +149,44 @@ def test_large_multichunk_case_is_bounded_and_exact():
     assert result.payload == data
     assert result.chunks == 3
     assert result.data_word_reads == 512 * 2 + 2
+
+
+def test_parallel_echoes_on_one_driver_never_interleave_scratchpad_cases():
+    class YieldingPort(FakeLT02):
+        def write32(self, address, word):
+            super().write32(address, word)
+            sleep(0)  # Encourage a context switch between MMIO operations.
+
+    port = YieldingPort()
+    runner = LoopTestDriver(port, base=BASE)
+    payloads = [bytes([(i * 17 + j) & 255 for j in range(2049 + i)])
+                for i in range(8)]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(runner.echo, payloads))
+    assert all(result.payload == data and
+               result.tx_crc32 == result.rx_crc32
+               for result, data in zip(results, payloads))
+    expected_words = sum((min(CAPACITY, len(data) - origin) + 3) // 4
+                         for data in payloads
+                         for origin in range(0, len(data), CAPACITY))
+    assert port.writes == port.reads == expected_words
+    assert not runner.poisoned
+
+
+def test_mmio_exception_poisoning_prevents_second_case_even_after_fault_removed():
+    class FailingPort(FakeLT02):
+        fail = True
+        def write32(self, addr, word):
+            if self.fail:
+                self.fail = False
+                raise OSError("synthetic bus write failure")
+            return super().write32(addr, word)
+
+    port = FailingPort()
+    runner = LoopTestDriver(port, base=BASE)
+    with pytest.raises(OSError, match="synthetic"):
+        runner.echo(b"uncertain")
+    assert runner.poisoned
+    with pytest.raises(LoopTestError, match="poisoned"):
+        runner.echo(b"not retried")
+    assert port.writes == 0
