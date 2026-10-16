@@ -53,16 +53,23 @@ def main()->int:
     # Historical v6.21 ST source-only postimage remains exactly frozen.
     # The new NXP KL25 source is independently validated and intentionally
     # omitted from the historical ST-specific route partition.
-    req(len(manifest["sources"])==35,"Production source count drift")
-    req(sum(int(s["row_count"]) for s in manifest["sources"])==4992,
+    req(len(manifest["sources"])==36,"Production source count drift")
+    req(sum(int(s["row_count"]) for s in manifest["sources"])==5885,
         "Production exact total drift")
-    req(manifest["sources"][-1]=={
+    req(manifest["sources"][-2]=={
         "manufacturer":"Microchip","family":"SAML1X",
         "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
         "row_count":122,
         "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
         "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
     },"unauthorized Microchip Phase 1 admission drift")
+    req(manifest["sources"][-1]=={
+        "manufacturer":"Microchip","family":"PIC32MX",
+        "path":"../research/microchip-pic32mx-893-commercial-l1-v1.csv",
+        "row_count":893,
+        "git_blob_sha":"9eba3e0898a42ef1129a572c5c3a6b0613e01166",
+        "sha256":"b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8",
+    },"PIC32MX 893 source pin drift")
     req(manifest["sources"][28:31]==[
         {
             "manufacturer":"NXP","family":"KL25",
