@@ -8,14 +8,14 @@ No additional HIL Gateway, Controller, device driver or REST API.
 - [Z2 Codex HIL assignment](codex-z2-hil-development-command.md) documents owner-authorized SSH/UART, Z2 account and a local private SSH/sudo credential interface. **Credentials are not in the repository.**
 - [KINGST PWM1→CH0 real loopback (2026-10-16)](../evidence/la2016-pwm-loopback/2026-10-16/README.md) passed 1 kHz/50% and 2 kHz/25% plus shutdown using the `kingst-la2016` sigrok AppImage; original SHA-256 `b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475`. Do NOT assume system `sigrok-cli` includes that driver.
 - USB Hub direct commands (`uhubctl`) and FT2232 JTAG/UART were exercised previously. USB2/USB3 identities can represent one physical Hub.
-- New worker inventory [Actions #38948008008](https://github.com/physicslu/plasma/actions/runs/38948008008) saw the tools but **FT2232 and LA USB nodes denied by DAC**, 2 generic UART candidates with zero RW access, and no `plugdev` membership. Actual previous Codex execution UID is **not definitively recorded** in sanitized evidence. `gordon` is the trusted operator account to compare locally, but do not assume the historical tests all ran under that UID.
+- New worker inventory [Actions #38948008008](https://github.com/physicslu/plasma/actions/runs/38948008008) saw the tools but **FT2232 and LA USB nodes denied by DAC**, 2 generic UART candidates with zero RW access, and no `plugdev` membership. Actual previous Codex execution UID is **not definitively recorded** in sanitized evidence. `<trusted-operator>` is the trusted operator account to compare locally, but do not assume the historical tests all ran under that UID.
 
 ## Exact scope of root-only host installer
 
 `scripts/plasma-codex-hardware-parity.py` provides `--audit`, `--self-test` and opt-in root-only `--apply`. GitHub Actions cannot apply it; PR CI runs only offline synthetic tests.
 
 With `--apply` on trusted **SWPC**:
-- Creates dedicated group `plasma-codex-io`, adds both existing operator `gordon` and `plasma-codex`, preserving original operator usability.
+- Creates dedicated group `plasma-codex-io`, adds both existing operator `<trusted-operator>` and `plasma-codex`, preserving original operator usability.
 - Creates an exact guarded `/etc/udev/rules.d/70-plasma-codex-io.rules` with GROUP `plasma-codex-io`, MODE 0660 only for FT2232 0403:6010, Hub 8564:4100, LA2016 77a1:01a2, and FT2232-descendant ttyUSB nodes. No wildcard all-USB, `sudoers`, `docker`, or blanket `dialout` membership.
 - Reloads udev rules **without** re-enumerating devices, changing active device-node modes, opening USB, operating power/FPGA, or restarting the Runner. Existing conflicting files and symlinks fail closed.
 - Optional `--la-appimage <OWNER_LOCAL_PATH>` verifies exact previously proven binary digest and atomically copies it to `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage`, exposing wrapper `/usr/local/bin/plasma-la2016-sigrok`. It does not invent a new firmware path. `SIGROK_FIRMWARE_PATH` may still need to be configured privately.
@@ -27,14 +27,14 @@ With `--apply` on trusted **SWPC**:
 Use **reviewed main** on SWPC; preserve local work. Read current context without making changes first:
 
 ```sh
-cd /storage/projects/plasma
+cd "${PLASMA_REPO:?set trusted SWPC checkout path}"
 git status --short
 git fetch origin main
 git merge --ff-only origin/main
 python3 scripts/plasma-codex-hardware-parity.py --audit
 ```
 
-Compare `gordon` group/permission baseline against `plasma-codex` and verify the previously used AppImage (do not assume the root-run audit proves original Codex's historical UID).
+Compare `<trusted-operator>` group/permission baseline against `plasma-codex` and verify the previously used AppImage (do not assume the root-run audit proves original Codex's historical UID).
 
 Then apply from the owner's **trusted administrative terminal** (not from GitHub Actions):
 
