@@ -53,6 +53,14 @@ def test_stm32f103c8_socket_contract_matches_resolved_ic_support() -> None:
     assert route["target_config"] == resolved.openocd_target_config
     assert route["operations"] == ["probe", "erase", "program", "read", "verify"]
 
+    composition = contract["composition_policy"]
+    assert composition == {
+        "mode": "additive_hardware_overlay",
+        "mutates_software_admission_authority": False,
+        "mutates_catalog_level_authority": False,
+        "requires_exact_icpn_match": True,
+    }
+
     boundary = contract["qualification_boundary"]
     assert boundary["sufficient_for_socket_schematic_and_layout_design"] is True
     assert boundary["sufficient_for_openocd_programmer_software_development"] is True
