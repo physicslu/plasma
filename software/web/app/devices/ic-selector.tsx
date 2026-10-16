@@ -417,9 +417,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 {selected.microchip_ic_information && (
                   <>
                     <div><dt>Core Model</dt><dd>{selected.microchip_ic_information.core_model}</dd></div>
-                    <div><dt>Phase 1 Evidence</dt><dd>IDENTIFIED · INFORMATION_COMPLETE: NO · DS60001513G p.14 / p.16</dd></div>
-                    <div><dt>Phase 2 Programming</dt><dd>UNKNOWN · {zh ? "未驗證軟體燒錄資格" : "Not software-qualified"}</dd></div>
-                    <div><dt>Phase 3 Compatibility</dt><dd>NOT_TESTED · {zh ? "未通過 PLASMA 實機配置測試" : "No validated PLASMA hardware configuration"}</dd></div>
+                    <div><dt>Catalog Level 0 Evidence</dt><dd>DISCOVERED · INFORMATION_COMPLETE: NO · DS60001513G p.14 / p.16</dd></div>
+                    <div><dt>Programming Qualification</dt><dd>UNKNOWN · {zh ? "尚未取得 Catalog Level 2" : "Catalog Level 2 not reached"}</dd></div>
+                    <div><dt>PLASMA Verification</dt><dd>NOT_TESTED · {zh ? "尚未取得 Catalog Level 3" : "Catalog Level 3 not reached"}</dd></div>
                   </>
                 )}
               </dl>
@@ -430,7 +430,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 <span>02</span>
                 <div>
                   <h3>{zh ? "Programming" : "Programming"}</h3>
-                  <p>{zh ? "Phase 2 軟體資格、燒錄介面、電氣條件、Flash geometry 與程序" : "Phase 2 software qualification, interfaces, electrical conditions, Flash geometry, and flow"}</p>
+                  <p>{zh ? "Programming Qualification、燒錄介面、電氣條件、Flash geometry 與程序" : "Programming qualification, interfaces, electrical conditions, Flash geometry, and flow"}</p>
                 </div>
               </div>
 
@@ -439,7 +439,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <dl>
                     <div>
                       <dt>{zh ? "Software Qualification" : "Software Qualification"}</dt>
-                      <dd><strong>{selected.programming_qualification.state}</strong>{selected.programming_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Phase 2 審查" : " · exact ICPN not yet Phase 2 reviewed")}</dd>
+                      <dd><strong>{selected.programming_qualification.state}</strong>{selected.programming_qualification.reviewed ? (zh ? " · exact ICPN 已審查" : " · exact ICPN reviewed") : (zh ? " · exact ICPN 尚未完成 Programming Qualification" : " · exact ICPN not yet programming-qualified")}</dd>
                     </div>
                     {selected.programming_qualification.provider && (
                       <>
@@ -488,11 +488,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     <div className="icSelectorProfileUnavailable">
                       {selected.backend.mapping_status === "mapped"
                         ? (zh
-                          ? "OpenOCD CFG 已存在，但此 exact ICPN 的 Phase 2 software qualification 仍為 UNKNOWN；CFG mapping 不能視為燒錄支援。"
-                          : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 software qualification; mapping alone is not programming support.")
+                          ? "OpenOCD CFG 已存在，但此 exact ICPN 的 Programming Qualification 仍為 UNKNOWN；CFG mapping 不能視為燒錄支援。"
+                          : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Programming Qualification; mapping alone is not programming support.")
                         : (zh
-                          ? "此 exact ICPN 尚未完成 Phase 2 software qualification。"
-                          : "This exact ICPN has not completed Phase 2 software qualification.")}
+                          ? "此 exact ICPN 尚未完成 Programming Qualification。"
+                          : "This exact ICPN has not completed Programming Qualification.")}
                     </div>
                   )}
                 </>
@@ -517,7 +517,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 </dl>
               ) : (
                 <div className="icSelectorProfileUnavailable">
-                  {zh ? "此部署未提供 Phase 2 software qualification evidence；不能從 CFG mapping 推論燒錄支援。" : "Phase 2 software qualification evidence is unavailable in this deployment; programming support cannot be inferred from CFG mapping."}
+                  {zh ? "此部署未提供 Programming Qualification evidence；不能從 CFG mapping 推論燒錄支援。" : "Programming Qualification evidence is unavailable in this deployment; programming support cannot be inferred from CFG mapping."}
                 </div>
               )}
             </section>
@@ -658,12 +658,12 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             <div className="icSelectorBoundary">
               {selected.programming_qualification?.state === "SUPPORTED"
                 ? (zh
-                  ? "此 exact ICPN 已完成 Phase 2 Programming qualification；Provider 與版本證據見上方。這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證。"
-                  : "This exact ICPN has completed Phase 2 Programming qualification. Provider/version evidence is shown above. This proves software programming capability only; PPU, Site, Socket, and real-IC Phase 3 validation remain separate.")
+                  ? "此 exact ICPN 已完成 Catalog Level 2 Programming qualification；Provider 與版本證據見上方。這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Catalog Level 3 驗證。"
+                  : "This exact ICPN has completed Catalog Level 2 Programming qualification. Provider/version evidence is shown above. This proves software programming capability only; PPU, Site, Socket, and real-IC Catalog Level 3 validation remain separate.")
                 : selected.programming_qualification?.state === "UNKNOWN" && selected.backend.mapping_status === "mapped"
                   ? (zh
-                    ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Phase 2 software qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
-                    : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Phase 2 software qualification; CFG existence is not programming support.")
+                    ? "OpenOCD CFG mapping 已存在，但此 exact ICPN 的 Programming Qualification 仍為 UNKNOWN；不能把 CFG exists 解讀成已支援燒錄。"
+                    : "An OpenOCD CFG mapping exists, but this exact ICPN remains UNKNOWN in Programming Qualification; CFG existence is not programming support.")
                   : selected.backend_candidate
                 ? (zh
                   ? "這顆 IC 已收錄於 Production Catalog，但目前沒有可執行的 OpenOCD Backend，無法視為已支援燒錄。"
