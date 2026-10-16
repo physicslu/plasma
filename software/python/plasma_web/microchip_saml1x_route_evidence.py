@@ -36,12 +36,12 @@ def admitted_saml1x_official_programming_routes(
     This function validates Microchip's frozen identity cohort; it cannot
     manufacture new order codes from DFP target names or Research candidates.
     """
-    count = admitted_microchip_phase1_count(catalog)
-    if count == 0:
+    total = admitted_microchip_phase1_count(catalog)
+    if total == 0:
         return AdmittedRouteCandidateRegistry(catalog, ())
     items: list[RouteEvidence] = []
     for row in catalog.records:
-        if row.vendor != "Microchip":
+        if row.vendor != "Microchip" or row.family != "SAML1X":
             continue
         ref = row.source_reference or ""
         match = SOURCE_SHA.search(ref)
