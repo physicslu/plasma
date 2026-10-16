@@ -1,11 +1,8 @@
-"""ADR-0002 Phase 2 — vendor-neutral Programming qualification registry.
+"""Vendor-neutral Programming Qualification registry.
 
-This is the canonical runtime entry point for Phase 2. Provider-specific evidence
-loaders (currently OpenOCD) remain responsible for validating their own source,
-version, driver, geometry, and operation evidence. Gateway/UI code must consume
-this registry rather than branching on a manufacturer or Programming Provider.
-Selector visibility remains owned by Phase 1 IDENTIFIED; this projection never
-grants Job/Batch execution authority.
+Provider-specific evidence loaders validate source, version, driver, geometry and
+operation evidence. This registry derives Catalog Level 0/1/2 without exposing
+legacy phase-prefixed fields. Catalog Level never grants Job/Batch execution authority.
 """
 from __future__ import annotations
 
@@ -16,8 +13,10 @@ from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, get_defa
 from .openocd_software_qualification import get_default_openocd_software_qualification_registry
 
 
-PHASE = "PROGRAMMING"
-PHASE1_IDENTIFIED = "IDENTIFIED"
+IDENTIFIED = "IDENTIFIED"
+CATALOG_LEVEL_DISCOVERED = "DISCOVERED"
+CATALOG_LEVEL_CANDIDATE = "PROGRAMMING_CANDIDATE"
+CATALOG_LEVEL_PROGRAMMABLE = "PROGRAMMABLE"
 PROGRAMMING_STATES = frozenset({"UNKNOWN", "CANDIDATE", "BLOCKED", "SUPPORTED", "UNSUPPORTED"})
 
 
@@ -36,7 +35,7 @@ def _require(condition: bool, reason: str) -> None:
 
 
 class ProgrammingQualificationRegistry:
-    """Canonical Phase 2 projection over one or more evidence providers."""
+    """Canonical Programming Qualification projection over evidence providers."""
 
     def __init__(
         self,
@@ -52,31 +51,33 @@ class ProgrammingQualificationRegistry:
                 _require(key not in seen, f"multiple providers claim the same reviewed exact ICPN: {key}")
                 seen.add(key)
                 row = catalog.resolve(key[0], key[1])
-                _require(row is not None, f"reviewed exact ICPN missing from Phase 1 Catalog: {key}")
+                _require(row is not None, f"reviewed exact ICPN missing from canonical identity store: {key}")
                 _require(
-                    row.phase1_identity_state == PHASE1_IDENTIFIED,
-                    f"Phase 2 record lacks Phase 1 IDENTIFIED prerequisite: {key}",
+                    row.identity_state == IDENTIFIED,
+                    f"Programming Qualification lacks IDENTIFIED exact ICPN prerequisite: {key}",
                 )
 
-    def _phase1_record(self, manufacturer: str, exact_icpn: str):
+    def _identity_record(self, manufacturer: str, exact_icpn: str):
         row = self._catalog.resolve(manufacturer, exact_icpn)
-        if row is None or row.phase1_identity_state != PHASE1_IDENTIFIED:
+        if row is None or row.identity_state != IDENTIFIED:
             return None
         return row
 
     @staticmethod
-    def _unknown(phase1_state: str) -> dict[str, Any]:
+    def _unknown(identity_state: str) -> dict[str, Any]:
+        identified = identity_state == IDENTIFIED
         return {
-            "schema_version": "1.0.0",
-            "phase": PHASE,
+            "schema_version": "2.0.0",
             "registry_id": None,
             "state": "UNKNOWN",
             "reviewed": False,
-            "phase1_identity_state": phase1_state,
+            "identity_state": identity_state,
+            "catalog_level": 0 if identified else None,
+            "catalog_level_state": CATALOG_LEVEL_DISCOVERED if identified else None,
             "provider": None,
             "operations": {},
             "programming": None,
-            "selector_visibility_authority": "PHASE1_IDENTIFIED",
+            "selector_visible": False,
             "execution_authorized": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -84,7 +85,7 @@ class ProgrammingQualificationRegistry:
         }
 
     def describe(self, manufacturer: str, exact_icpn: str) -> dict[str, Any]:
-        row = self._phase1_record(manufacturer, exact_icpn)
+        row = self._identity_record(manufacturer, exact_icpn)
         if row is None:
             return self._unknown("NOT_IDENTIFIED")
 
@@ -98,22 +99,24 @@ class ProgrammingQualificationRegistry:
             f"ambiguous reviewed Programming Providers for {manufacturer}/{exact_icpn}",
         )
         if not reviewed:
-            return self._unknown(PHASE1_IDENTIFIED)
+            return self._unknown(IDENTIFIED)
 
         raw = reviewed[0].describe(manufacturer, exact_icpn)
         state = raw.get("software_state")
         _require(state in PROGRAMMING_STATES, f"invalid provider state for {manufacturer}/{exact_icpn}: {state!r}")
+        programmable = state == "SUPPORTED"
         return {
-            "schema_version": "1.0.0",
-            "phase": PHASE,
+            "schema_version": "2.0.0",
             "registry_id": raw.get("registry_id"),
             "state": state,
             "reviewed": bool(raw.get("reviewed")),
-            "phase1_identity_state": PHASE1_IDENTIFIED,
+            "identity_state": IDENTIFIED,
+            "catalog_level": 2 if programmable else 1,
+            "catalog_level_state": CATALOG_LEVEL_PROGRAMMABLE if programmable else CATALOG_LEVEL_CANDIDATE,
             "provider": deepcopy(raw.get("provider")),
             "operations": deepcopy(raw.get("operations", {})),
             "programming": deepcopy(raw.get("programming")),
-            "selector_visibility_authority": "PHASE1_IDENTIFIED",
+            "selector_visible": programmable,
             "execution_authorized": False,
             "installed_runtime_attested": bool(raw.get("installed_runtime_attested", False)),
             "hardware_runtime_ready": bool(raw.get("hardware_runtime_ready", False)),
@@ -126,16 +129,20 @@ class ProgrammingQualificationRegistry:
     @property
     def summary(self) -> dict[str, Any]:
         reviewed = sum(len(provider.reviewed_exact_keys) for provider in self._providers)
+        supported = 0
+        for provider in self._providers:
+            for manufacturer, exact_icpn in provider.reviewed_exact_keys:
+                if provider.describe(manufacturer, exact_icpn).get("software_state") == "SUPPORTED":
+                    supported += 1
         return {
-            "phase": PHASE,
             "provider_count": len(self._providers),
-            "reviewed_exact_icpns": reviewed,
-            "catalog_phase1_identified_exact_icpns": sum(
-                1 for row in self._catalog.records
-                if row.phase1_identity_state == PHASE1_IDENTIFIED
+            "catalog_level_0_discovered_exact_icpns": sum(
+                1 for row in self._catalog.records if row.identity_state == IDENTIFIED
             ),
-            "selector_visibility_authority": "PHASE1_IDENTIFIED",
-            "execution_authorized_by_phase2_projection": False,
+            "catalog_level_1_or_higher_exact_icpns": reviewed,
+            "catalog_level_2_programmable_exact_icpns": supported,
+            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "execution_authorized_by_catalog_projection": False,
         }
 
 
