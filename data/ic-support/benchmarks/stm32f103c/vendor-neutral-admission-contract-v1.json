@@ -16,7 +16,7 @@
     },
     "binding": {
       "path": "data/ic-support/bindings/stm32f103c-pilot-v0.json",
-      "git_blob_sha1": "4cb9f27e1ae53b7d409ea99cfc9d0133bbf75611"
+      "git_blob_sha1": "be547e6b90744b8f2279deb06b3301778290748b"
     },
     "programming_profile": {
       "path": "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
