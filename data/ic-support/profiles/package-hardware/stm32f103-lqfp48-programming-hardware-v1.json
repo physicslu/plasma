@@ -29,24 +29,7 @@
     }
   ],
   "data": {
-    "package": {
-      "type": "LQFP",
-      "variant": "LQFP48",
-      "pin_count": 48,
-      "body_mm": {
-        "x": 7,
-        "y": 7,
-        "basis": "BSC"
-      },
-      "lead_span_mm": {
-        "x": 9,
-        "y": 9,
-        "basis": "BSC"
-      },
-      "pitch_mm": 0.5,
-      "max_height_mm": 1.6,
-      "pin1_reference": "DS5319 Rev 20 Figure 8 top view; pin 1 is VBAT at the upper-left corner adjacent to the pin-1 marker"
-    },
+    "package": "LQFP",
     "physical_pin_map": {
       "1": {
         "name": "VBAT",
@@ -304,6 +287,26 @@
       "socket_hil_passed": false,
       "execution_authorized": false,
       "note": "This profile is evidence-backed engineering input for a Socket PCB. It does not certify a specific socket, adapter, Site, PPU, signal-integrity implementation, or production programming configuration."
+    },
+    "pin_count": 48,
+    "package_variant": "LQFP48",
+    "package_mechanical": {
+      "type": "LQFP",
+      "variant": "LQFP48",
+      "pin_count": 48,
+      "body_mm": {
+        "x": 7,
+        "y": 7,
+        "basis": "BSC"
+      },
+      "lead_span_mm": {
+        "x": 9,
+        "y": 9,
+        "basis": "BSC"
+      },
+      "pitch_mm": 0.5,
+      "max_height_mm": 1.6,
+      "pin1_reference": "DS5319 Rev 20 Figure 8 top view; pin 1 is VBAT at the upper-left corner adjacent to the pin-1 marker"
     }
   }
 }
