@@ -378,7 +378,10 @@ def main() -> int:
     require(composition.get("requires_exact_icpn_match") is True, "Socket overlay must require exact ICPN matching")
 
     boundary = socket_contract.get("qualification_boundary", {})
-    require(boundary.get("sufficient_for_socket_schematic_and_layout_design") is True, "Socket design input readiness missing")
+    require(boundary.get("sufficient_for_socket_electrical_interface_design") is True, "Socket electrical interface design readiness missing")
+    require(boundary.get("sufficient_for_socket_schematic_design") is True, "Socket schematic design readiness missing")
+    require(boundary.get("sufficient_for_socket_pcb_footprint_design") is False, "Socket PCB footprint must remain unresolved")
+    require(boundary.get("sufficient_for_complete_socket_layout") is False, "complete Socket layout must remain unresolved")
     require(boundary.get("hardware_runtime_ready") is False, "Socket contract must not claim hardware runtime readiness")
     require(boundary.get("physical_programming_qualified") is False, "Socket contract must not claim physical qualification")
     require(boundary.get("hil_verified") is False, "Socket contract must not claim HIL")
