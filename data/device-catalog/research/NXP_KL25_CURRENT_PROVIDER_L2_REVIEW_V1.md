@@ -1,7 +1,7 @@
 # NXP MKL25Z128VLK4 — Current OpenOCD Provider Qualification Review v1
 
 **ADR-0002 Gate 1; source-only. Status: `CANDIDATE`, not `SUPPORTED`.**
-Repository base `2a4c8e4605257b885ad6f4e2383ac0359033df8b`.
+Repository base `3a54c30b0e171cf55dcc52fbc366b657c4c3d0c0` (includes Microchip PR #965 L1 admission).
 One and only one commercial Exact ICPN is reviewed in this increment: **`MKL25Z128VLK4`**.
 Other 11 KL25 exact orderable parts retain their existing L1 status.
 No new IC identity or Production source is added.
