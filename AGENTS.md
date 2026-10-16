@@ -549,6 +549,50 @@ After Merge Approval, merge to `main`, verify the resulting repository state, an
 
 If continuing would materially exceed the approved scope, stop and propose a revised plan. Approval of that revision is another Gate 1 decision, not a new gate type.
 
+### 11.1A Clickable owner approval choices (normative UX; no new gate)
+
+For **every user approval request** under the two-gate workflow, prefer a compact
+set of **clickable buttons or selection controls**, when the conversation
+surface supports them. The owner should normally be able to approve by
+**one click** rather than typing `批准`, `approve` or a long instruction.
+
+- Show **at most four choices in total** for one decision; fewer are
+  preferable when adequate. Do not use a long form or stack unrelated
+  decisions. Label each choice as a clear **action**, in the user's language
+  (normally Traditional Chinese for this project).
+- Display **only the currently applicable approval gate**. At Gate 1,
+  summarize the proposed plan and scope *before* offering approval. At Gate 2,
+  first report the exact PR, target branch, current head/CI/readiness and
+  any deployment or hardware consequences covered by the approved plan.
+  **Never display an actionable Gate 2 approval choice before merge-ready.**
+- Recommended Gate 1 choices: **「批准 Gate 1：執行此計畫」**,
+  **「要求修改計畫」**, **「暫緩」**, **「不批准」**.
+  Recommended Gate 2 choices: **「批准 Gate 2：合併 PR #N」**,
+  **「要求修改」**, **「暫緩」**, **「關閉 PR（不合併）」**.
+  Tailor or omit choices as appropriate; these are examples, not extra
+  approval gate types or a mandatory fixed menu.
+- Each approval control must convey an **explicit, scoped owner approval**
+  identifying **Gate 1 + the plan**, or **Gate 2 + the specific PR/target**
+  when deliberately selected (for example, by submitting a clear approval
+  message as the user's next turn). A rendered button, default selection,
+  hover, unrelated reply, or an agent's inference is **not approval**.
+  Do not use a generic unlabeled `Approve` control whose target is unclear.
+- **Non-approval choices never authorize work or merge**. A request to
+  revise, defer, decline or close a PR is not Gate 1 or Gate 2 approval.
+  Follow the selected instruction within the existing workflow and
+  authorization boundaries; closing a PR must not be treated as merging it.
+- If the client or agent execution environment **cannot render clickable
+  choices**, provide a concise, unambiguous set of **at most four short
+  selectable/text alternatives**, without pretending buttons exist or adding
+  a new consent step. Explicit unambiguous approvals given by ordinary user
+  text remain valid; never require the owner to click again.
+- **Presentation changes no authorization semantics**: Gate 1 is still
+  required before implementation, Gate 2 is still required before merge,
+  out-of-scope changes still return to a revised Gate 1, and routine
+  already-approved execution must not ask for redundant confirmations.
+  No click may silently bypass readiness, repository safety, or physical
+  hardware safeguards.
+
 ### 11.2 Routine autonomous work after Gate 1
 
 Requests such as:
