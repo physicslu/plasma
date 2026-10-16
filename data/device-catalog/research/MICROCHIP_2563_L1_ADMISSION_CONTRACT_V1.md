@@ -39,6 +39,24 @@ Outputs **only through canonical** `ProgrammingQualificationRegistry` and `Catal
 
 No blanket promotion of 2,563 Research mappings. No L2 SUPPORTED, L3 verified, program/erase/verify claims, installable runtime binding, flash algorithm changes, PPU/FPGA/HIL, Job/Batch entitlement, Microchip-specific public API, or main merge without owner approval.
 
+## Base Device review scope (computed from pinned 23,276-row replay)
+
+| Source-pinned target CFG | Exact ICPN candidates | Unique official MCP Base Devices |
+| --- | ---: | ---: |
+| `pic32mx.cfg` | 1,241 | 116 |
+| `at91samdXX.cfg` | 667 | 70 |
+| `atsame5x.cfg` | 354 | 25 |
+| `atsamv.cfg` | 175 | 39 |
+| `atsaml1x.cfg` target-only | 126 | 12 |
+| **Total** | **2,563** | **262** |
+
+This reduces repetitive *route applicability review units* from 2,563 order
+codes to 250 Base Devices in four P0 source/driver cohorts, plus 12 target-only
+Base Devices. Exact manufacturer commercial ICPN identity still must be
+independently valid for each of the 2,563 rows; Base Device grouping is NOT
+authority to invent or infer order-code variants. Base/Family programming
+applicability must be positively reviewed before propagating route evidence.
+
 ## Gate A execution log (2026-10-16)
 
 Gate A is **approved for implementation only**. Gate B (merge to main) has
