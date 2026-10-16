@@ -9,7 +9,7 @@ from threading import Event, Thread
 import pytest
 
 from plasma_interfaces.linux_mmio import (
-    LinuxMMIO, MMIOAperture, MMIOClosed, MMIOError, swd03_aperture,
+    LinuxMMIO, MMIOAperture, MMIOClosed, MMIOError, MMIOStats, swd03_aperture,
 )
 from plasma_interfaces.swd_transaction import SWDTransactionDriver
 
@@ -200,6 +200,8 @@ def test_eight_site_concurrent_access_and_no_cross_site_pollution(ram):
         with ThreadPoolExecutor(max_workers=8) as pool:
             observed = list(pool.map(worker, range(8)))
         assert observed == [((i + 1) << 24) | 1199 for i in range(8)]
+        # Access counters are shared, lock-protected and exclude the snapshot.
+        assert mmio.stats() == MMIOStats(read32=8 * 1201, write32=8 * 1200)
         for port in ports:
             port.close()
 
@@ -250,3 +252,26 @@ def test_concurrent_process_owner_scope_is_advisory(ram):
         assert os.path.exists(ram[1])
         owner.write32(0x1000, 0x55)
 
+
+
+def test_lifetime_safe_mmio_stats_count_only_successful_word_accesses(ram):
+    driver = backend(ram)
+    assert driver.stats() == MMIOStats(read32=0, write32=0)
+    with driver:
+        driver.write32(0x1000, 0x12345678)
+        assert driver.read32(0x1000) == 0x12345678
+        # Invalid offsets, alignment and values cannot increment counts.
+        for call in (
+            lambda: driver.read32(0x1001),
+            lambda: driver.write32(0x100C, 1),
+            lambda: driver.write32(0x1000, True),
+        ):
+            with pytest.raises(MMIOError):
+                call()
+        snap = driver.stats()
+        assert snap == MMIOStats(read32=1, write32=1)
+        assert driver.stats() == snap  # observing metrics must be inert
+    assert driver.stats() == MMIOStats(read32=1, write32=1)
+    with pytest.raises(MMIOClosed):
+        driver.read32(0x1000)
+    assert driver.stats() == snap

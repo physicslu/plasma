@@ -20,6 +20,7 @@ import platform
 import re
 import subprocess
 import sys
+from time import perf_counter_ns
 
 from pl.hil.swd04 import contract as old
 from pl.hil.swd04.collect import fclk0_from_summary
@@ -40,6 +41,7 @@ AXI_BASES = {
     "lt02_0": 0x40004000,
 }
 LENGTHS = (1, 4, 5, 1023, 1024, 1025, 2048, 2049, 4097, 8193)
+MAX_REPEATS = 8
 
 
 class LT02SafetyError(RuntimeError):
@@ -298,30 +300,82 @@ def case_payload(length: int, case: int) -> bytes:
 
 
 def run_cases(mmio: LinuxMMIO, source_sha: str,
-              lengths: tuple[int, ...] = LENGTHS) -> list[dict]:
-    """Production driver only: verifies true readback, counters and CRC."""
+              lengths: tuple[int, ...] = LENGTHS, *,
+              repeats: int = 1) -> list[dict]:
+    """Bounded deterministic repeated cases through the production PS driver.
+
+    A fresh FPGA identity is checked before any LT02 write. No retry is
+    attempted after a failed case; the owned driver is poisoned on failure.
+    """
+    require(type(repeats) is int and 1 <= repeats <= MAX_REPEATS,
+            f"LT02 repeats must be 1..{MAX_REPEATS}")
+    require(bool(lengths) and all(type(n) is int and 1 <= n <= 1024 * 1024
+                                  for n in lengths),
+            "LT02 test lengths must be a non-empty bounded tuple")
     for address, word in expected_identity(source_sha).items():
         require(mmio.read32(address) == word,
                 f"Candidate Identity mismatch at {address:#x}; STOP")
     observations = []
     with mmio.claim_site(site_id=1, base=LT02) as port:
         driver = LoopTestDriver(port, base=LT02, site_id=1)
-        for case, length in enumerate(lengths):
-            data = case_payload(length, case)
-            response = driver.echo(data)
-            require(response.payload == data and
-                    response.tx_crc32 == response.rx_crc32 and
-                    response.payload_length == len(data),
-                    f"LT02 case {case} data/CRC mismatch")
-            observations.append({
-                "bytes": length,
-                "chunks": response.chunks,
-                "write_words": response.data_word_writes,
-                "read_words": response.data_word_reads,
-                "crc32": response.tx_crc32,
-                "elapsed_ns": response.elapsed_ns,
-            })
+        for repetition in range(repeats):
+            for case, length in enumerate(lengths):
+                case_number = repetition * len(lengths) + case
+                data = case_payload(length, case_number)
+                response = driver.echo(data)
+                words = sum((min(2048, length - off) + 3) // 4
+                            for off in range(0, length, 2048))
+                chunks = (length + 2047) // 2048
+                require(response.payload == data and
+                        response.tx_crc32 == response.rx_crc32 and
+                        response.payload_length == len(data) and
+                        response.chunks == chunks and
+                        response.data_word_writes == words and
+                        response.data_word_reads == words,
+                        f"LT02 repeat {repetition}, case {case} mismatch; STOP")
+                observations.append({
+                    "repeat_index": repetition,
+                    "case_index": case,
+                    "bytes": length,
+                    "chunks": response.chunks,
+                    "write_words": response.data_word_writes,
+                    "read_words": response.data_word_reads,
+                    "crc32": response.tx_crc32,
+                    "elapsed_ns": response.elapsed_ns,
+                })
     return observations
+
+
+def summarize_cases(cases: list[dict], wall_elapsed_ns: int) -> dict:
+    """Report observed rates/latencies, with no arbitrary performance PASS gate.
+
+    Wall time includes Python orchestration. Driver time covers echo cases;
+    neither isolates pure FPGA/AXI latency or guarantees deterministic timing.
+    """
+    require(bool(cases) and type(wall_elapsed_ns) is int
+            and wall_elapsed_ns >= 0, "Invalid LT02 performance observations")
+    latencies = sorted(case["elapsed_ns"] for case in cases)
+    require(all(type(n) is int and n >= 0 for n in latencies),
+            "Invalid per-case elapsed time")
+    total_bytes = sum(case["bytes"] for case in cases)
+    writes = sum(case["write_words"] for case in cases)
+    reads = sum(case["read_words"] for case in cases)
+    driver_elapsed_ns = sum(latencies)
+    def rate(count: int) -> float | None:
+        return round(count * 1_000_000_000 / wall_elapsed_ns, 2) if wall_elapsed_ns else None
+    return {
+        "case_count": len(cases),
+        "total_bytes": total_bytes,
+        "data_write_words": writes,
+        "data_read_words": reads,
+        "wall_elapsed_ns": wall_elapsed_ns,
+        "sum_driver_elapsed_ns": driver_elapsed_ns,
+        "effective_bytes_per_s": rate(total_bytes),
+        "effective_data_word_ops_per_s": rate(writes + reads),
+        "case_latency_p50_ns": latencies[(len(latencies) * 50 + 99) // 100 - 1],
+        "case_latency_p95_ns": latencies[(len(latencies) * 95 + 99) // 100 - 1],
+        "case_latency_max_ns": latencies[-1],
+    }
 
 
 def record(path: Path, data: dict) -> None:
@@ -339,9 +393,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-manifest-sha256", required=True)
     parser.add_argument("--record-loaded-image", action="store_true",
                         help="After supervised external load, capture protected current-boot receipt only")
+    parser.add_argument("--repeats", type=int, default=1,
+                        help=f"Bounded LT02 case-matrix repeats (1..{MAX_REPEATS}; default 1)")
     parser.add_argument("--execute-live", action="store_true")
     parser.add_argument("--ack-unrecoverable-axi-stall-risk", action="store_true")
     args = parser.parse_args(argv)
+    if not 1 <= args.repeats <= MAX_REPEATS:
+        print(f"LT02_NO_GO: repeats must be 1..{MAX_REPEATS}", file=sys.stderr)
+        return 2
     if args.record_loaded_image:
         if args.execute_live or args.ack_unrecoverable_axi_stall_risk:
             print("LT02_NO_GO: receipt mode cannot execute MMIO", file=sys.stderr)
@@ -385,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
         "python": platform.python_version(),
         "hardware": "Z2-ARMv7-native-LinuxMMIO",
         "fpga_recovery": "NOT_RUN",
+        "repeats": args.repeats,
         "physical_swd": "NOT_RUN",
         "real_ic_programming": "NOT_RUN",
     }
@@ -398,9 +458,17 @@ def main(argv: list[str] | None = None) -> int:
         with LinuxMMIO((aperture, loopback_aperture(LT02)),
                        device="/dev/mem",
                        owner_lock="/run/lock/plasma-mmio.lock") as mmio:
-            results = run_cases(mmio, artifact["source_git_sha"])
-        result = {"result": "PASS", "cases": results,
-                  "source": "real PS LinuxMMIO when executed on Z2"}
+            start_ns = perf_counter_ns()
+            results = run_cases(mmio, artifact["source_git_sha"],
+                                repeats=args.repeats)
+            wall_ns = perf_counter_ns() - start_ns
+            stats = mmio.stats()
+        result = {
+            "result": "PASS", "cases": results,
+            "performance": summarize_cases(results, wall_ns),
+            "mmio_word_accesses": {"read32": stats.read32, "write32": stats.write32},
+            "source": "real PS LinuxMMIO when executed on Z2",
+        }
     except (OSError, ValueError, RuntimeError) as exc:
         result = {"result": "FAIL", "error": str(exc),
                   "stop_without_retry": True}

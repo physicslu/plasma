@@ -4,6 +4,33 @@
 injection. The current PYNQ-Z2 SWD-03 image implements **one** transaction
 aperture, not eight. **Real Z2 MMIO qualification: NOT RUN pending live evidence.**
 
+
+## LinuxMMIO v1.1 reliability and measurement candidate
+
+The native ARMv7 `memoryview.cast("I")` word access remains unchanged from
+the qualified v1.0 code path; no extra byte writes or speculative MMIO reads
+are introduced. An opt-in HIL runner uses the existing five-aperture LT02
+candidate to repeat the ten-case matrix (bounded at 1..8), verify exact
+data/CRC/counts, and report measured latency/rate instead of theoretical
+bus bandwidth. There is no hardware-triggered stress test by default.
+
+`LinuxMMIO.stats()` snapshots successful Python `read32`/`write32`
+operations under the existing lock, including after close. Invalid/rejected
+operations are excluded. These counts are **not** independent evidence of
+AXI acceptance (a SIGBUS or bus stall may bypass Python exceptions). The
+LT02 driver is poisoned after a partially executed or corrupt data case,
+preventing an automatic subsequent attempt; bad request arguments are
+rejected before any hardware access and do not poison the driver.
+
+Host unit tests exercise file-backed MMIO counts, 8-Site synthetic
+concurrency, close/quiesce, case serialization and poisoned-driver refusal.
+Fake port results are software contracts, not eight physical Sites or a
+new physical Z2 PASS. For the real target, only previously verified
+loaded-image receipts and owner-supervised recoverable sessions authorize
+running the optional repeat matrix; external SWD/DUT, illegal AXI offsets
+and a new bitstream are outside scope. The v1.1 real-board benchmark
+remains NOT RUN until actual evidence exists.
+
 ## Runtime and layering
 
 - PLASMA PPU target ARMv7 runtime qualification baseline: **CPython 3.12.13**,
