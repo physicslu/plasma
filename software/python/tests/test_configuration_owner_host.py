@@ -443,3 +443,19 @@ def test_cross_site_mmio_escape_poisoned_and_all_admission_blocked(host):
             o.claim_site(2, SITES[1], exact_ic="IC-A")
     finally:
         o.close()
+
+def test_close_error_still_retires_backend_other_leases_and_config_lock(host, monkeypatch):
+    o, b = running(host)
+    first = o.claim_site(1, SITES[0], exact_ic="IC-A")
+    other = o.claim_site(2, SITES[1], exact_ic="IC-A")
+    def failed_lease_close():
+        raise OSError("injected Site-port close error")
+    monkeypatch.setattr(first._port, "close", failed_lease_close)
+    with pytest.raises(OwnerError, match="retirement incomplete"):
+        o.close()
+    assert o.status().phase is Phase.CLOSED
+    assert b._retired and b._fd is None
+    assert not other._port._active
+    # The configuration lock cannot remain held following a cleanup error.
+    with owner(host) as fresh:
+        assert fresh.status().phase is Phase.IDLE
