@@ -19,6 +19,7 @@ from .device_catalog import (
 )
 from .openocd_software_qualification import get_default_openocd_software_qualification_registry
 from .microchip_saml1x_route_evidence import admitted_saml1x_official_programming_routes
+from .microchip_pic32mx_route_evidence import admitted_pic32mx_openocd_devid_routes
 
 
 IDENTIFIED = "IDENTIFIED"
@@ -245,5 +246,8 @@ def get_default_programming_qualification_registry() -> ProgrammingQualification
         catalog,
         tuple(providers),
         candidate_registry=get_default_backend_candidate_registry(),
-        candidate_registries=(admitted_saml1x_official_programming_routes(catalog),),
+        candidate_registries=(
+            admitted_saml1x_official_programming_routes(catalog),
+            admitted_pic32mx_openocd_devid_routes(catalog),
+        ),
     )
