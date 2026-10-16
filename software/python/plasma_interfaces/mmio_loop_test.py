@@ -74,6 +74,7 @@ class LoopTestDriver:
         self._port = port
         self.base = base
         self._case_lock = Lock()
+        self._poisoned = False
         for offset, expected in (
             (REG_MAGIC, MAGIC), (REG_ABI, ABI_VERSION),
             (REG_CAPABILITIES, CAPABILITIES), (REG_CAPACITY, CAPACITY),
@@ -98,10 +99,29 @@ class LoopTestDriver:
             raise LoopTestError("Word outside 32-bit range")
         self._port.write32(self.base + offset, word)
 
-    def echo(self, payload: bytes) -> LoopTestResult:
-        """Exclusive case lease: overlapping cases must not reuse the buffer."""
+    @property
+    def poisoned(self) -> bool:
+        """After an uncertain data-path failure, this instance cannot be reused."""
         with self._case_lock:
-            return self._echo_exclusive(payload)
+            return self._poisoned
+
+    def echo(self, payload: bytes) -> LoopTestResult:
+        """Serialize cases; poison on uncertain data-path errors, never retry."""
+        with self._case_lock:
+            if self._poisoned:
+                raise LoopTestError("LT02 driver poisoned; explicit hardware recovery required")
+            # Caller mistakes must not poison hardware that was never accessed.
+            if not isinstance(payload, bytes):
+                raise TypeError("payload must be immutable bytes")
+            if not 1 <= len(payload) <= MAX_CASE_BYTES:
+                raise ValueError("payload length must be 1..1048576 bytes")
+            try:
+                return self._echo_exclusive(payload)
+            except BaseException:
+                # A write may have completed before the exception. Invalidate
+                # this driver rather than accidentally replaying a partial case.
+                self._poisoned = True
+                raise
 
     def _echo_exclusive(self, payload: bytes) -> LoopTestResult:
         """Write once, read once and verify PL counters for each bounded chunk.
