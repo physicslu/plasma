@@ -18,6 +18,7 @@ from .device_catalog import (
     get_default_device_catalog,
 )
 from .openocd_software_qualification import get_default_openocd_software_qualification_registry
+from .nxp_kl25_qualification import get_default_nxp_kl25_qualification_provider
 from .microchip_saml1x_route_evidence import admitted_saml1x_official_programming_routes
 from .microchip_pic32mx_route_evidence import admitted_pic32mx_openocd_devid_routes
 
@@ -177,6 +178,7 @@ class ProgrammingQualificationRegistry:
             "provider": deepcopy(raw.get("provider")),
             "operations": deepcopy(raw.get("operations", {})),
             "programming": deepcopy(raw.get("programming")),
+            "qualification_gaps": deepcopy(raw.get("qualification_gaps", [])),
             "selector_visible": True,
             "job_selectable": programmable,
             "execution_authorized": False,
@@ -242,6 +244,9 @@ def get_default_programming_qualification_registry() -> ProgrammingQualification
     openocd = get_default_openocd_software_qualification_registry()
     if openocd is not None:
         providers.append(openocd)
+    nxp_kl25 = get_default_nxp_kl25_qualification_provider()
+    if nxp_kl25 is not None:
+        providers.append(nxp_kl25)
     return ProgrammingQualificationRegistry(
         catalog,
         tuple(providers),
