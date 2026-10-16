@@ -79,7 +79,7 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(design["package"]["lead_pitch_mm"], 0.5)
         self.assertEqual(
             design["pin_level_minimum_programming_hardware"]["mandatory_contact_count"],
-            12,
+            13,
         )
         contacts = {
             item.get("signal") or item["pin_name"]: item["package_pin"]
@@ -89,6 +89,7 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(contacts["SWDIO"], 34)
         self.assertEqual(contacts["SWCLK"], 37)
         self.assertEqual(contacts["NRST"], 7)
+        self.assertEqual(contacts["BOOT0"], 44)
         self.assertEqual(contacts["VDD_1"], 24)
         self.assertEqual(contacts["VDD_2"], 36)
         self.assertEqual(contacts["VDD_3"], 48)
@@ -99,6 +100,11 @@ class ICSupportResolverTests(unittest.TestCase):
             "connect_to_TARGET_VDD_when_no_external_battery",
         )
         self.assertEqual(design["power_and_reset"]["vbat"]["decoupling_to_ground_nf"], 100)
+        self.assertEqual(design["power_and_reset"]["boot0"]["normal_boot_value"], 0)
+        self.assertEqual(
+            design["power_and_reset"]["boot0"]["pull_down_ohms"]["typical"],
+            10000,
+        )
         self.assertFalse(socket["hardware_runtime_ready"])
         self.assertFalse(socket["physical_programming_qualified"])
 
