@@ -7,6 +7,7 @@ from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 EXPECTED = {
     "STM32F205RCT7TR": ("LQFP", "64", "256 KiB", "-40 to 105 C", "TR"),
@@ -37,7 +38,8 @@ def test_phase43g_exact_icpns_are_catalog_admitted_without_runtime_claims() -> N
 
 
 def test_phase43g_exact_icpns_are_exposed_by_rest_catalog() -> None:
-    expected_catalog_size = get_default_device_catalog().size
+    level_counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
+    expected_catalog_size = sum(level_counts[str(level)] for level in (1, 2, 3))
     server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
