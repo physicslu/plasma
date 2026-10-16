@@ -6,10 +6,10 @@ umask 077
 
 usage() {
   printf '%s\n' "Usage: bash scripts/plasma-codex-host-provision.sh --check|--apply"
-  exit 2
+  exit "${1:-0}"
 }
 (( $# == 1 )) || usage
-case "$1" in --check|--apply) mode="$1";; *) usage;; esac
+case "$1" in --check|--apply) mode="$1";; -h|--help) usage 0;; *) usage 2;; esac
 
 worker=plasma-codex
 owner=gordon
