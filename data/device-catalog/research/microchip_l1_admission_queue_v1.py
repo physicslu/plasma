@@ -28,6 +28,7 @@ EXPECTED_STATES = {
     "P1_TARGET_ONLY_CFG_CANDIDATE": 126,
     "NO_DFP_NAME_CFG_CROSSWALK": 20713,
 }
+PINNED_REPLAY_REPORT_SHA256 = "548c1a61c311bdad1c153565e966c768785f7ecaf28311693bd19c212ae734f0"
 SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 ICPN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+._/\-]{1,95}\Z")
@@ -39,7 +40,8 @@ def require(ok: bool, why: str) -> None:
 
 
 def build(report: dict, lock: dict, *, report_sha256: str) -> dict:
-    require(SHA256.fullmatch(report_sha256) is not None, "invalid report digest")
+    require(report_sha256 == PINNED_REPLAY_REPORT_SHA256,
+            "original replay report bytes not equal to approved archived artifact")
     replay = report.get("full_batch_original_source_replay")
     require(report.get("manufacturer") == "Microchip"
             and report.get("openocd_release") == "0.12.0"
