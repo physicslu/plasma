@@ -13,6 +13,7 @@ from plasma_core.diagnostics import (
     ECHO_TRANSFORM,
     LOOPBACK_DIAGNOSTIC_TYPE,
     PS_LOOPBACK_ENDPOINT,
+    PL_LOOPBACK_ENDPOINT,
     crc32_hex,
     require_crc32,
     require_nonnegative_int,
@@ -102,17 +103,18 @@ async def execute_ps_loopback(
     body: dict[str, Any],
     client_factory: Callable[[], PlasmaClient],
 ) -> dict[str, Any]:
-    """Bridge one Browser payload through the real Gateway -> Plasma Server path.
+    """Bridge a PS or explicitly enabled PL diagnostic through the real Plasma Server.
 
     This code deliberately has no Engineering Provider or Mock runtime fallback.
     If the local Plasma Server cannot execute the diagnostic exchange, the
     request fails instead of fabricating a PASS result.
     """
     _require_declared_keys(body)
-    if body["endpoint"] != PS_LOOPBACK_ENDPOINT:
+    endpoint = body["endpoint"]
+    if endpoint not in (PS_LOOPBACK_ENDPOINT, PL_LOOPBACK_ENDPOINT):
         raise PlasmaError(
             ErrorCode.OPERATION_UNSUPPORTED,
-            f"real-path loopback endpoint is not implemented: {body['endpoint']!r}",
+            f"real-path loopback endpoint is not implemented: {endpoint!r}",
         )
     test_id = require_test_id(body["test_id"])
     sequence = require_nonnegative_int(body["sequence"], "sequence")
@@ -130,13 +132,15 @@ async def execute_ps_loopback(
             "seed must be a string of at most 128 characters",
         )
     payload, tx_crc32 = _parse_payload(body)
+    if endpoint == PL_LOOPBACK_ENDPOINT and len(payload) > 1024 * 1024:
+        raise PlasmaError(ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE, "LT02 hardware case exceeds 1 MiB")
 
     started_at = time.monotonic()
     response, returned = await client_factory().diagnostic_loopback(
         payload,
         test_id=test_id,
         sequence=sequence,
-        endpoint=PS_LOOPBACK_ENDPOINT,
+        endpoint=endpoint,
         pattern=pattern,
         seed=seed,
         response_timeout_s=timeout_ms / 1000.0,
@@ -147,8 +151,8 @@ async def execute_ps_loopback(
         "message_type": DIAGNOSTIC_RESPONSE_MESSAGE_TYPE,
         "diagnostic_type": LOOPBACK_DIAGNOSTIC_TYPE,
         "diagnostic_version": DIAGNOSTIC_PROTOCOL_VERSION,
-        "endpoint": PS_LOOPBACK_ENDPOINT,
-        "source": PS_LOOPBACK_ENDPOINT,
+        "endpoint": endpoint,
+        "source": endpoint,
         "test_id": test_id,
         "sequence": sequence,
         "transform": ECHO_TRANSFORM,
@@ -189,12 +193,41 @@ async def execute_ps_loopback(
             context={"declared": response.get("rx_crc32"), "actual": rx_crc32},
         )
 
+    physical = {}
+    if endpoint == PL_LOOPBACK_ENDPOINT:
+        expected_chunks = (len(payload) + 2047) // 2048
+        expected_words = sum(
+            (min(2048, len(payload) - origin) + 3) // 4
+            for origin in range(0, len(payload), 2048)
+        )
+        expected_hw = {
+            "site_id": 1,
+            "lt02_data_word_writes": expected_words,
+            "lt02_data_word_reads": expected_words,
+            "lt02_chunks": expected_chunks,
+        }
+        for field, value in expected_hw.items():
+            if response.get(field) != value:
+                raise PlasmaError(
+                    ErrorCode.PROTOCOL_INCOMPLETE,
+                    f"PL diagnostic response has invalid {field}",
+                    context={"expected": value, "actual": response.get(field)},
+                )
+        elapsed = require_nonnegative_int(response.get("lt02_elapsed_ns"), "lt02_elapsed_ns")
+        physical = {
+            "site_id": 1,
+            "data_word_writes": expected_words,
+            "data_word_reads": expected_words,
+            "chunks": expected_chunks,
+            "fpga_driver_elapsed_ns": elapsed,
+        }
+
     return {
         "ok": True,
         "diagnostic_protocol_version": DIAGNOSTIC_PROTOCOL_VERSION,
         "loopback": {
-            "endpoint": PS_LOOPBACK_ENDPOINT,
-            "source": PS_LOOPBACK_ENDPOINT,
+            "endpoint": endpoint,
+            "source": endpoint,
             "test_id": test_id,
             "sequence": sequence,
             "transform": ECHO_TRANSFORM,
@@ -204,6 +237,7 @@ async def execute_ps_loopback(
             "tx_crc32": tx_crc32,
             "rx_crc32": rx_crc32,
             "ppu_rtt_ms": ppu_rtt_ms,
+            **({"lt02": physical} if physical else {}),
         },
         "payload_base64": base64.b64encode(returned).decode("ascii"),
     }
