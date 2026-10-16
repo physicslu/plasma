@@ -1,0 +1,74 @@
+name: Microchip 2563 L1 admission review
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_l1_admission_queue_v1.py'
+      - 'data/device-catalog/research/microchip-openocd-first-source-lock-v1.json'
+      - 'software/python/plasma_web/route_evidence_admission.py'
+      - 'software/python/plasma_web/programming_qualification.py'
+      - 'software/python/tests/test_route_evidence_admission.py'
+      - '.github/workflows/device-catalog-microchip-l1-admission-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  source-replayed-l1-review-queue:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate canonical L1 admission boundaries
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s software/python/tests \
+            -p 'test_route_evidence_admission.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_catalog_promotion_framework.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_programming_qualification.py' -v
+      - name: Fetch source-replayed original-byte report artifact (NOT raw manufacturer captures)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/microchip-l1"
+          gh run download 38664576255 --repo "${{ github.repository }}" \
+            --name microchip-phase1-full-original-mcp-cfg-reverse-coverage-v1 \
+            --dir "${{ runner.temp }}/microchip-l1"
+          test -s "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json"
+      - name: Validate all 2563 candidate rows against frozen source replay
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json"
+          python data/device-catalog/research/microchip_l1_admission_queue_v1.py \
+            --report "${{ runner.temp }}/microchip-l1/microchip-full-reverse.json" \
+            --output "${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json" --verify
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "microchip-l1/microchip-l1-review-queue.json"
+          q = json.loads(p.read_text(encoding="utf-8"))
+          assert q["research_cfg_candidates"] == len(q["rows"]) == 2563
+          assert q["identity_canonical_admitted_by_this_tool"] == 0
+          assert q["route_canonical_admitted_by_this_tool"] == 0
+          assert all(r["catalog_level"] is None
+                     and r["job_selectable"] is False
+                     and r["execution_authorized"] is False for r in q["rows"])
+          PY
+      - name: Upload research-only review ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-l1-2563-review-queue
+          path: ${{ runner.temp }}/microchip-l1/microchip-l1-review-queue.json
+          retention-days: 30
