@@ -99,7 +99,7 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
 
     def test_default_registry_preserves_st_65_and_derives_levels_from_routes(self):
         registry = get_default_programming_qualification_registry()
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 65)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 66)
         self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 65)
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
