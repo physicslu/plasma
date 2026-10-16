@@ -45,7 +45,7 @@ OpenOCD software qualification remains the ADR-0002 Level 2 authority.
 
 The Socket Design overlay is additive: it must not mutate, reseal, or supersede the frozen software-admission binding or its Level 2 qualification evidence chain.
 
-## 3. Canonical minimum SWD contact set
+## 3. Canonical minimum batteryless SWD fixture contact set
 
 For the STM32F103 LQFP48 package the minimum evidence-backed SWD programming
 contact set is:
