@@ -1,15 +1,11 @@
 # IC Selector Architecture
 
-Status: legacy IC Selector Phase 1 implementation contract (not ADR-0002 IC Information Phase 1 acceptance)
+Status: current ADR-0002 IC Selector runtime contract
 
-> **ADR-0002 phased migration (2026-10-14):** This document's earlier
-> "Phase 1" label is the IC Selector's historical implementation milestone,
-> not the new three-panel ADR-0002 Phase 1. The latter applies only to
-> manufacturer-sourced **01 IC Information** evidence. Default public
-> software-`SUPPORTED` selection filtering and coherent counts remain
-> **Phase 2 Programming / Issue #849**, not a completed runtime guarantee.
-> Internal exact-ICPN metadata completeness and software programming
-> qualification must not be conflated.
+> **ADR-0002 policy (2026-10-15):** Phase 1 `IDENTIFIED` Exact ICPN is the
+> Selector visibility boundary. Phase 2 Programming and Phase 3 PLASMA
+> Compatibility are independent displayed states and never act as visibility
+> filters. Selector visibility does not authorize Job/Batch execution.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
@@ -123,7 +119,7 @@ rejected
 
 The Production exact-ICPN UI uses **three display states within the existing OpenOCD Tag** (not a fifth Tag): `mapped` (green) when the Production Catalog backend says `mapped`; `candidate` (amber) only when Production remains `no_mapping` and independent, immutable, source-locked `backend_candidate` research evidence exists; `no_mapping` (neutral) otherwise. A source candidate is never an executable programming route; `backend.mapping_status` and `backend.target_config` remain the server's authority. The other three Tags (PPU, Socket, manufacturer part) are unaffected and never infer real hardware validation. Candidate evidence is optional in slim PPU bundles; missing evidence displays `no_mapping` without breaking catalog searches.
 
-ADR-0002 Phase 2B adds a separate **Software Qualification** badge. It is not a
+ADR-0002 Phase 2 Programming adds a separate **Software Qualification** badge. It is not a
 replacement for the OpenOCD CFG tag: `CFG mapped` answers whether a Catalog route exists,
 while `SUPPORTED / CANDIDATE / UNKNOWN / UNSUPPORTED` answers whether that exact ICPN has
 completed the version-locked OpenOCD software qualification transaction. In particular,
@@ -162,10 +158,11 @@ The same search result can carry three independent additive projections:
 - `manufacturer_device_basic_profile` — operator-facing Basic Device information.
 - `selected_profile` — deeper manufacturer/programming composition, only where the
   Programming Profile evidence chain exists.
-- `openocd_software_qualification` — SW/PPU-owned Phase 2 exact-ICPN software
-  qualification. It may be `SUPPORTED` even when `selected_profile` is absent, because
-  the qualification ledger binds the reviewed Programming Profile and exact geometry
-  independently from the legacy deep-detail projection.
+- `programming_qualification` — vendor-neutral ADR-0002 Phase 2 exact-ICPN
+  qualification. Provider-specific evidence (currently OpenOCD for the qualified ST
+  cohort) is normalized behind this payload. It may be `SUPPORTED` even when
+  `selected_profile` is absent, because Phase 2 binds the reviewed Programming Profile
+  and exact geometry independently from the legacy deep-detail projection.
 
 For Manufacturer Device Basic Profile v1, IC Information uses a fixed ten-field contract:
 
