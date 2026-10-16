@@ -161,6 +161,7 @@ class ProgrammingQualificationRegistry:
         } | reviewed_keys
         return {
             "provider_count": len(self._providers),
+            "reviewed_exact_icpns": len(reviewed_keys),
             "catalog_level_0_or_higher_discovered_exact_icpns": len(discovered_keys),
             "catalog_level_0_only_exact_icpns": len(discovered_keys - route_keys),
             "catalog_level_1_or_higher_exact_icpns": len(route_keys),
