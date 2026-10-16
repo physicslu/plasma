@@ -29,6 +29,20 @@ EDGE_L0_TO_L1 = "L0_TO_L1"
 EDGE_L1_TO_L2 = "L1_TO_L2"
 EDGE_L2_TO_L3 = "L2_TO_L3"
 
+EVIDENCE_IDENTITY_ONLY = "IDENTITY_ONLY"
+EVIDENCE_CATALOG_MAPPED_ROUTE = "CATALOG_MAPPED_ROUTE"
+EVIDENCE_BACKEND_CANDIDATE_ROUTE = "BACKEND_CANDIDATE_ROUTE"
+EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER = "REVIEWED_PROGRAMMING_PROVIDER"
+EVIDENCE_PLASMA_VERIFIED_CONFIGURATION = "PLASMA_VERIFIED_CONFIGURATION"
+
+PROMOTION_EVIDENCE_CLASSES = (
+    EVIDENCE_IDENTITY_ONLY,
+    EVIDENCE_CATALOG_MAPPED_ROUTE,
+    EVIDENCE_BACKEND_CANDIDATE_ROUTE,
+    EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER,
+    EVIDENCE_PLASMA_VERIFIED_CONFIGURATION,
+)
+
 NO_PROGRAMMING_ROUTE_EVIDENCE = "NO_PROGRAMMING_ROUTE_EVIDENCE"
 MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED = "MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED"
 BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED = "BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED"
@@ -121,12 +135,15 @@ class CatalogPromotionFramework:
 
         promotion_edge: str | None
         blocker: str | None
+        evidence_class: str
         if level == 0:
             promotion_edge = EDGE_L0_TO_L1
             blocker = NO_PROGRAMMING_ROUTE_EVIDENCE
+            evidence_class = EVIDENCE_IDENTITY_ONLY
         elif level == 1:
             promotion_edge = EDGE_L1_TO_L2
             if qualification.get("reviewed"):
+                evidence_class = EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER
                 state = qualification.get("state")
                 _require(
                     state != "SUPPORTED",
@@ -138,8 +155,10 @@ class CatalogPromotionFramework:
                     f"unclassified reviewed provider state for {record.vendor}/{record.identifier}: {state!r}",
                 )
             elif qualification.get("route_evidence") == "backend_candidate_registry":
+                evidence_class = EVIDENCE_BACKEND_CANDIDATE_ROUTE
                 blocker = BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED
             elif record.mapping_status == "mapped" and bool(record.target_config):
+                evidence_class = EVIDENCE_CATALOG_MAPPED_ROUTE
                 blocker = MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED
             else:
                 raise DeviceCatalogIntegrityError(
@@ -147,6 +166,7 @@ class CatalogPromotionFramework:
                     f"classifiable for {record.vendor}/{record.identifier}"
                 )
         elif level == 2:
+            evidence_class = EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER
             _require(
                 qualification.get("state") == "SUPPORTED",
                 f"Level 2 requires SUPPORTED qualification: {record.vendor}/{record.identifier}",
@@ -154,8 +174,14 @@ class CatalogPromotionFramework:
             promotion_edge = EDGE_L2_TO_L3
             blocker = PLASMA_VERIFIED_CONFIGURATION_MISSING
         else:
+            evidence_class = EVIDENCE_PLASMA_VERIFIED_CONFIGURATION
             promotion_edge = None
             blocker = None
+
+        _require(
+            evidence_class in PROMOTION_EVIDENCE_CLASSES,
+            f"unknown promotion evidence class for {record.vendor}/{record.identifier}",
+        )
 
         return {
             "manufacturer": record.vendor,
@@ -164,6 +190,7 @@ class CatalogPromotionFramework:
             "catalog_level_state": qualification.get("catalog_level_state"),
             "programming_state": qualification.get("state"),
             "reviewed": bool(qualification.get("reviewed", False)),
+            "promotion_evidence_class": evidence_class,
             "selector_visible": selector_visible,
             "job_selectable": job_selectable,
             "promotion_edge": promotion_edge,
@@ -181,6 +208,7 @@ class CatalogPromotionFramework:
         }
         total_selector_visible = 0
         total_job_selectable = 0
+        total_evidence: Counter[str] = Counter()
         observed = 0
 
         for record in self._catalog.records:
@@ -190,6 +218,7 @@ class CatalogPromotionFramework:
             observed += 1
             level = int(observation["catalog_level"])
             total_levels[level] += 1
+            total_evidence[str(observation["promotion_evidence_class"])] += 1
             total_selector_visible += int(bool(observation["selector_visible"]))
             total_job_selectable += int(bool(observation["job_selectable"]))
 
@@ -204,6 +233,7 @@ class CatalogPromotionFramework:
                         EDGE_L1_TO_L2: Counter(),
                         EDGE_L2_TO_L3: Counter(),
                     },
+                    "promotion_evidence_counts": Counter(),
                     "selector_visible_exact_icpns": 0,
                     "job_selectable_exact_icpns": 0,
                     "discovered_exact_icpns": 0,
@@ -211,6 +241,7 @@ class CatalogPromotionFramework:
             )
             row["discovered_exact_icpns"] += 1
             row["catalog_level_counts"][level] += 1
+            row["promotion_evidence_counts"][str(observation["promotion_evidence_class"])] += 1
             row["selector_visible_exact_icpns"] += int(bool(observation["selector_visible"]))
             row["job_selectable_exact_icpns"] += int(bool(observation["job_selectable"]))
 
@@ -255,6 +286,9 @@ class CatalogPromotionFramework:
                     "manufacturer": manufacturer,
                     "discovered_exact_icpns": int(row["discovered_exact_icpns"]),
                     "catalog_level_counts": level_payload(row["catalog_level_counts"]),
+                    "promotion_evidence_counts": dict(
+                        sorted(row["promotion_evidence_counts"].items())
+                    ),
                     "selector_visible_exact_icpns": int(row["selector_visible_exact_icpns"]),
                     "job_selectable_exact_icpns": int(row["job_selectable_exact_icpns"]),
                     "promotion_blocker_counts": blocker_payload(
@@ -273,6 +307,7 @@ class CatalogPromotionFramework:
             "manufacturer_count": len(manufacturers),
             "discovered_exact_icpns": observed,
             "catalog_level_counts": level_payload(total_levels),
+            "promotion_evidence_counts": dict(sorted(total_evidence.items())),
             "selector_visible_exact_icpns": total_selector_visible,
             "job_selectable_exact_icpns": total_job_selectable,
             "promotion_blocker_counts": blocker_payload(total_blockers),
