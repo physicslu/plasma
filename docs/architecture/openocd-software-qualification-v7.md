@@ -97,11 +97,12 @@ claim full raw-source custody for that document.
 
 ## Phase boundary
 
-v7 remains **software qualification only**:
+v7 remains **provider-specific Phase 2 evidence only**:
 
-- Phase 1 ST remains frozen at 4,629 exact ICPNs;
-- public Catalog migration is unchanged;
-- Job/Batch execution authorization is unchanged;
+- Phase 1 ST remains frozen at 4,629 exact ICPNs and is the Selector visibility authority;
+- the canonical runtime API is `programming_qualification`, not an OpenOCD-specific UI contract;
+- these 49 reviewed exact ICPNs remain Phase 2 `SUPPORTED`; all other exact ICPNs default to `UNKNOWN` until independently reviewed;
+- Job/Batch execution authorization is unchanged and remains fail-closed outside the qualification projection;
 - installed-runtime attestation is unchanged;
 - `hardware_runtime_ready=false`;
 - `physical_programming_qualified=false`;
