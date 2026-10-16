@@ -7,7 +7,9 @@ This does not amend ADR-0003 or the approved limitations of PR #982/#988.
 
 The standalone `configuration_safety_contract.py` accepts only immutable
 synthetic evidence pinned to the same boot, runtime source, resource/DT identity,
-old/candidate image, generation and owner epoch. No real FPGA loading, IO, sysfs,
+old/candidate SHA-256 image, generation and owner epoch. Source commits must
+use canonical lower-case 40/64-hex digests; images require lower-case 64-hex
+SHA-256 digests. Shape and identity matching do **not** verify actual bytes. No real FPGA loading, IO, sysfs,
 driver operation, bridge control, Kernel/DMA arbitration or hardware credential
 exists in this module. Passing the model returns an explicitly Host-only receipt
 with `grants_hardware_authority=False`.
