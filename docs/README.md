@@ -92,6 +92,7 @@
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
 - **Current** — [PLASMA GitHub Actions Control Bridge](development/plasma-actions-control-bridge.md)：定義 Issue #814、actor／workflow allowlist、`dispatch`／`cancel`／`rerun` 命令與最小權限安全邊界。
+- **Plan / Pilot** — [PLASMA Codex SWPC Read-only Bootstrap](development/plasma-codex-pilot.md)：Issue #981 Gate 1 A 的安全派工、獨立 Worker、tmux 監控與驗收邊界；尚非正式部署。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
