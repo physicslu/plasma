@@ -29,6 +29,20 @@ class MMIOClosed(MMIOError):
     """The backend/lease is no longer usable after close or PL reload."""
 
 
+@dataclass(frozen=True)
+class MMIOStats:
+    """Successful Python 32-bit accesses, not proof of AXI bus acceptance.
+
+    Snapshot is read-only and remains available after close. Rejected MMIO
+    operations are not counted. Actual AXI stalls/SIGBUS are not recoverable
+    with Python code.
+    """
+
+    read32: int
+    write32: int
+
+
+
 def _u32(value: int, name: str) -> int:
     if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
         raise MMIOError(f"{name} must be an unsigned 32-bit integer")
@@ -166,6 +180,8 @@ class LinuxMMIO:
         self._owners: dict[int, SiteMMIO] = {}
         self._poisoned = False
         self._retired = False
+        self._read_count = 0
+        self._write_count = 0
 
     def __enter__(self) -> LinuxMMIO:
         self.open()
@@ -255,13 +271,20 @@ class LinuxMMIO:
             self._words[aperture.base] = view
         return self._words[aperture.base]
 
+    def stats(self) -> MMIOStats:
+        """Snapshot successful native word operations without touching hardware."""
+        with self._mutex:
+            return MMIOStats(read32=self._read_count, write32=self._write_count)
+
     def read32(self, address: int) -> int:
         # Validate even when the backend is closed, before opening any mapping.
         with self._mutex:
             aperture, idx = self._register(address, write=False)
             self._check_active()
             try:
-                return self._map_words(aperture)[idx]
+                result = self._map_words(aperture)[idx]
+                self._read_count += 1
+                return result
             except (OSError, ValueError, BufferError, IndexError) as exc:
                 self._poisoned = True
                 raise MMIOError("MMIO read uncertain; no automatic retry") from exc
@@ -274,6 +297,7 @@ class LinuxMMIO:
             try:
                 # Never use struct.pack_into: ARMv7 may issue byte stores.
                 self._map_words(aperture)[idx] = value
+                self._write_count += 1
             except (OSError, ValueError, BufferError, IndexError) as exc:
                 self._poisoned = True
                 raise MMIOError("MMIO write uncertain; no automatic retry") from exc
