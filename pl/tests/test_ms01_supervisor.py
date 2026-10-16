@@ -71,6 +71,7 @@ def test_success_requires_independent_restore(tmp_path,plan):
 def test_normal_process_mmio_or_load_failure_restores_without_retry(tmp_path,plan,stage):
     c,a,j=setup(tmp_path,plan,fail=stage);r=c.run()
     assert r['result']=='FAIL' and r['recovery']=='PASS'
+    assert r['data_test']==('FAIL' if stage=='worker' else 'NOT_RUN')
     assert a.calls.count(stage)==1 and a.calls.count('restore')==1
     assert a.image=='base' and a.bindings==a.original
 
@@ -84,6 +85,7 @@ def test_fatal_supervisor_exit_can_explicitly_resume_recovery(tmp_path,plan,stag
     r=s.Controller(a,a.j,plan).recover()
     assert r['recovery']=='PASS' and a.image=='base' and a.bindings==a.original
     assert a.calls.count('worker')<=1  # Recovery NEVER reruns the benchmark.
+    if stage=='worker':assert r['data_test']=='FAIL'
 
 
 def test_surviving_child_blocks_new_load(tmp_path,plan):

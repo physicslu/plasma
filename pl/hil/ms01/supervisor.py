@@ -190,15 +190,19 @@ class Controller:
             self.a.receipt()
             self.j.save("CANDIDATE_LOADED")
             self.a.release_mmio()
-            self.j.save("WORKER_INTENT")
+            self.j.save("WORKER_INTENT", data_test="STARTED")
             self.a.worker()
             self.j.save("TEST_DONE", data_test="PASS")
         except UnsafeStall as exc:
             self.j.save("EXTERNAL_RECOVERY_REQUIRED", error=str(exc), recovery="NOT_RUN",
+                        data_test="FAIL" if self.j.state.get("data_test") == "STARTED"
+                        else self.j.state.get("data_test", "NOT_RUN"),
                         result="FAIL", axi_safety="UNKNOWN")
             return self.j.state
         except Exception as exc:
-            self.j.save("FAILED", error=str(exc), result="FAIL")
+            self.j.save("FAILED", error=str(exc), result="FAIL",
+                        data_test="FAIL" if self.j.state.get("data_test") == "STARTED"
+                        else self.j.state.get("data_test", "NOT_RUN"))
         return self.recover()
 
     def recover(self) -> dict:
@@ -208,6 +212,9 @@ class Controller:
             self.j.save("NO_GO", result="FAIL", recovery="NOT_RUN")
             return self.j.state
         original = self.j.state["original"]
+        if self.j.state.get("data_test") == "STARTED":
+            self.j.save("INTERRUPTED_TEST", data_test="FAIL", result="FAIL",
+                        error="Worker attempt interrupted before supervisor acceptance; inspect raw results")
         if not self.j.state.get("image_touched") and not self.j.state.get("release_intents"):
             self.j.save("NO_GO", result="FAIL", recovery="NOT_NEEDED")
             return self.j.state
