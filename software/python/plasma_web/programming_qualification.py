@@ -27,6 +27,12 @@ CATALOG_LEVEL_PROGRAMMABLE = "PROGRAMMABLE"
 PROGRAMMING_STATES = frozenset({"UNKNOWN", "CANDIDATE", "BLOCKED", "SUPPORTED", "UNSUPPORTED"})
 
 
+class CandidateRouteEvidenceProvider(Protocol):
+    """Read-only source-backed research candidate; never an executable backend."""
+
+    def lookup(self, record: DeviceCatalogRecord) -> dict[str, Any] | None: ...
+
+
 class ProgrammingQualificationProvider(Protocol):
     @property
     def reviewed_exact_keys(self) -> tuple[tuple[str, str], ...]: ...
@@ -49,11 +55,17 @@ class ProgrammingQualificationRegistry:
         catalog: DeviceCatalog,
         providers: tuple[ProgrammingQualificationProvider, ...],
         *,
-        candidate_registry: BackendCandidateRegistry | None = None,
+        candidate_registry: CandidateRouteEvidenceProvider | None = None,
+        candidate_registries: tuple[CandidateRouteEvidenceProvider, ...] = (),
     ) -> None:
         self._catalog = catalog
         self._providers = providers
-        self._candidate_registry = candidate_registry
+        # Preserve the existing ST input while allowing independently reviewed
+        # manufacturer-neutral adapters. Never silently select among conflicts.
+        self._candidate_registries = (
+            ((candidate_registry,) if candidate_registry is not None else ())
+            + tuple(candidate_registries)
+        )
         self._record_by_key = {
             (row.vendor.casefold(), row.identifier.casefold()): row
             for row in catalog.records
@@ -76,6 +88,15 @@ class ProgrammingQualificationRegistry:
                     row.identity_state == IDENTIFIED,
                     f"Programming Qualification lacks IDENTIFIED exact ICPN prerequisite: {key}",
                 )
+
+    def _candidate_for(self, row: DeviceCatalogRecord) -> dict[str, Any] | None:
+        candidates = [provider.lookup(row) for provider in self._candidate_registries]
+        matching = [candidate for candidate in candidates if candidate is not None]
+        _require(
+            len(matching) <= 1,
+            f"multiple candidate routes for {row.vendor}/{row.identifier}; review required",
+        )
+        return matching[0] if matching else None
 
     def _identity_record(self, manufacturer: str, exact_icpn: str):
         if not isinstance(manufacturer, str) or not isinstance(exact_icpn, str):
@@ -125,11 +146,7 @@ class ProgrammingQualificationRegistry:
             f"ambiguous reviewed Programming Providers for {manufacturer}/{exact_icpn}",
         )
         if not reviewed:
-            candidate = (
-                self._candidate_registry.lookup(row)
-                if self._candidate_registry is not None
-                else None
-            )
+            candidate = self._candidate_for(row)
             has_programming_route = (
                 (row.mapping_status == "mapped" and bool(row.target_config))
                 or candidate is not None
@@ -191,10 +208,7 @@ class ProgrammingQualificationRegistry:
             if row.identity_state == IDENTIFIED
             and (
                 (row.mapping_status == "mapped" and bool(row.target_config))
-                or (
-                    self._candidate_registry is not None
-                    and self._candidate_registry.lookup(row) is not None
-                )
+                or self._candidate_for(row) is not None
             )
         } | reviewed_keys
         level0_only = len(discovered_keys - route_keys)
