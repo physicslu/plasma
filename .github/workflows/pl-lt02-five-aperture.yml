@@ -1,0 +1,54 @@
+name: PL LT02 five-aperture Vivado source contracts
+
+on:
+  pull_request:
+    paths:
+      - "pl/projects/z2-lt02-axi/**"
+      - "pl/tests/test_z2_lt02_axi_build.py"
+      - "pl/rtl/bus/pl_mmio_loopback_axi_lite.sv"
+      - "pl/verification/test_mmio_lt02_rtl.py"
+      - ".github/workflows/pl-lt02-five-aperture.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/projects/z2-lt02-axi/**"
+      - "pl/tests/test_z2_lt02_axi_build.py"
+      - "pl/rtl/bus/pl_mmio_loopback_axi_lite.sv"
+      - ".github/workflows/pl-lt02-five-aperture.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lt02-five-aperture-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python runtime and RTL simulators
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog verilator
+          python3 -m pip install -e software/python pytest pytest-asyncio 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Build-source Tcl, Bash and artifact Python syntax
+        run: |
+          bash -n pl/projects/z2-lt02-axi/build-on-swpc.sh
+          python3 -m py_compile pl/projects/z2-lt02-axi/artifact.py
+          test -s pl/projects/z2-lt02-axi/create_project.tcl
+          test -s pl/projects/z2-lt02-axi/create_block_design.tcl
+          test -s pl/projects/z2-lt02-axi/build_bitstream.tcl
+      - name: Five-aperture HWH fault injection and source contracts
+        run: python3 -m pytest -v pl/tests/test_z2_lt02_axi_build.py
+      - name: LT02 actual RTL and injected production Python driver
+        env:
+          PYTHONPATH: software/python
+        run: |
+          verilator --lint-only --sv -Wall -Wno-UNUSEDSIGNAL --top-module pl_mmio_loopback_axi_lite pl/rtl/bus/pl_mmio_loopback_axi_lite.sv
+          python3 -m pytest -v pl/verification/test_mmio_lt02_rtl.py software/python/tests/test_mmio_loop_test.py
+      - name: Qualification boundary
+        run: |
+          echo "LT02 HWH fault-injection, source contracts, Verilator and real RTL/Cocotb PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "Vivado 2026.1, synthesis/implementation/timing, bitstream, Z2, ARMv7 native MMIO HIL and PL UI NOT RUN." >> "$GITHUB_STEP_SUMMARY"
