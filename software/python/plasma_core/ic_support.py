@@ -37,6 +37,7 @@ EXPECTED_CATALOG_FIELDS = (
 )
 MANUFACTURER_BASELINE_DIRNAME = "manufacturer-baseline"
 MANUFACTURER_BASELINE_GLOB = "*-manufacturer-only-v1.json"
+SOCKET_DESIGN_DIRNAME = "socket-design"
 
 
 class ICSupportIntegrityError(RuntimeError):
@@ -256,6 +257,8 @@ class ResolvedICSupport:
     profiles: dict[str, ResolvedProfile]
     revision_overrides: tuple[dict[str, Any], ...]
     manufacturer_profile: ResolvedManufacturerProfile | None = None
+    programming_hardware_profile: ResolvedProfile | None = None
+    socket_design_contract: dict[str, Any] | None = None
 
     def profile(self, kind: str) -> ResolvedProfile:
         try:
@@ -275,6 +278,10 @@ class ResolvedICSupport:
     def openocd_target_config(self) -> str:
         return str(self.expected_catalog["openocd_target_config"])
 
+    @property
+    def socket_programming_hardware_profile(self) -> ResolvedProfile | None:
+        return self.programming_hardware_profile
+
     def to_selected_profile_payload(self) -> dict[str, Any] | None:
         if self.manufacturer_profile is None:
             return None
@@ -286,7 +293,6 @@ class ResolvedICSupport:
             "pin_count": self.expected_catalog["pin_count"],
             "flash_size": self.expected_catalog["flash_size"],
         }
-        hardware = self.profile("package_hardware")
         payload["ic_support"] = {
             "binding_set_id": self.binding_set_id,
             "binding_status": self.binding_status,
@@ -294,13 +300,17 @@ class ResolvedICSupport:
                 kind: self.profiles[kind].to_summary()
                 for kind in EXPECTED_PROFILE_KINDS
             },
-            "programming_hardware": {
+        }
+        if self.programming_hardware_profile is not None:
+            hardware = self.programming_hardware_profile
+            payload["ic_support"]["programming_hardware"] = {
                 "profile_id": hardware.profile_id,
                 "status": hardware.status,
                 "scope": copy.deepcopy(hardware.scope),
                 "data": copy.deepcopy(hardware.data),
-            },
-        }
+            }
+        if self.socket_design_contract is not None:
+            payload["ic_support"]["socket_design"] = copy.deepcopy(self.socket_design_contract)
         return payload
 
     def to_runtime_payload(self) -> dict[str, Any]:
@@ -374,6 +384,44 @@ class ICSupportResolver:
                 _require(profile.profile_id not in profiles, f"duplicate IC Support profile_id: {profile.profile_id}")
                 profiles[profile.profile_id] = profile
         _require(profiles, f"no IC Support profiles found under {profiles_root}")
+
+        socket_designs: dict[str, tuple[dict[str, Any], ResolvedProfile]] = {}
+        socket_root = resolved_root / SOCKET_DESIGN_DIRNAME
+        if socket_root.exists():
+            for socket_path in sorted(socket_root.glob("*.json")):
+                contract = _load_object(socket_path)
+                contract_id = contract.get("contract_id")
+                status = contract.get("status")
+                target = contract.get("target")
+                canonical_profiles = contract.get("canonical_profiles")
+                _require(isinstance(contract_id, str) and contract_id, f"{socket_path}: contract_id is required")
+                _require(status == "engineering_design_input", f"{contract_id}: engineering_design_input status is required")
+                _require(isinstance(target, dict), f"{contract_id}: target object is required")
+                icpn = target.get("icpn")
+                _require(isinstance(icpn, str) and icpn, f"{contract_id}: exact target ICPN is required")
+                _require(isinstance(canonical_profiles, dict), f"{contract_id}: canonical_profiles is required")
+                hardware_id = canonical_profiles.get("package_hardware")
+                _require(
+                    isinstance(hardware_id, str) and hardware_id in profiles,
+                    f"{contract_id}: package_hardware profile is missing",
+                )
+                hardware = profiles[hardware_id]
+                _require(
+                    hardware.kind == "package_hardware",
+                    f"{contract_id}: package_hardware reference must resolve to package_hardware kind",
+                )
+                boundary = contract.get("qualification_boundary")
+                _require(isinstance(boundary, dict), f"{contract_id}: qualification_boundary is required")
+                _require(
+                    boundary.get("hardware_runtime_ready") is False
+                    and boundary.get("physical_programming_qualified") is False
+                    and boundary.get("hil_verified") is False
+                    and boundary.get("execution_authorized") is False,
+                    f"{contract_id}: socket design overlay must remain fail-closed",
+                )
+                key = icpn.casefold()
+                _require(key not in socket_designs, f"duplicate Socket Design Contract for exact ICPN: {icpn}")
+                socket_designs[key] = (copy.deepcopy(contract), hardware)
 
         manufacturer_profiles: dict[str, ResolvedManufacturerProfile] = {}
         manufacturer_root = resolved_root / MANUFACTURER_BASELINE_DIRNAME
@@ -467,6 +515,33 @@ class ICSupportResolver:
                         f"{canonical_icpn}: manufacturer profile Flash size does not match catalog binding",
                     )
 
+                socket_design = socket_designs.get(key)
+                socket_contract: dict[str, Any] | None = None
+                programming_hardware: ResolvedProfile | None = None
+                if socket_design is not None:
+                    socket_contract, programming_hardware = socket_design
+                    target = socket_contract["target"]
+                    _require(
+                        target.get("manufacturer") == expected_catalog["manufacturer"],
+                        f"{canonical_icpn}: Socket Design manufacturer does not match catalog binding",
+                    )
+                    _require(
+                        target.get("base_device") == expected_catalog["base_device"],
+                        f"{canonical_icpn}: Socket Design base_device does not match catalog binding",
+                    )
+                    _require(
+                        str(target.get("pin_count")) == str(expected_catalog["pin_count"]),
+                        f"{canonical_icpn}: Socket Design pin_count does not match catalog binding",
+                    )
+                    contract_refs = socket_contract["canonical_profiles"]
+                    _require(
+                        contract_refs.get("programming") == selected["programming"].profile_id
+                        and contract_refs.get("memory_geometry") == selected["memory_geometry"].profile_id
+                        and contract_refs.get("option") == selected["option"].profile_id
+                        and contract_refs.get("security") == selected["security"].profile_id,
+                        f"{canonical_icpn}: Socket Design canonical profile references drifted",
+                    )
+
                 records[key] = ResolvedICSupport(
                     icpn=canonical_icpn,
                     binding_set_id=binding_set_id,
@@ -475,6 +550,8 @@ class ICSupportResolver:
                     profiles=selected,
                     revision_overrides=tuple(normalized_overrides),
                     manufacturer_profile=manufacturer_profile,
+                    programming_hardware_profile=programming_hardware,
+                    socket_design_contract=socket_contract,
                 )
 
         _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
