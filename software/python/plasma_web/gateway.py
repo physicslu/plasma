@@ -297,10 +297,10 @@ def _parse_target_device(
     record = get_default_device_catalog().resolve(vendor, identifier)
     if record is None:
         raise ValueError(f"{label} must resolve to one canonical Device Catalog record")
-    # Catalog identity is useful for Phase 1 lookup, not an execution grant.
+    # Catalog identity is useful for Research/Engineering lookup, not an execution grant.
     # This applies equally to Engineering Job and Batch target_device inputs.
     if record.vendor == "Microchip" and record.mapping_status == "no_mapping":
-        raise ValueError(f"{label} Microchip Phase 1 identity has no executable programming mapping")
+        raise ValueError(f"{label} Microchip Level 0 identity has no executable programming mapping")
     return BatchTargetDeviceSnapshot(
         vendor=record.vendor,
         family=record.family,
@@ -317,7 +317,7 @@ def _reject_unmapped_microchip_raw_job_target(target: Any) -> None:
     record = get_default_device_catalog().resolve("Microchip", target)
     if record is not None and record.mapping_status == "no_mapping":
         raise ValueError(
-            "Microchip Phase 1 exact ICPN is lookup-only; "
+            "Microchip Level 0 exact ICPN is lookup-only; "
             "no executable programming mapping exists"
         )
 
