@@ -2,6 +2,12 @@
 from __future__ import annotations
 
 import pytest
+from pathlib import Path
+import sys
+
+# General PL source CI executes `pytest pl/tests` without installing the PPU
+# package. Make the REAL production driver module importable in that runner.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "software/python"))
 
 from pl.hil.lt02 import cases
 from plasma_interfaces.mmio_loop_test import (
