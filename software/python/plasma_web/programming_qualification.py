@@ -7,6 +7,7 @@ legacy phase-prefixed fields. Catalog Level never grants Job/Batch execution aut
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import cached_property, lru_cache
 from typing import Any, Protocol
 
 from .backend_candidate_registry import BackendCandidateRegistry, get_default_backend_candidate_registry
@@ -53,13 +54,18 @@ class ProgrammingQualificationRegistry:
         self._catalog = catalog
         self._providers = providers
         self._candidate_registry = candidate_registry
+        self._identity_by_key = {
+            (row.vendor.casefold(), row.identifier.casefold()): row
+            for row in catalog.records
+            if row.identity_state == IDENTIFIED
+        }
 
         seen: set[tuple[str, str]] = set()
         for provider in providers:
             for key in provider.reviewed_exact_keys:
                 _require(key not in seen, f"multiple providers claim the same reviewed exact ICPN: {key}")
                 seen.add(key)
-                row = catalog.resolve(key[0], key[1])
+                row = self._identity_record(key[0], key[1])
                 _require(row is not None, f"reviewed exact ICPN missing from canonical identity store: {key}")
                 _require(
                     row.identity_state == IDENTIFIED,
@@ -67,10 +73,9 @@ class ProgrammingQualificationRegistry:
                 )
 
     def _identity_record(self, manufacturer: str, exact_icpn: str):
-        row = self._catalog.resolve(manufacturer, exact_icpn)
-        if row is None or row.identity_state != IDENTIFIED:
+        if not isinstance(manufacturer, str) or not isinstance(exact_icpn, str):
             return None
-        return row
+        return self._identity_by_key.get((manufacturer.strip().casefold(), exact_icpn.strip().casefold()))
 
     @staticmethod
     def _unknown(identity_state: str, *, has_programming_route: bool = False) -> dict[str, Any]:
@@ -159,7 +164,7 @@ class ProgrammingQualificationRegistry:
     def state_for(self, manufacturer: str, exact_icpn: str) -> str:
         return str(self.describe(manufacturer, exact_icpn)["state"])
 
-    @property
+    @cached_property
     def summary(self) -> dict[str, Any]:
         reviewed_keys: set[tuple[str, str]] = set()
         supported_keys: set[tuple[str, str]] = set()
@@ -209,6 +214,7 @@ class ProgrammingQualificationRegistry:
         }
 
 
+@lru_cache(maxsize=1)
 def get_default_programming_qualification_registry() -> ProgrammingQualificationRegistry:
     catalog = get_default_device_catalog()
     providers: list[ProgrammingQualificationProvider] = []
