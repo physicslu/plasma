@@ -107,7 +107,7 @@ def check() -> None:
         "tmux -S \"$socket\"",
         "trap cleanup EXIT INT TERM",
         "chmod 0660 \"$socket\"",
-        "test -f \"$out/exit_code\"",
+        "test -f \"$out/complete\"",
         "sha256sum -c SHA256SUMS",
     ):
         assert piece in shell, f"missing monitor contract: {piece}"
