@@ -216,7 +216,7 @@ def main() -> int:
         "Socket binding scope drift",
     )
 
-    print("Socket design validation PASS: STM32F103C8T6 / LQFP48 / 12 mandatory contacts")
+    print("Socket design validation PASS: STM32F103C8T6 / LQFP48 / 13 mandatory contacts")
     return 0
 
 
