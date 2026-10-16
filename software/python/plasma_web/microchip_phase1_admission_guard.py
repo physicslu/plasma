@@ -73,8 +73,7 @@ def admitted_microchip_phase1_count(catalog: DeviceCatalog) -> int:
                 and row.identifier.startswith("PIC32MX")
                 and bool(row.base_device)
                 and row.base_device.startswith("PIC32MX")
-                and row.identifier.startswith(row.base_device + "-")
-                and row.mapping_status == "no_mapping"
+                # Do NOT infer order-code syntax from Base Device; manufacturer\n                # explicitly supplies the exact code/base link for BT/T variants.\n                and row.mapping_status == "no_mapping"
                 and not row.target_config
                 and match is not None
                 and f"basePartNumber={row.base_device}" in ref
