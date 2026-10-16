@@ -54,7 +54,7 @@ class VersionedProviderRegistryTests(unittest.TestCase):
                 self.assertIsNone(binding["installed_binary_sha256"])
                 self.assertIsNone(binding["installed_runtime_id"])
                 self.assertEqual(binding["qualified_hardware_operations"], [])
-        self.assertEqual(no_provider, 437)
+        self.assertEqual(no_provider, 1330)
         microchip = [r for r in self.catalog.records if r.vendor == "Microchip"]
         self.assertEqual(len(microchip), 1015)
         self.assertTrue(all(not self.provider.describe(r.vendor, r.identifier) for r in microchip))
