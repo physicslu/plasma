@@ -1,16 +1,17 @@
-# IC Information — Catalog Level 1 identity/evidence contract
+# IC Information — Catalog Level 0 identity/evidence contract
 
-Status: **Catalog Level 1 identity baseline established; Programming Qualification work approved 2026-10-15.** Filename retains legacy `phase1` for compatibility. Device Registry / Programming Catalog runtime migration remains separate.
+Status: **Catalog Level 0 identity baseline established; Programming Qualification work approved 2026-10-15.** Historical filename retains `phase1` only for path stability; active schema/API fields do not retain Phase naming. Research Registry / Programming Catalog runtime migration remains separate.
 
 ## Right-hand IC details: independent Catalog Level ownership
 
 | Section | Catalog Level | Purpose | Is it currently in scope? |
 | --- | --- | --- | --- |
-| 01 IC Information | Level 1 — `IDENTIFIED` | Original manufacturer IC identity / specifications, exact-ICPN evidence, known/unknown per field | BASELINE / BACKFILL ONLY |
-| 02 Programming | Level 2 — `PROGRAMMABLE` | Provider qualification; `SUPPORTED` programming evidence for the exact ICPN | YES — CURRENT |
+| 01 IC Information | Level 0 — `DISCOVERED` | Original manufacturer exact-ICPN identity / specifications, known/unknown per field | BASELINE / BACKFILL ONLY |
+| 02 Programming Research | Level 1 — `PROGRAMMING_CANDIDATE` | Source-backed Provider/target/driver/algorithm route worth qualifying | YES — CURRENT |
+| 02 Programming | Level 2 — `PROGRAMMABLE` | `ProgrammingQualification.state == SUPPORTED` for the exact ICPN | YES — CURRENT |
 | 03 PLASMA Compatibility | Level 3 — `PLASMA_VERIFIED` | Versioned PPU/Site/Socket/Adapter/FPGA/PS + voltage/pin and HIL evidence | NO |
 
-## Catalog Level 1 canonical information fields
+## Catalog Level 0 canonical information fields
 
 - `manufacturer`, `icpn` (exact ordering code), `base_device`;
 - `package`, `pin_count`, `flash`, `ram`, `vdd`, `io_supply`, `vdda`, `temperature`;
@@ -24,20 +25,20 @@ Status: **Catalog Level 1 identity baseline established; Programming Qualificati
 1. Rebuild a deterministic manufacturer-data ledger from pinned original inputs, without reading Programming or PLASMA Compatibility records as metadata sources.
 2. Count `VERIFIED/PARTIAL/UNKNOWN/CONFLICT` for every attribute, with independent admitted/candidate denominators; count unresolved identity separately.
 3. Record original manufacturer evidence SHA or source ref when it exists. A `PARTIAL` observation does not qualify a software profile; a missing attribute does not create an unsupported software decision.
-4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by Catalog Level 1 identity evidence.
-5. Programming Qualification work was approved on 2026-10-15. Level 1 evidence may be backfilled while reviewing the same official manufacturer documents, but `SUPPORTED` qualification is what derives Level 2 `PROGRAMMABLE`. Level 3 separately validates concrete Site/Adapter/Socket/PPU/FPGA/PS configurations.
+4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by Catalog Level 0 identity evidence.
+5. Identity evidence may be backfilled independently. A source-backed programming route promotes Level 0 to Level 1 `PROGRAMMING_CANDIDATE`; only `SUPPORTED` Programming Qualification promotes Level 1 to Level 2 `PROGRAMMABLE`. Level 3 separately validates concrete Site/Adapter/Socket/PPU/FPGA/PS configurations.
 
 ## Catalog surface distinction
 
-There are three different concepts: **Level 1 identity**, **Level 2 programming eligibility**, and **IC Information field completeness**. An Exact ICPN with Level 1 `IDENTIFIED` belongs to the Canonical Device Registry even when some information fields remain `UNKNOWN / PARTIAL / CONFLICT`; `INFORMATION_COMPLETE` does not change the Catalog Level.
+There are four different concerns: **Level 0 exact identity**, **Level 1 programming relevance**, **Level 2 programming eligibility**, and **IC Information field completeness**. An Exact ICPN with Level 0 `DISCOVERED` belongs to the Research Registry even when some information fields remain `UNKNOWN / PARTIAL / CONFLICT`; `INFORMATION_COMPLETE` does not change the Catalog Level.
 
-Only a `ProgrammingQualification.state == SUPPORTED` derives Level 2 `PROGRAMMABLE` and Programming Catalog / general IC Selector membership. Level 1-only ICPNs stay available to Engineering through the Device Registry. Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status. Selector membership never grants Job/Batch execution.
+Level 1 requires a concrete source-backed programming route and remains Engineering-only. Only `ProgrammingQualification.state == SUPPORTED` derives Level 2 `PROGRAMMABLE` and Programming Catalog / general IC Selector membership. Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status. Selector membership never grants Job/Batch execution.
 
-## Examples outside Catalog Level 1 identity
+## Examples outside Catalog Level 0 identity
 
 - Does the pinned OpenOCD `lpc2000` ROM IAP algorithm program LPC845 successfully?
 - Is the target Part ID present, and does readback verify?
 - Can a PPU Site safely supply VDD and program a particular Socket?
 - Is the machine configuration `READY` or HIL `PASSED`?
 
-These belong to Programming Qualification / Catalog Level 2 or PLASMA Compatibility / Catalog Level 3, not missing IC Information columns.
+These belong to Level 1 programming relevance, Level 2 Programming Qualification, or Level 3 PLASMA Compatibility—not missing IC Information columns.
