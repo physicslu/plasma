@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/plasma-codex-z2-login.yml"
       - "scripts/plasma-codex-z2-login*"
+      - "scripts/tests/test-plasma-codex-z2-login.py"
       - "docs/development/plasma-codex-z2-login.md"
       - "docs/README.md"
   push:
@@ -41,6 +42,7 @@ jobs:
           set -euo pipefail
           python3 scripts/plasma-codex-z2-login-contract.py check
           python3 scripts/plasma-codex-z2-login.py --self-test
+          python3 scripts/tests/test-plasma-codex-z2-login.py
           python3 -m py_compile scripts/plasma-codex-z2-login*.py
           bash -n scripts/plasma-codex-z2-login.sh scripts/plasma-codex-z2-login-inner.sh
 
