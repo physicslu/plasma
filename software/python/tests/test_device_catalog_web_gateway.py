@@ -489,7 +489,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
-        self.assertEqual(len(rows), 122)
+        self.assertEqual(len(rows), 1015)
         for row in rows:
             with self.subTest(icpn=row.identifier):
                 with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
@@ -511,7 +511,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
         registry = get_default_programming_qualification_registry()
-        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        rows = [r for r in catalog.records if r.vendor == "Microchip" and r.family == "SAML1X"]
         self.assertEqual(len(rows), 122)
         self.assertEqual(len({r.identifier for r in rows}), 122)
         self.assertTrue(all(r.family == "SAML1X" and
@@ -559,6 +559,40 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 status, payload = self.request(f"/api/devices/search?q={blocked}&limit=5")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["total_count"], 0)
+
+    def test_pic32mx_admitted_l1_candidate_visible_but_not_job_selectable(self) -> None:
+        catalog = get_default_device_catalog()
+        registry = get_default_programming_qualification_registry()
+        rows = [r for r in catalog.records
+                if r.vendor == "Microchip" and r.family == "PIC32MX"]
+        self.assertEqual(len(rows), 893)
+        self.assertEqual(len({r.identifier for r in rows}), 893)
+        for record in rows:
+            with self.subTest(icpn=record.identifier):
+                self.assertEqual(record.mapping_status, "no_mapping")
+                self.assertFalse(record.target_config)
+                q = registry.describe("Microchip", record.identifier)
+                self.assertEqual(q["catalog_level"], 1)
+                self.assertEqual(q["state"], "CANDIDATE")
+                self.assertTrue(q["selector_visible"])
+                self.assertFalse(q["job_selectable"])
+                self.assertFalse(q["execution_authorized"])
+                self.assertFalse(q["physical_programming_qualified"])
+        # Verify actual customer-facing gateway and L2 isolation for a bounded
+        # sample. Job rejection of all 1015 Microchip codes is a separate test.
+        for code in (rows[0].identifier, rows[len(rows) // 2].identifier,
+                     rows[-1].identifier):
+            status, payload = self.request(
+                f"/api/devices/search?q={code}&limit=100")
+            self.assertEqual(status, 200)
+            found = [r for r in payload["results"] if r["icpn"] == code]
+            self.assertEqual(len(found), 1)
+            self.assertEqual(found[0]["catalog_level"], 1)
+            self.assertFalse(found[0]["job_selectable"])
+            status, l2 = self.request(
+                f"/api/devices/search?q={code}&levels=2&limit=100")
+            self.assertEqual(status, 200)
+            self.assertEqual(l2["total_count"], 0)
 
     def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
         status, l1 = self.request("/api/devices/search?q=STM32F103V8H6&levels=1&limit=5")
