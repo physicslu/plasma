@@ -1,16 +1,16 @@
-# IC Information — Phase 1 evidence and admission contract
+# IC Information — Catalog Level 1 identity/evidence contract
 
-Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-10-15.** Public Catalog/Runtime migration remains separate.
+Status: **Catalog Level 1 identity baseline established; Programming Qualification work approved 2026-10-15.** Filename retains legacy `phase1` for compatibility. Device Registry / Programming Catalog runtime migration remains separate.
 
-## Right-hand IC details: independent phase ownership
+## Right-hand IC details: independent Catalog Level ownership
 
-| Section | Phase | Purpose | Is it currently in scope? |
+| Section | Catalog Level | Purpose | Is it currently in scope? |
 | --- | --- | --- | --- |
-| 01 IC Information | Phase 1 | Original manufacturer IC identity / specifications, exact-ICPN evidence, known/unknown per field | BASELINE / BACKFILL ONLY |
-| 02 Programming | Phase 2 | Silicon/revision applicability, manufacturer programming specification, OpenOCD target/driver and erase/program/read/verify | YES — CURRENT |
-| 03 PLASMA Compatibility | Phase 3 | Versioned PPU/Site/Socket/Adapter + voltage/pin and HIL/physical evidence | NO |
+| 01 IC Information | Level 1 — `IDENTIFIED` | Original manufacturer IC identity / specifications, exact-ICPN evidence, known/unknown per field | BASELINE / BACKFILL ONLY |
+| 02 Programming | Level 2 — `PROGRAMMABLE` | Provider qualification; `SUPPORTED` programming evidence for the exact ICPN | YES — CURRENT |
+| 03 PLASMA Compatibility | Level 3 — `PLASMA_VERIFIED` | Versioned PPU/Site/Socket/Adapter/FPGA/PS + voltage/pin and HIL evidence | NO |
 
-## Phase 1 canonical information fields
+## Catalog Level 1 canonical information fields
 
 - `manufacturer`, `icpn` (exact ordering code), `base_device`;
 - `package`, `pin_count`, `flash`, `ram`, `vdd`, `io_supply`, `vdda`, `temperature`;
@@ -24,20 +24,20 @@ Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-1
 1. Rebuild a deterministic manufacturer-data ledger from pinned original inputs, without reading Programming or PLASMA Compatibility records as metadata sources.
 2. Count `VERIFIED/PARTIAL/UNKNOWN/CONFLICT` for every attribute, with independent admitted/candidate denominators; count unresolved identity separately.
 3. Record original manufacturer evidence SHA or source ref when it exists. A `PARTIAL` observation does not qualify a software profile; a missing attribute does not create an unsupported software decision.
-4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by this phase.
-5. The distinct owner transition to Phase 2 Programming was approved on 2026-10-15. Phase 1 evidence may be backfilled while reviewing the same official manufacturer documents, but Programming qualification owns the current work. Phase 3 separately validates concrete Site/Adapter/Socket/PPU configurations.
+4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by Catalog Level 1 identity evidence.
+5. Programming Qualification work was approved on 2026-10-15. Level 1 evidence may be backfilled while reviewing the same official manufacturer documents, but `SUPPORTED` qualification is what derives Level 2 `PROGRAMMABLE`. Level 3 separately validates concrete Site/Adapter/Socket/PPU/FPGA/PS configurations.
 
 ## Catalog surface distinction
 
-There are two different concepts: **Phase 1 identity visibility** versus **IC Information field completeness**. Under current ADR-0002, an Exact ICPN with Phase 1 `IDENTIFIED` is eligible for IC Selector visibility even when some IC Information fields remain `UNKNOWN / PARTIAL / CONFLICT`.
+There are three different concepts: **Level 1 identity**, **Level 2 programming eligibility**, and **IC Information field completeness**. An Exact ICPN with Level 1 `IDENTIFIED` belongs to the Canonical Device Registry even when some information fields remain `UNKNOWN / PARTIAL / CONFLICT`; `INFORMATION_COMPLETE` does not change the Catalog Level.
 
-Phase 2 Programming and Phase 3 PLASMA Compatibility are independent displayed states, not Selector filters. A Phase 1-visible ICPN may therefore show Phase 2 `UNKNOWN` or `UNSUPPORTED` and Phase 3 `NOT_TESTED`. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification, and Selector visibility never grants Job/Batch execution.
+Only a `ProgrammingQualification.state == SUPPORTED` derives Level 2 `PROGRAMMABLE` and Programming Catalog / general IC Selector membership. Level 1-only ICPNs stay available to Engineering through the Device Registry. Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status. Selector membership never grants Job/Batch execution.
 
-## Examples of excluded Phase 1 questions
+## Examples outside Catalog Level 1 identity
 
 - Does the pinned OpenOCD `lpc2000` ROM IAP algorithm program LPC845 successfully?
 - Is the target Part ID present, and does readback verify?
 - Can a PPU Site safely supply VDD and program a particular Socket?
 - Is the machine configuration `READY` or HIL `PASSED`?
 
-These are Phase 2 or Phase 3 requirements, not missing IC Information columns.
+These belong to Programming Qualification / Catalog Level 2 or PLASMA Compatibility / Catalog Level 3, not missing IC Information columns.
