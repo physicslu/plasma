@@ -34,6 +34,10 @@
     "primary_transport": "SWD",
     "mandatory_contacts": [
       {
+        "pin": 1,
+        "signal": "VBAT"
+      },
+      {
         "pin": 7,
         "signal": "NRST"
       },
@@ -82,10 +86,6 @@
       {
         "pin": 44,
         "signal": "BOOT0"
-      },
-      {
-        "pin": 1,
-        "signal": "VBAT"
       }
     ],
     "target_voltage_reference": "VDD",
@@ -94,7 +94,12 @@
       "min": 2,
       "max": 3.6
     },
-    "external_vpp_required": false
+    "external_vpp_required": false,
+    "vbat_policy": {
+      "mode": "tie_to_vdd_when_no_external_battery",
+      "decoupling_nF": 100,
+      "source": "AN2586 Rev 8"
+    }
   },
   "software_design_input": {
     "flash_start": "0x08000000",
@@ -126,12 +131,13 @@
       "bulk_node": "VDD_3",
       "vdda": [
         {
-          "value_nF": 10
+          "value_nF": 100
         },
         {
           "value_uF": 1
         }
-      ]
+      ],
+      "vdda_basis": "AN2586 Rev 8"
     },
     "reset": {
       "active": "low",
@@ -144,6 +150,7 @@
     }
   },
   "implementation_decisions_pending": [
+    "batteryless VBAT tie implementation and 100 nF placement",
     "specific LQFP48 programming socket manufacturer and part number",
     "socket-to-Site connector pin assignment",
     "target power switch, current-limit and discharge implementation",
@@ -153,7 +160,10 @@
     "production ESD and operator-safety implementation"
   ],
   "qualification_boundary": {
-    "sufficient_for_socket_schematic_and_layout_design": true,
+    "sufficient_for_socket_electrical_interface_design": true,
+    "sufficient_for_socket_schematic_design": true,
+    "sufficient_for_socket_pcb_footprint_design": false,
+    "sufficient_for_complete_socket_layout": false,
     "sufficient_for_openocd_programmer_software_development": true,
     "sufficient_for_native_swd_transport_implementation": false,
     "hardware_runtime_ready": false,
