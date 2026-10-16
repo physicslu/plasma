@@ -16,12 +16,12 @@ from plasma_web.openocd_software_qualification import (
 EVIDENCE_FILES = (
     "release/openocd.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
-    "release/openocd-qualification/openocd-0.12.0-stm32f103-v7.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
     "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
     "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
-    "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-lqfp-v3.json",
-    "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-package-v4.json",
+    "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json",
     "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json",
     "data/ic-support/openocd-comparison/stm32f103c8t6-openocd-v0.12.0-v1.json",
     "data/ic-support/openocd-comparison/stm32f103-high-density-openocd-v0.12.0-v1.json",
@@ -244,9 +244,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.registry.state_for("STMicroelectronics", "STM32F103V8T7"),
             "UNKNOWN",
         )
-        # High-density qualification is bounded to reviewed R/V/Z LQFP identities; WLCSP remains UNKNOWN.
+        # XL-density remains a separate programming transaction and must stay UNKNOWN.
         self.assertEqual(
-            self.registry.state_for("STMicroelectronics", "STM32F103RCY6TR"),
+            self.registry.state_for("STMicroelectronics", "STM32F103RFT6"),
             "UNKNOWN",
         )
         # Ordering syntax must not synthesize exact commercial identities.
@@ -296,6 +296,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             ("STM32F103ZCT7TR", 256 * 1024, 128),
             ("STM32F103ZDT6", 384 * 1024, 192),
             ("STM32F103ZET7", 512 * 1024, 256),
+            ("STM32F103RCY6TR", 256 * 1024, 128),
+            ("STM32F103VDH6TR", 384 * 1024, 192),
+            ("STM32F103ZEH7TR", 512 * 1024, 256),
         ):
             with self.subTest(icpn=icpn):
                 item = self.registry.describe("STMicroelectronics", icpn)
@@ -348,21 +351,21 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 49)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 49)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 65)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 65)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 49,
+            registry.summary["catalog_exact_icpns"] - 65,
         )
         self.assertEqual(
             registry.summary["qualification_id"],
-            "adr0002-phase2-openocd-012-stm32f103-v7",
+            "adr0002-phase2-openocd-012-stm32f103-v8",
         )
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
-        self.assertEqual(len(registry.reviewed_exact_keys), 49)
+        self.assertEqual(len(registry.reviewed_exact_keys), 65)
 
     def test_local_evidence_blob_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)
@@ -394,7 +397,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             copy_evidence_tree(root)
             drift = (
                 root
-                / "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json"
+                / "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json"
             )
             drift.write_bytes(drift.read_bytes() + b"\n")
             with self.assertRaisesRegex(
