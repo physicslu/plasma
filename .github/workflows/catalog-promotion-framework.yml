@@ -12,6 +12,7 @@ on:
       - "software/python/plasma_web/device_catalog.py"
       - "software/python/tests/test_catalog_promotion_framework.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
+      - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/**"
       - "release/openocd.json"
@@ -27,6 +28,7 @@ on:
       - "software/python/plasma_web/device_catalog.py"
       - "software/python/tests/test_catalog_promotion_framework.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
+      - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/**"
       - "release/openocd.json"
@@ -63,6 +65,7 @@ jobs:
             software/python/plasma_web/programming_qualification.py
           python software/python/tests/test_catalog_promotion_framework.py
           python software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py
+          python software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py
       - name: Emit deterministic coverage and blocker report
         env:
           PYTHONPATH: software/python
