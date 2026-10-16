@@ -1,7 +1,7 @@
 """LT02 PS→PL scratchpad transport over an injected native 32-bit MMIO lease.
 
 This is NOT a PL REST endpoint and has no implicit hardware access. In
-particular it never opens /dev/mem, changes FPGA firmware or retries writes.
+particular it never opens /dev/mem, changes FPGA images or retries writes.
 """
 from __future__ import annotations
 
@@ -118,7 +118,7 @@ class LoopTestDriver:
             for index in range(words):
                 part = chunk[4 * index:4 * index + 4]
                 self._write(WINDOW_START + 4 * index,
-                            int.from_bytes(part.ljust(4, b"\\0"), "little"))
+                            int.from_bytes(part.ljust(4, bytes(1)), "little"))
             for index in range(words):
                 received.extend(self._read(WINDOW_START + 4 * index).to_bytes(4, "little"))
             # Trim padding per chunk, not just once at the end.
