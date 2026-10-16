@@ -264,6 +264,7 @@ export type ProgrammingQualification = {
   identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
   catalog_level: 0 | 1 | 2 | null;
   catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | null;
+  route_evidence?: "backend_candidate_registry";
   provider: {
     provider_id: string;
     version: string;
