@@ -84,7 +84,7 @@ def validate_profile(profile: dict[str, Any], known_sources: set[str]) -> None:
     require(isinstance(minimum, dict), "minimum programming hardware is required")
     contacts = minimum.get("mandatory_contacts")
     require(isinstance(contacts, list), "mandatory Socket contacts are required")
-    require(minimum.get("mandatory_contact_count") == len(contacts) == 12, "mandatory contact count drift")
+    require(minimum.get("mandatory_contact_count") == len(contacts) == 13, "mandatory contact count drift")
 
     expected_contacts = {
         (1, "VBAT", "VBAT", "backup_domain_power_required"),
@@ -99,6 +99,7 @@ def validate_profile(profile: dict[str, Any], known_sources: set[str]) -> None:
         (34, "PA13", "SWDIO", "debug_data_bidirectional"),
         (37, "PA14", "SWCLK", "debug_clock_input"),
         (7, "NRST", "NRST", "recovery_reset_active_low"),
+        (44, "BOOT0", "BOOT0", "boot_mode_control"),
     }
     observed_contacts = {
         (row.get("package_pin"), row.get("pin_name"), row.get("signal"), row.get("role"))
@@ -106,15 +107,11 @@ def validate_profile(profile: dict[str, Any], known_sources: set[str]) -> None:
         if isinstance(row, dict)
     }
     require(observed_contacts == expected_contacts, "mandatory Socket contact map drift")
-    require(len({row[0] for row in observed_contacts}) == 12, "mandatory Socket pins must be unique")
+    require(len({row[0] for row in observed_contacts}) == 13, "mandatory Socket pins must be unique")
 
     recovery = minimum.get("recovery_contacts")
     require(isinstance(recovery, list), "recovery contacts must be an array")
-    require(
-        {(row.get("package_pin"), row.get("pin_name")) for row in recovery if isinstance(row, dict)}
-        == {(44, "BOOT0")},
-        "optional recovery contact map drift",
-    )
+    require(recovery == [], "normal Socket design must not leave BOOT0 as an optional-only contact")
 
     power = data.get("power_and_reset")
     require(isinstance(power, dict), "power/reset design rules are required")
@@ -142,6 +139,17 @@ def validate_profile(profile: dict[str, Any], known_sources: set[str]) -> None:
         "VDDA decoupling drift",
     )
     require(power.get("nrst", {}).get("package_pin") == 7, "NRST physical pin drift")
+    require(
+        power.get("boot0") == {
+            "package_pin": 44,
+            "reset_latched": True,
+            "normal_boot_value": 0,
+            "normal_boot_target": "main_flash_memory",
+            "pull_down_ohms": {"typical": 10000, "basis": "AN2586 Figure 10 typical example"},
+            "programmer_control_recommended": True,
+        },
+        "BOOT0 Socket policy drift",
+    )
 
     boundaries = data.get("design_boundaries")
     require(isinstance(boundaries, dict), "Socket design boundaries are required")
