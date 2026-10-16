@@ -1,0 +1,330 @@
+{
+  "schema_version": "0.2.0",
+  "profile_id": "stm32f103-lqfp48-programming-hardware-v1",
+  "kind": "package_hardware",
+  "status": "pilot_engineering_input",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "series": "STM32F103",
+    "package": "LQFP",
+    "package_variant": "LQFP48",
+    "pin_count": 48,
+    "qualified_route": "SWD"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "2.3.9 Power supply schemes",
+        "2.3.24 Serial wire JTAG debug port (SWJ-DP)",
+        "Figure 8. STM32F103xx performance line LQFP48 pinout",
+        "Table 5. Medium-density STM32F103xx pin definitions",
+        "5.1.6 Power supply scheme",
+        "Table 6. Voltage characteristics",
+        "5.3.1 General operating conditions",
+        "5.3.14 NRST pin characteristics",
+        "6.9 LQFP48 package information (5B)",
+        "Table 62. LQFP48 mechanical data"
+      ]
+    },
+    {
+      "source_id": "st_an2586_rev8",
+      "sections": [
+        "2.1.2 Battery backup",
+        "2.2 Power supply schemes",
+        "2.3 Reset and power supply supervisor",
+        "4 Boot configuration",
+        "5 Debug management",
+        "6 Recommendations"
+      ]
+    }
+  ],
+  "data": {
+    "package": "LQFP",
+    "physical_pin_map": {
+      "1": {
+        "name": "VBAT",
+        "role": "backup_supply",
+        "fixture_policy": "tie_to_vdd_when_no_external_battery"
+      },
+      "7": {
+        "name": "NRST",
+        "role": "reset"
+      },
+      "8": {
+        "name": "VSSA",
+        "role": "analog_ground"
+      },
+      "9": {
+        "name": "VDDA",
+        "role": "analog_supply"
+      },
+      "23": {
+        "name": "VSS_1",
+        "role": "ground"
+      },
+      "24": {
+        "name": "VDD_1",
+        "role": "main_supply"
+      },
+      "34": {
+        "name": "PA13",
+        "role": "SWDIO",
+        "io_level": "FT",
+        "direction": "bidirectional"
+      },
+      "35": {
+        "name": "VSS_2",
+        "role": "ground"
+      },
+      "36": {
+        "name": "VDD_2",
+        "role": "main_supply"
+      },
+      "37": {
+        "name": "PA14",
+        "role": "SWCLK",
+        "io_level": "FT",
+        "direction": "programmer_to_target"
+      },
+      "44": {
+        "name": "BOOT0",
+        "role": "boot_mode_input"
+      },
+      "47": {
+        "name": "VSS_3",
+        "role": "ground"
+      },
+      "48": {
+        "name": "VDD_3",
+        "role": "main_supply"
+      }
+    },
+    "programming_interface": {
+      "primary": "SWD",
+      "swd": {
+        "swdio": {
+          "package_pin": 34,
+          "mcu_pin": "PA13",
+          "direction": "bidirectional",
+          "voltage_domain": "VDD"
+        },
+        "swclk": {
+          "package_pin": 37,
+          "mcu_pin": "PA14",
+          "direction": "programmer_to_target",
+          "voltage_domain": "VDD"
+        },
+        "reset": {
+          "package_pin": 7,
+          "mcu_pin": "NRST",
+          "direction": "programmer_to_target_open_drain_preferred",
+          "internal_pullup_ohm": {
+            "min": 30000,
+            "typ": 40000,
+            "max": 50000
+          }
+        },
+        "target_voltage_reference": {
+          "source": "VDD",
+          "required": true
+        },
+        "clock_hz": {
+          "manufacturer_max": null,
+          "manufacturer_min": null,
+          "manufacturer_recommended": null,
+          "status": "not_specified_by_locked_manufacturer_sources"
+        }
+      }
+    },
+    "power": {
+      "main_supply_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "programming_supply_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "required_supply_pins": [
+        24,
+        36,
+        48
+      ],
+      "required_ground_pins": [
+        23,
+        35,
+        47
+      ],
+      "analog_supply": {
+        "pin": 9,
+        "name": "VDDA",
+        "requirement": "must be connected to VDD",
+        "adc_unused_voltage_v": {
+          "min": 2,
+          "max": 3.6
+        }
+      },
+      "analog_ground": {
+        "pin": 8,
+        "name": "VSSA",
+        "requirement": "must be connected to VSS"
+      },
+      "backup_supply": {
+        "pin": 1,
+        "name": "VBAT",
+        "fixture_policy": "tie_to_vdd_when_no_external_battery",
+        "decoupling_nF": 100,
+        "operating_v": {
+          "min": 1.8,
+          "max": 3.6
+        },
+        "basis": "AN2586 Rev 8 recommends VBAT be connected externally to VDD with 100 nF when no external battery is used",
+        "required_for_primary_swd_signal_path": false,
+        "required_for_batteryless_socket_fixture": true
+      },
+      "all_main_power_and_ground_required": true,
+      "external_vpp_required": false,
+      "decoupling": {
+        "main_vdd": {
+          "per_vdd_nF": 100,
+          "bulk_uF": 4.7,
+          "bulk_location": "VDD_3"
+        },
+        "vdda": {
+          "capacitors": [
+            {
+              "value_nF": 100
+            },
+            {
+              "value_uF": 1
+            }
+          ],
+          "basis": "AN2586 Rev 8 power-supply scheme"
+        }
+      }
+    },
+    "reset": {
+      "package_pin": 7,
+      "active_level": "low",
+      "input_low_max_v": 0.8,
+      "input_high_min_v": 2,
+      "internal_pullup_ohm": {
+        "min": 30000,
+        "typ": 40000,
+        "max": 50000
+      },
+      "fixture_control": "recommended_and_contacted_for_recovery"
+    },
+    "boot": {
+      "boot0": {
+        "package_pin": 44,
+        "required_for_primary_swd_route": false,
+        "fixture_contact": "recommended_optional",
+        "reason": "not required by the qualified SWD/OpenOCD programming route; useful for deterministic boot/recovery policies"
+      }
+    },
+    "optional_fixture_contacts": [
+      {
+        "package_pin": 44,
+        "signal": "BOOT0",
+        "purpose": "boot-mode control / recovery"
+      }
+    ],
+    "design_boundary": {
+      "socket_interface_design_input_ready": true,
+      "electrical_schematic_design_input_ready": true,
+      "pcb_footprint_design_input_ready": false,
+      "socket_mechanical_selection_complete": false,
+      "socket_implementation_ready": false,
+      "programmer_transport_route": "SWD",
+      "hardware_runtime_ready": false,
+      "physical_programming_qualified": false,
+      "socket_hil_passed": false,
+      "execution_authorized": false,
+      "note": "Evidence-backed electrical and package design input is ready. A specific socket vendor/part, its PCB footprint, Site connector assignment, signal-integrity implementation, and physical HIL remain required before hardware implementation can be called ready."
+    },
+    "pin_count": 48,
+    "package_variant": "LQFP48",
+    "package_mechanical": {
+      "type": "LQFP",
+      "variant": "LQFP48",
+      "pin_count": 48,
+      "body_mm": {
+        "x": 7,
+        "y": 7,
+        "basis": "BSC"
+      },
+      "lead_span_mm": {
+        "x": 9,
+        "y": 9,
+        "basis": "BSC"
+      },
+      "pitch_mm": 0.5,
+      "max_height_mm": 1.6,
+      "pin1_reference": "DS5319 Rev 20 Figure 8 top view; pin 1 is VBAT at the upper-left corner adjacent to the pin-1 marker"
+    },
+    "minimum_batteryless_swd_fixture_contacts": [
+      {
+        "package_pin": 1,
+        "signal": "VBAT",
+        "purpose": "backup-domain supply tied to VDD for batteryless programming fixture"
+      },
+      {
+        "package_pin": 7,
+        "signal": "NRST",
+        "purpose": "reset/recovery"
+      },
+      {
+        "package_pin": 8,
+        "signal": "VSSA",
+        "purpose": "required analog ground"
+      },
+      {
+        "package_pin": 9,
+        "signal": "VDDA",
+        "purpose": "required analog supply tied to VDD"
+      },
+      {
+        "package_pin": 23,
+        "signal": "VSS_1",
+        "purpose": "required main ground"
+      },
+      {
+        "package_pin": 24,
+        "signal": "VDD_1",
+        "purpose": "required main supply / target reference"
+      },
+      {
+        "package_pin": 34,
+        "signal": "SWDIO",
+        "purpose": "SWD bidirectional data"
+      },
+      {
+        "package_pin": 35,
+        "signal": "VSS_2",
+        "purpose": "required main ground"
+      },
+      {
+        "package_pin": 36,
+        "signal": "VDD_2",
+        "purpose": "required main supply"
+      },
+      {
+        "package_pin": 37,
+        "signal": "SWCLK",
+        "purpose": "SWD clock"
+      },
+      {
+        "package_pin": 47,
+        "signal": "VSS_3",
+        "purpose": "required main ground"
+      },
+      {
+        "package_pin": 48,
+        "signal": "VDD_3",
+        "purpose": "required main supply / bulk decoupling node"
+      }
+    ]
+  }
+}

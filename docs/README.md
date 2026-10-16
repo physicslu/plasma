@@ -69,6 +69,7 @@
 - **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
 - **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
 - **Current** — [IC Support Runtime Resolver Foundation](architecture/ic-support-runtime-resolver.md)：定義 exact ICPN → reusable IC Support profiles 的 runtime-consumable resolver，並維持 Profile resolved 與 backend/runtime implemented 的 fail-closed 邊界。
+- **Current** — [Programming Hardware / Socket Design Input v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6／LQFP48 建立第一個 source-backed physical pin、SWD、power/reset、package geometry 與 minimum-contact machine-readable contract；可作為 Socket electrical interface／schematic 設計輸入，但實際 socket vendor footprint、完整 PCB layout、hardware runtime readiness、physical qualification 與 L3 仍未成立。
 - **Current** — [Profile-driven OpenOCD Plan Compiler](architecture/ic-support-openocd-plan-compiler.md)：將 evidence-backed Programming Profile 與 Memory Geometry 編譯成 deterministic OpenOCD dry-run plan；C8／CB geometry 分流，但硬體 execution 維持 fail-closed。
 - **Historical baseline** — [OpenOCD Software Qualification v1](architecture/openocd-software-qualification-v1.md)：首批 C8/CB direct-reference qualification。
 - **Historical expansion** — [OpenOCD Software Qualification v2](architecture/openocd-software-qualification-v2.md)：加入首批 C8/CB `TR=tape-and-reel` packing-only equivalence。

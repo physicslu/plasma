@@ -13,6 +13,7 @@ PROFILE_ROOT = HERE / "profiles"
 BINDING_FILE = HERE / "bindings" / "stm32f103c-pilot-v0.json"
 SOURCE_FILE = HERE / "evidence" / "sources.json"
 SCHEMA_FILE = HERE / "schema" / "ic-support-v0.schema.json"
+SOCKET_DESIGN_FILE = HERE / "socket-design" / "stm32f103c8t6-lqfp48-swd-v1.json"
 
 EXPECTED_KINDS = {
     "programming",
@@ -174,6 +175,87 @@ def validate_programming(profile: dict[str, Any]) -> None:
     require(registers["FLASH_CR"] == "0x40022010", "unexpected FLASH_CR")
 
 
+def validate_package_hardware(profile: dict[str, Any]) -> None:
+    data = profile["data"]
+    require(data.get("package") == "LQFP", "package hardware type must be LQFP")
+    require(data.get("pin_count") == 48, "package hardware pin count must be 48")
+    require(data.get("package_variant") == "LQFP48", "package hardware variant must be LQFP48")
+    package = data.get("package_mechanical")
+    require(isinstance(package, dict), "package_mechanical object is required")
+    require(package.get("type") == "LQFP", "package mechanical type must be LQFP")
+    require(package.get("variant") == "LQFP48", "package mechanical variant must be LQFP48")
+    require(package.get("pin_count") == 48, "package mechanical pin count must be 48")
+    require(package.get("pitch_mm") == 0.50, "LQFP48 pitch must be 0.50 mm")
+    require(package.get("body_mm") == {"x": 7.0, "y": 7.0, "basis": "BSC"}, "LQFP48 body geometry drift")
+
+    pins = data.get("physical_pin_map")
+    require(isinstance(pins, dict), "physical_pin_map is required")
+    required_pin_names = {
+        "7": "NRST",
+        "8": "VSSA",
+        "9": "VDDA",
+        "23": "VSS_1",
+        "24": "VDD_1",
+        "34": "PA13",
+        "35": "VSS_2",
+        "36": "VDD_2",
+        "37": "PA14",
+        "44": "BOOT0",
+        "47": "VSS_3",
+        "48": "VDD_3",
+    }
+    for pin, name in required_pin_names.items():
+        require(pins.get(pin, {}).get("name") == name, f"package pin {pin} must be {name}")
+
+    swd = data.get("programming_interface", {}).get("swd", {})
+    require(swd.get("swdio", {}).get("package_pin") == 34, "SWDIO must resolve to package pin 34 / PA13")
+    require(swd.get("swclk", {}).get("package_pin") == 37, "SWCLK must resolve to package pin 37 / PA14")
+    require(swd.get("reset", {}).get("package_pin") == 7, "NRST must resolve to package pin 7")
+    require(swd.get("target_voltage_reference", {}).get("required") is True, "target VDD reference must be required")
+
+    power = data.get("power", {})
+    require(power.get("required_supply_pins") == [24, 36, 48], "all three VDD pins must be required")
+    require(power.get("required_ground_pins") == [23, 35, 47], "all three VSS pins must be required")
+    require(power.get("all_main_power_and_ground_required") is True, "all main power/ground pins must be mandatory")
+    require(power.get("external_vpp_required") is False, "STM32F103 SWD programming must not require external VPP")
+    require(power.get("analog_supply", {}).get("pin") == 9, "VDDA must resolve to package pin 9")
+    require(power.get("analog_ground", {}).get("pin") == 8, "VSSA must resolve to package pin 8")
+    backup = power.get("backup_supply", {})
+    require(backup.get("pin") == 1, "VBAT must resolve to package pin 1")
+    require(backup.get("required_for_primary_swd_signal_path") is False, "VBAT must not be modeled as an SWD signal requirement")
+    require(backup.get("required_for_batteryless_socket_fixture") is True, "batteryless Socket profile must contact VBAT")
+    require(
+        backup.get("fixture_policy") == "tie_to_vdd_when_no_external_battery",
+        "batteryless Socket profile must tie VBAT to VDD",
+    )
+    require(backup.get("decoupling_nF") == 100, "VBAT batteryless tie must retain 100 nF decoupling")
+    vdda_caps = power.get("decoupling", {}).get("vdda", {}).get("capacitors")
+    require(
+        vdda_caps == [{"value_nF": 100}, {"value_uF": 1}],
+        "VDDA decoupling must follow AN2586 Rev 8 100 nF + 1 uF guidance",
+    )
+
+    contacts = data.get("minimum_batteryless_swd_fixture_contacts")
+    require(isinstance(contacts, list) and contacts, "minimum SWD programming contacts are required")
+    contact_pins = [item.get("package_pin") for item in contacts if isinstance(item, dict)]
+    require(
+        contact_pins == [1, 7, 8, 9, 23, 24, 34, 35, 36, 37, 47, 48],
+        "minimum SWD programming contact set drift",
+    )
+    require(44 not in contact_pins, "BOOT0 must not be promoted into the minimum SWD contact set")
+
+    boundary = data.get("design_boundary", {})
+    require(boundary.get("socket_interface_design_input_ready") is True, "socket interface design input must be marked ready")
+    require(boundary.get("electrical_schematic_design_input_ready") is True, "electrical schematic design input must be marked ready")
+    require(boundary.get("pcb_footprint_design_input_ready") is False, "specific Socket PCB footprint must remain unresolved")
+    require(boundary.get("socket_mechanical_selection_complete") is False, "specific Socket mechanical selection must remain unresolved")
+    require(boundary.get("socket_implementation_ready") is False, "Socket implementation readiness must remain false")
+    require(boundary.get("hardware_runtime_ready") is False, "hardware runtime readiness must remain false")
+    require(boundary.get("physical_programming_qualified") is False, "physical programming qualification must remain false")
+    require(boundary.get("socket_hil_passed") is False, "socket HIL must remain false")
+    require(boundary.get("execution_authorized") is False, "hardware profile must never authorize execution")
+
+
 def validate_option(profile: dict[str, Any]) -> None:
     data = profile["data"]
     require(data["region_start"] == "0x1FFFF800", "unexpected option-byte base")
@@ -256,7 +338,7 @@ def main() -> int:
         minimum_hw = package_data["pin_level_minimum_programming_hardware"]
         require(
             minimum_hw == {"status": "pending_evidence", "required_before_runtime_use": True},
-            f"{icpn}: Phase A must remain fail-closed on minimum pin-level hardware",
+            f"{icpn}: frozen Phase A package profile must remain fail-closed",
         )
         resolved[icpn] = selected
 
@@ -274,6 +356,38 @@ def main() -> int:
     validate_programming(c8["programming"])
     validate_option(c8["option"])
     validate_security(c8["security"])
+
+    socket_contract = load_json(SOCKET_DESIGN_FILE)
+    require(socket_contract.get("status") == "engineering_design_input", "Socket Design Contract status drift")
+    target = socket_contract.get("target", {})
+    require(target.get("icpn") == "STM32F103C8T6", "Socket Design Contract exact ICPN drift")
+    hardware_id = socket_contract.get("canonical_profiles", {}).get("package_hardware")
+    require(hardware_id in profiles, "Socket Design Contract package hardware profile is missing")
+    socket_hardware = profiles[hardware_id]
+    validate_package_hardware(socket_hardware)
+    require(
+        socket_contract["canonical_profiles"]["programming"] == c8["programming"]["profile_id"]
+        and socket_contract["canonical_profiles"]["memory_geometry"] == c8["memory_geometry"]["profile_id"]
+        and socket_contract["canonical_profiles"]["option"] == c8["option"]["profile_id"]
+        and socket_contract["canonical_profiles"]["security"] == c8["security"]["profile_id"],
+        "Socket Design Contract canonical profile references drift",
+    )
+    composition = socket_contract.get("composition_policy", {})
+    require(composition.get("mode") == "additive_hardware_overlay", "Socket overlay composition mode drift")
+    require(composition.get("mutates_software_admission_authority") is False, "Socket overlay must not mutate software admission")
+    require(composition.get("mutates_catalog_level_authority") is False, "Socket overlay must not mutate Catalog Level authority")
+    require(composition.get("requires_exact_icpn_match") is True, "Socket overlay must require exact ICPN matching")
+
+    boundary = socket_contract.get("qualification_boundary", {})
+    require(boundary.get("sufficient_for_socket_electrical_interface_design") is True, "Socket electrical interface design readiness missing")
+    require(boundary.get("sufficient_for_socket_schematic_design") is True, "Socket schematic design readiness missing")
+    require(boundary.get("sufficient_for_socket_pcb_footprint_design") is False, "Socket PCB footprint must remain unresolved")
+    require(boundary.get("sufficient_for_complete_socket_layout") is False, "complete Socket layout must remain unresolved")
+    require(boundary.get("hardware_runtime_ready") is False, "Socket contract must not claim hardware runtime readiness")
+    require(boundary.get("physical_programming_qualified") is False, "Socket contract must not claim physical qualification")
+    require(boundary.get("hil_verified") is False, "Socket contract must not claim HIL")
+    require(boundary.get("execution_authorized") is False, "Socket contract must not authorize execution")
+
     print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles")
     return 0
 
