@@ -49,7 +49,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
         extra = {r["icpn"] for r in csvrows(SOURCE_148)}
         self.assertEqual({r["icpn"] for r in self.queue}, original | extra)
         self.assertEqual(len(original & extra), 0)
-        self.assertEqual(self.catalog.size, 4853)
+        self.assertEqual(self.catalog.size, 4975)
         self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 224)
         self.assertTrue(all(self.catalog.resolve("NXP",r["icpn"]) is None
                             for r in self.queue))
@@ -62,6 +62,25 @@ class Nxp277GapReviewTests(unittest.TestCase):
             "production_manifest": MANIFEST,
         }
         for label, path in expected.items():
+            if label == "production_manifest":
+                # Source-locked historical NXP proof must survive additive
+                # Microchip publication, not treat an amended manifest as
+                # the old immutable source.
+                current = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(len(current["sources"]), 32)
+                self.assertEqual(current["sources"][-1], {
+                    "manufacturer":"Microchip","family":"SAML1X",
+                    "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
+                    "row_count":122,
+                    "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
+                    "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
+                })
+                current["sources"].pop()
+                previous = (json.dumps(current, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+                original = hashlib.sha1(
+                    f"blob {len(previous)}".encode() + bytes([0]) + previous).hexdigest()
+                self.assertEqual(original,self.summary["source_git_blobs"][label],label)
+                continue
             self.assertEqual(blob(path),
                              self.summary["source_git_blobs"][label], label)
         self.assertIsNone(self.summary["manufacturer_global_denominator"])

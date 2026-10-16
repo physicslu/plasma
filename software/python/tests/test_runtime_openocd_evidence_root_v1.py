@@ -63,7 +63,7 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
         ):
             with self.subTest(part=exact):
                 search = _device_search_payload(exact, limit=1)
-                self.assertEqual(search["catalog_size"], 4853)
+                self.assertEqual(search["catalog_size"], 4975)
                 self.assertEqual(search["count"], 1)
                 row = search["results"][0]
                 self.assertEqual(row["icpn"], exact)

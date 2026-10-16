@@ -18,6 +18,7 @@ from typing import Any
 
 from .backend_provenance import load_source_authorities
 from .runtime_evidence_root import default_runtime_evidence_root, source_files_available
+from .microchip_phase1_admission_guard import admitted_microchip_phase1_count
 from .device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, DeviceCatalogRecord,
     get_default_device_catalog,
@@ -107,12 +108,13 @@ class BackendCandidateRegistry:
         # the original 362 ST research candidates, never NXP programming routes.
         st_count = sum(r.vendor == "STMicroelectronics" for r in catalog.records)
         nxp = [r for r in catalog.records if r.vendor == "NXP"]
+        microchip = admitted_microchip_phase1_count(catalog)
         _ensure(st_count == 4629, "historical ST Production Catalog count drift")
         _ensure(
             (not nxp and catalog.size == 4629) or
             (catalog.size == 4641 and len(nxp) == 12 and
              all(r.family == "KL25" and r.production_admitted for r in nxp)) or
-            (catalog.size == 4853 and len(nxp) == 224 and
+            (catalog.size == 4853 + microchip and len(nxp) == 224 and
              Counter((r.family,r.mapping_status) for r in nxp) == {
                  ("KL25","mapped"):12,
                  ("MCX","no_mapping"):196,

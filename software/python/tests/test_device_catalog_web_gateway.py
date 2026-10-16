@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
 
 
 EXPECTED_PRODUCTION_CATALOG_SIZE = get_default_device_catalog().size
@@ -428,6 +428,80 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32g0x.cfg")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
+
+    def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
+        catalog = get_default_device_catalog()
+        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        self.assertEqual(len(rows), 122)
+        for row in rows:
+            with self.subTest(icpn=row.identifier):
+                with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
+                    _parse_target_device(
+                        {"vendor": "Microchip", "identifier": row.identifier},
+                        label="Engineering target_device")
+        with self.assertRaisesRegex(ValueError, "canonical Device Catalog"):
+            _parse_target_device(
+                {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
+                label="Batch target_device")
+        # Untyped Job.target string cannot bypass target_device's same guard.
+        for row in rows:
+            with self.subTest(raw_target=row.identifier):
+                with self.assertRaisesRegex(ValueError, "lookup-only"):
+                    _reject_unmapped_microchip_raw_job_target(row.identifier)
+        for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
+            _reject_unmapped_microchip_raw_job_target(other)
+
+    def test_microchip_122_exact_phase1_ic_information_search_not_programming(self) -> None:
+        catalog = get_default_device_catalog()
+        rows = [r for r in catalog.records if r.vendor == "Microchip"]
+        self.assertEqual(len(rows), 122)
+        self.assertEqual(len({r.identifier for r in rows}), 122)
+        self.assertTrue(all(r.family == "SAML1X" and
+                            r.mapping_status == "no_mapping" and
+                            r.target_config == "" for r in rows))
+        for record in rows:
+            with self.subTest(icpn=record.identifier):
+                status, payload = self.request(
+                    f"/api/devices/search?q={record.identifier}&limit=5")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["catalog_size"], 4975)
+                self.assertGreaterEqual(payload["total_count"], 1)
+                # Prefix results may include e.g. -MF and -MFT; exact match ranks first.
+                item = payload["results"][0]
+                self.assertEqual(item["icpn"], record.identifier)
+                self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
+                self.assertFalse(item["backend"]["target_config"])
+                self.assertIsNone(item["selected_profile"])
+                self.assertFalse(item["backend_providers"])
+                self.assertIsNone(item["backend_candidate"])
+                self.assertIsNone(item["backend_source_reference"])
+                information = item["microchip_phase1_ic_information"]
+                self.assertEqual(information["phase1_identity_state"], "IDENTIFIED")
+                self.assertFalse(information["phase1_information_complete"])
+                self.assertEqual(information["phase2_programming_state"], "UNKNOWN")
+                self.assertEqual(information["phase3_compatibility_state"], "NOT_TESTED")
+                self.assertIsNone(information["phase2_provider"])
+                self.assertEqual(information["phase2_supported_operations"], [])
+                self.assertEqual(information["phase3_verified_configurations"], [])
+                self.assertEqual(information["field_states"]["ram"], "VERIFIED")
+                self.assertEqual(information["field_states"]["working_vdd"], "PARTIAL")
+                self.assertEqual(information["field_states"]["io_supply"], "UNKNOWN")
+                self.assertEqual(information["field_states"]["vdda"], "UNKNOWN")
+                self.assertFalse(information["software_supported"])
+                self.assertFalse(information["programming_profile_authority"])
+                self.assertFalse(information["hardware_runtime_ready"])
+                qualification = item["openocd_software_qualification"]
+                self.assertEqual(qualification["software_state"], "UNKNOWN")
+                self.assertIsNone(qualification["provider"])
+                self.assertEqual(qualification["operations"], {})
+        for blocked in (
+            "ATSAML10D16A-MZTVAO", "ATSAML10E16A-MZTVAO",
+            "ATSAML10E16A-MZVAO", "ATSAML11E16A-MZTVAO",
+        ):
+            with self.subTest(excluded=blocked):
+                status, payload = self.request(f"/api/devices/search?q={blocked}&limit=5")
+                self.assertEqual(status, 200)
+                self.assertEqual(payload["total_count"], 0)
 
     def test_search_is_case_insensitive(self) -> None:
         status, payload = self.request("/api/devices/search?q=stm32f103c8t6")

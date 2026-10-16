@@ -252,6 +252,14 @@
       "row_count": 16,
       "git_blob_sha": "6413149e6be0e9af504b644ccceb030d4d851582",
       "sha256": "0228c6a077ea02d868ca53c6f82a8df81cf96d6f6306724852c3614b0b9727e5"
+    },
+    {
+      "manufacturer": "Microchip",
+      "family": "SAML1X",
+      "path": "../research/microchip-saml1x-122-commercial-icpn-v1.csv",
+      "row_count": 122,
+      "git_blob_sha": "0eb9c765e78e93686629b17576b122a14dfa60ab",
+      "sha256": "2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e"
     }
   ]
 }

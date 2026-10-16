@@ -300,6 +300,36 @@ export type OpenOCDSoftwareQualification = {
   physical_programming_qualified: false;
 };
 
+export type MicrochipPhase1ICInformation = {
+  status: "phase1_manufacturer_exact_material_partial_information";
+  manufacturer: "Microchip";
+  icpn: string;
+  phase1_identity_state: "IDENTIFIED";
+  phase1_information_complete: false;
+  phase2_programming_state: "UNKNOWN";
+  phase3_compatibility_state: "NOT_TESTED";
+  ram_size: string;
+  core_model: string;
+  working_vdd_v: null;
+  io_supply_v: null;
+  vdda_v: null;
+  field_states: Record<string, "VERIFIED" | "PARTIAL" | "UNKNOWN" | "CONFLICT" | "NOT_APPLICABLE">;
+  source: {
+    authority: "Microchip Technology official";
+    exact_mcp_material_source: string;
+    pdf_revision: "DS60001513G";
+    pdf_original_sha256: string;
+    pdf_printed_pages: number[];
+    official_pdf_grammar_not_exact_material_list: true;
+  };
+  software_supported: false;
+  phase2_provider: null;
+  phase2_supported_operations: [];
+  phase3_verified_configurations: [];
+  programming_profile_authority: false;
+  hardware_runtime_ready: false;
+};
+
 export type DeviceSearchResult = {
   vendor: string;
   family: string;
@@ -344,6 +374,7 @@ export type DeviceSearchResult = {
   backend_providers?: VersionedOpenOCDProvider[];
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
+  microchip_phase1_ic_information?: MicrochipPhase1ICInformation | null;
   selected_profile?: SelectedICProfile | null;
   openocd_software_qualification?: OpenOCDSoftwareQualification | null;
 };

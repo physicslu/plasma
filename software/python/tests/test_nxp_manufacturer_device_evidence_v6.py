@@ -25,7 +25,7 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         cls.new = [r for r in cls.nxp if r.family in {"MCX", "K32L2"}]
 
     def test_bounded_212_admitted_exact_and_source_verified(self) -> None:
-        self.assertEqual(self.catalog.size, 4853)
+        self.assertEqual(self.catalog.size, 4975)
         self.assertEqual(self.evidence.size, 212)
         self.assertEqual(len(self.nxp), 224)
         self.assertEqual(len(self.new), 212)
@@ -80,7 +80,7 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
     def test_control_station_api_paginates_and_stays_manufacturer_only(self) -> None:
         pages = [_device_search_payload("NXP", 100, offset=i)
                  for i in (0, 100, 200)]
-        self.assertTrue(all(p["ok"] and p["catalog_size"] == 4853 and
+        self.assertTrue(all(p["ok"] and p["catalog_size"] == 4975 and
                             p["total_count"] == 224 for p in pages))
         self.assertEqual([len(p["results"]) for p in pages], [100, 100, 24])
         rows = [r for page in pages for r in page["results"]]

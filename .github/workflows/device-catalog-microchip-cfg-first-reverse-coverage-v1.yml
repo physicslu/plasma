@@ -36,6 +36,8 @@ on:
       - 'data/device-catalog/research/microchip_phase1_p1_exact_pdf_field_enrichment_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p1_exact_pdf_field_enrichment_v1.py'
       - 'data/device-catalog/research/MICROCHIP_SAML1X_EXACT_PDF_PHASE1_ENRICHMENT_V1.md'
+      - 'data/device-catalog/research/microchip_saml1x_122_production_admission_candidate_v1.py'
+      - 'data/device-catalog/research/microchip-saml1x-122-commercial-icpn-v1.csv'
       - 'data/device-catalog/research/microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_p0_samr30_online_original_v1.py'
       - 'data/device-catalog/research/MICROCHIP_OPENOCD_REVERSE_COVERAGE_V1.md'
@@ -815,6 +817,14 @@ jobs:
               f.write("Remaining JSONL SHA256: "+summary["remaining_source_queue_sha256"]+"\n")
               f.write("No Phase 2 supported/production write/job authorization.\n")
           PY
+      - name: Produce exactly 122 manufacturer original source-bound Phase 1 canonical admission candidates
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_saml1x_122_production_admission_candidate_v1.py \
+            --ordering-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
+            --output "$root/microchip-saml1x-122-canonical-proposal.csv" \
+            --bootstrap-csv-in-ci-log
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
@@ -830,6 +840,7 @@ jobs:
             ${{ runner.temp }}/microchip-adr0002-5cfg-2563-phase1-target.json
             ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
             ${{ runner.temp }}/microchip-phase1-saml1x-exact-pdf-enriched.json
+            ${{ runner.temp }}/microchip-saml1x-122-canonical-proposal.csv
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
             ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441.jsonl
             ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441-summary.json
