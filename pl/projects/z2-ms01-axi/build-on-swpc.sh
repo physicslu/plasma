@@ -25,10 +25,10 @@ trap 'rc=$?; printf "EXIT_CODE=%s\n" "$rc" > "$PLASMA_MS01_BUILD/logs/build.stat
   > "$PLASMA_MS01_BUILD/logs/host-regression.log" 2>&1
 PYTHONPATH="$repo/software/python${PYTHONPATH:+:$PYTHONPATH}" \
   "${PLASMA_TEST_PYTHON:-python3}" -m pytest -q \
-  "$repo/pl/verification/test_mmio_ms01_rtl.py" \
+  "$repo/pl/verification/test_mmio_lt02_rtl.py" \
   "$repo/software/python/tests/test_mmio_loop_test.py" \
   "$repo/pl/tests/test_ms01_benchmark.py" \
-  > "$PLASMA_MS01_BUILD/logs/ms01-regression.log" 2>&1
+  > "$PLASMA_MS01_BUILD/logs/lt02-regression.log" 2>&1
 "${PLASMA_TEST_PYTHON:-python3}" -m pytest -q \
   "$repo/pl/tests/test_z2_control_waveform_build.py" \
   "$repo/pl/tests/test_z2_swd03_axi_build.py" \
