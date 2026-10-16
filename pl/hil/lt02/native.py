@@ -175,7 +175,7 @@ def capture_load_receipt(output: Path, candidate_bin: Path,
     fd = os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(receipt, f, sort_keys=True, indent=2)
-        f.write("\\n")
+        f.write("\n")
     return receipt
 
 
