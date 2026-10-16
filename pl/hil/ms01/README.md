@@ -74,3 +74,37 @@ evidence of real Z2 HIL, FPGA load, Direct MMIO processes, production
 programming, or physical eight-Site behavior.
 
 **No Gate 2 merge without a separate explicit owner approval.**
+
+
+## Dual-Site live entrypoint (not a programming command)
+
+The guarded runner is pl.hil.ms01.native. It is inert without explicit
+--execute-live and --ack-unrecoverable-axi-stall-risk flags. An authorized
+external SWPC supervisor must first build/verify the exact six-aperture
+candidate, convert BIT to a reviewed BIN, reconcile ownership, load the
+candidate via FPGA Manager, and record a root-owned current-boot receipt
+using --record-loaded-image. Before the runner, confirm and preserve
+original PYNQ base.bin/base.hwh. Do not reuse LT02-05 five-aperture
+load receipts or HWH files.
+
+The runner independently requires:
+- --manifest / --bit / --hwh / --candidate-bin
+- --recovery-bin / --recovery-hwh / --receipt / --output
+- --expected-manifest-sha256 / --expected-candidate-bin-sha256
+- --execute-live and --ack-unrecoverable-axi-stall-risk
+
+Optional bounded matrix: --iterations N, --trials N (1..3), and
+--payload-sizes 2048 8192 65536. The default is three trials, 1-Site
+and 2-Site, Thread and Process-IPC, three payload lengths = 36 runs.
+Each run captures cold end-to-end wall/CPU/RAM, full data CRC and actual
+LT02 hardware counter deltas. Repeat trials are NOT long-term reliability
+qualification. The runner does not estimate unmeasured bus throughput.
+
+Result status MS01_REAL_DATA_CASES_PASS_RECOVERY_NOT_RUN is NOT full HIL
+PASS: the independent supervisor still must restore original base.bin
+and independently reconcile HWH/UIO/services/HTTP/clock/kernel/SSH.
+On SIGBUS/AXI stall a started.json alone is NOT PASS. No automatic replay.
+
+Process-Direct and 4/8 physical Site experiments remain distinct
+NOT RUN stages; do not reinterpret Thread or Process-IPC results as proof
+of direct parallel AXI bus masters.
