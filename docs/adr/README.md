@@ -15,6 +15,7 @@
 |---|---|---|
 | [ADR-0001](0001-pynq-system-python-plasma-runtime-separation.md) | Accepted | PYNQ System Python 與 Plasma PPU Python Runtime 分離；Plasma 不依賴或取代 PYNQ System Python。 |
 | [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted | 統一 Catalog Level：L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 internal-only，Customer IC Selector 顯示 L1–L3，Job Picker 僅 L2/L3。Catalog visibility、Job selection 與 execution entitlement 分離。 |
+| [ADR-0003](0003-runtime-fpga-driver-reconfiguration-boundary.md) | **Proposed** | Runtime FPGA Driver／UIO 選型候選、PPU Configuration Owner、Bitstream 不重啟 Linux 的安全交接；待現場 Kernel／UIO／Bridge 與 Hardware ABI 審核，不是 Accepted Driver。 |
 
 ## Maintenance rule
 
