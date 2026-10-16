@@ -64,8 +64,8 @@ contact set is:
 | 47 | VSS_3 | main ground |
 | 48 | VDD_3 | main supply / bulk decoupling node |
 
-`BOOT0` (pin 44) and `VBAT` (pin 1) remain recommended optional fixture contacts.
-They are not promoted into the minimum SWD programming set.
+`BOOT0` (pin 44) remains a recommended optional fixture contact for boot-mode control/recovery.
+`VBAT` (pin 1) is **mandatory in the batteryless programming fixture policy**: AN2586 Rev 8 recommends tying VBAT to VDD with 100 nF when no external battery is used. It is therefore part of the canonical Socket power/contact set, even though SWD signaling itself does not consume VBAT.
 
 ## 4. Mechanical and electrical design inputs
 
@@ -77,6 +77,8 @@ start schematic, footprint and socket-interface design:
 - 9.0 mm × 9.0 mm lead span;
 - 0.50 mm pitch;
 - 1.60 mm maximum package height.
+
+These package dimensions identify the IC envelope and support socket selection, but they do **not** define a vendor-specific programming-socket PCB footprint. The socket manufacturer/part number and its land pattern remain unresolved.
 
 The profile also carries:
 
@@ -96,7 +98,8 @@ exact ICPN with the reusable technical profiles and the qualified OpenOCD route.
 
 It intentionally records implementation decisions that remain open, including:
 
-- actual LQFP48 programming-socket vendor/part number;
+- actual LQFP48 programming-socket vendor/part number and vendor land pattern;
+- batteryless VBAT-to-VDD tie and 100 nF placement;
 - socket-to-Site connector pin assignment;
 - target power switch/current-limit/discharge circuit;
 - SWD driver/series-resistor implementation;
@@ -125,7 +128,9 @@ L3 PLASMA_VERIFIED
 For the current STM32F103C8T6 vertical slice:
 
 - OpenOCD programmer software development: **ready as L2 software input**
-- Socket schematic/layout design input: **ready**
+- Socket electrical-interface and schematic design input: **ready**
+- specific socket mechanical selection / vendor PCB footprint: **not ready**
+- complete Socket PCB layout: **not ready**
 - native PL/FPGA SWD transport implementation: **not claimed**
 - specific Socket/Site hardware runtime readiness: **false**
 - physical programming qualification: **false**
