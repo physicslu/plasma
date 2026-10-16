@@ -327,7 +327,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         self.assertIsNone(unreviewed["provider"])
         self.assertEqual(unreviewed["operations"], {})
         self.assertIsNone(unreviewed["programming"])
-        self.assertEqual(unreviewed["selector_visibility_rule"], "CATALOG_LEVEL_2_PROGRAMMABLE")
+        self.assertEqual(unreviewed["selector_visibility_rule"], "CATALOG_LEVEL_1_OR_HIGHER")
         self.assertFalse(unreviewed["job_batch_execution_changed"])
         self.assertFalse(unreviewed["hardware_runtime_ready"])
         self.assertFalse(unreviewed["physical_programming_qualified"])
@@ -360,7 +360,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         )
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
-            "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "CATALOG_LEVEL_1_OR_HIGHER",
         )
         self.assertEqual(len(registry.reviewed_exact_keys), 49)
 

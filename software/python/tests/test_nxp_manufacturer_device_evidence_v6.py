@@ -7,6 +7,7 @@ from pathlib import Path
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import _device_search_payload
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.nxp_manufacturer_device_evidence import (
     EVIDENCE_RELATIVE_PATH,
     NXPManufacturerDeviceEvidence,
@@ -77,27 +78,32 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
             with self.assertRaisesRegex(NXPManufacturerDeviceEvidenceError, "Git blob changed"):
                 NXPManufacturerDeviceEvidence.from_file(path)
 
-    def test_control_station_api_paginates_and_stays_manufacturer_only(self) -> None:
-        pages = [_device_search_payload("NXP", 100, offset=i)
-                 for i in (0, 100, 200)]
-        self.assertTrue(all(p["ok"] and p["catalog_size"] == 4975 and
-                            p["total_count"] == 224 for p in pages))
-        self.assertEqual([len(p["results"]) for p in pages], [100, 100, 24])
-        rows = [r for page in pages for r in page["results"]]
-        nxp_profiles = [r for r in rows if r["nxp_manufacturer_device_profile"]]
-        self.assertEqual(len(nxp_profiles), 212)
-        self.assertEqual(sum(r["manufacturer_device_basic_profile"] is not None
-                             for r in rows), 0)
-        for item in rows:
-            self.assertIsNone(item["selected_profile"])
-            self.assertEqual(item["physical_validation"]["ppu_status"], "no_evidence")
-            if item["family"] in {"MCX", "K32L2"}:
-                self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
-                self.assertFalse(item["backend"]["target_config"])
-                self.assertIsNotNone(item["nxp_manufacturer_device_profile"])
-            else:
-                self.assertEqual(item["family"], "KL25")
-                self.assertIsNone(item["nxp_manufacturer_device_profile"])
+    def test_customer_selector_exposes_nxp_l1_plus_but_not_internal_l0_evidence(self) -> None:
+        summary = get_default_programming_qualification_registry().summary
+        expected_catalog_size = sum(summary["catalog_level_counts"][str(level)] for level in (1, 2, 3))
+        payload = _device_search_payload("NXP", 100)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["catalog_size"], expected_catalog_size)
+        self.assertEqual(payload["total_count"], 12)
+        self.assertEqual(payload["count"], 12)
+        self.assertEqual(payload["levels"], [1, 2, 3])
+        rows = payload["results"]
+        self.assertTrue(all(
+            item["family"] == "KL25"
+            and item["catalog_level"] == 1
+            and item["job_selectable"] is False
+            and item["nxp_manufacturer_device_profile"] is None
+            for item in rows
+        ))
+
+        # The 212 MCX/K32L2 manufacturer evidence records remain valid internal data,
+        # but their current runtime route evidence has not crossed the L1 gate.
+        for record in self.new:
+            internal = self.evidence.resolve_exact(record)
+            self.assertIsNotNone(internal)
+            public = _device_search_payload(record.identifier, 5)
+            self.assertEqual(public["total_count"], 0)
+            self.assertEqual(public["results"], [])
 
     def test_new_unqualified_discovery_skus_not_added_to_production(self) -> None:
         import csv

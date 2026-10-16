@@ -1,17 +1,13 @@
 # IC Selector Architecture
 
-Status: current runtime plus accepted ADR-0002 Catalog Level migration target
+Status: current ADR-0002 Catalog Level customer/internal visibility contract
 
-> **ADR-0002 policy (2026-10-16):** Level 0 `DISCOVERED` is the exact-ICPN
-> Research Registry. Level 1 `PROGRAMMING_CANDIDATE` means a source-backed
-> programming route exists and the device belongs in the qualification queue.
-> Only Level 2 `PROGRAMMABLE` belongs to the general Programming Catalog / IC Selector.
-> Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status.
-> Selector visibility never authorizes Job/Batch execution.
->
-> **Migration gap:** the current runtime `GET /api/devices/search` still reflects
-> the earlier Production Catalog projection and may expose Level 0/1 rows.
-> This document does not claim that the runtime visibility split is already complete.
+> **ADR-0002 policy (2026-10-16):** Level 0 `DISCOVERED` belongs to the
+> **Internal Research Registry only** and is not exposed to ordinary users.
+> The customer-facing IC Selector exposes Level 1 `PROGRAMMING_CANDIDATE`,
+> Level 2 `PROGRAMMABLE`, and Level 3 `PLASMA_VERIFIED`, with a server-side
+> Catalog Level filter. Job pickers request Level 2/3 only. Selector or picker
+> membership never authorizes Job/Batch execution.
 
 Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
 Related composed-profile model: [`selected-ic-profile-v1.md`](./selected-ic-profile-v1.md).
@@ -23,21 +19,20 @@ IC Selector is a shared Plasma capability for finding and inspecting IC catalog 
 The same catalog and search semantics serve three contexts:
 
 ```text
-Research Registry (Level 0+)
+Internal Research Registry (Level 0+)
     |
 Canonical Catalog Service
-    +-- Engineering Research / qualification lookup
-    +-- Level 1+ programming-candidate queue
+    +-- internal research / coverage / qualification
     |
-Programming Catalog projection (Level 2+)
+Customer IC Selector projection (Level 1–3)
+    +-- standalone /devices lookup + Level Filter
     |
-IC Selector
-    +-- standalone programming lookup (/devices after migration)
+Job Picker projection (Level 2–3)
     +-- Production Mode picker
     +-- Engineering Mode picker
 ```
 
-The Research Registry answers **which exact IC identity exists in PLASMA?** The Level 1 queue answers **which devices have a concrete programming route worth qualifying?** The IC Selector answers **which programming-qualified IC may the user choose?** Product-mode policy separately answers **may this exact runtime/hardware configuration execute now?**
+The Internal Research Registry answers **which exact IC identities PLASMA is tracking?** The customer IC Selector answers **which devices have at least a concrete programming route and therefore represent a customer-visible capability or service opportunity?** Level 1 may be inspected but not chosen for a Job. Job Picker membership begins at Level 2. Product-mode policy separately answers **may this exact runtime/hardware configuration execute now?**
 
 ## Product-mode boundary
 
@@ -61,7 +56,7 @@ data/device-catalog/research/openocd-parts-canonical.csv
 The browser does not parse the CSV directly. The Python Web REST Gateway owns a read-only runtime catalog and exposes:
 
 ```text
-GET /api/devices/search?q=<identifier>&limit=<1..100>
+GET /api/devices/search?q=<identifier>&limit=<1..100>&levels=<1,2,3 subset>
 ```
 
 The service reports the canonical catalog size with each search response. The browser must not hard-code that count.
@@ -72,9 +67,12 @@ Search responses also distinguish pagination from filtered cardinality:
 - `total_count` = number of admitted rows matching the query before pagination;
 - `offset` = zero-based position of the first requested row in the deterministic ranked result set;
 - `limit` = maximum rows requested for this page;
-- `catalog_size` = total rows in the current legacy Production Catalog projection.
+- `catalog_size` = number of customer-visible rows in the requested L1/L2/L3 projection;
+- `levels` = normalized server-applied Catalog Level filter.
 
-Under the accepted Catalog Level target, Level 0 Research Registry, Level 1 qualification queue, and Level 2 Programming Catalog / Selector are separate denominators and must not be reported as one number.
+The public endpoint rejects Level 0. Pagination and `total_count` are calculated **after**
+the server-side Level filter, so the browser never hides rows after pagination. Internal
+Research Registry cardinality remains a separate engineering metric.
 
 The browser must present the visible range and total matches separately, for example `1–30 / 1,400`, and provide explicit previous/next navigation when `total_count > limit`. Changing the query resets `offset=0`; changing pages clears a prior selection so the detail panel never implies that an off-page row is still selected. The ranked ordering contract is stable across pages, so repeated `query + offset + limit` requests must return the same identifiers while the underlying catalog revision is unchanged.
 
@@ -114,7 +112,7 @@ Search is case-insensitive and ranks identifier matches in this order:
 
 Within the same match rank, exact manufacturer part numbers receive priority over broader identifier kinds.
 
-The current search implementation deliberately searches the normalized identifier field first. Vendor/family filters and broader fuzzy search can be added later without changing the exact/prefix/partial precedence.
+The current search implementation searches the normalized identifier field first, then applies the requested L1/L2/L3 Product projection before pagination. Level 0 cannot be requested from the public endpoint. Vendor/family filters and broader fuzzy search can be added later without changing the exact/prefix/partial precedence.
 
 ## Evidence and status boundary
 
@@ -234,13 +232,14 @@ picker
 
 `lookup` is the standalone `/devices` experience.
 
-`picker` exposes the same search/results/evidence presentation and an `onSelect` callback for Production or Engineering workflows. The shared Selector itself is a Level 2+ Programming Catalog projection. Mode-specific execution eligibility is still evaluated by the calling workflow/policy layer and must not be inferred from Selector membership.
+`picker` exposes the same search/results/evidence presentation and an `onSelect` callback for Production or Engineering workflows. The standalone `lookup` Selector is a customer-facing L1–L3 capability catalog with a Level Filter. The `picker` form requests L2/L3 only, so an L1 Programming Candidate cannot be selected for a Job. Mode-specific execution eligibility remains a separate calling workflow/policy decision and must not be inferred from picker membership.
 
 ## Catalog Level migration non-goals
 
 This migration does not:
 
-- promote pre-Level aliases, Level 0 identities, or Level 1 candidates into Level 2 without `SUPPORTED` qualification;
+- expose Level 0 Research Inventory to ordinary users;
+- promote a Level 1 candidate into Job eligibility or Level 2 without `SUPPORTED` qualification;
 - create PPU or Socket verification evidence;
 - infer package from naming conventions;
 - make the IC Selector a Product Mode;

@@ -15,6 +15,7 @@ from plasma_web.device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, get_default_device_catalog,
 )
 from plasma_web.gateway import _device_search_payload
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
 class BackendCandidateRegistryTests(unittest.TestCase):
@@ -118,11 +119,23 @@ class BackendCandidateRegistryTests(unittest.TestCase):
                                    (c5, "STM32C531CBT3TR"),
                                    (f1, "STM32F103C8T6")):
             self.assertTrue(payload["ok"])
-            self.assertEqual(payload["catalog_size"], self.catalog.size)
+            expected_size = sum(
+                get_default_programming_qualification_registry().summary["catalog_level_counts"][str(level)]
+                for level in (1, 2, 3)
+            )
+            self.assertEqual(payload["catalog_size"], expected_size)
             self.assertGreaterEqual(payload["count"], 1)
             self.assertEqual(payload["results"][0]["icpn"], requested)
         for payload in (h5, c5):
             result = payload["results"][0]
+            self.assertEqual(result["catalog_level"], 1)
+            self.assertEqual(result["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+            self.assertFalse(result["job_selectable"])
+            self.assertEqual(result["programming_qualification"]["state"], "CANDIDATE")
+            self.assertEqual(
+                result["programming_qualification"]["route_evidence"],
+                "backend_candidate_registry",
+            )
             self.assertEqual(result["backend"]["mapping_status"], "no_mapping")
             self.assertFalse(result["backend"]["target_config"])
             self.assertEqual(result["backend_candidate"]["status"], "research_only")

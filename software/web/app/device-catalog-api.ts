@@ -264,6 +264,7 @@ export type ProgrammingQualification = {
   identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
   catalog_level: 0 | 1 | 2 | null;
   catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | null;
+  route_evidence?: "backend_candidate_registry";
   provider: {
     provider_id: string;
     version: string;
@@ -297,6 +298,7 @@ export type ProgrammingQualification = {
     backend_constraints: string[];
   } | null;
   selector_visible: boolean;
+  job_selectable: boolean;
   execution_authorized: false;
   installed_runtime_attested: false;
   hardware_runtime_ready: false;
@@ -385,12 +387,17 @@ export type DeviceSearchResult = {
   microchip_ic_information?: MicrochipICInformation | null;
   selected_profile?: SelectedICProfile | null;
   programming_qualification?: ProgrammingQualification | null;
+  catalog_level: 1 | 2 | 3;
+  catalog_level_state: "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | "PLASMA_VERIFIED";
+  job_selectable: boolean;
 };
 
 export type DeviceSearchResponse = {
   ok: boolean;
   rest_contract_version?: string;
+  scope: "customer_ic_selector";
   query: string;
+  levels: Array<1 | 2 | 3>;
   catalog_size: number;
   count: number;
   total_count: number;
@@ -403,6 +410,7 @@ export type DeviceSearchOptions = {
   apiBase: string;
   limit?: number;
   offset?: number;
+  levels?: Array<1 | 2 | 3>;
   signal?: AbortSignal;
 };
 
@@ -413,7 +421,13 @@ export async function searchDevices(
   const apiBase = normalizeApiBase(options.apiBase);
   const limit = options.limit ?? 20;
   const offset = options.offset ?? 0;
-  const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+  const levels = options.levels ?? [1, 2, 3];
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+    offset: String(offset),
+    levels: levels.join(","),
+  });
   const response = await fetch(`${apiBase}/api/devices/search?${params.toString()}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },

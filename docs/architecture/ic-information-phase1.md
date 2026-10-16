@@ -32,7 +32,7 @@ Status: **Catalog Level 0 identity baseline established; Programming Qualificati
 
 There are four different concerns: **Level 0 exact identity**, **Level 1 programming relevance**, **Level 2 programming eligibility**, and **IC Information field completeness**. An Exact ICPN with Level 0 `DISCOVERED` belongs to the Research Registry even when some information fields remain `UNKNOWN / PARTIAL / CONFLICT`; `INFORMATION_COMPLETE` does not change the Catalog Level.
 
-Level 1 requires a concrete source-backed programming route and remains Engineering-only. Only `ProgrammingQualification.state == SUPPORTED` derives Level 2 `PROGRAMMABLE` and Programming Catalog / general IC Selector membership. Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status. Selector membership never grants Job/Batch execution.
+Level 1 requires a concrete source-backed programming route and is the minimum customer-visible IC Selector level. It remains non-programmable and non-Job-selectable. Only `ProgrammingQualification.state == SUPPORTED` derives Level 2 `PROGRAMMABLE` and Job Picker eligibility. Level 3 `PLASMA_VERIFIED` is an additive verified-configuration status. Selector or picker membership never grants Job/Batch execution.
 
 ## Examples outside Catalog Level 0 identity
 

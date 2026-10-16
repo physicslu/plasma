@@ -9,7 +9,13 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Protocol
 
-from .device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, get_default_device_catalog
+from .backend_candidate_registry import BackendCandidateRegistry, get_default_backend_candidate_registry
+from .device_catalog import (
+    DeviceCatalog,
+    DeviceCatalogIntegrityError,
+    DeviceCatalogRecord,
+    get_default_device_catalog,
+)
 from .openocd_software_qualification import get_default_openocd_software_qualification_registry
 
 
@@ -41,9 +47,12 @@ class ProgrammingQualificationRegistry:
         self,
         catalog: DeviceCatalog,
         providers: tuple[ProgrammingQualificationProvider, ...],
+        *,
+        candidate_registry: BackendCandidateRegistry | None = None,
     ) -> None:
         self._catalog = catalog
         self._providers = providers
+        self._candidate_registry = candidate_registry
 
         seen: set[tuple[str, str]] = set()
         for provider in providers:
@@ -83,7 +92,8 @@ class ProgrammingQualificationRegistry:
             "provider": None,
             "operations": {},
             "programming": None,
-            "selector_visible": False,
+            "selector_visible": level is not None and level >= 1,
+            "job_selectable": False,
             "execution_authorized": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -105,11 +115,23 @@ class ProgrammingQualificationRegistry:
             f"ambiguous reviewed Programming Providers for {manufacturer}/{exact_icpn}",
         )
         if not reviewed:
-            has_programming_route = row.mapping_status == "mapped" and bool(row.target_config)
-            return self._unknown(
+            candidate = (
+                self._candidate_registry.lookup(row)
+                if self._candidate_registry is not None
+                else None
+            )
+            has_programming_route = (
+                (row.mapping_status == "mapped" and bool(row.target_config))
+                or candidate is not None
+            )
+            result = self._unknown(
                 IDENTIFIED,
                 has_programming_route=has_programming_route,
             )
+            if candidate is not None:
+                result["state"] = "CANDIDATE"
+                result["route_evidence"] = "backend_candidate_registry"
+            return result
 
         raw = reviewed[0].describe(manufacturer, exact_icpn)
         state = raw.get("software_state")
@@ -126,7 +148,8 @@ class ProgrammingQualificationRegistry:
             "provider": deepcopy(raw.get("provider")),
             "operations": deepcopy(raw.get("operations", {})),
             "programming": deepcopy(raw.get("programming")),
-            "selector_visible": programmable,
+            "selector_visible": True,
+            "job_selectable": programmable,
             "execution_authorized": False,
             "installed_runtime_attested": bool(raw.get("installed_runtime_attested", False)),
             "hardware_runtime_ready": bool(raw.get("hardware_runtime_ready", False)),
@@ -156,17 +179,32 @@ class ProgrammingQualificationRegistry:
             (row.vendor, row.identifier)
             for row in self._catalog.records
             if row.identity_state == IDENTIFIED
-            and row.mapping_status == "mapped"
-            and bool(row.target_config)
+            and (
+                (row.mapping_status == "mapped" and bool(row.target_config))
+                or (
+                    self._candidate_registry is not None
+                    and self._candidate_registry.lookup(row) is not None
+                )
+            )
         } | reviewed_keys
+        level0_only = len(discovered_keys - route_keys)
+        level1_only = len(route_keys - supported_keys)
+        level2_only = len(supported_keys)
         return {
             "provider_count": len(self._providers),
             "reviewed_exact_icpns": len(reviewed_keys),
             "catalog_level_0_or_higher_discovered_exact_icpns": len(discovered_keys),
-            "catalog_level_0_only_exact_icpns": len(discovered_keys - route_keys),
+            "catalog_level_0_only_exact_icpns": level0_only,
             "catalog_level_1_or_higher_exact_icpns": len(route_keys),
-            "catalog_level_2_programmable_exact_icpns": len(supported_keys),
-            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "catalog_level_2_programmable_exact_icpns": level2_only,
+            "catalog_level_counts": {
+                "0": level0_only,
+                "1": level1_only,
+                "2": level2_only,
+                "3": 0,
+            },
+            "selector_visibility_rule": "CATALOG_LEVEL_1_OR_HIGHER",
+            "job_picker_rule": "CATALOG_LEVEL_2_OR_HIGHER",
             "execution_authorized_by_catalog_projection": False,
         }
 
@@ -177,4 +215,8 @@ def get_default_programming_qualification_registry() -> ProgrammingQualification
     openocd = get_default_openocd_software_qualification_registry()
     if openocd is not None:
         providers.append(openocd)
-    return ProgrammingQualificationRegistry(catalog, tuple(providers))
+    return ProgrammingQualificationRegistry(
+        catalog,
+        tuple(providers),
+        candidate_registry=get_default_backend_candidate_registry(),
+    )
