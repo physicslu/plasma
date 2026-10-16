@@ -9,6 +9,7 @@ import {
 import "./devices.css";
 
 export type ICSelectorUsage = "lookup" | "picker";
+type CatalogLevelFilter = "all" | 1 | 2 | 3;
 
 export type ICSelectorProps = {
   usage?: ICSelectorUsage;
@@ -75,6 +76,17 @@ function softwareQualificationClass(state: string | undefined): string {
 function softwareQualificationLabel(state: string | undefined, zh: boolean): string {
   if (!state) return zh ? "軟體資格 · 未提供" : "Software · Unavailable";
   return zh ? `軟體資格 · ${state}` : `Software · ${state}`;
+}
+
+function catalogLevelLabel(level: 1 | 2 | 3, zh: boolean): string {
+  if (level === 1) return zh ? "L1 · Programming Candidate" : "L1 · Programming Candidate";
+  if (level === 2) return zh ? "L2 · Programmable" : "L2 · Programmable";
+  return zh ? "L3 · PLASMA Verified" : "L3 · PLASMA Verified";
+}
+
+function catalogLevelClass(level: 1 | 2 | 3): string {
+  if (level === 1) return "pending";
+  return "verified";
 }
 
 function formatFlashBytes(value: number): string {
@@ -147,6 +159,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
   const { locale } = useI18n();
   const zh = locale === "zh-TW";
   const [query, setQuery] = useState("");
+  const [levelFilter, setLevelFilter] = useState<CatalogLevelFilter>("all");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [pageOffset, setPageOffset] = useState(0);
@@ -157,11 +170,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
 
   useEffect(() => {
     const controller = new AbortController();
-    void searchDevices("", { apiBase, limit: 1, signal: controller.signal })
+    const levels: Array<1 | 2 | 3> = usage === "picker"
+      ? [2, 3]
+      : levelFilter === "all" ? [1, 2, 3] : [levelFilter];
+    void searchDevices("", { apiBase, limit: 1, levels, signal: controller.signal })
       .then(payload => setCatalogSize(payload.catalog_size))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [apiBase]);
+  }, [apiBase, levelFilter, usage]);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -172,10 +188,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       setLoading(true);
       setError(null);
       try {
+        const levels: Array<1 | 2 | 3> = usage === "picker"
+          ? [2, 3]
+          : levelFilter === "all" ? [1, 2, 3] : [levelFilter];
         const payload = await searchDevices(normalized, {
           apiBase,
           limit: SEARCH_PAGE_SIZE,
           offset: pageOffset,
+          levels,
           signal: controller.signal,
         });
         setResults(payload.results);
@@ -195,10 +215,20 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, pageOffset, query]);
+  }, [apiBase, levelFilter, pageOffset, query, usage]);
 
   function updateQuery(value: string) {
     setQuery(value);
+    setResults([]);
+    setTotalCount(0);
+    setPageOffset(0);
+    setSelected(null);
+    setError(null);
+    setLoading(false);
+  }
+
+  function updateLevelFilter(value: CatalogLevelFilter) {
+    setLevelFilter(value);
     setResults([]);
     setTotalCount(0);
     setPageOffset(0);
@@ -217,20 +247,44 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       <div className="icSelectorSearchPanel">
         <div className="icSelectorSearchHead">
           <div>
-            <p className="icSelectorEyebrow">ICPN CATALOG · PRODUCTION ADMITTED</p>
+            <p className="icSelectorEyebrow">ICPN CATALOG · CUSTOMER VISIBLE · L1–L3</p>
             <h1>IC Selector</h1>
             <p>
               {zh
-                ? "搜尋已通過 admission 的 exact commercial ICPN。可輸入 ICPN、Vendor、Family 或其組合。"
-                : "Search admitted exact commercial ICPNs by ICPN, Vendor, Family, or a combination."}
+                ? "搜尋 L1–L3 的 exact commercial ICPN；L0 Research Inventory 不對一般 User 顯示。"
+                : "Search customer-visible L1–L3 exact commercial ICPNs. Internal Level 0 Research Inventory is not exposed."}
             </p>
           </div>
           <div className="icSelectorCatalogMeta">
-            <span>Admitted ICPNs</span>
+            <span>{zh ? "目前可見 ICPNs" : "Visible ICPNs"}</span>
             <b>{catalogSize?.toLocaleString() ?? "—"}</b>
-            <small>{zh ? "Server production catalog" : "server production catalog"}</small>
+            <small>{usage === "picker"
+              ? (zh ? "Job Picker · L2/L3" : "Job Picker · L2/L3")
+              : levelFilter === "all" ? "L1–L3" : `L${levelFilter}`}
+            </small>
           </div>
         </div>
+
+        {usage === "lookup" && (
+          <div className="icSelectorLevelFilters" role="group" aria-label={zh ? "Catalog Level 篩選" : "Catalog Level filter"}>
+            {([
+              ["all", zh ? "全部 L1–L3" : "All L1–L3"],
+              [1, "L1 Candidate"],
+              [2, "L2 Programmable"],
+              [3, "L3 Verified"],
+            ] as Array<[CatalogLevelFilter, string]>).map(([value, label]) => (
+              <button
+                type="button"
+                key={String(value)}
+                className={levelFilter === value ? "active" : ""}
+                aria-pressed={levelFilter === value}
+                onClick={() => updateLevelFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ))}
 
         <label className="icSelectorSearchBox">
           <span>ICPN / Vendor / Family</span>
@@ -260,14 +314,18 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
         {!query.trim() && (
           <div className="icSelectorEmpty">
             {zh
-              ? "目前只列出已進入 production catalog 的 exact ICPN；research candidate 不會出現在這裡。"
-              : "Only exact ICPNs admitted to the production catalog are listed; research candidates are excluded."}
+              ? (usage === "picker"
+                  ? "Job Picker 只顯示 L2/L3；L1 Candidate 不可直接建立燒錄 Job。"
+                  : "一般 IC Selector 顯示 L1–L3；L0 Research Inventory 僅供內部研究。")
+              : (usage === "picker"
+                  ? "Job Picker exposes L2/L3 only; L1 candidates cannot create programming jobs."
+                  : "The general IC Selector exposes L1–L3. Level 0 Research Inventory is internal-only.")}
           </div>
         )}
 
         {query.trim() && !loading && !error && results.length === 0 && (
           <div className="icSelectorEmpty">
-            {zh ? "Production catalog 中找不到符合的 admitted ICPN。" : "No matching admitted ICPN exists in the production catalog."}
+            {zh ? "目前選取的 Catalog Level 中找不到符合的 ICPN。" : "No matching ICPN exists in the selected Catalog Levels."}
           </div>
         )}
 
@@ -301,6 +359,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                     </span>
                   </div>
                   <div className="icSelectorStatusRow icSelectorStatusEvidence">
+                    <span className={catalogLevelClass(device.catalog_level)}>
+                      {catalogLevelLabel(device.catalog_level, zh)}
+                    </span>
                     <span className={softwareQualificationClass(device.programming_qualification?.state)}>
                       {softwareQualificationLabel(device.programming_qualification?.state, zh)}
                     </span>
@@ -351,9 +412,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       <aside className="icSelectorDetail" aria-live="polite">
         {selected ? (
           <>
-            <p className="icSelectorEyebrow">SELECTED ADMITTED ICPN</p>
+            <p className="icSelectorEyebrow">SELECTED CUSTOMER-VISIBLE ICPN</p>
             <h2>{selected.icpn ?? selected.identifier}</h2>
-            <span className="icSelectorKind">Exact ICPN · Catalog v{selected.catalog.version ?? "—"}</span>
+            <span className="icSelectorKind">{catalogLevelLabel(selected.catalog_level, zh)} · Exact ICPN · Catalog v{selected.catalog.version ?? "—"}</span>
 
             <section className="icSelectorProfileSection" data-profile-section="device">
               <div className="icSelectorProfileHead">
@@ -656,7 +717,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               </div>
             )}
             <div className="icSelectorBoundary">
-              {selected.programming_qualification?.state === "SUPPORTED"
+              {selected.catalog_level === 1
+                ? (zh
+                  ? "L1 Programming Candidate：已有具體、可追溯的 programming route，但尚未完成 qualification。這類 IC 可作為客戶委託 Programming Qualification 的候選，不能直接建立燒錄 Job。"
+                  : "L1 Programming Candidate: a concrete source-backed programming route exists, but qualification is incomplete. It may be a support-request candidate and cannot directly create a programming job.")
+                : selected.programming_qualification?.state === "SUPPORTED"
                 ? (zh
                   ? "此 exact ICPN 已完成 Catalog Level 2 Programming qualification；Provider 與版本證據見上方。這只代表軟體燒錄能力已證實，仍不代表 PPU、Site、Socket 或實體 IC 已完成 Catalog Level 3 驗證。"
                   : "This exact ICPN has completed Catalog Level 2 Programming qualification. Provider/version evidence is shown above. This proves software programming capability only; PPU, Site, Socket, and real-IC Catalog Level 3 validation remain separate.")
