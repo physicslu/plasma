@@ -13,17 +13,17 @@ PLASMA 現階段以 **OpenOCD** 為燒錄軟體 Backend。Manufacturer DFP、Pro
 
 Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣品與治具。若把 Socket HIL PASS 當作 Catalog 顯示條件，便會錯誤排除 OpenOCD 已支援、只是尚未備齊實體測試條件的 IC。反過來，若將所有 DFP 或 OpenOCD CFG 文字命中的 IC 直接列為 Supported，也會虛報實際軟體能力。
 
-2026-10-15 的舊決議曾讓 Exact ICPN identity 直接取得 IC Selector visibility。Owner 於 2026-10-16 修正為四級 Catalog maturity：**Level 0 保存已確認 Exact ICPN、但尚無具體 Programming Provider／algorithm 研究路徑的 Research inventory；Level 1 收錄已有 source-backed programming route、值得進一步 qualification 的 Exact ICPN；一般 Programming Catalog／Job IC Selector 以 Level 2 `PROGRAMMABLE` 為最低可見門檻。** Level 2 仍不等於執行授權；真正燒錄必須另外通過 installed Runtime、route、電氣與安全 gate。
+2026-10-15 的舊決議曾讓 Exact ICPN identity 直接取得 IC Selector visibility。Owner 於 2026-10-16 修正為四級 Catalog maturity，並進一步決議產品表面分離：**Level 0 `DISCOVERED` 僅存在於 Internal Research Registry，不對一般 User 暴露；一般 Customer-facing IC Selector 顯示 Level 1／2／3，並提供 Catalog Level Filter；Job Picker 只允許 Level 2／3。** Level 1 代表有 source-backed programming route、可作為客戶委託 qualification 的候選，但不代表可燒錄。Level 2 仍不等於執行授權；真正燒錄必須另外通過 installed Runtime、route、電氣與安全 gate。
 
 ## Decision
 
-> **PLASMA 將「原廠存在」、「有具體 programming route 值得研究」、「已可軟體燒錄」與「PLASMA 實機已驗證」分成四級：Level 0 `DISCOVERED` → Level 1 `PROGRAMMING_CANDIDATE` → Level 2 `PROGRAMMABLE` → Level 3 `PLASMA_VERIFIED`。只有 Level 2+ 進入一般 Programming Catalog／IC Selector。任何 Catalog Level 都不是 Job／Batch 執行授權；執行仍須獨立通過 Runtime、route、電氣與安全 gate。**
+> **PLASMA 將「原廠存在」、「有具體 programming route 值得 qualification」、「已可軟體燒錄」與「PLASMA 實機已驗證」分成四級：Level 0 `DISCOVERED` → Level 1 `PROGRAMMING_CANDIDATE` → Level 2 `PROGRAMMABLE` → Level 3 `PLASMA_VERIFIED`。一般 Customer-facing IC Selector 顯示 L1–L3；L0 僅供 Internal Research。Job Picker 只顯示 L2/L3。任何 Catalog Level 都不是 Job／Batch 執行授權；執行仍須獨立通過 Runtime、route、電氣與安全 gate。**
 
 具體規則：
 
 1. **Manufacturer Research Catalog** 保存原廠發現的候選 ICPN、DFP 裝置名稱、搜尋失敗、生命週期觀測與證據；不受 Programming Provider 支援與否限制。尚未能確認完整商用 Exact ICPN 的 alias／family／模糊候選不取得 Catalog Level。由原廠來源無歧義確認 Exact ICPN 後，至少可進 **Level 0 `DISCOVERED` Research Registry**；但 Level 0 不代表有任何可用 programming route，也不得進一般 IC Selector。
 2. **Canonical Identity Store** 管理精確原廠商業 ICPN 與逐欄位可驗證來源，並作為 Level 0+ 的共同 identity authority。**Level 1 `PROGRAMMING_CANDIDATE` 不是身分層，而是 programming-relevance admission：必須在 Exact ICPN identity 已成立的前提下，另有至少一條 source-backed Programming Provider／target／driver／algorithm／ROM-IAP／官方 programming route，可合理映射到該 Exact ICPN 或其已證實 Base／Family。**
-3. **Programming Catalog / IC Selector View** 只收錄已達 **Catalog Level 2 `PROGRAMMABLE`** 的 Exact ICPN。`PROGRAMMABLE` 由至少一個版本鎖定 `ProgrammingQualification.state == SUPPORTED` 導出。Level 0／Level 1 都只能出現在 Research／Engineering Registry；其中 Level 1 表示「值得繼續做 qualification」，不是「已可燒錄」。
+3. **Customer-facing IC Selector View** 收錄 **Level 1 `PROGRAMMING_CANDIDATE`、Level 2 `PROGRAMMABLE`、Level 3 `PLASMA_VERIFIED`**，並提供 Level Filter。Level 1 可被一般 User 搜尋與檢視，用來表達「已有具體 programming route、可委託 qualification」，但 `job_selectable=false`；只有 Level 2／3 可進 Job Picker。Level 0 僅存在於 Internal Research Registry，不由 public Selector API 暴露。
 4. 軟體支援資格要鎖定 **OpenOCD Provider / 版本或 source commit、Target／Device 對應、Flash Driver、必要的 Flash geometry／bank 假設以及 program、必要 erase、read/verify 等實際宣告的 operation 能力**，保留證據與約束。只有 CFG 檔案名稱、家族字首、確定性 `mapped` 路徑或研究候選，**不足以單獨宣告 OpenOCD = SUPPORTED**。不能在無實體的條件下證成必要晶片特性時，維持 Candidate/Unknown。
 5. **硬體驗證獨立維度**：分開保存 IC/package、Socket／Adapter 型號與修訂版、PPU/Site 型號、供電與接腳映射、Programming Provider／PLASMA 軟體版本及測試結果。Catalog Level 3 尚未測試的 Exact ICPN 仍可顯示；UI 必須明示 `NOT_TESTED`，不能標成 Hardware Passed。
 6. **執行授權仍分離**：Programming Catalog／IC Selector 顯示永遠不直接授權燒錄。Job/Batch 必須至少確認導出 Catalog Level 2 的 `ProgrammingQualification.state == SUPPORTED` 仍適用、相符 Runtime 已安裝、route／電壓／操作／安全條件成立，並在產品執行政策要求時確認對應 Catalog Level 3 verified configuration，全部 fail-closed。
@@ -36,14 +36,14 @@ Catalog Level 描述的是**一顆 Exact ICPN 對 PLASMA programming 的成熟�
 
 | Catalog Level | 正式名稱 | 核心問題 | 達成條件 | 主要產品面 |
 |---|---|---|---|---|
-| **Level 0 — DISCOVERED** | **Research Inventory** | 這顆 Exact ICPN 是否確實存在，值得保留等待未來研究？ | Exact Manufacturer ICPN 身分及來源無歧義成立；**不要求**任何 Programming Provider／CFG／driver／algorithm 路徑 | Research Registry / Engineering inventory |
-| **Level 1 — PROGRAMMING_CANDIDATE** | **Programming Candidate** | PLASMA 是否已有具體、可稽核的 programming route 值得進一步 qualification？ | Level 0 + 至少一條 source-backed Provider／target／driver／algorithm／ROM-IAP／官方 programming route，且 applicability 可合理落到該 Exact ICPN／已證實 Base／Family | Engineering Device Registry / qualification queue |
+| **Level 0 — DISCOVERED** | **Research Inventory** | 這顆 Exact ICPN 是否確實存在，值得保留等待未來研究？ | Exact Manufacturer ICPN 身分及來源無歧義成立；**不要求**任何 Programming Provider／CFG／driver／algorithm 路徑 | **Internal Research Registry only；一般 User 不可見** |
+| **Level 1 — PROGRAMMING_CANDIDATE** | **Programming Candidate** | PLASMA 是否已有具體、可稽核的 programming route 值得進一步 qualification？ | Level 0 + 至少一條 source-backed Provider／target／driver／algorithm／ROM-IAP／官方 programming route，且 applicability 可合理落到該 Exact ICPN／已證實 Base／Family | **Customer IC Selector + qualification/service-request candidate；不可直接建立 Job** |
 | **Level 2 — PROGRAMMABLE** | **Programming Qualified** | PLASMA 是否已有合格軟體燒錄方法？ | Level 1 + 至少一個版本鎖定 Programming Provider 對該 Exact ICPN 的 `ProgrammingQualification.state == SUPPORTED` | Programming Catalog / Job IC Selector |
 | **Level 3 — PLASMA_VERIFIED** | **PLASMA Compatibility Verified** | PLASMA 實機是否驗證過？ | Level 2 + 至少一組版本化 PPU／Site／Socket／Adapter／FPGA／PS／Provider configuration HIL `PASSED` | Verified badge / verified configuration selection |
 
 **Identity status 與 Catalog Level 分離。** 完整商用 Exact ICPN 身分成立是進入 Level 0 的最低條件；`INFORMATION_COMPLETE` 仍是欄位品質，不是升級條件。alias、family name、DFP device name、模糊或衝突的料號仍留在 pre-Level Research domain，不得算 Level 0。
 
-**Level 1 是 programming relevance gate，不是 support claim。** CFG 名稱、family prefix 或 driver 線索可以成為 Level 1 證據的一部分，但必須 source-backed 且能說明與 Exact ICPN／Base／Family 的 applicability；Level 1 可對應 Programming Qualification 的 `UNKNOWN／CANDIDATE／BLOCKED／UNSUPPORTED` 等狀態，仍不得進一般 IC Selector。
+**Level 1 是 programming relevance gate，不是 support claim。** CFG 名稱、family prefix 或 driver 線索可以成為 Level 1 證據的一部分，但必須 source-backed 且能說明與 Exact ICPN／Base／Family 的 applicability。Level 1 可出現在一般 IC Selector，供 User 看見「PLASMA 已找到可研究的 programming route」，但必須明示 `PROGRAMMING_CANDIDATE`、不得宣稱可燒錄、不得由 Job Picker 選取。
 
 **正式不變量：**
 
@@ -51,7 +51,7 @@ Catalog Level 描述的是**一顆 Exact ICPN 對 PLASMA programming 的成熟�
 Level 3 PLASMA_VERIFIED ⊆ Level 2 PROGRAMMABLE ⊆ Level 1 PROGRAMMING_CANDIDATE ⊆ Level 0 DISCOVERED
 ```
 
-**Microchip 典型案例：** 原廠已確認、但目前沒有 OpenOCD 或其他 Provider programming route 的大量 Exact ICPN 應停在 Level 0。它們保留在 Research Registry，未來有新 Provider、CFG、driver、algorithm 或官方 programming path 時可升到 Level 1；不得因「原廠料號存在」就進 IC Selector。
+**Microchip 典型案例：** 原廠已確認、但目前沒有 OpenOCD 或其他 Provider programming route 的大量 Exact ICPN 應停在 Level 0。它們保留在 **Internal Research Registry**，未來有新 Provider、CFG、driver、algorithm 或官方 programming path 時可升到 Level 1；在升到 Level 1 前不得由 public IC Selector API 暴露。
 
 **舊術語 migration：** Active schema／API／runtime payload **不得保留** `phase1_*`／`phase2_*`／`phase3_*` 欄位，也不得提供 compatibility alias。Source-locked historical artifact 的原始 bytes、歷史檔名或內部欄位可以原樣保存作 forensic input，但 canonical parser 必須轉成 Catalog Level／Programming Qualification 欄位後才可進 Product domain。
 
@@ -101,8 +101,8 @@ IC Detail 的三個操作區塊仍是 **IC Information / Programming / PLASMA Co
 
 | Catalog Level | UI 區塊 | 個別 Exact ICPN 的進入／完成條件 | 不得推論 |
 | --- | --- | --- | --- |
-| **Catalog Level 0 — Research Inventory** | **01 IC Information** | **`DISCOVERED`**：完整商用 Exact ICPN 已由 Manufacturer 官方來源無歧義確認；可持續補強 Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等欄位。`INFORMATION_COMPLETE` 是獨立欄位品質里程碑，不改變 Catalog Level。 | 只進 Research Registry／Engineering inventory；**不代表有 programming route，更不代表可進一般 IC Selector**。 |
-| **Catalog Level 1 — Programming Candidate** | **02 Programming Research** | **`PROGRAMMING_CANDIDATE`**：Level 0 Exact ICPN 已具至少一條 source-backed Provider／target／driver／algorithm／ROM-IAP／官方 programming route，applicability 可合理映射到該 ICPN／Base／Family，值得做完整 qualification。 | 仍不得宣稱可燒錄；不得進一般 IC Selector。 |
+| **Catalog Level 0 — Research Inventory** | **01 IC Information** | **`DISCOVERED`**：完整商用 Exact ICPN 已由 Manufacturer 官方來源無歧義確認；可持續補強 Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等欄位。`INFORMATION_COMPLETE` 是獨立欄位品質里程碑，不改變 Catalog Level。 | 只進 Internal Research Registry；**一般 User 不可見**。 |
+| **Catalog Level 1 — Programming Candidate** | **02 Programming Research** | **`PROGRAMMING_CANDIDATE`**：Level 0 Exact ICPN 已具至少一條 source-backed Provider／target／driver／algorithm／ROM-IAP／官方 programming route，applicability 可合理映射到該 ICPN／Base／Family，值得做完整 qualification。 | 可進一般 IC Selector，作為 qualification／客戶委託候選；**不可進 Job Picker、不可宣稱可燒錄**。 |
 | **Catalog Level 2 — Programming Qualified** | **02 Programming** | **Catalog Level 1 的子集合**：對精確 ICPN 依原廠 programming evidence 與版本鎖定 Programming Provider 驗證 Silicon ID／Revision、Target／Device mapping、Flash Driver、Bank／Geometry／Security 與宣告的 Erase／Program／Read／Verify 操作。至少一個 `ProgrammingQualification.state == SUPPORTED` 才導出 `PROGRAMMABLE`。 | 家族名稱、共用 Core、單獨 CFG／Driver 字串或 Candidate evidence，都不足以取得 Level 2。 |
 | **Catalog Level 3 — PLASMA Verified** | **03 PLASMA Compatibility** | **Catalog Level 2 的子集合**：至少有一組明確版本化的 **IC／Package＋PPU／Site＋Socket／Adapter＋FPGA／PS／Provider** configuration，通過供電、Pin Mapping、SWD／JTAG、保護與實機 HIL，才導出 `PLASMA_VERIFIED`。 | Level 3 只證明至少一組 configuration；不代表所有 Site／Adapter／版本都通過，也不能免除當次 Job／Batch 的安全檢查。 |
 
@@ -130,7 +130,7 @@ Catalog Level 2 若不符合、證據不足、在指定 Provider／版本不支�
 4. **原始證據封存與 Catalog Level 0 數量分開管理**：能取得時封存原廠 XLSX／PDF／HTML／API 原始 Bytes 與 SHA-256。若無法封存，必須標記 `SOURCE_BYTES_NOT_ARCHIVED`，保留官方 URL、觀察時間、Source Scope，**不可聲稱已保存原廠 Binary SHA 或完整的原始檔位元重播**。但是可由官方**個別物料紀錄直接確認且無歧義**的 ICPN，仍可計為 `IDENTIFIED`；未封存來源須另列缺口。Catalog Level 0 `DISCOVERED` 決定 Canonical Device Registry membership，但**不構成 Catalog Level 2、IC Selector visibility 或執行授權**。
 5. **欄位持續補強，不阻擋 `IDENTIFIED`**：補齊 `base_device / package / pin_count / flash / ram / working_vdd / io_supply / vdda_or_analog_supply / temperature`，以及適用的 Core／Architecture。保留原始單位、工作模式、文件版次／表格、Exact／Family 適用範圍與 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT`。如原廠明確證明沒有某個獨立電源軌，可使用附證據的 `NOT_APPLICABLE`；不得以 Absolute Maximum Ratings 當 Working VDD，亦不可將 VREF 混為 VDDA。
 6. **`INFORMATION_COMPLETE` 門檻**：所有適用的必要欄位均有精確料號或明確涵蓋該料號的 Family 官方證據，結果為 `VERIFIED` 或有來源的 `NOT_APPLICABLE`。必要欄位存在 `UNKNOWN／PARTIAL／CONFLICT` 時不得列為資訊完整，**但不撤銷 Catalog Level 0 `DISCOVERED`**。來源原檔封存覆蓋率再單獨呈現。
-7. **Catalog Level 邊界**：Catalog Level 0 不宣稱 Erase／Program／Verify 可用、不授權 `SUPPORTED`、不建立已驗證 Programming Profile，也不授權 Job／Batch 或實機 HIL。通過 Catalog Level 0 `DISCOVERED` 的 Exact ICPN 應可由 Research Registry／Engineering inventory 查詢；具體 programming route 成立後才升到 Level 1 `PROGRAMMING_CANDIDATE`；只有達到 Level 2 `PROGRAMMABLE` 才進入 Programming Catalog／一般 IC Selector。尚未達 `IDENTIFIED` 的 Research-only 候選不得混入任何 canonical product surface。
+7. **Catalog Level 邊界**：Catalog Level 0 不宣稱 Erase／Program／Verify 可用、不授權 `SUPPORTED`、不建立已驗證 Programming Profile，也不授權 Job／Batch 或實機 HIL。通過 Catalog Level 0 `DISCOVERED` 的 Exact ICPN 僅可由 Internal Research Registry／Engineering inventory 查詢；具體 programming route 成立後升到 Level 1 `PROGRAMMING_CANDIDATE`，此時才可進一般 Customer-facing IC Selector；達到 Level 2 `PROGRAMMABLE` 後才可進 Job Picker。尚未達 `IDENTIFIED` 的 Research-only 候選不得混入任何 canonical product surface。
 
 **案例：** 從 `lpc8xx.cfg` 發現家族後，可反查 NXP 官方 LPC811／812／822／824 各自存在的完整商用後綴。每一筆**經原廠個別確認**者即可進入 Catalog Level 0 `DISCOVERED`；即使某個 Silicon Revision 尚無 `lpc2000.c` 支援證據，也是在 Catalog Level 2 再檢查。**一個 CFG 不等於一個 ICPN，也不代表整個家族已 `SUPPORTED`。**
 
@@ -147,7 +147,7 @@ Catalog Level 2 若不符合、證據不足、在指定 Provider／版本不支�
 3. **Exact ICPN Crosswalk**：明確保存 `manufacturer + exact_icpn + base_device/family + source_scope`。只有無歧義官方完整商用料號可標為 Catalog Level 0 `DISCOVERED`。
 4. **IC Information Projection**：Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、VDDA、Temperature 等欄位各自使用 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT／NOT_APPLICABLE`；未知不得補零、不得跨 rail 複製、Family evidence 不得假裝 Exact evidence。
 5. **Programming Handoff**：Catalog Level 0 `DISCOVERED` 只有在存在 source-backed programming route 時才升到 Level 1 `PROGRAMMING_CANDIDATE`；Level 1 經版本鎖定 Programming Provider + 原廠 programming evidence 完成 Exact ICPN qualification 且為 `SUPPORTED` 才升到 Level 2 `PROGRAMMABLE`。
-6. **Registry / Selector / Execution Separation**：Catalog Level 0 `DISCOVERED` 決定 Research Registry membership；Catalog Level 1 `PROGRAMMING_CANDIDATE` 決定 qualification queue；Catalog Level 2 `PROGRAMMABLE` 決定一般 IC Selector membership；Catalog Level 3 提供 verified configuration 狀態。任何較高 Level 的失敗或撤銷不得反向刪除仍有效的較低 Level 身分證據。
+6. **Registry / Selector / Job / Execution Separation**：L0 `DISCOVERED` 決定 Internal Research Registry membership；L1 `PROGRAMMING_CANDIDATE` 起即可進一般 Customer IC Selector；L2 `PROGRAMMABLE` 起才可進 Job Picker；L3 提供 verified configuration 狀態。Catalog visibility、Job selection 與最終 execution entitlement 是三個不同 gate。
 
 **本 ADR-0002 是此跨廠牌 discovery 方法的唯一規範來源。** 新的 ST／NXP／Microchip 或其他 Manufacturer discovery 工作、review 與 consumer 都必須直接遵守本節的 Catalog Level／field naming、證據門檻與 selector/execution 邊界；既有 vendor-specific historical artifacts 可以保留作證據與重播，但不得自行定義另一套 Catalog Level 或 visibility policy。
 
@@ -186,7 +186,7 @@ Catalog Level 2 從 **Catalog Level 0 `DISCOVERED` 的 Exact ICPN 集合**選取
 - **`UNSUPPORTED`（限定版本與操作範圍）**：經審核確定該 Provider／版本／操作不適用；保留 Catalog Level 0 `DISCOVERED` 身分，不可推論全世界任何後端都永遠無法燒錄。
 - **退版或資格回歸**：保留原廠料號與歷史證據，撤銷受影響的 Catalog Level 2 `SUPPORTED`，並重新評估依賴它的 Catalog Level 3 `PLASMA_VERIFIED`。
 
-Catalog Level 2 建立獨立的軟體資格權威。Catalog Level 1-only ICPN 在 Device Registry／Engineering lookup 中可檢視其 `UNKNOWN／CANDIDATE／BLOCKED／UNSUPPORTED` Programming Qualification；只有 `SUPPORTED` 才導出 Catalog Level 2 `PROGRAMMABLE` 並進入一般 IC Selector。Job／Batch 仍不得把 Selector 可見性解讀為執行授權。
+Catalog Level 2 建立獨立的軟體資格權威。Level 1 ICPN 可在一般 IC Selector 中檢視其 qualification gap，但 `job_selectable=false`；只有 `SUPPORTED` 才導出 Level 2 `PROGRAMMABLE` 並取得 Job Picker eligibility。Job／Batch 仍不得把 Selector visibility 或 Job Picker membership 解讀為最終執行授權。
 
 ### Catalog Level 3 — PLASMA Compatibility handoff（與軟體資格分離的實機相容性）
 
@@ -196,7 +196,7 @@ Catalog Level 3 `PLASMA_VERIFIED` 統計**唯一 Exact ICPN 數**；通過的實
 
 ### Visibility and execution boundary
 
-The general IC Selector is a **Programming Catalog surface**, not an execution entitlement surface. Only Catalog Level 2 `PROGRAMMABLE` Exact ICPNs are visible there. Catalog Level 1-only identities remain searchable through the Canonical Device Registry／Engineering lookup, where detailed Programming Qualification state may be inspected. Catalog Level 3 verified configurations are additive status, not a Selector prerequisite. No `OpenOCD CFG exists` badge, Catalog Level, Production admission or Selector visibility may be interpreted as Job／Batch authorization.
+The general IC Selector is a **customer capability surface**, not an execution entitlement surface. It exposes Catalog Level 1／2／3 with a Level Filter. L1 means a concrete programming route exists and may represent a customer qualification request; L2 means software programming qualification is `SUPPORTED`; L3 means at least one PLASMA configuration is verified. L0 remains internal-only. Job Pickers request L2/L3 only. No `OpenOCD CFG exists` badge, Catalog Level, Selector visibility or Job Picker membership may be interpreted as final Job／Batch authorization.
 
 ## Catalog Level scope of the existing OpenOCD-first and Core/Driver requirements
 
@@ -280,8 +280,8 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 
 ## Migration gap and ownership
 
-- **Accepted now:** 跨 Manufacturer Catalog Level 0／1／2／3 定義、Level 0 Research Registry／Level 1 Programming Candidate／Level 2 Programming Catalog & IC Selector／Level 3 PLASMA Verified 邊界，以及 Catalog Level 與 execution entitlement 的獨立 fail-closed 邊界。
-- **Migration debt — current Selector behavior:** 現有 `GET /api/devices/search`／IC Selector 仍可能包含只應屬 Level 0／1 的既有 Production rows。這是 2026-10-15 舊 visibility policy 的相容性遺留；後續 migration 必須拆出 Level 0/1 Research/Engineering Registry projection 與 Level 2 Programming Catalog projection，**不得刪除 Level 0 identity evidence**。
+- **Accepted now:** 跨 Manufacturer Catalog Level 0／1／2／3 定義、**L0 Internal Research Registry、L1–L3 Customer IC Selector、L2/L3 Job Picker** 邊界，以及 Catalog visibility、Job selection 與 execution entitlement 的獨立 fail-closed 邊界。
+- **Public API boundary:** `GET /api/devices/search` 是 Customer IC Selector projection，只允許 `levels` 為 1／2／3 的子集合；Level 0 request 必須 fail-closed。Internal Research Registry 不透過此 public endpoint 暴露。Pagination、`total_count` 與 `catalog_size` 必須在 server-side Level projection 後計算。
 - **Migration rule — no active Phase fields:** active API／runtime／canonical output 不得出現 `phase1_*`／`phase2_*`／`phase3_*` 欄位；不提供 alias。只有 immutable/source-locked historical evidence 可原樣保留舊欄位作 input，且不得直接投影到 Product payload。
 - **Not yet fully normalized:** ST／NXP／Microchip 的歷史資料仍分散於不同 artifact／resolver；後續 migration 要把它們投影成相同 Catalog Level／qualification 欄位與 UI payload，而不是再建立 Manufacturer-specific policy。
 - 現行 `docs/architecture/icpn-catalog-admission-policy.json` 的 `requires_deterministic_backend_route_or_explicit_mapping_state`，是內部 **identity admission** 契約，**不得被誤讀為 Public Catalog 可見規則**。
@@ -299,10 +299,10 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 - 四級均以 **Distinct Exact ICPN** 統計，不得混入 CFG 檔數、Base Device、Family 頁數、Profile 數或 HIL 測試執行次數；每個 Snapshot 驗證 `L3 ⊆ L2 ⊆ L1 ⊆ L0`。資訊完整數和實體配置組合數獨立報告。
 - Catalog Level 3 `PLASMA_VERIFIED` 必須有指定配置；Level 2 `PROGRAMMABLE` 但 Socket／PPU 未測的 IC 仍可顯示於 Selector，但不得標成 Level 3；單一硬體失敗不得直接撤銷 Level 2。
 
-1. 使用實際 Catalog Level 0 `DISCOVERED` rows 計算 **Research Registry** 的結果總數；使用 Level 1 `PROGRAMMING_CANDIDATE` rows 計算 qualification queue；使用 Level 2 `PROGRAMMABLE` rows 獨立計算 **Programming Catalog／IC Selector** 的結果總數，不手填或繼承歷史 coverage 數。
-2. 測試 Catalog Level 0 `DISCOVERED` 但 未達 `SUPPORTED` 的 Exact ICPN **只存在於 Level 0／1 Registry、但不出現在一般 IC Selector**；任何 CFG／family/source candidate 都不得自行導出 `PROGRAMMABLE`。
+1. 使用實際 Level 0 `DISCOVERED` rows 計算 **Internal Research Registry**；一般 IC Selector 的 `catalog_size`／`total_count` 必須由所選 L1／L2／L3 Filter 的 server-side projection 計算；Job Picker 只以 L2／L3 計算，不手填或繼承歷史 coverage 數。
+2. 測試 L0 Exact ICPN **不會由 public IC Selector API 回傳，且 `levels=0` fail-closed**；L1 Exact ICPN 可由一般 Selector 搜尋，但 `job_selectable=false`；任何 CFG／family/source candidate 都不得自行導出 `PROGRAMMABLE`。
 3. 測試 `ProgrammingQualification.state == SUPPORTED` 的 ICPN 導出 Catalog Level 2 `PROGRAMMABLE` 並出現在 IC Selector；即使 Socket／PPU 未測試也維持 Level 2，但不得標為 Catalog Level 3 `PLASMA_VERIFIED`。
-4. Research／Engineering Registry 與 Programming Catalog／IC Selector 必須使用同一 Canonical Identity source，但採不同 projection：Research Registry = Level 0+；Qualification Queue = Level 1+；Selector = Level 2+。Catalog Level 3 只增加 verified configuration 狀態，不改變 Level 2 Selector membership。
+4. Internal Research Registry 與 Customer IC Selector 必須使用同一 Canonical Identity source，但採不同 projection：Internal Registry = L0+；Customer Selector = L1–L3；Job Picker = L2/L3。Catalog Level 3 增加 verified configuration 狀態。
 5. 保持 Job／Batch 的 runtime executable、選定 Site、電氣限制、配置安全與硬體審核獨立 fail-closed；嚴禁由 Catalog presence 推導可執行。
 6. Research-only Microchip 24,051 候選與原廠資料庫不受顯示規則刪除或修改。
 7. Core／Transport／Target／Flash Driver／Exact ICPN 每一層具可審核來源與版本，且測試同 Core 但不同 Flash Driver 不得被誤判可互換；多核心或未知 Core 不可被強制歸類為 ARM。
@@ -312,7 +312,7 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 ## Alternatives considered
 
 - **所有 Research 候選都直接顯示**：拒絕；尚未通過 Catalog Level 0 `DISCOVERED` 的字串可能是 alias、family name、模糊命中或不存在的商用料號。
-- **一般 IC Selector 顯示 Catalog Level 2 `PROGRAMMABLE`；Level 0／1 留在 Research／Engineering Registry**：**採用**。這保留完整 identity universe，同時避免把尚無可用 Programming Provider 的大量 IC 混入燒錄工作選擇器。
+- **一般 IC Selector 顯示 L1–L3，並提供 Level Filter；L0 保持 Internal-only；Job Picker 顯示 L2/L3**：**採用**。這讓客戶可看見可委託 qualification／validation 的候選，同時不把純 identity inventory 當成產品能力。
 - **只顯示 Catalog Level 3 `PLASMA_VERIFIED`**：拒絕；把治具／硬體可取得性錯當成 IC identity 或軟體資格門檻。
 - **Catalog Level 0 `DISCOVERED` 全部直接進一般 IC Selector**：拒絕；大量尚無任何 `SUPPORTED` Programming Qualification 的 IC 會形成不可操作的 Product noise。
 
@@ -325,10 +325,10 @@ Catalog Level 0 — DISCOVERED
 Research Registry
        ↓ source-backed programming route exists
 Catalog Level 1 — PROGRAMMING_CANDIDATE
-Qualification Queue
+Customer IC Selector / Qualification Candidate
        ↓ ProgrammingQualification.state == SUPPORTED
 Catalog Level 2 — PROGRAMMABLE
-Programming Catalog / IC Selector
+Customer IC Selector + Job Picker
        ↓ specific PLASMA configuration HIL PASSED
 Catalog Level 3 — PLASMA_VERIFIED
        ↓ separate runtime execution entitlement
@@ -337,4 +337,4 @@ Job / Batch still requires applicable qualification + installed Runtime
     → fail closed
 ```
 
-**Normative clarification (2026-10-16):** Exact ICPN identity alone is Level 0 and does not create IC Selector visibility. Source-backed programming relevance is Level 1. General IC Selector visibility begins at Level 2 `PROGRAMMABLE`. Level 3 is configuration-specific HIL evidence and never replaces execution-time safety gates.
+**Normative clarification (2026-10-16):** Exact ICPN identity alone is Level 0 and remains Internal Research only. Source-backed programming relevance is Level 1 and is the minimum Customer IC Selector visibility level. Job Picker eligibility begins at Level 2 `PROGRAMMABLE`. Level 3 is configuration-specific HIL evidence and never replaces execution-time safety gates.
