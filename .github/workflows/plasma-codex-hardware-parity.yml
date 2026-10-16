@@ -1,0 +1,39 @@
+name: PLASMA dedicated Codex hardware parity offline contracts
+
+# Never schedule the SWPC Runner or modify its permissions from a PR.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-hardware-parity.yml"
+      - "scripts/plasma-codex-hardware-parity.py"
+      - "scripts/tests/test-plasma-codex-hardware-parity.py"
+      - "docs/development/plasma-codex-hardware-parity.md"
+      - "docs/README.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-hardware-parity.yml"
+      - "scripts/plasma-codex-hardware-parity.py"
+      - "scripts/tests/test-plasma-codex-hardware-parity.py"
+      - "docs/development/plasma-codex-hardware-parity.md"
+      - "docs/README.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate offline rules, exact artifact, and no host mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma-codex-hardware-parity.py
+          python3 scripts/plasma-codex-hardware-parity.py --self-test
+          python3 scripts/tests/test-plasma-codex-hardware-parity.py
+          git diff --exit-code

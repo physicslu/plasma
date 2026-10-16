@@ -96,6 +96,7 @@
 - **Plan / Preflight** — [PLASMA Codex SWPC Bootstrap Preflight](development/plasma-codex-swpc-bootstrap-preflight.md)：Issue #981 的現有 SWPC Runner 唯讀前置檢查與真實 Worker 驗證邊界；未執行部署或硬體操作。
 - **Plan / Host setup** — [PLASMA Codex SWPC Dedicated Worker Provisioning](development/plasma-codex-worker-provisioning.md)：Issue #981 獨立 Linux 帳號、tmux 監控目錄、Runner 註冊與安全驗證的分階段作業程序；文件與程式碼本身不代表 SWPC 已配置。
 - **Plan / Passive inventory** — [PLASMA Codex Direct HIL Tool Readiness](development/plasma-codex-hil-tool-inventory.md)：重用 Z2 SSH／UART／JTAG、Hub 直接 USB 命令及 KINGST LA Driver／CLI，僅盤點專用 Worker 的 PATH、USB 列舉與裝置權限，不開啟或操作設備；Gate 2 前不觸發實機盤點。
+- **Plan / Host activation** — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：複製原 Codex 經驗證的 Z2／Hub／KINGST 所需 Linux 裝置權限及已鎖定 sigrok AppImage；僅由 SWPC 受信任管理員在 Gate 2 後啟用，保留原設備權限與兩階段合併審核。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
