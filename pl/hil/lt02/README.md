@@ -42,6 +42,42 @@ and the production `plasma_interfaces.mmio_loop_test.LoopTestDriver`:
    success and failure paths and independently observe the restoration.
    This module **does not perform FPGA loading, service changes or recovery**.
 
+
+## LinuxMMIO v1.1 / LT02 repeat-and-performance regression (candidate)
+
+This is an **opt-in addition** to the above supervised LT02-05 procedure.
+The default is unchanged: **one** ten-case matrix; no automatic FPGA load.
+Only after the exact candidate has passed the current live preflight, an
+operator-authorized supervisor may supply `--repeats 2` through
+`--repeats 8` to the same `--execute-live` invocation. The manifest,
+current-boot load receipt, original image backup and independent recovery
+requirements do not change. Every attempt uses a fresh unique `--output`
+directory; do not overwrite old evidence. Do not run repeat stress tests if
+other SWPC agents currently own the FPGA image or MMIO aperture.
+
+`result.json` contains `cases` with repeat/case indices, byte-exact CRC,
+counter deltas and elapsed time; `performance` includes aggregate
+bytes, word counts, observed wall-time effective B/s and word ops/s,
+per-case latency p50/p95/max, and `mmio_word_accesses` with observed
+successful Python native word read/write counts. Word-operation statistics
+include metadata/identity/counter accesses, whereas `data_*_words` only
+count LT02 scratchpad payload accesses. These are **different denominators**.
+The wall-time rate includes interpreter overhead, thread scheduling and
+mapping effects; it is **not** an FPGA bus or electrical throughput
+specification. Zero elapsed wall time produces `null` rather than a
+fabricated infinite rate. No arbitrary throughput PASS threshold is enforced.
+
+After an uncertain MMIO error, counter discrepancy or CRC mismatch, the
+production `LoopTestDriver` instance is poisoned and no second case is
+attempted. A Python exception or timeout cannot guarantee recovery from
+kernel AXI SIGBUS/hang. The independent supervisor must still restore the
+original `base.bin` and verify UIO, clocks, services and network status
+before overall HIL PASS is claimed.
+
+**As of this change: host regression and CI are distinct from a new Z2
+execution. The original PR #957 real-HIL PASS remains historical evidence;
+a v1.1 repeated real-board performance result must be separately observed.**
+
 ## Approved development orchestration on SWPC
 
 Use `docs/development/codex-z2-hil-development-command.md` and
