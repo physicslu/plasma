@@ -491,12 +491,12 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.phase1_identity_state == "IDENTIFIED"
+                row.identity_state == "IDENTIFIED"
                 and row.identifier_kind == "manufacturer_part_number"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"qualified exact ICPN Phase 1 / Programming route drift: {key[1]}",
+                f"qualified exact ICPN identity / Programming route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"qualification basis missing: {key[1]}")
@@ -643,7 +643,7 @@ class OpenOCDSoftwareQualificationRegistry:
                 ("STMicroelectronics", "STM32F103VBT7"),
                 ("STMicroelectronics", "STM32F103VBT7TR"),
             },
-            "Phase 2 qualification scope expanded without review",
+            "Programming Qualification scope expanded without review",
         )
         _require(
             all(record["software_state"] == "SUPPORTED" for record in self._records.values()),
@@ -937,12 +937,12 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"high-density qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.phase1_identity_state == "IDENTIFIED"
+                row.identity_state == "IDENTIFIED"
                 and row.identifier_kind == "manufacturer_part_number"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"high-density exact ICPN Phase 1 / Programming route drift: {key[1]}",
+                f"high-density exact ICPN identity / Programming route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"high-density qualification basis missing: {key[1]}")
@@ -1086,7 +1086,7 @@ class OpenOCDSoftwareQualificationRegistry:
         }
         _require(
             high_exact.issubset(self._records) and len(self._records) == 49,
-            "combined Phase 2 qualification scope expanded without review",
+            "combined Programming Qualification scope expanded without review",
         )
 
         for qualification_name, boundary in (
@@ -1103,7 +1103,7 @@ class OpenOCDSoftwareQualificationRegistry:
             ):
                 _require(
                     boundary.get(boundary_key) is False,
-                    f"unsafe {qualification_name} Phase 2 boundary: {boundary_key}",
+                    f"unsafe {qualification_name} Programming Qualification boundary: {boundary_key}",
                 )
 
         boundary = qualification_manifest.get("acceptance_boundary", {})
@@ -1114,7 +1114,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "physical_programming_qualified",
             "phase3_compatibility_claimed",
         ):
-            _require(boundary.get(key) is False, f"unsafe Phase 2 boundary: {key}")
+            _require(boundary.get(key) is False, f"unsafe Programming Qualification boundary: {key}")
 
         self.source_lock_id = source_lock["source_lock_id"]
         self.qualification_id = qualification_manifest["qualification_id"]
@@ -1149,7 +1149,7 @@ class OpenOCDSoftwareQualificationRegistry:
         return record["software_state"] if record is not None else self.default_unreviewed_state
 
     def describe(self, manufacturer: str, exact_icpn: str) -> dict[str, Any]:
-        """Return the read-only Phase 2 software-qualification projection.
+        """Return the read-only provider Programming Qualification projection.
 
         UNKNOWN is explicit when the exact ICPN has not completed review. A
         Catalog mapping or family relationship never fills provider, operation,
@@ -1166,7 +1166,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "provider": None,
             "operations": {},
             "programming": None,
-            "selector_visibility_authority": "PHASE1_IDENTIFIED",
+            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
             "job_batch_execution_changed": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -1241,7 +1241,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "supported_exact_icpns": supported,
             "catalog_exact_icpns": self._catalog.size,
             "unreviewed_default_unknown_exact_icpns": self._catalog.size - len(self._records),
-            "selector_visibility_authority": "PHASE1_IDENTIFIED",
+            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
             "hardware_runtime_ready": False,
             "physical_programming_qualified": False,
         }
