@@ -95,6 +95,14 @@ def _make_snapshot(tmp_path):
     boot = procroot / "sys/kernel/random/boot_id"
     boot.parent.mkdir(parents=True)
     boot.write_text("synthetic-boot-id")
+    release = procroot / "sys/kernel/osrelease"
+    release.write_text("6.8.0-synthetic")
+    board = sysroot / "firmware/devicetree/base/model"
+    board.parent.mkdir(parents=True)
+    board.write_bytes(b"Fake Zynq board\\x00")
+    platform = sysroot / "bus/platform/devices/40000000.fabric"
+    platform.mkdir(parents=True)
+    (platform / "resource").write_text("40000000 4000ffff 00000200\\n")
     return sysroot, procroot, map0
 
 
@@ -108,6 +116,10 @@ def test_single_uio_covers_candidate_64k_but_does_not_qualify_hardware(
     assert report["hardware_ready"] is False
     assert report["reload_authorized"] is False
     assert report["boot_id"] == "synthetic-boot-id"
+    assert report["kernel_release"] == "6.8.0-synthetic"
+    assert report["device_tree_board_model"] == "Fake Zynq board"
+    assert report["related_platform_resource_candidates"][0]["platform_device"] == "40000000.fabric"
+    assert report["related_platform_resource_candidates"][0]["driver"] is None
     assert report["fpga_bridge_sysfs_entries"] == ["fpga_bridge0"]
     assert report["candidate_ppu_window"]["mmap_selector_bytes"] == 0
     assert report["candidate_ppu_window"]["window_byte_index"] == 0
@@ -193,6 +205,14 @@ def test_malformed_or_missing_sysfs_fails_closed(tmp_path, bad):
         sysroot = tmp_path / "missing_sys"
     with pytest.raises(Phase1Error):
         read_uio_snapshot(sysroot)
+
+
+def test_malformed_kernel_platform_resources_block_inventory(tmp_path, proposal):
+    sysroot, procroot, _ = _make_snapshot(tmp_path)
+    resource = sysroot / "bus/platform/devices/40000000.fabric/resource"
+    resource.write_text("broken-resource\\n")
+    with pytest.raises(Phase1Error, match="Malformed"):
+        collect_inventory(sysroot, procroot, proposal)
 
 
 def test_inventory_missing_manager_never_claims_ready(tmp_path, proposal):
