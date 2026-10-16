@@ -4,7 +4,9 @@
   "status": "pilot",
   "catalog_source": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
   "evidence": [
-    {"source_id": "plasma_stm32f1_catalog_main"}
+    {
+      "source_id": "plasma_stm32f1_catalog_main"
+    }
   ],
   "bindings": [
     {
@@ -20,7 +22,7 @@
       "profiles": {
         "programming": "stm32f1-medium-density-flash-v0",
         "memory_geometry": "stm32f103c8-64k-v0",
-        "package_hardware": "stm32f103-lqfp48-debug-v0",
+        "package_hardware": "stm32f103-lqfp48-programming-hardware-v1",
         "option": "stm32f1-option-bytes-v0",
         "security": "stm32f1-medium-density-security-v0"
       },
@@ -39,7 +41,7 @@
       "profiles": {
         "programming": "stm32f1-medium-density-flash-v0",
         "memory_geometry": "stm32f103cb-128k-v0",
-        "package_hardware": "stm32f103-lqfp48-debug-v0",
+        "package_hardware": "stm32f103-lqfp48-programming-hardware-v1",
         "option": "stm32f1-option-bytes-v0",
         "security": "stm32f1-medium-density-security-v0"
       },
