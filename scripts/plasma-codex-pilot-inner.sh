@@ -27,10 +27,9 @@ printf 'github_run_id=%s\nsource_sha=%s\n' \
 
 set +e
 timeout --signal=TERM --kill-after=10s 900s \
-  codex exec \
+  codex --ask-for-approval never exec \
     --json \
     --sandbox read-only \
-    --ask-for-approval never \
     --output-last-message "$out/last-message.txt" \
     - < "$out/prompt.txt" 2>&1 | tee "$out/codex.jsonl"
 rc="${PIPESTATUS[0]}"
