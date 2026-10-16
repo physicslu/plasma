@@ -1166,7 +1166,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "provider": None,
             "operations": {},
             "programming": None,
-            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "selector_visibility_rule": "CATALOG_LEVEL_1_OR_HIGHER",
             "job_batch_execution_changed": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -1241,7 +1241,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "supported_exact_icpns": supported,
             "catalog_exact_icpns": self._catalog.size,
             "unreviewed_default_unknown_exact_icpns": self._catalog.size - len(self._records),
-            "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "selector_visibility_rule": "CATALOG_LEVEL_1_OR_HIGHER",
             "hardware_runtime_ready": False,
             "physical_programming_qualified": False,
         }
