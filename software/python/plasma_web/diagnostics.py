@@ -102,6 +102,7 @@ def _parse_payload(body: dict[str, Any]) -> tuple[bytes, str]:
 async def execute_ps_loopback(
     body: dict[str, Any],
     client_factory: Callable[[], PlasmaClient],
+    *, pl_endpoint_enabled: bool = False,
 ) -> dict[str, Any]:
     """Bridge a PS or explicitly enabled PL diagnostic through the real Plasma Server.
 
@@ -116,7 +117,7 @@ async def execute_ps_loopback(
             ErrorCode.OPERATION_UNSUPPORTED,
             f"real-path loopback endpoint is not implemented: {endpoint!r}",
         )
-    test_id = require_test_id(body["test_id"])
+    # REST remains PL-disabled until Manager admission, capability / image\n    # receipt checks and role authorization are implemented in phase 2.\n    if endpoint == PL_LOOPBACK_ENDPOINT and not pl_endpoint_enabled:\n        raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PL REST diagnostics not enabled")\n    test_id = require_test_id(body["test_id"])
     sequence = require_nonnegative_int(body["sequence"], "sequence")
     timeout_ms = _parse_timeout_ms(body["timeout_ms"])
     pattern = body["pattern"]
