@@ -23,7 +23,7 @@ from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
 from .openocd_provider_registry import get_default_openocd_provider_registry
 from .openocd_software_qualification import (
-    get_default_openocd_software_qualification_registry,
+    get_default_programming_qualification_registry,
 )
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
@@ -89,7 +89,7 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
     candidates = get_default_backend_candidate_registry()
     upstream = default_pinned_upstream()
     versioned_providers = get_default_openocd_provider_registry()
-    software_qualification = get_default_openocd_software_qualification_registry()
+    programming_qualification = get_default_programming_qualification_registry()
     ic_support = get_default_ic_support_resolver()
     device_basic = get_default_manufacturer_device_basic_resolver()
     results = []
@@ -130,11 +130,14 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
             if support is not None
             else None
         )
-        item["openocd_software_qualification"] = (
-            software_qualification.describe(record.vendor, exact_icpn)
-            if software_qualification is not None
+        phase2 = (
+            programming_qualification.describe(record.vendor, exact_icpn)
+            if programming_qualification is not None
             else None
         )
+        item["programming_qualification"] = phase2
+        # Compatibility alias. New clients must use programming_qualification.
+        item["openocd_software_qualification"] = phase2
         results.append(item)
     return {
         "ok": True,

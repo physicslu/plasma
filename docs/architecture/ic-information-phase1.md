@@ -1,6 +1,6 @@
 # IC Information — Phase 1 evidence and admission contract
 
-Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-10-15.** Public Catalog/Runtime migration remains separate.
+Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-10-15.** Phase 1 `IDENTIFIED` is the IC Selector visibility boundary.
 
 ## Right-hand IC details: independent phase ownership
 
@@ -24,14 +24,14 @@ Status: **Phase 1 baseline established; Phase 2 owner transition approved 2026-1
 1. Rebuild a deterministic manufacturer-data ledger from pinned original inputs, without reading Programming or PLASMA Compatibility records as metadata sources.
 2. Count `VERIFIED/PARTIAL/UNKNOWN/CONFLICT` for every attribute, with independent admitted/candidate denominators; count unresolved identity separately.
 3. Record original manufacturer evidence SHA or source ref when it exists. A `PARTIAL` observation does not qualify a software profile; a missing attribute does not create an unsupported software decision.
-4. No `openocd_software_support=SUPPORTED`, `Hardware Ready`, public selectable `Catalog`, Job/Batch, Production admission mutation or physical PASS is derived by this phase.
+4. Phase 1 may establish `IDENTIFIED` and therefore Selector visibility, but it derives no Phase 2 `SUPPORTED`, `Hardware Ready`, Job/Batch execution authorization, Production admission mutation or physical PASS.
 5. The distinct owner transition to Phase 2 Programming was approved on 2026-10-15. Phase 1 evidence may be backfilled while reviewing the same official manufacturer documents, but Programming qualification owns the current work. Phase 3 separately validates concrete Site/Adapter/Socket/PPU configurations.
 
 ## Catalog surface distinction
 
-There are two different concepts: **IC Information research/detail completeness** versus **default public IC Selector eligibility**. IC information in a research/admin detail view may be incomplete; it does not grant default product Catalog visibility.
+ADR-0002 separates **identity visibility**, **IC Information completeness**, and **Programming qualification**. An Exact ICPN that passes Phase 1 `IDENTIFIED` is eligible for IC Selector visibility even when some IC Information fields remain `UNKNOWN/PARTIAL` and even when Phase 2 remains `UNKNOWN` or `CANDIDATE`.
 
-Accepted ADR-0002 final policy stays: default product selectable Catalog is limited to qualified OpenOCD software `SUPPORTED` exact ICPNs. That filtering and consistent count migration is outstanding, tracked separately in Issue #849 and is **not** implemented merely by completing the Phase 1 baseline or the initial Phase 2A qualification registry. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as software qualification.
+Phase 2 `SUPPORTED` is not a visibility filter. Existing UI badges such as "OpenOCD CFG exists" must not be interpreted as Programming qualification, and Selector visibility must never be interpreted as Job/Batch execution authorization.
 
 ## Examples of excluded Phase 1 questions
 

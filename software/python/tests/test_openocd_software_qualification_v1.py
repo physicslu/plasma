@@ -7,9 +7,11 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.openocd_software_qualification import (
     OpenOCDSoftwareQualificationRegistry,
+    ProgrammingQualificationRegistry,
     REQUIRED_OPERATIONS,
     ROOT,
     get_default_openocd_software_qualification_registry,
+    get_default_programming_qualification_registry,
 )
 
 
@@ -65,7 +67,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.catalog = get_default_device_catalog()
-        cls.registry = OpenOCDSoftwareQualificationRegistry(cls.catalog, ROOT)
+        cls.registry = ProgrammingQualificationRegistry(cls.catalog, ROOT)
 
     def test_reviewed_cohort_is_exact_and_supported(self):
         expected = (
@@ -299,7 +301,11 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         ):
             with self.subTest(icpn=icpn):
                 item = self.registry.describe("STMicroelectronics", icpn)
-                self.assertEqual(item["software_state"], "SUPPORTED")
+                self.assertEqual(item["phase1_identity_state"], "IDENTIFIED")
+                self.assertEqual(item["phase2_state"], "SUPPORTED")
+                self.assertEqual(item["software_state"], item["phase2_state"])
+                self.assertEqual(item["visibility_authority"], "PHASE1_IDENTIFIED")
+                self.assertFalse(item["execution_authorized"])
                 self.assertTrue(item["reviewed"])
                 self.assertEqual(item["provider"]["version"], "0.12.0")
                 self.assertEqual(item["provider"]["flash_driver"], "stm32f1x")
@@ -322,12 +328,15 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                 )
 
         unreviewed = self.registry.describe("STMicroelectronics", "STM32F103V8H6")
-        self.assertEqual(unreviewed["software_state"], "UNKNOWN")
+        self.assertEqual(unreviewed["phase1_identity_state"], "IDENTIFIED")
+        self.assertEqual(unreviewed["phase2_state"], "UNKNOWN")
+        self.assertEqual(unreviewed["software_state"], unreviewed["phase2_state"])
         self.assertFalse(unreviewed["reviewed"])
         self.assertIsNone(unreviewed["provider"])
         self.assertEqual(unreviewed["operations"], {})
         self.assertIsNone(unreviewed["programming"])
-        self.assertFalse(unreviewed["public_catalog_visibility_changed"])
+        self.assertEqual(unreviewed["visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertFalse(unreviewed["execution_authorized"])
         self.assertFalse(unreviewed["job_batch_execution_changed"])
         self.assertFalse(unreviewed["hardware_runtime_ready"])
         self.assertFalse(unreviewed["physical_programming_qualified"])
@@ -347,8 +356,13 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         self.assertFalse(self.registry.acceptance_boundary["physical_programming_qualified"])
 
     def test_default_registry_is_available_in_full_source_tree(self):
-        registry = get_default_openocd_software_qualification_registry()
+        registry = get_default_programming_qualification_registry()
+        compatibility_registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
+        self.assertIsNotNone(compatibility_registry)
+        self.assertIsInstance(registry, ProgrammingQualificationRegistry)
+        self.assertIsInstance(compatibility_registry, OpenOCDSoftwareQualificationRegistry)
+        self.assertEqual(registry.supported_exact_icpns("STMicroelectronics"), compatibility_registry.supported_exact_icpns("STMicroelectronics"))
         self.assertEqual(registry.summary["supported_exact_icpns"], 49)
         self.assertEqual(registry.summary["reviewed_exact_icpns"], 49)
         self.assertEqual(
@@ -359,6 +373,8 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             registry.summary["qualification_id"],
             "adr0002-phase2-openocd-012-stm32f103-v7",
         )
+        self.assertEqual(registry.summary["phase1_visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertFalse(registry.summary["execution_authorized"])
 
     def test_local_evidence_blob_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)

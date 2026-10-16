@@ -125,7 +125,7 @@ async function installApi(page: Page) {
       count: 1,
       results: [{
         vendor: "STMicroelectronics", family: "STM32F1", subfamily: null, plasma_series: "STM32",
-        identifier: "STM32F103C8T6", identifier_kind: "manufacturer_part_number", icpn: "STM32F103C8T6", package: null,
+        identifier: "STM32F103C8T6", identifier_kind: "manufacturer_part_number", icpn: "STM32F103C8T6", phase1: { identity_state: "IDENTIFIED" }, package: null,
         cpu_architectures: ["ARM Cortex-M3"],
         backend: { type: "openocd", distribution: "upstream-openocd", target_config: "tcl/target/stm32f1x.cfg", mapping_status: "mapping_candidate" },
         physical_validation: { engineering_status: "not_verified", ppu_status: "no_evidence", socket_status: "no_evidence" }, catalog_origin: "test",

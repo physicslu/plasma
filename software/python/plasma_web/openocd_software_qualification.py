@@ -1,14 +1,13 @@
-"""ADR-0002 Phase 2A OpenOCD software-qualification registry.
+"""ADR-0002 Phase 2 — Programming qualification registry.
 
-This registry is intentionally separate from:
-- Production identity admission,
-- OpenOCD mapping metadata,
-- installed runtime attestation,
-- Phase 3 physical compatibility,
-- Job/Batch execution authorization.
+The public interface is vendor-neutral: Phase 2 consumes a Phase 1 IDENTIFIED
+exact ICPN and projects Programming state independently from Selector visibility,
+installed runtime attestation, Phase 3 physical compatibility, and Job/Batch
+execution authorization. The current reviewed provider authority is OpenOCD and
+the current qualified cohort is ST STM32F103.
 
 Only exact ICPNs explicitly present in the reviewed qualification ledger can
-return SUPPORTED. All other exact ICPNs remain UNKNOWN by default.
+return SUPPORTED. All other Phase 1 exact ICPNs remain UNKNOWN by default.
 """
 from __future__ import annotations
 
@@ -61,8 +60,8 @@ def _git_blob_sha1(raw: bytes) -> str:
     ).hexdigest()
 
 
-class OpenOCDSoftwareQualificationRegistry:
-    """Reviewed software qualification; never a hardware/runtime execution grant."""
+class ProgrammingQualificationRegistry:
+    """ADR-0002 Phase 2 qualification; never a visibility or execution grant."""
 
     def __init__(self, catalog: DeviceCatalog, root: Path | None = ROOT) -> None:
         _require(root is not None, "explicit/full evidence root required")
@@ -491,12 +490,11 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.production_admitted
-                and row.identifier_kind == "manufacturer_part_number"
+                row.phase1_identity_state == "IDENTIFIED"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"qualified exact ICPN Production route drift: {key[1]}",
+                f"qualified exact ICPN Phase 1 identity/provider route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"qualification basis missing: {key[1]}")
@@ -937,12 +935,11 @@ class OpenOCDSoftwareQualificationRegistry:
             row = catalog_by_key.get(key)
             _require(row is not None, f"high-density qualified ICPN missing from Production Catalog: {key}")
             _require(
-                row.production_admitted
-                and row.identifier_kind == "manufacturer_part_number"
+                row.phase1_identity_state == "IDENTIFIED"
                 and row.family == "STM32F1"
                 and row.mapping_status == "mapped"
                 and row.target_config == q_provider["target_config"],
-                f"high-density exact ICPN Production route drift: {key[1]}",
+                f"high-density exact ICPN Phase 1 identity/provider route drift: {key[1]}",
             )
             basis = raw.get("qualification_basis")
             _require(isinstance(basis, dict), f"high-density qualification basis missing: {key[1]}")
@@ -1104,7 +1101,7 @@ class OpenOCDSoftwareQualificationRegistry:
             ):
                 _require(
                     boundary.get(boundary_key) is False,
-                    f"unsafe {qualification_name} Phase 2A boundary: {boundary_key}",
+                    f"unsafe {qualification_name} Phase 2 boundary: {boundary_key}",
                 )
 
         boundary = qualification_manifest.get("acceptance_boundary", {})
@@ -1116,7 +1113,7 @@ class OpenOCDSoftwareQualificationRegistry:
             "physical_programming_qualified",
             "phase3_compatibility_claimed",
         ):
-            _require(boundary.get(key) is False, f"unsafe Phase 2A boundary: {key}")
+            _require(boundary.get(key) is False, f"unsafe Phase 2 boundary: {key}")
 
         self.source_lock_id = source_lock["source_lock_id"]
         self.qualification_id = qualification_manifest["qualification_id"]
@@ -1155,15 +1152,23 @@ class OpenOCDSoftwareQualificationRegistry:
 
         record = self._records.get((manufacturer, exact_icpn))
         state = record["software_state"] if record is not None else self.default_unreviewed_state
+        catalog_row = self._catalog.resolve(manufacturer, exact_icpn)
+        phase1_identity_state = (
+            catalog_row.phase1_identity_state if catalog_row is not None else "RESEARCH_ONLY"
+        )
         payload: dict[str, Any] = {
-            "schema_version": "1.0.0",
+            "schema_version": "1.1.0",
             "registry_id": self.qualification_id,
+            "phase1_identity_state": phase1_identity_state,
+            "phase2_state": state,
+            # Compatibility field for existing clients; canonical name is phase2_state.
             "software_state": state,
             "reviewed": record is not None,
             "provider": None,
             "operations": {},
             "programming": None,
-            "public_catalog_visibility_changed": False,
+            "visibility_authority": "PHASE1_IDENTIFIED",
+            "execution_authorized": False,
             "job_batch_execution_changed": False,
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
@@ -1238,13 +1243,19 @@ class OpenOCDSoftwareQualificationRegistry:
             "supported_exact_icpns": supported,
             "catalog_exact_icpns": self._catalog.size,
             "unreviewed_default_unknown_exact_icpns": self._catalog.size - len(self._records),
-            "public_catalog_visibility_changed": False,
+            "phase1_visibility_authority": "PHASE1_IDENTIFIED",
+            "execution_authorized": False,
             "hardware_runtime_ready": False,
             "physical_programming_qualified": False,
         }
 
 
-def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQualificationRegistry | None:
+# Compatibility alias retained for existing imports while new consumers use the
+# canonical ADR-0002 Phase 2 name.
+OpenOCDSoftwareQualificationRegistry = ProgrammingQualificationRegistry
+
+
+def get_default_programming_qualification_registry() -> ProgrammingQualificationRegistry | None:
     required = (
         RELEASE_REL,
         SOURCE_LOCK_REL,
@@ -1258,4 +1269,9 @@ def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQual
     )
     if not source_files_available(ROOT, required):
         return None
-    return OpenOCDSoftwareQualificationRegistry(get_default_device_catalog(), ROOT)
+    return ProgrammingQualificationRegistry(get_default_device_catalog(), ROOT)
+
+
+def get_default_openocd_software_qualification_registry() -> ProgrammingQualificationRegistry | None:
+    """Deprecated compatibility accessor for the current OpenOCD-backed registry."""
+    return get_default_programming_qualification_registry()

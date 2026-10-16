@@ -93,9 +93,14 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertFalse(selected["plasma_compatibility"]["hardware_runtime_ready"])
         self.assertFalse(selected["plasma_compatibility"]["physical_programming_qualified"])
 
-        qualification = result["openocd_software_qualification"]
+        qualification = result["programming_qualification"]
         self.assertIsNotNone(qualification)
-        self.assertEqual(qualification["software_state"], "SUPPORTED")
+        self.assertEqual(result["phase1"]["identity_state"], "IDENTIFIED")
+        self.assertEqual(qualification["phase1_identity_state"], "IDENTIFIED")
+        self.assertEqual(qualification["phase2_state"], "SUPPORTED")
+        self.assertEqual(qualification["software_state"], qualification["phase2_state"])
+        self.assertEqual(qualification["visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertFalse(qualification["execution_authorized"])
         self.assertTrue(qualification["reviewed"])
         self.assertEqual(qualification["provider"]["version"], "0.12.0")
         self.assertEqual(qualification["provider"]["target_config"], "tcl/target/stm32f1x.cfg")
@@ -109,7 +114,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
             64 * 1024,
         )
-        self.assertFalse(qualification["public_catalog_visibility_changed"])
         self.assertFalse(qualification["hardware_runtime_ready"])
         self.assertFalse(qualification["physical_programming_qualified"])
 
@@ -130,7 +134,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         # The historical deep selected_profile remains absent; Phase 2 qualification
         # is an independent SW/PPU authority and must still project SUPPORTED.
         self.assertIsNone(result["selected_profile"])
-        qualification = result["openocd_software_qualification"]
+        qualification = result["programming_qualification"]
         self.assertIsNotNone(qualification)
         self.assertEqual(qualification["software_state"], "SUPPORTED")
         self.assertTrue(qualification["reviewed"])
@@ -155,7 +159,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103V8H6")
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
-        qualification = result["openocd_software_qualification"]
+        qualification = result["programming_qualification"]
         self.assertEqual(qualification["software_state"], "UNKNOWN")
         self.assertFalse(qualification["reviewed"])
         self.assertIsNone(qualification["provider"])
@@ -181,7 +185,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertEqual(payload["count"], 1)
                 result = payload["results"][0]
                 self.assertEqual(result["icpn"], icpn)
-                qualification = result["openocd_software_qualification"]
+                qualification = result["programming_qualification"]
                 self.assertEqual(qualification["software_state"], "SUPPORTED")
                 self.assertTrue(qualification["reviewed"])
                 self.assertEqual(
@@ -212,7 +216,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 status, payload = self.request(f"/api/devices/search?q={icpn}&limit=1")
                 self.assertEqual(status, 200)
                 self.assertEqual(payload["count"], 1)
-                qualification = payload["results"][0]["openocd_software_qualification"]
+                qualification = payload["results"][0]["programming_qualification"]
                 self.assertEqual(qualification["software_state"], "SUPPORTED")
                 self.assertTrue(qualification["reviewed"])
                 self.assertEqual(
@@ -235,7 +239,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STM32F103RCY6TR&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
-        qualification = payload["results"][0]["openocd_software_qualification"]
+        qualification = payload["results"][0]["programming_qualification"]
         self.assertEqual(qualification["software_state"], "UNKNOWN")
         self.assertFalse(qualification["reviewed"])
         self.assertIsNone(qualification["provider"])
@@ -265,7 +269,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertEqual(payload["count"], 1)
                 result = payload["results"][0]
                 self.assertEqual(result["icpn"], icpn)
-                qualification = result["openocd_software_qualification"]
+                qualification = result["programming_qualification"]
                 self.assertEqual(qualification["software_state"], "SUPPORTED")
                 self.assertTrue(qualification["reviewed"])
                 self.assertEqual(
@@ -286,7 +290,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103CBT6")
         self.assertIsNone(result["selected_profile"])
-        qualification = result["openocd_software_qualification"]
+        qualification = result["programming_qualification"]
         self.assertIsNotNone(qualification)
         self.assertEqual(qualification["software_state"], "SUPPORTED")
         self.assertTrue(qualification["reviewed"])
@@ -404,7 +408,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertIsNone(payload["results"][0]["manufacturer_device_basic_profile"])
         self.assertIsNone(payload["results"][0]["selected_profile"])
 
-        qualification = payload["results"][0]["openocd_software_qualification"]
+        qualification = payload["results"][0]["programming_qualification"]
         self.assertIsNotNone(qualification)
         self.assertEqual(qualification["software_state"], "UNKNOWN")
         self.assertFalse(qualification["reviewed"])

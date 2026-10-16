@@ -125,19 +125,17 @@ physical qualification.
 
 ## API
 
-`GET /api/devices/search` remains the stable route. Results may include three independent
-additive projections:
+`GET /api/devices/search` remains the stable route. Results include a canonical Phase 1 identity projection and may include independent additive detail/qualification projections:
 
-- `manufacturer_device_basic_profile` — basic IC Information facts; currently STM32F1 v1.
-- `selected_profile` — the deeper manufacturer/programming composition used only when
-  Programming Profile evidence exists.
-- `openocd_software_qualification` — ADR-0002 Phase 2 exact-ICPN software
-  qualification from the SW/PPU-owned release authority. It is independent from both
-  Catalog mapping and the legacy deeper selected-profile composition.
+- `phase1.identity_state` — canonical ADR-0002 Phase 1 identity state. Current Production exact-ICPN rows project as `IDENTIFIED` because their admission already requires authoritative exact manufacturer provenance.
+- `manufacturer_device_basic_profile` — basic IC Information facts; currently ST-oriented.
+- `selected_profile` — the deeper manufacturer/programming composition used only when Programming Profile evidence exists.
+- `programming_qualification` — canonical ADR-0002 Phase 2 exact-ICPN Programming qualification. The current Provider is OpenOCD and the current qualified reference cohort is ST STM32F103. It is independent from both Catalog mapping and the legacy deeper selected-profile composition.
+- `openocd_software_qualification` — compatibility alias for existing clients; new clients must use `programming_qualification`.
 
 A Basic Profile does not imply that `selected_profile` exists.
 
-Likewise, an OpenOCD CFG mapping does not imply `openocd_software_qualification=SUPPORTED`.
+Likewise, an OpenOCD CFG mapping does not imply `programming_qualification.phase2_state=SUPPORTED`.
 An exact ICPN that has not completed Phase 2 review is projected as `UNKNOWN`, even when
 the Production Catalog already carries a mapped target CFG. A reviewed exact ICPN may be
 `SUPPORTED` even when the historical `selected_profile` deep-composition payload is not
