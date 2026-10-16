@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import plasma_web.nxp_manufacturer_device_evidence as evidence_module
-from plasma_web.device_catalog import DEVICE_CATALOG_MANIFEST_ENV
+from plasma_web.device_catalog import DEVICE_CATALOG_MANIFEST_ENV, get_default_device_catalog
 from plasma_web.gateway import _device_search_payload
 
 
@@ -43,18 +43,29 @@ class NXPInstalledWheelDataRootTests(unittest.TestCase):
                         evidence_module._root() / evidence_module.EVIDENCE_RELATIVE_PATH
                     )
 
-    def test_nxp_vendor_and_exact_search_stay_admitted_only(self) -> None:
-        found = _device_search_payload("NXP", limit=1)
-        self.assertEqual(found["total_count"], 224)
-        self.assertEqual(found["results"][0]["vendor"], "NXP")
-        mcx = _device_search_payload("MCXA132VFM", limit=1)
-        self.assertEqual(mcx["count"], 1)
-        item = mcx["results"][0]
+    def test_public_nxp_search_is_l1_plus_and_internal_mcx_evidence_remains_available(self) -> None:
+        found = _device_search_payload("NXP", limit=100)
+        self.assertEqual(found["total_count"], 12)
+        self.assertTrue(found["results"])
+        self.assertTrue(all(
+            item["vendor"] == "NXP"
+            and item["family"] == "KL25"
+            and item["catalog_level"] == 1
+            and item["job_selectable"] is False
+            for item in found["results"]
+        ))
+
+        mcx_public = _device_search_payload("MCXA132VFM", limit=1)
+        self.assertEqual(mcx_public["count"], 0)
+        self.assertEqual(mcx_public["total_count"], 0)
+        self.assertEqual(mcx_public["results"], [])
+
+        record = get_default_device_catalog().resolve("NXP", "MCXA132VFM")
+        self.assertIsNotNone(record)
+        item = evidence_module.get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
+        self.assertIsNotNone(item)
         self.assertEqual(item["icpn"], "MCXA132VFM")
-        self.assertEqual(item["nxp_manufacturer_device_profile"]["icpn"], item["icpn"])
-        self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
-        self.assertIsNone(item["selected_profile"])
-        self.assertEqual(item["physical_validation"]["socket_status"], "no_evidence")
+        self.assertFalse(item["programming_profile_authority"])
 
 
 if __name__ == "__main__":
