@@ -206,23 +206,23 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(report["discovered_exact_icpns"], 4975)
         self.assertEqual(
             report["catalog_level_counts"],
-            {"0": 437, "1": 4489, "2": 49, "3": 0},
+            {"0": 315, "1": 4595, "2": 65, "3": 0},
         )
         self.assertEqual(
             report["promotion_evidence_counts"],
             {
-                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 362,
-                EVIDENCE_CATALOG_MAPPED_ROUTE: 4127,
-                EVIDENCE_IDENTITY_ONLY: 437,
-                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 49,
+                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 484,
+                EVIDENCE_CATALOG_MAPPED_ROUTE: 4111,
+                EVIDENCE_IDENTITY_ONLY: 315,
+                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 65,
             },
         )
-        self.assertEqual(report["selector_visible_exact_icpns"], 4538)
-        self.assertEqual(report["job_selectable_exact_icpns"], 49)
+        self.assertEqual(report["selector_visible_exact_icpns"], 4660)
+        self.assertEqual(report["job_selectable_exact_icpns"], 65)
 
         self.assertEqual(
             by_manufacturer["STMicroelectronics"]["catalog_level_counts"],
-            {"0": 103, "1": 4477, "2": 49, "3": 0},
+            {"0": 103, "1": 4461, "2": 65, "3": 0},
         )
         self.assertEqual(
             by_manufacturer["NXP"]["catalog_level_counts"],
@@ -230,14 +230,14 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             by_manufacturer["Microchip"]["catalog_level_counts"],
-            {"0": 122, "1": 0, "2": 0, "3": 0},
+            {"0": 0, "1": 122, "2": 0, "3": 0},
         )
 
         self.assertEqual(
             by_manufacturer["STMicroelectronics"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
             {
                 BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED: 362,
-                MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 4115,
+                MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 4099,
             },
         )
         self.assertEqual(
@@ -245,12 +245,12 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
             {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 12},
         )
         self.assertEqual(
-            by_manufacturer["Microchip"]["promotion_blocker_counts"][EDGE_L0_TO_L1],
-            {NO_PROGRAMMING_ROUTE_EVIDENCE: 122},
+            by_manufacturer["Microchip"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
+            {BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED: 122},
         )
         self.assertEqual(
             report["promotion_blocker_counts"][EDGE_L2_TO_L3],
-            {PLASMA_VERIFIED_CONFIGURATION_MISSING: 49},
+            {PLASMA_VERIFIED_CONFIGURATION_MISSING: 65},
         )
 
 
