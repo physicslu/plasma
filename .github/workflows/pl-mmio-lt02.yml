@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends iverilog verilator
-          python3 -m pip install pytest 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+          python3 -m pip install -e software/python pytest pytest-asyncio 'cocotb==1.9.2' 'cocotb-test==0.2.6'
       - name: LinuxMMIO / LT02 host-only tests
         env:
           PYTHONPATH: software/python
