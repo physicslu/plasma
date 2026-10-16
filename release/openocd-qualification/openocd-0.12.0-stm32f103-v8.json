@@ -18,7 +18,7 @@
     {
       "qualification_id": "adr0002-phase2-openocd-012-stm32f103-medium-v4",
       "qualification_path": "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
-      "git_blob_sha1": "db7c4f190da7a9ea5acaf7eb564a5a405db52d0d",
+      "git_blob_sha1": "06fc766df2fe2548866dcfcc9c93ebdd9610e640",
       "role": "medium_density_existing_authority",
       "supported_exact_icpn_count": 22
     },
