@@ -194,6 +194,101 @@ def validate_security(profile: dict[str, Any]) -> None:
     require(wrp["granularity_bytes"] == 4096, "medium-density WRP granularity must be 4096 bytes")
 
 
+def validate_c8_programming_hardware(profile: dict[str, Any]) -> None:
+    require(
+        profile.get("profile_id") == "stm32f103c8t6-lqfp48-swd-socket-v1",
+        "STM32F103C8T6 Programming Hardware profile identity drift",
+    )
+    scope = profile.get("scope")
+    require(isinstance(scope, dict), "STM32F103C8T6 Programming Hardware scope is required")
+    require(scope.get("icpn") == "STM32F103C8T6", "Programming Hardware must bind exact ICPN")
+    require(scope.get("base_device") == "STM32F103C8", "Programming Hardware Base Device drift")
+    require(scope.get("package") == "LQFP", "Programming Hardware package drift")
+    require(scope.get("pin_count") == 48, "Programming Hardware pin count drift")
+    require(scope.get("programming_interface") == "SWD", "Programming Hardware interface drift")
+
+    data = profile.get("data")
+    require(isinstance(data, dict), "STM32F103C8T6 Programming Hardware data is required")
+    require(
+        data.get("design_input_state") == "socket_schematic_ready_not_physically_qualified",
+        "STM32F103C8T6 socket design input state drift",
+    )
+
+    physical = data.get("physical_validation")
+    require(isinstance(physical, dict), "STM32F103C8T6 physical_validation is required")
+    for key in ("fixture_qualified", "hardware_runtime_ready", "physical_programming_qualified", "hil_pass"):
+        require(physical.get(key) is False, f"STM32F103C8T6 {key} must remain false")
+
+    mech = data.get("package_mechanical")
+    require(isinstance(mech, dict), "STM32F103C8T6 package mechanics are required")
+    require(mech.get("package") == "LQFP48", "STM32F103C8T6 package must be LQFP48")
+    require(mech.get("terminal_count") == 48, "STM32F103C8T6 terminal count must be 48")
+    require(mech.get("body_size_mm") == {"x": 7.0, "y": 7.0}, "STM32F103C8T6 body must be 7x7 mm")
+    require(mech.get("overall_span_mm") == {"x": 9.0, "y": 9.0}, "STM32F103C8T6 package span must be 9x9 mm")
+    require(mech.get("lead_pitch_mm") == 0.5, "STM32F103C8T6 lead pitch must be 0.5 mm")
+
+    expected_pins = {
+        "1": ("VBAT", "backup_supply"),
+        "7": ("NRST", "reset"),
+        "8": ("VSSA", "analog_ground"),
+        "9": ("VDDA", "analog_supply"),
+        "23": ("VSS_1", "ground"),
+        "24": ("VDD_1", "main_supply"),
+        "34": ("PA13", "SWDIO"),
+        "35": ("VSS_2", "ground"),
+        "36": ("VDD_2", "main_supply"),
+        "37": ("PA14", "SWCLK"),
+        "44": ("BOOT0", "boot_strap"),
+        "47": ("VSS_3", "ground"),
+        "48": ("VDD_3", "main_supply"),
+    }
+    pin_map = data.get("pin_map")
+    require(isinstance(pin_map, dict), "STM32F103C8T6 socket-critical pin map is required")
+    require(set(pin_map) == set(expected_pins), "STM32F103C8T6 socket-critical pin set drift")
+    for number, expected in expected_pins.items():
+        item = pin_map[number]
+        require(
+            (item.get("name"), item.get("role")) == expected,
+            f"STM32F103C8T6 pin {number} mapping drift",
+        )
+
+    interface = data.get("programming_interface")
+    require(isinstance(interface, dict) and interface.get("interface") == "SWD", "SWD contract is required")
+    signals = interface.get("signals")
+    require(isinstance(signals, dict), "SWD signals are required")
+    require(signals.get("SWDIO", {}).get("package_pin") == 34, "SWDIO must be package pin 34")
+    require(signals.get("SWCLK", {}).get("package_pin") == 37, "SWCLK must be package pin 37")
+    require(signals.get("NRST", {}).get("package_pin") == 7, "NRST must be package pin 7")
+    require(interface.get("connect_under_reset_capable") is True, "NRST recovery control is required")
+
+    power = data.get("power")
+    require(isinstance(power, dict), "STM32F103C8T6 power contract is required")
+    require(power.get("programming_vdd_v") == {"min": 2.0, "max": 3.6}, "programming VDD range drift")
+    require(power.get("external_vpp_required") is False, "external VPP must not be required")
+    require(
+        {item["package_pin"] for item in power.get("mandatory_supply_contacts", [])} == {9, 24, 36, 48},
+        "mandatory supply contacts drift",
+    )
+    require(
+        {item["package_pin"] for item in power.get("mandatory_ground_contacts", [])} == {8, 23, 35, 47},
+        "mandatory ground contacts drift",
+    )
+
+    contract = data.get("fixture_contact_contract")
+    require(isinstance(contract, dict), "fixture contact contract is required")
+    mandatory = contract.get("mandatory_contacts")
+    require(isinstance(mandatory, list), "mandatory fixture contacts are required")
+    expected_contacts = {
+        (24, "VDD_1"), (36, "VDD_2"), (48, "VDD_3"), (9, "VDDA"),
+        (23, "VSS_1"), (35, "VSS_2"), (47, "VSS_3"), (8, "VSSA"),
+        (34, "SWDIO"), (37, "SWCLK"), (7, "NRST"),
+    }
+    require(
+        {(item["package_pin"], item["signal"]) for item in mandatory} == expected_contacts,
+        "mandatory SWD socket contact set drift",
+    )
+    require(contract.get("minimum_contact_count") == 11, "minimum SWD socket contact count must be 11")
+
 def main() -> int:
     schema = load_json(SCHEMA_FILE)
     require(schema.get("$schema") == "https://json-schema.org/draft/2020-12/schema", "unexpected JSON Schema version")
@@ -274,6 +369,10 @@ def main() -> int:
     validate_programming(c8["programming"])
     validate_option(c8["option"])
     validate_security(c8["security"])
+    hardware = profiles.get("stm32f103c8t6-lqfp48-swd-socket-v1")
+    require(hardware is not None, "STM32F103C8T6 Programming Hardware profile is missing")
+    validate_c8_programming_hardware(hardware)
+
     print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles")
     return 0
 
