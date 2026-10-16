@@ -102,12 +102,13 @@ def synthetic_dpidr(port) -> dict[str, object]:
             "synthetic_fixture_only": True}
 
 
-def run_stage(stage: str, *, device="/dev/mem",
-              owner_lock="/run/lock/plasma-mmio.lock") -> dict[str, object]:
+def run_stage(stage: str, *, device: str,
+              owner_lock: str) -> dict[str, object]:
     """Real backend defaults; tests may inject a *regular file* as device.
 
-    Caller MUST independently pass strict live prerequisite checks before
-    invoking run_stage with /dev/mem. This function is not a public entrypoint.
+    A caller MUST supply a deliberate device and lock path. The live CLI
+    verifies all strict prerequisites before calling this function with
+    /dev/mem. This function is not a public entrypoint.
     """
     with LinuxMMIO(apertures(stage), device=device, owner_lock=owner_lock,
                    readonly=(stage == "HIL01")) as mmio:
@@ -174,7 +175,8 @@ def main(argv: list[str] | None = None) -> int:
         "utc_started": datetime.now(timezone.utc).isoformat(),
     })
     try:
-        observation = run_stage(args.stage)
+        observation = run_stage(args.stage, device="/dev/mem",
+                                owner_lock="/run/lock/plasma-mmio.lock")
         result = {"result": "PASS", "observations": observation}
     except (OSError, ValueError, c.SafetyError, RuntimeError) as exc:
         # No repeated hardware access, no implicit recover/reset after error.
