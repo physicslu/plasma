@@ -36,7 +36,7 @@ timeout --signal=TERM --kill-after=10s 900s \
 rc="${PIPESTATUS[0]}"
 set -e
 printf 'end_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "$out/metadata.txt"
-printf '%s\n' "$rc" > "$out/exit_code.pending"
-mv "$out/exit_code.pending" "$out/exit_code"
+printf '%s\n' "$rc" > "$out/exit_code"
 ( cd "$out" && sha256sum exit_code metadata.txt > SHA256SUMS )
+touch "$out/complete"
 printf '\nCodex ended with rc=%s. Terminal session available until Actions finalizes.\n' "$rc"
