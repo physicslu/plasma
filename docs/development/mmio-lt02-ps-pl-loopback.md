@@ -13,7 +13,7 @@ Control Station / existing Engineering Loopback Test UI (PL disabled until prove
    -> production LinuxMMIO -> PS GP0 AXI4-Lite -> new LT02 RTL
 ```
 
-The currently merged SWD-03 four-aperture internal DPIDR fixture is unchanged and **does not contain this new block**. A separately implemented, validated five-aperture Z2 candidate is necessary before HIL. Do not use the old SWD-03 firmware receipt or claimed Build ID to authorize a new image. This initial integration includes no Z2 load, service deployment, real MCU, external PL I/O, or IC programming.
+The currently merged SWD-03 four-aperture internal DPIDR fixture is unchanged and **does not contain this new block**. A separate five-aperture Z2 source/build candidate now exists at [z2-lt02-axi](../../pl/projects/z2-lt02-axi/README.md); it still requires an actual Vivado implementation, handoff and verified Bitstream before HIL. Do not use the old SWD-03 FPGA image receipt or claimed Build ID to authorize a new image. This initial integration includes no Z2 load, service deployment, real MCU, external PL I/O, or IC programming.
 
 The existing `software/web/app/engineering/loopback-test.tsx` already owns the eight deterministic patterns, lengths, repeat/delay and CRC display. Do not create another page or accidentally enable the PL selector. PL becomes enabled only after an actual PPU PL service with hardware-source proof, Manager allowlist, Gateway, Server, and browser response validation exists. PS-only loopback must remain untouched.
 
