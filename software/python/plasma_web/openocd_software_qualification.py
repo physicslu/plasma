@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -1247,6 +1248,7 @@ class OpenOCDSoftwareQualificationRegistry:
         }
 
 
+@lru_cache(maxsize=1)
 def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQualificationRegistry | None:
     required = (
         RELEASE_REL,
