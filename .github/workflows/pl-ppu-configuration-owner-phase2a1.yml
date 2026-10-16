@@ -1,0 +1,54 @@
+name: PLASMA PPU Configuration Owner Phase 2A.1 Host-only
+
+on:
+  pull_request:
+    paths:
+      - "software/python/plasma_interfaces/configuration_owner.py"
+      - "software/python/tests/test_configuration_owner_host.py"
+      - "software/python/plasma_interfaces/uio_backend.py"
+      - "software/python/tests/test_uio_backend_host.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
+      - "docs/development/ppu-configuration-owner-phase2a1-host.md"
+      - ".github/workflows/pl-ppu-configuration-owner-phase2a1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "software/python/plasma_interfaces/configuration_owner.py"
+      - "software/python/tests/test_configuration_owner_host.py"
+      - "software/python/plasma_interfaces/uio_backend.py"
+      - "software/python/tests/test_uio_backend_host.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/tests/test_linux_mmio.py"
+      - "docs/development/ppu-configuration-owner-phase2a1-host.md"
+      - ".github/workflows/pl-ppu-configuration-owner-phase2a1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  host-configuration-owner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python Host test dependencies
+        run: python3 -m pip install -e software/python pytest pytest-asyncio
+      - name: Phase 2A.1 Owner and Phase 2A/LinuxMMIO regression
+        run: |
+          python3 -m pytest -q \
+            software/python/tests/test_configuration_owner_host.py \
+            software/python/tests/test_uio_backend_host.py \
+            software/python/tests/test_linux_mmio.py
+      - name: Host evidence/safety limitations
+        if: always()
+        run: |
+          {
+            echo "Synthetic phase 2A.1 owner only; no physical FPGA admission."
+            echo "All memory accesses use ordinary regular-file mocks."
+            echo "No /dev/uioX, /dev/mem, FPGA Manager, unbind, RTL, Z2 or DUT operation."
+            echo "M1 Architecture Freeze remains NO-GO."
+          } >> "$GITHUB_STEP_SUMMARY"
