@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from plasma_web.device_catalog import DeviceCatalogIntegrityError
 from plasma_web.gateway import _device_search_payload
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.backend_candidate_registry import (
     ROOT as CANDIDATE_ROOT,
     get_default_backend_candidate_registry,
@@ -63,7 +64,11 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
         ):
             with self.subTest(part=exact):
                 search = _device_search_payload(exact, limit=1)
-                self.assertEqual(search["catalog_size"], 4975)
+                level_counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
+                self.assertEqual(
+                    search["catalog_size"],
+                    sum(level_counts[str(level)] for level in (1, 2, 3)),
+                )
                 self.assertEqual(search["count"], 1)
                 row = search["results"][0]
                 self.assertEqual(row["icpn"], exact)
@@ -80,7 +85,8 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
                     self.assertIsNone(provider["installed_binary_sha256"])
                 self.assertEqual(row["physical_validation"]["socket_status"], "no_evidence")
         nxp = _device_search_payload("NXP", limit=1)
-        self.assertEqual(nxp["total_count"], 224)
+        self.assertEqual(nxp["levels"], [1, 2, 3])
+        self.assertEqual(nxp["total_count"], 12)
 
     def test_explicit_empty_and_partially_missing_roots_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
