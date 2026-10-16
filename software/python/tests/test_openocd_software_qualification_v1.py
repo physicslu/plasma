@@ -327,7 +327,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
         self.assertIsNone(unreviewed["provider"])
         self.assertEqual(unreviewed["operations"], {})
         self.assertIsNone(unreviewed["programming"])
-        self.assertEqual(unreviewed["selector_visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertEqual(unreviewed["selector_visibility_rule"], "CATALOG_LEVEL_2_PROGRAMMABLE")
         self.assertFalse(unreviewed["job_batch_execution_changed"])
         self.assertFalse(unreviewed["hardware_runtime_ready"])
         self.assertFalse(unreviewed["physical_programming_qualified"])
@@ -359,8 +359,8 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "adr0002-phase2-openocd-012-stm32f103-v7",
         )
         self.assertEqual(
-            registry.summary["selector_visibility_authority"],
-            "PHASE1_IDENTIFIED",
+            registry.summary["selector_visibility_rule"],
+            "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
         self.assertEqual(len(registry.reviewed_exact_keys), 49)
 
