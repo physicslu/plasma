@@ -14,6 +14,7 @@ from plasma_core.diagnostics import (
     LOOPBACK_DIAGNOSTIC_TYPE,
     PS_LOOPBACK_ENDPOINT,
     PL_LOOPBACK_ENDPOINT,
+    MAX_PL_LOOPBACK_CASE_BYTES,
     crc32_hex,
     require_crc32,
     require_nonnegative_int,
@@ -137,7 +138,7 @@ async def execute_ps_loopback(
             "seed must be a string of at most 128 characters",
         )
     payload, tx_crc32 = _parse_payload(body)
-    if endpoint == PL_LOOPBACK_ENDPOINT and len(payload) > 1024 * 1024:
+    if endpoint == PL_LOOPBACK_ENDPOINT and len(payload) > MAX_PL_LOOPBACK_CASE_BYTES:
         raise PlasmaError(ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE, "LT02 hardware case exceeds 1 MiB")
 
     started_at = time.monotonic()
