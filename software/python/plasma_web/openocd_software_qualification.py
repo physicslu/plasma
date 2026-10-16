@@ -29,12 +29,12 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
-QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v7.json"
+QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json"
 MEDIUM_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
 APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
 EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json"
-HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-lqfp-v3.json"
-HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-t6-t7-applicability-v3.json"
+HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-package-v4.json"
+HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json"
 HIGH_EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
@@ -114,11 +114,11 @@ class OpenOCDSoftwareQualificationRegistry:
             qualification_manifest.get("provider_source_lock_id") == source_lock.get("source_lock_id")
             and qualification_manifest.get("provider") == q_provider
             and qualification_manifest.get("qualification_id")
-            == "adr0002-phase2-openocd-012-stm32f103-v7"
+            == "adr0002-phase2-openocd-012-stm32f103-v8"
             and qualification_manifest.get("predecessor_qualification_id")
-            == "adr0002-phase2-openocd-012-stm32f103-v6"
-            and qualification_manifest.get("supported_exact_icpn_count") == 49,
-            "STM32F103 v7 qualification manifest drift",
+            == "adr0002-phase2-openocd-012-stm32f103-v7"
+            and qualification_manifest.get("supported_exact_icpn_count") == 65,
+            "STM32F103 v8 qualification manifest drift",
         )
         manifest_cohorts = {
             item.get("qualification_path"): item
@@ -127,13 +127,13 @@ class OpenOCDSoftwareQualificationRegistry:
         }
         _require(
             set(manifest_cohorts) == {MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL},
-            "STM32F103 v7 cohort manifest scope drift",
+            "STM32F103 v8 cohort manifest scope drift",
         )
         for rel in (MEDIUM_QUALIFICATION_REL, HIGH_QUALIFICATION_REL):
             raw = (root / rel).read_bytes()
             _require(
                 _git_blob_sha1(raw) == manifest_cohorts[rel].get("git_blob_sha1"),
-                f"STM32F103 v7 cohort lock drift: {rel}",
+                f"STM32F103 v8 cohort lock drift: {rel}",
             )
         _require(
             high_qualification.get("provider_source_lock_id") == source_lock.get("source_lock_id")
@@ -788,7 +788,11 @@ class OpenOCDSoftwareQualificationRegistry:
             and high_band.get("pin_count", {}).get("R") == 64
             and high_band.get("pin_count", {}).get("V") == 100
             and high_band.get("pin_count", {}).get("Z") == 144
+            and high_ordering.get("required_package_codes")
+            == {"T": "LQFP", "H": "LFBGA", "Y": "WLCSP64"}
             and high_band.get("package", {}).get("T") == "LQFP"
+            and high_band.get("package", {}).get("H") == "LFBGA"
+            and high_band.get("package", {}).get("Y") == "WLCSP64"
             and high_band.get("temperature_c", {}).get("6") == "-40 to 85 C"
             and high_band.get("temperature_c", {}).get("7") == "-40 to 105 C"
             and high_ordering.get("required_temperature_codes")
@@ -847,6 +851,22 @@ class OpenOCDSoftwareQualificationRegistry:
                 "STM32F103ZDT6",
                 "STM32F103ZET6",
                 "STM32F103ZET7",
+                "STM32F103RCY6TR",
+                "STM32F103RDY6TR",
+                "STM32F103REY6TR",
+                "STM32F103VCH6",
+                "STM32F103VDH6",
+                "STM32F103VDH6TR",
+                "STM32F103VEH6",
+                "STM32F103VEH6TR",
+                "STM32F103VEH7",
+                "STM32F103ZCH6",
+                "STM32F103ZDH6",
+                "STM32F103ZDH6TR",
+                "STM32F103ZEH6",
+                "STM32F103ZEH6TR",
+                "STM32F103ZEH7",
+                "STM32F103ZEH7TR",
             },
             "high-density manufacturer applicability scope expanded without review",
         )
@@ -1084,16 +1104,32 @@ class OpenOCDSoftwareQualificationRegistry:
             ("STMicroelectronics", "STM32F103ZET6"),
             ("STMicroelectronics", "STM32F103ZET6TR"),
             ("STMicroelectronics", "STM32F103ZET7"),
+            ("STMicroelectronics", "STM32F103RCY6TR"),
+            ("STMicroelectronics", "STM32F103RDY6TR"),
+            ("STMicroelectronics", "STM32F103REY6TR"),
+            ("STMicroelectronics", "STM32F103VCH6"),
+            ("STMicroelectronics", "STM32F103VDH6"),
+            ("STMicroelectronics", "STM32F103VDH6TR"),
+            ("STMicroelectronics", "STM32F103VEH6"),
+            ("STMicroelectronics", "STM32F103VEH6TR"),
+            ("STMicroelectronics", "STM32F103VEH7"),
+            ("STMicroelectronics", "STM32F103ZCH6"),
+            ("STMicroelectronics", "STM32F103ZDH6"),
+            ("STMicroelectronics", "STM32F103ZDH6TR"),
+            ("STMicroelectronics", "STM32F103ZEH6"),
+            ("STMicroelectronics", "STM32F103ZEH6TR"),
+            ("STMicroelectronics", "STM32F103ZEH7"),
+            ("STMicroelectronics", "STM32F103ZEH7TR"),
         }
         _require(
-            high_exact.issubset(self._records) and len(self._records) == 49,
+            high_exact.issubset(self._records) and len(self._records) == 65,
             "combined Programming Qualification scope expanded without review",
         )
 
         for qualification_name, boundary in (
             ("medium-density", qualification.get("acceptance_boundary", {})),
             ("high-density", high_qualification.get("acceptance_boundary", {})),
-            ("v7 manifest", qualification_manifest.get("acceptance_boundary", {})),
+            ("v8 manifest", qualification_manifest.get("acceptance_boundary", {})),
         ):
             for boundary_key in (
                 "job_batch_execution_changed",
