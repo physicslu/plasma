@@ -37,7 +37,9 @@
       "source_id": "st_an2586_rev8",
       "sections": [
         "2.1.2 Battery backup",
-        "2.2 Power supply schemes"
+        "2.2 Power supply schemes",
+        "4.1 Boot mode selection",
+        "4.2 Boot pin connection / Figure 10"
       ]
     }
   ],
@@ -156,20 +158,19 @@
           "pin_name": "NRST",
           "signal": "NRST",
           "role": "recovery_reset_active_low"
-        }
-      ],
-      "recovery_contacts": [
+        },
         {
           "package_pin": 44,
           "pin_name": "BOOT0",
           "signal": "BOOT0",
           "role": "boot_mode_control",
-          "required_for_normal_swd_route": false,
-          "contact_recommended_for_recovery": true,
-          "drive_policy": "site_policy_required_before_hil"
+          "normal_socket_policy": "pull_down_for_main_flash_boot",
+          "typical_pull_down_ohms": 10000,
+          "programmer_override": "may_drive_high_for_system_memory_recovery_when_site_policy_allows"
         }
       ],
-      "mandatory_contact_count": 12
+      "recovery_contacts": [],
+      "mandatory_contact_count": 13
     },
     "power_and_reset": {
       "target_vdd_v": {
@@ -235,6 +236,17 @@
           "min": 1.8,
           "max": 3.6
         }
+      },
+      "boot0": {
+        "package_pin": 44,
+        "reset_latched": true,
+        "normal_boot_value": 0,
+        "normal_boot_target": "main_flash_memory",
+        "pull_down_ohms": {
+          "typical": 10000,
+          "basis": "AN2586 Figure 10 typical example"
+        },
+        "programmer_control_recommended": true
       }
     },
     "design_boundaries": {
