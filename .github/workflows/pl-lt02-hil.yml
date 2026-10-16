@@ -1,0 +1,44 @@
+name: PL LT02 Z2 HIL offline development gates
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/lt02/**"
+      - "pl/tests/test_lt02_native_hil.py"
+      - "pl/verification/test_mmio_lt02_rtl.py"
+      - "software/python/plasma_interfaces/mmio_loop_test.py"
+      - ".github/workflows/pl-lt02-hil.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/lt02/**"
+      - "pl/tests/test_lt02_native_hil.py"
+      - ".github/workflows/pl-lt02-hil.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lt02-hil-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install RTL simulation and reviewed Python package
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog
+          python3 -m pip install -e software/python pytest pytest-asyncio 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: LT02 runner syntax and strict host safety tests
+        run: |
+          python3 -m py_compile pl/hil/lt02/native.py
+          python3 -m pytest -v pl/tests/test_lt02_native_hil.py
+      - name: Same production LoopTestDriver against real RTL in Icarus
+        run: python3 -m pytest -v pl/verification/test_mmio_lt02_rtl.py
+      - name: HIL evidence boundary
+        run: |
+          echo "LT02 development HIL runner guard tests and production Driver/Cocotb RTL PASS." >> "$GITHUB_STEP_SUMMARY"
+          echo "No PYNQ-Z2 image load, native /dev/mem, FPGA restoration or real IC operation occurs in GitHub CI." >> "$GITHUB_STEP_SUMMARY"

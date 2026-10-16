@@ -38,7 +38,8 @@ jobs:
           python3 -m py_compile pl/projects/z2-swd-gpio/build-progress.py
       - name: Source layout and artifact unit tests (no Vivado or Z2)
         run: |
-          python3 -m pip install pytest
+          # PL HIL tests import the production Python interfaces and its declared PyYAML dependency.
+          python3 -m pip install pytest 'PyYAML>=6.0'
           python3 -m pytest -q pl/tests
       - name: Install RTL simulators and cocotb test requirements
         run: |

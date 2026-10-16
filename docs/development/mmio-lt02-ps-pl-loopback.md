@@ -13,7 +13,7 @@ Control Station / existing Engineering Loopback Test UI (PL disabled until prove
    -> production LinuxMMIO -> PS GP0 AXI4-Lite -> new LT02 RTL
 ```
 
-The currently merged SWD-03 four-aperture internal DPIDR fixture is unchanged and **does not contain this new block**. A separate five-aperture Z2 source/build candidate now exists at [z2-lt02-axi](../../pl/projects/z2-lt02-axi/README.md); it still requires an actual Vivado implementation, handoff and verified Bitstream before HIL. Do not use the old SWD-03 FPGA image receipt or claimed Build ID to authorize a new image. This initial integration includes no Z2 load, service deployment, real MCU, external PL I/O, or IC programming.
+The currently merged SWD-03 four-aperture internal DPIDR fixture is unchanged and **does not contain this new block**. A separate five-aperture Z2 source/build candidate now exists at [z2-lt02-axi](../../pl/projects/z2-lt02-axi/README.md); PR #954 已合併，SWPC 回報實際 Vivado Build PASS 並保留產物；本 Repository 的公開 CI 本身未驗證該 SWPC 私有 Build Log，LT02-05 仍需逐項比對 BIT/HWH/Manifest 與取得實機 HIL 證據。 Do not use the old SWD-03 FPGA image receipt or claimed Build ID to authorize a new image. This initial integration includes no Z2 load, service deployment, real MCU, external PL I/O, or IC programming.
 
 The existing `software/web/app/engineering/loopback-test.tsx` already owns the eight deterministic patterns, lengths, repeat/delay and CRC display. Do not create another page or accidentally enable the PL selector. PL becomes enabled only after an actual PPU PL service with hardware-source proof, Manager allowlist, Gateway, Server, and browser response validation exists. PS-only loopback must remain untouched.
 
@@ -47,7 +47,7 @@ If AXI AW and W arrive on different cycles, the slave must wait for both. BVALID
 - A mismatch or counter error fails immediately. Never retry a possibly completed write.
 - Emit bytes, chunk count, word counts, elapsed PS-side nanoseconds, TX/RX CRC32 and payload bytes to the higher-level diagnostic transport. **Browser/Manager RTT is a separate metric**.
 - Pattern generation, test-ID, sequence, CRC verification, request admission and inter-packet delay belong to the existing diagnostics stack, not FPGA/driver.
-- The LinuxMMIO caller creates a precise `MMIOAperture` allowlist (only the above registers/window), holds exclusive ownership, and closes before FPGA reload. No fallback to a mock or synthetic PASS in the PL real path.
+- The [LT02-05 HIL runner](../../pl/hil/lt02/README.md) supplies the qualified real-board experiment without changing the PL UI. The LinuxMMIO caller creates a precise `MMIOAperture` allowlist (only the above registers/window), holds exclusive ownership, and closes before FPGA reload. No fallback to a mock or synthetic PASS in the PL real path.
 
 ## Acceptance gates
 
