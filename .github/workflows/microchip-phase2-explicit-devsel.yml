@@ -117,7 +117,7 @@ jobs:
                   assert result['execution_authorized'] is False
               else:
                   assert hit is None
-          assert all(r['mapping_status'] == 'no_mapping' and not r['target_config']
+          assert all(r.mapping_status == 'no_mapping' and not r.target_config
                      for r in microchip)
           PY
       - name: Run source-bound SAM L1 and historical Microchip regression tests
