@@ -94,8 +94,9 @@ def validate_contract(data: dict) -> dict:
                     {"site_id", "site_abi_version", "site_status"},
                     "Invalid Site discovery aperture")
             site_ids.add(site_id)
-    require(len(seen_bases) == 12 and site_ids == set(range(1, 9)),
-            "Missing one or more Site slots")
+    require(seen_bases == {base + i * stride for i in range(12)} and
+            site_ids == set(range(1, 9)),
+            "Missing/replaced one or more fixed ABI slots")
     require(integer(data.get("magics", {}).get("ppu_identity_word"), "magic")
             == 0x4D534C50, "Unexpected identity magic")
     return {"base": base, "size": size, "sites": 8,
@@ -186,8 +187,11 @@ def resolve_mapping(uios: list[dict], start: int, size: int,
             type(page_size) is int and page_size >= 4096,
             "Invalid requested physical window")
     matched = []
+    overlaps = 0
     for uio in uios:
         for m in uio["maps"]:
+            if m["addr"] < start + size and start < m["addr"] + m["size"]:
+                overlaps += 1
             if m["addr"] <= start and start + size <= m["addr"] + m["size"]:
                 matched.append({
                     "device": uio["device"],
@@ -198,8 +202,8 @@ def resolve_mapping(uios: list[dict], start: int, size: int,
                     "window_size": size,
                     "driver": uio["driver"],
                 })
-    require(len(matched) == 1,
-            f"UIO mapping candidate ambiguous/unavailable: {len(matched)} matches")
+    require(len(matched) == 1 and overlaps == 1,
+            f"UIO mapping candidate ambiguous/unavailable: {len(matched)} full matches, {overlaps} overlaps")
     return matched[0]
 
 
