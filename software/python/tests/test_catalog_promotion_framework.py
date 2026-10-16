@@ -15,6 +15,7 @@ from plasma_web.catalog_promotion_framework import (
     NO_PROGRAMMING_ROUTE_EVIDENCE,
     PLASMA_VERIFIED_CONFIGURATION_MISSING,
     PROVIDER_QUALIFICATION_BLOCKED,
+    PROVIDER_QUALIFICATION_INCOMPLETE,
     CatalogPromotionFramework,
     get_default_catalog_promotion_framework,
 )
@@ -148,6 +149,7 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(
             observed["BLOCKED1"]["promotion_blocker"],
             PROVIDER_QUALIFICATION_BLOCKED,
+    PROVIDER_QUALIFICATION_INCOMPLETE,
         )
 
         self.assertEqual(observed["SUPPORTED1"]["catalog_level"], 2)
@@ -212,9 +214,9 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
             report["promotion_evidence_counts"],
             {
                 EVIDENCE_BACKEND_CANDIDATE_ROUTE: 1377,
-                EVIDENCE_CATALOG_MAPPED_ROUTE: 4128,
+                EVIDENCE_CATALOG_MAPPED_ROUTE: 4127,
                 EVIDENCE_IDENTITY_ONLY: 315,
-                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 65,
+                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 66,
             },
         )
         self.assertEqual(report["selector_visible_exact_icpns"], 5570)
@@ -242,7 +244,8 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             by_manufacturer["NXP"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
-            {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 29},
+            {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 28,
+             PROVIDER_QUALIFICATION_INCOMPLETE: 1},
         )
         self.assertEqual(
             by_manufacturer["Microchip"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
