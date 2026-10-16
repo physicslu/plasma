@@ -71,6 +71,8 @@ from plasma_web.runtime_evidence_root import default_runtime_evidence_root
 from plasma_web.backend_candidate_registry import get_default_backend_candidate_registry
 from plasma_web.backend_source_reference import default_pinned_upstream
 from plasma_web.openocd_provider_registry import get_default_openocd_provider_registry
+from plasma_web.device_catalog import get_default_device_catalog
+from plasma_web.nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 
 root = default_runtime_evidence_root()
 if root is None or not root.is_dir():
@@ -86,6 +88,16 @@ if provider is None or provider.inventory != {
     raise SystemExit("[render-start] source-only OpenOCD provider inventory missing")
 if default_pinned_upstream() is None:
     raise SystemExit("[render-start] pinned OpenOCD source reference missing")
+
+# L0 manufacturer evidence is internal-only. Validate its installed data root
+# directly instead of leaking it through the customer-facing IC Selector API.
+catalog = get_default_device_catalog()
+mcx_record = catalog.resolve("NXP", "MCXA132VFM")
+if mcx_record is None:
+    raise SystemExit("[render-start] NXP Level 0 identity missing from internal catalog")
+mcx_evidence = get_default_nxp_manufacturer_device_evidence().resolve_exact(mcx_record)
+if not isinstance(mcx_evidence, dict) or mcx_evidence.get("icpn") != "MCXA132VFM":
+    raise SystemExit("[render-start] installed NXP Level 0 evidence path is broken")
 PY
 
 
@@ -186,32 +198,27 @@ if result.get("icpn") != "STM32F103C8T6" or not isinstance(selected_profile, dic
 if selected_profile.get("icpn") != "STM32F103C8T6":
     raise SystemExit("[render-start] IC Selector selected_profile identity mismatch")
 
-# A green STM32 smoke can hide the NXP installed-wheel research path bug.
-# Exercise the same query that users type, plus an exact MCX evidence join,
-# before advertising a healthy public Console.
+# Public readiness verifies only customer-visible Catalog Levels. NXP KL25
+# is Level 1 in the active runtime; Level 0 MCX evidence was checked internally above.
 with urlopen(
     f"http://127.0.0.1:{port}/api/devices/search?q=NXP&limit=1",
     timeout=3,
 ) as response:
     nxp_search = json.loads(response.read())
 if nxp_search.get("total_count", 0) < 1 or not nxp_search.get("results"):
-    raise SystemExit("[render-start] NXP ICPN search unexpectedly empty")
-if nxp_search["results"][0].get("vendor") != "NXP":
-    raise SystemExit("[render-start] NXP query returned a non-NXP record")
+    raise SystemExit("[render-start] customer-visible NXP search unexpectedly empty")
+nxp_row = nxp_search["results"][0]
+if (nxp_row.get("vendor") != "NXP"
+        or nxp_row.get("catalog_level") != 1
+        or nxp_row.get("family") != "KL25"):
+    raise SystemExit("[render-start] NXP customer-selector Level 1 boundary drift")
 with urlopen(
     f"http://127.0.0.1:{port}/api/devices/search?q=MCXA132VFM&limit=1",
     timeout=3,
 ) as response:
-    mcx_search = json.loads(response.read())
-mcx_rows = mcx_search.get("results")
-if not isinstance(mcx_rows, list) or len(mcx_rows) != 1:
-    raise SystemExit("[render-start] NXP exact ICPN search failed")
-mcx = mcx_rows[0]
-evidence = mcx.get("nxp_manufacturer_device_profile")
-if mcx.get("icpn") != "MCXA132VFM" or not isinstance(evidence, dict):
-    raise SystemExit("[render-start] installed NXP evidence path is broken")
-if evidence.get("icpn") != "MCXA132VFM" or mcx["backend"]["mapping_status"] != "no_mapping":
-    raise SystemExit("[render-start] NXP manufacturer-only evidence boundary drift")
+    mcx_public = json.loads(response.read())
+if mcx_public.get("total_count") != 0 or mcx_public.get("results"):
+    raise SystemExit("[render-start] Level 0 NXP identity leaked into customer selector")
 for exact, provider_id in (
     ("STM32H503CBT6", "openocd-st-h5-research"),
     ("STM32C531CBT6", "openocd-st-c5-stldr-research"),

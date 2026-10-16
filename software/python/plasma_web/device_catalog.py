@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 DEFAULT_SEARCH_LIMIT = 20
@@ -375,8 +375,13 @@ class DeviceCatalog:
         *,
         limit: int = DEFAULT_SEARCH_LIMIT,
         offset: int = 0,
+        predicate: Callable[[DeviceCatalogRecord], bool] | None = None,
     ) -> tuple[list[DeviceCatalogRecord], int]:
-        """Return one deterministic ranked page plus the full filtered match count."""
+        """Return one deterministic ranked page plus the full filtered match count.
+
+        predicate is applied before pagination so total_count and page boundaries
+        describe the same product surface the caller exposes.
+        """
         normalized = query.strip().casefold()
         if not normalized:
             return [], 0
@@ -401,6 +406,8 @@ class DeviceCatalog:
             )
             searchable = f"{identifier} {taxonomy}"
             if not all(token in searchable for token in tokens):
+                continue
+            if predicate is not None and not predicate(record):
                 continue
             if identifier == normalized:
                 match_rank = 0

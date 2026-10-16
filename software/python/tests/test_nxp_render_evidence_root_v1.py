@@ -43,18 +43,20 @@ class NXPInstalledWheelDataRootTests(unittest.TestCase):
                         evidence_module._root() / evidence_module.EVIDENCE_RELATIVE_PATH
                     )
 
-    def test_nxp_vendor_and_exact_search_stay_admitted_only(self) -> None:
-        found = _device_search_payload("NXP", limit=1)
-        self.assertEqual(found["total_count"], 224)
-        self.assertEqual(found["results"][0]["vendor"], "NXP")
+    def test_nxp_customer_selector_exposes_routes_but_hides_level0_identity(self) -> None:
+        found = _device_search_payload("NXP", limit=100)
+        self.assertEqual(found["levels"], [1, 2, 3])
+        self.assertEqual(found["total_count"], 12)
+        self.assertTrue(found["results"])
+        self.assertTrue(all(item["vendor"] == "NXP" for item in found["results"]))
+        self.assertTrue(all(item["family"] == "KL25" for item in found["results"]))
+        self.assertTrue(all(item["catalog_level"] == 1 for item in found["results"]))
+
+        # MCX remains source-verified/admitted identity data, but is active Level 0
+        # and therefore must not leak into the customer-facing selector.
         mcx = _device_search_payload("MCXA132VFM", limit=1)
-        self.assertEqual(mcx["count"], 1)
-        item = mcx["results"][0]
-        self.assertEqual(item["icpn"], "MCXA132VFM")
-        self.assertEqual(item["nxp_manufacturer_device_profile"]["icpn"], item["icpn"])
-        self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
-        self.assertIsNone(item["selected_profile"])
-        self.assertEqual(item["physical_validation"]["socket_status"], "no_evidence")
+        self.assertEqual(mcx["count"], 0)
+        self.assertEqual(mcx["total_count"], 0)
 
 
 if __name__ == "__main__":

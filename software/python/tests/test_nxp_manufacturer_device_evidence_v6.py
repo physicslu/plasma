@@ -77,27 +77,25 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
             with self.assertRaisesRegex(NXPManufacturerDeviceEvidenceError, "Git blob changed"):
                 NXPManufacturerDeviceEvidence.from_file(path)
 
-    def test_control_station_api_paginates_and_stays_manufacturer_only(self) -> None:
-        pages = [_device_search_payload("NXP", 100, offset=i)
-                 for i in (0, 100, 200)]
-        self.assertTrue(all(p["ok"] and p["catalog_size"] == 4975 and
-                            p["total_count"] == 224 for p in pages))
-        self.assertEqual([len(p["results"]) for p in pages], [100, 100, 24])
-        rows = [r for page in pages for r in page["results"]]
-        nxp_profiles = [r for r in rows if r["nxp_manufacturer_device_profile"]]
-        self.assertEqual(len(nxp_profiles), 212)
-        self.assertEqual(sum(r["manufacturer_device_basic_profile"] is not None
-                             for r in rows), 0)
-        for item in rows:
+    def test_customer_selector_hides_nxp_level0_and_keeps_level1_routes(self) -> None:
+        payload = _device_search_payload("NXP", 100)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["levels"], [1, 2, 3])
+        self.assertLess(payload["catalog_size"], self.catalog.size)
+        self.assertEqual(payload["total_count"], 12)
+        self.assertEqual(len(payload["results"]), 12)
+        for item in payload["results"]:
+            self.assertEqual(item["family"], "KL25")
+            self.assertEqual(item["catalog_level"], 1)
+            self.assertEqual(item["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+            self.assertFalse(item["job_selectable"])
+            self.assertIsNone(item["nxp_manufacturer_device_profile"])
             self.assertIsNone(item["selected_profile"])
             self.assertEqual(item["physical_validation"]["ppu_status"], "no_evidence")
-            if item["family"] in {"MCX", "K32L2"}:
-                self.assertEqual(item["backend"]["mapping_status"], "no_mapping")
-                self.assertFalse(item["backend"]["target_config"])
-                self.assertIsNotNone(item["nxp_manufacturer_device_profile"])
-            else:
-                self.assertEqual(item["family"], "KL25")
-                self.assertIsNone(item["nxp_manufacturer_device_profile"])
+
+        # The 212 MCX/K32L2 exact ICPNs remain admitted identity records but are
+        # Level 0 in the active runtime and therefore absent from the public selector.
+        self.assertEqual(sum(r.family in {"MCX", "K32L2"} for r in self.nxp), 212)
 
     def test_new_unqualified_discovery_skus_not_added_to_production(self) -> None:
         import csv

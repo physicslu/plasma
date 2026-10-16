@@ -78,6 +78,7 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertEqual(result["catalog_level_state"], "PROGRAMMABLE")
         self.assertEqual(result["state"], "SUPPORTED")
         self.assertTrue(result["selector_visible"])
+        self.assertTrue(result["job_selectable"])
         self.assertFalse(result["execution_authorized"])
         self.assertFalse(result["hardware_runtime_ready"])
         self.assertFalse(result["physical_programming_qualified"])
@@ -88,7 +89,11 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 49)
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
-            "CATALOG_LEVEL_2_PROGRAMMABLE",
+            "CATALOG_LEVEL_1_OR_HIGHER",
+        )
+        self.assertEqual(
+            registry.summary["job_picker_rule"],
+            "CATALOG_LEVEL_2_OR_HIGHER",
         )
 
         st = registry.describe("STMicroelectronics", "STM32F103ZCT6")
@@ -105,8 +110,18 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertEqual(routed["catalog_level"], 1)
         self.assertEqual(routed["catalog_level_state"], "PROGRAMMING_CANDIDATE")
         self.assertEqual(routed["state"], "UNKNOWN")
-        self.assertFalse(routed["selector_visible"])
+        self.assertTrue(routed["selector_visible"])
+        self.assertFalse(routed["job_selectable"])
         self.assertIsNone(routed["provider"])
+
+        h5_candidate = registry.describe("STMicroelectronics", "STM32H503CBT6")
+        self.assertEqual(h5_candidate["identity_state"], "IDENTIFIED")
+        self.assertEqual(h5_candidate["catalog_level"], 1)
+        self.assertEqual(h5_candidate["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+        self.assertEqual(h5_candidate["state"], "CANDIDATE")
+        self.assertEqual(h5_candidate["route_evidence"], "backend_candidate_registry")
+        self.assertTrue(h5_candidate["selector_visible"])
+        self.assertFalse(h5_candidate["job_selectable"])
 
         nxp = registry.describe("NXP", "MCXA132VFM")
         self.assertEqual(nxp["identity_state"], "IDENTIFIED")
@@ -114,6 +129,7 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertEqual(nxp["catalog_level_state"], "DISCOVERED")
         self.assertEqual(nxp["state"], "UNKNOWN")
         self.assertFalse(nxp["selector_visible"])
+        self.assertFalse(nxp["job_selectable"])
         self.assertIsNone(nxp["provider"])
         self.assertFalse(nxp["execution_authorized"])
 
