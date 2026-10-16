@@ -22,12 +22,51 @@ Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣
 具體規則：
 
 1. **Manufacturer Research Catalog** 保存原廠發現的候選 ICPN、DFP 裝置名稱、搜尋失敗、生命週期觀測與證據；不受 OpenOCD 支援與否限制。只有通過 Phase 1 Exact ICPN identity gate 的 `IDENTIFIED` 記錄才取得 Selector visibility；`RESEARCH_ONLY`／`IDENTITY_DISPUTED` 不得冒充正式料號。
-2. **Canonical Phase 1 Identity / Information Store** 管理精確原廠商業 ICPN 與逐欄位可驗證來源。不同 Brand 可使用不同官方取得介面，但進入 PLASMA 後必須收斂成同一份 Phase 1 schema、field-state 與 provenance contract；不得因 Brand 改變證據門檻。
+2. **Canonical Phase 1 Identity / Information Store** 管理精確原廠商業 ICPN 與逐欄位可驗證來源。不同 Manufacturer 可使用不同官方取得介面，但進入 PLASMA 後必須收斂成同一份 Phase 1 schema、field-state 與 provenance contract；不得因 Manufacturer 改變證據門檻。
 3. **User-facing PLASMA Catalog / IC Selector View**（包括 `GET /api/devices/search`、`catalog_size`、`total_count`、分頁、IC Selector 與 picker）以 **Phase 1 `IDENTIFIED` exact ICPN** 為可見集合。Phase 2 `UNKNOWN／CANDIDATE／SUPPORTED／UNSUPPORTED` 與 Phase 3 `NOT_TESTED／PASSED／FAILED` 是顯示狀態，不是 Selector visibility filter。
 4. 軟體支援資格要鎖定 **OpenOCD Provider / 版本或 source commit、Target／Device 對應、Flash Driver、必要的 Flash geometry／bank 假設以及 program、必要 erase、read/verify 等實際宣告的 operation 能力**，保留證據與約束。只有 CFG 檔案名稱、家族字首、確定性 `mapped` 路徑或研究候選，**不足以單獨宣告 OpenOCD = SUPPORTED**。不能在無實體的條件下證成必要晶片特性時，維持 Candidate/Unknown。
 5. **硬體驗證獨立維度**：分開保存 IC/package、Socket／Adapter 型號與修訂版、PPU/Site 型號、供電與接腳映射、Programming Provider／PLASMA 軟體版本及測試結果。Phase 3 尚未測試的 Exact ICPN 仍可顯示；UI 必須明示 `NOT_TESTED`，不能標成 Hardware Passed。
 6. **執行授權仍分離**：Catalog／IC Selector 顯示永遠不直接授權燒錄。Job/Batch 必須至少確認 Phase 2 `SUPPORTED`、相符已安裝 Runtime、電壓／操作／安全條件，並在產品執行政策要求時確認對應 Phase 3 硬體配置，全部 fail-closed。
 7. **OpenOCD 是目前 Phase 2 Provider，不是 Phase 1 visibility gate。** 未來 Vendor Backend / Plasma-native Backend 可透過版本化 Programming Qualification Provider contract 加入，不得修改 Phase 1 Exact ICPN identity 標準來取得特殊待遇。
+
+
+### Cross-Manufacturer canonical production boundary（規範性）
+
+本 ADR 正式使用 **Manufacturer** 表示 IC 原廠。ST、NXP、Microchip 僅是 PLASMA 現階段已研究的 Manufacturer 實例，**不是架構上的固定集合、enum 或 hard-coded allowlist**；未來新增任何 Manufacturer 時，必須直接適用相同 contract。
+
+PLASMA 採用下列唯一資料流：
+
+```text
+Manufacturer-specific Research / Discovery
+        ↓
+Common Phase 1 / Phase 2 / Phase 3 Qualification Gates
+        ↓
+Vendor-neutral Canonical PLASMA Data Model
+        ↓
+Common Product Catalog / API / IC Selector UI
+```
+
+1. **Research / Discovery 可以 Manufacturer-specific。** 各 Manufacturer 可依其官方介面使用不同 Product API、Web、Parametric Export、DFP、Datasheet、Ordering Table、Programming Guide、OpenOCD reverse discovery 或其他可稽核來源；Research artifact、crawler、adapter 與暫存 schema 不要求一致。
+2. **Qualification 是 Research 與 Product domain 的唯一邊界。** Research candidate 不得直接成為 Product row。資料只有在符合本 ADR 的 Phase 1／2／3 gate 後，才能投影至對應的 Canonical Production state。
+3. **通過 gate 後不得再建立 Manufacturer-specific Product schema。** Canonical identity 使用 `(manufacturer, exact_icpn)` 作為邏輯唯一鍵；所有 Manufacturer 共用相同 Phase 定義、field-state、provenance、Programming Qualification 與 Compatibility contract。
+4. **Phase store 可以分離，identity 必須共用。** Phase 1、Phase 2、Phase 3 可因 lifecycle、版本化與 evidence 特性採不同實體 Store／Repository，但必須引用同一 Canonical Identity。此 ADR 所稱「共用資料」指 **Common Canonical Data Model + Common Repository / Service Boundary**，不要求所有 evidence 塞入單一資料表。
+5. **Product API 必須是共用 contract。** `GET /api/devices/search`、detail/picker 與後續正式 Product API 必須只暴露 canonical identity + Phase 1／2／3 contract；不得新增 `/api/st/*`、`/api/nxp/*`、`/api/microchip/*` 等 Manufacturer-specific Product API 來繞過共同模型。
+6. **Product payload 不得長期暴露 Manufacturer-specific schema。** 既有 `nxp_manufacturer_device_profile`、`microchip_phase1_ic_information`、以及將 OpenOCD provider identity 當成 Phase 2 Product schema 的歷史介面，均視為 **migration debt**。可在 migration 期間維持相容性，但不得再擴張其語意或新增同類 contract。
+7. **UI 只理解 canonical Phase contract。** IC Selector／IC Detail 可以顯示 Manufacturer 名稱與 Manufacturer-specific evidence，但不得以 ST／NXP／Microchip 分支決定 Phase semantics、Selector visibility 或 execution entitlement。
+8. **Programming Provider 與 Manufacturer 都不是 Product schema。** OpenOCD、未來 Manufacturer backend 或 PLASMA-native backend 都只能作為版本化 Phase 2 Provider；Provider-specific evidence 必須 normalize 成共用 `ProgrammingQualification`。
+9. **Migration 不得改寫已核准 evidence。** Vendor-specific historical artifact 可以保留供 forensic replay；後續 migration 只改 canonical projection／API boundary，不得因 schema normalization 自動晉升或降級任何 ICPN 的 Phase 狀態。
+
+**架構不變量：**
+
+```text
+Manufacturer-specific Research
+    → Common Qualification Gates
+    → Vendor-neutral Canonical Production Data
+
+Phase 3 PASSED ⊆ Phase 2 SUPPORTED ⊆ Phase 1 IDENTIFIED
+```
+
+任何新 Manufacturer 的 onboarding 都只能新增／修改 Research source adapter、evidence parser 或 provider implementation；**不得要求新增一套 Manufacturer-specific Product policy、Phase enum、Product API 或 UI qualification branch。**
 
 ## Implementation Phases — 三階段 IC Detail 與 Exact ICPN 驗收漏斗（已採納規範）
 
@@ -72,7 +111,7 @@ Phase 2 若不符合、證據不足、在指定 Provider／版本不支援，或
 
 ### Phase 1 — Cross-vendor canonical discovery method
 
-ST、NXP、Microchip 及未來 Brand 必須使用**同一套 discovery 判定流程與 canonical output**。差異只允許存在於原廠資料取得 adapter，不允許存在於 Phase 定義、欄位狀態、證據門檻或 Selector／execution 語意。
+現階段的 ST、NXP、Microchip 及未來任何 Manufacturer 必須使用**同一套 discovery 判定流程與 canonical output**。差異只允許存在於原廠資料取得 adapter，不允許存在於 Phase 定義、欄位狀態、證據門檻或 Selector／execution 語意。
 
 固定流程：
 
@@ -83,7 +122,7 @@ ST、NXP、Microchip 及未來 Brand 必須使用**同一套 discovery 判定流
 5. **Programming Handoff**：Phase 1 `IDENTIFIED` 可進 Phase 2 review；只有經版本鎖定 Programming Provider + 原廠 programming evidence 完成 Exact ICPN qualification 才可標 `SUPPORTED`。
 6. **Selector / Execution Separation**：Phase 1 `IDENTIFIED` 決定是否可搜尋；Phase 2、Phase 3 只決定顯示的能力狀態與執行 gate，不得反向刪除有效的 Phase 1 身分。
 
-**本 ADR-0002 是此跨廠牌 discovery 方法的唯一規範來源。** 新的 ST／NXP／Microchip 或其他 Brand discovery 工作、review 與 consumer 都必須直接遵守本節的 Phase／field naming、證據門檻與 selector/execution 邊界；既有 vendor-specific historical artifacts 可以保留作證據與重播，但不得自行定義另一套 Phase 或 visibility policy。
+**本 ADR-0002 是此跨廠牌 discovery 方法的唯一規範來源。** 新的 ST／NXP／Microchip 或其他 Manufacturer discovery 工作、review 與 consumer 都必須直接遵守本節的 Phase／field naming、證據門檻與 selector/execution 邊界；既有 vendor-specific historical artifacts 可以保留作證據與重播，但不得自行定義另一套 Phase 或 visibility policy。
 
 ### Vendor-specific official source adapters
 
@@ -142,16 +181,16 @@ OpenOCD-first CFG／Target／Driver 分析是**Phase 1 的預設研究入口**�
 
 ## Cross-vendor discovery execution order
 
-ST、NXP、Microchip 與未來 Brand 一律使用相同的 discovery 執行順序；差異只允許存在於原廠資料取得介面。
+現階段的 ST、NXP、Microchip 與未來任何 Manufacturer 一律使用相同的 discovery 執行順序；差異只允許存在於原廠資料取得介面。
 
 1. **鎖定 Programming Provider 與版本**：使用 `release/openocd.json` 或另行核准的 Provider Registry，保存 Provider、Version／Source Commit、Target CFG、Include Graph、Flash Driver、Silicon Identity／Probe Rule 與內容雜湊。
 2. **由軟體能力反查原廠裝置範圍**：Capability Seed 只能建立技術研究入口，不能建立商用料號、Phase 1 身分或 Phase 2 支援結論。
-3. **只由原廠官方來源取得 Exact ICPN**：使用各 Brand 官方 Material／Ordering／Product／Parametric／DFP／Datasheet 等來源，保存 Source URI、Scope、Observation Time 與可取得的原始 Bytes／Hash。不得依 CFG 名稱、Family 前綴或 suffix grammar 創造不存在的料號。
+3. **只由原廠官方來源取得 Exact ICPN**：使用各 Manufacturer 官方 Material／Ordering／Product／Parametric／DFP／Datasheet 等來源，保存 Source URI、Scope、Observation Time 與可取得的原始 Bytes／Hash。不得依 CFG 名稱、Family 前綴或 suffix grammar 創造不存在的料號。
 4. **Phase 1 判定**：只有原廠完整商用 Exact ICPN 身分無歧義者可標為 `IDENTIFIED`。IC Information 各欄獨立使用 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT／NOT_APPLICABLE`，不得用預設值填補未知。
 5. **Phase 2 判定**：只有 Phase 1 `IDENTIFIED` 的 Exact ICPN 可進 Programming review；必須完成版本鎖定 Provider、原廠 programming evidence、Silicon／Revision、Flash geometry／security 與宣告操作的適用性驗證，才可標為 `SUPPORTED`。
 6. **Phase 3 判定**：只有 Phase 2 `SUPPORTED` 的 Exact ICPN 可建立指定 PPU／Site／Socket／Adapter 配置的實機驗證；通過者標為 `PASSED`。
 7. **停止與重啟規則**：證據不足就保留當前 Phase 的真實狀態與 missing-evidence 清單並停止擴張；只有 Provider 版本、原廠證據或核准產品需求發生實質變化時才重新開案。缺證據不能推論成永久不支援。
-8. **跨 Brand 一致性**：相同證據強度必須得到相同 Phase 判定；不得因 ST、NXP、Microchip 或任何 Brand 使用不同網站／API 就放寬 identity、field、programming 或 HIL 證據門檻。
+8. **跨 Manufacturer 一致性**：相同證據強度必須得到相同 Phase 判定；不得因 ST、NXP、Microchip 或任何 Manufacturer 使用不同網站／API 就放寬 identity、field、programming 或 HIL 證據門檻。
 
 **本 ADR-0002 是上述 discovery 方法的唯一規範來源。** 歷史研究 artifact 可保留原始舊名詞以維持可追溯性，但新資料、API、UI、報表、CI 與 workflow 不得再建立或依賴另一套數字型研究狀態。
 
@@ -214,7 +253,7 @@ ST、NXP、Microchip 與未來 Brand 一律使用相同的 discovery 執行順�
 
 ## Migration gap and ownership
 
-- **Accepted now:** 跨 Brand Phase 1／2／3 定義、Phase 1 `IDENTIFIED` Selector visibility、Phase 2／3 與 execution 的獨立 fail-closed 邊界。
+- **Accepted now:** 跨 Manufacturer Phase 1／2／3 定義、Phase 1 `IDENTIFIED` Selector visibility、Phase 2／3 與 execution 的獨立 fail-closed 邊界。
 - **Not yet fully normalized:** ST／NXP／Microchip 的歷史資料仍分散於不同 artifact／resolver；後續 migration 要把它們投影成相同 Phase 欄位與 UI payload，而不是再建立 Brand-specific policy。
 - 現行 `docs/architecture/icpn-catalog-admission-policy.json` 的 `requires_deterministic_backend_route_or_explicit_mapping_state`，是內部 **identity admission** 契約，**不得被誤讀為 Public Catalog 可見規則**。
 - 現行 `backend.mapping_status=mapped` 主要表示確定性路由，尚不能概括為已做所有 software qualification；`no_mapping` 更不能當 Supported。Research `backend_candidate` 不可轉為可執行路由。
