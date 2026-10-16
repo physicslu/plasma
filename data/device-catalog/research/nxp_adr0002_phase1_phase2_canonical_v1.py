@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""NXP ADR-0002 Phase1 exact identity to Phase2 evidence-only transition.
+"""NXP ADR-0002 legacy Phase1/Phase2 artifact projected under Catalog Levels.
 
-Official manufacturer identity ledgers are the Phase1 authority.
-Archived OpenOCD 501 v10 is a source clue, not Phase2 state authority.
+Official manufacturer identity ledgers establish Catalog Level 1 identity.
+Archived OpenOCD 501 v10 is a source clue, not Programming Qualification authority.
+Legacy phase1/phase2 field names remain for immutable artifact compatibility only.
 No historical P0/P1/P2 research priority enters the canonical output.
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ STATES = ("UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED")
 
 def need(ok, reason):
     if not ok:
-        raise ValueError("NXP ADR-0002 Phase1/Phase2: " + reason)
+        raise ValueError("NXP ADR-0002 Catalog Level projection: " + reason)
 
 def gitblob(blob):
     return hashlib.sha1(b"blob " + str(len(blob)).encode() + b"\0" + blob).hexdigest()
@@ -47,9 +48,11 @@ def read_source(key, root=ROOT):
 
 def authority(root=ROOT):
     adr = (root / "docs/adr/0002-openocd-software-qualified-catalog-visibility.md").read_text(encoding="utf-8")
-    for token in ("Phase 1 — IC Information", "Phase 2 — Programming",
-                  "Phase 3 — PLASMA Compatibility", "INFORMATION_COMPLETE",
-                  "不得再建立或依賴另一套數字型研究狀態"):
+    for token in ("Catalog Level 1 — IC Identity",
+                  "Catalog Level 2 — Programming Qualified",
+                  "Catalog Level 3 — PLASMA Verified",
+                  "INFORMATION_COMPLETE",
+                  "Research / Discovery 不設 Level 0"):
         need(token in adr, "latest ADR-0002 semantic contract missing: " + token)
     release = (root / "release/openocd.json").read_bytes()
     need(gitblob(release) == RELEASE_BLOB, "pinned OpenOCD provider blob drift")
@@ -63,7 +66,7 @@ def identities(root=ROOT):
     admitted = [r for r in old if r["identity_state"] == "ADMITTED"]
     need(len(admitted) == 224 and
          len([r for r in old if r["identity_state"] == "RESEARCH_ONLY"]) == 277,
-         "Phase1 277 Research-only identities must not be silently promoted")
+         "Level 1 gate must not silently promote the 277 Research-only identities")
     parts = {}
     for r in admitted:
         need(r["manufacturer_uri"].startswith("https://www.nxp.com/"),
