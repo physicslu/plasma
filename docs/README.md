@@ -68,8 +68,8 @@
 - **Plan** — [Device Support / Hardware Execution / OpenOCD Architecture](architecture/device-support-hardware-openocd.md)：PoC 維持 PYNQ + Python；Production 將 Programmer Backend、stable Plasma HW API、UIO/MMIO/DMA/IRQ 與 PL protocol engine 分層，並避免 OpenOCD per-bit bit-banging。
 - **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
 - **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
-- **Current** — [Programming Hardware / Socket Design Input v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6／LQFP48 建立第一個 source-locked physical pin、SWD、power/reset、package geometry 與 minimum-contact machine-readable contract；可作為 Socket schematic/layout 設計輸入，但不代表 hardware runtime readiness、physical qualification 或 L3。
 - **Current** — [IC Support Runtime Resolver Foundation](architecture/ic-support-runtime-resolver.md)：定義 exact ICPN → reusable IC Support profiles 的 runtime-consumable resolver，並維持 Profile resolved 與 backend/runtime implemented 的 fail-closed 邊界。
+- **Current** — [Programming Hardware / Socket Design Input v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6／LQFP48 建立第一個 source-locked physical pin、SWD、power/reset、package geometry 與 minimum-contact machine-readable contract；可作為 Socket schematic/layout 設計輸入，但不代表 hardware runtime readiness、physical qualification 或 L3。
 - **Current** — [Profile-driven OpenOCD Plan Compiler](architecture/ic-support-openocd-plan-compiler.md)：將 evidence-backed Programming Profile 與 Memory Geometry 編譯成 deterministic OpenOCD dry-run plan；C8／CB geometry 分流，但硬體 execution 維持 fail-closed。
 - **Historical baseline** — [OpenOCD Software Qualification v1](architecture/openocd-software-qualification-v1.md)：首批 C8/CB direct-reference qualification。
 - **Historical expansion** — [OpenOCD Software Qualification v2](architecture/openocd-software-qualification-v2.md)：加入首批 C8/CB `TR=tape-and-reel` packing-only equivalence。
@@ -94,6 +94,7 @@
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
 - **Current** — [PLASMA GitHub Actions Control Bridge](development/plasma-actions-control-bridge.md)：定義 Issue #814、actor／workflow allowlist、`dispatch`／`cancel`／`rerun` 命令與最小權限安全邊界。
 - **Plan / Pilot** — [PLASMA Codex SWPC Read-only Bootstrap](development/plasma-codex-pilot.md)：Issue #981 Gate 1 A 的安全派工、獨立 Worker、tmux 監控與驗收邊界；尚非正式部署。
+- **Plan / Preflight** — [PLASMA Codex SWPC Bootstrap Preflight](development/plasma-codex-swpc-bootstrap-preflight.md)：Issue #981 的現有 SWPC Runner 唯讀前置檢查與真實 Worker 驗證邊界；未執行部署或硬體操作。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
