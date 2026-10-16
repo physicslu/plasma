@@ -45,7 +45,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(api, /catalog_verification/);
   assert.match(api, /physical_validation/);
   assert.match(api, /revision_sha256/);
-  assert.match(selector, /ICPN CATALOG · PRODUCTION ADMITTED/);
+  assert.match(selector, /ICPN CATALOG · CUSTOMER VISIBLE · L1–L3/);
   assert.match(selector, /Exact ICPN/);
   assert.match(selector, /Catalog Revision/);
   assert.match(selector, /Authority/);
@@ -62,7 +62,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.doesNotMatch(selector, /無實體證據/);
   assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*display:\s*grid/);
   assert.match(styles, /\.icSelectorStatusStack\s*\{[^}]*gap:\s*5px/);
-  assert.match(selector, /research candidate 不會出現在這裡/);
+  assert.match(selector, /L0 Research Inventory 僅供內部研究/);
   assert.doesNotMatch(selector, /OCD Candidate/);
   assert.doesNotMatch(selector, /LPC845/);
   assert.doesNotMatch(selector, /nRF52840/);
@@ -79,6 +79,7 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*null/);
   assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*null/);
   assert.match(api, /selector_visible:\s*boolean/);
+  assert.match(api, /job_selectable:\s*boolean/);
   assert.match(api, /execution_authorized:\s*false/);
   assert.match(api, /hardware_runtime_ready:\s*false/);
   assert.match(api, /physical_programming_qualified:\s*false/);
@@ -87,6 +88,7 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.doesNotMatch(api, /phase2_/);
   assert.doesNotMatch(api, /phase3_/);
 
+  assert.match(selector, /catalogLevelLabel\(device\.catalog_level, zh\)/);
   assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);
   assert.match(selector, /state === "CANDIDATE" \|\| state === "BLOCKED"/);
   assert.match(selector, /軟體資格 ·/);
@@ -99,13 +101,35 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Catalog Level 3 驗證/);
 });
 
-test("shared PMode and EMode picker is constrained to admitted exact ICPNs", async () => {
+test("shared PMode and EMode picker requests only Level 2 and Level 3 ICPNs", async () => {
   const picker = await source("../app/devices/ic-picker-field.tsx");
 
   assert.match(picker, /Search admitted ICPN/);
+  assert.match(picker, /levels:\s*\[2, 3\]/);
+  assert.match(picker, /L\{device\.catalog_level\}/);
   assert.match(picker, /Exact ICPN ·/);
   assert.match(picker, /OCD Mapped/);
   assert.doesNotMatch(picker, /IC identifier/);
+});
+
+test("general IC Selector exposes L1-L3 filters while Level 0 stays outside the public contract", async () => {
+  const selector = await source("../app/devices/ic-selector.tsx");
+  const api = await source("../app/device-catalog-api.ts");
+  const styles = await source("../app/devices/devices.css");
+
+  assert.match(api, /levels\?:\s*Array<1 \| 2 \| 3>/);
+  assert.match(api, /levels:\s*levels\.join\(","\)/);
+  assert.match(api, /scope:\s*"customer_ic_selector"/);
+  assert.match(api, /catalog_level:\s*1\s*\|\s*2\s*\|\s*3/);
+  assert.doesNotMatch(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3/);
+  assert.match(selector, /全部 L1–L3/);
+  assert.match(selector, /L1 Candidate/);
+  assert.match(selector, /L2 Programmable/);
+  assert.match(selector, /L3 Verified/);
+  assert.match(selector, /levelFilter === "all" \? \[1, 2, 3\] : \[levelFilter\]/);
+  assert.match(selector, /usage === "picker"[\s\S]*?\[2, 3\]/);
+  assert.match(selector, /L1 Programming Candidate：已有具體、可追溯的 programming route/);
+  assert.match(styles, /\.icSelectorLevelFilters\s*\{/);
 });
 
 test("IC Selector reports total filtered matches and uses a balanced desktop detail layout", async () => {
@@ -131,6 +155,7 @@ test("IC Selector paginates server-side and resets selection across result pages
   assert.match(api, /offset:\s*number/);
   assert.match(api, /offset\?:\s*number/);
   assert.match(api, /offset:\s*String\(offset\)/);
+  assert.match(api, /levels:\s*levels\.join\(","\)/);
   assert.match(selector, /SEARCH_PAGE_SIZE\s*=\s*30/);
   assert.match(selector, /offset:\s*pageOffset/);
   assert.match(selector, /setPageOffset\(0\)/);
