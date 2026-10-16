@@ -5,6 +5,7 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
@@ -583,14 +584,14 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         for code in (rows[0].identifier, rows[len(rows) // 2].identifier,
                      rows[-1].identifier):
             status, payload = self.request(
-                f"/api/devices/search?q={code}&limit=100")
+                f"/api/devices/search?q={quote(code, safe='')}&limit=100")
             self.assertEqual(status, 200)
             found = [r for r in payload["results"] if r["icpn"] == code]
             self.assertEqual(len(found), 1)
             self.assertEqual(found[0]["catalog_level"], 1)
             self.assertFalse(found[0]["job_selectable"])
             status, l2 = self.request(
-                f"/api/devices/search?q={code}&levels=2&limit=100")
+                f"/api/devices/search?q={quote(code, safe='')}&levels=2&limit=100")
             self.assertEqual(status, 200)
             self.assertEqual(l2["total_count"], 0)
 
