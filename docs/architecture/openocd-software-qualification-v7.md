@@ -5,7 +5,7 @@ Status: **Current ADR-0002 Programming Qualification authority for Catalog Level
 ## Scope
 
 v7 preserves the v4 medium-density authority and replaces the v6 high-density R/V-pin
-cohort authority with a bounded R/V/Z-pin LQFP authority. No Catalog Level 1 identity is added.
+cohort authority with a bounded R/V/Z-pin LQFP authority. No Catalog Level 0 identity is added.
 
 The combined registry contains **49 exact ICPNs**:
 
@@ -13,7 +13,7 @@ The combined registry contains **49 exact ICPNs**:
 - 19 previously qualified high-density R/V-pin LQFP exact ICPNs;
 - 8 newly qualified high-density Z-pin LQFP exact ICPNs.
 
-The ST Catalog Level 1 frozen denominator remains **4,629 exact ICPNs** in the Device Registry. This transaction changes
+The ST Catalog Level 0 exact-identity denominator remains **4,629 exact ICPNs** in the Research Registry. This transaction changes
 only Programming Qualification; `SUPPORTED` rows derive Catalog Level 2 `PROGRAMMABLE`.
 
 ## New Z-pin direct cohort
@@ -99,9 +99,9 @@ claim full raw-source custody for that document.
 
 v7 remains **provider-specific Programming Qualification evidence only**:
 
-- Catalog Level 1 ST remains frozen at 4,629 exact ICPNs and is the Device Registry identity authority;
+- Catalog Level 0 ST remains frozen at 4,629 exact ICPNs and is the exact-identity authority;
 - the canonical runtime API is `programming_qualification`, not an OpenOCD-specific UI contract;
-- these 49 reviewed exact ICPNs have `ProgrammingQualification.state == SUPPORTED` and therefore derive Catalog Level 2 `PROGRAMMABLE`; all other Level 1 exact ICPNs remain `UNKNOWN` until independently reviewed;
+- these 49 reviewed exact ICPNs have `ProgrammingQualification.state == SUPPORTED` and therefore derive Catalog Level 2 `PROGRAMMABLE`; other exact ICPNs are Level 1 only when a source-backed programming route exists, otherwise they remain Level 0;
 - Job/Batch execution authorization is unchanged and remains fail-closed outside the qualification projection;
 - installed-runtime attestation is unchanged;
 - `hardware_runtime_ready=false`;
