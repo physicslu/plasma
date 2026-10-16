@@ -36,6 +36,7 @@ def test_valid_proposal_only_not_physical_acceptance(proposal):
     "wrong_status", "wrong_magic", "wrong_abi", "wrong_endianness",
     "wrong_capacity", "missing_site", "duplicate_site", "swapped_site_id",
     "reserved_write", "misaligned_register", "duplicate_register",
+    "missing_reserved_replaced_by_extra_window",
     "writeable_register", "missing_identity", "wrong_physical_base",
 ])
 def test_proposal_invalid_map_fails_closed(proposal, change):
@@ -57,6 +58,8 @@ def test_proposal_invalid_map_fails_closed(proposal, change):
         regions[-1]["base"] = regions[-2]["base"]
     elif change == "swapped_site_id":
         regions[-1]["site_id"] = 7
+    elif change == "missing_reserved_replaced_by_extra_window":
+        regions[2]["base"] = "0x4000C000"
     elif change == "reserved_write":
         regions[1]["registers"] = [{"name": "poke", "offset": "0x000",
                                     "access": "ro", "width_bits": 32}]
@@ -149,6 +152,19 @@ def test_unmapped_or_ambiguous_window_fails_closed(tmp_path, bad):
         windows = (0x4000F000, 8192)
     with pytest.raises(Phase1Error):
         resolve_mapping(read_uio_snapshot(sysroot), *windows)
+
+
+def test_partial_overlap_cannot_be_ignored_as_a_safe_full_mapping(tmp_path):
+    sysroot, _, _ = _make_snapshot(tmp_path)
+    other = sysroot / "class/uio/uio4"
+    map0 = other / "maps/map0"
+    map0.mkdir(parents=True)
+    (other / "name").write_text("partial-competing-owner")
+    for name, value in (("addr", "0x4000F000"), ("size", "0x1000"),
+                        ("offset", "0x0"), ("name", "overlap")):
+        (map0 / name).write_text(value)
+    with pytest.raises(Phase1Error, match="overlaps"):
+        resolve_mapping(read_uio_snapshot(sysroot), 0x40000000, 65536)
 
 
 def test_duplicate_uio_ownership_is_not_chosen_arbitrarily(tmp_path):
