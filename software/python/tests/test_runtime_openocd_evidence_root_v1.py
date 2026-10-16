@@ -34,7 +34,7 @@ from plasma_web.runtime_evidence_root import (
 
 REPO = Path(__file__).resolve().parents[3]
 EXPECTED_PROVIDERS = {
-    "openocd-upstream": 4184,
+    "openocd-upstream": 4193,
     "openocd-st-h5-research": 190,
     "openocd-st-c5-stldr-research": 172,
 }
@@ -86,7 +86,7 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
                 self.assertEqual(row["physical_validation"]["socket_status"], "no_evidence")
         nxp = _device_search_payload("NXP", limit=1)
         self.assertEqual(nxp["levels"], [1, 2, 3])
-        self.assertEqual(nxp["total_count"], 20)
+        self.assertEqual(nxp["total_count"], 29)
 
     def test_explicit_empty_and_partially_missing_roots_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
