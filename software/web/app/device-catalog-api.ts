@@ -257,12 +257,13 @@ export type NXPManufacturerDeviceProfile = {
 };
 
 export type ProgrammingQualification = {
-  schema_version: "1.0.0";
-  phase: "PROGRAMMING";
+  schema_version: "2.0.0";
   registry_id: string | null;
   state: "UNKNOWN" | "CANDIDATE" | "BLOCKED" | "SUPPORTED" | "UNSUPPORTED";
   reviewed: boolean;
-  phase1_identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
+  identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
+  catalog_level: 0 | 1 | 2 | null;
+  catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | null;
   provider: {
     provider_id: string;
     version: string;
@@ -295,21 +296,23 @@ export type ProgrammingQualification = {
     blocked_operations: string[];
     backend_constraints: string[];
   } | null;
-  selector_visibility_authority: "PHASE1_IDENTIFIED";
+  selector_visible: boolean;
   execution_authorized: false;
   installed_runtime_attested: false;
   hardware_runtime_ready: false;
   physical_programming_qualified: false;
 };
 
-export type MicrochipPhase1ICInformation = {
-  status: "phase1_manufacturer_exact_material_partial_information";
+export type MicrochipICInformation = {
+  status: "manufacturer_exact_material_partial_information";
   manufacturer: "Microchip";
   icpn: string;
-  phase1_identity_state: "IDENTIFIED";
-  phase1_information_complete: false;
-  phase2_programming_state: "UNKNOWN";
-  phase3_compatibility_state: "NOT_TESTED";
+  identity_state: "IDENTIFIED";
+  information_complete: false;
+  catalog_level: 0;
+  catalog_level_state: "DISCOVERED";
+  programming_state: "UNKNOWN";
+  compatibility_state: "NOT_TESTED";
   ram_size: string;
   core_model: string;
   working_vdd_v: null;
@@ -325,9 +328,9 @@ export type MicrochipPhase1ICInformation = {
     official_pdf_grammar_not_exact_material_list: true;
   };
   software_supported: false;
-  phase2_provider: null;
-  phase2_supported_operations: [];
-  phase3_verified_configurations: [];
+  programming_provider: null;
+  supported_operations: [];
+  verified_configurations: [];
   programming_profile_authority: false;
   hardware_runtime_ready: false;
 };
@@ -340,8 +343,8 @@ export type DeviceSearchResult = {
   identifier: string;
   identifier_kind: DeviceIdentifierKind;
   icpn: string | null;
-  phase1: {
-    identity_state: "IDENTIFIED" | "RESEARCH_ONLY";
+  identity: {
+    state: "IDENTIFIED" | "RESEARCH_ONLY";
   };
   package: string | null;
   pin_count: string | null;
@@ -379,7 +382,7 @@ export type DeviceSearchResult = {
   backend_providers?: VersionedOpenOCDProvider[];
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
-  microchip_phase1_ic_information?: MicrochipPhase1ICInformation | null;
+  microchip_ic_information?: MicrochipICInformation | null;
   selected_profile?: SelectedICProfile | null;
   programming_qualification?: ProgrammingQualification | null;
 };
