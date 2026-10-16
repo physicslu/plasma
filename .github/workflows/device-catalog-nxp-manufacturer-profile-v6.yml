@@ -45,15 +45,15 @@ jobs:
           )
           from plasma_web.device_catalog import get_default_device_catalog
           catalog=get_default_device_catalog()
-          assert catalog.size == 4983
+          assert catalog.size == 4992
           assert sum(r.vendor=="Microchip" for r in catalog.records)==122
           assert all(r.mapping_status == "no_mapping" and not r.target_config for r in catalog.records if r.vendor=="Microchip")
           assert evidence().size == 212
-          assert sum(r.vendor=="NXP" for r in catalog.records)==232
+          assert sum(r.vendor=="NXP" for r in catalog.records)==241
           assert sum(r.vendor=="STMicroelectronics" for r in catalog.records)==4629
           assert all(r.mapping_status == "no_mapping" and not r.target_config for
                      r in catalog.records if r.vendor=="NXP" and r.family in {"MCX","K32L2"})
-          print("NXP 212 source-bound Device payload PASS; eight new source-backed L1 routes are non-executable")
+          print("NXP 212 source-bound Device payload PASS; seventeen source-backed LPC11U6X/LPC81X/LPC11U2X L1 routes are non-executable")
           PY
 
   manufacturer-device-browser-types:
