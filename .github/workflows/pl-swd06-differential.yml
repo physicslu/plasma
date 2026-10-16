@@ -1,0 +1,74 @@
+name: PL SWD-06 RTL-Python differential co-simulation
+
+on:
+  pull_request:
+    paths:
+      - "pl/verification/cocotb/swd06_driver_cocotb.py"
+      - "pl/verification/test_swd06_rtl_python.py"
+      - "software/python/plasma_interfaces/swd_transaction.py"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "docs/development/swd06-rtl-python-differential.md"
+      - ".github/workflows/pl-swd06-differential.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/verification/cocotb/swd06_driver_cocotb.py"
+      - "pl/verification/test_swd06_rtl_python.py"
+      - "software/python/plasma_interfaces/swd_transaction.py"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "docs/development/swd06-rtl-python-differential.md"
+      - ".github/workflows/pl-swd06-differential.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-rtl-python-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Icarus and Python co-simulation dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog
+          python3 -m pip install -e ./software/python
+          python3 -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Syntax of differential bridge and runner
+        run: |
+          python3 -m py_compile \
+            pl/verification/cocotb/swd06_driver_cocotb.py \
+            pl/verification/test_swd06_rtl_python.py
+      - name: SWD-06 real RTL differential
+        run: python3 -m pytest -vv -s pl/verification/test_swd06_rtl_python.py
+      - name: Retained SWD-05 software driver mock regressions
+        run: python3 -m pytest -q software/python/tests/test_swd_transaction_driver.py
+      - name: Retained SWD-03 AXI RTL regression
+        run: python3 -m pytest -q pl/verification/test_swd03_axi_rtl.py
+      - name: Preserve simulator failures for diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swd06-rtl-python-failure-${{ github.run_id }}
+          path: |
+            pl/build/swd06/
+            pl/build/swd03/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Acceptance boundary
+        run: |
+          echo "SWD06_REAL_RTL_PYTHON_DIFFERENTIAL_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Real Icarus SWD-03 RTL AXI/PHY + cocotb synchronous PS driver bridge; simulated targets only." >> "$GITHUB_STEP_SUMMARY"
+          echo "No Vivado rebuild, Z2 HIL, physical SWD pins, service/deployment, or real IC programming." >> "$GITHUB_STEP_SUMMARY"

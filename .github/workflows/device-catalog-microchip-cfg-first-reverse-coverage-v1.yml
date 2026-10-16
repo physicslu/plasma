@@ -20,6 +20,11 @@ on:
       - 'data/device-catalog/research/MICROCHIP_P0_OFFICIAL_SOURCE_GAPS_V1.md'
       - 'data/device-catalog/research/microchip_phase1_s1_exact_identity_funnel_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_s1_exact_identity_funnel_v1.py'
+      - 'data/device-catalog/research/microchip_adr0002_canonical_phase_contract_v1.py'
+      - 'data/device-catalog/research/test_microchip_adr0002_canonical_phase_contract_v1.py'
+      - 'data/device-catalog/research/microchip_adr0002_cfg2563_target_scope_v1.py'
+      - 'data/device-catalog/research/test_microchip_adr0002_cfg2563_target_scope_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_ADR0002_PHASE_CONFORMANCE_V1.md'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md'
       - 'data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py'
       - 'data/device-catalog/research/test_microchip_phase1_cfg2563_st_field_ledger_v1.py'
@@ -481,7 +486,45 @@ jobs:
                       str(d["phase1_s1_complete"])+"\n")
               f.write("Source observation evidence gaps: "+
                       str(d["phase1_research_only_source_gaps"])+"\n")
-              f.write("Research P0/P1/P2 are separate from S1/S2/S3.\n")
+              f.write("Historical P0/P1/P2 groups are archived only, not canonical Phase or visibility states.\n")
+          PY
+      - name: Validate ADR-0002 canonical Microchip Phase 1/2/3 (no legacy priority qualification)
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_adr0002_canonical_phase_contract_v1.py' -v
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_adr0002_canonical_phase_contract_v1.py \
+            --source-s1-funnel "$root/microchip-phase1-s1-exact-identity-funnel.json" \
+            --output "$root/microchip-adr0002-canonical-phase-status.json"
+          python data/device-catalog/research/microchip_adr0002_canonical_phase_contract_v1.py \
+            --source-s1-funnel "$root/microchip-phase1-s1-exact-identity-funnel.json" \
+            --output "$root/microchip-adr0002-canonical-phase-status.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])/"microchip-adr0002-canonical-phase-status.json"
+          d=json.loads(path.read_text())
+          assert d["policy"]=="ADR-0002"
+          assert d["phase1_exact_icpn_observed"]==23276
+          assert d["selector_visible_identified_count"]==23276
+          assert d["phase1_information_complete_count"]==0
+          assert d["phase2_programming_state_counts"]["SUPPORTED"]==0
+          assert d["phase3_compatibility_state_counts"]["PASSED"]==0
+          assert d["no_legacy_priority_in_canonical_output"] is True
+          assert len(d["records"])==23276
+          assert len({r["icpn"].upper() for r in d["records"]})==23276
+          assert all(r["ic_selector_visible"] is True
+              and r["execution_authorized"] is False
+              and r["phase2"]["programming_state"]=="UNKNOWN"
+              and r["phase3"]["compatibility_state"]=="NOT_TESTED"
+              and "research_priority" not in r
+              for r in d["records"])
+          assert d["production_write_authorized"] is False
+          print("MICROCHIP_ADR0002_SNAPSHOT_IDENTIFIED",23276)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("ADR-0002 Microchip source Phase1 IDENTIFIED: 23276; Phase2 SUPPORTED: 0; Phase3 PASSED: 0.\n")
+              f.write("Canonical projection uses no P0/P1/P2, grants no Job rights, and does not automatically deploy Selector.\n")
           PY
       - name: Freeze 5 CFG x 2563 original Microchip ICPN ST-style Phase 1 field evidence
         run: |
@@ -543,6 +586,40 @@ jobs:
                       d["cfg_identity_freeze_sha256"]+"\n")
               f.write("13 ST-style per-field evidence states; S1_complete=0\n")
               f.write("No Production admission, public Selector or software support\n")
+          PY
+      - name: Verify frozen 2,563 as Microchip Phase 1 CFG-first engineering target
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_adr0002_cfg2563_target_scope_v1.py' -v
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_adr0002_cfg2563_target_scope_v1.py \
+            --canonical "$root/microchip-adr0002-canonical-phase-status.json" \
+            --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --output "$root/microchip-adr0002-5cfg-2563-phase1-target.json"
+          python data/device-catalog/research/microchip_adr0002_cfg2563_target_scope_v1.py \
+            --canonical "$root/microchip-adr0002-canonical-phase-status.json" \
+            --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --output "$root/microchip-adr0002-5cfg-2563-phase1-target.json" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"microchip-adr0002-5cfg-2563-phase1-target.json"
+          d=json.loads(p.read_text(encoding="utf-8"))
+          assert d["phase1_delivery_target_exact_icpns"]==2563
+          assert d["phase1_target_identified"]==2563
+          assert d["source_snapshot_official_identified_exact_icpns"]==23276
+          assert d["initial_implementation_batch_proposed"]==122
+          assert d["remaining_target_after_proposed_batch"]==2441
+          assert d["phase2_target_supported"]==0
+          assert d["phase3_target_passed"]==0
+          assert d["source_confirmed_other_identity_records_not_disqualified"] is True
+          assert not d["production_write_authorized"]
+          assert not d["job_batch_execution_authorized"]
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("MICROCHIP PHASE 1 DELIVERY TARGET (5 OpenOCD CFG): 2563 exact ICPNs\n")
+              f.write("Proposed first Selector delivery 122; remaining scoped target 2441\n")
+              f.write("23276 original-source identity observations preserved as broader evidence, NOT current delivery target\n")
           PY
       - name: Validate P1 original-MCP ordering grammar audit offline fail-closed
         run: |
@@ -673,6 +750,8 @@ jobs:
             ${{ runner.temp }}/microchip-p2-dfp-identity-archive.json
             ${{ runner.temp }}/microchip-p1-phase1-information-ledger.json
             ${{ runner.temp }}/microchip-phase1-s1-exact-identity-funnel.json
+            ${{ runner.temp }}/microchip-adr0002-canonical-phase-status.json
+            ${{ runner.temp }}/microchip-adr0002-5cfg-2563-phase1-target.json
             ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
             ${{ runner.temp }}/microchip-phase1-saml1x-exact-pdf-enriched.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json

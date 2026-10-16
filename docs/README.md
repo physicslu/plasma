@@ -15,7 +15,7 @@
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
-- **Plan / Accepted Policy** — [ADR-0002: OpenOCD 軟體支援、Catalog 顯示與研究優先順序](adr/0002-openocd-software-qualified-catalog-visibility.md)（實作順序：Phase 1 IC Information → Phase 2 Programming → Phase 3 PLASMA Compatibility；預設 Product Catalog 的 SUPPORTED-only 政策維持，尚未完成遷移。）：產品 Catalog 僅顯示指定版本 OpenOCD 已確認具燒錄能力的 ICPN；Socket/PPU/Site HIL 獨立；研究工作優先針對 OpenOCD 支援目標，其餘原廠候選只保留來源。API/UI migration 追蹤 [Issue #849](https://github.com/physicslu/plasma/issues/849)，研究作業優先順序追蹤 [Issue #851](https://github.com/physicslu/plasma/issues/851)。
+- **Current / Accepted Policy** — [ADR-0002: IC Discovery、Phase 狀態與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：ST／NXP／Microchip 與未來 Brand 一律使用 Phase 1 IC Information → Phase 2 Programming → Phase 3 PLASMA Compatibility；Phase 1 `IDENTIFIED` 即可在 IC Selector 搜尋並查看三階段狀態，Phase 2 `SUPPORTED` 與 Phase 3 `PASSED` 不作為 visibility filter；Job／Batch 執行仍由 Programming、Runtime、電氣與硬體安全條件獨立 fail-closed。
 
 ## Operator
 
@@ -71,7 +71,8 @@
 - **Historical expansion** — [OpenOCD Software Qualification v3](architecture/openocd-software-qualification-v3.md)：把 STM32F103 medium-density direct applicability 擴到 R8/RB/V8/VB T6，並只對已直接資格化的 T6 exact ICPN 展開 TR packing equivalence。
 - **Historical expansion** — [OpenOCD Software Qualification v4](architecture/openocd-software-qualification-v4.md)：在 exact Production identity 與 DS5319 Flash characteristics 證據下，直接資格化 C8/CB/R8/RB/VB 的 T7 LQFP cohort，再對其 TR packing variant 做 deterministic inheritance；總計 22 個 exact ICPN SUPPORTED。
 - **Historical expansion** — [OpenOCD Software Qualification v5](architecture/openocd-software-qualification-v5.md)：建立 multi-density umbrella authority，加入 STM32F103 high-density R-pin/LQFP bounded cohort，合計 31 個 exact ICPN SUPPORTED。
-- **Current** — [OpenOCD Software Qualification v6](architecture/openocd-software-qualification-v6.md)：Phase 1 ST 維持 4,629 exact ICPN frozen；Phase 2 在既有 R-pin high-density 基礎上新增 V-pin/LQFP-100 bounded cohort，建立 VC/VD/VE 獨立 geometry，合計 41 個 exact ICPN SUPPORTED；Z-pin、BGA/WLCSP、XL-density 與 Phase 3 仍未宣告。
+- **Historical expansion** — [OpenOCD Software Qualification v6](architecture/openocd-software-qualification-v6.md)：Phase 1 ST 維持 4,629 exact ICPN frozen；Phase 2 將 high-density LQFP 擴到 R/V-pin，合計 41 個 exact ICPN SUPPORTED。
+- **Current** — [OpenOCD Software Qualification v7](architecture/openocd-software-qualification-v7.md)：Phase 1 ST 維持 4,629 exact ICPN frozen；Phase 2 新增 Z-pin/LQFP-144 bounded cohort，建立 ZC/ZD/ZE 獨立 geometry，合計 49 個 exact ICPN SUPPORTED；BGA/WLCSP、XL-density 與 Phase 3 仍未宣告。
 - **Current** — [OpenOCD Compiled-Plan Executor](architecture/ic-support-openocd-plan-executor.md)：驗證 PS-side canonical OpenOCD plan → isolated software subprocess boundary；production hardware gate 仍關閉，PL/native programming 不在本階段範圍。
 - **Current** — [Vendor-neutral IC admission governance](architecture/vendor-neutral-ic-admission.md)：以 content-addressed artifact、review、disposition、canonical envelope、operation admission 與 backend binding 建立通用治理邊界；尚未接入 production runtime。
 - **Current** — [IC Support Architecture Freeze v1](architecture/ic-support-architecture-freeze-v1.md)：凍結 PR-A／PR-B／PR-C／PR-D 後的 vendor-neutral trust、operation admission、Compiler Registry 與 software/hardware readiness 邊界；不宣稱 HIL 或實體燒錄 readiness。
@@ -104,9 +105,16 @@
 - **Current** — [Operator Acceptance Test Matrix](development/operator-acceptance-test-matrix.md)
 - **Current** — [Programming Image Observability Test Plan](development/programming-image-observability-test-plan.md)
 - **Current** — [Runtime Acceptance](testing/runtime-acceptance.md)
+- **Current / Prototype Execution Contract** — [PYNQ-Z2 Codex Autonomous HIL Command](development/codex-z2-hil-development-command.md)：可重複使用的 Codex 任務指令、私有 SSH／sudo 認證介面與 PSPL-02／SWD-00 實機測試／復原驗收標準；文件不代表實機測試已完成。
 - **Current** — [FPGA Development Guide](development/fpga-development-guide.md)
 - **Current** — [FPGA Verification Guide](development/fpga-verification-guide.md)
 - **Current** — [PLASMA FPGA SystemVerilog Coding Standard](development/fpga-systemverilog-style.md)：規範新 RTL 的可移植語法、FSM／Type／Width、AXI/Response 與 SWD／Programming Site 驗證標準。
+- **Reference / Operator-observed / HARDWARE NO-GO** — [2026-10-15 PYNQ-Z2 HIL Hardware Inventory](development/hil-hardware-inventory.md)：記錄 Transcend Hub Port 2／3／4、Z2 JTAG／UART 與 5V 供電主張、AX88179、KINGST LA2016、PL 執行環境及復原驗收缺口；不含操作端識別資料，也不取代即時安全預檢。
+- **Host-only / HARDWARE NO-GO** — [PSPL-02 / SWD-00 Internal Waveform HIL](development/pspl02-swd00-hil-runbook.md)：三區段 baseline 專用的產物校驗、預檢、受限 MMIO 與原映像復原程序；現場獨立復原及 privileged ownership 尚待確認。
+- **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
+- **Host-only / Execution Preparation** — [SWD-04 Offline Execution Checklist](development/swd04-offline-execution-checklist.md)：真實 Artifact、BIN 格式、離線工具包、服務隔離與 HIL／Recovery 操作單；缺少復原檔案時禁止載入。
+- **Host-only software integration** — [SWD-05 Linux PS SWD Transaction Driver](development/swd05-linux-swd-transaction-driver.md)：基於 SWD-03 AXI ABI 的單 Site Driver、注入式 MMIO、Response ACK、WAIT/FAULT/ABORT、posted AP read 與故障隔離；目前無 Z2 實機資格。
+- **Host-only differential** — [SWD-06 RTL ↔ Python Differential Verification](development/swd06-rtl-python-differential.md)：由 SWD-05 Python Driver 操作 SWD-03 真實 RTL 的 Cocotb AXI4-Lite Bus，僅驗證模擬硬體，Z2 實機尚未執行。
 - **Reference** — [Mock Runtime Foundation Notes](development/mock-runtime-foundation-notes.md)
 - **Plan** — [Device Support Catalog Implementation Plan](development/device-support-implementation-plan.md)
 - **Plan** — [OpenOCD Part-number Expansion Plan](development/openocd-part-number-expansion-plan.md)
@@ -130,6 +138,7 @@
 - **Current** — [SWPC Z2-like Configured Mock Programming](deployment/swpc-z2like-configured-mock-programming.md)：將 Engineering Programming 綁定到 canonical `lab/swpc-z2like-01/SITE1..SITE8` 與既有 Plasma Server，明確拒絕 non-mock Site，且不建立舊 32-PPU demo topology；僅屬 software/mock qualification。
 - **Reference** — [PPU ARMv7 Runtime Lab](deployment/ppu-armv7-runtime-lab.md)：定義 integration-host QEMU ARMv7 一鍵 runtime/resource 診斷、live／ready／PS Loopback 路徑隔離與非 Z2-HIL 證據邊界。
 - **Hardware Acceptance / FULL PASS** — [2026-10-14 PYNQ-Z2 Identity-only PS/PL HIL](evidence/hil-pspl-01/2026-10-14-pynq-z2/README.md)：HIL-PSPL-01 八個 AXI GP0 Identity 讀值及原平台復原；不包含 AXI write、直接 RRESP、FPGA SWD Master 或 IC programming。
+- **Offline Preparation / HARDWARE NO-GO** — [2026-10-15 PSPL-02 / SWD-00](evidence/hil-pspl-02/2026-10-15-offline/README.md)：離線測試、既有 Vivado 證據與候選／復原產物校驗；新 Z2 HIL 均為 NOT RUN。
 - **Reference** — [2026-09-02 SWPC/QEMU ARMv7 Runtime Evidence](evidence/armv7-runtime/2026-09-02-swpc-qemu/README.md)：歸檔實測 JSON 與工程判讀；僅屬 SWPC/QEMU ARMv7 userspace evidence，不代表 PYNQ-Z2 native memory acceptance。
 - **Reference** — [Control Station Runtime Acceptance Evidence](deployment/control-station-runtime-acceptance.md)：定義 macOS／Linux／Windows clean-runtime CI 的證據範圍與不可延伸宣稱的邊界。
 - **Current** — [macOS Control Station Installer Pilot](deployment/macos-control-station-installer-pilot.md)：定義 unsigned `.pkg`、per-user `launchd` LaunchAgents、absolute Node/Python runtime binding，以及 install/start/restart/stop-start/basic-uninstall acceptance；不代表 signing/notarization readiness。

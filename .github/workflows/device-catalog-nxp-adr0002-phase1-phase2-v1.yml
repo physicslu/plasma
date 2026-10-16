@@ -1,0 +1,38 @@
+name: NXP ADR-0002 Canonical Phase1 Phase2 Contract
+on:
+  pull_request:
+    paths:
+      - "docs/adr/0002-openocd-software-qualified-catalog-visibility.md"
+      - "data/device-catalog/research/nxp_adr0002_phase1_phase2_canonical_v1.py"
+      - "data/device-catalog/research/test_nxp_adr0002_phase1_phase2_canonical_v1.py"
+      - "data/device-catalog/research/test_nxp_adr0002_single_authority_v1.py"
+      - "data/device-catalog/research/NXP_ADR0002_PHASE1_PHASE2_CANONICAL_V1.md"
+      - "data/device-catalog/research/NXP_ADR0002_ONLY_LEGACY_RETIREMENT_V1.md"
+      - ".github/workflows/device-catalog-nxp-adr0002-phase1-phase2-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/research/nxp_adr0002_phase1_phase2_canonical_v1.py"
+      - "data/device-catalog/research/test_nxp_adr0002_phase1_phase2_canonical_v1.py"
+      - "data/device-catalog/research/test_nxp_adr0002_single_authority_v1.py"
+      - ".github/workflows/device-catalog-nxp-adr0002-phase1-phase2-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nxp-adr0002-two-phase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Replay exact NXP Phase1 297 manufacturer identities and Phase2 source-only states
+        run: python data/device-catalog/research/nxp_adr0002_phase1_phase2_canonical_v1.py
+      - name: Verify current ADR and negative source-to-SUPPORTED gates
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_adr0002_phase1_phase2_canonical_v1.py" -v
+      - name: Enforce sole ADR-0002 authority and retirement of legacy research priority CI
+        run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_adr0002_single_authority_v1.py" -v

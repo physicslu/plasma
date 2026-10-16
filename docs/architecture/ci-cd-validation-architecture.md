@@ -182,6 +182,10 @@ PPU and Z2 gates own risks such as:
 - PPU networking acceptance;
 - release artifact integrity.
 
+Within the PPU release gate, **packaging/runtime qualification and heavy network qualification are separate risk surfaces**. A change can legitimately alter the packaged PPU payload without changing network commissioning semantics. The PPU release workflow therefore keeps package construction and ARMv7 runtime acceptance active for real packaged-runtime changes, while Network Phase 1/2, Virtual PPU Network Lab and Static IPv4 fault/repeatability gates are additionally routed by `scripts/ci/ppu-network-trigger.py`.
+
+The routing contract is deliberately fail-closed for foundational PPU/network code and fail-open only for reviewed non-network surfaces. For example, `software/python/plasma_web/openocd_software_qualification.py` and `release/openocd-qualification/**` can change the packaged OpenOCD qualification projection and therefore still require the normal PPU package/runtime gate, but they do **not** by themselves justify Static IPv4 or privilege-parity acceptance.
+
 A Device Catalog row addition does not alter those artifacts by itself and therefore does not trigger those release gates.
 
 Conversely, changes to PPU/Z2 software, packaging scripts, deployment contracts, or explicitly executed release tests must still trigger the appropriate heavy release validation.
@@ -229,8 +233,9 @@ Do not solve this by broad CI fan-out. A follow-up architecture change should gi
 6. **Use precise cross-data dependencies.** A benchmark may trigger on one pinned catalog source it actually binds; do not replace that with a whole-family or whole-production glob.
 7. **Tests are not deployable runtime by default.** Release workflows follow only tests/helpers they execute directly.
 8. **Documentation is not runtime by default.** Markdown belongs to documentation integrity unless a release process consumes it.
-9. **Do not weaken a real dependency to save runners.** If a true code-level dependency exists, fix the architecture rather than hiding it with a path exclusion.
-10. **Historical evidence stays historical.** Current catalog growth must not rewrite old phase boundaries.
+9. **Route heavy sub-gates by risk, not package membership alone.** If a module is packaged into the PPU but cannot affect network commissioning, package/runtime acceptance may still be required while heavy network fault-injection is skipped.
+10. **Do not weaken a real dependency to save runners.** If a true code-level dependency exists, fix the architecture rather than hiding it with a path exclusion.
+11. **Historical evidence stays historical.** Current catalog growth must not rewrite old phase boundaries.
 
 ## 10. Concurrency and superseded runs
 

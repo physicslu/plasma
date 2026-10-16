@@ -1,0 +1,79 @@
+name: PL SWD-04 HIL host safety contracts
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/swd04/**"
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "pl/verification/cocotb/test_swd03_axi.py"
+      - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_collect.py"
+      - "pl/tests/test_swd04_staging.py"
+      - "pl/verification/test_swd04_hil_rtl.py"
+      - "pl/verification/cocotb/swd04_hil_cocotb.py"
+      - "docs/development/swd04-offline-execution-checklist.md"
+      - "docs/development/swd04-z2-hil-runbook.md"
+      - ".github/workflows/pl-swd04-hil.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/swd04/**"
+      - "pl/rtl/bus/swd_transaction_axi_lite.sv"
+      - "pl/rtl/site/swd_transaction_master.sv"
+      - "pl/rtl/site/swd_waveform_engine.sv"
+      - "pl/rtl/site/swd03_dpidr_responder.sv"
+      - "pl/sim/swd03_axi_fixture_tb.sv"
+      - "pl/verification/cocotb/test_swd03_axi.py"
+      - "pl/tests/test_swd04_hil_contract.py"
+      - "pl/tests/test_swd04_collect.py"
+      - "pl/tests/test_swd04_staging.py"
+      - "pl/verification/test_swd04_hil_rtl.py"
+      - "pl/verification/cocotb/swd04_hil_cocotb.py"
+      - "docs/development/swd04-offline-execution-checklist.md"
+      - ".github/workflows/pl-swd04-hil.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swd04-host-safety:
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install isolated Python test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog
+          python3 -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Static source/CLI checks
+        run: |
+          python3 -m compileall -q pl/hil/swd04/
+          python3 -m pl.hil.swd04.preflight --help
+          python3 -m pl.hil.swd04.collect --help
+          python3 -m pl.hil.swd04.live --help
+          python3 -m pl.hil.swd04.restore --help
+          python3 -m pl.hil.swd04.staging --help
+      - name: SWD-04 offline synthetic regressions
+        run: |
+          python3 -m pytest -q \
+            pl/tests/test_swd04_hil_contract.py \
+            pl/tests/test_swd04_collect.py \
+            pl/tests/test_swd04_staging.py
+      - name: Exact HIL-02/03 functions against actual RTL
+        run: python3 -m pytest -q pl/verification/test_swd04_hil_rtl.py
+      - name: Explicit acceptance boundary
+        run: |
+          echo "SWD04_HOST_SAFETY_TESTS_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Z2 connection, FPGA loading, live MMIO, service changes, electrical tests or IC programming performed." >> "$GITHUB_STEP_SUMMARY"

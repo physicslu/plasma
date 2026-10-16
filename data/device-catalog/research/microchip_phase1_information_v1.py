@@ -20,7 +20,7 @@ FIELDS = (
     "flash", "ram", "vdd", "io_supply", "vdda", "temperature",
     "core_architecture", "core_model",
 )
-STATUSES = ("VERIFIED", "PARTIAL", "UNKNOWN", "CONFLICT")
+STATUSES = ("VERIFIED", "PARTIAL", "UNKNOWN", "CONFLICT", "NOT_APPLICABLE")
 EXACT_SCOPE = "exact_part_catalog_row"
 FAMILY_SCOPE = "base_device_family_parametrics"
 FORBIDDEN = {
@@ -38,7 +38,7 @@ def require(condition, reason):
 
 def check_numeric_value(field, entry):
     status = entry["status"]
-    if status in ("UNKNOWN", "CONFLICT"):
+    if status in ("UNKNOWN", "CONFLICT", "NOT_APPLICABLE"):
         return
     value = entry["value"]
     if field == "pin_count":
@@ -178,6 +178,14 @@ def check(dataset):
                         and isinstance(entry["source_locator"], str)
                         and bool(entry["source_locator"].strip()),
                         f"missing traceable manufacturer evidence: {field}")
+                if status == "NOT_APPLICABLE":
+                    require(field not in ("manufacturer", "icpn", "base_device")
+                            and value is None and entry["unit"] is None
+                            and entry["evidence_scope"] in
+                            (EXACT_SCOPE, "exact_mcp_response_row", FAMILY_SCOPE)
+                            and "NOT_APPLICABLE" in
+                            (entry["notes"] or "").upper(),
+                            "NOT_APPLICABLE requires official explicit absence evidence")
                 if status == "VERIFIED":
                     allowed_exact = {EXACT_SCOPE}
                     if field == "base_device":

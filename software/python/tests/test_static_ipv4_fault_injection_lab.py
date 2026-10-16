@@ -191,7 +191,15 @@ def test_production_manager_and_gateway_have_no_fault_switches() -> None:
 
 def test_release_workflow_runs_repeatability_gate_after_happy_path_and_retains_evidence() -> None:
     workflow = _text(".github/workflows/ppu-release.yml")
+    router = _text("scripts/ci/ppu-network-trigger.py")
     assert ".github/workflows/persistent-integration-host.yml" in workflow
+    assert "scripts/ci/ppu-network-trigger.py" in workflow
+    assert "route-ppu-network:" in workflow
+    assert workflow.count("if: needs.route-ppu-network.outputs.network_changed == 'true'") == 4
+    assert "release/openocd-qualification/openocd-0.12.0-stm32f103-v6.json" in router
+    assert "software/python/plasma_web/openocd_software_qualification.py" in router
+    assert "software/python/plasma_web/ppu_network_activation.py" in router
+    assert "software/python/plasma_manager/network_commissioning.py" in router
     assert "timeout-minutes: 90" in workflow
     assert "scripts/static-ipv4-fault-injection-lab.py" in workflow
     assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow

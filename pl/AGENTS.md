@@ -85,6 +85,45 @@ reference-model comparison.
 - Boundary, reset, error, cancellation/abort, timeout, and back-to-back transaction cases must
   be considered in addition to happy-path tests.
 
+## 4A. Shared PS driver and Cocotb/HIL verification contract
+
+For any PS-visible AXI-Lite register or command protocol, prefer **one
+production PS control/transaction implementation** exercised by both
+Cocotb and the real Linux PS, with a narrow injected MMIO interface
+(`read32`/`write32`, and other widths only when explicitly specified).
+
+- Cocotb must exercise the **same register sequencing, state handling,
+  address/value calculation, and response validation** used by the PS
+  application. Do not maintain an independent test-only copy of the
+  control algorithm that can drift from production.
+- Use an **AXI bus-functional-model backend** when simulating RTL and
+  a **Linux MMIO backend** when running on the Z2; adapt execution models
+  (e.g., synchronous versus asynchronous I/O) without duplicating business
+  logic. A mock backend only proves the mock contract, not bus behavior.
+- For applicable AXI-Lite interfaces test aligned full-word reads/writes,
+  byte/partial writes and WSTRB semantics, valid and invalid offsets,
+  AW/W independence, BRESP/RRESP, backpressure, and reset. For invalid
+  transactions, check the expected error in simulation; **do not
+  deliberately provoke bus faults in development HIL**.
+- The real Linux backend must have **separate target-architecture
+  verification**: inspect how its actual CPython/native implementation
+  emits aligned memory accesses (including ARMv7 STR versus STRB),
+  memory mapping attributes and any required barriers, and confirm
+  behavior in bounded real-PS HIL. `struct.pack_into("<I", ...)`
+  specifies byte representation but **does not guarantee a single
+  32-bit device-register write**.
+- **Never equate** Cocotb RTL PASS with ARM/Linux/PS7-to-PL MMIO PASS.
+  Record software-driver regression, RTL transaction simulation,
+  target-access-width validation, and real HIL as distinct results.
+- Prefer small new regression cases and reuse of existing tests over
+  introducing a whole-SoC co-simulation framework for a prototype.
+
+See `docs/development/fpga-verification-guide.md` for the practical
+verification matrix and accepted limitations. The 2026-10-15 PSPL-02
+CONTROL-page SIGBUS remains **an unproven root-cause hypothesis** until
+ARM instruction and/or transaction evidence confirms it; an abort address
+at `base+1` is not proof that the AXI slave saw `AWADDR=base+1`.
+
 ## 5. RTL change requirements
 
 For a behavioral RTL change, the agent must consider all of the following before declaring the
@@ -113,9 +152,8 @@ SystemVerilog RTL
     -> synthesis
     -> implementation
     -> timing checks
-    -> merge approval
-    -> deploy approval
-    -> Z2 hardware validation
+    -> approved-scope Z2 hardware validation (when applicable)
+    -> merge approval (for PR integration)
 ```
 
 Not every stage is configured in CI yet. Report the exact stages that were actually run.
@@ -133,7 +171,9 @@ FPGA work inherits the repository approval model:
 - Merge to `main` requires explicit user approval unless the root contract explicitly allows a
   documentation-only direct-main workflow requested by the user.
 - Loading a new bitstream on Z2, changing FPGA I/O behavior on connected hardware, changing DUT
-  power/voltage, or programming a real IC requires the protected hardware approval defined by
-  the root `AGENTS.md`.
+  power/voltage, or programming a real IC requires explicit coverage in the **approved Gate 1 scope**
+  under the root `AGENTS.md`. Do not invent a separate deployment/hardware approval gate.
+  Internal-loopback prototype HIL defaults to the root's `development` profile and canonical
+  autonomous Codex execution command; operations outside that scope still need authorization.
 
 Never turn a software/simulation pass into a claim of hardware validation.
