@@ -1,0 +1,124 @@
+name: PLASMA dedicated Codex passive HIL tool inventory (Issue 981)
+
+# No device opens or hardware commands. Owner-only exact Issue comment on main.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-hil-tool-inventory.yml"
+      - "scripts/plasma-codex-hil-tool-inventory*.py"
+      - "docs/development/plasma-codex-hil-tool-inventory.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-hil-tool-inventory.yml"
+      - "scripts/plasma-codex-hil-tool-inventory*.py"
+      - "docs/development/plasma-codex-hil-tool-inventory.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-hil-tools-981
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run passive tooling self-test and owner-dispatch contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-hil-tool-inventory.py --self-test
+          python3 scripts/plasma-codex-hil-tool-inventory-contract.py check
+          python3 -m py_compile scripts/plasma-codex-hil-tool-inventory*.py
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex hil-tools 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reviewed_sha: ${{ steps.auth.outputs.reviewed_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Validate owner, command, issue, and immutable reviewed SHA
+        id: auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-hil-tool-inventory-contract.py event "$GITHUB_EVENT_PATH"
+          printf 'reviewed_sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  inventory:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout reviewed source with no persistent token
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.reviewed_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Verify dedicated runner identity before passive inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "Unexpected privileged group; passive inventory aborted" >&2
+            exit 1
+          fi
+      - name: Collect sanitized local metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/plasma-codex-hil-tools-$GITHUB_RUN_ID"
+          mkdir -p "$out"
+          chmod 700 "$out"
+          set +e
+          python3 scripts/plasma-codex-hil-tool-inventory.py --json > "$out/report.json"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$out/exit_code"
+          ( cd "$out" && sha256sum report.json exit_code > SHA256SUMS )
+          if test "$status" -ne 0; then
+            echo "Passive inventory identity check failed: exit $status" >&2
+            exit "$status"
+          fi
+          echo "Passive inventory completed; device operation NOT RUN." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized inventory evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-hil-tools-981-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-codex-hil-tools-${{ github.run_id }}/report.json
+            ${{ runner.temp }}/plasma-codex-hil-tools-${{ github.run_id }}/exit_code
+            ${{ runner.temp }}/plasma-codex-hil-tools-${{ github.run_id }}/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 14
