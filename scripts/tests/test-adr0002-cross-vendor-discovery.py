@@ -2,7 +2,7 @@
 """ADR-0002 single-authority governance checks.
 
 ADR-0002 is the only normative cross-manufacturer policy for IC discovery,
-Phase 1/2/3 status, Selector visibility, and execution separation.
+Catalog Level 0/1/2/3, Registry/Selector visibility, and execution separation.
 This test validates the ADR text; it does not define a second policy.
 """
 from __future__ import annotations
@@ -18,21 +18,21 @@ def main() -> int:
     text = ADR.read_text(encoding="utf-8")
 
     required = (
-        "Phase 1 — IC Information",
-        "Phase 2 — Programming",
-        "Phase 3 — PLASMA Compatibility",
-        "Phase 1 `IDENTIFIED`",
-        "Phase 1 `INFORMATION_COMPLETE`",
-        "Phase 2 `SUPPORTED`",
-        "Phase 3 `PASSED`",
-        "Phase 3 `PASSED` ⊆ Phase 2 `SUPPORTED` ⊆ Phase 1 `IDENTIFIED`",
+        "Level 0 — DISCOVERED",
+        "Level 1 — PROGRAMMING_CANDIDATE",
+        "Level 2 — PROGRAMMABLE",
+        "Level 3 — PLASMA_VERIFIED",
+        "Level 3 PLASMA_VERIFIED ⊆ Level 2 PROGRAMMABLE ⊆ Level 1 PROGRAMMING_CANDIDATE ⊆ Level 0 DISCOVERED",
+        "Research Registry",
+        "Qualification Queue",
+        "Programming Catalog / IC Selector View",
+        "ProgrammingQualification.state == SUPPORTED",
         "Cross-vendor discovery execution order",
         "現階段的 ST、NXP、Microchip 與未來任何 Manufacturer 一律使用相同的 discovery 執行順序",
         "本 ADR-0002 是上述 discovery 方法的唯一規範來源",
-        "Phase 1 `IDENTIFIED` 的 Exact ICPN 應可由 Catalog／IC Selector 查詢",
-        "Catalog／IC Selector 顯示永遠不直接授權燒錄",
-        "Phase 2 `UNKNOWN／CANDIDATE／SUPPORTED／UNSUPPORTED`",
-        "Phase 3 `NOT_TESTED／PASSED／FAILED`",
+        "Level 0／Level 1 都只能出現在 Research／Engineering Registry",
+        "Programming Catalog／IC Selector 顯示永遠不直接授權燒錄",
+        "不得保留** `phase1_*`／`phase2_*`／`phase3_*` 欄位",
     )
     missing = [item for item in required if item not in text]
     if missing:
@@ -41,7 +41,9 @@ def main() -> int:
     forbidden_patterns = {
         "legacy S1/S2/S3 alias": r"\bS[123](?:_complete)?\b",
         "legacy P0/P1/P2 priority": r"\bP[012]\b",
-        "SUPPORTED-only selector policy": r"SUPPORTED-only",
+        "legacy Phase 1 heading": r"Phase 1 — IC Information",
+        "legacy Phase 2 heading": r"Phase 2 — Programming",
+        "legacy Phase 3 heading": r"Phase 3 — PLASMA Compatibility",
         "secondary canonical discovery contract": r"IC Discovery Canonical Contract",
     }
     for label, pattern in forbidden_patterns.items():
@@ -53,10 +55,29 @@ def main() -> int:
             raise SystemExit(f"ADR-0002 lost representative manufacturer: {maker}")
     if "差異只允許存在於原廠資料取得介面" not in text:
         raise SystemExit("ADR-0002 no longer constrains manufacturer-specific acquisition to source adapters")
-    if "相同證據強度必須得到相同 Phase 判定" not in text:
+    if "相同證據強度必須得到相同 Catalog Level 判定" not in text:
         raise SystemExit("ADR-0002 lost cross-manufacturer equal-evidence rule")
 
-    print("ADR-0002 single-authority cross-manufacturer contract PASS")
+    active_contract_files = (
+        ROOT / "software/python/plasma_web/device_catalog.py",
+        ROOT / "software/python/plasma_web/programming_qualification.py",
+        ROOT / "software/python/plasma_web/gateway.py",
+        ROOT / "software/web/app/device-catalog-api.ts",
+    )
+    forbidden_active_tokens = (
+        "phase1_",
+        "phase2_",
+        "phase3_",
+        "microchip_phase1_ic_information",
+        "selector_visibility_authority",
+    )
+    for path in active_contract_files:
+        active = path.read_text(encoding="utf-8")
+        for token in forbidden_active_tokens:
+            if token in active:
+                raise SystemExit(f"active Catalog contract retained forbidden token {token!r}: {path}")
+
+    print("ADR-0002 single-authority cross-manufacturer Catalog Level contract PASS")
     return 0
 
 

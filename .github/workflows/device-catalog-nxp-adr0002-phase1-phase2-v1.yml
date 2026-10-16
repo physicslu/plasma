@@ -1,4 +1,4 @@
-name: NXP ADR-0002 Canonical Phase1 Phase2 Contract
+name: NXP ADR-0002 Catalog Levels Contract
 on:
   pull_request:
     paths:
@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 jobs:
-  nxp-adr0002-two-phase:
+  nxp-adr0002-catalog-levels:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Replay exact NXP Phase1 297 manufacturer identities and Phase2 source-only states
+      - name: Replay NXP Level 0 identities and Level 1 programming candidates
         run: python data/device-catalog/research/nxp_adr0002_phase1_phase2_canonical_v1.py
       - name: Verify current ADR and negative source-to-SUPPORTED gates
         run: python -m unittest discover -s data/device-catalog/research -p "test_nxp_adr0002_phase1_phase2_canonical_v1.py" -v

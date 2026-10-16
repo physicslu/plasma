@@ -112,14 +112,8 @@ class DeviceCatalogRecord:
         return self.identifier if self.identifier_kind == "manufacturer_part_number" else None
 
     @property
-    def phase1_identity_state(self) -> str:
-        """ADR-0002 Phase 1 identity state for the runtime Catalog record.
-
-        Production admission is only created from an exact manufacturer part number
-        with retained manufacturer identity evidence. Make that previously implicit
-        contract explicit so Phase 2 depends on Phase 1 semantics rather than on a
-        vendor-specific admission flag.
-        """
+    def identity_state(self) -> str:
+        """Canonical exact-ICPN identity state independent of Catalog Level."""
         if self.production_admitted and self.identifier_kind == "manufacturer_part_number":
             return "IDENTIFIED"
         return "RESEARCH_ONLY"
@@ -134,8 +128,8 @@ class DeviceCatalogRecord:
             "identifier": self.identifier,
             "identifier_kind": self.identifier_kind,
             "icpn": self.icpn,
-            "phase1": {
-                "identity_state": self.phase1_identity_state,
+            "identity": {
+                "state": self.identity_state,
             },
             "package": self.package,
             "pin_count": self.pin_count,

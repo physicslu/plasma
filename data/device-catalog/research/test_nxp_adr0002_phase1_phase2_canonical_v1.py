@@ -1,41 +1,45 @@
-"""NXP ADR-0002 canonical Phase 1/2 negative and regression gates."""
+"""NXP ADR-0002 Catalog Level canonical negative and regression gates."""
 from __future__ import annotations
 import copy
 import unittest
 from unittest.mock import patch
 import nxp_adr0002_phase1_phase2_canonical_v1 as subject
 
-class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
+class TestNxpCanonicalCatalogLevels(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.rows=subject.build()
         cls.by_part={r["icpn"]:r for r in cls.rows}
 
-    def test_phase1_297_and_phase2_true_states(self):
+    def test_level0_297_and_level1_candidate_states(self):
         p=subject.report(self.rows)
-        self.assertEqual(p["phase1_identified"],297)
-        self.assertEqual(p["phase1_information_complete"],0)
-        self.assertEqual(p["phase2_states"],{
+        self.assertEqual(p["catalog_level_0_or_higher_discovered"],297)
+        self.assertEqual(p["catalog_level_0_only"],269)
+        self.assertEqual(p["catalog_level_1_programming_candidate"],28)
+        self.assertEqual(p["information_complete"],0)
+        self.assertEqual(p["programming_state_counts"],{
             "UNKNOWN":269,"CANDIDATE":28,"SUPPORTED":0,"UNSUPPORTED":0})
-        self.assertEqual(p["phase1_base_alias_pending"],212)
-        self.assertEqual(p["phase1_new_original_vendor_bytes_not_archived"],73)
+        self.assertEqual(p["base_alias_pending"],212)
+        self.assertEqual(p["new_original_vendor_bytes_not_archived"],73)
 
-    def test_exact_nxp_icpn_lpc11u68_visible_in_phase1_without_support(self):
+    def test_exact_nxp_icpn_lpc11u68_remains_level0_without_route(self):
         r=self.by_part["LPC11U68JBD48E"]
-        self.assertEqual(r["phase1"],"IDENTIFIED")
-        self.assertEqual(r["phase2"],"UNKNOWN")
+        self.assertEqual(r["identity_state"],"IDENTIFIED")
+        self.assertEqual(r["catalog_level"],0)
+        self.assertEqual(r["catalog_level_state"],"DISCOVERED")
+        self.assertEqual(r["programming_state"],"UNKNOWN")
         self.assertEqual(r["base_device"],"LPC11U68JBD48")
         self.assertIsNone(r["programming_profile_id"])
-        self.assertEqual(r["phase3"],"NOT_AUDITED")
+        self.assertEqual(r["compatibility_state"],"NOT_AUDITED")
 
     def test_kl25_and_k32l2_source_only_candidates(self):
-        rows=[r for r in self.rows if r["phase2"]=="CANDIDATE"]
+        rows=[r for r in self.rows if r["programming_state"]=="CANDIDATE"]
         self.assertEqual(len(rows),28)
         self.assertEqual(sum(r["target_cfg"]=="tcl/target/kl25.cfg" for r in rows),12)
         self.assertEqual(sum(r["driver"]=="kinetis" and not r["target_cfg"] for r in rows),16)
         self.assertTrue(all(r["operations"]["verify"]=="NOT_QUALIFIED" for r in rows))
 
-    def test_phase2_count_never_includes_unverified_research_only_277(self):
+    def test_catalog_levels_never_include_unverified_research_only_277(self):
         legacy=subject.read_source("legacy")
         admitted={r["icpn"] for r in legacy if r["identity_state"]=="ADMITTED"}
         disallowed={r["icpn"] for r in legacy if r["identity_state"]=="RESEARCH_ONLY"}
@@ -44,9 +48,9 @@ class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
         self.assertFalse(disallowed.intersection(self.by_part))
         self.assertEqual(len(set(self.by_part)-admitted),73)
 
-    def test_reject_fake_phase2_supported(self):
+    def test_reject_fake_programmable_promotion(self):
         rows=copy.deepcopy(self.rows)
-        rows[0]["phase2"]="SUPPORTED"
+        rows[0]["programming_state"]="SUPPORTED"
         with self.assertRaisesRegex(ValueError,"cannot promote"):
             subject.validate(rows)
 
@@ -73,7 +77,7 @@ class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
 
     def test_reject_identity_loss_or_duplicate(self):
         rows=copy.deepcopy(self.rows)
-        rows[0]["phase1"]="RESEARCH_ONLY"
+        rows[0]["identity_state"]="RESEARCH_ONLY"
         with self.assertRaisesRegex(ValueError,"illegal"):
             subject.validate(rows)
         rows=copy.deepcopy(self.rows)
@@ -81,18 +85,18 @@ class TestNxpCanonicalPhase1Phase2(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"distinct"):
             subject.validate(rows)
 
-    def test_unreviewed_historical_priority_never_public_phase_state(self):
+    def test_unreviewed_historical_priority_never_public_catalog_state(self):
         row=self.by_part["LPC11U68JBD48E"]
         self.assertNotIn("research_priority",row)
         # NXP may legitimately use /P1K in the official order code. The
         # obsolete research priority field, not those literal characters,
-        # must be absent from the normative Phase1/Phase2 schema.
+        # must be absent from the canonical Catalog Level schema.
         for row in self.rows:
             self.assertNotIn("research_priority",row)
 
-    def test_phase3_no_fake_hil(self):
+    def test_no_fake_level3_hil(self):
         rows=copy.deepcopy(self.rows)
-        rows[0]["phase3"]="PASSED"
+        rows[0]["compatibility_state"]="PASSED"
         with self.assertRaisesRegex(ValueError,"fabricated"):
             subject.validate(rows)
 

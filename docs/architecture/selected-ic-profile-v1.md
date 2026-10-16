@@ -131,7 +131,7 @@ additive projections:
 - `manufacturer_device_basic_profile` — basic IC Information facts; currently STM32F1 v1.
 - `selected_profile` — the deeper manufacturer/programming composition used only when
   Programming Profile evidence exists.
-- `programming_qualification` — vendor-neutral ADR-0002 Phase 2 exact-ICPN
+- `programming_qualification` — vendor-neutral ADR-0002 exact-ICPN Programming Qualification used to derive Catalog Level 2
   Programming qualification. Provider-specific evidence is normalized behind this
   projection and remains independent from both Catalog mapping and the legacy deeper
   selected-profile composition.
@@ -139,7 +139,7 @@ additive projections:
 A Basic Profile does not imply that `selected_profile` exists.
 
 Likewise, an OpenOCD CFG mapping does not imply `programming_qualification.state=SUPPORTED`.
-An exact ICPN that has not completed Phase 2 review is projected as `UNKNOWN`, even when
+An exact ICPN whose Programming Qualification has not completed review is projected as `UNKNOWN`, even when
 the Production Catalog already carries a mapped target CFG. A reviewed exact ICPN may be
 `SUPPORTED` even when the historical `selected_profile` deep-composition payload is not
 available for that exact ordering code; the two projections answer different questions.

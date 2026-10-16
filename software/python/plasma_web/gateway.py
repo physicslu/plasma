@@ -80,25 +80,25 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_MICROCHIP_L1_ORDER = re.compile(
+_MICROCHIP_IDENTITY_ORDER = re.compile(
     r"\A(ATSAML(10|11)(D|E)(14|15|16)A)-([AMUY])([UFZ])(T?)(KPH)?\Z"
 )
-_MICROCHIP_L1_PACKAGES = {"A":"TQFP","M":"VQFN","U":"WLCSP","Y":"SSOP"}
-_MICROCHIP_L1_FLASH_KB = {"14":16,"15":32,"16":64}
-_MICROCHIP_L1_PDF_SHA = (
+_MICROCHIP_IDENTITY_PACKAGES = {"A":"TQFP","M":"VQFN","U":"WLCSP","Y":"SSOP"}
+_MICROCHIP_IDENTITY_FLASH_KB = {"14":16,"15":32,"16":64}
+_MICROCHIP_IDENTITY_PDF_SHA = (
     "ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e"
 )
 
 
-def _microchip_phase1_ic_information(record: Any) -> dict[str, Any] | None:
-    """Read-only Phase 1 display overlay; source-locked Production identity only."""
+def _microchip_ic_information(record: Any) -> dict[str, Any] | None:
+    """Read-only Microchip identity/information overlay; source-locked exact ICPN only."""
     if record.vendor != "Microchip":
         return None
-    match = _MICROCHIP_L1_ORDER.fullmatch(record.icpn or "")
+    match = _MICROCHIP_IDENTITY_ORDER.fullmatch(record.icpn or "")
     if match is None or record.family != "SAML1X" or not record.production_admitted:
-        raise ValueError("unknown Microchip Phase 1 SKU in admitted Product Catalog")
+        raise ValueError("unknown Microchip exact SKU in admitted Product Catalog")
     base, series, group, density, package_code, grade, _carrier, kph = match.groups()
-    package = _MICROCHIP_L1_PACKAGES[package_code]
+    package = _MICROCHIP_IDENTITY_PACKAGES[package_code]
     pin_count = 24 if group == "D" else 32
     high = 85 if grade == "U" else 125
     ram = 16 if density == "16" else (8 if series == "11" or density == "15" else 4)
@@ -111,22 +111,24 @@ def _microchip_phase1_ic_information(record: Any) -> dict[str, Any] | None:
     if (restrictions or record.base_device != base
         or record.subfamily != "SAML" + series
         or record.package != package or record.pin_count != str(pin_count)
-        or record.flash_size != f"{_MICROCHIP_L1_FLASH_KB[density]} KB"
+        or record.flash_size != f"{_MICROCHIP_IDENTITY_FLASH_KB[density]} KB"
         or record.temperature_grade != f"-40..{high} C"
         or record.mapping_status != "no_mapping" or record.target_config
         or record.verification_status != "verified_microchip_mcp_exact_ordering_and_pdf_applicability"
         or "original_response_sha256=" not in (record.source_reference or "")
-        or _MICROCHIP_L1_PDF_SHA not in (record.source_reference or "")
+        or _MICROCHIP_IDENTITY_PDF_SHA not in (record.source_reference or "")
         or f"partNumber={record.icpn}" not in (record.source_reference or "")
         or f"basePartNumber={base}" not in (record.source_reference or "")):
-        raise ValueError("Microchip Phase 1 original evidence applicability drift")
+        raise ValueError("Microchip original evidence applicability drift")
     return {
-        "status":"phase1_manufacturer_exact_material_partial_information",
+        "status":"manufacturer_exact_material_partial_information",
         "manufacturer":"Microchip","icpn":record.icpn,
-        "phase1_identity_state":"IDENTIFIED",
-        "phase1_information_complete":False,
-        "phase2_programming_state":"UNKNOWN",
-        "phase3_compatibility_state":"NOT_TESTED",
+        "identity_state":"IDENTIFIED",
+        "information_complete":False,
+        "catalog_level":0,
+        "catalog_level_state":"DISCOVERED",
+        "programming_state":"UNKNOWN",
+        "compatibility_state":"NOT_TESTED",
         "ram_size":f"{ram} KB",
         "core_model":"Arm Cortex-M23",
         "working_vdd_v":None,"io_supply_v":None,"vdda_v":None,
@@ -141,14 +143,14 @@ def _microchip_phase1_ic_information(record: Any) -> dict[str, Any] | None:
             "authority":"Microchip Technology official",
             "exact_mcp_material_source":record.source_reference,
             "pdf_revision":"DS60001513G",
-            "pdf_original_sha256":_MICROCHIP_L1_PDF_SHA,
+            "pdf_original_sha256":_MICROCHIP_IDENTITY_PDF_SHA,
             "pdf_printed_pages":[14,16],
             "official_pdf_grammar_not_exact_material_list":True,
         },
         "software_supported":False,
-        "phase2_provider":None,
-        "phase2_supported_operations":[],
-        "phase3_verified_configurations":[],
+        "programming_provider":None,
+        "supported_operations":[],
+        "verified_configurations":[],
         "programming_profile_authority":False,
         "hardware_runtime_ready":False,
     }
@@ -197,8 +199,8 @@ def _device_search_payload(query: str, limit: int, offset: int = 0) -> dict[str,
             if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
             else None
         )
-        item["microchip_phase1_ic_information"] = (
-            _microchip_phase1_ic_information(record)
+        item["microchip_ic_information"] = (
+            _microchip_ic_information(record)
         )
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
@@ -295,10 +297,10 @@ def _parse_target_device(
     record = get_default_device_catalog().resolve(vendor, identifier)
     if record is None:
         raise ValueError(f"{label} must resolve to one canonical Device Catalog record")
-    # Catalog identity is useful for Phase 1 lookup, not an execution grant.
+    # Catalog identity is useful for Research/Engineering lookup, not an execution grant.
     # This applies equally to Engineering Job and Batch target_device inputs.
     if record.vendor == "Microchip" and record.mapping_status == "no_mapping":
-        raise ValueError(f"{label} Microchip Phase 1 identity has no executable programming mapping")
+        raise ValueError(f"{label} Microchip Level 0 identity has no executable programming mapping")
     return BatchTargetDeviceSnapshot(
         vendor=record.vendor,
         family=record.family,
@@ -315,7 +317,7 @@ def _reject_unmapped_microchip_raw_job_target(target: Any) -> None:
     record = get_default_device_catalog().resolve("Microchip", target)
     if record is not None and record.mapping_status == "no_mapping":
         raise ValueError(
-            "Microchip Phase 1 exact ICPN is lookup-only; "
+            "Microchip Level 0 exact ICPN is lookup-only; "
             "no executable programming mapping exists"
         )
 

@@ -61,11 +61,11 @@ def _record(*, admitted: bool) -> DeviceCatalogRecord:
 
 
 class ProgrammingQualificationRegistryTests(unittest.TestCase):
-    def test_phase2_provider_requires_phase1_identified(self):
+    def test_provider_requires_identified_exact_icpn(self):
         catalog = DeviceCatalog((_record(admitted=False),))
         with self.assertRaisesRegex(
             DeviceCatalogIntegrityError,
-            "Phase 2 record lacks Phase 1 IDENTIFIED prerequisite",
+            "Programming Qualification lacks IDENTIFIED exact ICPN prerequisite",
         ):
             ProgrammingQualificationRegistry(catalog, (_FakeProvider(),))
 
@@ -73,32 +73,47 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         catalog = DeviceCatalog((_record(admitted=True),))
         registry = ProgrammingQualificationRegistry(catalog, (_FakeProvider(),))
         result = registry.describe("ExampleVendor", "EXAMPLE123")
-        self.assertEqual(result["phase"], "PROGRAMMING")
-        self.assertEqual(result["phase1_identity_state"], "IDENTIFIED")
+        self.assertEqual(result["identity_state"], "IDENTIFIED")
+        self.assertEqual(result["catalog_level"], 2)
+        self.assertEqual(result["catalog_level_state"], "PROGRAMMABLE")
         self.assertEqual(result["state"], "SUPPORTED")
-        self.assertEqual(result["selector_visibility_authority"], "PHASE1_IDENTIFIED")
+        self.assertTrue(result["selector_visible"])
         self.assertFalse(result["execution_authorized"])
         self.assertFalse(result["hardware_runtime_ready"])
         self.assertFalse(result["physical_programming_qualified"])
 
-    def test_default_registry_preserves_st_49_and_projects_other_phase1_as_unknown(self):
+    def test_default_registry_preserves_st_49_and_derives_levels_from_routes(self):
         registry = get_default_programming_qualification_registry()
         self.assertEqual(registry.summary["reviewed_exact_icpns"], 49)
+        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 49)
         self.assertEqual(
-            registry.summary["selector_visibility_authority"],
-            "PHASE1_IDENTIFIED",
+            registry.summary["selector_visibility_rule"],
+            "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
 
         st = registry.describe("STMicroelectronics", "STM32F103ZCT6")
-        self.assertEqual(st["phase"], "PROGRAMMING")
-        self.assertEqual(st["phase1_identity_state"], "IDENTIFIED")
+        self.assertEqual(st["identity_state"], "IDENTIFIED")
+        self.assertEqual(st["catalog_level"], 2)
+        self.assertEqual(st["catalog_level_state"], "PROGRAMMABLE")
         self.assertEqual(st["state"], "SUPPORTED")
+        self.assertTrue(st["selector_visible"])
         self.assertEqual(st["provider"]["provider_id"], "openocd-upstream")
         self.assertFalse(st["execution_authorized"])
 
+        routed = registry.describe("STMicroelectronics", "STM32F407VGT6")
+        self.assertEqual(routed["identity_state"], "IDENTIFIED")
+        self.assertEqual(routed["catalog_level"], 1)
+        self.assertEqual(routed["catalog_level_state"], "PROGRAMMING_CANDIDATE")
+        self.assertEqual(routed["state"], "UNKNOWN")
+        self.assertFalse(routed["selector_visible"])
+        self.assertIsNone(routed["provider"])
+
         nxp = registry.describe("NXP", "MCXA132VFM")
-        self.assertEqual(nxp["phase1_identity_state"], "IDENTIFIED")
+        self.assertEqual(nxp["identity_state"], "IDENTIFIED")
+        self.assertEqual(nxp["catalog_level"], 0)
+        self.assertEqual(nxp["catalog_level_state"], "DISCOVERED")
         self.assertEqual(nxp["state"], "UNKNOWN")
+        self.assertFalse(nxp["selector_visible"])
         self.assertIsNone(nxp["provider"])
         self.assertFalse(nxp["execution_authorized"])
 

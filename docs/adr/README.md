@@ -14,7 +14,7 @@
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0001](0001-pynq-system-python-plasma-runtime-separation.md) | Accepted | PYNQ System Python 與 Plasma PPU Python Runtime 分離；Plasma 不依賴或取代 PYNQ System Python。 |
-| [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted | 統一所有 Brand 的 Phase 1 IC Information → Phase 2 Programming → Phase 3 PLASMA Compatibility；Phase 1 `IDENTIFIED` 即可在 IC Selector 顯示，Phase 2／3 狀態獨立呈現，Job/Batch 執行仍 fail-closed。 |
+| [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted | 統一 Catalog Level：L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；只有 L2+ 進一般 IC Selector。Active API/runtime 不保留 Phase-prefixed 欄位，Catalog Level 與 Job/Batch execution entitlement 分離。 |
 
 ## Maintenance rule
 

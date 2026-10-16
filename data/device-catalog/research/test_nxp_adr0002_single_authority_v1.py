@@ -92,10 +92,13 @@ class NxpSingleAuthorityContract(unittest.TestCase):
             self.assertNotIn("priority_proposal",part)
             self.assertNotIn("source_priority",part)
             self.assertNotIn("p0",part)
-            self.assertEqual(part["phase1"],"IDENTIFIED")
-            self.assertIn(part["phase2"],("UNKNOWN","CANDIDATE"))
+            self.assertEqual(part["identity_state"],"IDENTIFIED")
+            self.assertIn(part["catalog_level"],(0,1))
+            self.assertIn(part["catalog_level_state"],("DISCOVERED","PROGRAMMING_CANDIDATE"))
+            self.assertIn(part["programming_state"],("UNKNOWN","CANDIDATE"))
         summary=canonical.report(rows)
-        self.assertEqual(summary["phase2_states"]["SUPPORTED"],0)
+        self.assertEqual(summary["programming_state_counts"]["SUPPORTED"],0)
+        self.assertEqual(summary["catalog_level_2_programmable_in_this_source_audit"],0)
         self.assertFalse(summary["execution_authorized"] if "execution_authorized" in summary
                          else summary.get("execution_authorized",False))
 

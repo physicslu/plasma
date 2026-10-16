@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""NXP ADR-0002 Phase1 exact identity to Phase2 evidence-only transition.
+"""NXP ADR-0002 historical-source projection under Catalog Levels.
 
-Official manufacturer identity ledgers are the Phase1 authority.
-Archived OpenOCD 501 v10 is a source clue, not Phase2 state authority.
-No historical P0/P1/P2 research priority enters the canonical output.
+Official manufacturer identity ledgers establish Level 0 DISCOVERED identity.
+Archived OpenOCD 501 v10 is a source clue for Level 1 programming relevance,
+not Programming Qualification authority. Historical filenames remain immutable,
+but canonical output contains no phase-prefixed fields.
 """
 from __future__ import annotations
 import csv
@@ -31,7 +32,7 @@ STATES = ("UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED")
 
 def need(ok, reason):
     if not ok:
-        raise ValueError("NXP ADR-0002 Phase1/Phase2: " + reason)
+        raise ValueError("NXP ADR-0002 Catalog Level projection: " + reason)
 
 def gitblob(blob):
     return hashlib.sha1(b"blob " + str(len(blob)).encode() + b"\0" + blob).hexdigest()
@@ -47,9 +48,11 @@ def read_source(key, root=ROOT):
 
 def authority(root=ROOT):
     adr = (root / "docs/adr/0002-openocd-software-qualified-catalog-visibility.md").read_text(encoding="utf-8")
-    for token in ("Phase 1 — IC Information", "Phase 2 — Programming",
-                  "Phase 3 — PLASMA Compatibility", "INFORMATION_COMPLETE",
-                  "不得再建立或依賴另一套數字型研究狀態"):
+    for token in ("Level 0 — DISCOVERED",
+                  "Level 1 — PROGRAMMING_CANDIDATE",
+                  "Level 2 — PROGRAMMABLE",
+                  "Level 3 — PLASMA_VERIFIED",
+                  "INFORMATION_COMPLETE"):
         need(token in adr, "latest ADR-0002 semantic contract missing: " + token)
     release = (root / "release/openocd.json").read_bytes()
     need(gitblob(release) == RELEASE_BLOB, "pinned OpenOCD provider blob drift")
@@ -63,7 +66,7 @@ def identities(root=ROOT):
     admitted = [r for r in old if r["identity_state"] == "ADMITTED"]
     need(len(admitted) == 224 and
          len([r for r in old if r["identity_state"] == "RESEARCH_ONLY"]) == 277,
-         "Phase1 277 Research-only identities must not be silently promoted")
+         "Level 0 identity gate must not silently promote the 277 Research-only identities")
     parts = {}
     for r in admitted:
         need(r["manufacturer_uri"].startswith("https://www.nxp.com/"),
@@ -85,37 +88,40 @@ def identities(root=ROOT):
             need(p not in parts and r[uri].startswith("https://www.nxp.com/")
                  and bool(r[base]) and len(r["manufacturer_12nc"]) == 12
                  and r["manufacturer_12nc"].isascii() and r["manufacturer_12nc"].isdigit(),
-                 "new Phase1 requires official exact material/Base/12NC: "+p)
+                 "new Level 0 identity requires official exact material/Base/12NC: "+p)
             parts[p] = {"source":r[uri],"base_device":r[base],
                         "base_relation":"DATASHEET_CROSSWALK" if name in ("81","82","11") else "PRODUCT_MODEL",
                         "original_bytes":"NOT_ARCHIVED"}
     need(len(parts) == 297 and sum(x["base_relation"]=="UNRECONCILED_ALIAS" for x in parts.values())==212,
-         "approved Phase1 297 identities / 212 alias gaps drifted")
+         "approved Level 0 297 identities / 212 alias gaps drifted")
     return parts
 
 def validate(rows):
     need(len(rows)==297 and len({r["icpn"] for r in rows})==297,
-         "Phase2 must be subset of distinct exact Phase1 ICPNs")
-    need(all(r["phase1"] == "IDENTIFIED" and r["manufacturer"] == "NXP"
-             and r["phase2"] in STATES for r in rows),
-         "illegal Phase1/Phase2 state")
-    need(Counter(r["phase2"] for r in rows)=={"CANDIDATE":28,"UNKNOWN":269},
-         "old source-only research cannot promote SUPPORTED or UNSUPPORTED")
+         "Catalog Level projection must use distinct exact ICPNs")
+    need(all(r["identity_state"] == "IDENTIFIED" and r["manufacturer"] == "NXP"
+             and r["programming_state"] in STATES
+             and r["catalog_level"] in (0, 1)
+             and r["catalog_level_state"] in ("DISCOVERED", "PROGRAMMING_CANDIDATE")
+             for r in rows),
+         "illegal Catalog Level / Programming state")
+    need(Counter(r["programming_state"] for r in rows)=={"CANDIDATE":28,"UNKNOWN":269},
+         "old source-only research cannot promote PROGRAMMABLE")
     need(all(r["silicon_revision"] == "NOT_VERIFIED"
              and r["flash_geometry"] == "NOT_VERIFIED"
              and r["security"] == "NOT_VERIFIED"
              and not r["programming_profile_id"]
              and r["operations"] == {"erase":"NOT_QUALIFIED","program":"NOT_QUALIFIED",
                                     "read":"NOT_QUALIFIED","verify":"NOT_QUALIFIED"}
-             and r["phase3"] == "NOT_AUDITED"
+             and r["compatibility_state"] == "NOT_AUDITED"
              for r in rows), "fabricated software support, Programming Profile or HIL")
-    need(sum(r["phase2"]=="CANDIDATE" and r["target_cfg"]=="tcl/target/kl25.cfg"
+    need(sum(r["programming_state"]=="CANDIDATE" and r["target_cfg"]=="tcl/target/kl25.cfg"
              for r in rows)==12, "KL25 source-backed candidate count changed")
-    need(sum(r["phase2"]=="CANDIDATE" and not r["target_cfg"]
+    need(sum(r["programming_state"]=="CANDIDATE" and not r["target_cfg"]
              and r["driver"]=="kinetis" for r in rows)==16,
          "K32L2 driver-only candidate count changed")
     need(all(not r["target_cfg"] and not r["driver"]
-             for r in rows if r["phase2"]=="UNKNOWN"),
+             for r in rows if r["programming_state"]=="UNKNOWN"),
          "unreviewed source guesses cannot become qualified routes")
 
 def build(root=ROOT):
@@ -143,35 +149,52 @@ def build(root=ROOT):
         if not target: missing.append("TARGET_CONFIG")
         if not driver: missing.append("FLASH_DRIVER")
         rows.append({
-            "manufacturer":"NXP","icpn":part,"phase1":"IDENTIFIED",
+            "manufacturer":"NXP","icpn":part,
+            "identity_state":"IDENTIFIED",
             "information_complete":False, **parts[part],
-            "phase2":"CANDIDATE" if candidate else "UNKNOWN",
-            "provider":"openocd-upstream","provider_version":provider["version"],
-            "provider_commit":COMMIT,"target_cfg":target,"driver":driver,
+            "catalog_level":1 if candidate else 0,
+            "catalog_level_state":"PROGRAMMING_CANDIDATE" if candidate else "DISCOVERED",
+            "programming_state":"CANDIDATE" if candidate else "UNKNOWN",
+            "provider":"openocd-upstream" if candidate else None,
+            "provider_version":provider["version"] if candidate else None,
+            "provider_commit":COMMIT if candidate else None,
+            "target_cfg":target,"driver":driver,
             "silicon_revision":"NOT_VERIFIED", "flash_geometry":"NOT_VERIFIED",
             "security":"NOT_VERIFIED","programming_profile_id":None,
             "operations":{op:"NOT_QUALIFIED" for op in ("erase","program","read","verify")},
-            "missing_evidence":missing, "phase3":"NOT_AUDITED"})
+            "missing_evidence":missing, "compatibility_state":"NOT_AUDITED"})
     validate(rows)
     return rows
 
 def report(rows):
-    c=Counter(r["phase2"] for r in rows)
-    return {"manufacturer":"NXP","phase1_identified":len(rows),
-            "phase1_information_complete":0,
-            "phase1_base_alias_pending":212,"phase1_new_original_vendor_bytes_not_archived":73,
-            "phase2_states":{state:c[state] for state in STATES},
-            "phase2_candidate_family_evidence":{"KL25_target_driver":12,"K32L2_driver_only":16},
-            "phase2_supported_in_this_source_audit":0,
-            "phase2_scope":"no new software qualification; not all external support assessed",
-            "phase3":"NOT_AUDITED","execution_authorized":False,
-            "canonical_phases_only":True,"historical_priorities_excluded":True,
-            "openocd_source_commit":COMMIT}
+    states=Counter(r["programming_state"] for r in rows)
+    levels=Counter(r["catalog_level"] for r in rows)
+    return {
+        "manufacturer":"NXP",
+        "catalog_level_0_or_higher_discovered":len(rows),
+        "catalog_level_0_only":levels[0],
+        "catalog_level_1_programming_candidate":levels[1],
+        "information_complete":0,
+        "base_alias_pending":212,
+        "new_original_vendor_bytes_not_archived":73,
+        "programming_state_counts":{state:states[state] for state in STATES},
+        "catalog_level_1_candidate_evidence":{
+            "KL25_target_driver":12,
+            "K32L2_driver_only":16,
+        },
+        "catalog_level_2_programmable_in_this_source_audit":0,
+        "programming_scope":"no new software qualification; not all external support assessed",
+        "catalog_level_3_state":"NOT_AUDITED",
+        "execution_authorized":False,
+        "canonical_catalog_levels_only":True,
+        "historical_priorities_excluded":True,
+        "openocd_source_commit":COMMIT,
+    }
 
 if __name__=="__main__":
     import sys
     rows=build()
-    print("NXP_ADR0002_PHASE1_PHASE2_PASS S1=297 S1_COMPLETE=0 S2_CANDIDATE=28 S2_UNKNOWN=269 S2_SUPPORTED=0_IN_AUDIT S3=NOT_AUDITED")
+    print("NXP_ADR0002_CATALOG_LEVEL_PASS L0PLUS=297 L0_ONLY=269 L1=28 L2=0_IN_AUDIT L3=NOT_AUDITED")
     print(json.dumps(report(rows),indent=2,ensure_ascii=False))
     if "--jsonl" in sys.argv:
         for row in rows:
