@@ -15,6 +15,7 @@ from plasma_web.catalog_promotion_framework import (
     NO_PROGRAMMING_ROUTE_EVIDENCE,
     PLASMA_VERIFIED_CONFIGURATION_MISSING,
     PROVIDER_QUALIFICATION_BLOCKED,
+    PROVIDER_QUALIFICATION_INCOMPLETE,
     CatalogPromotionFramework,
     get_default_catalog_promotion_framework,
 )
@@ -242,7 +243,8 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             by_manufacturer["NXP"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
-            {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 28,\n             PROVIDER_QUALIFICATION_INCOMPLETE: 1},
+            {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 28,
+             PROVIDER_QUALIFICATION_INCOMPLETE: 1},
         )
         self.assertEqual(
             by_manufacturer["Microchip"]["promotion_blocker_counts"][EDGE_L0_TO_L1],
