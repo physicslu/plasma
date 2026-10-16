@@ -15,7 +15,7 @@ The actual SWPC read-only preflight confirmed:
 - dedicated `SWPC-plasma-codex` runner / dedicated account authentication: NOT CHECKED;
 - hardware: NOT TOUCHED.
 
-`codex` not being in `plasma-ci` PATH does not prove it is absent from `gordon`'s existing interactive environment.
+`codex` not being in `plasma-ci` PATH does not prove it is absent from `<trusted-operator>`'s existing interactive environment.
 
 ## Security/implementation choices
 
@@ -25,10 +25,10 @@ The two approval types remain Gate 1 for scoped work and Gate 2 for PR merge. Th
 
 ## One-time local administrator bootstrap (after this PR merges)
 
-**Do not copy/paste a remote installer through `curl | bash`.** Pull reviewed `main` to an authorized local checkout on **SWPC**, verify its SHA and no unrelated changes, then run this dedicated script using your existing privileged SWPC administrative channel, not the `plasma-ci` account:
+**Do not copy/paste a remote installer through `curl | bash`.** Pull reviewed `main` to an authorized local checkout on **SWPC**, verify its SHA and no unrelated changes, set `PLASMA_REPO` to that checkout path, then run this dedicated script using your existing privileged SWPC administrative channel, not the `plasma-ci` account:
 
 ```sh
-cd /storage/projects/plasma
+cd "${PLASMA_REPO:?set trusted checkout path}"
 git status -sb
 git fetch origin main
 # Confirm that you are running reviewed code and haven't overwritten existing work.
@@ -40,7 +40,7 @@ bash scripts/plasma-codex-host-provision.sh --check
 The `--apply` entrypoint verifies `hostname=SWPC`, root privileges, *not* executing in GitHub Actions, account identities and directory conflicts before changes. It idempotently:
 
 - creates locked-down `plasma-codex` system user, private HOME and `actions-runner` directory;
-- creates `plasma-monitor`, adds trusted `gordon` and `plasma-codex` only to that monitor group (new SSH login needed for group membership);
+- creates `plasma-monitor`, adds trusted `<trusted-operator>` and `plasma-codex` only to that monitor group (new SSH login needed for group membership);
 - writes `/etc/tmpfiles.d/plasma-codex.conf` **only if absent or byte-compatible**; creates `/run/plasma-codex` owner `plasma-codex:plasma-monitor`, mode `2770`, persistent across reboots via systemd-tmpfiles;
 - explicitly refuses any reused worker account with unexpected home/shell, root uid, privileged groups, or conflicting socket paths.
 
@@ -50,7 +50,7 @@ If the root channel is unavailable, record **HOST_PROVISIONING_BLOCKED** and sto
 
 ## Install Codex under the *new* worker identity
 
-Use an official supported Codex CLI installation method suited to SWPC; verify the installed CLI via the dedicated worker's login environment. Do not silently copy `gordon`'s `~/.codex` authentication or session files. Supply an explicit service-suitable Codex authentication path owned by `plasma-codex` and protected with `0700/0600` permissions, outside the repo, never in GitHub PR/Issue/CI logs.
+Use an official supported Codex CLI installation method suited to SWPC; verify the installed CLI via the dedicated worker's login environment. Do not silently copy `<trusted-operator>`'s `~/.codex` authentication or session files. Supply an explicit service-suitable Codex authentication path owned by `plasma-codex` and protected with `0700/0600` permissions, outside the repo, never in GitHub PR/Issue/CI logs.
 
 Commands that only verify tool availability (without starting an AI session) under that account:
 
@@ -58,7 +58,7 @@ Commands that only verify tool availability (without starting an AI session) und
 codex --version
 codex exec --help
 tmux -V
-python3 /storage/projects/plasma/scripts/plasma-codex-worker-readiness.py --json
+python3 $PLASMA_REPO/scripts/plasma-codex-worker-readiness.py --json
 ```
 
 The checker reports **prerequisites** only. Codex CLI version/help success is NOT authentication or API readiness. Never log `env`, `~/.codex`, personal access tokens, or runner `.credentials`.
