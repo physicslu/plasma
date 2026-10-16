@@ -83,7 +83,7 @@ class ICSupportResolverTests(unittest.TestCase):
         self.assertEqual(selected_hw["profile_id"], "stm32f103-lqfp48-programming-hardware-v1")
         contact_map = {
             item["signal"]: item["package_pin"]
-            for item in selected_hw["data"]["minimum_swd_programming_contacts"]
+            for item in selected_hw["data"]["minimum_batteryless_swd_fixture_contacts"]
         }
         self.assertEqual(contact_map["VBAT"], 1)
         self.assertEqual(contact_map["SWDIO"], 34)
