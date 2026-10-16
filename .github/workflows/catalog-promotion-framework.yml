@@ -6,11 +6,11 @@ on:
       - main
     paths:
       - "software/python/plasma_web/catalog_promotion_framework.py"
-      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/programming_qualification.py"\n      - "software/python/plasma_web/nxp_kl25_qualification.py"
       - "software/python/plasma_web/backend_candidate_registry.py"
       - "software/python/plasma_web/openocd_software_qualification.py"
       - "software/python/plasma_web/device_catalog.py"
-      - "software/python/tests/test_catalog_promotion_framework.py"
+      - "software/python/tests/test_catalog_promotion_framework.py"\n      - "software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
       - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
@@ -22,11 +22,11 @@ on:
   pull_request:
     paths:
       - "software/python/plasma_web/catalog_promotion_framework.py"
-      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/programming_qualification.py"\n      - "software/python/plasma_web/nxp_kl25_qualification.py"
       - "software/python/plasma_web/backend_candidate_registry.py"
       - "software/python/plasma_web/openocd_software_qualification.py"
       - "software/python/plasma_web/device_catalog.py"
-      - "software/python/tests/test_catalog_promotion_framework.py"
+      - "software/python/tests/test_catalog_promotion_framework.py"\n      - "software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
       - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
@@ -62,8 +62,9 @@ jobs:
         run: |
           python -m py_compile \
             software/python/plasma_web/catalog_promotion_framework.py \
-            software/python/plasma_web/programming_qualification.py
-          python software/python/tests/test_catalog_promotion_framework.py
+            software/python/plasma_web/programming_qualification.py \
+            software/python/plasma_web/nxp_kl25_qualification.py
+          python software/python/tests/test_catalog_promotion_framework.py\n          python software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py
           python software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py
           python software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py
       - name: Emit deterministic coverage and blocker report
