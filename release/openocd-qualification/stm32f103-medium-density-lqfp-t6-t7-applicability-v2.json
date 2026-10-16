@@ -43,7 +43,7 @@
     },
     "programming_review": {
       "path": "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
-      "git_blob_sha1": "eb136aca6119c9d5b6696285fb57434b0c4c4f62",
+      "git_blob_sha1": "73b69154d34969d089c032583d9970179149a3e8",
       "required_fact_ids": [
         "stm32f103c-family-applicability",
         "stm32f103c-medium-density-page-geometry",
