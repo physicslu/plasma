@@ -1,0 +1,90 @@
+[
+  {
+    "stage": "pwm1-on-capture",
+    "started_utc": "2026-10-16T10:51:12.943080+00:00",
+    "argv": [
+      "<sigrok-appimage>",
+      "--appimage-extract-and-run",
+      "--loglevel",
+      "4",
+      "--driver",
+      "kingst-la2016:conn=<usb-connection>",
+      "--config",
+      "samplerate=1m",
+      "--config",
+      "channel_group=PWM1:output_frequency=2000:output_duty_cycle=25:enabled=on",
+      "--channels",
+      "CH0",
+      "--samples",
+      "100000",
+      "--output-file",
+      "<case-evidence>/pwm1-2khz-25pct-ch0.sr"
+    ],
+    "command": "<sigrok-appimage> --appimage-extract-and-run --loglevel 4 --driver kingst-la2016:conn=<usb-connection> --config samplerate=1m --config channel_group=PWM1:output_frequency=2000:output_duty_cycle=25:enabled=on --channels CH0 --samples 100000 --output-file <case-evidence>/pwm1-2khz-25pct-ch0.sr",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "sr: [00:00.000007] log: libsigrok loglevel set to 4.\nsr: [00:00.000015] backend: libsigrok 0.6.0-git-883c2ac/4:0:0.\nsr: [00:00.000033] backend: Libs: glib 2.64.6 (rt: 2.64.6/6406:6), zlib 1.2.11, libzip 1.5.1, minilzo 2.10, libserialport 0.1.1/1:0:1 (rt: 0.1.1/1:0:1), libusb-1.0 1.0.25.11696 API 0x01000107, hidapi 0.9.0, bluez 5.53, libftdi 1.4, librevisa 0.0.20130812.\nsr: [00:00.000036] backend: Host: x86_64-pc-linux-gnu, little-endian.\nsr: [00:00.000038] backend: SCPI backends: TCP, RPC, serial, VISA, USBTMC.\nsr: [00:00.000039] backend: Firmware search paths:\nsr: [00:00.000050] backend:  - <firmware-directory>\nsr: [00:00.000051] backend:  - <appimage-runtime>/usr/share/sigrok-firmware\nsr: [00:00.000053] backend:  - <firmware-directory>\nsr: [00:00.000054] backend:  - /__w/sigrok-build/sigrok-build/sr/share/sigrok-firmware\nsr: [00:00.000055] backend:  - /usr/share/gnome/sigrok-firmware\nsr: [00:00.000056] backend:  - /usr/local/share/sigrok-firmware\nsr: [00:00.000057] backend:  - /usr/share/sigrok-firmware\nsrd: libsigrokdecode loglevel set to 4.\nsr: [00:00.001816] usb: Found USB device (VID:PID = 77a1:01a2, bus.address = <usb-connection>).\nsr: [00:00.001838] kingst-la2016: USB enum found 77a1:01a2 at path <usb-port-path>, <usb-connection>.\nsr: [00:00.001846] kingst-la2016: USB PID 01a2, MCU firmware 'kingst-la-01a2.fw'.\nsr: [00:00.002866] kingst-la2016: Manufacture date: 2026-03.\nsr: [00:00.004251] kingst-la2016: Using secondary magic 0xb (0x10).\nsr: [00:00.004255] kingst-la2016: Model 'LA2016', 16 channels, max 200MHz.\nsr: [00:00.004257] kingst-la2016: FPGA bitstream file 'kingst-la2016a2-fpga.bitstream'.\nsr: [00:00.004277] kingst-la2016: Checking operation of the FPGA bitstream.\nsr: [00:00.004527] kingst-la2016: Could re-use current FPGA bitstream. No upload required.\nsr: [00:00.075128] kingst-la2016: Run state: 0x85ed (idle).\nsr: [00:00.075220] kingst-la2016: Device should be initialized.\nsr: [00:00.075273] device: kingst-la2016: Opening device instance.\nsr: [00:00.075306] kingst-la2016: PWM config, app spec, ch 0, en 0, freq 1000.0, duty 50.0.\nsr: [00:00.075317] kingst-la2016: PWM config, reg 0x0070, freq 200000, duty 100000.\nsr: [00:00.075399] kingst-la2016: PWM config, app spec, ch 1, en 0, freq 100000.0, duty 50.0.\nsr: [00:00.075403] kingst-la2016: PWM config, reg 0x0078, freq 2000, duty 1000.\nsr: [00:00.075549] kingst-la2016: PWM config, app spec, ch 0, en 0, freq 2000.0, duty 50.0.\nsr: [00:00.075553] kingst-la2016: PWM config, reg 0x0070, freq 100000, duty 50000.\nsr: [00:00.075686] kingst-la2016: PWM config, app spec, ch 0, en 1, freq 2000.0, duty 50.0.\nsr: [00:00.075692] kingst-la2016: PWM config, reg 0x0070, freq 100000, duty 50000.\nsr: [00:00.076045] kingst-la2016: PWM config, app spec, ch 0, en 1, freq 2000.0, duty 25.0.\nsr: [00:00.076048] kingst-la2016: PWM config, reg 0x0070, freq 100000, duty 25000.\nsr: [00:00.076379] session: Using thread-default main context.\nsr: [00:00.076381] session: Starting.\nsr: [00:00.076383] hwdriver: kingst-la2016: Starting acquisition.\nsr: [00:00.076404] kingst-la2016: Set threshold voltage 1.40V.\nsr: [00:00.076406] kingst-la2016: Duty cycle values: R56 0x021f, R79 0x00f2.\nsr: [00:00.076605] kingst-la2016: Set trigger config: enabled-channels 0x0001, triggering-channels 0x0000, level-triggered 0x0000, high/falling 0x0000.\nsr: [00:00.076867] kingst-la2016: No trigger setup, skipping pre-trigger config.\nsr: [00:00.076869] kingst-la2016: Set sample config: 1000kHz (div 200), 100000 samples.\nsr: [00:00.076871] kingst-la2016: Capture ratio 50%, count 0, mem 256.\nsr: [00:00.077215] session: bus: Received SR_DF_HEADER packet.\ncli: Received SR_DF_HEADER.\nsr: [00:00.127688] kingst-la2016: Run state: 0x85ee (post-trigger sampling).\nsr: [00:00.228862] kingst-la2016: Run state: 0x85ed (idle).\nsr: [00:00.228870] kingst-la2016: Acquisition completion seen (hardware).\nsr: [00:00.228873] session: bus: Received SR_DF_FRAME_BEGIN packet.\ncli: Received SR_DF_FRAME_BEGIN.\nsr: [00:00.229353] kingst-la2016: Capture info: n_rep_packets: 0x00000262/610, before_trigger: 0x00000000/0, write_pos: 0x000007a0/1952.\nsr: [00:00.229361] kingst-la2016: Want to read 122 xfer-packets starting from pos 0.\nsr: [00:00.229453] kingst-la2016: Will read from 0x00000000, 0x000007a0 bytes.\nsr: [00:00.230391] kingst-la2016: Acquisition data download started.\nsr: [00:00.231411] kingst-la2016: receive_transfer(): status LIBUSB_SUCCESS / LIBUSB_TRANSFER_COMPLETED received 1952 bytes.\nsr: [00:00.231722] kingst-la2016: Download finished, flushing session feed queue.\nsr: [00:00.231725] session: bus: Received SR_DF_LOGIC packet (203290 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (203290 bytes, unitsize = 2).\nsr: [00:00.232216] output/srzip: output unit size 2, feed unit size 2.\nsr: [00:00.232221] output/srzip: Matching unit size, passing logic data as is.\nsr: [00:00.232286] kingst-la2016: Total samples after chunk: 101645.\nsr: [00:00.232290] kingst-la2016: Download finished, post processing.\nsr: [00:00.233117] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233128] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233137] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233146] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233155] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233164] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233173] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.233197] session: bus: Received SR_DF_FRAME_END packet.\ncli: Received SR_DF_FRAME_END.\nsr: [00:00.233202] session: bus: Received SR_DF_END packet.\ncli: Received SR_DF_END.\nsr: [00:00.234855] kingst-la2016: Download finished, done post processing.\nsr: [00:00.234888] session: Stopped.\nsr: [00:00.234895] hwdriver: Cleaning up all drivers.\nsr: [00:00.234922] kingst-la2016: Closing device on <usb-connection> (logical) / <usb-port-path> (physical) interface 0.\n",
+    "finished_utc": "2026-10-16T10:51:13.220669+00:00"
+  },
+  {
+    "stage": "pwm1-finally-off",
+    "started_utc": "2026-10-16T10:51:13.220845+00:00",
+    "argv": [
+      "<sigrok-appimage>",
+      "--appimage-extract-and-run",
+      "--loglevel",
+      "4",
+      "--driver",
+      "kingst-la2016:conn=<usb-connection>",
+      "--config",
+      "channel_group=PWM1:enabled=off",
+      "--set"
+    ],
+    "command": "<sigrok-appimage> --appimage-extract-and-run --loglevel 4 --driver kingst-la2016:conn=<usb-connection> --config channel_group=PWM1:enabled=off --set",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "sr: [00:00.000006] log: libsigrok loglevel set to 4.\nsr: [00:00.000029] backend: libsigrok 0.6.0-git-883c2ac/4:0:0.\nsr: [00:00.000047] backend: Libs: glib 2.64.6 (rt: 2.64.6/6406:6), zlib 1.2.11, libzip 1.5.1, minilzo 2.10, libserialport 0.1.1/1:0:1 (rt: 0.1.1/1:0:1), libusb-1.0 1.0.25.11696 API 0x01000107, hidapi 0.9.0, bluez 5.53, libftdi 1.4, librevisa 0.0.20130812.\nsr: [00:00.000050] backend: Host: x86_64-pc-linux-gnu, little-endian.\nsr: [00:00.000052] backend: SCPI backends: TCP, RPC, serial, VISA, USBTMC.\nsr: [00:00.000053] backend: Firmware search paths:\nsr: [00:00.000061] backend:  - <firmware-directory>\nsr: [00:00.000063] backend:  - <appimage-runtime>/usr/share/sigrok-firmware\nsr: [00:00.000064] backend:  - <firmware-directory>\nsr: [00:00.000065] backend:  - /__w/sigrok-build/sigrok-build/sr/share/sigrok-firmware\nsr: [00:00.000067] backend:  - /usr/share/gnome/sigrok-firmware\nsr: [00:00.000068] backend:  - /usr/local/share/sigrok-firmware\nsr: [00:00.000069] backend:  - /usr/share/sigrok-firmware\nsrd: libsigrokdecode loglevel set to 4.\nsr: [00:00.001849] usb: Found USB device (VID:PID = 77a1:01a2, bus.address = <usb-connection>).\nsr: [00:00.001855] kingst-la2016: USB enum found 77a1:01a2 at path <usb-port-path>, <usb-connection>.\nsr: [00:00.001858] kingst-la2016: USB PID 01a2, MCU firmware 'kingst-la-01a2.fw'.\nsr: [00:00.002937] kingst-la2016: Manufacture date: 2026-03.\nsr: [00:00.004342] kingst-la2016: Using secondary magic 0xb (0x10).\nsr: [00:00.004362] kingst-la2016: Model 'LA2016', 16 channels, max 200MHz.\nsr: [00:00.004365] kingst-la2016: FPGA bitstream file 'kingst-la2016a2-fpga.bitstream'.\nsr: [00:00.004366] kingst-la2016: Checking operation of the FPGA bitstream.\nsr: [00:00.004657] kingst-la2016: Could re-use current FPGA bitstream. No upload required.\nsr: [00:00.075340] kingst-la2016: Run state: 0x85ed (idle).\nsr: [00:00.075472] kingst-la2016: Device should be initialized.\nsr: [00:00.075514] device: kingst-la2016: Opening device instance.\nsr: [00:00.075550] kingst-la2016: PWM config, app spec, ch 0, en 0, freq 1000.0, duty 50.0.\nsr: [00:00.075562] kingst-la2016: PWM config, reg 0x0070, freq 200000, duty 100000.\nsr: [00:00.075685] kingst-la2016: PWM config, app spec, ch 1, en 0, freq 100000.0, duty 50.0.\nsr: [00:00.075691] kingst-la2016: PWM config, reg 0x0078, freq 2000, duty 1000.\nsr: [00:00.075831] kingst-la2016: PWM config, app spec, ch 0, en 0, freq 1000.0, duty 50.0.\nsr: [00:00.075837] kingst-la2016: PWM config, reg 0x0070, freq 200000, duty 100000.\nsr: [00:00.075926] device: kingst-la2016: Closing device instance.\nsr: [00:00.075930] kingst-la2016: Closing device on <usb-connection> (logical) / <usb-port-path> (physical) interface 0.\nsr: [00:00.075945] hwdriver: Cleaning up all drivers.\n",
+    "finished_utc": "2026-10-16T10:51:13.340630+00:00"
+  },
+  {
+    "stage": "pwm1-off-capture",
+    "started_utc": "2026-10-16T10:51:13.340816+00:00",
+    "argv": [
+      "<sigrok-appimage>",
+      "--appimage-extract-and-run",
+      "--loglevel",
+      "4",
+      "--driver",
+      "kingst-la2016:conn=<usb-connection>",
+      "--config",
+      "samplerate=1m",
+      "--channels",
+      "CH0",
+      "--samples",
+      "20000",
+      "--output-file",
+      "<case-evidence>/pwm1-off-ch0.sr"
+    ],
+    "command": "<sigrok-appimage> --appimage-extract-and-run --loglevel 4 --driver kingst-la2016:conn=<usb-connection> --config samplerate=1m --channels CH0 --samples 20000 --output-file <case-evidence>/pwm1-off-ch0.sr",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "sr: [00:00.000007] log: libsigrok loglevel set to 4.\nsr: [00:00.000015] backend: libsigrok 0.6.0-git-883c2ac/4:0:0.\nsr: [00:00.000033] backend: Libs: glib 2.64.6 (rt: 2.64.6/6406:6), zlib 1.2.11, libzip 1.5.1, minilzo 2.10, libserialport 0.1.1/1:0:1 (rt: 0.1.1/1:0:1), libusb-1.0 1.0.25.11696 API 0x01000107, hidapi 0.9.0, bluez 5.53, libftdi 1.4, librevisa 0.0.20130812.\nsr: [00:00.000036] backend: Host: x86_64-pc-linux-gnu, little-endian.\nsr: [00:00.000038] backend: SCPI backends: TCP, RPC, serial, VISA, USBTMC.\nsr: [00:00.000040] backend: Firmware search paths:\nsr: [00:00.000051] backend:  - <firmware-directory>\nsr: [00:00.000052] backend:  - <appimage-runtime>/usr/share/sigrok-firmware\nsr: [00:00.000053] backend:  - <firmware-directory>\nsr: [00:00.000055] backend:  - /__w/sigrok-build/sigrok-build/sr/share/sigrok-firmware\nsr: [00:00.000056] backend:  - /usr/share/gnome/sigrok-firmware\nsr: [00:00.000057] backend:  - /usr/local/share/sigrok-firmware\nsr: [00:00.000058] backend:  - /usr/share/sigrok-firmware\nsrd: libsigrokdecode loglevel set to 4.\nsr: [00:00.001748] usb: Found USB device (VID:PID = 77a1:01a2, bus.address = <usb-connection>).\nsr: [00:00.001755] kingst-la2016: USB enum found 77a1:01a2 at path <usb-port-path>, <usb-connection>.\nsr: [00:00.001760] kingst-la2016: USB PID 01a2, MCU firmware 'kingst-la-01a2.fw'.\nsr: [00:00.002744] kingst-la2016: Manufacture date: 2026-03.\nsr: [00:00.004153] kingst-la2016: Using secondary magic 0xb (0x10).\nsr: [00:00.004156] kingst-la2016: Model 'LA2016', 16 channels, max 200MHz.\nsr: [00:00.004158] kingst-la2016: FPGA bitstream file 'kingst-la2016a2-fpga.bitstream'.\nsr: [00:00.004160] kingst-la2016: Checking operation of the FPGA bitstream.\nsr: [00:00.004511] kingst-la2016: Could re-use current FPGA bitstream. No upload required.\nsr: [00:00.075358] kingst-la2016: Run state: 0x85ed (idle).\nsr: [00:00.075452] kingst-la2016: Device should be initialized.\nsr: [00:00.075500] device: kingst-la2016: Opening device instance.\nsr: [00:00.075524] kingst-la2016: PWM config, app spec, ch 0, en 0, freq 1000.0, duty 50.0.\nsr: [00:00.075534] kingst-la2016: PWM config, reg 0x0070, freq 200000, duty 100000.\nsr: [00:00.075651] kingst-la2016: PWM config, app spec, ch 1, en 0, freq 100000.0, duty 50.0.\nsr: [00:00.075671] kingst-la2016: PWM config, reg 0x0078, freq 2000, duty 1000.\nsr: [00:00.075803] session: Using thread-default main context.\nsr: [00:00.075805] session: Starting.\nsr: [00:00.075807] hwdriver: kingst-la2016: Starting acquisition.\nsr: [00:00.075842] kingst-la2016: Set threshold voltage 1.40V.\nsr: [00:00.075845] kingst-la2016: Duty cycle values: R56 0x021f, R79 0x00f2.\nsr: [00:00.076055] kingst-la2016: Set trigger config: enabled-channels 0x0001, triggering-channels 0x0000, level-triggered 0x0000, high/falling 0x0000.\nsr: [00:00.076458] kingst-la2016: No trigger setup, skipping pre-trigger config.\nsr: [00:00.076461] kingst-la2016: Set sample config: 1000kHz (div 200), 20000 samples.\nsr: [00:00.076481] kingst-la2016: Capture ratio 50%, count 0, mem 256.\nsr: [00:00.077059] session: bus: Received SR_DF_HEADER packet.\ncli: Received SR_DF_HEADER.\nsr: [00:00.127564] kingst-la2016: Acquisition completion seen (hardware).\nsr: [00:00.127572] session: bus: Received SR_DF_FRAME_BEGIN packet.\ncli: Received SR_DF_FRAME_BEGIN.\nsr: [00:00.127858] kingst-la2016: Capture info: n_rep_packets: 0x0000005a/90, before_trigger: 0x00000000/0, write_pos: 0x00000120/288.\nsr: [00:00.127861] kingst-la2016: Want to read 18 xfer-packets starting from pos 0.\nsr: [00:00.127989] kingst-la2016: Will read from 0x00000000, 0x00000120 bytes.\nsr: [00:00.128797] kingst-la2016: Acquisition data download started.\nsr: [00:00.130089] kingst-la2016: receive_transfer(): status LIBUSB_SUCCESS / LIBUSB_TRANSFER_COMPLETED received 288 bytes.\nsr: [00:00.130178] kingst-la2016: Download finished, flushing session feed queue.\nsr: [00:00.130182] session: bus: Received SR_DF_LOGIC packet (44992 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (44992 bytes, unitsize = 2).\nsr: [00:00.130574] output/srzip: output unit size 2, feed unit size 2.\nsr: [00:00.130577] output/srzip: Matching unit size, passing logic data as is.\nsr: [00:00.130591] kingst-la2016: Total samples after chunk: 22496.\nsr: [00:00.130595] kingst-la2016: Download finished, post processing.\nsr: [00:00.131329] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131339] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131348] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131357] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131365] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131374] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131383] kingst-la2016: receive_transfer(): status LIBUSB_TRANSFER_CANCELLED received 0 bytes.\nsr: [00:00.131399] session: bus: Received SR_DF_FRAME_END packet.\ncli: Received SR_DF_FRAME_END.\nsr: [00:00.131403] session: bus: Received SR_DF_END packet.\ncli: Received SR_DF_END.\nsr: [00:00.131791] kingst-la2016: Download finished, done post processing.\nsr: [00:00.131803] session: Stopped.\nsr: [00:00.131809] hwdriver: Cleaning up all drivers.\nsr: [00:00.131833] kingst-la2016: Closing device on <usb-connection> (logical) / <usb-port-path> (physical) interface 0.\n",
+    "finished_utc": "2026-10-16T10:51:13.515930+00:00"
+  },
+  {
+    "stage": "sr-show",
+    "started_utc": "2026-10-16T10:51:13.516109+00:00",
+    "argv": [
+      "<sigrok-appimage>",
+      "--appimage-extract-and-run",
+      "--input-file",
+      "<case-evidence>/pwm1-2khz-25pct-ch0.sr",
+      "--show"
+    ],
+    "command": "<sigrok-appimage> --appimage-extract-and-run --input-file <case-evidence>/pwm1-2khz-25pct-ch0.sr --show",
+    "returncode": 0,
+    "stdout": "Samplerate: 1000000\nChannels: 16\n- CH0: logic\n- 1: logic\n- 2: logic\n- 3: logic\n- 4: logic\n- 5: logic\n- 6: logic\n- 7: logic\n- 8: logic\n- 9: logic\n- 10: logic\n- 11: logic\n- 12: logic\n- 13: logic\n- 14: logic\n- 15: logic\nLogic unitsize: 2\nLogic sample count: 101645\n",
+    "stderr": "",
+    "finished_utc": "2026-10-16T10:51:13.560699+00:00"
+  }
+]
