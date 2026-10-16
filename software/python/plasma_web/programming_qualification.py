@@ -161,13 +161,22 @@ class ProgrammingQualificationRegistry:
             and row.mapping_status == "mapped"
             and bool(row.target_config)
         } | reviewed_keys
+        level0_only = len(discovered_keys - route_keys)
+        level1_only = len(route_keys - supported_keys)
+        level2_only = len(supported_keys)
         return {
             "provider_count": len(self._providers),
             "reviewed_exact_icpns": len(reviewed_keys),
             "catalog_level_0_or_higher_discovered_exact_icpns": len(discovered_keys),
-            "catalog_level_0_only_exact_icpns": len(discovered_keys - route_keys),
+            "catalog_level_0_only_exact_icpns": level0_only,
             "catalog_level_1_or_higher_exact_icpns": len(route_keys),
-            "catalog_level_2_programmable_exact_icpns": len(supported_keys),
+            "catalog_level_2_programmable_exact_icpns": level2_only,
+            "catalog_level_counts": {
+                "0": level0_only,
+                "1": level1_only,
+                "2": level2_only,
+                "3": 0,
+            },
             "selector_visibility_rule": "CATALOG_LEVEL_1_OR_HIGHER",
             "job_picker_rule": "CATALOG_LEVEL_2_OR_HIGHER",
             "execution_authorized_by_catalog_projection": False,
