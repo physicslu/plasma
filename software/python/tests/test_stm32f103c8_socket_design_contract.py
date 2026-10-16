@@ -38,7 +38,7 @@ def test_stm32f103c8_socket_contract_matches_resolved_ic_support() -> None:
     hardware = resolved.socket_programming_hardware_profile.data
     mandatory_from_profile = [
         {"pin": item["package_pin"], "signal": item["signal"]}
-        for item in hardware["minimum_swd_programming_contacts"]
+        for item in hardware["minimum_batteryless_swd_fixture_contacts"]
     ]
     assert contract["socket_interface"]["mandatory_contacts"] == mandatory_from_profile
 
