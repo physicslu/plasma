@@ -96,7 +96,7 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(selector, /Programming Profile/);
   assert.match(selector, /CFG Mapping/);
   assert.match(selector, /CFG mapping 不能視為燒錄支援/);
-  assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 PLASMA 實機驗證/);
+  assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Catalog Level 3 驗證/);
 });
 
 test("shared PMode and EMode picker is constrained to admitted exact ICPNs", async () => {
