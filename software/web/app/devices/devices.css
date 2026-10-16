@@ -54,6 +54,28 @@
 .icSelectorCatalogMeta small { display: block; color: var(--muted); font-size: 9px; }
 .icSelectorCatalogMeta b { display: block; margin: 2px 0; color: var(--cyan); font: 800 21px var(--font-mono); }
 
+.icSelectorLevelFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.icSelectorLevelFilters button {
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 5px 9px;
+  font: 650 9px var(--font-mono);
+  cursor: pointer;
+}
+.icSelectorLevelFilters button:hover,
+.icSelectorLevelFilters button.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel));
+}
+
 .icSelectorSearchBox {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
