@@ -13,7 +13,7 @@ import csv
 import hashlib
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 ORIGINAL_INDEX = "data/device-catalog/research/microchip-phase1-remaining2441-exact-identity-v1.csv"
 PRODUCT_SOURCE = "data/device-catalog/research/microchip-pic32mx-893-commercial-l1-v1.csv"
 SOURCE_INDEX_BLOB = "2f7a2b1b768e2c4ccb0eb184330c405cc3826357"
