@@ -167,47 +167,15 @@ def record_load_receipt(path: Path, candidate_bin: Path,
         handle.write("\n")
 
 
-def check_site2_ownership() -> None:
-    """Cover site2 omitted from the retained five-aperture LT02 preflight."""
-    lo, hi = SITE_BASES[2], SITE_BASES[2] + 4096
-
-    def overlap(start: int, end: int) -> bool:
-        return start < hi and end > lo
-
-    related_uio: set[str] = set()
-    for uio in Path("/sys/class/uio").glob("uio*"):
-        for mapping in (uio / "maps").glob("map*"):
-            start = int((mapping / "addr").read_text(), 0)
-            size = int((mapping / "size").read_text(), 0)
-            if overlap(start, start + size):
-                related_uio.add("/dev/" + uio.name)
-                require(not (uio / "device/driver").exists(),
-                        "Site 2 kernel UIO driver still owns PL")
-    for dev in Path("/sys/bus/platform/devices").iterdir():
-        if not (dev / "driver").exists():
-            continue
-        match = re.match(r"^([0-9A-Fa-f]+)\.", dev.name)
-        if match and overlap(int(match[1], 16), int(match[1], 16) + 1):
-            raise old.LT02SafetyError("Site 2 platform owner remains active")
-        resource = dev / "resource"
-        if resource.exists():
-            for row in resource.read_text().splitlines():
-                start, last, flags = (int(part, 16) for part in row.split())
-                if flags & 0x200 and overlap(start, last + 1):
-                    raise old.LT02SafetyError("Site 2 kernel resource is active")
-    for proc in Path("/proc").iterdir():
-        if not proc.name.isdecimal():
-            continue
-        try:
-            for f in (proc / "fd").iterdir():
-                if os.readlink(f) in related_uio:
-                    raise old.LT02SafetyError("Site 2 UIO fd owned by PID " + proc.name)
-            for row in (proc / "maps").read_text().splitlines():
-                fields = row.split()
-                if len(fields) >= 6 and fields[5] in related_uio:
-                    raise old.LT02SafetyError("Site 2 UIO mapping owned by PID " + proc.name)
-        except (FileNotFoundError, ProcessLookupError):
-            continue
+def check_ownership(*, sysroot: Path = Path("/sys"),
+                    procroot: Path = Path("/proc"),
+                    full_reconfiguration: bool = False,
+                    allowed_kernel_devices: frozenset[str] = frozenset()) -> None:
+    """One common audit covering all six apertures, including retained mmap."""
+    old.check_ownership(sysroot=sysroot, procroot=procroot,
+                        aperture_end=SITE_BASES[2] + 4096,
+                        full_reconfiguration=full_reconfiguration,
+                        allowed_kernel_devices=allowed_kernel_devices)
 
 
 def verify_live_environment(receipt_path: Path, candidate_bin: Path,
@@ -225,8 +193,7 @@ def verify_live_environment(receipt_path: Path, candidate_bin: Path,
     require(old.read_json(receipt_path) == _candidate_receipt(
         candidate_bin, artifact),
         "MS01 load receipt does not match the exact current FPGA boot")
-    old.check_ownership()
-    check_site2_ownership()
+    check_ownership()
 
 
 def _record(path: Path, data: dict) -> None:

@@ -4,8 +4,9 @@ on:
   pull_request:
     paths:
       - "pl/hil/ms01/**"
-      - "pl/tests/test_ms01_benchmark.py"
-      - "pl/tests/test_ms01_native_hil.py"
+      - "pl/tests/test_ms01_*.py"
+      - "pl/hil/lt02/native.py"
+      - "pl/tests/test_lt02_native_hil.py"
       - "software/python/plasma_interfaces/mmio_loop_test.py"
       - "software/python/tests/test_mmio_loop_test.py"
       - "pl/projects/z2-ms01-axi/**"
@@ -15,7 +16,9 @@ on:
     branches: [main]
     paths:
       - "pl/hil/ms01/**"
-      - "pl/tests/test_ms01_benchmark.py"
+      - "pl/tests/test_ms01_*.py"
+      - "pl/hil/lt02/native.py"
+      - "pl/tests/test_lt02_native_hil.py"
       - ".github/workflows/pl-ms01-benchmark.yml"
 
 permissions:
@@ -34,12 +37,15 @@ jobs:
         run: python3 -m pip install -e software/python pytest
       - name: Compile and run Host-only concurrent benchmarking
         run: |
-          python3 -m py_compile pl/hil/ms01/benchmark.py pl/hil/ms01/native.py pl/projects/z2-ms01-axi/artifact.py
+          python3 -m py_compile pl/hil/ms01/benchmark.py pl/hil/ms01/native.py pl/hil/ms01/supervisor.py pl/projects/z2-ms01-axi/artifact.py
           python3 -m pytest -q pl/tests/test_ms01_benchmark.py \
             software/python/tests/test_mmio_loop_test.py \
             software/python/tests/test_linux_mmio.py \
             pl/tests/test_z2_ms01_axi_build.py \
-            pl/tests/test_ms01_native_hil.py
+            pl/tests/test_ms01_native_hil.py \
+            pl/tests/test_ms01_ownership.py \
+            pl/tests/test_ms01_supervisor.py \
+            pl/tests/test_lt02_native_hil.py
       - name: Evidence limitation
         run: |
           echo "Host file-backed, synthetic WordPort and Process-IPC only." >> "$GITHUB_STEP_SUMMARY"
