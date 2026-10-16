@@ -115,7 +115,6 @@ def check() -> None:
         "--sandbox read-only",
         "codex --ask-for-approval never exec",
         "timeout --signal=TERM --kill-after=10s 900s",
-        "codex exec",
         'rc="${PIPESTATUS[0]}"',
     ):
         assert piece in inner, f"missing bounded Codex contract: {piece}"
