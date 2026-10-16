@@ -38,3 +38,34 @@ Outputs **only through canonical** `ProgrammingQualificationRegistry` and `Catal
 ## Explicit non-goals
 
 No blanket promotion of 2,563 Research mappings. No L2 SUPPORTED, L3 verified, program/erase/verify claims, installable runtime binding, flash algorithm changes, PPU/FPGA/HIL, Job/Batch entitlement, Microchip-specific public API, or main merge without owner approval.
+
+## Gate A execution log (2026-10-16)
+
+Gate A is **approved for implementation only**. Gate B (merge to main) has
+**not** been granted. PR #965 remains Draft.
+
+- Archived full original-byte replay report: Actions run 38664576255,
+  Artifact 11940412265, file `microchip-full-reverse.json`, locked byte
+  SHA-256 `548c1a61c311bdad1c153565e966c768785f7ecaf28311693bd19c212ae734f0`.
+- Source replay attestation in that report: 13 source roots, 313 attested
+  original batch archives, 8 quarantined, 23,276 unique source-replayed ICPN
+  candidates, 2,563 CFG mapping candidates.
+- `microchip_l1_admission_queue_v1.py` checks the pinned original report
+  bytes, provider source commit, CFG source blobs, source-linked exact identity
+  digests, all unique ICPNs, and the frozen per-CFG distribution. A **read-only
+  Research review ledger** of 2,563 rows is emitted by a GitHub CI job.
+- `route_evidence_admission.py` defines a reviewed evidence adapter constrained
+  to exact canonical identities. `ProgrammingQualificationRegistry` now
+  accepts multiple vendor-neutral candidate evidence providers and fails closed
+  on overlapping candidate claims. Existing ST candidate registry remains
+  the default; the Microchip adapter is **not** populated with unreviewed rows.
+- Required next gate: independently review family/base applicability for
+  the four static-driver cohorts (2,437 rows); identify a real programming
+  path for the 126 target-only rows or preserve their L0 status. Canonical
+  Production identity admission and the source-locked registry binding are
+  still outstanding.
+
+**Crucial status:** Successfully producing the 2,563-row review ledger is
+**not** a completed L1 promotion. Microchip Production remains 122 L0-only,
+0 L1-only, 0 L2-only, 0 L3-only until the independent canonical gates pass.
+No consumer may use a `PENDING` research ledger row as Product authority.
