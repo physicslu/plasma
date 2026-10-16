@@ -176,11 +176,14 @@ def validate_programming(profile: dict[str, Any]) -> None:
 
 def validate_package_hardware(profile: dict[str, Any]) -> None:
     data = profile["data"]
-    package = data.get("package")
-    require(isinstance(package, dict), "package hardware profile must contain package object")
-    require(package.get("type") == "LQFP", "package hardware type must be LQFP")
-    require(package.get("variant") == "LQFP48", "package hardware variant must be LQFP48")
-    require(package.get("pin_count") == 48, "package hardware pin count must be 48")
+    require(data.get("package") == "LQFP", "package hardware type must be LQFP")
+    require(data.get("pin_count") == 48, "package hardware pin count must be 48")
+    require(data.get("package_variant") == "LQFP48", "package hardware variant must be LQFP48")
+    package = data.get("package_mechanical")
+    require(isinstance(package, dict), "package_mechanical object is required")
+    require(package.get("type") == "LQFP", "package mechanical type must be LQFP")
+    require(package.get("variant") == "LQFP48", "package mechanical variant must be LQFP48")
+    require(package.get("pin_count") == 48, "package mechanical pin count must be 48")
     require(package.get("pitch_mm") == 0.50, "LQFP48 pitch must be 0.50 mm")
     require(package.get("body_mm") == {"x": 7.0, "y": 7.0, "basis": "BSC"}, "LQFP48 body geometry drift")
 
