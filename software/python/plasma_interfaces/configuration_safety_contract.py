@@ -19,6 +19,12 @@ class EvidenceKind(str, Enum):
     SYNTHETIC = "SYNTHETIC_FIXTURE"
 
 
+def _hex_digest(value: str, lengths: tuple[int, ...]) -> bool:
+    return type(value) is str and len(value) in lengths and all(
+        char in "0123456789abcdef" for char in value
+    )
+
+
 @dataclass(frozen=True)
 class ConfigurationPin:
     boot_id: str
@@ -35,6 +41,14 @@ class ConfigurationPin:
             value = getattr(self, field)
             if type(value) is not str or not value or value.strip() != value or len(value) > 256:
                 raise ContractRejected("Missing/ambiguous exact pin: " + field)
+        # Shape-check content-addressed identities; these synthetic pins do NOT
+        # verify any actual source/image bytes or provide hardware attestation.
+        if not _hex_digest(self.source_sha, (40, 64)):
+            raise ContractRejected("Invalid source commit digest")
+        if not _hex_digest(self.old_image_sha256, (64,)):
+            raise ContractRejected("Invalid old image SHA-256")
+        if not _hex_digest(self.candidate_sha256, (64,)):
+            raise ContractRejected("Invalid candidate SHA-256")
         if type(self.mapping_generation) is not int or self.mapping_generation < 1:
             raise ContractRejected("Invalid mapping generation")
 
