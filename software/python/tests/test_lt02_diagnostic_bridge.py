@@ -138,7 +138,14 @@ class LT02RealTCPBridgeTests(unittest.IsolatedAsyncioTestCase):
             self.assertGreaterEqual(detail["lt02"]["fpga_driver_elapsed_ns"], 0)
         self.assertGreater(self.port.data_writes, 0)
 
-    async def test_gateway_pl_defaults_to_fail_closed_even_when_server_has_driver(self) -> None:\n        client = await self.start_server(enable_pl=True)\n        with self.assertRaises(PlasmaError) as caught:\n            await execute_ps_loopback(self.body(b"safe default"), lambda: client)\n        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)\n        self.assertEqual(self.port.data_writes, 0)\n\n    async def test_pl_size_cap_applied_before_driver_access(self) -> None:
+    async def test_gateway_pl_defaults_to_fail_closed_even_when_server_has_driver(self) -> None:
+        client = await self.start_server(enable_pl=True)
+        with self.assertRaises(PlasmaError) as caught:
+            await execute_ps_loopback(self.body(b"safe default"), lambda: client)
+        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
+        self.assertEqual(self.port.data_writes, 0)
+
+    async def test_pl_size_cap_applied_before_driver_access(self) -> None:
         client = await self.start_server(enable_pl=True)
         data = b"x" * (1024 * 1024 + 1)
         with self.assertRaises(PlasmaError) as caught:
