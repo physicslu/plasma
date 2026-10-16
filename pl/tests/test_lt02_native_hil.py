@@ -1,10 +1,15 @@
 """Host-only LT02-05 HIL guards and real production-driver integration tests."""
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
+import sys
 import zlib
+
+# Source-layout CI intentionally installs pytest only, not the PPU wheel.
+# Resolve the in-repository production Python package for this test module;
+# the deployed Z2 uses the reviewed installed package instead.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "software/python"))
 
 import pytest
 
