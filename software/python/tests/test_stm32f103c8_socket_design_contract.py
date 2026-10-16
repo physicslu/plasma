@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from plasma_core.ic_support import ICSupportResolver
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -62,7 +63,10 @@ def test_stm32f103c8_socket_contract_matches_resolved_ic_support() -> None:
     }
 
     boundary = contract["qualification_boundary"]
-    assert boundary["sufficient_for_socket_schematic_and_layout_design"] is True
+    assert boundary["sufficient_for_socket_electrical_interface_design"] is True
+    assert boundary["sufficient_for_socket_schematic_design"] is True
+    assert boundary["sufficient_for_socket_pcb_footprint_design"] is False
+    assert boundary["sufficient_for_complete_socket_layout"] is False
     assert boundary["sufficient_for_openocd_programmer_software_development"] is True
     assert boundary["sufficient_for_native_swd_transport_implementation"] is False
     assert boundary["hardware_runtime_ready"] is False
@@ -71,7 +75,7 @@ def test_stm32f103c8_socket_contract_matches_resolved_ic_support() -> None:
     assert boundary["execution_authorized"] is False
 
 
-def test_stm32f103c8_socket_contract_keeps_boot0_out_of_minimum_swd_set() -> None:
+def test_stm32f103c8_socket_contract_requires_vbat_but_keeps_boot0_optional() -> None:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     mandatory = {
         (entry["pin"], entry["signal"])
@@ -82,7 +86,30 @@ def test_stm32f103c8_socket_contract_keeps_boot0_out_of_minimum_swd_set() -> Non
         for entry in contract["socket_interface"]["recommended_optional_contacts"]
     }
 
+    assert (1, "VBAT") in mandatory
+    assert (1, "VBAT") not in optional
     assert (44, "BOOT0") not in mandatory
     assert (44, "BOOT0") in optional
-    assert (1, "VBAT") not in mandatory
-    assert (1, "VBAT") in optional
+    assert contract["socket_interface"]["vbat_policy"] == {
+        "mode": "tie_to_vdd_when_no_external_battery",
+        "decoupling_nF": 100,
+        "source": "AN2586 Rev 8",
+    }
+
+
+def test_stm32f103c8_socket_contract_is_bound_to_actual_adr0002_l2_authority() -> None:
+    qualification = get_default_programming_qualification_registry().describe(
+        "STMicroelectronics",
+        "STM32F103C8T6",
+    )
+
+    assert qualification["catalog_level"] == 2
+    assert qualification["catalog_level_state"] == "PROGRAMMABLE"
+    assert qualification["state"] == "SUPPORTED"
+    assert qualification["reviewed"] is True
+    assert qualification["job_selectable"] is True
+    assert qualification["execution_authorized"] is False
+    provider = qualification["provider"]
+    assert provider is not None
+    assert provider["provider_id"] == "openocd-upstream"
+    assert provider["version"] == "0.12.0"
