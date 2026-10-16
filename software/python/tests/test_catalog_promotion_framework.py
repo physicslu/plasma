@@ -7,6 +7,10 @@ from plasma_web.catalog_promotion_framework import (
     EDGE_L0_TO_L1,
     EDGE_L1_TO_L2,
     EDGE_L2_TO_L3,
+    EVIDENCE_BACKEND_CANDIDATE_ROUTE,
+    EVIDENCE_CATALOG_MAPPED_ROUTE,
+    EVIDENCE_IDENTITY_ONLY,
+    EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER,
     MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED,
     NO_PROGRAMMING_ROUTE_EVIDENCE,
     PLASMA_VERIFIED_CONFIGURATION_MISSING,
@@ -108,11 +112,19 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
 
         self.assertEqual(observed["DISCOVERED1"]["catalog_level"], 0)
         self.assertEqual(
+            observed["DISCOVERED1"]["promotion_evidence_class"],
+            EVIDENCE_IDENTITY_ONLY,
+        )
+        self.assertEqual(
             observed["DISCOVERED1"]["promotion_blocker"],
             NO_PROGRAMMING_ROUTE_EVIDENCE,
         )
 
         self.assertEqual(observed["MAPPED1"]["catalog_level"], 1)
+        self.assertEqual(
+            observed["MAPPED1"]["promotion_evidence_class"],
+            EVIDENCE_CATALOG_MAPPED_ROUTE,
+        )
         self.assertEqual(
             observed["MAPPED1"]["promotion_blocker"],
             MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED,
@@ -120,17 +132,29 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
 
         self.assertEqual(observed["CANDIDATE1"]["catalog_level"], 1)
         self.assertEqual(
+            observed["CANDIDATE1"]["promotion_evidence_class"],
+            EVIDENCE_BACKEND_CANDIDATE_ROUTE,
+        )
+        self.assertEqual(
             observed["CANDIDATE1"]["promotion_blocker"],
             BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED,
         )
 
         self.assertEqual(observed["BLOCKED1"]["catalog_level"], 1)
         self.assertEqual(
+            observed["BLOCKED1"]["promotion_evidence_class"],
+            EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER,
+        )
+        self.assertEqual(
             observed["BLOCKED1"]["promotion_blocker"],
             PROVIDER_QUALIFICATION_BLOCKED,
         )
 
         self.assertEqual(observed["SUPPORTED1"]["catalog_level"], 2)
+        self.assertEqual(
+            observed["SUPPORTED1"]["promotion_evidence_class"],
+            EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER,
+        )
         self.assertEqual(
             observed["SUPPORTED1"]["promotion_blocker"],
             PLASMA_VERIFIED_CONFIGURATION_MISSING,
@@ -141,6 +165,15 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(
             report["catalog_level_counts"],
             {"0": 1, "1": 3, "2": 1, "3": 0},
+        )
+        self.assertEqual(
+            report["promotion_evidence_counts"],
+            {
+                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 1,
+                EVIDENCE_CATALOG_MAPPED_ROUTE: 1,
+                EVIDENCE_IDENTITY_ONLY: 1,
+                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 2,
+            },
         )
         self.assertEqual(report["selector_visible_exact_icpns"], 4)
         self.assertEqual(report["job_selectable_exact_icpns"], 1)
@@ -174,6 +207,15 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(
             report["catalog_level_counts"],
             {"0": 437, "1": 4489, "2": 49, "3": 0},
+        )
+        self.assertEqual(
+            report["promotion_evidence_counts"],
+            {
+                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 362,
+                EVIDENCE_CATALOG_MAPPED_ROUTE: 4127,
+                EVIDENCE_IDENTITY_ONLY: 437,
+                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 49,
+            },
         )
         self.assertEqual(report["selector_visible_exact_icpns"], 4538)
         self.assertEqual(report["job_selectable_exact_icpns"], 49)
