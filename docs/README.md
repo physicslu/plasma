@@ -23,6 +23,7 @@
 
 ## Architecture and contracts
 
+- **Plan / Proposed** — [Runtime FPGA Architecture v1.0](architecture/runtime-fpga-architecture-v1.md)：記錄一台 PPU 同批次相同 IC、多 Site 獨立執行、切換介面不重啟 Linux 的架構前提，以及 Driver／Hardware ABI／動態 FPGA Switching、HIL Phase、相依性與 Gate 邊界；**尚未實作，也不授權實機操作**。
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
 - **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
