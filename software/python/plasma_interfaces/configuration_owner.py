@@ -340,7 +340,7 @@ class ConfigurationOwner:
             self._phase = Phase.MODEL_LOAD
 
     def simulate_image_switch(self, candidate_label: str) -> None:
-        """Record a label in RAM; no bitstream, firmware, FPGA Manager or sysfs access."""
+        """Record a candidate label in RAM; never change an FPGA image or sysfs state."""
         with self._mutex:
             self._require(Phase.MODEL_LOAD)
             if type(candidate_label) is not str or not candidate_label.strip() \
