@@ -160,5 +160,11 @@
     "physical_programming_qualified": false,
     "hil_verified": false,
     "execution_authorized": false
+  },
+  "composition_policy": {
+    "mode": "additive_hardware_overlay",
+    "mutates_software_admission_authority": false,
+    "mutates_catalog_level_authority": false,
+    "requires_exact_icpn_match": true
   }
 }
