@@ -9,6 +9,13 @@ import sys
 # package. Make the REAL production driver module importable in that runner.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "software/python"))
 
+# Generic Z2 source-layout workflow installs pytest only, not the complete PPU
+# dependencies. Skip *only there*; dedicated LT02 P0 CI installs the package
+# and MUST execute this suite, so package/import failures still fail its job.
+import importlib.util
+if importlib.util.find_spec("yaml") is None:
+    pytest.skip("PPU dependency PyYAML is absent in layout-only CI; full LT02 CI runs these tests", allow_module_level=True)
+
 from pl.hil.lt02 import cases
 from plasma_interfaces.mmio_loop_test import (
     MAGIC, ABI_VERSION, CAPABILITIES, CAPACITY, WINDOW_START,
