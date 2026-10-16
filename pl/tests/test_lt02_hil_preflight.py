@@ -24,8 +24,6 @@ def fixture(tmp_path: Path, monkeypatch):
             path.write_bytes(name.encode())
     ET.ElementTree(handoff()).write(paths["candidate.hwh"])
     monkeypatch.setattr(c, "RECOVERY_BIN_SHA256", c.digest(paths["base.bin"]))
-    monkeypatch.setattr(c, "RECOVERY_HWH_SHA256", c.digest(paths["base.hwh"])
-                        if paths["base.hwh"].exists() else "0" * 64)
     # Original PYNQ base HWH is only SHA-256 checked and never parsed as LT02.
     paths["base.hwh"].write_bytes(b"original PYNQ base HWH")
     monkeypatch.setattr(c, "RECOVERY_HWH_SHA256", c.digest(paths["base.hwh"]))
@@ -53,6 +51,14 @@ def fixture(tmp_path: Path, monkeypatch):
         "target_programming_qualified": False,
         "loading_safety": "NOT_QUALIFIED",
         "toolchain": {"name": "Vivado", "version": "2026.1"},
+        "implemented_slack_ns": {"setup": 0.4, "hold": 0.02},
+        "evidence_sha256": {name: "c" * 64 for name in (
+            "logs/legacy-regression.log", "logs/host-regression.log",
+            "logs/lt02-regression.log", "logs/artifact-regression.log",
+            "logs/vivado-console.log", "reports/timing_summary.rpt",
+            "reports/drc.rpt", "reports/methodology.rpt",
+            "reports/utilization.rpt", "reports/check_timing.rpt",
+        )},
         "acceptance": {
             "LT02_HOST_RTL": "PASS", "LT02_IMPLEMENTED_HOST": "PASS",
             "Z2_HIL": "NOT_RUN", "physical_swd": "NOT_RUN",
@@ -144,6 +150,9 @@ def test_missing_independently_approved_digest_fails(fixture, field):
     ("physical_programming_qualified", True),
     ("loading_safety", "QUALIFIED"),
     ("toolchain", {"name": "Vivado", "version": "2025.1"}),
+    ("implemented_slack_ns", {"setup": -0.1, "hold": 0.02}),
+    ("implemented_slack_ns", {"setup": 0.1, "hold": -0.02}),
+    ("evidence_sha256", {}),
 ])
 def test_semantic_manifest_forgery_rejected_even_when_rehashed(
         fixture, field, value):
