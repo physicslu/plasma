@@ -24,6 +24,10 @@ on:
       - 'data/device-catalog/research/test_microchip_adr0002_canonical_phase_contract_v1.py'
       - 'data/device-catalog/research/microchip_adr0002_cfg2563_target_scope_v1.py'
       - 'data/device-catalog/research/test_microchip_adr0002_cfg2563_target_scope_v1.py'
+      - 'data/device-catalog/research/microchip_adr0002_phase1_remaining2441_queue_v1.py'
+      - 'data/device-catalog/research/test_microchip_adr0002_phase1_remaining2441_queue_v1.py'
+      - 'data/device-catalog/research/MICROCHIP_ADR0002_2441_PHASE1_DELIVERY_QUEUE_V1.md'
+      - 'data/device-catalog/research/microchip-phase1-remaining2441-exact-identity-v1.csv'
       - 'data/device-catalog/research/MICROCHIP_ADR0002_PHASE_CONFORMANCE_V1.md'
       - 'data/device-catalog/research/MICROCHIP_PHASE1_S1_IDENTITY_FUNNEL_V1.md'
       - 'data/device-catalog/research/microchip_phase1_cfg2563_st_field_ledger_v1.py'
@@ -739,6 +743,78 @@ jobs:
               f.write("Frozen 2563 ICPNs unchanged; S1_complete=0. "
                       "No Catalog, OpenOCD SUPPORTED or HIL changes.\n")
           PY
+      - name: Derive owner-approved five-CFG remaining 2441 exact Phase1 identity queue
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s data/device-catalog/research \
+            -p 'test_microchip_adr0002_phase1_remaining2441_queue_v1.py' -v
+          root="$RUNNER_TEMP"
+          python data/device-catalog/research/microchip_adr0002_phase1_remaining2441_queue_v1.py \
+            --canonical "$root/microchip-adr0002-canonical-phase-status.json" \
+            --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --first-batch-pdf-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
+            --output-jsonl "$root/microchip-adr0002-phase1-remaining2441.jsonl" \
+            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json" \
+            --output-identity-csv "$root/microchip-adr0002-phase1-remaining2441-identities.csv" \
+            --bootstrap-identity-csv-in-ci-log
+          python data/device-catalog/research/microchip_adr0002_phase1_remaining2441_queue_v1.py \
+            --canonical "$root/microchip-adr0002-canonical-phase-status.json" \
+            --cfg-frozen "$root/microchip-phase1-5cfg-2563-st-fields.json" \
+            --first-batch-pdf-crosswalk "$root/microchip-p1-ordering-crosswalk.json" \
+            --output-jsonl "$root/microchip-adr0002-phase1-remaining2441.jsonl" \
+            --summary-json "$root/microchip-adr0002-phase1-remaining2441-summary.json" \
+            --output-identity-csv "$root/microchip-adr0002-phase1-remaining2441-identities.csv" --verify
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          summary=json.loads((root/"microchip-adr0002-phase1-remaining2441-summary.json").read_text())
+          rows=[json.loads(x) for x in
+                (root/"microchip-adr0002-phase1-remaining2441.jsonl").read_text().splitlines()]
+          assert summary["phase1_engineering_target_exact_icpns"]==2563
+          assert summary["first_proposed_122_exact_icpns"]==122
+          assert summary["remaining_phase1_identified_exact_icpns"]==2441
+          assert len(rows)==len({x["icpn"].upper() for x in rows})==2441
+          import csv
+          with (root/"microchip-adr0002-phase1-remaining2441-identities.csv").open() as f:
+              identities=list(csv.DictReader(f))
+          assert len(identities)==2441
+          assert summary["remaining_research_identity_csv_sha256"]==(
+              "ecec8112d52d3d5b3b7313e2316da67e6dc670794713abf49b5b8fdeb6f0688d")
+          assert (root/"microchip-adr0002-phase1-remaining2441-identities.csv").read_bytes()==(
+              Path("data/device-catalog/research/"
+                   "microchip-phase1-remaining2441-exact-identity-v1.csv").read_bytes())
+          assert len({r["icpn"].upper() for r in identities})==2441
+          assert all(r["phase1_identity_status"]=="IDENTIFIED"
+              and r["executable_mapping_status"]=="no_mapping"
+              and r["phase2_programming_state"]=="UNKNOWN"
+              and r["phase3_compatibility_state"]=="NOT_TESTED"
+              for r in identities)
+          assert summary["remaining_cfg_counts"]=={
+              "tcl/target/pic32mx.cfg":1241,
+              "tcl/target/at91samdXX.cfg":667,
+              "tcl/target/atsame5x.cfg":354,
+              "tcl/target/atsamv.cfg":175,
+              "tcl/target/atsaml1x.cfg":4,
+          }
+          assert summary["remaining_special_vao_exact_icpns"]==4
+          assert summary["phase1_information_complete"]==0
+          assert summary["phase2_supported"]==0
+          assert summary["phase3_passed"]==0
+          assert all(r["phase1_identity_status"]=="IDENTIFIED"
+                     and r["phase2_programming_state"]=="UNKNOWN"
+                     and r["phase3_compatibility_state"]=="NOT_TESTED"
+                     and r["research_cfg_is_executable_mapping"] is False
+                     and r["executable_openocd_target_cfg"] is None
+                     and r["source_pinned_not_production_published"] is True
+                     and r["job_batch_execution_authorized"] is False for r in rows)
+          assert not summary["production_write_authorized"]
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("Microchip Phase 1 2563 5-CFG target = 122 staged + 2441 source-bound remaining.\n")
+              f.write("4 special VAO remain Phase 1 IDENTIFIED but optional package evidence unresolved.\n")
+              f.write("Remaining JSONL SHA256: "+summary["remaining_source_queue_sha256"]+"\n")
+              f.write("No Phase 2 supported/production write/job authorization.\n")
+          PY
       - name: Archive Research-only exact ICPN crosswalk
         if: always()
         uses: actions/upload-artifact@v4
@@ -755,6 +831,9 @@ jobs:
             ${{ runner.temp }}/microchip-phase1-5cfg-2563-st-fields.json
             ${{ runner.temp }}/microchip-phase1-saml1x-exact-pdf-enriched.json
             ${{ runner.temp }}/microchip-p1-ordering-crosswalk.json
+            ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441.jsonl
+            ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441-summary.json
+            ${{ runner.temp }}/microchip-adr0002-phase1-remaining2441-identities.csv
           if-no-files-found: warn
           retention-days: 90
 
