@@ -207,6 +207,40 @@ def resolve_mapping(uios: list[dict], start: int, size: int,
     return matched[0]
 
 
+def read_platform_resource_candidates(sysroot: Path, start: int,
+                                      end: int) -> list[dict]:
+    """Read advertised overlapping Kernel resources; absence is NOT ownership proof."""
+    root = sysroot / "bus/platform/devices"
+    require(root.is_dir(), "Platform-device resource inventory unavailable")
+    result = []
+    try:
+        devices = list(root.iterdir())
+    except OSError as exc:
+        raise Phase1Error("Platform-device inventory denied") from exc
+    for device in sorted(devices, key=lambda p: p.name):
+        resource = device / "resource"
+        if not resource.exists():
+            continue
+        matched = []
+        for row in _read_text(resource, "platform resource").splitlines():
+            fields = row.split()
+            require(len(fields) == 3, "Malformed platform resource line")
+            try:
+                lo, hi, flags = (int(x, 16) for x in fields)
+            except ValueError as exc:
+                raise Phase1Error("Malformed platform resource hex") from exc
+            require(0 <= lo <= hi and hi < 0x100000000,
+                    "Invalid platform resource interval")
+            if flags & 0x200 and lo < end and start <= hi:
+                matched.append({"start": lo, "end_inclusive": hi,
+                                "flags": flags})
+        if matched:
+            result.append({"platform_device": device.name,
+                           "driver": _link_name(device / "driver"),
+                           "overlapping_memory_resources": matched})
+    return result
+
+
 def collect_inventory(sysroot: Path, procroot: Path, contract: dict) -> dict:
     validated = validate_contract(contract)
     uios = read_uio_snapshot(sysroot)
@@ -216,6 +250,15 @@ def collect_inventory(sysroot: Path, procroot: Path, contract: dict) -> dict:
     boot = procroot / "sys/kernel/random/boot_id"
     state = _read_text(manager, "FPGA Manager state")
     boot_id = _read_text(boot, "boot_id")
+    release = _read_text(procroot / "sys/kernel/osrelease", "Kernel release")
+    model = sysroot / "firmware/devicetree/base/model"
+    board_model = None
+    if model.exists():
+        raw = model.read_bytes()
+        require(len(raw) <= 1024, "Oversized board model in Device Tree")
+        board_model = raw.decode("utf-8", errors="replace").strip("\x00\n")
+    platforms = read_platform_resource_candidates(sysroot,
+                                                  validated["base"], 0x80000000)
     bridges = sysroot / "class/fpga_bridge"
     bridge_entries = sorted(p.name for p in bridges.iterdir()) if bridges.is_dir() else []
     return {
@@ -224,6 +267,9 @@ def collect_inventory(sysroot: Path, procroot: Path, contract: dict) -> dict:
         "reload_authorized": False,
         "read_only": True,
         "boot_id": boot_id,
+        "kernel_release": release,
+        "device_tree_board_model": board_model,
+        "related_platform_resource_candidates": platforms,
         "fpga_manager_state": state,
         "fpga_bridge_sysfs_entries": bridge_entries,
         "uio": uios,
