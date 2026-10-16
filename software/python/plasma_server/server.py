@@ -17,6 +17,7 @@ from plasma_core.diagnostics import (
     LOOPBACK_DIAGNOSTIC_TYPE,
     PS_LOOPBACK_ENDPOINT,
     PL_LOOPBACK_ENDPOINT,
+    MAX_PL_LOOPBACK_CASE_BYTES,
     crc32_hex,
     require_crc32,
     require_nonnegative_int,
@@ -41,8 +42,6 @@ from plasma_core.protocol import (
     read_frame,
 )
 
-from plasma_interfaces.mmio_loop_test import LoopTestDriver, MAX_CASE_BYTES
-
 from .site_manager import SiteManager
 
 
@@ -51,8 +50,12 @@ class PlasmaServer:
         self, config: PlasmaConfig, manager: SiteManager | None = None,
         *, lt02_driver: LoopTestDriver | None = None,
     ) -> None:
-        if lt02_driver is not None and not isinstance(lt02_driver, LoopTestDriver):
-            raise TypeError("PL diagnostics require a production LoopTestDriver instance")
+        if lt02_driver is not None:
+            # Lazy import: default PS-only PlasmaServer remains importable on
+            # Windows; the production LinuxMMIO module depends on fcntl.
+            from plasma_interfaces.mmio_loop_test import LoopTestDriver
+            if not isinstance(lt02_driver, LoopTestDriver):
+                raise TypeError("PL diagnostics require a production LoopTestDriver instance")
         # No implicit /dev/mem open, overlay load, service activation or mock fallback.
         self.lt02_driver = lt02_driver
         self._lt02_poisoned = False
@@ -257,7 +260,7 @@ class PlasmaServer:
         result = None
         output = frame.binary
         if endpoint == PL_LOOPBACK_ENDPOINT:
-            if payload_length > MAX_CASE_BYTES:
+            if payload_length > MAX_PL_LOOPBACK_CASE_BYTES:
                 raise PlasmaError(ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE,
                                   "LT02 hardware case exceeds 1 MiB")
             assert self.lt02_driver is not None
