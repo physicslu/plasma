@@ -254,6 +254,14 @@
       "sha256": "0228c6a077ea02d868ca53c6f82a8df81cf96d6f6306724852c3614b0b9727e5"
     },
     {
+      "manufacturer": "NXP",
+      "family": "LPC11U6X",
+      "path": "../research/nxp-lpc11u6x-8-commercial-l1-v1.csv",
+      "row_count": 8,
+      "git_blob_sha": "7eb882262d6f907022d3aaa4e5bd8c656f641a54",
+      "sha256": "39cf41e7bf67ee076c19ad53c388c3d9b61b556767c1a7b8ec9420cc1542ad77"
+    },
+    {
       "manufacturer": "Microchip",
       "family": "SAML1X",
       "path": "../research/microchip-saml1x-122-commercial-icpn-v1.csv",
