@@ -29,22 +29,7 @@
     }
   ],
   "data": {
-    "package": {
-      "family": "LQFP",
-      "terminals": 48,
-      "body_mm": {
-        "x": 7,
-        "y": 7
-      },
-      "lead_span_mm": {
-        "x": 9,
-        "y": 9
-      },
-      "pitch_mm": 0.5,
-      "max_height_mm": 1.6,
-      "numbering_view": "top_view_counterclockwise",
-      "pin1_identifier_required_for_fixture_orientation": true
-    },
+    "package": "LQFP",
     "physical_pin_map": [
       {
         "pin": 1,
@@ -408,6 +393,21 @@
       "physical_socket_qualified": false,
       "hardware_runtime_ready": false,
       "execution_authorized": false
+    },
+    "pin_count": 48,
+    "mechanical": {
+      "body_mm": {
+        "x": 7,
+        "y": 7
+      },
+      "lead_span_mm": {
+        "x": 9,
+        "y": 9
+      },
+      "pitch_mm": 0.5,
+      "max_height_mm": 1.6,
+      "numbering_view": "top_view_counterclockwise",
+      "pin1_identifier_required_for_fixture_orientation": true
     }
   }
 }
