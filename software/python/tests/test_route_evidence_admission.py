@@ -39,7 +39,7 @@ class RouteEvidenceAdmissionTests(unittest.TestCase):
     def test_candidate_is_l1_without_l2_or_execution(self):
         catalog = DeviceCatalog((row(),))
         candidates = AdmittedRouteCandidateRegistry(catalog, (evidence(),))
-        qualification = ProgrammingQualificationRegistry(catalog, (), candidate_registry=candidates)
+        qualification = ProgrammingQualificationRegistry(catalog, (), candidate_registries=(candidates,))
         q = qualification.describe("ExampleVendor", "EXACT123")
         self.assertEqual(q["catalog_level"], 1)
         self.assertEqual(q["state"], "CANDIDATE")
@@ -64,10 +64,21 @@ class RouteEvidenceAdmissionTests(unittest.TestCase):
         with self.assertRaisesRegex(DeviceCatalogIntegrityError, "duplicate"):
             AdmittedRouteCandidateRegistry(catalog, (evidence(), evidence()))
 
+    def test_candidate_registry_conflicts_are_not_silently_selected(self):
+        catalog = DeviceCatalog((row(),))
+        candidates = AdmittedRouteCandidateRegistry(catalog, (evidence(),))
+        registry = ProgrammingQualificationRegistry(
+            catalog, (), candidate_registries=(candidates, candidates),
+        )
+        with self.assertRaisesRegex(DeviceCatalogIntegrityError, "multiple candidate routes"):
+            registry.describe("ExampleVendor", "EXACT123")
+        with self.assertRaisesRegex(DeviceCatalogIntegrityError, "multiple candidate routes"):
+            _ = registry.summary
+
     def test_no_evidence_stays_l0(self):
         catalog = DeviceCatalog((row(),))
         candidates = AdmittedRouteCandidateRegistry(catalog, ())
-        qualification = ProgrammingQualificationRegistry(catalog, (), candidate_registry=candidates)
+        qualification = ProgrammingQualificationRegistry(catalog, (), candidate_registries=(candidates,))
         q = qualification.describe("ExampleVendor", "EXACT123")
         self.assertEqual(q["catalog_level"], 0)
         self.assertFalse(q["selector_visible"])
