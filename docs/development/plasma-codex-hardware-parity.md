@@ -16,7 +16,7 @@ No additional HIL Gateway, Controller, device driver or REST API.
 
 With `--apply` on trusted **SWPC**:
 - Creates dedicated group `plasma-codex-io`, adds both existing operator `<trusted-operator>` and `plasma-codex`, preserving original operator usability.
-- Creates an exact guarded `/etc/udev/rules.d/70-plasma-codex-io.rules` with GROUP `plasma-codex-io`, MODE 0660 only for FT2232 0403:6010, Hub 8564:4100, LA2016 77a1:01a2, and FT2232-descendant ttyUSB nodes. No wildcard all-USB, `sudoers`, `docker`, or blanket `dialout` membership.
+- Creates an exact guarded `/etc/udev/rules.d/99-plasma-codex-io.rules` with GROUP `plasma-codex-io`, MODE 0660 only for FT2232 0403:6010, Hub 8564:4100, LA2016 77a1:01a2, and FT2232-descendant ttyUSB nodes. No wildcard all-USB, `sudoers`, `docker`, or blanket `dialout` membership.
 - Reloads udev rules **without** re-enumerating devices, changing active device-node modes, opening USB, operating power/FPGA, or restarting the Runner. Existing conflicting files and symlinks fail closed.
 - Optional `--la-appimage <OWNER_LOCAL_PATH>` verifies exact previously proven binary digest and atomically copies it to `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage`, exposing wrapper `/usr/local/bin/plasma-la2016-sigrok`. It does not invent a new firmware path. `SIGROK_FIRMWARE_PATH` may still need to be configured privately.
 
