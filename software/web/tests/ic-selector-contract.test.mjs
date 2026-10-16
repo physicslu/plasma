@@ -68,20 +68,24 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.doesNotMatch(selector, /nRF52840/);
 });
 
-test("Phase 2 Programming qualification is vendor-neutral and independent from CFG mapping and physical readiness", async () => {
+test("Programming qualification derives Catalog Level 2 independently from CFG mapping and physical readiness", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
   const api = await source("../app/device-catalog-api.ts");
 
   assert.match(api, /ProgrammingQualification/);
   assert.match(api, /programming_qualification\?:\s*ProgrammingQualification\s*\|\s*null/);
-  assert.match(api, /phase:\s*"PROGRAMMING"/);
   assert.match(api, /state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"BLOCKED"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
-  assert.match(api, /phase1_identity_state:\s*"IDENTIFIED"\s*\|\s*"NOT_IDENTIFIED"/);
-  assert.match(api, /selector_visibility_authority:\s*"PHASE1_IDENTIFIED"/);
+  assert.match(api, /identity_state:\s*"IDENTIFIED"\s*\|\s*"NOT_IDENTIFIED"/);
+  assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*null/);
+  assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*null/);
+  assert.match(api, /selector_visible:\s*boolean/);
   assert.match(api, /execution_authorized:\s*false/);
   assert.match(api, /hardware_runtime_ready:\s*false/);
   assert.match(api, /physical_programming_qualified:\s*false/);
   assert.doesNotMatch(api, /openocd_software_qualification/);
+  assert.doesNotMatch(api, /phase1_/);
+  assert.doesNotMatch(api, /phase2_/);
+  assert.doesNotMatch(api, /phase3_/);
 
   assert.match(selector, /softwareQualificationLabel\(device\.programming_qualification\?\.state, zh\)/);
   assert.match(selector, /state === "CANDIDATE" \|\| state === "BLOCKED"/);
@@ -92,8 +96,7 @@ test("Phase 2 Programming qualification is vendor-neutral and independent from C
   assert.match(selector, /Programming Profile/);
   assert.match(selector, /CFG Mapping/);
   assert.match(selector, /CFG mapping 不能視為燒錄支援/);
-  assert.match(selector, /Phase 2 Programming qualification/);
-  assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 Phase 3 驗證/);
+  assert.match(selector, /仍不代表 PPU、Site、Socket 或實體 IC 已完成 PLASMA 實機驗證/);
 });
 
 test("shared PMode and EMode picker is constrained to admitted exact ICPNs", async () => {
