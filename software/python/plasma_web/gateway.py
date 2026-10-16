@@ -96,23 +96,32 @@ def _microchip_ic_information(
     """Read-only manufacturer information; canonical Qualification owns Level."""
     if record.vendor != "Microchip":
         return None
-    if record.family == "PIC32MX":
+    if record.family in {"PIC32MX", "SAMDCRL0", "SAMD5E5"}:
         ref = record.source_reference or ""
+        is_sam_phase2 = record.family in {"SAMDCRL0", "SAMD5E5"}
+        prefix_ok = (record.identifier.startswith("AT") if is_sam_phase2
+                     else record.identifier.startswith("PIC32MX"))
+        verification = (
+            "verified_microchip_mcp_exact_ordering_and_pinned_driver_part_devsel"
+            if is_sam_phase2 else
+            "verified_microchip_mcp_exact_ordering_and_pinned_openocd_devid"
+        )
+        route_ok = ("explicit_driver_part=" in ref and "driver_devsel=0x" in ref
+                    if is_sam_phase2 else "expected_devid=" in ref)
         if (not record.production_admitted
             or record.mapping_status != "no_mapping" or record.target_config
-            or not record.base_device or not record.identifier.startswith("PIC32MX")
+            or not record.base_device or not prefix_ok
             or record.source_authority != "Microchip Technology official"
-            or record.verification_status !=
-                "verified_microchip_mcp_exact_ordering_and_pinned_openocd_devid"
+            or record.verification_status != verification
             or f"partNumber={record.icpn}" not in ref
             or f"basePartNumber={record.base_device}" not in ref
             or "original_response_sha256=" not in ref
-            or "expected_devid=" not in ref
+            or not route_ok
             or qualification["catalog_level"] != 1
             or qualification["state"] != "CANDIDATE"
             or qualification["job_selectable"]
             or qualification["execution_authorized"]):
-            raise ValueError("Microchip PIC32MX exact identity/route evidence boundary changed")
+            raise ValueError("Microchip exact identity/route evidence boundary changed")
         return {
             "status": "manufacturer_exact_material_identity_route_candidate",
             "manufacturer": "Microchip", "icpn": record.icpn,
@@ -135,7 +144,10 @@ def _microchip_ic_information(
             "source": {
                 "authority": "Microchip Technology official",
                 "exact_mcp_material_source": ref,
-                "provider_route_evidence": "OpenOCD v0.12.0 pinned driver DEVID",
+                "provider_route_evidence": (
+                    "OpenOCD v0.12.0 pinned SAM part/DEVSEL"
+                    if is_sam_phase2 else "OpenOCD v0.12.0 pinned driver DEVID"
+                ),
                 "official_pdf_grammar_not_exact_material_list": False,
             },
             "software_supported": False,
