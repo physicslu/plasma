@@ -241,7 +241,7 @@ def check_ownership(*, sysroot: Path = Path("/sys"),
     for device in (sysroot / "bus/platform/devices").iterdir():
         if not (device / "driver").exists():
             continue
-        match = re.match(r"^([a-fA-F0-9]+)\\.", device.name)
+        match = re.match(r"^([a-fA-F0-9]+)\.", device.name)
         conflict = bool(match and overlaps(int(match[1], 16),
                                            int(match[1], 16) + 1))
         resource = device / "resource"

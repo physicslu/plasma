@@ -279,3 +279,18 @@ def test_fclk_enabled_guard():
     assert n.check_fclk_enabled("fclk0 1 1 100000000")
     assert not n.check_fclk_enabled("fclk0 0 0 100000000")
     assert not n.check_fclk_enabled("missing 1 1 100000000")
+
+
+@pytest.mark.parametrize("name,conflicts", [
+    ("40000000.fabric", True), ("40004000.lt02", True),
+    ("40005000.unrelated", False), ("43c00000.audio-codec-ctrl", False),
+])
+def test_platform_owner_named_resource_without_resource_file(trees, name, conflicts):
+    sys, proc = trees
+    device = sys / "bus/platform/devices" / name
+    (device / "driver").mkdir(parents=True)
+    if conflicts:
+        with pytest.raises(n.LT02SafetyError, match="kernel PL resource"):
+            n.check_ownership(sysroot=sys, procroot=proc)
+    else:
+        n.check_ownership(sysroot=sys, procroot=proc)
