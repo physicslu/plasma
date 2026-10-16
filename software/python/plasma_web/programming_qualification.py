@@ -64,16 +64,22 @@ class ProgrammingQualificationRegistry:
         return row
 
     @staticmethod
-    def _unknown(identity_state: str) -> dict[str, Any]:
+    def _unknown(identity_state: str, *, has_programming_route: bool = False) -> dict[str, Any]:
         identified = identity_state == IDENTIFIED
+        level = 1 if identified and has_programming_route else (0 if identified else None)
+        level_state = (
+            CATALOG_LEVEL_CANDIDATE if level == 1
+            else CATALOG_LEVEL_DISCOVERED if level == 0
+            else None
+        )
         return {
             "schema_version": "2.0.0",
             "registry_id": None,
             "state": "UNKNOWN",
             "reviewed": False,
             "identity_state": identity_state,
-            "catalog_level": 0 if identified else None,
-            "catalog_level_state": CATALOG_LEVEL_DISCOVERED if identified else None,
+            "catalog_level": level,
+            "catalog_level_state": level_state,
             "provider": None,
             "operations": {},
             "programming": None,
@@ -99,7 +105,11 @@ class ProgrammingQualificationRegistry:
             f"ambiguous reviewed Programming Providers for {manufacturer}/{exact_icpn}",
         )
         if not reviewed:
-            return self._unknown(IDENTIFIED)
+            has_programming_route = row.mapping_status == "mapped" and bool(row.target_config)
+            return self._unknown(
+                IDENTIFIED,
+                has_programming_route=has_programming_route,
+            )
 
         raw = reviewed[0].describe(manufacturer, exact_icpn)
         state = raw.get("software_state")
@@ -128,19 +138,33 @@ class ProgrammingQualificationRegistry:
 
     @property
     def summary(self) -> dict[str, Any]:
-        reviewed = sum(len(provider.reviewed_exact_keys) for provider in self._providers)
-        supported = 0
+        reviewed_keys: set[tuple[str, str]] = set()
+        supported_keys: set[tuple[str, str]] = set()
         for provider in self._providers:
             for manufacturer, exact_icpn in provider.reviewed_exact_keys:
+                key = (manufacturer, exact_icpn)
+                reviewed_keys.add(key)
                 if provider.describe(manufacturer, exact_icpn).get("software_state") == "SUPPORTED":
-                    supported += 1
+                    supported_keys.add(key)
+
+        discovered_keys = {
+            (row.vendor, row.identifier)
+            for row in self._catalog.records
+            if row.identity_state == IDENTIFIED
+        }
+        route_keys = {
+            (row.vendor, row.identifier)
+            for row in self._catalog.records
+            if row.identity_state == IDENTIFIED
+            and row.mapping_status == "mapped"
+            and bool(row.target_config)
+        } | reviewed_keys
         return {
             "provider_count": len(self._providers),
-            "catalog_level_0_discovered_exact_icpns": sum(
-                1 for row in self._catalog.records if row.identity_state == IDENTIFIED
-            ),
-            "catalog_level_1_or_higher_exact_icpns": reviewed,
-            "catalog_level_2_programmable_exact_icpns": supported,
+            "catalog_level_0_or_higher_discovered_exact_icpns": len(discovered_keys),
+            "catalog_level_0_only_exact_icpns": len(discovered_keys - route_keys),
+            "catalog_level_1_or_higher_exact_icpns": len(route_keys),
+            "catalog_level_2_programmable_exact_icpns": len(supported_keys),
             "selector_visibility_rule": "CATALOG_LEVEL_2_PROGRAMMABLE",
             "execution_authorized_by_catalog_projection": False,
         }
