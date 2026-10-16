@@ -387,14 +387,24 @@ class ConfigurationOwner:
             leases = tuple(self._leases.values())
             self._leases.clear()
             self._batch_ic = None
+            failures = []
             try:
                 for lease in leases:
                     lease._active = False
-                    lease._port.close()
+                    try:
+                        lease._port.close()
+                    except Exception as exc:
+                        failures.append(exc)
                 if self._backend is not None:
-                    self._backend.close()
-                    self._backend = None
+                    try:
+                        self._backend.close()
+                    except Exception as exc:
+                        failures.append(exc)
+                    finally:
+                        self._backend = None
             finally:
                 if self._fd is not None:
                     os.close(self._fd)
                     self._fd = None
+            if failures:
+                raise OwnerError("Host owner retirement incomplete; do not reuse") from failures[0]
