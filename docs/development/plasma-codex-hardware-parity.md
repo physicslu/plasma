@@ -20,7 +20,7 @@ With `--apply` on trusted **SWPC**:
 - Reloads udev rules **without** re-enumerating devices, changing active device-node modes, opening USB, operating power/FPGA, or restarting the Runner. Existing conflicting files and symlinks fail closed.
 - Optional `--la-appimage <OWNER_LOCAL_PATH>` verifies exact previously proven binary digest and atomically copies it to `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage`, exposing wrapper `/usr/local/bin/plasma-la2016-sigrok`. It does not invent a new firmware path. `SIGROK_FIRMWARE_PATH` may still need to be configured privately.
 
-`--audit` checks known accounts/groups, managed rules, installed LA digest and **file metadata only** for the existing private Z2 credential-store convention. It never reads, parses, displays or copies passwords, SSH keys, environment values, unique USB serial numbers or machine-specific paths.
+`--audit` compares the operator and worker against USB/FT2232-TTY permission mode bits (not ACL/LSM), groups, managed rules, installed LA digest and **file metadata only** for the existing private Z2 credential-store convention. It never reads, parses, displays or copies passwords, SSH keys, environment values, unique USB serial numbers or machine-specific paths.
 
 ## Deployment after Gate 2 (operator terminal; not PR workflow)
 
