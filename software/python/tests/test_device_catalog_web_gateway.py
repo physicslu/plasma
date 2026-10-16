@@ -44,7 +44,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(payload["count"], payload["total_count"])
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103C8T6")
-        self.assertEqual(result["phase1"]["identity_state"], "IDENTIFIED")
+        self.assertEqual(result["identity"]["state"], "IDENTIFIED")
         self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
         self.assertEqual(result["catalog"]["scope"], "production_admitted")
         self.assertEqual(result["catalog"]["version"], "1.0.0")
