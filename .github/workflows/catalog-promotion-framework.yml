@@ -74,6 +74,7 @@ jobs:
           assert report["framework"] == "ADR-0002-cross-manufacturer-promotion"
           assert report["execution_authorized_by_framework"] is False
           assert sum(report["catalog_level_counts"].values()) == report["discovered_exact_icpns"]
+          assert sum(report["promotion_evidence_counts"].values()) == report["discovered_exact_icpns"]
           assert report["selector_visible_exact_icpns"] == (
               report["catalog_level_counts"]["1"]
               + report["catalog_level_counts"]["2"]
