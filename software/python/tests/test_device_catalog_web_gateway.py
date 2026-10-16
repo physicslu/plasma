@@ -242,15 +242,45 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(qualification["hardware_runtime_ready"])
                 self.assertFalse(qualification["physical_programming_qualified"])
 
-    def test_stm32f103_high_density_unreviewed_package_remains_unknown(self) -> None:
+    def test_stm32f103_high_density_wlcsp_package_is_l2_supported(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103RCY6TR&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
-        qualification = payload["results"][0]["programming_qualification"]
+        result = payload["results"][0]
+        self.assertEqual(result["catalog_level"], 2)
+        self.assertTrue(result["job_selectable"])
+        qualification = result["programming_qualification"]
+        self.assertEqual(qualification["state"], "SUPPORTED")
+        self.assertTrue(qualification["reviewed"])
+        self.assertEqual(
+            qualification["programming"]["programming_profile_id"],
+            "stm32f1-high-density-flash-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["memory_geometry_profile_id"],
+            "stm32f103rc-256k-v0",
+        )
+        self.assertEqual(
+            qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
+            256 * 1024,
+        )
+        self.assertFalse(qualification["execution_authorized"])
+        self.assertFalse(qualification["hardware_runtime_ready"])
+        self.assertFalse(qualification["physical_programming_qualified"])
+
+    def test_stm32f103_xl_density_remains_l1_unknown(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103RFT6&limit=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["catalog_level"], 1)
+        self.assertFalse(result["job_selectable"])
+        qualification = result["programming_qualification"]
         self.assertEqual(qualification["state"], "UNKNOWN")
         self.assertFalse(qualification["reviewed"])
         self.assertIsNone(qualification["provider"])
         self.assertIsNone(qualification["programming"])
+        self.assertFalse(qualification["execution_authorized"])
 
     def test_stm32f103_tr_ordering_variants_are_phase2_supported(self) -> None:
         for icpn, expected_bytes, expected_pages in (
