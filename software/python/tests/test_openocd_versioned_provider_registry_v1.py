@@ -28,7 +28,7 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         return self.provider.describe("STMicroelectronics", part)
 
     def test_all_4629_exact_icpns_and_independent_states(self):
-        self.assertEqual(self.catalog.size, 4983)
+        self.assertEqual(self.catalog.size, 5876)
         self.assertEqual(sum(row.vendor == "STMicroelectronics" for row in self.catalog.records), 4629)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "KL25" for row in self.catalog.records), 12)
         self.assertEqual(sum(row.vendor == "NXP" and row.family == "MCX" and row.mapping_status == "no_mapping" for row in self.catalog.records),196)
@@ -56,7 +56,7 @@ class VersionedProviderRegistryTests(unittest.TestCase):
                 self.assertEqual(binding["qualified_hardware_operations"], [])
         self.assertEqual(no_provider, 437)
         microchip = [r for r in self.catalog.records if r.vendor == "Microchip"]
-        self.assertEqual(len(microchip), 122)
+        self.assertEqual(len(microchip), 1015)
         self.assertTrue(all(not self.provider.describe(r.vendor, r.identifier) for r in microchip))
         self.assertEqual(per_family[("STM32H5", "candidate")], 190)
         self.assertEqual(per_family[("STM32C5", "candidate")], 172)
