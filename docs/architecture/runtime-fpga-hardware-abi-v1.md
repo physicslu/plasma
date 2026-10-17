@@ -4,7 +4,7 @@
 >
 > Scope: PPU-level discovery, image compatibility and independent Site discovery. The **data-plane command/FIFO/IRQ/DMA** registers are intentionally **not** defined here. Source of machine-checkable candidate layout: [`runtime_fpga_abi_v1_proposal.json`](../../pl/verification/runtime_fpga_abi_v1_proposal.json). Review with [ADR-0003](../adr/0003-runtime-fpga-driver-reconfiguration-boundary.md).
 
-## 1. Why a fixed hardware ABI
+> **2026-10-17 scope note:** This document is the **earlier general runtime-switching ABI proposal**; it is **not** the first-generation full fixed-image SWD/SPI command contract. The new [fixed-image ABI v1 Gate 1 review candidate](fixed-fpga-hardware-abi-v1-gate1.md) and its [machine-readable schema](../../pl/verification/fixed_image_abi_v1_gate1.json) provide the first-generation normal-programming data plane, still **NOT RTL implemented / NOT M1 frozen**. Generic A/B reload is deferred rather than silently made mandatory. In particular, `uio_backend.py` and `configuration_owner.py` now **exist as Host-only synthetic implementations**, not real `/dev/uio*` adapters or a production configuration owner. Old planning/checklist statements below are historical at their creation date.\n\n## 1. Why a fixed hardware ABI
 
 The Linux Runtime Driver must not depend on every IC algorithm or special Bitstream having its own arbitrary AXI address table. A future two-image A/B HIL must be able to:
 
