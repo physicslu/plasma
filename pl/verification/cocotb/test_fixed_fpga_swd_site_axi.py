@@ -208,3 +208,44 @@ async def injected_sim_driver_through_axi_to_virtual_swd_target(dut):
     assert (dpidr.ack, dpidr.data_valid, dpidr.attempts, dpidr.link_state, dpidr.raw_status) == (1, True, 1, 2, 0)
     assert not driver.poisoned
     dut._log.info("FIXED_ABI_DRIVER_AXILITE_SWD_VIRTUAL_TARGET_PASS")
+
+
+@cocotb.test()
+async def site1_timeout_fault_evidence_ack_does_not_recover(dut):
+    """Fatal timeout snapshot -> fault ACK -> still FAULT; no silent re-admission."""
+    b = Bench(dut)
+    await b.init()
+    assert await b.write(0x24, 301) == OKAY
+    assert await b.write(0x30, 64) == OKAY
+    assert await b.write(0x34, 0) == OKAY
+    assert await b.write(0x38, 0) == OKAY
+    assert await b.write(0x3c, 1) == OKAY
+    assert await b.write(0x20, 2) == OKAY
+    assert await b.wait_done(3000) == 8
+    assert await b.read(0x48) == (OKAY, 301)
+    assert await b.read(0x4c) == (OKAY, 5)
+    assert await b.read(0x70) == (OKAY, 7)
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.write(0x64, 302) == SLVERR
+    assert await b.write(0x64, 301) == OKAY
+    assert await b.read(0x0c) == (OKAY, 8)
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.write(0x24, 302) == SLVERR
+    assert await b.write(0x20, 2) == SLVERR
+    dut._log.info("FIXED_ABI_TIMEOUT_FAULT_ACK_STICKY_PASS")
+
+
+@cocotb.test()
+async def site1_rejects_reset_timing_drift_before_commit(dut):
+    b = Bench(dut)
+    await b.init()
+    assert await b.write(0x24, 401) == OKAY
+    assert await b.write(0x30, 50) == SLVERR
+    assert await b.write(0x5c, 1) == SLVERR
+    assert await b.write(0x30, 64) == OKAY
+    assert await b.write(0x5c, 2) == OKAY
+    assert await b.write(0x34, 0) == OKAY
+    assert await b.write(0x38, 0) == OKAY
+    assert await b.write(0x20, 2) == OKAY
+    assert await b.wait_done() == 4
+    dut._log.info("FIXED_ABI_TIMING_BOUNDARY_PASS")
