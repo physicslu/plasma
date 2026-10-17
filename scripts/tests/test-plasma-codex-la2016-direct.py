@@ -198,12 +198,12 @@ class OfflineDirectContracts(unittest.TestCase):
             seen.append(timeout_seconds)
             return history[len(seen)-1]
         with tempfile.TemporaryDirectory() as temp, \
-             mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \\
+             mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \
              mock.patch.object(direct,"sandbox_prefix",
                                side_effect=lambda device, evidence, *, allow_device:
                                ["bwrap", "--dev", "/dev", "--", str(evidence)]
-                               if not allow_device else None), \\
-             mock.patch.object(direct,"preparation_namespace_test"), \\
+                               if not allow_device else None), \
+             mock.patch.object(direct,"preparation_namespace_test"), \
              mock.patch.object(direct,"invoke_codex",side_effect=fake_invoke):
             root=Path(temp)
             outcomes=direct.prepare_codex(root)
@@ -220,10 +220,10 @@ class OfflineDirectContracts(unittest.TestCase):
         ]:
             with self.subTest(status=status, termination=termination), \
                  tempfile.TemporaryDirectory() as temp, \
-                 mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \\
+                 mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \
                  mock.patch.object(direct,"sandbox_prefix",
-                                   return_value=["bwrap","--dev","/dev"]), \\
-                 mock.patch.object(direct,"preparation_namespace_test"), \\
+                                   return_value=["bwrap","--dev","/dev"]), \
+                 mock.patch.object(direct,"preparation_namespace_test"), \
                  mock.patch.object(direct,"invoke_codex",return_value={
                      "status":status,"termination":termination,
                      "elapsed_seconds":1}) as mock_invoke:
@@ -233,10 +233,10 @@ class OfflineDirectContracts(unittest.TestCase):
 
     def test_all_four_timeout_attempts_exhaust_without_device(self) -> None:
         with tempfile.TemporaryDirectory() as temp, \
-             mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \\
+             mock.patch.object(direct.shutil,"which",return_value="/usr/bin/codex"), \
              mock.patch.object(direct,"sandbox_prefix",
-                               return_value=["bwrap","--dev","/dev"]), \\
-             mock.patch.object(direct,"preparation_namespace_test"), \\
+                               return_value=["bwrap","--dev","/dev"]), \
+             mock.patch.object(direct,"preparation_namespace_test"), \
              mock.patch.object(direct,"invoke_codex",return_value={
                  "status":"TIMEOUT","termination":"SIGTERM_REAPED",
                  "elapsed_seconds":1}) as invoke:
