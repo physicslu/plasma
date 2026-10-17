@@ -146,8 +146,11 @@ def verify_canary_receipts(receipts: object) -> dict:
 
 
 def read_json(path: Path) -> object:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 1048576:
-        deny("JSON_INPUT_INVALID")
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1048576:
+            deny("JSON_INPUT_INVALID")
+    except OSError as ex:
+        raise Denied("JSON_INPUT_INVALID") from ex
     def no_duplicates(pairs: list[tuple[str,Any]]) -> dict:
         result = {}
         for key, value in pairs:
