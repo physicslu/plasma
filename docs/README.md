@@ -24,6 +24,7 @@
 
 ## Architecture and contracts
 
+- **Plan / Offline-only Gate 1A** — [Unified Engineering Dispatch v1](architecture/plasma-engineering-dispatch-v1.md)：定義 versioned Work Order、SHA256 owner approval、Capability Policy、離線授權及去重契約；所有既有 Codex Workflows 不修改，僅在未來派工時逐條遷移，**尚未部署或啟用新的 Runtime Dispatcher**。
 - **Plan / Proposed** — [Runtime FPGA Architecture v1.0](architecture/runtime-fpga-architecture-v1.md)：記錄一台 PPU 同批次相同 IC、多 Site 獨立執行、切換介面不重啟 Linux 的架構前提，以及 Driver／Hardware ABI／動態 FPGA Switching、HIL Phase、相依性與 Gate 邊界；**尚未實作，也不授權實機操作**。
 - **Plan / Proposed** — [Runtime FPGA Hardware ABI v1](architecture/runtime-fpga-hardware-abi-v1.md)：定義 PPU 64-KiB／8-Site 候選 AXI Map、Identity／Capability、Major/Minor，相容性與現有 MS01 的語意落差；**不代表真實 RTL 已實作**。
 - **Host-only review / M1 NO-GO** — [Zynq FPGA Manager Isolation and Runtime Ownership Review](architecture/zynq-fpga-manager-isolation-ownership-review.md)：以 Z2 唯讀盤點、Kernel/DT 綁定與明確標示的 Xilinx 參考原始碼，審查 UIO Ownership、PS–PL 隔離缺口及 PPU Configuration Owner；不授權 FPGA 載入或 HIL-B/C。
