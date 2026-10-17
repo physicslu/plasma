@@ -237,6 +237,19 @@ def validate_pair(on: Path, off: Path, hz: int, duty: int) -> dict:
     }
 
 def evidence_report(root: Path) -> list[dict]:
+    # Two byte-for-byte copies of the archival ON captures cannot be new HIL
+    # evidence. This only catches naive replay; it is not cryptographic proof
+    # of instrument origin.
+    archive = (Path(__file__).resolve().parents[1] /
+               "docs/evidence/la2016-pwm-loopback/2026-10-16")
+    archive_dirs = ("1khz-50pct", "2khz-25pct")
+    archived_on = 0
+    for (hz, _duty), folder in zip(CASES, archive_dirs):
+        candidate = root / f"{hz}hz-on.sr"
+        if candidate.exists() and sha256(candidate) == sha256(archive / folder / "on.sr"):
+            archived_on += 1
+    if archived_on == 2:
+        raise ValueError("ARCHIVED_CAPTURE_REPLAY_DENIED")
     return [validate_pair(root/f"{hz}hz-on.sr", root/f"{hz}hz-off.sr", hz, duty)
             for hz,duty in CASES]
 
