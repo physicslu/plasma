@@ -368,7 +368,8 @@ def self_test() -> int:
         a=validate_pair(fixture/d/"on.sr",fixture/d/"off.sr",hz,duty)
         assert a["result"]=="PASS" and a["off_samples"]>=20000
     src=Path(__file__).read_text()
-    assert "codex" in src and "--dev-bind" in src and "validate_agent_request(" not in src
+    assert "codex" in src and "--dev-bind" in src
+    assert "validate_agent_request" not in src.split("def self_test()")[0]
     print("LA2016 Direct owner gating, real archived waveform/off verification PASS")
     return 0
 
