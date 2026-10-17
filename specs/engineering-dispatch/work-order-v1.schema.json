@@ -11,6 +11,8 @@
     "repository",
     "issue_number",
     "requested_by",
+    "reviewed_main_sha",
+    "authorization_kind",
     "objective",
     "capability",
     "entrypoint",
@@ -151,6 +153,16 @@
           "offline-test-report"
         ]
       }
+    },
+    "reviewed_main_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "authorization_kind": {
+      "enum": [
+        "gate1-implementation",
+        "hardware-one-shot"
+      ]
     }
   }
 }
