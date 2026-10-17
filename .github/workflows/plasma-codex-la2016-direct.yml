@@ -121,7 +121,7 @@ jobs:
           r=json.load(open(sys.argv[1],encoding="utf-8"))
           for key in ("preparation_status","preparation_attempts","live_attempts",
                       "agent_exec","agent_termination","codex_elapsed_seconds",
-                      "failure_stage","primary_failure","network_preflight","result",
+                      "failure_stage","primary_failure","network_preflight","private_logs","result",
                       "pwm_off_command","independent_off_watchdog",
                       "watchdog_final_receipt","z2_fpga","usb_hub_power","external_dut"):
               value = r.get(key,"NOT_RUN")
