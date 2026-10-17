@@ -28,6 +28,7 @@
 - **Plan / Proposed** — [Runtime FPGA Hardware ABI v1](architecture/runtime-fpga-hardware-abi-v1.md)：定義 PPU 64-KiB／8-Site 候選 AXI Map、Identity／Capability、Major/Minor，相容性與現有 MS01 的語意落差；**不代表真實 RTL 已實作**。
 - **Host-only review / M1 NO-GO** — [Zynq FPGA Manager Isolation and Runtime Ownership Review](architecture/zynq-fpga-manager-isolation-ownership-review.md)：以 Z2 唯讀盤點、Kernel/DT 綁定與明確標示的 Xilinx 參考原始碼，審查 UIO Ownership、PS–PL 隔離缺口及 PPU Configuration Owner；不授權 FPGA 載入或 HIL-B/C。
 - **Host-only evidence review / M1 NO-GO** — [PPU Phase 2B M1 Hardware Boundary](architecture/ppu-phase2b-m1-hardware-boundary.md)：以唯讀 UIO/Manager/Bridge Inventory 的離線 Gate 拒絕未經證實的 FPGA 重配置安全主張，列出 Kernel Source、AXI Drain、DMA/VMAs 與外部復原的硬體阻擋證據；不授權實機操作。
+- **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
 - **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
