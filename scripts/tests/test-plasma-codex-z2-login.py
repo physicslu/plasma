@@ -41,29 +41,8 @@ class Z2LoginContracts(unittest.TestCase):
             self.assertEqual(subject.uart_candidates(tty_root), [])
 
     def test_uart_wake_requires_two_separate_enter_keypresses(self) -> None:
-        # Owner's real picocom evidence: two Enter presses produce the
-        # interactive 'xilinx@pynq:~        with patch.object(subject, "private_file", side_effect=ValueError("no file")):
-            with self.assertRaisesRegex(ValueError, "PRIVATE_CREDENTIAL_OR_HOST_KEY_NOT_READY"):
-                subject.creds()
-
-    def test_atomic_secret_creation_never_overwrites(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            target = Path(temp) / "private.json"
-            subject.atomic_private_create(target, b"secret")
-            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
-            with self.assertRaises(FileExistsError):
-                subject.atomic_private_create(target, b"new secret")
-            self.assertEqual(target.read_bytes(), b"secret")
-
-    def test_no_hardware_activity_during_self_test(self) -> None:
-        with patch.object(subject, "ssh_login", side_effect=AssertionError):
-            with patch.object(subject, "uart_login", side_effect=AssertionError):
-                subject.self_test()
-
-
-if __name__ == "__main__":
-    unittest.main()
- prompt. A single CRLF is not equivalent.
+        # Owner's picocom evidence: two Enter presses produce the
+        # interactive 'xilinx@pynq:~$' prompt. CRLF is not two CR keys.
         with patch.object(subject.os, "write") as sender:
             with patch.object(subject.time, "sleep") as pause:
                 subject.wake_uart_console(17, pause_seconds=0.35)
@@ -72,10 +51,8 @@ if __name__ == "__main__":
         ])
         pause.assert_called_once_with(0.35)
 
-    def test_real_uart_shell_prompt_and_stage_schema(self) -> None:
-        # Terminal-ready behavior is prompt-preserving; no password prompt
-        # should be required for an already authenticated console.
-        import re
+    def test_z2_interactive_shell_prompt_format(self) -> None:
+        # A preauthenticated UART shell must not be asked for a password.
         prompt = "\r\nxilinx@pynq:~$ "
         self.assertRegex(
             prompt,
