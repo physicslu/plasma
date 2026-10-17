@@ -86,6 +86,17 @@ class Gate1DContracts(unittest.TestCase):
                 p[key]=value
                 self.assertEqual(gate.exact_live_ruleset([p],self.proposal)["status"],gate.STATUS_BLOCKED)
 
+    def test_broad_ruleset_also_matching_claim_branch_forces_no_go(self) -> None:
+        exact=copy.deepcopy(self.proposal)
+        exact.update(id=100,source="physicslu/plasma",source_type="Repository")
+        broader=copy.deepcopy(exact)
+        broader["id"]=101
+        broader["name"]="Global branch control"
+        broader["conditions"]["ref_name"]["include"]=["~ALL"]
+        r=gate.exact_live_ruleset([exact,broader],self.proposal)
+        self.assertEqual(r["status"],gate.STATUS_BLOCKED)
+        self.assertEqual(r["matching_claim_rulesets"],2)
+
     def test_canary_receipts_are_only_untrusted_schemas(self) -> None:
         valid=[{"step":k,"result":"OBSERVED","ref":gate.CANARY_REF}
                for k in gate.CANARY_TYPES]
