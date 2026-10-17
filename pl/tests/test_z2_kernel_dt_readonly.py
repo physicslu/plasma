@@ -187,6 +187,8 @@ def test_sysfs_symlink_outside_root_rejected(fake):
     fake["sys"].joinpath("class/fpga_manager/fpga0/device").unlink()
     fake["sys"].joinpath("class/fpga_manager/fpga0/device").symlink_to(
         fake["proc"], target_is_directory=True)
+    (fake["proc"] / "of_node").mkdir()
+    (fake["proc"] / "of_node/compatible").write_bytes(b"unexpected\\x00")
     with pytest.raises(InventoryRefused, match="outside input root"):
         collect(fake["sys"], fake["proc"])
 
