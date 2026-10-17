@@ -9,7 +9,7 @@ echo "PLASMA Z2 — dedicated Codex SSH SWD-05 one-shot"
 echo "Only sanitized stage status is displayed; no credentials/hosts/serial data."
 echo "Starting fixed, limited preapproved guarded internal-fixture load/HIL/recovery."
 set +e
-timeout --signal=TERM --kill-after=5s 125s \
+timeout --signal=TERM --kill-after=5s 420s \
   python3 scripts/plasma-codex-z2-swd05.py --run
 rc=$?
 set -e
