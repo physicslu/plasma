@@ -364,3 +364,96 @@ power or DUT action. Gate 2 merger is separately approved.
 read/write token identity and protection behavior, classification of
 every potentially exposed workflow, strict credential handoff, and
 a separate one-shot *software-only* live Codex acceptance.
+
+## 8. Gate 1D — Claim Namespace write-once qualification (new proposal)
+
+> **Status: Gate 1D code-only PR; GitHub Ruleset NOT applied; Runtime remains NO-GO.**
+> As of 2026-10-18 GitHub still reports only `Protect Plasma main`
+> (Ruleset #20964250); no `plasma-engineering-claims/*` branches.
+> The GitHub connector can read rulesets but does **not** expose a
+> supported Create/Update Ruleset operation. Do not claim to have changed
+> GitHub security controls.
+
+### 8.1 Reviewed administrative configuration
+
+`specs/engineering-dispatch/claim-protection-ruleset-v1.json` is an
+**unapplied ruleset proposal**, not an active repository setting. The
+intended rule for branch refs matching
+`refs/heads/plasma-engineering-claims/**/*` is:
+
+- `target=branch`, `enforcement=active`, no exclusions or bypass.
+- **Restrict updates**, **Restrict deletions**, **Block force pushes**.
+- **Do NOT enable Restrict creations** for this namespace: otherwise the
+  intended actor cannot perform the initial write-once claim without a
+  bypass, and that same bypass could defeat update/delete protection.
+- **Do NOT** modify the existing `Protect Plasma main` ruleset. A
+  dedicated new ruleset is required.
+
+In GitHub repository Settings → Rules → Rulesets → New branch ruleset,
+review `include` pattern, protection toggles, rule enforcement, and
+app/role bypass list before any activation. Administrative setup must be
+recorded with its GitHub Ruleset ID and an independently verified
+read-back. Ruleset pattern semantics and effective permissions must
+be qualified on GitHub itself, not inferred only from local glob
+evaluation. Updating settings is outside the current connector's
+supported write surface, so it requires a separately authorized
+repository-admin action.
+
+**Token identity risk:** `contents:write` is broader than a claim-only
+permission; neither the Ruleset nor the Work Order JSON inherently
+guarantees claim-only scope. The trusted Claimer must not share any
+GitHub write token with Codex. Do not use a privileged App-token bypass
+to make canaries pass. If the desired creation/update separation
+cannot be enforced without an unacceptable bypass, choose a
+different CAS store.
+
+### 8.2 Deterministic negative canary (NOT executed in Gate 1D)
+
+Only after a separate explicit one-shot authorization and verified
+Ruleset installation, run **one** live canary under a narrowly scoped
+trusted identity. Its expected observations, in this strict order:
+
+1. **CREATE_ALLOWED**: atomically create exactly
+   `refs/heads/plasma-engineering-claims/900003/ruleset-canary-r1`
+   pointing to an approved existing commit.
+2. **SECOND_CREATE_REJECTED**: attempt the exact same `POST /git/refs`
+   again, require rejection; never retry an uncertain first write.
+3. **UPDATE_REJECTED**: attempt a regular update with an expected old SHA;
+   require rejection.
+4. **FORCE_UPDATE_REJECTED**: attempt a force update; require rejection.
+5. **DELETE_REJECTED**: attempt ref deletion; require rejection.
+6. **READBACK_PRESERVED**: read back the original SHA after the tests,
+   and audit all triggered GitHub Actions/workflow effects.
+
+These are **security-negative probes**; abort and escalate if any
+unexpected mutation succeeds. Never use the real `main` ref, a working
+engineering Work Order, an actual production Claim, or an SWPC/
+LA2016/Z2/DUT path for the canary. Do not try to remove a correctly
+protected test ref automatically: it is intentionally permanent
+until a separately authorized administrative retention procedure.
+
+`scripts/plasma_engineering_dispatch_gate1d.py` checks proposal
+fields, performs conservative read-only Ruleset read-back validation,
+detects overlapping rulesets, and validates *synthetic canary receipt
+shape*. **Receipt shape alone is not trusted proof of actual GitHub
+behavior.** All outputs retain `runtime_enabled=false`. The
+read-back implementation requires verified GitHub provenance and
+must be paired with the real negative probes; synthetic JSON cannot
+promote runtime readiness.
+
+### 8.3 Workflow event risk and migration remains unchanged
+
+GitHub's native `GITHUB_TOKEN` suppresses most recursively generated
+events, but GitHub App/PAT tokens may generate further workflow runs;
+do not interchange these token types without requalification. The
+Gate 1C full-workflow audit still requires review of four possible
+claim-ref event pathways; its findings are not suppressed by this
+Ruleset proposal. The old eleven `plasma-codex-*.yml` workflows
+remain untouched and only migrate one by one when next needed.
+
+This Gate 1D PR has no claim creation, Ruleset API mutation, GitHub
+`issue_comment` trigger, runtime activation, actual Codex, SWPC
+deployment, hardware, or production batch scheduler changes.
+**Separate Gate 2 is required for merging this code.** Real
+Ruleset configuration and one-shot canary each require a distinct
+operational authorization and successful environment readiness.
