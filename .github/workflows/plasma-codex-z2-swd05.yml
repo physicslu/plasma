@@ -42,9 +42,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PYTHONPATH="$PWD/software/python:$PWD"
           python3 scripts/plasma-codex-z2-swd05-contract.py check
           python3 scripts/plasma-codex-z2-swd05.py --self-test
-          python3 scripts/tests/test-plasma-codex-z2-swd05.py
           PYTHONPATH="$PWD/software/python:$PWD" python3 -m unittest pl.tests.test_swd05_one_shot
           python3 scripts/tests/test-plasma-codex-z2-swd05.py
           python3 -m py_compile scripts/plasma-codex-z2-swd05*.py
@@ -75,7 +75,7 @@ jobs:
           python3 scripts/plasma-codex-z2-swd05-contract.py event "$GITHUB_EVENT_PATH"
           printf 'reviewed_sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  readiness:
+  oneshot:
     needs: authorize
     if: ${{ needs.authorize.result == 'success' }}
     runs-on: [self-hosted, linux, x64, plasma-codex]
@@ -109,7 +109,7 @@ jobs:
           fi
           test "$(stat -c '%U:%G:%a' /run/plasma-codex)" = plasma-codex:plasma-monitor:2770
           test -z "$(git status --porcelain)"
-      - name: Execute fixed read-only supervised SWD-05 internal loopback in monitored tmux
+      - name: Execute bounded supervised SWD-05 internal loopback in monitored tmux
         shell: bash
         run: bash scripts/plasma-codex-z2-swd05.sh
       - name: Summarize sanitized evidence status
