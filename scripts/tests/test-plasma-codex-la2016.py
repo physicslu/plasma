@@ -84,7 +84,9 @@ class RealAgentLA2016Contract(unittest.TestCase):
             self.assertIn("--ro-bind", args)
             self.assertIn("--bind", args)
             self.assertIn(str(out / "agent"), args)
-            self.assertNotIn("--bind " + str(out), " ".join(args))
+            bind_targets = [args[i+2] for i, x in enumerate(args) if x == "--bind"]
+            self.assertNotIn(str(out), bind_targets)
+            self.assertIn(str(out / "agent"), bind_targets)
             self.assertNotIn(str(out / "pwm-off-confirmed"), " ".join(args))
             self.assertIn("read-only", args)
             self.assertEqual(args[args.index("--output-last-message")+1],
