@@ -139,7 +139,7 @@ class Gate1BContracts(unittest.TestCase):
         plan, ref = self.auth()
         github = SimulatedGitHub()
         self.assertEqual(gate.claim_with_transport(ref, github),
-                         "CLAIMED_ONCE_IMMUTABLE_GITHUB_REF")
+                         "CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED")
         other_plan, other_ref = self.auth()
         self.assertEqual(other_plan["work_order_sha256"], plan["work_order_sha256"])
         with self.assertRaisesRegex(core.ContractDenied,
@@ -164,7 +164,7 @@ class Gate1BContracts(unittest.TestCase):
                 return str(error)
         with ThreadPoolExecutor(max_workers=16) as executor:
             outcomes = list(executor.map(attempt,range(16)))
-        self.assertEqual(outcomes.count("CLAIMED_ONCE_IMMUTABLE_GITHUB_REF"),1)
+        self.assertEqual(outcomes.count("CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED"),1)
         self.assertEqual(outcomes.count("WORK_ORDER_ALREADY_CLAIMED_OR_REF_INVALID"),15)
         self.assertEqual(len(github.refs),1)
 
@@ -229,7 +229,7 @@ class Gate1BContracts(unittest.TestCase):
                 "ref":ref.ref,"object":{"sha":ref.sha}}).encode()
             mock_net.return_value.__enter__.return_value=response
             self.assertEqual(gate.claim_with_transport(ref,transport),
-                             "CLAIMED_ONCE_IMMUTABLE_GITHUB_REF")
+                             "CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED")
             request=mock_net.call_args.args[0]
             self.assertEqual(request.get_method(),"POST")
             self.assertEqual(request.full_url,gate.API)
