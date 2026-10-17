@@ -175,9 +175,9 @@ def software_only_command(order: dict, workspace: Path, codex: Path) -> list[str
     """
     if order["capability"] != "software-pr":
         refuse("CODEX_SOFTWARE_ONLY_REQUIRED")
-    if type(workspace) is not Path or not workspace.is_absolute():
+    if not isinstance(workspace, Path) or not workspace.is_absolute():
         refuse("CODEX_WORKSPACE_INVALID")
-    if type(codex) is not Path or not codex.is_absolute():
+    if not isinstance(codex, Path) or not codex.is_absolute():
         refuse("CODEX_BINARY_INVALID")
     return [str(codex), "--ask-for-approval", "never", "exec",
             "--sandbox", "workspace-write",
@@ -198,9 +198,9 @@ def offline_mock_codex_acceptance(order: dict, policy: dict,
             or order["authorization_kind"] != "gate1-implementation"
             or not DEV_NULL.issubset(set(order["scope"]["deny_resources"]))):
         refuse("OFFLINE_SOFTWARE_SCOPE_DENIED")
-    if type(scratch) is not Path or scratch.is_symlink() or not scratch.is_dir():
+    if not isinstance(scratch, Path) or scratch.is_symlink() or not scratch.is_dir():
         refuse("OFFLINE_SCRATCH_INVALID")
-    if type(mock_codex) is not Path or not mock_codex.is_absolute() or not mock_codex.is_file():
+    if not isinstance(mock_codex, Path) or not mock_codex.is_absolute() or not mock_codex.is_file():
         refuse("OFFLINE_MOCK_CODEX_REQUIRED")
     repo_paths = order["scope"]["allow_repo_paths"]
     if not all(p.startswith("docs/") or p.startswith("scripts/tests/") for p in repo_paths):
