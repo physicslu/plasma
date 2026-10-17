@@ -214,7 +214,7 @@ def offline_mock_codex_acceptance(order: dict, policy: dict,
         result = subprocess.run(
             command, input="PLASMA offline software-only fake Codex acceptance\n",
             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE, env=allow_env,
+            env=allow_env,
             timeout=min(order["timeout_seconds"], 20), check=False,
             cwd=scratch,
         )
