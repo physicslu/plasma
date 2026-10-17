@@ -173,7 +173,7 @@ def private_run_directory(rid: str) -> Path:
         mode = root.stat()
         if not stat.S_ISDIR(mode.st_mode) or mode.st_uid != os.geteuid():
             raise ValueError("PRIVATE_LOG_DIRECTORY_OWNER_DENIED")
-        if name != ".local" and mode.st_mode & 0o077:
+        if name in {"plasma", "codex-runs"} and mode.st_mode & 0o077:
             raise ValueError("PRIVATE_LOG_DIRECTORY_MODE_DENIED")
     prune_private_logs(root)
     attempt = os.getenv("GITHUB_RUN_ATTEMPT", "1")
