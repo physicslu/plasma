@@ -27,6 +27,10 @@ CI_NO_RUNTIME = "GATE1B_NOT_ACTIVE_NO_ISSUE_DISPATCH"
 DEV_NULL = frozenset({"usb", "z2", "fpga", "mmio", "dut", "hub-power",
                       "network-instrument", "host-root"})
 ALLOWED_WORKER = "software-isolated"
+REF_PATTERN = re.compile(
+    r"refs/heads/plasma-engineering-claims/[1-9][0-9]*/"
+    r"[a-z0-9][a-z0-9-]{2,63}-r[1-9][0-9]*\\Z"
+)
 
 
 def refuse(code: str) -> None:
@@ -84,7 +88,7 @@ def accept_claim_response(request: ClaimRequest, status: int, data: object) -> s
             or type(data.get("object")) is not dict
             or data["object"].get("sha") != request.sha):
         refuse("GITHUB_CLAIM_RECEIPT_MISMATCH")
-    return "CLAIMED_ONCE_IMMUTABLE_GITHUB_REF"
+    return "CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED"
 
 
 def claim_with_transport(request: ClaimRequest,
@@ -110,7 +114,7 @@ def github_ref_transport(token: str) -> Callable[[str, dict[str, str]], tuple[in
         if endpoint != API or not isinstance(payload, dict) or set(payload) != {"ref", "sha"}:
             refuse("GITHUB_CLAIM_ENDPOINT_INVALID")
         if not (isinstance(payload["ref"], str)
-                and payload["ref"].startswith(CLAIM_PREFIX + "/")
+                and REF_PATTERN.fullmatch(payload["ref"])
                 and isinstance(payload["sha"], str)
                 and SHA40.fullmatch(payload["sha"])):
             refuse("GITHUB_CLAIM_PAYLOAD_INVALID")
