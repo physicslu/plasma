@@ -41,7 +41,7 @@ MAX_SAMPLES = 250000
 CODEX_TIMEOUT_SECONDS = 600  # Ten-minute live execution; never auto-retry actuation.
 # One initial preparation attempt plus THREE escalating timeout-only retries.
 # Hardware USB is masked in every preparation attempt.
-PREPARATION_TIMEOUT_SECONDS = (600, 900, 1200, 1500)
+PREPARATION_TIMEOUT_SECONDS = (300, 600, 900, 1200)
 WATCHDOG_DEADLINE_SECONDS = 635
 AGENT_TERM_GRACE_SECONDS = 8
 AGENT_KILL_GRACE_SECONDS = 5
@@ -615,7 +615,7 @@ def self_test() -> int:
     assert "codex" in src and "--dev-bind" in src
     assert "validate_agent_request" not in src.split("def self_test()")[0]
     assert CODEX_TIMEOUT_SECONDS == 600
-    assert PREPARATION_TIMEOUT_SECONDS == (600, 900, 1200, 1500)
+    assert PREPARATION_TIMEOUT_SECONDS == (300, 600, 900, 1200)
     assert WATCHDOG_DEADLINE_SECONDS > CODEX_TIMEOUT_SECONDS
     print("LA2016 Direct owner gating, real archived waveform/off verification PASS")
     return 0
