@@ -43,7 +43,6 @@ jobs:
           python3 scripts/plasma-codex-z2-readiness-contract.py check
           python3 scripts/plasma-codex-z2-readiness.py --self-test
           python3 scripts/tests/test-plasma-codex-z2-readiness.py
-          python3 scripts/tests/test-plasma-codex-z2-readiness.py
           python3 -m py_compile scripts/plasma-codex-z2-readiness*.py
           bash -n scripts/plasma-codex-z2-readiness.sh scripts/plasma-codex-z2-readiness-inner.sh
 
@@ -86,7 +85,7 @@ jobs:
           ref: ${{ needs.authorize.outputs.reviewed_sha }}
           persist-credentials: false
           clean: true
-      - name: Verify dedicated SWPC worker and direct device groups
+      - name: Verify dedicated SWPC worker identity (no privileged groups)
         shell: bash
         run: |
           set -euo pipefail
@@ -118,8 +117,9 @@ jobs:
             python3 - "$out/report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
           import json,sys
           data=json.load(open(sys.argv[1],encoding="utf-8"))
-          for key in ("scope","ssh","uart"):
-              print(f"{key}: {data[key]}")
+          for key in ("transport", "baseline_result", "fpga_manager_state",
+                      "hardware_go", "mmio_access", "fpga_reload", "uart"):
+              print(f"{key}: {data.get(key, 'NOT_OBSERVED')}")
           PY
           else
             echo "Z2 readiness test: NOT_RUN or missing sanitized report" >> "$GITHUB_STEP_SUMMARY"
