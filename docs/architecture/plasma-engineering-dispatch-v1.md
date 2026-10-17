@@ -153,3 +153,106 @@ does not prove future sandbox device isolation.
 
 No existing workflow is modified. No Work Order in this draft is actionable
 by GitHub without a **new, separately approved runtime integration**.
+
+## 6. Gate 1B: GitHub adapter + software-only acceptance contracts
+
+> **Status (2026-10-17): Gate 1B proposed implementation in an independent
+> PR; hosted/offline test only. New GitHub Issue dispatch is NOT active.**
+> Gate 1A has been merged; the above earlier roadmap is historical
+> sequencing, not a claim that this stage was deployed.
+
+Owner migration decision: **all existing 11 `plasma-codex-*.yml` workflows
+are unchanged.** After the new runtime architecture receives its own
+separate approval, new work orders use the unified contract; older
+workflows migrate **one at a time** only when next needed, with parity
+verification and rollback. Never bulk-retire the LA2016 Direct path.
+
+### 6.1 GitHub cross-run claim CAS
+
+`scripts/plasma_engineering_dispatch_gate1b.py` builds a **GitHub
+create-ref request** for the approved, immutable Work Order:
+
+```text
+POST /repos/physicslu/plasma/git/refs
+{"ref":"refs/heads/plasma-engineering-claims/<issue>/<work-id>-r<rev>",
+ "sha":"<reviewed-main-commit>"}
+```
+
+A successful HTTP **201** with the expected exact ref and SHA yields a
+sanitized `CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED` receipt. An HTTP **422**
+means an already-present or invalid ref and must fail closed. Any other
+HTTP status, timeout, transport failure or malformed response also
+fails closed; never retry an ambiguous claim write. This is an **atomic
+GitHub ref create**, not the old local filesystem ledger, and the namespace
+persists across runner filesystems and subsequent workflow executions.
+It does not require a race-prone GET-before-POST query.
+
+Security nuance: ordinary Git refs are **not inherently immutable against
+owners with update/delete rights**; the method is create-only, but a
+privileged actor or a misconfigured workflow can rewrite or delete the
+ref. **Before activating runtime**, configure/verify GitHub rulesets that
+protect this claim namespace from force updates/deletions, verify every
+work order source is checked out by exact reviewed commit SHA, ensure
+the Apps/Actions credential can create claims without granting write
+authority to the Codex worker, and audit push-triggered workflows that
+could run due to claim-branch creation. If any precondition cannot be
+attested, fail closed and do **not** enable runtime. Claim records are
+not automatically deleted; retention/capacity policy needs independent
+approval. Crash after successfully claiming is a spent one-shot, not
+permission to repeat automatically.
+
+### 6.2 GitHub authorization and worker separation
+
+The future GitHub adapter converts **trusted Actions environment**
+(`GITHUB_EVENT_NAME`, `GITHUB_ACTOR`, `GITHUB_REPOSITORY`,
+`GITHUB_REF`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, plus
+independently checked-out `git rev-parse HEAD`) to the existing
+Gate 1A authorization contract. Owner's exact comment SHA256,
+revision and authorization kind must match an immutable reviewed
+Work Order. A GitHub Issue body, edited comment or arbitrary user
+JSON can never grant an executable shell command.
+
+For `software-pr`, capability maps to the `software-isolated`
+worker class only. **Do not use the SWPC `plasma-codex` account as
+a general software worker:** its existing supplementary I/O group is
+instrument-capable. A future live Software-only job must use a
+fresh ephemeral GitHub-hosted runner, restricted repository write
+boundary, no device access, a reviewed narrow sandbox, and separately
+scoped credentials. The trusted claim step may need
+`contents:write`; that token must **never be sent** to Codex or
+injected into its workspace. The worker receives only its own
+minimum access. A general `workspace-write` Codex flag by itself is
+not an OS/device or network exfiltration boundary; evaluate the
+runtime image and network policy separately.
+
+`software_only_command` generates a fixed argument array, not shell
+interpolation of Issue text. `offline_mock_codex_acceptance` runs
+only a **deterministic FAKE executable** in a disposable test
+directory and checks a sanitized content-hash receipt. This verifies
+command contract and basic lifecycle, **not live Codex authentication,
+network access, sandbox escape prevention, PR publishing, or device
+isolation**. Actual Codex acceptance remains a separate post-Gate-2,
+explicitly approved test.
+
+### 6.3 New CI does not install a live Dispatcher
+
+`.github/workflows/plasma-engineering-dispatch-gate1b-contract.yml`
+runs only on pull-request / main-push path changes on
+`ubuntu-24.04`, with `contents:read` and no credentials,
+`issue_comment`, `workflow_dispatch` or self-hosted runners.
+Offline tests simulate hostile event tampering, edited issue scope,
+replayed work order across independent GitHub-runners, concurrent
+claim races, interrupted HTTP, exact ref/SHA matching, protected
+token transport, capability separation and FAKE Codex acceptance.
+
+The adapter **contains no runtime trigger** and its CLI returns
+`GATE1B_NOT_ACTIVE_NO_ISSUE_DISPATCH`. All capability policy
+`runtime_enabled` fields stay `false`. Do not publish a broad
+new production dispatcher or retire any legacy trigger in this PR.
+
+**Gate 1B acceptance:** an independent PR + full hosted CI +
+exact HEAD/mergeability check; **Gate 2 requires separate owner
+approval**. Subsequent activation must separately qualify protected
+GitHub claim refs and an actual isolated software-only Codex runner,
+then obtain an independent explicitly approved one-shot smoke run;
+a passed fake-model CI test is insufficient.
