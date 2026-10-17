@@ -28,6 +28,8 @@ REGISTRY_ID = "adr0002-nxp-kl25-current-openocd-candidate-review-v1"
 # for the approved provider revision.
 BLOBS = {
     "release/openocd.json": "08c884b1bf6f5999c6d34c090992a8b59d85971d",
+    "data/device-catalog/research/nxp-kl25-current-source-review-v2.json":
+        "92b526ed30b2e159e45f3eff2e3b59fff2f86e72",
     "data/device-catalog/research/nxp-kl25-commercial-icpn.csv":
         "53087e9082445e7948f88e688ecd890b0454d788",
     "data/device-catalog/research/nxp-kl25-openocd-provider-delta-v1.json":
@@ -88,6 +90,7 @@ class NxpKl25QualificationProvider:
             else:
                 _read_locked(root, rel)
 
+        source_review = payload["data/device-catalog/research/nxp-kl25-current-source-review-v2.json"]
         release = payload["release/openocd.json"]
         delta = payload["data/device-catalog/research/nxp-kl25-openocd-provider-delta-v1.json"]
         fcf = payload["data/device-catalog/research/nxp-kl25-fcf-sector-safety-v1.json"]
@@ -139,6 +142,108 @@ class NxpKl25QualificationProvider:
             and outcome.get("source_semantic_equivalence_certified") is False
             and outcome.get("all_nxp_phase2_supported_new_from_this_change") == 0,
             "FCF safety audit/qualification limits changed",
+        )
+        # Pinned upstream source inspection cannot certify a live probe or flash operation.
+        _require(
+            source_review.get("schema_version") == "1.0.0"
+            and source_review.get("audit_id") == "nxp-kl25-current-openocd-source-review-v2"
+            and source_review.get("review_boundary") == "SOURCE_ONLY_NO_EXECUTION"
+            and source_review.get("exact") == {
+                "manufacturer": VENDOR, "icpn": ICPN, "other_kl25_variants_inherited": 0
+            },
+            "source review exact-ICPN scope drift",
+        )
+        upstream = source_review.get("source_files", {})
+        expected_blobs = {
+            "tcl/target/kl25.cfg": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+            "tcl/target/klx.cfg": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+            "tcl/target/swj-dp.tcl": "f2b233fb78133fd5e45395fd307674c16a65ed70",
+            "src/flash/nor/kinetis.c": "7137b4aa078719af31122f8276494f006589e8ab",
+        }
+        _require(
+            set(upstream) == set(expected_blobs)
+            and all(upstream[rel].get("git_blob") == blob
+                    and type(upstream[rel].get("bytes")) is int
+                    and upstream[rel]["bytes"] > 0
+                    for rel, blob in expected_blobs.items())
+            and source_review.get("provider", {}).get("source_commit") == CURRENT
+            and source_review["provider"].get("runtime_id") == release["runtime_id"]
+            and source_review["provider"].get("target_config") == "tcl/target/kl25.cfg"
+            and source_review["provider"].get("flash_driver") == "kinetis"
+            and source_review.get("historical_non_authority", {}).get("commit") == LEGACY
+            and source_review["historical_non_authority"].get("gate58_state") == "REJECTED_REVIEW"
+            and source_review["historical_non_authority"].get("operation_admission_transferable") is False,
+            "pinned current source or historical non-authority changed",
+        )
+        expected_observations = {
+            "TRANSPORT_DEPENDS_ON_SELECTED_SESSION",
+            "SWJ_DISPATCHES_SWD_OR_JTAG",
+            "TARGET_RESET_INIT_HAS_SIDE_EFFECT",
+            "EXACT_PROBE_READS_DEVICE_REGISTERS",
+            "PROBE_DECODES_DYNAMIC_GEOMETRY",
+            "FCF_GENERATOR_HAS_ASSERT_PATH",
+            "SECTOR_ERASE_CAN_WRITE_FCF",
+            "ANY_FCF_SECTOR_WRITE_CAN_WRITE_FCF",
+        }
+        observations = source_review.get("observations", ())
+        _require(
+            type(observations) is list
+            and len(observations) == len(expected_observations)
+            and {o.get("id") for o in observations if isinstance(o, dict)}
+                == expected_observations
+            and all(
+                o.get("source") in upstream
+                and isinstance(o.get("line_start"), int)
+                and isinstance(o.get("line_end"), int)
+                and 0 < o["line_start"] <= o["line_end"]
+                and bool(o.get("implication"))
+                for o in observations
+            ),
+            "upstream source observation incomplete",
+        )
+        safe = source_review.get("protected_flash", {})
+        legacy_constraints = legacy["admitted_constraints"]
+        _require(
+            safe.get("fcf_start") == int(legacy_constraints["flash_configuration_field_start"], 0)
+            and safe.get("fcf_end_exclusive") == (
+                safe["fcf_start"] + legacy_constraints["flash_configuration_field_size_bytes"])
+            and safe.get("sector_start") == int(
+                legacy_constraints["flash_configuration_field_sector_start"], 0)
+            and safe.get("sector_end_exclusive") == (
+                safe["sector_start"] + legacy_constraints["flash_configuration_field_sector_size_bytes"])
+            and safe["sector_start"] == 0x400
+            and safe["sector_end_exclusive"] == 0x800
+            and safe.get("geometry_runtime_verified") is False
+            and safe.get("program_intersection_requires_rejection") is True
+            and safe.get("erase_containing_sector_requires_rejection") is True
+            and safe.get("fcf_rewrite_qualified") is False,
+            "FCF whole-sector safety contract changed",
+        )
+        _require(
+            source_review.get("operation_review") == {
+                "READ": "NOT_QUALIFIED",
+                "VERIFY": "NOT_QUALIFIED",
+                "PROGRAM": "NOT_QUALIFIED",
+                "ERASE_SECTOR": "NOT_QUALIFIED",
+            }
+            and source_review.get("gates") == {
+                "swd_session_and_debug_id_pass": False,
+                "exact_sdid_revision_and_sim_fcfg_pass": False,
+                "fcf_no_implicit_mutation_proven": False,
+                "pinned_binary_runtime_attested": False,
+                "read_verify_program_erase_qualified": False,
+                "hardware_hil_pass": False,
+            }
+            and source_review.get("result") == {
+                "programming_qualification_state": "CANDIDATE",
+                "catalog_level": 1,
+                "job_selectable": False,
+                "execution_authorized": False,
+                "installed_runtime_attested": False,
+                "physical_programming_qualified": False,
+                "supported_exact_icpn_count_new": 0,
+            },
+            "source-only audit may not grant qualification or execution",
         )
         self._provider = {
             "provider_id": "openocd-upstream",
