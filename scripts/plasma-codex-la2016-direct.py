@@ -562,19 +562,23 @@ def run() -> int:
     if out.exists() or out.is_symlink():
         raise ValueError("EXISTING_OUTPUT_DENIED")
     out.mkdir(mode=0o700)
-    private_logs = private_run_directory(rid)
+    private_logs = None
     evidence=out/"evidence"
     evidence.mkdir(mode=0o700)
     report={"schema":"plasma.la2016.direct.v1","result":"NO_GO","agent_exec":"NOT_RUN",
             "failure_stage":"NOT_STARTED","primary_failure":"NONE",
             "agent_termination":"NOT_NEEDED","codex_elapsed_seconds":0,
             "preparation_attempts":[],"preparation_status":"NOT_RUN",
-            "network_preflight":"NOT_RUN","live_attempts":0,
+            "network_preflight":"NOT_RUN","private_logs":"NOT_READY",
+            "live_attempts":0,
             "cases":[],"pwm_off_command":"NOT_RUN","independent_off_watchdog":"NOT_ARMED",
             "z2_fpga":"NOT_RUN","usb_hub_power":"NOT_RUN","external_dut":"NOT_RUN"}
     rc=2
     conn=None
     try:
+        report["failure_stage"] = "PRIVATE_LOG_PREFLIGHT"
+        private_logs = private_run_directory(rid)
+        report["private_logs"] = "OWNER_ONLY_PERSISTENT"
         report["failure_stage"] = "APPIMAGE_PREFLIGHT"
         pinned_app()
         report["failure_stage"] = "CODEX_PREPARATION"
