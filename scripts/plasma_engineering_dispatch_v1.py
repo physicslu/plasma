@@ -77,7 +77,7 @@ def positive_int(value: object, maximum: int, code: str) -> int:
 def safe_path(value: object) -> bool:
     if type(value) is not str or not PATH_CHARS.fullmatch(value):
         return False
-    if value.startswith(("/", "-")) or "//" in value or "\\" in value:
+    if value.startswith(("/", "-")) or "//" in value or ".." in value or "\\" in value:
         return False
     parts = PurePosixPath(value).parts
     return bool(parts) and all(p not in {".", ".."} for p in value.split("/"))
