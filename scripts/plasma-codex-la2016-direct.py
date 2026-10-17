@@ -107,15 +107,21 @@ def detect_la() -> tuple[str, Path]:
         raise ValueError("LA2016_BUSY_OR_UNKNOWN")
     return conn, device
 
-def physical_off(conn: str) -> bool:
-    # OUTER safety helper, not used by Codex as a command intermediary.
-    p = subprocess.run(
-        [str(APP), "--appimage-extract-and-run", "--loglevel", "4",
-         "--driver", "kingst-la2016:conn=" + conn,
-         "--config", "channel_group=PWM1:enabled=off", "--set"],
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, timeout=16, check=False,
-    )
+def physical_off(conn: str, private_log: Path | None = None) -> bool:
+    """Issue OFF directly; stdout/stderr are private if explicitly requested."""
+    cmd = [str(APP), "--appimage-extract-and-run", "--loglevel", "4",
+           "--driver", "kingst-la2016:conn=" + conn,
+           "--config", "channel_group=PWM1:enabled=off", "--set"]
+    if private_log is None:
+        p = subprocess.run(cmd, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=16, check=False)
+    else:
+        fd = os.open(private_log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as private:
+            p = subprocess.run(cmd, stdin=subprocess.DEVNULL,
+                               stdout=private, stderr=subprocess.STDOUT,
+                               timeout=16, check=False)
     return p.returncode == 0
 
 def sandbox_prefix(device: Path, evidence: Path) -> list[str]:
@@ -289,7 +295,7 @@ def watchdog(out: Path, conn: str) -> int:
     # Physical command is still best-effort; do not claim output is LOW.
     try:
         pinned_app()
-        success = physical_off(conn)
+        success = physical_off(conn, out / "watchdog-off-private.log")
     except (OSError, ValueError, subprocess.SubprocessError):
         success = False
     write_watchdog_receipt(
@@ -437,7 +443,7 @@ def run() -> int:
                 try:
                     # The model launch group has been reaped (or marked unknown)
                     # before the final OFF attempt; preserve first failure.
-                    if physical_off(conn):
+                    if physical_off(conn, out / "parent-off-private.log"):
                         report["pwm_off_command"]="COMMAND_OK"
                         (out/"off-confirmed").touch(exist_ok=False)
                     else:
