@@ -80,7 +80,7 @@ The operator subsequently provided an independently run local Codex success on t
 
 This PR modifies only the reviewed source and hosted/offline tests, **not** SWPC permissions, instruments or real hardware jobs.
 
-- Codex duration budget extends from 118 to 240 seconds, above the observed 185-second local success. The independent deadline attempts OFF at 265 seconds unless a successful parent OFF *command* was recorded. These are *software attempt deadlines*, **not PWM1 ON-time electrical interlocks**. A truly independent output-on watchdog would require instrument/host-independent current state sensing or a power gate, and is not claimed here.
+- Codex direct physical test duration budget extends from 118 to 600 seconds (10 minutes). Non-actuating Codex preparation uses 600, 900, 1200, and 1500 seconds (initial attempt plus three timeout-only retries). The independent live-stage deadline attempts OFF at 635 seconds unless a successful parent OFF *command* was recorded. These are *software attempt deadlines*, **not PWM1 ON-time electrical interlocks**. A truly independent output-on watchdog would require instrument/host-independent current state sensing or a power gate, and is not claimed here.
 - `invoke_codex` uses a new process session, with 0600 **SWPC-private raw stdout JSONL and stderr**. GitHub receives only enumerated stage/exit categories and elapsed duration; no raw private paths, commands, credentials or USB identities.
 - Before host OFF, a hung process group gets SIGTERM, bounded reap, then SIGKILL + bounded reap. The reaper status is diagnostic only: a child that creates a new session or a kernel hang may escape. Any uncertain process ownership remains a **NO-GO**, not a verified recovery.
 - Report independently retains `primary_failure` (`CODEX_TIMEOUT`, `CODEX_EXIT_NONZERO`, `FAIL_IN_EVIDENCE_VERIFICATION`, etc.), `failure_stage`, `agent_termination`, `codex_elapsed_seconds`, `pwm_off_command`, `watchdog_final_receipt` so that `NO_GO_OFF` cannot erase the earlier cause.
@@ -90,6 +90,28 @@ This PR modifies only the reviewed source and hosted/offline tests, **not** SWPC
 
 ### Known risks before authorizing another physical run
 
-The direct CLI still lives inside bwrap, whereas the local interactive test did not necessarily share that mount/user namespace; `sg` on the host is not proof the nested process can claim the USB interface. Even a successful `os.open()` does not prove a `libusb_claim_interface()` will succeed. It also remains possible that Codex may take **longer** than 240 seconds on an unusually complex diagnosis; such a result must still be reported as TIMEOUT, not retried automatically. The parent and deadline OFF attempts may both fail if USB is unavailable, busy or the host crashes. **If `NO_GO_OFF` is seen, obtain operator verification of PWM1 OFF or safe power removal before any retry.**
+The direct CLI still lives inside bwrap, whereas the local interactive test did not necessarily share that mount/user namespace; `sg` on the host is not proof the nested process can claim the USB interface. Even a successful `os.open()` does not prove a `libusb_claim_interface()` will succeed. It also remains possible that Codex may take **longer** than 600 seconds on an unusually complex diagnosis; such a result must still be reported as TIMEOUT, not retried automatically. The parent and deadline OFF attempts may both fail if USB is unavailable, busy or the host crashes. **If `NO_GO_OFF` is seen, obtain operator verification of PWM1 OFF or safe power removal before any retry.**
 
 **Gate scope:** This PR is Gate 1 only (offline implementation and test); separate Gate 2 to merge, then separate explicit one-time hardware approval, and no automated replay.
+
+## 2026-10-17: ten-minute starting budget and conditional adaptive retry (Gate 1)
+
+The owner requested an initial 10-minute Codex limit and *three progressively longer retries on timeout*. This is implemented without extending the independent PWM watchdog across AI thinking/retry cycles:
+
+| Stage | Attempt | Codex timeout | LA2016 USB visibility | PWM action | Auto retry on timeout |
+| --- | --- | --- | --- | --- | --- |
+| Inert preparation | 1 | 600 s (10 min) | No device node | **Impossible via direct USB** | If timeout and process group reaped |
+| Inert preparation | 2 | 900 s (15 min) | No device node | **Impossible via direct USB** | If timeout and process group reaped |
+| Inert preparation | 3 | 1200 s (20 min) | No device node | **Impossible via direct USB** | If timeout and process group reaped |
+| Inert preparation | 4 | 1500 s (25 min) | No device node | **Impossible via direct USB** | No further retries |
+| Actual Codex Direct LA2016 | **1 only** | 600 s (10 min) | Exactly one validated LA2016 device | Actual PWM1/CH0 test | **Never** |
+
+Each inert preparation attempt opens a separate isolated writable folder and retains **private** Codex JSONL/err. The outer bwrap sandbox masks ALL USB devices, including the LA, and read-only code and private credential boundaries are unchanged. A passive namespace check must prove USB is hidden before each retry. The purpose of preparation is to allow Codex to examine the working command contract, assess risks and plan execution without touching LA2016. This remains direct Codex work, not a JSON control protocol or an action forwarding Supervisor. This is not a claim of network isolation: the model API remains reachable and is constrained by instruction against unrelated network hosts.
+
+If preparation returns `EXIT_NONZERO`, `SPAWN_OR_IO_ERROR`, or `TIMEOUT` without confirmed subprocess group reaping, **stop immediately**. Only a genuine `TIMEOUT` with a reaped process group may advance to the next budget. Each attempt's result is durably saved as an enumerated receipt, including all four when retries exhaust. No script automatically resubmits GitHub Issue comments or restarts a GitHub Actions run.
+
+The **actual** Codex session sees the LA2016 USB node only **after** preparation succeeds and preflight validates device access. It runs once, for up to 600 s. A timeout or any uncertain physical PWM state is **NO-GO**, never an automated repeat. The live-stage best-effort OFF watchdog attempts shutdown after 635 s (not after the cumulative 70-minute preparation). The Actions self-hosted job has a 95-minute envelope to accommodate worst-case 70-minute preparation + 10-minute real invocation + safety cleanup, and GitHub-hosted PR contract CI remains 8 minutes.
+
+**Why this exception matters:** A hardware-enabled agent can activate PWM in any previous attempt. Merely receiving `TIMEOUT`, a successful sigrok `enabled=off` command, or a process termination receipt does not prove physical LOW. Automatic threefold re-execution of a potentially actuated instrument task would violate the project's single-run hardware-approval boundary and could retry with still-open USB handles. A separate explicit owner authorization is required for another physical run.
+
+No real hardware was operated by this code change; only hosted/offline contract tests qualify these retry rules.
