@@ -2,7 +2,7 @@
 // Not a PPU image, not a real UIO device, not a universal multi-site endpoint.
 // No power, OE, NRST, FPGA Manager, PL reload, external pin constraints or SPI.
 // Reuses the established swd_transaction_master; master protocol has a narrower
-// 64-bit requested SWD line-reset subset than the proposed 50..128 bit ABI.
+// precisely 64 driven-high line-reset clocks; the ABI now requires 64.
 // A synthesized fixed-image product must add global Identity and qualify
 // timing/resource/AXI before any board or DUT operation.
 module fixed_fpga_swd_site_axi_lite #(
@@ -52,6 +52,7 @@ module fixed_fpga_swd_site_axi_lite #(
     logic [31:0] seq_q, proto_q, flags_q, count_q, arg_q, data_q;
     logic [31:0] timeout_q, div_q;
     logic [31:0] done_seq, done_status, done_data, counter_q;
+    logic [31:0] swd_meta_q, swd_raw_status_q, last_seq;
     logic [31:0] active_seq;
     logic done_valid, fault_latched, launch_pending, abort_pulse, consume_pulse;
     logic [31:0] operation_q;
@@ -94,13 +95,15 @@ module fixed_fpga_swd_site_axi_lite #(
             4'd6: translate_status=32'd4;  // PARITY
             4'd7: translate_status=32'd5;  // TIMEOUT
             4'd8: translate_status=32'd6;  // ABORTED
-            4'd1,4'd2: translate_status=32'd7; // invalid/needs reset
+            4'd1: translate_status=32'd7; // BAD_ARGUMENT
+            4'd2: translate_status=32'd10; // NEED_RESET (not a bad argument)
+            4'd9: translate_status=32'd11; // PHY_ERROR
             default: translate_status=32'd9; // INTERNAL_FAULT
         endcase
     endfunction
 
     function automatic logic valid_cmd(input logic [31:0] cmd);
-        valid_cmd = !active && master_ready && seq_q != 0 &&
+        valid_cmd = !active && master_ready && seq_q != 0 && seq_q != last_seq &&
             proto_q==PROTO_SWD && flags_q==0 &&
             div_q>=2 && div_q<=65535 && timeout_q != 0 &&
             ((cmd==CMD_XFER && count_q==32 && arg_q<=15) ||
@@ -116,6 +119,7 @@ module fixed_fpga_swd_site_axi_lite #(
             count_q<=32; arg_q<=2; data_q<=0;
             timeout_q<=32'd1000000; div_q<=2;
             done_seq<=0; done_status<=0; done_data<=0;
+            swd_meta_q<=0; swd_raw_status_q<=0; last_seq<=0;
             counter_q<=0; active_seq<=0;
             done_valid<=0; fault_latched<=0; launch_pending<=0;
             abort_pulse<=0; consume_pulse<=0; operation_q<=0;
@@ -128,6 +132,8 @@ module fixed_fpga_swd_site_axi_lite #(
                 done_seq<=active_seq;
                 done_status<=translate_status(master_status);
                 done_data <= (master_data_valid && master_status==0) ? master_rdata : 0;
+                swd_meta_q <= {17'd0, master_link, master_attempts, master_data_valid, master_ack};
+                swd_raw_status_q <= {28'd0, master_status};
                 done_valid<=1;
                 counter_q<=counter_q+32'd1;
                 consume_pulse<=1;
@@ -157,6 +163,7 @@ module fixed_fpga_swd_site_axi_lite #(
                         else begin
                             operation_q<=wdata;
                             active_seq<=seq_q;
+                            last_seq<=seq_q;
                             launch_pending<=1;
                         end
                     end
@@ -174,12 +181,15 @@ module fixed_fpga_swd_site_axi_lite #(
                               else data_q<=wdata;
                     8'h3c: if (active || wdata==0) s_axi_bresp<=SLVERR;
                               else timeout_q<=wdata;
+                    // Launch-window abort returns SLVERR. Never pretend it cancelled SWD.
                     8'h54: if (wdata!=1 || !master_busy) s_axi_bresp<=SLVERR;
                               else abort_pulse<=1;
                     8'h5c: if (active || wdata<2 || wdata>65535) s_axi_bresp<=SLVERR;
                               else div_q<=wdata;
                     8'h64: begin
-                        if (!done_valid || fault_latched || wdata!=done_seq)
+                        // Fault ACK consumes the completion evidence but NEVER clears
+                        // the latched FAULT. No in-band recovery is implemented.
+                        if (!done_valid || wdata!=done_seq)
                             s_axi_bresp<=SLVERR;
                         else done_valid<=0;
                     end
@@ -209,9 +219,11 @@ module fixed_fpga_swd_site_axi_lite #(
                     8'h48: s_axi_rdata<=done_seq;
                     8'h4c: s_axi_rdata<=done_status;
                     8'h50: s_axi_rdata<=done_valid && done_status==0 && operation_q==CMD_XFER && arg_q[1] ? 1 : 0;
-                    8'h58: s_axi_rdata<=1; // placeholder FIFO depth; SPI unsupported
+                    8'h58: s_axi_rdata<=0; // no SPI FIFO, do not claim capacity
                     8'h60: s_axi_rdata<=done_data;
                     8'h68: s_axi_rdata<=counter_q;
+                    8'h6c: s_axi_rdata<=swd_meta_q;
+                    8'h70: s_axi_rdata<=swd_raw_status_q;
                     default: s_axi_rresp<=SLVERR;
                 endcase
             end
