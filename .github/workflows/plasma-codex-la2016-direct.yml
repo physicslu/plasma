@@ -74,7 +74,7 @@ jobs:
     needs: authorize
     if: ${{ needs.authorize.result == 'success' }}
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: 6
+    timeout-minutes: 95
     permissions:
       contents: read
     steps:
@@ -119,8 +119,11 @@ jobs:
             python3 - "$out/report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
           import json,sys
           r=json.load(open(sys.argv[1],encoding="utf-8"))
-          for key in ("agent_exec","result","pwm_off_command",
-                      "independent_off_watchdog","z2_fpga","usb_hub_power","external_dut"):
+          for key in ("preparation_status","preparation_attempts","live_attempts",
+                      "agent_exec","agent_termination","codex_elapsed_seconds",
+                      "failure_stage","primary_failure","result",
+                      "pwm_off_command","independent_off_watchdog",
+                      "watchdog_final_receipt","z2_fpga","usb_hub_power","external_dut"):
               print(key + ": " + r.get(key,"NOT_RUN"))
           PY
           else
