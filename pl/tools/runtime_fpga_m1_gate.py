@@ -66,20 +66,37 @@ def assess_z2_m1_inventory(snapshot: object) -> dict:
     _require(device.startswith("/dev/uio") and device[8:].isdigit(),
              "Candidate must reference /dev/uioN")
     matches = []
+    overlapping = 0
+    seen_devices: set[str] = set()
     for uio in uios:
         _require(type(uio) is dict, "Malformed UIO entry")
-        _string(uio.get("device"), "UIO entry device")
+        dev = _string(uio.get("device"), "UIO entry device")
+        _require(dev.startswith("/dev/uio") and dev[8:].isdigit()
+                 and dev not in seen_devices,
+                 "Duplicate or unrecognized UIO device")
+        seen_devices.add(dev)
         maps = uio.get("maps")
-        _require(type(maps) is list, "UIO entry maps missing")
+        _require(type(maps) is list and maps, "UIO entry maps missing")
+        seen_indices: set[int] = set()
         for m in maps:
             _require(type(m) is dict, "UIO map entry malformed")
-            if (uio["device"] == device and
+            for field in ("index", "addr", "size", "offset"):
+                _require(type(m.get(field)) is int, "UIO map integer required: " + field)
+            index, addr, size, offset = (m["index"], m["addr"], m["size"], m["offset"])
+            _require(index >= 0 and index not in seen_indices
+                     and 0 <= addr <= 0xFFFFFFFF and 0 < size
+                     and addr + size <= 0x100000000 and 0 <= offset < 4096,
+                     "Malformed/duplicate UIO mapping interval")
+            seen_indices.add(index)
+            if addr < 0x40010000 and 0x40000000 < addr + size:
+                overlapping += 1
+            if (dev == device and
                     uio.get("driver") == "uio_pdrv_genirq" and
-                    m.get("index") == 0 and m.get("addr") == 0x40000000 and
-                    m.get("size") == 0x10000 and m.get("offset") == 0):
+                    index == 0 and addr == 0x40000000 and
+                    size == 0x10000 and offset == 0):
                 matches.append(uio)
-    _require(len(matches) == 1,
-             "Exact single Z2 UIO driver/range/map0 not observed")
+    _require(len(matches) == 1 and overlapping == 1,
+             "Unique exact Z2 map0 not observed or extra overlapping UIO owner")
     bridge_entries = snapshot.get("fpga_bridge_sysfs_entries")
     _require(type(bridge_entries) is list and len(bridge_entries) <= 64,
              "FPGA bridge inventory unavailable")
