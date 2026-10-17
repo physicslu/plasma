@@ -1,0 +1,27 @@
+name: PPU Phase 2B M1 Hardware Boundary Offline Contract
+on:
+  pull_request:
+    paths:
+      - 'pl/tools/runtime_fpga_m1_gate.py'
+      - 'pl/tests/test_runtime_fpga_m1_gate.py'
+      - 'pl/tools/runtime_fpga_phase1.py'
+      - 'pl/tests/test_runtime_fpga_phase1.py'
+      - '.github/workflows/ppu-phase2b-m1-boundary-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-m1-no-go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only offline test runner
+        run: python -m pip install pytest
+      - name: Test read-only inventory rejection and M1 evidence limits
+        run: python -m pytest -q pl/tests/test_runtime_fpga_m1_gate.py pl/tests/test_runtime_fpga_phase1.py
