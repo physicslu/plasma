@@ -208,6 +208,7 @@ class Gate1BContracts(unittest.TestCase):
         hardware["authorization_kind"] = "hardware-one-shot"
         hardware["scope"]["required_permissions"] = ["repo:read","usb:la2016"]
         hardware["scope"]["deny_resources"].remove("usb")
+        hardware["scope"]["deny_resources"].append("repository-write")
         with self.assertRaisesRegex(core.ContractDenied,"SOFTWARE_ONLY_CAPABILITY_REQUIRED"):
             gate.claim_request(hardware,plan,self.policy)
         self.assertFalse(self.policy["capabilities"]["software-pr"]["runtime_enabled"])
