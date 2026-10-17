@@ -11,6 +11,7 @@ import configparser
 import copy
 import fcntl
 import hashlib
+import grp
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,12 @@ USB_ROOT = Path("/sys/bus/usb/devices")
 LOCK = Path("/run/lock/plasma-la2016.lock")
 CASES = ((1000, 50), (2000, 25))
 MAX_SAMPLES = 250000
+# A live hardware budget is NOT a physical PWM-ON timer. The independent
+# watchdog is a best-effort OFF attempt; no guaranteed electrical cutoff.
+CODEX_TIMEOUT_SECONDS = 240
+WATCHDOG_DEADLINE_SECONDS = 265
+AGENT_TERM_GRACE_SECONDS = 8
+AGENT_KILL_GRACE_SECONDS = 5
 # Real device must never be driven by PR-triggered execution.
 def authorized(e: dict, actor: str, repo: str, ref: str) -> bool:
     i, c, s, r = (e.get("issue") or {}, e.get("comment") or {},
@@ -54,8 +61,11 @@ def worker_identity() -> None:
             or os.getenv("GITHUB_REPOSITORY") != REPO
             or os.getenv("GITHUB_REF") != "refs/heads/main"):
         raise ValueError("WORKER_IDENTITY_DENIED")
-    if set(os.getgroups()) & {0}:  # root group must not be inherited
+    groups = set(os.getgroups())
+    if 0 in groups:
         raise ValueError("ROOT_GROUP_DENIED")
+    if grp.getgrnam("plasma-codex-io").gr_gid not in groups:
+        raise ValueError("LA_GROUP_NOT_LOADED")
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -143,13 +153,14 @@ def sandbox_prefix(device: Path, evidence: Path) -> list[str]:
 
 def namespace_test(prefix: list[str], device: Path) -> None:
     # No Python stdout/USB addresses published; check actual namespace before PWM.
-    expr = ("from pathlib import Path; import sys; "
+    expr = ("from pathlib import Path; import sys, os; "
             "dev=Path(sys.argv[1]); "
             "assert dev.exists() and dev.is_char_device(); "
             "assert list(Path('/dev/bus/usb').glob('*/*')) == [dev]; "
             "assert not Path('/dev/mem').exists(); "
             "assert not list(Path('/dev').glob('ttyUSB*')); "
-            "assert not Path('/home/plasma-codex/.ssh/id_rsa').exists()")
+            "assert not Path('/home/plasma-codex/.ssh/id_rsa').exists(); "
+            "fd=os.open(dev, os.O_RDWR|os.O_NONBLOCK|os.O_CLOEXEC); os.close(fd)")
     args = prefix + ["--", sys.executable, "-c", expr, str(device)]
     p = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=20, check=False)
@@ -253,19 +264,102 @@ def evidence_report(root: Path) -> list[dict]:
     return [validate_pair(root/f"{hz}hz-on.sr", root/f"{hz}hz-off.sr", hz, duty)
             for hz,duty in CASES]
 
+def write_watchdog_receipt(out: Path, result: str) -> None:
+    """Persist a sanitized local receipt; not an electrical OFF proof."""
+    allowed = {"PARENT_OFF_COMMAND_OK", "DEADLINE_OFF_COMMAND_OK",
+               "DEADLINE_OFF_FAILED_OR_UNKNOWN"}
+    if result not in allowed:
+        raise ValueError("INVALID_WATCHDOG_RESULT")
+    temp = out / "watchdog-receipt.tmp"
+    temp.write_text(result + "\n", encoding="utf-8")
+    os.replace(temp, out / "watchdog-receipt")
+
+
 def watchdog(out: Path, conn: str) -> int:
     worker_identity()
     if not re.fullmatch(r"[1-9][0-9]{0,2}\.[1-9][0-9]{0,2}", conn):
         return 2
     (out/"armed").touch(exist_ok=False)
-    time.sleep(135)
-    if (out/"off-confirmed").is_file():
-        return 0
+    deadline = time.monotonic() + WATCHDOG_DEADLINE_SECONDS
+    while time.monotonic() < deadline:
+        if (out / "off-confirmed").is_file():
+            write_watchdog_receipt(out, "PARENT_OFF_COMMAND_OK")
+            return 0
+        time.sleep(1)
+    # Physical command is still best-effort; do not claim output is LOW.
     try:
         pinned_app()
-        return 0 if physical_off(conn) else 2
+        success = physical_off(conn)
     except (OSError, ValueError, subprocess.SubprocessError):
-        return 2
+        success = False
+    write_watchdog_receipt(
+        out, "DEADLINE_OFF_COMMAND_OK" if success else "DEADLINE_OFF_FAILED_OR_UNKNOWN"
+    )
+    return 0 if success else 2
+
+def terminate_agent(proc: subprocess.Popen, *, sleep_grace: int = AGENT_TERM_GRACE_SECONDS) -> str:
+    """Bounded cleanup of the rootless bwrap launch process group.
+
+    A detached descendant can escape process groups; bwrap --die-with-parent
+    further limits it but cannot guarantee all libusb handles have closed.
+    No OFF result is trusted solely because SIGTERM was sent.
+    """
+    if proc.poll() is not None:
+        return "ALREADY_EXITED"
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return "ALREADY_EXITED"
+    except OSError:
+        return "TERMINATION_UNKNOWN"
+    try:
+        proc.wait(timeout=sleep_grace)
+        return "SIGTERM_REAPED"
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=AGENT_KILL_GRACE_SECONDS)
+            return "SIGKILL_REAPED"
+        except (OSError, subprocess.TimeoutExpired):
+            return "TERMINATION_UNKNOWN"
+
+
+def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
+    """Save *raw* stdout/stderr privately; release only enum diagnostics."""
+    # Deliberately avoid putting arbitrary model/tool output in Actions logs.
+    safe_env = {k: v for k, v in os.environ.items()
+                if k not in {"GITHUB_TOKEN", "GH_TOKEN", "SSH_AUTH_SOCK",
+                             "ACTIONS_RUNTIME_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"}
+                and not k.endswith(("_PASSWORD", "_PRIVATE_KEY", "_SECRET"))}
+    result: dict[str, object] = {
+        "status": "NOT_STARTED", "termination": "NOT_NEEDED",
+        "elapsed_seconds": 0
+    }
+    started = time.monotonic()
+    with (out / "codex-stdout-private.jsonl").open("xb") as stdout, \\
+         (out / "codex-stderr-private.log").open("xb") as stderr:
+        proc = subprocess.Popen(
+            args, stdin=subprocess.PIPE, stdout=stdout, stderr=stderr,
+            text=True, env=safe_env, start_new_session=True,
+            close_fds=True
+        )
+        result["status"] = "STARTED"
+        try:
+            proc.communicate(input=work, timeout=CODEX_TIMEOUT_SECONDS)
+            result["status"] = "PASS" if proc.returncode == 0 else "EXIT_NONZERO"
+            result["exit_code"] = proc.returncode
+        except subprocess.TimeoutExpired:
+            result["status"] = "TIMEOUT"
+            result["termination"] = terminate_agent(proc)
+            # communicate() may have written stdin before timing out.
+            # Process-group reap, not a Codex answer, precedes host PWM OFF.
+        except (OSError, ValueError):
+            result["status"] = "SPAWN_OR_IO_ERROR"
+            result["termination"] = terminate_agent(proc)
+        finally:
+            result["elapsed_seconds"] = round(time.monotonic() - started, 2)
+    return result
+
 
 def run() -> int:
     worker_identity()
@@ -279,18 +373,24 @@ def run() -> int:
     evidence=out/"evidence"
     evidence.mkdir(mode=0o700)
     report={"schema":"plasma.la2016.direct.v1","result":"NO_GO","agent_exec":"NOT_RUN",
+            "failure_stage":"NOT_STARTED","primary_failure":"NONE",
+            "agent_termination":"NOT_NEEDED","codex_elapsed_seconds":0,
             "cases":[],"pwm_off_command":"NOT_RUN","independent_off_watchdog":"NOT_ARMED",
             "z2_fpga":"NOT_RUN","usb_hub_power":"NOT_RUN","external_dut":"NOT_RUN"}
     rc=2
     conn=None
     try:
+        report["failure_stage"] = "APPIMAGE_PREFLIGHT"
         pinned_app()
+        report["failure_stage"] = "USB_PREFLIGHT"
         conn,dev=detect_la()
         with LOCK.open("a+") as file:
             fcntl.flock(file,fcntl.LOCK_EX|fcntl.LOCK_NB)
             # Fail closed unless the sandbox can really expose ONE LA device.
+            report["failure_stage"] = "NAMESPACE_PREFLIGHT"
             prefix=sandbox_prefix(dev,evidence)
             namespace_test(prefix,dev)
+            report["failure_stage"] = "WATCHDOG_ARM"
             # Secure the independent OFF attempt before asking Codex to actuate.
             guard=subprocess.Popen(
                 [sys.executable,str(Path(__file__).resolve()),"--watchdog",
@@ -308,6 +408,7 @@ def run() -> int:
             else:
                 raise ValueError("WATCHDOG_ARM_TIMEOUT")
             report["independent_off_watchdog"]="ARMED"
+            report["failure_stage"] = "CODEX_EXEC"
             try:
                 codex=shutil.which("codex")
                 args=prefix+[
@@ -317,20 +418,25 @@ def run() -> int:
                 ]
                 # Full CLI sandbox disabled *inside* outer fail-closed bwrap:
                 # real /dev, host write paths and private Z2 credentials hidden.
-                p=subprocess.run(args,input=prompt(evidence,conn),text=True,
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,timeout=118,check=False)
-                report["agent_exec"]="PASS" if p.returncode==0 else "FAIL_OR_UNKNOWN"
-                if p.returncode!=0:
+                outcome=invoke_codex(args,prompt(evidence,conn),out)
+                report["agent_exec"]=outcome["status"]
+                report["agent_termination"]=outcome["termination"]
+                report["codex_elapsed_seconds"]=outcome["elapsed_seconds"]
+                if outcome["status"]!="PASS":
+                    report["primary_failure"]="CODEX_"+str(outcome["status"])
                     raise ValueError("DIRECT_CODEX_FAILED")
+                report["failure_stage"]="EVIDENCE_VERIFICATION"
                 report["cases"]=evidence_report(evidence)
                 report["result"]="PASS_DIRECT_LA2016_LOOPBACK"
+                report["failure_stage"]="FINAL_OFF"
                 rc=0
             finally:
                 # OFF regardless of Codex or waveform verifier outcome.
                 try:
+                    # The model launch group has been reaped (or marked unknown)
+                    # before the final OFF attempt; preserve first failure.
                     if physical_off(conn):
-                        report["pwm_off_command"]="PASS"
+                        report["pwm_off_command"]="COMMAND_OK"
                         (out/"off-confirmed").touch(exist_ok=False)
                     else:
                         report["pwm_off_command"]="FAILED_OR_UNKNOWN"
@@ -344,7 +450,16 @@ def run() -> int:
             configparser.Error,KeyError,IndexError):
         if report["result"]!="NO_GO_OFF":
             report["result"]="NO_GO"
+        if report["primary_failure"] == "NONE":
+            report["primary_failure"]="FAIL_IN_"+str(report["failure_stage"])
         rc=2
+    # A model response or an OFF command's rc can never attest electrical LOW.
+    # A watchdog receipt may not yet exist, because it runs independently.
+    receipt = out / "watchdog-receipt"
+    report["watchdog_final_receipt"]=(
+        receipt.read_text(encoding="utf-8").strip()
+        if receipt.is_file() else "PENDING_OR_UNOBSERVED"
+    )
     (out/"report.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     (out/"exit_code").write_text(str(rc)+"\n")
     with (out/"SHA256SUMS").open("w") as f:
@@ -383,6 +498,8 @@ def self_test() -> int:
     src=Path(__file__).read_text()
     assert "codex" in src and "--dev-bind" in src
     assert "validate_agent_request" not in src.split("def self_test()")[0]
+    assert CODEX_TIMEOUT_SECONDS > 185
+    assert WATCHDOG_DEADLINE_SECONDS > CODEX_TIMEOUT_SECONDS
     print("LA2016 Direct owner gating, real archived waveform/off verification PASS")
     return 0
 
