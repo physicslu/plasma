@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Gate 1A: standalone, HOSTED/OFFLINE only dispatcher security contracts."""
+from __future__ import annotations
+
+import copy
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import threading
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+import plasma_engineering_dispatch_v1 as dispatch
+
+SCHEMA_PATH = ROOT / "specs/engineering-dispatch/work-order-v1.schema.json"
+POLICY_PATH = ROOT / "specs/engineering-dispatch/capabilities-v1.json"
+SAMPLE_PATH = ROOT / "specs/engineering-dispatch/examples/software-readonly-v1.json"
+WORKFLOW_PATH = ROOT / ".github/workflows/plasma-engineering-dispatch-contract.yml"
+
+
+class DispatchGate1AContracts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.policy = json.loads(POLICY_PATH.read_text())
+        cls.sample = json.loads(SAMPLE_PATH.read_text())
+        cls.schema = json.loads(SCHEMA_PATH.read_text())
+
+    def order(self) -> dict:
+        return copy.deepcopy(self.sample)
+
+    def event(self, order: dict | None = None, *, comment_id: int = 101) -> dict:
+        order = order or self.order()
+        return {
+            "action": "created", "issue": {"number": order["issue_number"]},
+            "comment": {"id": comment_id, "user": {"login": "physicslu"},
+                        "body": dispatch.approval_command(order)},
+            "sender": {"login": "physicslu"},
+            "repository": {"full_name": "physicslu/plasma"},
+        }
+
+    def context(self, order: dict | None = None) -> dict:
+        order = order or self.order()
+        return {
+            "event_name": "issue_comment", "actor": "physicslu",
+            "repository": "physicslu/plasma", "ref": "refs/heads/main",
+            "checked_out_sha": order["reviewed_main_sha"],
+            "run_id": 99999901, "run_attempt": 1,
+        }
+
+    def check_denied(self, order: dict, expected: str, policy: dict | None = None) -> None:
+        with self.assertRaisesRegex(dispatch.ContractDenied, expected):
+            dispatch.validate_work_order(order, policy or self.policy)
+
+    def test_schema_and_offline_mode_match_implementation(self) -> None:
+        self.assertEqual(self.schema["$schema"],
+                         "https://json-schema.org/draft/2020-12/schema")
+        self.assertFalse(self.schema["additionalProperties"])
+        self.assertEqual(set(self.schema["required"]), dispatch.ORDER_KEYS)
+        self.assertEqual(set(self.schema["properties"]), dispatch.ORDER_KEYS)
+        self.assertEqual(set(self.schema["properties"]["scope"]["required"]),
+                         dispatch.SCOPE_KEYS)
+        self.assertFalse(self.schema["properties"]["scope"]["additionalProperties"])
+        self.assertEqual(self.policy["status"], dispatch.NO_RUNTIME)
+        self.assertEqual(set(self.policy["capabilities"]), dispatch.CAPABILITIES)
+        self.assertTrue(all(p["runtime_enabled"] is False
+                            for p in self.policy["capabilities"].values()))
+        self.assertEqual(self.sample["issue_number"], 900001)  # inert fixture only
+        rule = dispatch.validate_work_order(self.order(), self.policy)
+        self.assertEqual(rule["worker_class"], "hosted-offline")
+        self.assertEqual(self.sample["reviewed_main_sha"],
+                         "e93ce8974d00d3e930026333785a5645e89d61cf")
+
+    def test_digest_is_canonical_and_approval_binds_immutable_content(self) -> None:
+        original = self.order()
+        reversed_order = dict(reversed(list(original.items())))
+        self.assertEqual(dispatch.digest(original), dispatch.digest(reversed_order))
+        self.assertEqual(len(dispatch.digest(original)), 64)
+        self.assertRegex(dispatch.approval_command(original),
+                         r"^/plasma-dispatch approve offline-safety-review rev=1 "
+                         r"sha256=[0-9a-f]{64} kind=gate1-implementation$")
+        valid = dispatch.authorize(self.event(original), self.context(original),
+                                   original, self.policy)
+        self.assertEqual(valid["status"], "AUTH_CONTRACT_PASS_NO_DISPATCH")
+        self.assertIs(valid["runtime_enabled"], False)
+        self.assertEqual(valid["worker_class"], "hosted-offline")
+        self.assertEqual(valid["work_order_sha256"], dispatch.digest(original))
+        tampered = copy.deepcopy(original)
+        tampered["objective"] += " unauthorized append"
+        with self.assertRaisesRegex(dispatch.ContractDenied, "APPROVAL_DIGEST_OR_BODY_MISMATCH"):
+            dispatch.authorize(self.event(original), self.context(original),
+                               tampered, self.policy)
+        tampered = self.order()
+        tampered["revision"] += 1
+        with self.assertRaisesRegex(dispatch.ContractDenied, "APPROVAL_DIGEST_OR_BODY_MISMATCH"):
+            dispatch.authorize(self.event(original), self.context(original),
+                               tampered, self.policy)
+
+    def test_event_provenance_and_exact_owner_command_negative(self) -> None:
+        order = self.order()
+        event = self.event(order)
+        ctx = self.context(order)
+        for field, bad in {
+            "event_name": "pull_request", "actor": "untrusted",
+            "repository": "attacker/plasma", "ref": "refs/heads/feature",
+            "checked_out_sha": "0"*40, "run_id": False,
+            "run_attempt": 0,
+        }.items():
+            with self.subTest(field=field):
+                mutated = copy.deepcopy(ctx)
+                mutated[field] = bad
+                with self.assertRaises(dispatch.ContractDenied):
+                    dispatch.authorize(event, mutated, order, self.policy)
+        for dotted, bad in (
+            ("action", "edited"), ("issue.number", 42),
+            ("issue.pull_request", {"url": "https://example.invalid/pull"}),
+            ("sender.login", "untrusted"),
+            ("comment.user.login", "untrusted"),
+            ("repository.full_name", "untrusted/plasma"),
+            ("comment.body", dispatch.approval_command(order) + "\n"),
+            ("comment.body", "/plasma-dispatch approve x; touch /tmp/unsafe"),
+            ("comment.id", 0),
+        ):
+            with self.subTest(dotted=dotted):
+                mutated = copy.deepcopy(event)
+                x = mutated
+                parts = dotted.split(".")
+                for item in parts[:-1]:
+                    x = x[item]
+                x[parts[-1]] = bad
+                with self.assertRaises(dispatch.ContractDenied):
+                    dispatch.authorize(mutated, ctx, order, self.policy)
+        ctx["injected_context_field"] = "untrusted"
+        with self.assertRaisesRegex(dispatch.ContractDenied, "GITHUB_CONTEXT_INVALID"):
+            dispatch.authorize(event, ctx, order, self.policy)
+
+    def test_paths_unknown_fields_and_strict_numeric_types(self) -> None:
+        for path in ("../secrets", "/etc/passwd", "docs/../other", "a//b",
+                     "docs\0bad", "a\\b", "-danger"):
+            with self.subTest(path=repr(path)):
+                order = self.order()
+                order["scope"]["allow_repo_paths"] = [path]
+                self.check_denied(order, "WORK_ORDER_PATHS_INVALID")
+        for key,value,reason in (
+            ("revision",True,"WORK_ORDER_REVISION_INVALID"),
+            ("issue_number",False,"WORK_ORDER_ISSUE_INVALID"),
+            ("timeout_seconds",0,"WORK_ORDER_TIMEOUT_INVALID"),
+            ("reviewed_main_sha","HEAD","WORK_ORDER_PIN_INVALID"),
+            ("requested_by","untrusted","WORK_ORDER_OWNER_DENIED"),
+            ("authorization_kind","merge","WORK_ORDER_AUTHORIZATION_KIND_INVALID"),
+            ("capability","sudo-shell","CAPABILITY_UNKNOWN"),
+        ):
+            with self.subTest(key=key):
+                order = self.order()
+                order[key] = value
+                self.check_denied(order, reason)
+        order = self.order()
+        order["arbitrary_shell"] = "echo hello"
+        self.check_denied(order, "WORK_ORDER_FIELDS_INVALID")
+        order = self.order()
+        order["scope"]["extra"] = True
+        self.check_denied(order, "WORK_ORDER_SCOPE_INVALID")
+        order = self.order()
+        order["acceptance"] = ["repeat this"] * 2
+        self.check_denied(order, "WORK_ORDER_ACCEPTANCE_INVALID")
+
+    def test_capability_segregation_hardware_must_have_one_shot(self) -> None:
+        order = self.order()
+        order["capability"] = "la2016-loopback"
+        order["entrypoint"] = "la2016-direct"
+        order["scope"]["required_permissions"] = ["repo:read", "usb:la2016"]
+        order["scope"]["deny_resources"].remove("usb")
+        order["timeout_seconds"] = 300
+        self.check_denied(order, "HARDWARE_ONE_SHOT_APPROVAL_REQUIRED")
+        order["authorization_kind"] = "hardware-one-shot"
+        rule = dispatch.validate_work_order(order, self.policy)
+        self.assertEqual(rule["worker_class"], "la2016-isolated")
+        self.assertIs(rule["runtime_enabled"], False)
+        self.assertTrue(rule["hardware_authorization"])
+        order["scope"]["deny_resources"].remove("z2")
+        self.check_denied(order, "CAPABILITY_NEGATIVE_SCOPE_MISSING")
+        order["scope"]["deny_resources"].append("z2")
+        order["scope"]["required_permissions"].append("z2:hardware-owner")
+        self.check_denied(order, "CAPABILITY_PERMISSIONS_MISMATCH")
+        order = self.order()
+        order["scope"]["required_permissions"] = ["repo:read", "repo:write-branch"]
+        self.check_denied(order, "CAPABILITY_PERMISSIONS_MISMATCH")
+        bad_policy = copy.deepcopy(self.policy)
+        bad_policy["capabilities"]["la2016-loopback"]["runtime_enabled"] = True
+        self.check_denied(self.order(), "RUNTIME_DISPATCH_FORBIDDEN_GATE1A",bad_policy)
+        bad_policy = copy.deepcopy(self.policy)
+        bad_policy["capabilities"]["z2-privileged"]["runtime_enabled"] = True
+        self.check_denied(self.order(), "RUNTIME_DISPATCH_FORBIDDEN_GATE1A",bad_policy)
+
+    def test_offline_local_claim_deduplicates_comment_and_run_retries(self) -> None:
+        order = self.order()
+        plan = dispatch.authorize(self.event(order), self.context(order),
+                                  order, self.policy)
+        with tempfile.TemporaryDirectory() as t:
+            folder = Path(t) / "ledger"
+            folder.mkdir(mode=0o700)
+            result = dispatch.claim_offline(plan, folder)
+            self.assertTrue(result.exists())
+            self.assertEqual(result.stat().st_mode & 0o777, 0o600)
+            repeated = copy.deepcopy(plan)
+            repeated["comment_id"] = 102
+            repeated["run_id"] += 1
+            with self.assertRaisesRegex(dispatch.ContractDenied,
+                                        "WORK_ORDER_REVISION_ALREADY_CLAIMED"):
+                dispatch.claim_offline(repeated, folder)
+            upgraded = copy.deepcopy(plan)
+            upgraded["revision"] = 2
+            # Version 2 still requires independently validated owner approval
+            # in production; this only tests ledger key isolation.
+            self.assertNotEqual(dispatch.replay_key(upgraded),
+                                dispatch.replay_key(plan))
+            self.assertTrue(dispatch.claim_offline(upgraded, folder).exists())
+            os.chmod(folder, 0o755)
+            with self.assertRaisesRegex(dispatch.ContractDenied, "REPLAY_DIRECTORY_NOT_PRIVATE"):
+                dispatch.claim_offline(plan, folder)
+            os.chmod(folder, 0o700)
+
+    def test_parallel_claim_only_one_wins(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        plan = dispatch.authorize(self.event(), self.context(),
+                                  self.order(), self.policy)
+        with tempfile.TemporaryDirectory() as t:
+            folder = Path(t) / "ledger"
+            folder.mkdir(mode=0o700)
+            def attempt(_: int) -> str:
+                try:
+                    dispatch.claim_offline(plan, folder)
+                    return "CLAIMED"
+                except dispatch.ContractDenied:
+                    return "DENIED"
+            with ThreadPoolExecutor(max_workers=12) as pool:
+                results = list(pool.map(attempt, range(12)))
+            self.assertEqual(results.count("CLAIMED"), 1)
+            self.assertEqual(results.count("DENIED"), 11)
+
+    def test_json_parser_rejects_duplicate_or_nonfinite_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as t:
+            file = Path(t) / "input.json"
+            for content,code in (
+                ('{"revision":1,"revision":2}', "JSON_DUPLICATE_KEY"),
+                ('{"foo":NaN}',"JSON_CONSTANT_DENIED"),
+                ("{" * 33000,"JSON_FILE_DENIED"),
+            ):
+                file.write_text(content)
+                with self.assertRaisesRegex(dispatch.ContractDenied, code):
+                    dispatch.load_json(file)
+
+    def test_cli_only_validates_and_never_executes_workflow(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/plasma_engineering_dispatch_v1.py"),
+             "validate", "--work-order", str(SAMPLE_PATH),
+             "--policy", str(POLICY_PATH)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            check=False, timeout=8,
+        )
+        self.assertEqual(completed.returncode, 0,completed.stderr)
+        out = json.loads(completed.stdout)
+        self.assertEqual(out["status"], "VALIDATED_OFFLINE_ONLY_NO_DISPATCH")
+        self.assertIs(out["runtime_enabled"], False)
+        source = (ROOT / "scripts/plasma_engineering_dispatch_v1.py").read_text()
+        self.assertNotIn("import subprocess",source)
+        self.assertNotIn("import requests",source)
+        self.assertNotIn("os.system(",source)
+        self.assertNotIn("os.exec",source)
+        self.assertNotIn("urllib",source)
+        self.assertNotIn("github.event.comment.body",source)
+        wf = WORKFLOW_PATH.read_text()
+        self.assertIn("runs-on: ubuntu-24.04", wf)
+        self.assertIn("persist-credentials: false", wf)
+        self.assertNotIn("issue_comment:", wf)
+        self.assertNotIn("workflow_dispatch:", wf)
+        self.assertNotIn("self-hosted", wf)
+        self.assertNotIn("actions/upload-artifact", wf)
+        self.assertNotIn("permissions: write-all", wf)
+        self.assertNotIn("sudo ", wf)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
