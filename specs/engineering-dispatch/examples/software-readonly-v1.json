@@ -1,0 +1,42 @@
+{
+  "schema_version": "plasma.engineering.work_order.v1",
+  "work_order_id": "offline-safety-review",
+  "revision": 1,
+  "repository": "physicslu/plasma",
+  "issue_number": 900001,
+  "requested_by": "physicslu",
+  "reviewed_main_sha": "e93ce8974d00d3e930026333785a5645e89d61cf",
+  "authorization_kind": "gate1-implementation",
+  "objective": "Run an offline read-only contract review against checked-in engineering docs. No hardware commands.",
+  "capability": "software-readonly",
+  "entrypoint": "offline-analysis",
+  "scope": {
+    "allow_repo_paths": [
+      "docs/architecture",
+      "specs/engineering-dispatch"
+    ],
+    "deny_resources": [
+      "usb",
+      "z2",
+      "fpga",
+      "mmio",
+      "dut",
+      "hub-power",
+      "network-instrument",
+      "repository-write",
+      "host-root"
+    ],
+    "required_permissions": [
+      "repo:read"
+    ]
+  },
+  "timeout_seconds": 120,
+  "acceptance": [
+    "Offline contract tests pass",
+    "No hardware runner or external DUT accessed"
+  ],
+  "evidence": [
+    "sanitized-receipt",
+    "offline-test-report"
+  ]
+}

@@ -1,0 +1,42 @@
+name: PLASMA Engineering Dispatch Gate 1A Offline Contracts
+
+# Deliberately NOT a runtime dispatcher. No issue_comment, workflow_dispatch,
+# self-hosted runner, GitHub issue mutation, device access, or model invocation.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-dispatch-contract.yml"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-dispatch-contract.yml"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate offline dispatcher interfaces and negative security contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma_engineering_dispatch_v1.py scripts/tests/test_plasma_engineering_dispatch_v1.py
+          python3 scripts/plasma_engineering_dispatch_v1.py validate \
+            --work-order specs/engineering-dispatch/examples/software-readonly-v1.json \
+            --policy specs/engineering-dispatch/capabilities-v1.json
+          python3 scripts/tests/test_plasma_engineering_dispatch_v1.py
