@@ -29,7 +29,7 @@ DEV_NULL = frozenset({"usb", "z2", "fpga", "mmio", "dut", "hub-power",
 ALLOWED_WORKER = "software-isolated"
 REF_PATTERN = re.compile(
     r"refs/heads/plasma-engineering-claims/[1-9][0-9]*/"
-    r"[a-z0-9][a-z0-9-]{2,63}-r[1-9][0-9]*\\Z"
+    r"[a-z0-9][a-z0-9-]{2,63}-r[1-9][0-9]*\Z"
 )
 
 
