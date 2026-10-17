@@ -106,6 +106,7 @@
 - **Plan / Read-only diagnostics** — [PLASMA Codex LA2016 Worker Failure Diagnostics](development/plasma-codex-la2016-diagnose.md)：Issue #981 專用 Codex Runner 的 AppImage、USB 被動存取、bubblewrap 與唯讀 Agent 請求診斷；不執行 PWM、CH0 擷取或硬體操作。
 - **Plan / Agent direct A/B (Gate 1 only)** — [PLASMA Codex Direct LA2016 Loopback](development/plasma-codex-la2016-direct.md)：將 Codex 直接操作 sigrok-cli 與既有 JSON Supervisor 對照；分離 LA-only USB 隔離、獨立 PWM OFF 以及波形驗證，尚未授權實機操作。
 - **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
+- **Gate 1 / read-only inventory** — [Z2 Kernel/Device Tree Read-only Inventory](development/z2-kernel-dt-readonly-gate1.md)：限定唯讀 Kernel Config、Device Tree、FPGA Manager／Region／Bridge 與 UIO metadata；Host 假資料驗證與獨立 SWPC Codex 實機取證分開，M1 維持 NO-GO。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
