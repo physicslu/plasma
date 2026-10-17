@@ -5,7 +5,9 @@
 > This review has no live FPGA, MMIO, UIO, DUT, deployment, FPGA Manager or reload permission.
 > A successful Host validator only establishes that the **proposal is internally consistent**.
 
-> **Semantic convergence Gate 1 amendment:** [SWD reset, clock, metadata, fault/ACK semantics](fixed-fpga-swd-semantics-gate1.md) supersedes earlier ambiguous SWD descriptions. Candidate still not Accepted; M1 NO-GO. New Site RO registers: SWD_RESPONSE_META (+0x06C), SWD_RAW_STATUS (+0x070).\n\n## First-principle product invariant
+> **Semantic convergence Gate 1 amendment:** [SWD reset, clock, metadata, fault/ACK semantics](fixed-fpga-swd-semantics-gate1.md) supersedes earlier ambiguous SWD descriptions. Candidate still not Accepted; M1 NO-GO. New Site RO registers: SWD_RESPONSE_META (+0x06C), SWD_RAW_STATUS (+0x070).
+
+## First-principle product invariant
 
 The operator changes IC/profile/protocol while the **same running Linux / Ethernet / Gateway** remains up. v1 uses exactly one Universal **full fixed image** for normal programming; there is **no FPGA reload as part of a Job, batch transition, Site request, or protocol switch**. Boot-time/static provisioning and factory recovery are separate maintenance processes, outside this design's execution authority.
 
