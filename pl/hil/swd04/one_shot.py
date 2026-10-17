@@ -23,7 +23,8 @@ from pl.hil.swd04 import contract as c, development, native_qualify, staging
 
 FIRMWARE_ROOT = Path("/lib/firmware")
 MANAGER = Path("/sys/class/fpga_manager/fpga0")
-OWNER_LOCK = Path("/run/lock/plasma-z2-swd05-supervisor.lock")
+OWNER_DIR = Path("/run/plasma-z2-swd05")
+OWNER_LOCK = OWNER_DIR / "supervisor.lock"
 SERVICES = c.REQUIRED_SERVICES
 STAGES = ("HIL01", "HIL02")
 
@@ -184,7 +185,12 @@ def run_protected(
 
 def run_live(i: Inputs) -> dict[str, str]:
     verify_inputs(i)  # All hashes and paths before any physical action.
+    OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
+    protected(OWNER_DIR, file=False)
+    if OWNER_LOCK.exists():
+        protected(OWNER_LOCK)
     lock_fd = os.open(OWNER_LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    protected(OWNER_LOCK)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         require(not i.output.exists(), "Output path already used")
@@ -297,7 +303,15 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, c.SafetyError, RuntimeError, subprocess.SubprocessError):
         print("SWD05_ONESHOT_NO_GO: prerequisites or execution blocked", file=sys.stderr)
         return 2
-    print("SWD05_ONESHOT_" + result["overall"])
+    print("PLASMA_SWD05_REPORT=" + json.dumps({
+        "schema": "plasma.z2.swd05.oneshot.v1",
+        "stages": result, "site": 1,
+        "candidate_source": c.SOURCE_SHA,
+        "candidate_bin_sha256": c.CANDIDATE_BIN_SHA256,
+        "recovery_bin_sha256": c.RECOVERY_BIN_SHA256,
+        "external_dut": "NOT_RUN",
+        "physical_swd": "NOT_RUN",
+    }, sort_keys=True))
     return 0 if result["overall"] == "PASS_DEVELOPMENT_INTERNAL_FIXTURE" else 2
 
 
