@@ -134,3 +134,42 @@ def test_cli_rejects_malformed_or_missing_file(tmp_path, capsys):
     assert main(["--inventory", str(missing)]) == 2
     out = json.loads(capsys.readouterr().out)
     assert "INVENTORY_INVALID" in out["error"]
+
+
+@pytest.mark.parametrize("field,invalid", [
+    ("index", False), ("addr", True), ("size", True), ("offset", False),
+])
+def test_boolean_values_cannot_impersonate_uio_map_integers(z2_snapshot,
+                                                              field, invalid):
+    z2_snapshot["uio"][0]["maps"][0][field] = invalid
+    with pytest.raises(ReviewRefused):
+        assess_z2_m1_inventory(z2_snapshot)
+
+
+def test_overlapping_second_uio_mapping_fails_closed(z2_snapshot):
+    z2_snapshot["uio"].append({
+        "device": "/dev/uio7", "driver": "uio_pdrv_genirq",
+        "maps": [{"index": 0, "addr": 0x40008000,
+                  "size": 0x1000, "offset": 0}],
+    })
+    with pytest.raises(ReviewRefused, match="overlapping"):
+        assess_z2_m1_inventory(z2_snapshot)
+
+
+def test_overlapping_second_map_on_same_uio_fails_closed(z2_snapshot):
+    z2_snapshot["uio"][0]["maps"].append(
+        {"index": 1, "addr": 0x40001000, "size": 4096, "offset": 0}
+    )
+    with pytest.raises(ReviewRefused, match="overlapping"):
+        assess_z2_m1_inventory(z2_snapshot)
+
+
+def test_non_overlapping_extra_uio_remains_review_only(z2_snapshot):
+    z2_snapshot["uio"].append({
+        "device": "/dev/uio7", "driver": "uio_pdrv_genirq",
+        "maps": [{"index": 0, "addr": 0x50000000,
+                  "size": 0x1000, "offset": 0}],
+    })
+    result = assess_z2_m1_inventory(z2_snapshot)
+    assert result["verdict"] == "M1_NO_GO"
+    assert result["reload_authorized"] is False
