@@ -127,7 +127,7 @@ class OfflineDirectContracts(unittest.TestCase):
         assert "validate_agent_request(" not in source
         assert "codex" in source and "--sandbox" in source
         assert "--dev-bind" in source and "--tmpfs" in source
-        assert "physical_off(conn)" in source
+        assert "physical_off(conn," in source
         assert "invoke_codex(args,prompt(evidence,conn),out)" in source
         assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def run()")[0]
         assert "CALL_SUPERVISOR" not in source
