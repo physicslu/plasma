@@ -68,6 +68,8 @@ def manager_state():
 
 def uio_snapshot():
     names = []
+    fabric_driver = False
+    audio_driver = False
     try:
         nodes = sorted(Path("/sys/class/uio").glob("uio*"))[:32]
     except OSError:
@@ -76,14 +78,18 @@ def uio_snapshot():
         name = read(item / "name").decode("utf-8", "replace").strip()
         if name == "fabric":
             names.append("FABRIC")
+            fabric_driver = fabric_driver or (item / "device" / "driver").is_symlink()
         elif name == "audio-codec-ctrl":
             names.append("AUDIO_CODEC_CTRL")
+            audio_driver = audio_driver or (item / "device" / "driver").is_symlink()
         else:
             names.append("OTHER")
     return {
         "count": len(nodes),
         "fabric_detected": "FABRIC" in names,
         "audio_codec_detected": "AUDIO_CODEC_CTRL" in names,
+        "fabric_driver_link": fabric_driver,
+        "audio_codec_driver_link": audio_driver,
     }
 
 def fclk0():
@@ -92,7 +98,8 @@ def fclk0():
     b = read("/sys/kernel/debug/clk/fclk0/clk_rate", 32).strip()
     if b.isdigit():
         n = int(b)
-        return {"visibility": "OBSERVED", "hz": n if 0 < n < 1000000000 else None}
+        if 0 < n < 1000000000:
+            return {"visibility": "OBSERVED", "hz": n}
     return {"visibility": "NOT_OBSERVED_UNPRIVILEGED", "hz": None}
 
 def services():
@@ -143,10 +150,14 @@ def validate_remote(data: object) -> dict:
         raise ValueError("INVALID_FPGA_MANAGER")
     uio = data["uio"]
     if not isinstance(uio, dict) or set(uio) != {
-        "count", "fabric_detected", "audio_codec_detected"
+        "count", "fabric_detected", "audio_codec_detected",
+        "fabric_driver_link", "audio_codec_driver_link"
     } or type(uio["count"]) is not int or not 0 <= uio["count"] <= 32:
         raise ValueError("INVALID_UIO")
-    if any(type(uio[x]) is not bool for x in ("fabric_detected", "audio_codec_detected")):
+    if any(type(uio[x]) is not bool for x in (
+        "fabric_detected", "audio_codec_detected",
+        "fabric_driver_link", "audio_codec_driver_link",
+    )):
         raise ValueError("INVALID_UIO_FIELD")
     clk = data["fclk0"]
     if not isinstance(clk, dict) or set(clk) != {"visibility", "hz"}:
@@ -294,7 +305,8 @@ def main() -> int:
             "machine_armv7": True, "device_tree_zynq7000": True,
             "device_tree_board_model_available": False,
             "fpga_manager_state": "OPERATING",
-            "uio": {"count": 2, "fabric_detected": True, "audio_codec_detected": True},
+            "uio": {"count": 2, "fabric_detected": True, "audio_codec_detected": True,
+                    "fabric_driver_link": True, "audio_codec_driver_link": True},
             "fclk0": {"visibility": "NOT_OBSERVED_UNPRIVILEGED", "hz": None},
             "services": {x: "ACTIVE" for x in
                          ("plasma-bootstrap", "plasma-server", "plasma-web",
