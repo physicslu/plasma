@@ -233,10 +233,37 @@ def uart_candidates(root: Path = Path("/sys/class/tty")) -> list[Path]:
     return result
 
 
-def uart_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
+def wake_uart_console(fd: int, pause_seconds: float = 0.45) -> None:
+    """Reproduce two actual Enter keypresses used on the enrolled Z2 UART.
+
+    A single CRLF byte pair is not equivalent to two separately delivered CR
+    keypresses on a Linux serial console. Empty commands are non-destructive.
+    """
+    os.write(fd, b"\r")
+    time.sleep(pause_seconds)
+    os.write(fd, b"\r")
+
+
+def uart_login(
+    record: dict[str, str], seconds: int = MAX_SECONDS,
+    diagnostics: dict[str, bool | int] | None = None,
+) -> str:
+    stages = diagnostics if diagnostics is not None else {}
+    stages.update({
+        "device_matched": False,
+        "port_opened": False,
+        "enter_sent": 0,
+        "rx_seen": False,
+        "login_prompt_seen": False,
+        "password_prompt_seen": False,
+        "shell_prompt_seen": False,
+        "command_sent": False,
+        "marker_verified": False,
+    })
     paths = uart_candidates()
     if len(paths) != 1:
         return "BLOCKED_UART_DEVICE_MAPPING"
+    stages["device_matched"] = True
     if not shutil.which("fuser"):
         return "BLOCKED_UART_OWNER_CHECK_MISSING"
     probe = subprocess.run(["fuser", "-s", str(paths[0])], stdout=subprocess.DEVNULL,
@@ -250,6 +277,7 @@ def uart_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
     except OSError:
         return "BLOCKED_UART_OPEN"
     original = None
+    stages["port_opened"] = True
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         original = termios.tcgetattr(fd)
@@ -261,7 +289,8 @@ def uart_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
         opts[5] = termios.B115200
         termios.tcsetattr(fd, termios.TCSANOW, opts)
         fcntl.ioctl(fd, termios.TIOCEXCL)
-        os.write(fd, b"\r\n")
+        wake_uart_console(fd)
+        stages["enter_sent"] = 2
         buf = b""
         seen_login = seen_password = probe_sent = False
         deadline = time.monotonic() + seconds
@@ -274,16 +303,20 @@ def uart_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
                 continue
             if not data:
                 continue
+            stages["rx_seen"] = True
             buf = (buf + data)[-8192:]
             tail = buf.decode("utf-8", "replace")
             if UART_MARK + LOGIN in tail:
+                stages["marker_verified"] = True
                 return "PASS"
             if not seen_login and re.search(r"(?im)(?:^|[\r\n])[\w .-]{0,64}login:\s*$", tail):
+                stages["login_prompt_seen"] = True
                 os.write(fd, (LOGIN + "\r").encode())
                 seen_login = True
                 buf = b""
                 continue
             if not seen_password and re.search(r"(?im)(?:^|[\r\n])password:\s*$", tail):
+                stages["password_prompt_seen"] = True
                 os.write(fd, record["ssh_password"].encode() + b"\r")
                 seen_password = True
                 buf = b""
@@ -291,8 +324,10 @@ def uart_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
             # Do not send commands to bootloader, login prompt or unknown
             # terminal applications. The shell prompt must be identifiable.
             if not probe_sent and re.search(r"(?m)(?:^|[\r\n])[\w.-]+@[\w.-]+:[^\r\n]{0,70}\$\s*$", tail):
+                stages["shell_prompt_seen"] = True
                 os.write(fd, ("printf '" + UART_MARK + "'; id -un\r").encode())
                 probe_sent = True
+                stages["command_sent"] = True
                 buf = b""
         return "TIMEOUT_UART"
     except (OSError, ValueError, termios.error):
@@ -321,6 +356,7 @@ def execute() -> int:
         "runner": "SWPC-plasma-codex",
         "ssh": "NOT_RUN",
         "uart": "NOT_RUN",
+        "uart_stages": {},
         "no_power_reset_jtag_fpga_dut": True,
     }
     try:
@@ -336,7 +372,7 @@ def execute() -> int:
         results["ssh"] = ssh_login(record)
         print("[SSH] " + results["ssh"], flush=True)
         print("[UART] FT2232 channel B console / read-only id: starting", flush=True)
-        results["uart"] = uart_login(record)
+        results["uart"] = uart_login(record, diagnostics=results["uart_stages"])
         print("[UART] " + results["uart"], flush=True)
     data = json.dumps(results, sort_keys=True, indent=2) + "\n"
     report = out / "report.json"
