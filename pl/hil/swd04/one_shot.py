@@ -244,6 +244,20 @@ def run_live(i: Inputs) -> dict[str, str]:
                         # process. Recovery by FPGA load is now unsafe.
                         raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD") from exc
                 raise c.SafetyError("MMIO_CHILD_TIMEOUT") from exc
+            except BaseException:
+                # SSH disconnect / supervisor interruption: do not leave
+                # a live MMIO child holding an aperture when finally restores.
+                if proc.poll() is None:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        try:
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD")
+                raise
             require(status == 0, name + " child failed or SIGBUS")
             data = json.loads((a if name == "HIL01" else b).joinpath("result.json").read_text())
             require(data["result"] == "PASS" and data["stage"] == name,
@@ -262,11 +276,24 @@ def run_live(i: Inputs) -> dict[str, str]:
             require(service_snapshot() == snapshot["services"], "Service state changed")
             require(uio_snapshot() == snapshot["uio"], "UIO binding state differs")
             clock_and_owner()
-        outcome = run_protected(
-            preflight=preflight, load_candidate=load,
-            hil01=lambda: stage("HIL01", None),
-            hil02=lambda: stage("HIL02", a / "result.json"),
-            restore=restore, verify_restoration=verify_restoration)
+        # An SSH disconnect normally propagates SIGHUP or SIGTERM; route it
+        # into the Python finally recovery path. SIGKILL, SIGBUS in the
+        # supervisor and uninterruptible kernel stalls remain unrecoverable.
+        watched = (signal.SIGTERM, signal.SIGHUP)
+        old_handlers = {sig: signal.getsignal(sig) for sig in watched}
+        def interrupt(sig, frame):
+            raise c.SafetyError("SUPERVISOR_INTERRUPTED")
+        try:
+            for sig in watched:
+                signal.signal(sig, interrupt)
+            outcome = run_protected(
+                preflight=preflight, load_candidate=load,
+                hil01=lambda: stage("HIL01", None),
+                hil02=lambda: stage("HIL02", a / "result.json"),
+                restore=restore, verify_restoration=verify_restoration)
+        finally:
+            for sig, handler in old_handlers.items():
+                signal.signal(sig, handler)
         # A report never leaks kernel process, paths, addresses or credentials.
         record_json(i.output / "summary.json", {
             "schema": "plasma.z2.swd05.oneshot.v1",
