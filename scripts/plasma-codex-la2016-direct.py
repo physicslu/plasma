@@ -587,6 +587,7 @@ def run() -> int:
             if str(exc).startswith(("CODEX_NETWORK_", "DNS_")):
                 report["failure_stage"] = "NETWORK_PREFLIGHT"
                 report["primary_failure"] = str(exc)
+                report["network_preflight"] = str(exc)
             receipt = out / "preparation-receipts.json"
             if receipt.is_file():
                 report["preparation_attempts"] = json.loads(
@@ -665,7 +666,18 @@ def run() -> int:
                     report["result"]="NO_GO_OFF"
                     rc=2
     except (OSError,ValueError,subprocess.SubprocessError,zipfile.BadZipFile,
-            configparser.Error,KeyError,IndexError):
+            configparser.Error,KeyError,IndexError) as exc:
+        if (report["failure_stage"] == "NETWORK_PREFLIGHT"
+                and isinstance(exc, ValueError)
+                and str(exc) in {"CODEX_NETWORK_RESOLV_CONF_MISSING",
+                                 "CODEX_NETWORK_DNS_FAIL",
+                                 "CODEX_NETWORK_PREFLIGHT_ERROR",
+                                 "DNS_RESOLV_CONF_UNAVAILABLE",
+                                 "DNS_RESOLV_CONF_UNREADABLE",
+                                 "DNS_RUN_TARGET_NOT_ALLOWLISTED"}):
+            report["network_preflight"] = str(exc)
+            if report["primary_failure"] == "NONE":
+                report["primary_failure"] = str(exc)
         if report["result"]!="NO_GO_OFF":
             report["result"]="NO_GO"
         if report["primary_failure"] == "NONE":
