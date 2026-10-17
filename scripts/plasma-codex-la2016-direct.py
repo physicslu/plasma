@@ -434,6 +434,11 @@ def prepare_codex(out: Path) -> list[dict[str, object]]:
                  "termination": outcome["termination"],
                  "elapsed_seconds": outcome["elapsed_seconds"]}
         notes.append(entry)
+        # Every step is durably recorded even if all retries time out.
+        receipt = out / "preparation-receipts.json"
+        temp = out / "preparation-receipts.tmp"
+        temp.write_text(json.dumps(notes, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temp, receipt)
         if outcome["status"] == "PASS":
             return notes
         # Failed, un-reaped process, or other error is NOT safe to retry.
@@ -472,6 +477,10 @@ def run() -> int:
             report["preparation_status"] = "PASS"
         except ValueError:
             report["preparation_status"] = "FAILED_OR_RETRY_EXHAUSTED"
+            receipt = out / "preparation-receipts.json"
+            if receipt.is_file():
+                report["preparation_attempts"] = json.loads(
+                    receipt.read_text(encoding="utf-8"))
             raise
         report["failure_stage"] = "USB_PREFLIGHT"
         conn,dev=detect_la()
