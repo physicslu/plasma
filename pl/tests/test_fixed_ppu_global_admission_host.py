@@ -171,6 +171,9 @@ def test_active_two_site_leases_same_ic_and_batch(descriptor, inventory, regs):
 
 
 def test_stale_epoch_wrong_batch_or_different_ic_rejected(descriptor, inventory, regs):
+    descriptor["expected_identity"]["site_present_bitmap"] = 3
+    regs[0x030] = 3
+    regs[0x034] = 3
     b = HostBrokerAdmission(receipt(descriptor, inventory, regs))
     lease = b.claim(1, exact_ic="STM32F103C8T6", batch_id="B1",
                     generation=7, owner_epoch="FAKE-OWNER-EPOCH-A")
