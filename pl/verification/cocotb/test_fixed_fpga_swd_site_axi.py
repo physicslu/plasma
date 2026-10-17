@@ -129,7 +129,7 @@ async def site1_register_map_and_strict_axi_errors(dut):
     assert await b.read(0x04) == (OKAY, 0x10000)
     assert await b.read(0x08) == (OKAY, 1)
     assert await b.read(0x0c) == (OKAY, 1)
-    assert await b.read(0x58) == (OKAY, 1)
+    assert await b.read(0x58) == (OKAY, 0)  # no SPI FIFO
     assert await b.read(0x18) == (OKAY, 0)
     assert await b.read(0x20) == (SLVERR, 0)  # WO command is not readable
     assert await b.read(0x0700) == (SLVERR, 0)  # Reserved Site offset
@@ -144,7 +144,7 @@ async def site1_register_map_and_strict_axi_errors(dut):
     assert await b.write(0x20, 1) == OKAY    # before reset: NEED_RESET result
     assert await b.wait_done() == 4
     assert await b.read(0x48) == (OKAY, 1)
-    assert await b.read(0x4c) == (OKAY, 7)  # Mapped NEED_RESET
+    assert await b.read(0x4c) == (OKAY, 10)  # NEED_RESET distinct
     assert await b.write(0x64, 2) == SLVERR # Exact sequence binding
     assert await b.write(0x64, 1) == OKAY
     assert await b.read(0x0c) == (OKAY, 1)
@@ -180,6 +180,12 @@ async def site1_reset_then_virtual_dpidr(dut):
     assert await b.read(0x4c) == (OKAY, 0)
     assert await b.read(0x60) == (OKAY, 0x2BA01477)
     assert await b.read(0x50) == (OKAY, 1)
+    meta = (await b.read(0x6c))[1]
+    assert meta & 7 == 1
+    assert meta & 8
+    assert ((meta >> 4) & 0x1FF) == 1
+    assert ((meta >> 13) & 3) == 2
+    assert await b.read(0x70) == (OKAY, 0)
     assert await b.write(0x64, 8) == OKAY
     assert await b.read(0x68) == (OKAY, 2)
     dut._log.info("FIXED_ABI_SWDSITE_DPIDR_PASS")
@@ -199,5 +205,47 @@ async def injected_sim_driver_through_axi_to_virtual_swd_target(dut):
     dpidr = await driver.transact(sequence=101, opcode=1, bit_count=32, arg0=2)
     assert dpidr.sequence == 101 and dpidr.status == 0
     assert dpidr.data == 0x2BA01477
+    assert (dpidr.ack, dpidr.data_valid, dpidr.attempts, dpidr.link_state, dpidr.raw_status) == (1, True, 1, 2, 0)
     assert not driver.poisoned
     dut._log.info("FIXED_ABI_DRIVER_AXILITE_SWD_VIRTUAL_TARGET_PASS")
+
+
+@cocotb.test()
+async def site1_timeout_fault_evidence_ack_does_not_recover(dut):
+    """Fatal timeout snapshot -> fault ACK -> still FAULT; no silent re-admission."""
+    b = Bench(dut)
+    await b.init()
+    assert await b.write(0x24, 301) == OKAY
+    assert await b.write(0x30, 64) == OKAY
+    assert await b.write(0x34, 0) == OKAY
+    assert await b.write(0x38, 0) == OKAY
+    assert await b.write(0x3c, 1) == OKAY
+    assert await b.write(0x20, 2) == OKAY
+    assert await b.wait_done(3000) == 8
+    assert await b.read(0x48) == (OKAY, 301)
+    assert await b.read(0x4c) == (OKAY, 5)
+    assert await b.read(0x70) == (OKAY, 7)
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.write(0x64, 302) == SLVERR
+    assert await b.write(0x64, 301) == OKAY
+    assert await b.read(0x0c) == (OKAY, 8)
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.write(0x24, 302) == SLVERR
+    assert await b.write(0x20, 2) == SLVERR
+    dut._log.info("FIXED_ABI_TIMEOUT_FAULT_ACK_STICKY_PASS")
+
+
+@cocotb.test()
+async def site1_rejects_reset_timing_drift_before_commit(dut):
+    b = Bench(dut)
+    await b.init()
+    assert await b.write(0x24, 401) == OKAY
+    assert await b.write(0x30, 50) == SLVERR
+    assert await b.write(0x5c, 1) == SLVERR
+    assert await b.write(0x30, 64) == OKAY
+    assert await b.write(0x5c, 2) == OKAY
+    assert await b.write(0x34, 0) == OKAY
+    assert await b.write(0x38, 0) == OKAY
+    assert await b.write(0x20, 2) == OKAY
+    assert await b.wait_done() == 4
+    dut._log.info("FIXED_ABI_TIMING_BOUNDARY_PASS")

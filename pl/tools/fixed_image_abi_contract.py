@@ -56,7 +56,7 @@ def validate_abi(spec: dict) -> dict:
     }, "Command numbering changed")
     expected_results = ["OK", "SWD_WAIT", "SWD_FAULT", "SWD_NO_ACK",
                         "PARITY", "TIMEOUT", "ABORTED", "BAD_ARGUMENT",
-                        "ENGINE_UNAVAILABLE", "INTERNAL_FAULT"]
+                        "ENGINE_UNAVAILABLE", "INTERNAL_FAULT", "NEED_RESET", "PHY_ERROR"]
     _require(spec.get("results") == {name: i for i, name in enumerate(expected_results)},
              "Result numbering changed")
     regions = spec.get("regions")
@@ -113,9 +113,29 @@ def validate_abi(spec: dict) -> dict:
         "DONE_WORDS": (80, "ro"), "ABORT": (84, "wo"),
         "CAPACITY_WORDS": (88, "ro"), "CLOCK_DIV": (92, "wo"),
         "DONE_DATA": (96, "ro"), "ACK_SEQ": (100, "wo"),
-        "TRANSACTION_COUNTER": (104, "ro")
+        "TRANSACTION_COUNTER": (104, "ro"),
+        "SWD_RESPONSE_META": (108, "ro"),
+        "SWD_RAW_STATUS": (112, "ro")
     }
     _require(site == exact, "Required data-plane register layout changed")
+    tc = spec.get("transaction_contract", {})
+    reset = tc.get("swd_line_reset", {})
+    timing = tc.get("swd_timing", {})
+    metadata = tc.get("swd_metadata", {})
+    completion = tc.get("swd_completion", {})
+    _require(reset.get("required_high_clocks") == 64
+             and reset.get("hi_z_recovery_clocks") == 64
+             and reset.get("post_reset_idle_clocks") == 8,
+             "Incorrect SWD line reset contract")
+    _require(timing.get("clock_div_register") == "CLOCK_DIV"
+             and timing.get("minimum") == 2 and timing.get("maximum") == 65535,
+             "Incorrect SWD half-period contract")
+    _require(metadata.get("offset") == 108
+             and metadata.get("raw_status_offset") == 112,
+             "SWD metadata layout not aligned")
+    _require(completion.get("fault_ack", "").startswith("ACK_SEQ clears DONE_VALID")
+             and completion.get("recovery", "").startswith("no in-band"),
+             "Missing fail-closed fault/ACK policy")
     sw = spec.get("software_contract", {})
     _require(sw.get("broker") == "ONE_PRIVILEGED_BACKEND_OWNER_PER_PPU"
              and sw.get("register_policy") == "DENY_RESERVED_REGIONS_AND_UNLISTED_OFFSETS"
@@ -200,7 +220,7 @@ def admit_host_transaction(spec: dict, broker: dict, lease: dict, command: dict)
         command.get(k) for k in ("sequence", "bit_count", "timeout_ticks",
                                  "clock_div", "flags", "arg0", "wdata"))
     _require(_natural(seq, lo=1) and _natural(ticks, lo=1) and
-             _natural(div, lo=1, hi=65535) and _natural(flags) and
+             _natural(div, lo=2, hi=65535) and _natural(flags) and
              _natural(arg) and _natural(data), "Invalid command fields")
     capacity = broker.get("capacity_words")
     max_bits = broker.get("max_transfer_bits")
@@ -214,7 +234,7 @@ def admit_host_transaction(spec: dict, broker: dict, lease: dict, command: dict)
     if name == "SWD_XFER":
         _require(bits == 32 and arg <= 15 and flags == 0 and not words, "Bad SWD transfer")
     elif name == "SWD_LINE_RESET":
-        _require(_natural(bits, lo=50, hi=128) and
+        _require(bits == 64 and
                  flags == 0 and arg == 0 and data == 0 and not words,
                  "Bad SWD line reset")
     elif name == "SPI_TRANSFER":

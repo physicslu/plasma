@@ -6,6 +6,10 @@ on:
       - 'pl/verification/test_fixed_fpga_swd_site_rtl.py'
       - 'pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py'
       - 'pl/verification/models/fixed_swd_site_driver.py'
+      - 'pl/verification/fixed_image_abi_v1_gate1.json'
+      - 'pl/tools/fixed_image_abi_contract.py'
+      - 'pl/tests/test_fixed_image_abi_contract.py'
+      - 'docs/architecture/fixed-fpga-swd-semantics-gate1.md'
       - 'pl/tests/test_fixed_swd_site_slice_source.py'
       - 'docs/architecture/fixed-fpga-swd-site1-rtl-gate1.md'
       - '.github/workflows/ppu-fixed-swd-site1-rtl-host.yml'
@@ -30,5 +34,9 @@ jobs:
           python -m pip install pytest cocotb cocotb-test
       - name: RTL AXI-Lite SWD v1 virtual DPIDR
         run: python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
+      - name: Validate machine ABI semantic contract
+        run: |
+          python -m pl.tools.fixed_image_abi_contract pl/verification/fixed_image_abi_v1_gate1.json
+          python -m pytest -q pl/tests/test_fixed_image_abi_contract.py
       - name: Host source/gap contracts
         run: python -m pytest -q pl/tests/test_fixed_swd_site_slice_source.py

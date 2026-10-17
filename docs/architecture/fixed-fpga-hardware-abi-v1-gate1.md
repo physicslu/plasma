@@ -5,6 +5,8 @@
 > This review has no live FPGA, MMIO, UIO, DUT, deployment, FPGA Manager or reload permission.
 > A successful Host validator only establishes that the **proposal is internally consistent**.
 
+> **Semantic convergence Gate 1 amendment:** [SWD reset, clock, metadata, fault/ACK semantics](fixed-fpga-swd-semantics-gate1.md) supersedes earlier ambiguous SWD descriptions. Candidate still not Accepted; M1 NO-GO. New Site RO registers: SWD_RESPONSE_META (+0x06C), SWD_RAW_STATUS (+0x070).
+
 ## First-principle product invariant
 
 The operator changes IC/profile/protocol while the **same running Linux / Ethernet / Gateway** remains up. v1 uses exactly one Universal **full fixed image** for normal programming; there is **no FPGA reload as part of a Job, batch transition, Site request, or protocol switch**. Boot-time/static provisioning and factory recovery are separate maintenance processes, outside this design's execution authority.
@@ -41,10 +43,10 @@ The v1 proposed hardware transport is **32-bit little-endian, naturally aligned*
 | `0x040`, `0x044` | TX_DATA, RX_DATA | WO / RO | PIO FIFO push/pop, 32-bit little-endian bytes |
 | `0x048–0x050` | DONE_SEQ, DONE_STATUS, DONE_WORDS | RO | Completion must echo exact sequence; terminal result explicit |
 | `0x054` | ABORT | WO | Write 1 requests Site abort, **not** guaranteed bus cancellation |
-| `0x058` | CAPACITY_WORDS | RO | 1–256; real depth must be measured, no assumed BRAM |
+| `0x058` | CAPACITY_WORDS | RO | 0 when no SPI capability; 1–256 for SPI FIFO only; real depth must be measured |
 | `0x05C` | CLOCK_DIV | WO | Bounded integer 1–65535, only while IDLE |
 | `0x060` | DONE_DATA | RO | SWD read 32-bit result on successful completion |
-| `0x064` | ACK_SEQ | WO | Only exact DONE_SEQ releases terminal result to IDLE |
+| `0x064` | ACK_SEQ | WO | Only matching DONE_SEQ ACK consumes completion; fatal FAULT remains latched |
 | `0x068` | TRANSACTION_COUNTER | RO | Diagnostics only, wraps; not durable identity |
 
 These are proposed **wire contracts**, NOT safe speculative offsets for the current FPGA! No read-modify-write and no access outside the approved RO/WO sets. All slots must return defined AXI responses; malformed requests should be rejected by **software prior to issuing an AXI transaction**. Whether RTL can fail safely for arbitrary accesses remains an independent hardware verification task.

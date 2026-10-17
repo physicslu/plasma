@@ -128,3 +128,74 @@ def test_sim_driver_refuses_invalid_line_reset_range_as_unimplemented_subset():
     with pytest.raises(ValueError, match="64-bit"):
         go(d.transact(sequence=22, opcode=2, bit_count=50))
     assert bus.log == []
+
+
+def test_host_driver_serializes_two_concurrent_site_commands():
+    class YieldingAxi(FakeAxi):
+        async def read(self, offset):
+            await asyncio.sleep(0)
+            return await super().read(offset)
+
+        async def write(self, offset, value, strb=15):
+            await asyncio.sleep(0)
+            return await super().write(offset, value, strb)
+
+    async def scenario():
+        bus = YieldingAxi()
+        driver = FixedSWDSiteSimDriver(bus)
+        results = await asyncio.gather(
+            driver.transact(sequence=201, opcode=2, bit_count=64),
+            driver.transact(sequence=202, opcode=2, bit_count=64),
+        )
+        assert [x.sequence for x in results] == [201, 202]
+        commands = [i for i, action in enumerate(bus.log)
+                    if action[:2] == ("write", 0x20)]
+        acks = [i for i, action in enumerate(bus.log)
+                if action[:2] == ("write", 0x64)]
+        assert len(commands) == len(acks) == 2
+        assert commands[0] < acks[0] < commands[1] < acks[1]
+    go(scenario())
+
+
+def test_host_fault_response_ack_preserves_evidence_and_poison():
+    class FaultAxi(FakeAxi):
+        async def read(self, offset):
+            if offset == 0x0C and self.done:
+                return (0, 8)
+            if offset == 0x70:
+                return (0, 7)
+            return await super().read(offset)
+
+    bus = FaultAxi()
+    bus.status = 5
+    driver = FixedSWDSiteSimDriver(bus)
+    with pytest.raises(FixedSWDSliceError, match="external recovery") as exc:
+        go(driver.transact(sequence=203, opcode=2, bit_count=64))
+    assert exc.value.response.sequence == 203
+    assert exc.value.response.status == 5
+    assert exc.value.response.raw_status == 7
+    assert driver.poisoned
+    assert ("write", 0x64, 203) in bus.log
+
+
+def test_malformed_swd_metadata_is_poisoned_without_ack():
+    class BadMeta(FakeAxi):
+        async def read(self, offset):
+            if offset == 0x6C:
+                return (0, 0x80000000)
+            return await super().read(offset)
+
+    bus = BadMeta()
+    driver = FixedSWDSiteSimDriver(bus)
+    with pytest.raises(FixedSWDSliceError, match="metadata"):
+        go(driver.transact(sequence=204, opcode=2, bit_count=64))
+    assert driver.poisoned
+    assert not any(a[:2] == ("write", 0x64) for a in bus.log)
+
+
+def test_half_period_one_rejected_by_sim_driver():
+    bus = FakeAxi()
+    driver = FixedSWDSiteSimDriver(bus)
+    with pytest.raises(ValueError, match="half-period"):
+        go(driver.transact(sequence=205, opcode=2, bit_count=64, clock_div=1))
+    assert bus.log == []
