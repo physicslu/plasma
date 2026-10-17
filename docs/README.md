@@ -102,6 +102,7 @@
 - **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
 - **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
 - **Plan / supervised SWD-05** — [PLASMA Codex Z2 SSH-based SWD-05 One-shot](development/plasma-codex-z2-swd05.md)：依 Gate 1 將既有四 Aperture SWD-05 實機測試封裝為帶完整 SHA256、FCLK/驅動使用權檢查及 FPGA 原始映像恢復的單次 Supervisor；Gate 2 前僅離線測試。
+- **Plan / Agent HIL acceptance** — [PLASMA Codex Agent → KINGST LA2016](development/plasma-codex-la2016.md)：Issue #981 受限 Codex 意圖請求、bubblewrap USB 隔離、PWM1→CH0 兩組波形與 OFF 實證、SHA-256 證據；僅 Gate 2 後允許實機執行。
 - **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
