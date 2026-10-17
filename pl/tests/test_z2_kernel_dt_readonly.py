@@ -217,3 +217,33 @@ def test_cli_sanitizes_blocker_without_raw_file_paths(fake, capsys):
     assert blocked["result"] == "BLOCKED"
     assert blocked["reload_authorized"] is False
     assert str(fake["tmp"]) not in json.dumps(blocked)
+
+
+def test_boot_is_sampled_twice_and_consistency_is_explicit(fake):
+    report = collect(fake["sys"], fake["proc"])
+    assert report["boot_and_kernel_two_sample_consistency"] == "MATCHED"
+    assert report["collection_started_at_utc"] <= report["collected_at_utc"]
+
+
+@pytest.mark.parametrize("attribute,replacement", [
+    ("sys/kernel/random/boot_id", "ffffffff-ffff-ffff-ffff-ffffffffffff\\n"),
+    ("sys/kernel/osrelease", "7.0-changed-kernel\\n"),
+])
+def test_reboot_or_kernel_change_mid_snapshot_fails_closed(
+        fake, monkeypatch, attribute, replacement):
+    import pl.tools.z2_kernel_dt_readonly as collector
+
+    original = collector._read
+    observations = {"count": 0}
+
+    def double_read(root, relative, limit=collector.MAX_SYSFS):
+        if root == fake["proc"] and relative == attribute:
+            observations["count"] += 1
+            if observations["count"] == 2:
+                return replacement.encode()
+        return original(root, relative, limit)
+
+    monkeypatch.setattr(collector, "_read", double_read)
+    with pytest.raises(InventoryRefused, match="changed during collection"):
+        collect(fake["sys"], fake["proc"])
+    assert observations["count"] == 2
