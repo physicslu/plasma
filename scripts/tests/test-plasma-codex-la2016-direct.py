@@ -129,6 +129,8 @@ class OfflineDirectContracts(unittest.TestCase):
         assert "--dev-bind" in source and "--tmpfs" in source
         assert "physical_off(conn," in source
         assert "invoke_codex(args,prompt(evidence,conn),out)" in source
+        assert "guard.wait(timeout=" in source
+        assert "watchdog_final_receipt" in source
         assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def run()")[0]
         assert "CALL_SUPERVISOR" not in source
         assert "pwm-off-confirmed" not in source  # separate marker from legacy path
