@@ -7,6 +7,8 @@ import configparser
 import json
 from pathlib import Path
 import subprocess
+import sys
+import os
 import tempfile
 import types
 import unittest
@@ -126,9 +128,58 @@ class OfflineDirectContracts(unittest.TestCase):
         assert "codex" in source and "--sandbox" in source
         assert "--dev-bind" in source and "--tmpfs" in source
         assert "physical_off(conn)" in source
-        assert "input=prompt(evidence,conn)" in source
+        assert "invoke_codex(args,prompt(evidence,conn),out)" in source
+        assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def run()")[0]
         assert "CALL_SUPERVISOR" not in source
         assert "pwm-off-confirmed" not in source  # separate marker from legacy path
+
+
+    def test_direct_exec_records_nonzero_and_keeps_private_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            command=[sys.executable,"-c",
+                     "import sys;print('private diagnostic');sys.exit(17)"]
+            result=direct.invoke_codex(command,"",Path(tmp))
+            self.assertEqual(result["status"],"EXIT_NONZERO")
+            self.assertEqual(result["exit_code"],17)
+            self.assertEqual(result["termination"],"NOT_NEEDED")
+            self.assertIn("private diagnostic",
+                          (Path(tmp)/"codex-stdout-private.jsonl").read_text())
+            self.assertEqual(
+                (Path(tmp)/"codex-stdout-private.jsonl").stat().st_mode & 0o777,
+                0o600,
+            )
+
+    def test_timeout_kills_its_own_process_group(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(direct,"CODEX_TIMEOUT_SECONDS",0.15):
+            command=[sys.executable,"-c","import time;time.sleep(3)"]
+            result=direct.invoke_codex(command,"",Path(tmp))
+            self.assertEqual(result["status"],"TIMEOUT")
+            self.assertIn(result["termination"],{"SIGTERM_REAPED","SIGKILL_REAPED"})
+            self.assertLess(result["elapsed_seconds"],3)
+
+    def test_watchdog_receipt_is_sanitized(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)
+            with self.assertRaisesRegex(ValueError,"INVALID_WATCHDOG_RESULT"):
+                direct.write_watchdog_receipt(path,"raw-password\n")
+            direct.write_watchdog_receipt(path,"DEADLINE_OFF_FAILED_OR_UNKNOWN")
+            self.assertEqual(
+                (path/"watchdog-receipt").read_text(),
+                "DEADLINE_OFF_FAILED_OR_UNKNOWN\n",
+            )
+
+    def test_agent_env_excludes_ci_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, \\
+             mock.patch.dict(os.environ, {"GITHUB_TOKEN":"secret-token",
+                                          "ACTIONS_RUNTIME_TOKEN":"secret-rtc"}):
+            command=[sys.executable,"-c",
+                     "import os;print(os.getenv('GITHUB_TOKEN','NOT_SET'));"
+                     "print(os.getenv('ACTIONS_RUNTIME_TOKEN','NOT_SET'))"]
+            result=direct.invoke_codex(command,"",Path(tmp))
+            self.assertEqual(result["status"],"PASS")
+            self.assertEqual((Path(tmp)/"codex-stdout-private.jsonl").read_text().strip(),
+                             "NOT_SET\nNOT_SET")
 
     def test_no_hardware_if_runner_identity_unverified(self) -> None:
         with mock.patch.object(direct.socket,"gethostname",return_value="untrusted"):
