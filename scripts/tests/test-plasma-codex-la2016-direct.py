@@ -207,7 +207,7 @@ class OfflineDirectContracts(unittest.TestCase):
              mock.patch.object(direct,"invoke_codex",side_effect=fake_invoke):
             root=Path(temp)
             outcomes=direct.prepare_codex(root)
-            self.assertEqual(seen,[600,900,1200,1500])
+            self.assertEqual(seen,[300,600,900,1200])
             self.assertEqual(len(outcomes),4)
             self.assertEqual(outcomes[-1]["status"],"PASS")
             self.assertEqual(len(json.loads(
@@ -255,7 +255,7 @@ class OfflineDirectContracts(unittest.TestCase):
         self.assertTrue("WATCHDOG_DEADLINE_SECONDS > CODEX_TIMEOUT_SECONDS"
                         in SOURCE.read_text())
         self.assertEqual(direct.CODEX_TIMEOUT_SECONDS,600)
-        self.assertEqual(direct.PREPARATION_TIMEOUT_SECONDS,(600,900,1200,1500))
+        self.assertEqual(direct.PREPARATION_TIMEOUT_SECONDS,(300,600,900,1200))
 
 
     def test_no_hardware_if_runner_identity_unverified(self) -> None:
