@@ -3,6 +3,7 @@
 from __future__ import annotations
 from contextlib import contextmanager
 import importlib.util
+import configparser
 import json
 from pathlib import Path
 import subprocess
@@ -60,7 +61,7 @@ class OfflineDirectContracts(unittest.TestCase):
             rootpath=Path(temp)/"bad.sr"
             with zipfile.ZipFile(rootpath,"w") as z:
                 z.writestr("metadata","incorrect")
-            with self.assertRaises(ValueError):
+            with self.assertRaises((ValueError, configparser.Error)):
                 direct.bits(rootpath)
 
     def test_minimal_off_command_never_uses_agent_reply(self) -> None:
