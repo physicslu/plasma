@@ -336,8 +336,8 @@ def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
         "elapsed_seconds": 0
     }
     started = time.monotonic()
-    with (out / "codex-stdout-private.jsonl").open("xb") as stdout, \\
-         (out / "codex-stderr-private.log").open("xb") as stderr:
+    with ((out / "codex-stdout-private.jsonl").open("xb") as stdout,
+          (out / "codex-stderr-private.log").open("xb") as stderr):
         proc = subprocess.Popen(
             args, stdin=subprocess.PIPE, stdout=stdout, stderr=stderr,
             text=True, env=safe_env, start_new_session=True,
@@ -440,9 +440,13 @@ def run() -> int:
                         (out/"off-confirmed").touch(exist_ok=False)
                     else:
                         report["pwm_off_command"]="FAILED_OR_UNKNOWN"
+                        if report["primary_failure"]=="NONE":
+                            report["primary_failure"]="FINAL_OFF_COMMAND_NONZERO"
                         rc=2
                         report["result"]="NO_GO_OFF"
                 except (OSError,ValueError,subprocess.SubprocessError):
+                    if report["primary_failure"]=="NONE":
+                        report["primary_failure"]="FINAL_OFF_COMMAND_ERROR"
                     report["pwm_off_command"]="FAILED_OR_UNKNOWN"
                     report["result"]="NO_GO_OFF"
                     rc=2
