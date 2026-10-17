@@ -1,0 +1,30 @@
+name: Z2 Kernel DT Read-only Inventory Host Contracts
+on:
+  pull_request:
+    paths:
+      - 'pl/tools/z2_kernel_dt_readonly.py'
+      - 'pl/tests/test_z2_kernel_dt_readonly.py'
+      - 'pl/tools/runtime_fpga_kernel_lineage.py'
+      - 'pl/tests/test_runtime_fpga_kernel_lineage.py'
+      - 'pl/tools/runtime_fpga_m1_gate.py'
+      - 'pl/tests/test_runtime_fpga_m1_gate.py'
+      - 'pl/tests/test_runtime_fpga_phase1.py'
+      - '.github/workflows/z2-kernel-dt-readonly-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-inventory-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install offline pytest
+        run: python -m pip install pytest
+      - name: Test fake sys/proc, kernel lineage, M1 and Phase 1 guard
+        run: python -m pytest -q pl/tests/test_z2_kernel_dt_readonly.py pl/tests/test_runtime_fpga_kernel_lineage.py pl/tests/test_runtime_fpga_m1_gate.py pl/tests/test_runtime_fpga_phase1.py
