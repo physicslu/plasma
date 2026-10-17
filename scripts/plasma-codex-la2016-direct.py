@@ -336,8 +336,10 @@ def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
         "elapsed_seconds": 0
     }
     started = time.monotonic()
-    with ((out / "codex-stdout-private.jsonl").open("xb") as stdout,
-          (out / "codex-stderr-private.log").open("xb") as stderr):
+    with (os.fdopen(os.open(out / "codex-stdout-private.jsonl",
+                             os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stdout,
+          os.fdopen(os.open(out / "codex-stderr-private.log",
+                             os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stderr):
         proc = subprocess.Popen(
             args, stdin=subprocess.PIPE, stdout=stdout, stderr=stderr,
             text=True, env=safe_env, start_new_session=True,
@@ -412,7 +414,7 @@ def run() -> int:
             try:
                 codex=shutil.which("codex")
                 args=prefix+[
-                    "--",codex,"--ask-for-approval","never","exec",
+                    "--",codex,"--ask-for-approval","never","exec","--json",
                     "--sandbox","danger-full-access",
                     "--output-last-message",str(evidence/"agent-result.txt"),"-"
                 ]
