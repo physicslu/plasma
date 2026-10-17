@@ -2,7 +2,7 @@
 # No terminal contents from Z2 are copied to GitHub logs.
 set -euo pipefail
 umask 077
-out="${PLASMA_Z2_LOGIN_OUT:?}"
+out="${PLASMA_Z2_READINESS_OUT:?}"
 test "$(id -un)" = plasma-codex
 test "$RUNNER_NAME" = SWPC-plasma-codex
 echo "PLASMA Z2 — dedicated Codex SSH-only PS/PL readiness"
