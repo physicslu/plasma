@@ -106,7 +106,7 @@ def sandbox_args(output: Path) -> list[str]:
     argv = [
         bwrap, "--die-with-parent", "--new-session", "--unshare-pid",
         "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-        "--bind", str(output), str(output),
+        "--bind", str(output / "agent"), str(output / "agent"),
     ]
     # Prevent tool-spawned commands from reading HIL credentials/host keys.
     for private in (home / ".config" / "plasma", home / ".ssh"):
@@ -118,7 +118,7 @@ def sandbox_args(output: Path) -> list[str]:
              "--chdir", os.environ.get("GITHUB_WORKSPACE", "/"),
              "--", codex, "--ask-for-approval", "never", "exec",
              "--sandbox", "read-only", "--output-last-message",
-             str(output / "agent-request.json"), "-"]
+             str(output / "agent" / "agent-request.json"), "-"]
     return argv
 
 def codex_request(out: Path) -> dict:
@@ -129,7 +129,7 @@ def codex_request(out: Path) -> dict:
     )
     if proc.returncode != 0:
         raise ValueError("CODEX_EXEC_NOT_SUCCESS")
-    path = out / "agent-request.json"
+    path = out / "agent" / "agent-request.json"
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
         raise ValueError("NO_AGENT_REQUEST")
     try:
@@ -282,7 +282,7 @@ def watchdog(out: Path, conn: str) -> int:
     worker_identity()
     if not re.fullmatch(r"[1-9][0-9]{0,2}\.[1-9][0-9]{0,2}", conn):
         return 2
-    time.sleep(60)
+    time.sleep(125)
     if (out / "pwm-off-confirmed").exists():
         return 0
     try:
@@ -322,8 +322,10 @@ def run() -> int:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             # Agent has no physical USB node; it must produce a constrained
             # intent which the separate trusted supervisor validates.
+            (out / "agent").mkdir(mode=0o700, exist_ok=False)
             request = codex_request(out)
             validate_agent_request(request)
+            report["agent_request_sha256"] = sha256(out / "agent" / "agent-request.json")
             report["agent_exec"] = "PASS"
             report["agent_request"] = "PASS"
             # Never allow PWM output without an independent deadline OFF.
