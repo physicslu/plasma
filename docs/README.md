@@ -28,7 +28,6 @@
 - **Plan / Proposed** — [Runtime FPGA Hardware ABI v1](architecture/runtime-fpga-hardware-abi-v1.md)：定義 PPU 64-KiB／8-Site 候選 AXI Map、Identity／Capability、Major/Minor，相容性與現有 MS01 的語意落差；**不代表真實 RTL 已實作**。
 - **Host-only review / M1 NO-GO** — [Zynq FPGA Manager Isolation and Runtime Ownership Review](architecture/zynq-fpga-manager-isolation-ownership-review.md)：以 Z2 唯讀盤點、Kernel/DT 綁定與明確標示的 Xilinx 參考原始碼，審查 UIO Ownership、PS–PL 隔離缺口及 PPU Configuration Owner；不授權 FPGA 載入或 HIL-B/C。
 - **Host-only evidence review / M1 NO-GO** — [PPU Phase 2B M1 Hardware Boundary](architecture/ppu-phase2b-m1-hardware-boundary.md)：以唯讀 UIO/Manager/Bridge Inventory 的離線 Gate 拒絕未經證實的 FPGA 重配置安全主張，列出 Kernel Source、AXI Drain、DMA/VMAs 與外部復原的硬體阻擋證據；不授權實機操作。
-- **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
 - **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
@@ -102,6 +101,8 @@
 - **Plan / Host activation** — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：複製原 Codex 經驗證的 Z2／Hub／KINGST 所需 Linux 裝置權限及已鎖定 sigrok AppImage；僅由 SWPC 受信任管理員在 Gate 2 後啟用，保留原設備權限與兩階段合併審核。
 - **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
 - **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
+- **Plan / supervised SWD-05** — [PLASMA Codex Z2 SSH-based SWD-05 One-shot](development/plasma-codex-z2-swd05.md)：依 Gate 1 將既有四 Aperture SWD-05 實機測試封裝為帶完整 SHA256、FCLK/驅動使用權檢查及 FPGA 原始映像恢復的單次 Supervisor；Gate 2 前僅離線測試。
+- **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
