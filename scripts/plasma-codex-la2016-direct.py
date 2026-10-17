@@ -465,8 +465,17 @@ def run() -> int:
         if report["primary_failure"] == "NONE":
             report["primary_failure"]="FAIL_IN_"+str(report["failure_stage"])
         rc=2
-    # A model response or an OFF command's rc can never attest electrical LOW.
-    # A watchdog receipt may not yet exist, because it runs independently.
+    # A model response or an OFF command rc can never attest electrical LOW.
+    # Before finalizing report/cleaning Runner temp, reconcile the watchdog
+    # receipt. If parent OFF failed, allow deadline OFF to actually attempt
+    # recovery; never mark that attempt as a physical CH0 LOW confirmation.
+    if report["independent_off_watchdog"] == "ARMED":
+        try:
+            guard.wait(timeout=5 if report["pwm_off_command"]=="COMMAND_OK"
+                       else WATCHDOG_DEADLINE_SECONDS + 20)
+        except subprocess.TimeoutExpired:
+            # Detached watchdog retains its best-effort OFF duty.
+            pass
     receipt = out / "watchdog-receipt"
     report["watchdog_final_receipt"]=(
         receipt.read_text(encoding="utf-8").strip()
