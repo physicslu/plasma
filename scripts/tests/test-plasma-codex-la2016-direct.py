@@ -10,6 +10,8 @@ import subprocess
 import sys
 import os
 import tempfile
+import textwrap
+import time
 import types
 import unittest
 from unittest import mock
@@ -128,7 +130,7 @@ class OfflineDirectContracts(unittest.TestCase):
         assert "codex" in source and "--sandbox" in source
         assert "--dev-bind" in source and "--tmpfs" in source
         assert "physical_off(conn," in source
-        assert "invoke_codex(args,prompt(evidence,conn),out)" in source
+        assert "invoke_codex(args,prompt(evidence,conn),private_logs)" in source
         assert "guard.wait(timeout=" in source
         assert "watchdog_final_receipt" in source
         assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def preparation_prompt")[0]
@@ -204,6 +206,7 @@ class OfflineDirectContracts(unittest.TestCase):
                                ["bwrap", "--dev", "/dev", "--", str(evidence)]
                                if not allow_device else None), \
              mock.patch.object(direct,"preparation_namespace_test"), \
+             mock.patch.object(direct,"network_preflight",return_value="DNS_PASS_MODEL_API_UNVERIFIED"), \
              mock.patch.object(direct,"invoke_codex",side_effect=fake_invoke):
             root=Path(temp)
             outcomes=direct.prepare_codex(root)
@@ -224,6 +227,7 @@ class OfflineDirectContracts(unittest.TestCase):
                  mock.patch.object(direct,"sandbox_prefix",
                                    return_value=["bwrap","--dev","/dev"]), \
                  mock.patch.object(direct,"preparation_namespace_test"), \
+             mock.patch.object(direct,"network_preflight",return_value="DNS_PASS_MODEL_API_UNVERIFIED"), \
                  mock.patch.object(direct,"invoke_codex",return_value={
                      "status":status,"termination":termination,
                      "elapsed_seconds":1}) as mock_invoke:
@@ -237,6 +241,7 @@ class OfflineDirectContracts(unittest.TestCase):
              mock.patch.object(direct,"sandbox_prefix",
                                return_value=["bwrap","--dev","/dev"]), \
              mock.patch.object(direct,"preparation_namespace_test"), \
+             mock.patch.object(direct,"network_preflight",return_value="DNS_PASS_MODEL_API_UNVERIFIED"), \
              mock.patch.object(direct,"invoke_codex",return_value={
                  "status":"TIMEOUT","termination":"SIGTERM_REAPED",
                  "elapsed_seconds":1}) as invoke:
@@ -251,11 +256,109 @@ class OfflineDirectContracts(unittest.TestCase):
         run = src.split("def run() -> int:",1)[1].split("def self_test()",1)[0]
         self.assertIn('report["live_attempts"] = 1',run)
         self.assertEqual(run.count("invoke_codex("),1)
-        self.assertIn('prepare_codex(out)', run)
+        self.assertIn('prepare_codex(out, private_logs)', run)
         self.assertTrue("WATCHDOG_DEADLINE_SECONDS > CODEX_TIMEOUT_SECONDS"
                         in SOURCE.read_text())
         self.assertEqual(direct.CODEX_TIMEOUT_SECONDS,600)
         self.assertEqual(direct.PREPARATION_TIMEOUT_SECONDS,(300,600,900,1200))
+
+
+    def test_systemd_resolver_narrow_readonly_bind(self) -> None:
+        target=Path("/run/systemd/resolve/stub-resolv.conf")
+        with (
+            mock.patch.object(direct.Path,"resolve",return_value=target),
+            mock.patch.object(direct.Path,"is_file",return_value=True),
+            mock.patch.object(direct.os,"access",return_value=True),
+        ):
+            args=direct.resolver_bind_args()
+        self.assertEqual(args,[
+            "--dir","/run/systemd","--dir","/run/systemd/resolve",
+            "--ro-bind",str(target),str(target)])
+        self.assertNotIn("--dev-bind",args)
+        with (
+            mock.patch.object(direct.Path,"resolve",return_value=Path("/run/private.key")),
+            mock.patch.object(direct.Path,"is_file",return_value=True),
+            mock.patch.object(direct.os,"access",return_value=True),
+        ):
+            with self.assertRaisesRegex(ValueError,"DNS_RUN_TARGET_NOT_ALLOWLISTED"):
+                direct.resolver_bind_args()
+        with mock.patch.object(direct.Path,"resolve",side_effect=FileNotFoundError()):
+            with self.assertRaisesRegex(ValueError,"DNS_RESOLV_CONF_UNAVAILABLE"):
+                direct.resolver_bind_args()
+
+    def test_network_preflight_fail_closed_before_codex(self) -> None:
+        for code,expected in [(21,"CODEX_NETWORK_RESOLV_CONF_MISSING"),
+                              (22,"CODEX_NETWORK_DNS_FAIL"),
+                              (1,"CODEX_NETWORK_DNS_FAIL")]:
+            with (
+                self.subTest(code=code),
+                mock.patch.object(direct.subprocess,"run",
+                    return_value=subprocess.CompletedProcess([],code)) as proc
+            ):
+                with self.assertRaisesRegex(ValueError,expected):
+                    direct.network_preflight(["bwrap","--dev","/dev"])
+                args=proc.call_args.args[0]
+                self.assertEqual(args[:3],["bwrap","--dev","/dev"])
+                self.assertNotIn("--dev-bind",args)
+                self.assertEqual(proc.call_args.kwargs["timeout"],20)
+        with mock.patch.object(direct.subprocess,"run",
+                return_value=subprocess.CompletedProcess([],0)):
+            self.assertEqual(direct.network_preflight(["bwrap"]),
+                             "DNS_PASS_MODEL_API_UNVERIFIED")
+
+    def test_private_log_survives_runner_cleanup_and_expires_safely(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            home=Path(temp)/"home"
+            home.mkdir()
+            (home/".local").mkdir(mode=0o755)
+            (home/".local"/"state").mkdir(mode=0o755)
+            with (
+                mock.patch.object(direct.pwd,"getpwuid",
+                    return_value=types.SimpleNamespace(pw_dir=str(home))),
+                mock.patch.dict(os.environ,{"GITHUB_RUN_ATTEMPT":"1"}),
+            ):
+                private=direct.private_run_directory("39034925259")
+                self.assertEqual(private.parent.name,"codex-runs")
+                self.assertEqual(private.stat().st_mode & 0o777,0o700)
+                self.assertEqual(private.parent.stat().st_mode & 0o777,0o700)
+                prep=private/"preparation"
+                prep.mkdir(mode=0o700)
+                result=direct.invoke_codex(
+                    [sys.executable,"-c","print('PRIVATE_LOG_SENTINEL')"],"",prep)
+                self.assertEqual(result["status"],"PASS")
+                file=prep/"codex-stdout-private.jsonl"
+                self.assertTrue(file.is_file())
+                self.assertEqual(file.stat().st_mode & 0o777,0o600)
+                with tempfile.TemporaryDirectory() as runner_tmp:
+                    (Path(runner_tmp)/"report.json").write_text("{}")
+                self.assertIn("PRIVATE_LOG_SENTINEL",file.read_text())
+                old=private.parent/"100-attempt-1"
+                old.mkdir(mode=0o700)
+                (old/"old.txt").write_text("expired")
+                stale=time.time()-(direct.PRIVATE_LOG_RETENTION_DAYS+2)*86400
+                os.utime(old,(stale,stale))
+                direct.prune_private_logs(private.parent)
+                self.assertFalse(old.exists())
+                self.assertTrue(private.exists())
+                with self.assertRaisesRegex(ValueError,"PRIVATE_LOG_RUN_COLLISION"):
+                    direct.private_run_directory("39034925259")
+
+    def test_actions_summary_serializes_preparation_attempt_list(self) -> None:
+        workflow=WORKFLOW.read_text()
+        part=workflow.split("<<'PY'\n",1)[1].split("\n          PY",1)[0]
+        script=textwrap.dedent(part)
+        with tempfile.TemporaryDirectory() as temp:
+            report=Path(temp)/"report.json"
+            report.write_text(json.dumps({
+                "preparation_attempts":[{"attempt":1,"status":"EXIT_NONZERO"}],
+                "network_preflight":"CODEX_NETWORK_DNS_FAIL",
+                "result":"NO_GO"
+            }))
+            proc=subprocess.run([sys.executable,"-",str(report)],
+                                input=script,capture_output=True,text=True,timeout=5)
+            self.assertEqual(proc.returncode,0,proc.stderr)
+            self.assertIn('"status": "EXIT_NONZERO"',proc.stdout)
+            self.assertIn("network_preflight: CODEX_NETWORK_DNS_FAIL",proc.stdout)
 
 
     def test_no_hardware_if_runner_identity_unverified(self) -> None:
