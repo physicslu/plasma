@@ -128,7 +128,7 @@ def sandbox_prefix(device: Path, evidence: Path) -> list[str]:
     parts = [
         bwrap, "--die-with-parent", "--new-session", "--unshare-pid",
         "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-        "--tmpfs", "/run", "--dir", "/dev/bus", "--dir", "/dev/bus/usb",
+        "--tmpfs", "/run", "--tmpfs", "/tmp", "--dir", "/dev/bus", "--dir", "/dev/bus/usb",
         "--dir", str(device.parent), "--dev-bind", str(device), str(device),
         "--bind", str(evidence), str(evidence),
     ]
@@ -305,7 +305,7 @@ def run() -> int:
                 # Full CLI sandbox disabled *inside* outer fail-closed bwrap:
                 # real /dev, host write paths and private Z2 credentials hidden.
                 p=subprocess.run(args,input=prompt(evidence,conn),text=True,
-                                stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL,timeout=118,check=False)
                 report["agent_exec"]="PASS" if p.returncode==0 else "FAIL_OR_UNKNOWN"
                 if p.returncode!=0:
@@ -332,9 +332,6 @@ def run() -> int:
         if report["result"]!="NO_GO_OFF":
             report["result"]="NO_GO"
         rc=2
-    for name in ("agent-result.txt",):
-        # The model message is local debugging context only; never upload it.
-        pass
     (out/"report.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     (out/"exit_code").write_text(str(rc)+"\n")
     with (out/"SHA256SUMS").open("w") as f:
