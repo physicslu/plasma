@@ -1,0 +1,137 @@
+name: PLASMA dedicated Codex Z2 SSH-only PS/PL readiness (Issue 981)
+
+# User-approved lab prototype: only exact trusted owner Issue command on main.
+# Do not execute untrusted PR code on the hardware-enabled self-hosted runner.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-z2-readiness.yml"
+      - "scripts/plasma-codex-z2-readiness*"
+      - "scripts/tests/test-plasma-codex-z2-readiness.py"
+      - "docs/development/plasma-codex-z2-readiness.md"
+      - "docs/README.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-z2-readiness.yml"
+      - "scripts/plasma-codex-z2-readiness*"
+      - "docs/development/plasma-codex-z2-readiness.md"
+      - "docs/README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-z2-readiness-981
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate owner authorization and offline execution invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-z2-readiness-contract.py check
+          python3 scripts/plasma-codex-z2-readiness.py --self-test
+          python3 scripts/tests/test-plasma-codex-z2-readiness.py
+          python3 scripts/tests/test-plasma-codex-z2-readiness.py
+          python3 -m py_compile scripts/plasma-codex-z2-readiness*.py
+          bash -n scripts/plasma-codex-z2-readiness.sh scripts/plasma-codex-z2-readiness-inner.sh
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex z2-readiness 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reviewed_sha: ${{ steps.auth.outputs.reviewed_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify exact owner event and pin reviewed source commit
+        id: auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-z2-readiness-contract.py event "$GITHUB_EVENT_PATH"
+          printf 'reviewed_sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  readiness:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out pinned reviewed main (no persisted token)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.reviewed_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Verify dedicated SWPC worker and direct device groups
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          for required in plasma-monitor; do
+            id -nG | tr ' ' '\n' | grep -Fxq "$required"
+          done
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "Unexpected privileged Linux worker group" >&2
+            exit 1
+          fi
+          test "$(stat -c '%U:%G:%a' /run/plasma-codex)" = plasma-codex:plasma-monitor:2770
+          test -z "$(git status --porcelain)"
+      - name: Execute fixed read-only SSH-only PS/PL readiness in monitored tmux
+        shell: bash
+        run: bash scripts/plasma-codex-z2-readiness.sh
+      - name: Summarize sanitized evidence status
+        if: always()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/plasma-z2-readiness-$GITHUB_RUN_ID"
+          if test -f "$out/report.json"; then
+            python3 - "$out/report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          for key in ("scope","ssh","uart"):
+              print(f"{key}: {data[key]}")
+          PY
+          else
+            echo "Z2 readiness test: NOT_RUN or missing sanitized report" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload sanitized Z2 readiness result only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-z2-readiness-981-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-z2-readiness-${{ github.run_id }}/report.json
+            ${{ runner.temp }}/plasma-z2-readiness-${{ github.run_id }}/exit_code
+            ${{ runner.temp }}/plasma-z2-readiness-${{ github.run_id }}/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 14
