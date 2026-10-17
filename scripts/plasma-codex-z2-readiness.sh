@@ -16,7 +16,7 @@ session="plasma-z2-readiness-${GITHUB_RUN_ID}"
 out="${RUNNER_TEMP:?}/plasma-z2-readiness-${GITHUB_RUN_ID}"
 test ! -e "$socket"
 mkdir -m 0700 "$out"
-export PLASMA_Z2_LOGIN_OUT="$out"
+export PLASMA_Z2_READINESS_OUT="$out"
 cleanup() {
   tmux -S "$socket" kill-server >/dev/null 2>&1 || true
   rm -f "$socket"
