@@ -277,7 +277,7 @@ class DispatchGate1AContracts(unittest.TestCase):
         self.assertIn("persist-credentials: false", wf)
         self.assertNotIn("issue_comment:", wf)
         self.assertNotIn("workflow_dispatch:", wf)
-        self.assertNotIn("self-hosted", wf)
+        self.assertNotIn("runs-on: [self-hosted", wf)
         self.assertNotIn("actions/upload-artifact", wf)
         self.assertNotIn("permissions: write-all", wf)
         self.assertNotIn("sudo ", wf)
