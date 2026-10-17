@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import signal
 from typing import Callable
 
 from pl.hil.swd04 import contract as c, development, native_qualify, staging
@@ -209,17 +210,42 @@ def run_live(i: Inputs) -> dict[str, str]:
             manager_write(i.candidate_bin.name)
             development.record_loaded_image(i.candidate_bin, receipt)
         def stage(name: str, previous: Path | None) -> None:
-            args = ["--profile", "development", "--stage", name,
+            args = [sys.executable, "-m", "pl.hil.swd04.native_qualify",
+                    "--profile", "development", "--stage", name,
                     "--session", str(receipt), "--candidate-bin", str(i.candidate_bin),
                     "--output", str(a if name == "HIL01" else b),
                     "--execute-live", "--ack-unrecoverable-axi-stall-risk"]
             if previous is not None:
                 args.extend(("--previous", str(previous)))
-            require(native_qualify.main(args) == 0, name + " did not PASS")
+            # Process isolation is mandatory: a SIGBUS must not kill the
+            # supervisor, leaving FPGA Manager unrecovered.
+            proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    start_new_session=True)
+            try:
+                status = proc.wait(timeout=35)
+            except subprocess.TimeoutExpired as exc:
+                os.killpg(proc.pid, signal.SIGTERM)
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        # The mapping may still be owned by a kernel-stalled
+                        # process. Recovery by FPGA load is now unsafe.
+                        raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD") from exc
+                raise c.SafetyError("MMIO_CHILD_TIMEOUT") from exc
+            require(status == 0, name + " child failed or SIGBUS")
             data = json.loads((a if name == "HIL01" else b).joinpath("result.json").read_text())
             require(data["result"] == "PASS" and data["stage"] == name,
                     "Stage report invalid")
         def restore() -> None:
+            # A retained /dev/mem or PL mapping is a hard NO-RELOAD even
+            # after a child timeout, to avoid reconfiguring under a consumer.
+            development.check_ownership()
             # Never trust candidate observations as evidence of original image.
             require(c.sha256_file(i.recovery_bin) == c.RECOVERY_BIN_SHA256,
                     "Recovery bytes changed")
