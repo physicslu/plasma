@@ -23,7 +23,8 @@ def example() -> dict:
         "device_tree_zynq7000": True,
         "device_tree_board_model_available": False,
         "fpga_manager_state": "OPERATING",
-        "uio": {"count": 2, "fabric_detected": True, "audio_codec_detected": True},
+        "uio": {"count": 2, "fabric_detected": True, "audio_codec_detected": True,
+                "fabric_driver_link": True, "audio_codec_driver_link": True},
         "fclk0": {"visibility": "NOT_OBSERVED_UNPRIVILEGED", "hz": None},
         "services": {
             name: "ACTIVE" for name in (
