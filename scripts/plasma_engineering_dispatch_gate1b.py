@@ -203,7 +203,7 @@ def offline_mock_codex_acceptance(order: dict, policy: dict,
     if not isinstance(mock_codex, Path) or not mock_codex.is_absolute() or not mock_codex.is_file():
         refuse("OFFLINE_MOCK_CODEX_REQUIRED")
     repo_paths = order["scope"]["allow_repo_paths"]
-    if not all(p.startswith("docs/") or p.startswith("scripts/tests/") for p in repo_paths):
+    if not all(p.startswith("docs/") or p == "scripts/tests" or p.startswith("scripts/tests/") for p in repo_paths):
         refuse("SOFTWARE_SMOKE_REPO_SCOPE_INVALID")
     # Fake executable is a trusted CI fixture; no actual Codex auth, repo
     # token, network grant or hardware device access.
