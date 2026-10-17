@@ -38,8 +38,11 @@ CASES = ((1000, 50), (2000, 25))
 MAX_SAMPLES = 250000
 # A live hardware budget is NOT a physical PWM-ON timer. The independent
 # watchdog is a best-effort OFF attempt; no guaranteed electrical cutoff.
-CODEX_TIMEOUT_SECONDS = 240
-WATCHDOG_DEADLINE_SECONDS = 265
+CODEX_TIMEOUT_SECONDS = 600  # Ten-minute live execution; never auto-retry actuation.
+# One initial preparation attempt plus THREE escalating timeout-only retries.
+# Hardware USB is masked in every preparation attempt.
+PREPARATION_TIMEOUT_SECONDS = (600, 900, 1200, 1500)
+WATCHDOG_DEADLINE_SECONDS = 635
 AGENT_TERM_GRACE_SECONDS = 8
 AGENT_KILL_GRACE_SECONDS = 5
 # Real device must never be driven by PR-triggered execution.
@@ -124,7 +127,7 @@ def physical_off(conn: str, private_log: Path | None = None) -> bool:
                                timeout=16, check=False)
     return p.returncode == 0
 
-def sandbox_prefix(device: Path, evidence: Path) -> list[str]:
+def sandbox_prefix(device: Path, evidence: Path, *, allow_device: bool = True) -> list[str]:
     """OS-enforced LA-only /dev despite worker DAC to other devices.
 
     The outer bubblewrap namespace is the hardware isolation boundary.
@@ -144,10 +147,12 @@ def sandbox_prefix(device: Path, evidence: Path) -> list[str]:
     parts = [
         bwrap, "--die-with-parent", "--new-session", "--unshare-pid",
         "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-        "--tmpfs", "/run", "--tmpfs", "/tmp", "--dir", "/dev/bus", "--dir", "/dev/bus/usb",
-        "--dir", str(device.parent), "--dev-bind", str(device), str(device),
-        "--bind", str(evidence), str(evidence),
+        "--tmpfs", "/run", "--tmpfs", "/tmp",
     ]
+    if allow_device:
+        parts += ["--dir", "/dev/bus", "--dir", "/dev/bus/usb",
+                  "--dir", str(device.parent), "--dev-bind", str(device), str(device)]
+    parts += ["--bind", str(evidence), str(evidence)]
     for private in (home / ".ssh", home / ".config" / "plasma"):
         if private.is_dir():
             if private.is_symlink():
@@ -330,7 +335,8 @@ def terminate_agent(proc: subprocess.Popen, *, sleep_grace: int = AGENT_TERM_GRA
             return "TERMINATION_UNKNOWN"
 
 
-def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
+def invoke_codex(args: list[str], work: str, out: Path,
+                 *, timeout_seconds: int = CODEX_TIMEOUT_SECONDS) -> dict[str, object]:
     """Save *raw* stdout/stderr privately; release only enum diagnostics."""
     # Deliberately avoid putting arbitrary model/tool output in Actions logs.
     safe_env = {k: v for k, v in os.environ.items()
@@ -353,7 +359,7 @@ def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
         )
         result["status"] = "STARTED"
         try:
-            proc.communicate(input=work, timeout=CODEX_TIMEOUT_SECONDS)
+            proc.communicate(input=work, timeout=timeout_seconds)
             result["status"] = "PASS" if proc.returncode == 0 else "EXIT_NONZERO"
             result["exit_code"] = proc.returncode
         except subprocess.TimeoutExpired:
@@ -367,6 +373,74 @@ def invoke_codex(args: list[str], work: str, out: Path) -> dict[str, object]:
         finally:
             result["elapsed_seconds"] = round(time.monotonic() - started, 2)
     return result
+
+
+def preparation_prompt() -> str:
+    return """PLASMA Issue #981 LA2016 non-actuating preparation.
+You are Codex preparing to execute a previously owner-approved, separately
+isolated LA2016 PWM1->CH0 experiment. In THIS session you have NO USB nodes,
+NO ability to drive PWM, and NO hardware work is authorized. DO NOT attempt
+to access USB, network instruments, Z2, FT2232, DUT, JTAG, USB Hub or FPGA.
+Read checked-in public docs/evidence/la2016-pwm-loopback/2026-10-16/README.md
+and verify the documented CLI syntax. Prepare your own concise checklist of
+expected steps and risks. You can use ordinary read-only shell commands in
+the repository (do not run any instrument commands). No downloads,
+credential reads, privilege escalation, host configuration or file edits.
+Return concise preparation notes, no JSON API schema. This is not a test PASS.
+"""
+
+
+def preparation_namespace_test(prefix: list[str]) -> None:
+    """No real USB hardware access while Codex may be automatically retried."""
+    expr = ("from pathlib import Path; "
+            "assert not list(Path('/dev/bus/usb').glob('*/*')); "
+            "assert not Path('/dev/mem').exists(); "
+            "assert not list(Path('/dev').glob('ttyUSB*'))")
+    proc = subprocess.run(prefix + ["--", sys.executable, "-c", expr],
+                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL, timeout=20, check=False)
+    if proc.returncode != 0:
+        raise ValueError("PREPARATION_USB_MASK_NOT_PROVEN")
+
+
+def prepare_codex(out: Path) -> list[dict[str, object]]:
+    """Retry ONLY an inert Codex planning session, never a real PWM session.
+
+    The outer bwrap --dev mount hides LA and all other USB devices. No physical
+    claim/control occurs in this function. Do not infer model authorization.
+    """
+    notes: list[dict[str, object]] = []
+    root = out / "preparation"
+    root.mkdir(mode=0o700)
+    cmd = shutil.which("codex")
+    if not cmd:
+        raise ValueError("PREPARATION_CODEX_MISSING")
+    for attempt, budget in enumerate(PREPARATION_TIMEOUT_SECONDS, start=1):
+        folder = root / f"attempt-{attempt}"
+        folder.mkdir(mode=0o700)
+        prefix = sandbox_prefix(Path("/dev/bus/usb/001/001"), folder,
+                                allow_device=False)
+        preparation_namespace_test(prefix)
+        argv = prefix + [
+            "--", cmd, "--ask-for-approval", "never", "exec", "--json",
+            "--sandbox", "danger-full-access",
+            "--output-last-message", str(folder / "last-message-private.txt"), "-"
+        ]
+        outcome = invoke_codex(argv, preparation_prompt(), folder,
+                               timeout_seconds=budget)
+        # Only bounded categorical evidence is returned from private output.
+        entry = {"attempt": attempt, "timeout_seconds": budget,
+                 "status": outcome["status"],
+                 "termination": outcome["termination"],
+                 "elapsed_seconds": outcome["elapsed_seconds"]}
+        notes.append(entry)
+        if outcome["status"] == "PASS":
+            return notes
+        # Failed, un-reaped process, or other error is NOT safe to retry.
+        if (outcome["status"] != "TIMEOUT"
+            or outcome["termination"] not in {"SIGTERM_REAPED", "SIGKILL_REAPED"}):
+            raise ValueError("PREPARATION_NOT_RETRYABLE")
+    raise ValueError("PREPARATION_TIMEOUT_RETRY_EXHAUSTED")
 
 
 def run() -> int:
@@ -383,6 +457,8 @@ def run() -> int:
     report={"schema":"plasma.la2016.direct.v1","result":"NO_GO","agent_exec":"NOT_RUN",
             "failure_stage":"NOT_STARTED","primary_failure":"NONE",
             "agent_termination":"NOT_NEEDED","codex_elapsed_seconds":0,
+            "preparation_attempts":[],"preparation_status":"NOT_RUN",
+            "live_attempts":0,
             "cases":[],"pwm_off_command":"NOT_RUN","independent_off_watchdog":"NOT_ARMED",
             "z2_fpga":"NOT_RUN","usb_hub_power":"NOT_RUN","external_dut":"NOT_RUN"}
     rc=2
@@ -390,6 +466,13 @@ def run() -> int:
     try:
         report["failure_stage"] = "APPIMAGE_PREFLIGHT"
         pinned_app()
+        report["failure_stage"] = "CODEX_PREPARATION"
+        try:
+            report["preparation_attempts"] = prepare_codex(out)
+            report["preparation_status"] = "PASS"
+        except ValueError:
+            report["preparation_status"] = "FAILED_OR_RETRY_EXHAUSTED"
+            raise
         report["failure_stage"] = "USB_PREFLIGHT"
         conn,dev=detect_la()
         with LOCK.open("a+") as file:
@@ -417,6 +500,7 @@ def run() -> int:
                 raise ValueError("WATCHDOG_ARM_TIMEOUT")
             report["independent_off_watchdog"]="ARMED"
             report["failure_stage"] = "CODEX_EXEC"
+            report["live_attempts"] = 1  # Physical execution may never auto-retry.
             try:
                 codex=shutil.which("codex")
                 args=prefix+[
@@ -519,7 +603,8 @@ def self_test() -> int:
     src=Path(__file__).read_text()
     assert "codex" in src and "--dev-bind" in src
     assert "validate_agent_request" not in src.split("def self_test()")[0]
-    assert CODEX_TIMEOUT_SECONDS > 185
+    assert CODEX_TIMEOUT_SECONDS == 600
+    assert PREPARATION_TIMEOUT_SECONDS == (600, 900, 1200, 1500)
     assert WATCHDOG_DEADLINE_SECONDS > CODEX_TIMEOUT_SECONDS
     print("LA2016 Direct owner gating, real archived waveform/off verification PASS")
     return 0
