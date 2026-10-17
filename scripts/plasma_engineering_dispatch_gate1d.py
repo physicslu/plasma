@@ -7,6 +7,7 @@ GitHub refs, changes rulesets, uses GitHub credentials, or invokes Codex.
 from __future__ import annotations
 
 import argparse
+from fnmatch import fnmatchcase
 import json
 from pathlib import Path
 import re
@@ -89,10 +90,14 @@ def exact_live_ruleset(snapshot: object, proposal: dict) -> dict:
         exc = refs.get("exclude")
         if type(inc) is not list or type(exc) is not list:
             deny("GITHUB_RULESET_REF_FIELDS_INVALID")
-        if REF_INCLUDE not in inc:
+        # Catch broader ~ALL and glob rules which can silently override
+        # desired create/update semantics even if the dedicated rule exists.
+        covers_claim = any(pattern == "~ALL" or
+                           (type(pattern) is str and
+                            fnmatchcase(CANARY_REF, pattern))
+                           for pattern in inc)
+        if not covers_claim:
             continue
-        # A candidate deliberately overlapping claim namespace may be
-        # broader than our policy. Cannot silently let it influence create.
         matches.append(candidate)
     if len(matches) != 1:
         return {"status": STATUS_BLOCKED, "matching_claim_rulesets": len(matches),
