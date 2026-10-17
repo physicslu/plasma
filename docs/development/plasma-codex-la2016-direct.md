@@ -1,6 +1,6 @@
 # PLASMA Issue #981 — LA2016 Codex Direct Execution A/B (Gate 1 only)
 
-**Status: proposed, not deployed.** Owner has explicitly approved **Gate 1 development and offline tests** only. Gate 2 is required for merge; a **separate one-shot explicit owner approval** is required before ever creating the hardware-triggering Issue comment.
+**Status: direct path merged in PR #1006; later one-shot HIL failed, Gate 1 diagnosis remediation pending.** Owner has explicitly approved **Gate 1 development and offline tests** only. Gate 2 is required for merge; a **separate one-shot explicit owner approval** is required before ever creating the hardware-triggering Issue comment.
 
 ## Hypothesis and controlled comparison
 
@@ -69,3 +69,27 @@ No runtime workflow is executed until the separate hardware test authorization. 
 - Native sigrok/AppImage extraction needs a writable temporary directory, provided by isolated `/tmp`. The firmware lookup environment may require additional local qualification; no firmware is installed or uploaded by this proposal.
 - Runtime USB permission alone is insufficient if a different process holds the device. Race conditions beyond an advisory `fuser`+file lock require physical acceptance.
 - Codex may still fail or refuse shell work, or produce invalid files. Those are honest NO_GO, not evidence that the old Supervisor is needed.
+
+## 2026-10-17 one-shot real Direct result and Gate 1 diagnostics remediation
+
+**Historical fact, not a successful Direct acceptance:** [run #39031253858](https://github.com/physicslu/plasma/actions/runs/39031253858) launched on trusted `main fb7e6b764611f5ea75f59c951b528c51ab0dc777`, passed GitHub authorization/worker-identity and entered the direct `codex exec` stage. The execution lasted ~118 seconds, matching the prior `subprocess.run(... timeout=118)`. Report and SHA256 checked: `result=NO_GO_OFF`, `agent_exec=NOT_RUN`, `cases=[]`, `independent_off_watchdog=ARMED`, `pwm_off_command=FAILED_OR_UNKNOWN`. No new .sr files were archived; physical OFF status was **NOT ATTESTED**. The old `NOT_RUN` sentinel was not proof the Codex subprocess had not started: it only changed after a successful return from `subprocess.run()`. A detached, unobserved watchdog attempt is likewise no proof of CH0 LOW.
+
+The operator subsequently provided an independently run local Codex success on the **same LA2016**, ~185 seconds, with *fresh* 1kHz/50% and 2kHz/25% captured archives, verified OFF captures (each 22,496 LOW samples), and 25 evidence SHA256 PASS. It initially hit `LIBUSB_ERROR_ACCESS`; using an already-authorized `plasma-codex-io` group session via `sg plasma-codex-io` resolved it without changing host permissions. The observed success is user-supplied testimony; the local `.work/la2016-repeat/20261017T121229Z` data were **not independently fetched into this PR**. It is strong evidence that **an interactive Codex workflow can do the task**, but does not prove the separately isolated self-hosted Runner had the same supplementary groups or working libusb access.
+
+### New Gate 1 remediation contract — no hardware work authorized
+
+This PR modifies only the reviewed source and hosted/offline tests, **not** SWPC permissions, instruments or real hardware jobs.
+
+- Codex duration budget extends from 118 to 240 seconds, above the observed 185-second local success. The independent deadline attempts OFF at 265 seconds unless a successful parent OFF *command* was recorded. These are *software attempt deadlines*, **not PWM1 ON-time electrical interlocks**. A truly independent output-on watchdog would require instrument/host-independent current state sensing or a power gate, and is not claimed here.
+- `invoke_codex` uses a new process session, with 0600 **SWPC-private raw stdout JSONL and stderr**. GitHub receives only enumerated stage/exit categories and elapsed duration; no raw private paths, commands, credentials or USB identities.
+- Before host OFF, a hung process group gets SIGTERM, bounded reap, then SIGKILL + bounded reap. The reaper status is diagnostic only: a child that creates a new session or a kernel hang may escape. Any uncertain process ownership remains a **NO-GO**, not a verified recovery.
+- Report independently retains `primary_failure` (`CODEX_TIMEOUT`, `CODEX_EXIT_NONZERO`, `FAIL_IN_EVIDENCE_VERIFICATION`, etc.), `failure_stage`, `agent_termination`, `codex_elapsed_seconds`, `pwm_off_command`, `watchdog_final_receipt` so that `NO_GO_OFF` cannot erase the earlier cause.
+- The watchdog now writes a **private, independently persisted sanitized receipt** after either parent command confirmation or its own deadline OFF attempt. A future run's initial artifact can legitimately say `PENDING_OR_UNOBSERVED` if the detached watchdog has not yet fired. Neither `COMMAND_OK` nor `DEADLINE_OFF_COMMAND_OK` proves physical CH0 LOW without a real capture.
+- The outer Runner checks that `plasma-codex-io` is an **actually loaded supplementary group** (not just a name in `/etc/group`). Its bwrap preflight attempts a bounded open/close of the *single* exposed USB character node, without configuring the instrument or changing access control. This passive device-open test happens **only after a separate physical-test authorization**, not in Gate 1/PR CI. `LIBUSB_ERROR_ACCESS` may still arise from an actual libusb claim; it must remain diagnosable from the private logs.
+- The independent host OFF attempt also logs stderr/stdout privately at mode 0600. Post-test waveform verifier still rejects stale archival replay and requires actual per-case OFF-low captures.
+
+### Known risks before authorizing another physical run
+
+The direct CLI still lives inside bwrap, whereas the local interactive test did not necessarily share that mount/user namespace; `sg` on the host is not proof the nested process can claim the USB interface. Even a successful `os.open()` does not prove a `libusb_claim_interface()` will succeed. It also remains possible that Codex may take **longer** than 240 seconds on an unusually complex diagnosis; such a result must still be reported as TIMEOUT, not retried automatically. The parent and deadline OFF attempts may both fail if USB is unavailable, busy or the host crashes. **If `NO_GO_OFF` is seen, obtain operator verification of PWM1 OFF or safe power removal before any retry.**
+
+**Gate scope:** This PR is Gate 1 only (offline implementation and test); separate Gate 2 to merge, then separate explicit one-time hardware approval, and no automated replay.
