@@ -62,7 +62,9 @@
     "ABORTED": 6,
     "BAD_ARGUMENT": 7,
     "ENGINE_UNAVAILABLE": 8,
-    "INTERNAL_FAULT": 9
+    "INTERNAL_FAULT": 9,
+    "NEED_RESET": 10,
+    "PHY_ERROR": 11
   },
   "regions": [
     {
@@ -280,7 +282,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -328,7 +330,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -370,7 +372,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -382,19 +384,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -406,13 +408,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -451,7 +465,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -499,7 +513,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -541,7 +555,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -553,19 +567,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -577,13 +591,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -622,7 +648,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -670,7 +696,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -712,7 +738,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -724,19 +750,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -748,13 +774,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -793,7 +831,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -841,7 +879,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -883,7 +921,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -895,19 +933,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -919,13 +957,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -964,7 +1014,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -1012,7 +1062,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -1054,7 +1104,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -1066,19 +1116,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -1090,13 +1140,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -1135,7 +1197,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -1183,7 +1245,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -1225,7 +1287,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -1237,19 +1299,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -1261,13 +1323,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -1306,7 +1380,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -1354,7 +1428,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -1396,7 +1470,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -1408,19 +1482,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -1432,13 +1506,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -1477,7 +1563,7 @@
           "name": "SITE_ERROR",
           "offset": 16,
           "access": "ro",
-          "semantics": "Latched error enum; no automatic replay."
+          "semantics": "Latched v1 terminal error on FAULT, independent of DONE_STATUS; persists after fault-response ACK"
         },
         {
           "name": "INFLIGHT_SEQ",
@@ -1525,7 +1611,7 @@
           "name": "BIT_COUNT",
           "offset": 48,
           "access": "wo",
-          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=64 driven-high clocks (excluding 64-clock Hi-Z preamble); SPI=8..MAX_TRANSFER_BITS and multiple of 8"
         },
         {
           "name": "ARG0",
@@ -1567,7 +1653,7 @@
           "name": "DONE_STATUS",
           "offset": 76,
           "access": "ro",
-          "semantics": "Result enum; distinguish transport failure and target ACK."
+          "semantics": "Stable v1 enum 0..11; NEED_RESET=10, PHY_ERROR=11 distinct from invalid request"
         },
         {
           "name": "DONE_WORDS",
@@ -1579,19 +1665,19 @@
           "name": "ABORT",
           "offset": 84,
           "access": "wo",
-          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+          "semantics": "Write 1 only if master is already BUSY; pre-launch BUSY may SLVERR. Rejected or ambiguous abort requires fail-closed owner, not retry"
         },
         {
           "name": "CAPACITY_WORDS",
           "offset": 88,
           "access": "ro",
-          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+          "semantics": "Actual SPI FIFO words, 0 when SPI not supported; positive capacity 1..256 only for SPI-capable Site"
         },
         {
           "name": "CLOCK_DIV",
           "offset": 92,
           "access": "wo",
-          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+          "semantics": "SWD half-period FPGA clock cycles, 2..65535; fSWCLK=FCLK/(2*N) during active clock edges. Board Descriptor binds FCLK"
         },
         {
           "name": "DONE_DATA",
@@ -1603,13 +1689,25 @@
           "name": "ACK_SEQ",
           "offset": 100,
           "access": "wo",
-          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+          "semantics": "Only matching DONE_SEQ acknowledged after snapshot; clears completion-valid for DONE or FAULT but never clears FAULT latch"
         },
         {
           "name": "TRANSACTION_COUNTER",
           "offset": 104,
           "access": "ro",
           "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        },
+        {
+          "name": "SWD_RESPONSE_META",
+          "offset": 108,
+          "access": "ro",
+          "semantics": "bits2:0 raw SWD ACK, bit3 DATA_VALID, bits12:4 ATTEMPTS, bits14:13 LINK_STATE; bit31:15 zero; stable through matching ACK_SEQ"
+        },
+        {
+          "name": "SWD_RAW_STATUS",
+          "offset": 112,
+          "access": "ro",
+          "semantics": "Raw legacy SWD master 4-bit diagnostic status (not normative v1 enum), stable through matching ACK_SEQ"
         }
       ]
     },
@@ -1652,9 +1750,10 @@
       "outcome": "SWD acknowledgement and read/write payload; WAIT/FAULT are terminal command responses, no implicit replay"
     },
     "swd_line_reset": {
-      "min_bits": 50,
-      "max_bits": 128,
-      "output": "SWDIO logical high for BIT_COUNT cycles; no per-target power or reset"
+      "required_high_clocks": 64,
+      "hi_z_recovery_clocks": 64,
+      "post_reset_idle_clocks": 8,
+      "meaning": "BIT_COUNT specifies driven-high SWCLK cycles only; prior recovery is Hi-Z and not included"
     },
     "spi_transfer": {
       "min_bits": 8,
@@ -1673,7 +1772,32 @@
       "FPGA_IMAGE_SWITCH",
       "POWER_CONTROL",
       "RESET_CONTROL"
-    ]
+    ],
+    "swd_timing": {
+      "clock_div_register": "CLOCK_DIV",
+      "semantics": "SWD half-period input FPGA clock cycles",
+      "minimum": 2,
+      "maximum": 65535,
+      "serial_swd_clock": "FCLK/(2*CLOCK_DIV), ideal active SWD waveform only",
+      "clock_source": "verified image/board descriptor; no assumed FCLK"
+    },
+    "swd_completion": {
+      "status": "exactly one of IDLE=1 BUSY=2 DONE=4 FAULT=8; FAILED execution may latch FAULT",
+      "result_identity": "DONE_SEQ echoes committed nonzero SEQUENCE; observed status/ACK/link/attempts sampled atomically by hardware",
+      "fault_snapshot": "SWD response/error evidence must remain readable in FAULT until explicit matching ACK_SEQ",
+      "fault_ack": "ACK_SEQ clears DONE_VALID only; never clears latched FAULT or authorizes another command",
+      "timeout": "software polling expiry does NOT prove hardware stopped; poison owner",
+      "abort": "ABORT is accepted only when SWD master reports BUSY, not launch_pending; SLVERR during launch transition is ambiguous and poisons owner",
+      "recovery": "no in-band unpoison or automatic recovery; requires independent external safety and new owner epoch"
+    },
+    "swd_metadata": {
+      "register": "SWD_RESPONSE_META",
+      "offset": 108,
+      "encoding": "bits2:0 wire ACK (NONE=0, OK=1, WAIT=2, FAULT=4, any other raw value observed); bit3 DATA_VALID; bits12:4 ATTEMPTS u9; bits14:13 LINK_STATE (0 reset,1 DPIDR required,2 connected); bits31:15 zero",
+      "raw_status_register": "SWD_RAW_STATUS",
+      "raw_status_offset": 112,
+      "meaning": "raw 4-bit diagnostic status of existing SWD master; stable v1 status remains DONE_STATUS; not a public product error enum"
+    }
   },
   "qualification": {
     "host_contract": "REQUIRED",
@@ -1682,6 +1806,7 @@
     "real_uio_hil": false,
     "eight_site_hil": false,
     "m1_architecture_freeze": "NO_GO_PENDING_OWNER_REVIEW",
-    "hardware_authority": false
+    "hardware_authority": false,
+    "semantic_convergence_host_only": true
   }
 }
