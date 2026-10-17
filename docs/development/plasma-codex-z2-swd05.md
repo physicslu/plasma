@@ -42,7 +42,7 @@ This asks once for these **actual Z2 absolute paths**:
 - `output`: fresh unique private directory below `/root/`; its parent must exist and be root-owned/non-group-writeable.
 - `sudo_password`: Z2 sudo credential entered via hidden getpass; not assumed equal to SSH password, never posted to GitHub.
 
-Worker file: `/home/plasma-codex/.config/plasma/z2-swd05-oneshot.json`, 0600; enrollment does not overwrite. If it is absent, invalid or remote source/artifacts are not staged and pinned, **NO_GO**; do not guess values or weaken checks. Development default `xilinx` SSH credentials are already separately enrolled; no recopy.
+Worker file: `<dedicated-worker-home>/.config/plasma/z2-swd05-oneshot.json`, 0600; enrollment does not overwrite. If it is absent, invalid or remote source/artifacts are not staged and pinned, **NO_GO**; do not guess values or weaken checks. Development default `xilinx` SSH credentials are already separately enrolled; no recopy.
 
 Before Gate 2, **do not enroll or dispatch unless expressly authorized as part of a trusted operator setup**. GitHub Actions PR events always run **hosted offline contract tests only**, not remote Z2 or Worker execution.
 
