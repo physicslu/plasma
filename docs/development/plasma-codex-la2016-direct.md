@@ -159,7 +159,7 @@ without the original private stderr, which Runner cleanup had already removed.
   `RUNNER_TEMP`:
 
   ```text
-  /home/plasma-codex/.local/state/plasma/codex-runs/
+  ${WORKER_HOME}/.local/state/plasma/codex-runs/
     <GITHUB_RUN_ID>-attempt-<GITHUB_RUN_ATTEMPT>/
       preparation/attempt-1/codex-stdout-private.jsonl
       preparation/attempt-1/codex-stderr-private.log
@@ -193,7 +193,8 @@ hardware job**:
 
 ```bash
 RUN=<numeric-github-run-id>
-BASE=/home/plasma-codex/.local/state/plasma/codex-runs
+WORKER_HOME=$(getent passwd plasma-codex | cut -d: -f6)
+BASE=${WORKER_HOME}/.local/state/plasma/codex-runs
 sudo find "$BASE" -maxdepth 1 -type d -name "$RUN-attempt-*" -print
 sudo ls -l "$BASE/${RUN}-attempt-1/preparation/attempt-1/"
 sudo tail -n 80 "$BASE/${RUN}-attempt-1/preparation/attempt-1/codex-stderr-private.log"
