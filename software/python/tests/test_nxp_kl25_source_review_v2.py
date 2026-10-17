@@ -6,10 +6,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plasma_core.errors import PlasmaError
-from plasma_interfaces.kl25_openocd_plan import (
-    KL25OpenOCDPlanCompiler, load_backend_lock,
-)
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.nxp_kl25_qualification import (
     NxpKl25QualificationProvider,
@@ -85,24 +81,40 @@ class Kl25CurrentSourceReviewV2Tests(unittest.TestCase):
                     with self.assertRaises(DeviceCatalogIntegrityError):
                         NxpKl25QualificationProvider(get_default_device_catalog(), ROOT)
 
-    def test_program_fcf_sector_boundary_rejects_every_overlapping_region(self) -> None:
+    def test_source_review_fcf_boundary_policy_is_closed(self) -> None:
         doc = json.loads((ROOT / REL).read_text(encoding="utf-8"))
         guarded = doc["protected_flash"]
-        lock = load_backend_lock()["admitted_constraints"]
-        self.assertEqual((guarded["sector_start"], guarded["sector_end_exclusive"]),
-                         (0x400, 0x800))
+        legacy = json.loads((
+            ROOT / "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
+        ).read_text(encoding="utf-8"))
+        constraints = legacy["admitted_constraints"]
+        lower = guarded["sector_start"]
+        upper = guarded["sector_end_exclusive"]
+        self.assertEqual((lower, upper), (0x400, 0x800))
+        self.assertEqual(
+            (lower, upper),
+            (int(constraints["flash_configuration_field_sector_start"], 0),
+             int(constraints["flash_configuration_field_sector_start"], 0)
+             + constraints["flash_configuration_field_sector_size_bytes"]),
+        )
         self.assertEqual(guarded["erase_sector_bytes"], 1024)
         self.assertEqual(guarded["program_longword_bytes"], 4)
+        self.assertTrue(guarded["program_intersection_requires_rejection"])
+        self.assertTrue(guarded["erase_containing_sector_requires_rejection"])
+        self.assertFalse(guarded["fcf_rewrite_qualified"])
+
+        # This is evidence-range validation, not a substitute for the actual
+        # KL25OpenOCDPlanCompiler regression tests run by full Python CI.
+        overlaps = lambda start, size: start < upper and start + size > lower
         for offset, size in ((0x400, 4), (0x410, 4), (0x7fc, 4),
                              (0x3fc, 8), (0x3fc, 0x405), (0x0, 0x401),
                              (0x0, 0x800), (0x7fc, 8)):
             with self.subTest(offset=offset, size=size):
-                with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
-                    KL25OpenOCDPlanCompiler._reject_fcf_intersection(offset, size, lock)
+                self.assertTrue(overlaps(offset, size))
         for offset, size in ((0, 0x400), (0x3fc, 4), (0x800, 4),
                              (0x800, 0x1000)):
-            with self.subTest(allowed_offset=offset):
-                KL25OpenOCDPlanCompiler._reject_fcf_intersection(offset, size, lock)
+            with self.subTest(offset=offset, size=size):
+                self.assertFalse(overlaps(offset, size))
 
 
 if __name__ == "__main__":
