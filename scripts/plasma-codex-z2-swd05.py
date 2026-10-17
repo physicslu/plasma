@@ -36,6 +36,19 @@ ROUTE = Path("/home/plasma-codex/.config/plasma/z2-swd05-oneshot.json")
 FIELDS = ("source_root", "candidate_bit", "candidate_hwh", "manifest",
           "candidate_bin", "recovery_bin", "recovery_hwh", "output", "sudo_password")
 MARKER = "PLASMA_SWD05_REPORT="
+REVIEWED_SOURCES = (
+    "pl/hil/swd04/one_shot.py",
+    "pl/hil/swd04/development.py",
+    "pl/hil/swd04/native_qualify.py",
+    "pl/hil/swd04/contract.py",
+    "pl/hil/swd04/collect.py",
+    "pl/hil/swd04/staging.py",
+    "pl/hil/swd04/mmio_contract.py",
+    "pl/hil/swd04/live.py",
+    "software/python/plasma_interfaces/__init__.py",
+    "software/python/plasma_interfaces/linux_mmio.py",
+    "software/python/plasma_interfaces/swd_transaction.py",
+)
 TIMEOUT_SECONDS = 185
 MAX_REPLY = 20000
 STAGES = ("preflight", "candidate_load", "hil01", "hil02",
@@ -93,13 +106,23 @@ def enroll() -> None:
 def fixed_remote_cmd(route: dict[str, str]) -> str:
     """Shell quote every operator-enrolled path, never interpolate Issue text."""
     root = route["source_root"]
-    local_src = Path(__file__).resolve().parents[1] / "pl/hil/swd04/one_shot.py"
-    sha = hashlib.sha256(local_src.read_bytes()).hexdigest()
-    remote_src = root + "/pl/hil/swd04/one_shot.py"
-    # Verify exact new reviewed root module installed at the remote source root.
-    # Native/staging dependencies are protected by root ownership checks and
-    # the existing candidate/build hashes; no volatile pip install is allowed.
-    check = "test \"$(sha256sum " + shlex.quote(remote_src) + " | cut -d' ' -f1)\" = " + shlex.quote(sha)
+    repository_root = Path(__file__).resolve().parents[1]
+    # Check the exact reviewed code for EVERY imported target dependency,
+    # rather than pinning the supervisor module alone. Remote files must
+    # be root-owned, not writable by the Linux login account.
+    checks = []
+    for relpath in REVIEWED_SOURCES:
+        expected = hashlib.sha256((repository_root / relpath).read_bytes()).hexdigest()
+        remote = root + "/" + relpath
+        q = shlex.quote(remote)
+        checks.append("test \"$(sha256sum " + q + " | cut -d' ' -f1)\" = "
+                      + shlex.quote(expected))
+        checks.append("test \"$(stat -c %u " + q + ")\" = 0")
+        checks.append("test $((0$(stat -c %a " + q + ") & 0022)) -eq 0")
+    quoted_root = shlex.quote(root)
+    checks.insert(0, "test \"$(stat -c %u " + quoted_root + ")\" = 0")
+    checks.insert(1, "test $((0$(stat -c %a " + quoted_root + ") & 0022)) -eq 0")
+    check = " && ".join(checks)
     argv = [
         "sudo", "-S", "-p", "PLASMA_SWD05_SUDO_PROMPT:",
         "env", "PYTHONPATH=" + root + ":" + root + "/software/python",
