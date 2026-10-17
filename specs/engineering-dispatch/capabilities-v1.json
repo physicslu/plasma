@@ -5,7 +5,6 @@
     "software-readonly": {
       "entrypoint": "offline-analysis",
       "worker_class": "hosted-offline",
-      "enabled": true,
       "permissions": [
         "repo:read"
       ],
@@ -21,12 +20,12 @@
         "network-instrument",
         "repository-write",
         "host-root"
-      ]
+      ],
+      "runtime_enabled": false
     },
     "software-pr": {
       "entrypoint": "software-pr",
       "worker_class": "software-isolated",
-      "enabled": true,
       "permissions": [
         "repo:read",
         "repo:write-branch"
@@ -42,12 +41,12 @@
         "hub-power",
         "network-instrument",
         "host-root"
-      ]
+      ],
+      "runtime_enabled": false
     },
     "la2016-loopback": {
       "entrypoint": "la2016-direct",
       "worker_class": "la2016-isolated",
-      "enabled": true,
       "permissions": [
         "repo:read",
         "usb:la2016"
@@ -63,12 +62,12 @@
         "network-instrument",
         "repository-write",
         "host-root"
-      ]
+      ],
+      "runtime_enabled": false
     },
     "z2-readonly": {
       "entrypoint": "z2-inventory",
       "worker_class": "z2-readonly",
-      "enabled": true,
       "permissions": [
         "repo:read",
         "ssh:z2-readonly"
@@ -83,12 +82,12 @@
         "hub-power",
         "repository-write",
         "host-root"
-      ]
+      ],
+      "runtime_enabled": false
     },
     "z2-privileged": {
       "entrypoint": "z2-hil-protected",
       "worker_class": "z2-hil-privileged",
-      "enabled": false,
       "permissions": [
         "repo:read",
         "z2:hardware-owner"
@@ -100,7 +99,8 @@
         "dut",
         "hub-power",
         "repository-write"
-      ]
+      ],
+      "runtime_enabled": false
     }
   }
 }
