@@ -144,6 +144,7 @@ def collect(sysroot: Path, procroot: Path) -> dict:
     """Collect limited observations only. Always NOT_ATTESTED/NO-GO."""
     if not sysroot.is_dir() or not procroot.is_dir():
         raise InventoryRefused("Input /sys or /proc directory missing")
+    started_at_utc = datetime.now(timezone.utc).isoformat()
     boot = _decode(_read(procroot, "sys/kernel/random/boot_id"))
     release = _decode(_read(procroot, "sys/kernel/osrelease"))
     if not boot or not release:
@@ -200,9 +201,15 @@ def collect(sysroot: Path, procroot: Path) -> dict:
             "driver": _driver_name(sysroot, prefix + "/device/driver"),
             "maps": maps,
         })
+    final_boot = _decode(_read(procroot, "sys/kernel/random/boot_id"))
+    final_release = _decode(_read(procroot, "sys/kernel/osrelease"))
+    if final_boot != boot or final_release != release:
+        raise InventoryRefused("Boot or kernel release changed during collection")
     return {
         "schema": "plasma-z2-kernel-dt-readonly-inventory-v1",
+        "collection_started_at_utc": started_at_utc,
         "collected_at_utc": datetime.now(timezone.utc).isoformat(),
+        "boot_and_kernel_two_sample_consistency": "MATCHED",
         "source_kind": "CALLER_SUPPLIED_SYSROOT_PROCROOT_UNATTESTED",
         "boot_id_sha256": hashlib.sha256(boot.encode("utf-8")).hexdigest(),
         "kernel_release": release,
