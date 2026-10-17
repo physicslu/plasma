@@ -209,3 +209,48 @@ def test_host_contract_performs_no_disk_or_device_io(tmp_path, descriptor, inven
                     generation=7, owner_epoch="FAKE-OWNER-EPOCH-A")
     b.release(lease)
     assert list(tmp_path.iterdir()) == before
+
+
+def test_board_descriptor_schema_and_synthetic_fixture_are_consistent(descriptor):
+    root = Path(__file__).resolve().parents[1] / "verification"
+    schema = json.loads((root / "fixed_ppu_board_descriptor_host_v1.schema.json").read_text())
+    sample = json.loads((root / "examples/fixed_ppu_board_descriptor_synthetic.json").read_text())
+    assert schema["properties"]["schema"]["const"] == sample["schema"]
+    assert set(schema["required"]) == set(sample)
+    assert set(schema["properties"]["uio_pin"]["required"]) == set(sample["uio_pin"])
+    assert set(schema["properties"]["expected_identity"]["required"]) == set(sample["expected_identity"])
+    assert schema["properties"]["hardware_authority"]["const"] is False
+    assert validate_board_descriptor(sample, SPEC) is sample
+
+
+def test_unknown_descriptor_and_pin_fields_fail_closed(descriptor, inventory, regs):
+    descriptor["debug_allow_mmio"] = True
+    with pytest.raises(ContractError):
+        receipt(descriptor, inventory, regs)
+    del descriptor["debug_allow_mmio"]
+    descriptor["uio_pin"]["device_name"] = "uio0"
+    with pytest.raises(ContractError):
+        receipt(descriptor, inventory, regs)
+
+
+def test_unready_site_cannot_get_lease(descriptor, inventory, regs):
+    regs[0x034] = 0
+    b = HostBrokerAdmission(receipt(descriptor, inventory, regs))
+    with pytest.raises(ContractError, match="not READY"):
+        b.claim(1, exact_ic="STM32F103C8T6", batch_id="B1",
+                generation=7, owner_epoch="FAKE-OWNER-EPOCH-A")
+
+
+def test_host_broker_thread_race_only_one_owner(descriptor, inventory, regs):
+    from concurrent.futures import ThreadPoolExecutor
+    b = HostBrokerAdmission(receipt(descriptor, inventory, regs))
+    def one_claim(_):
+        try:
+            return b.claim(1, exact_ic="STM32F103C8T6", batch_id="B1",
+                           generation=7, owner_epoch="FAKE-OWNER-EPOCH-A")
+        except ContractError:
+            return None
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        leases = list(pool.map(one_claim, range(16)))
+    assert sum(x is not None for x in leases) == 1
+    b.release(next(x for x in leases if x is not None))
