@@ -115,3 +115,96 @@ The **actual** Codex session sees the LA2016 USB node only **after** preparation
 **Why this exception matters:** A hardware-enabled agent can activate PWM in any previous attempt. Merely receiving `TIMEOUT`, a successful sigrok `enabled=off` command, or a process termination receipt does not prove physical LOW. Automatic threefold re-execution of a potentially actuated instrument task would violate the project's single-run hardware-approval boundary and could retry with still-open USB handles. A separate explicit owner authorization is required for another physical run.
 
 No real hardware was operated by this code change; only hosted/offline contract tests qualify these retry rules.
+
+## 2026-10-17 — DNS recovery and private diagnostics (new Gate 1, offline only)
+
+The approved run [Actions #39034925259](https://github.com/physicslu/plasma/actions/runs/39034925259)
+failed at **CODEX_PREPARATION** with `EXIT_NONZERO` after 177.77 s — **not TIMEOUT**;
+`live_attempts=0`, no new PWM, no `.sr` archives, watchdog not armed.
+The GitHub Actions summary also failed independently because Python tried to
+concatenate a list (`preparation_attempts`) with a string.
+
+On SWPC the operator verified `/etc/resolv.conf` is a symlink to
+`/run/systemd/resolve/stub-resolv.conf`. The real bwrap layout with
+`--tmpfs /run` made `resolv.conf exists: False` and DNS `gaierror`.
+A separate **non-actuating** bwrap probe that read-only binds just this stub
+returned `resolv.conf: True`, `DNS: PASS`. This establishes a real sandbox
+DNS defect, but **the previous 177.77-second Codex exit reason cannot be proved**
+without the original private stderr, which Runner cleanup had already removed.
+
+### Exact revised boundary
+
+- Preserve `--ro-bind / /`, `--dev /dev`, `--proc /proc`, `--tmpfs /run`
+  and `--tmpfs /tmp`. If `/etc/resolv.conf` resolves to an allowlisted
+  `/run/systemd/resolve/{stub-resolv.conf,resolv.conf}`, create only
+  `/run/systemd/resolve` and **read-only bind exactly the resolved file**.
+  Other `/run` symlink targets fail closed; regular host resolv.conf is
+  left read-only as inherited. No wholesale host /run exposure, no USB
+  relaxation, no host DNS changes and no permission changes.
+- Before **each inert preparation Codex invocation**, execute an independent
+  Python DNS preflight **inside that exact bwrap namespace**, asserting
+  resolv.conf is present and `socket.getaddrinfo('api.openai.com',443)`
+  succeeds; suppress untrusted output. `CODEX_NETWORK_RESOLV_CONF_MISSING`
+  and `CODEX_NETWORK_DNS_FAIL` are separately classified and **stop before
+  Codex or USB operations**. Repeat the same DNS check before the
+  once-only real Codex stage (after passive LA-only namespace probe, before
+  the OFF watchdog and hardware execution).
+- **DNS pass is not authentication or application-layer reachability proof.**
+  It does not verify TLS/proxy, account login, an actual Codex model API call,
+  or the model subscription. The stage returns the exact sanitized status
+  `DNS_PASS_MODEL_API_UNVERIFIED`; Codex's own result and private
+  stderr/JSONL must be consulted for genuine application failures. Never
+  promote DNS PASS into a hardware acceptance verdict.
+- Use a dedicated **non-root owner-only** durable directory, separate from
+  `RUNNER_TEMP`:
+
+  ```text
+  ${WORKER_HOME}/.local/state/plasma/codex-runs/
+    <GITHUB_RUN_ID>-attempt-<GITHUB_RUN_ATTEMPT>/
+      preparation/attempt-1/codex-stdout-private.jsonl
+      preparation/attempt-1/codex-stderr-private.log
+      preparation/attempt-1/last-message-private.txt
+      ...
+      codex-stdout-private.jsonl
+      codex-stderr-private.log
+      parent-off-private.log
+      watchdog-off-private.log
+  ```
+
+  The private `plasma` and `codex-runs` directories must be
+  owner-controlled mode **0700**; raw logs are created exclusively mode
+  **0600**. Existing symlinks, unexpected owners, and collisions fail
+  closed. The runner does not change privileged host settings. All
+  `GITHUB_RUN_ID` and run-attempt components are validated numeric.
+  On each new authorized run, owner-only numeric run folders older than
+  **14 days** are pruned; non-matching and symlink paths are not followed.
+  Avoid manual upload of these private files to GitHub; they can contain
+  prompts, file contents and credentials. Only sanitized `report.json`,
+  `exit_code`, hashes and original waveforms belong in Artifacts.
+- Summary printing now serializes lists/dicts with `json.dumps`, avoiding
+  the secondary `TypeError`. Network status is a separate field. Existing
+  5/10/15/20-minute retry sequence and **single 10-minute live stage**,
+  fixed host OFF, and 635s best-effort guard remain unchanged.
+
+### Operator-only read-only investigation
+
+For a future authorized GitHub run ID, inspect on SWPC **without starting a
+hardware job**:
+
+```bash
+RUN=<numeric-github-run-id>
+WORKER_HOME=$(getent passwd plasma-codex | cut -d: -f6)
+BASE=${WORKER_HOME}/.local/state/plasma/codex-runs
+sudo find "$BASE" -maxdepth 1 -type d -name "$RUN-attempt-*" -print
+sudo ls -l "$BASE/${RUN}-attempt-1/preparation/attempt-1/"
+sudo tail -n 80 "$BASE/${RUN}-attempt-1/preparation/attempt-1/codex-stderr-private.log"
+```
+
+Do not paste raw stderr/JSONL into public issues; manually redact secrets,
+private paths and tokens before sharing summaries. Never infer PWM1 electrical
+OFF from a command exit code or a watchdog software receipt.
+
+**Gate boundary:** all new tests in this change run offline on GitHub-hosted
+CI; **no self-hosted runner**, issue comment dispatch, SWPC login, real
+LA2016 operation, Z2, Hub or DUT access. Gate 2 merge and any further live
+hardware authorization remain separate.

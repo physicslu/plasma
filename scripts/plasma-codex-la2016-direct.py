@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import pwd
 import re
+import stat
 import shutil
 import signal
 import socket
@@ -45,6 +46,7 @@ PREPARATION_TIMEOUT_SECONDS = (300, 600, 900, 1200)
 WATCHDOG_DEADLINE_SECONDS = 635
 AGENT_TERM_GRACE_SECONDS = 8
 AGENT_KILL_GRACE_SECONDS = 5
+PRIVATE_LOG_RETENTION_DAYS = 14
 # Real device must never be driven by PR-triggered execution.
 def authorized(e: dict, actor: str, repo: str, ref: str) -> bool:
     i, c, s, r = (e.get("issue") or {}, e.get("comment") or {},
@@ -127,6 +129,105 @@ def physical_off(conn: str, private_log: Path | None = None) -> bool:
                                timeout=16, check=False)
     return p.returncode == 0
 
+
+def resolver_bind_args(resolv: Path = Path("/etc/resolv.conf")) -> list[str]:
+    """Restore just the verified systemd-resolved stub, never the host /run.
+
+    The host's /etc/resolv.conf may be a symlink into /run.  --tmpfs /run
+    otherwise breaks that symlink inside bubblewrap (confirmed on SWPC).
+    """
+    try:
+        target = resolv.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("DNS_RESOLV_CONF_UNAVAILABLE") from exc
+    if not target.is_file() or not os.access(target, os.R_OK):
+        raise ValueError("DNS_RESOLV_CONF_UNREADABLE")
+    run_root = Path("/run")
+    if target == run_root or run_root in target.parents:
+        if target not in {
+            Path("/run/systemd/resolve/stub-resolv.conf"),
+            Path("/run/systemd/resolve/resolv.conf"),
+        }:
+            raise ValueError("DNS_RUN_TARGET_NOT_ALLOWLISTED")
+        return ["--dir", "/run/systemd", "--dir", "/run/systemd/resolve",
+                "--ro-bind", str(target), str(target)]
+    # Regular /etc/resolv.conf, or a symlink outside /run: ro-bind / / suffices.
+    return []
+
+
+def private_run_directory(rid: str) -> Path:
+    """Owner-private durable log storage, deliberately outside RUNNER_TEMP."""
+    if not re.fullmatch(r"[0-9]+", rid):
+        raise ValueError("PRIVATE_RUN_ID_INVALID")
+    home = Path(pwd.getpwuid(os.geteuid()).pw_dir)
+    if home.is_symlink() or not home.is_dir():
+        raise ValueError("PRIVATE_LOG_HOME_UNSAFE")
+    root = home
+    # .local is not necessarily private, but all children must be owner 0700.
+    for name in (".local", "state", "plasma", "codex-runs"):
+        root = root / name
+        if root.is_symlink():
+            raise ValueError("PRIVATE_LOG_SYMLINK_DENIED")
+        if not root.exists():
+            root.mkdir(mode=0o700)
+        mode = root.stat()
+        if not stat.S_ISDIR(mode.st_mode) or mode.st_uid != os.geteuid():
+            raise ValueError("PRIVATE_LOG_DIRECTORY_OWNER_DENIED")
+        if name in {"plasma", "codex-runs"} and mode.st_mode & 0o077:
+            raise ValueError("PRIVATE_LOG_DIRECTORY_MODE_DENIED")
+    prune_private_logs(root)
+    attempt = os.getenv("GITHUB_RUN_ATTEMPT", "1")
+    if not re.fullmatch(r"[1-9][0-9]{0,3}", attempt):
+        raise ValueError("PRIVATE_LOG_ATTEMPT_INVALID")
+    result = root / (rid + "-attempt-" + attempt)
+    if result.is_symlink() or result.exists():
+        raise ValueError("PRIVATE_LOG_RUN_COLLISION")
+    result.mkdir(mode=0o700)
+    return result
+
+
+def prune_private_logs(root: Path) -> None:
+    """Remove only stale, owned 0700 numeric run directories older than 14d.
+
+    Called only under the owner-specific GitHub Actions concurrency lock.
+    Never follow symlinks or change host permissions.
+    """
+    cutoff = time.time() - PRIVATE_LOG_RETENTION_DAYS * 86400
+    for folder in root.iterdir():
+        if not re.fullmatch(r"[0-9]+-attempt-[0-9]+", folder.name):
+            continue
+        if folder.is_symlink():
+            continue
+        st = folder.stat(follow_symlinks=False)
+        if (stat.S_ISDIR(st.st_mode) and st.st_uid == os.geteuid()
+                and (st.st_mode & 0o077) == 0 and st.st_mtime < cutoff):
+            shutil.rmtree(folder)
+
+
+def network_preflight(prefix: list[str]) -> str:
+    """Check DNS in the exact Codex sandbox before every model invocation.
+
+    API authentication is NOT established by DNS and cannot be inferred here.
+    """
+    expr = (
+        "import pathlib,socket,sys; "
+        "p=pathlib.Path('/etc/resolv.conf'); "
+        "sys.exit(21) if not p.is_file() else None; "
+        "try_it=socket.getaddrinfo('api.openai.com',443,type=socket.SOCK_STREAM); "
+        "sys.exit(0 if try_it else 22)"
+    )
+    try:
+        p = subprocess.run(prefix + ["--", sys.executable, "-c", expr],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=20, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError("CODEX_NETWORK_PREFLIGHT_ERROR") from exc
+    if p.returncode == 21:
+        raise ValueError("CODEX_NETWORK_RESOLV_CONF_MISSING")
+    if p.returncode != 0:
+        raise ValueError("CODEX_NETWORK_DNS_FAIL")
+    return "DNS_PASS_MODEL_API_UNVERIFIED"
+
 def sandbox_prefix(device: Path, evidence: Path, *, allow_device: bool = True) -> list[str]:
     """OS-enforced LA-only /dev despite worker DAC to other devices.
 
@@ -149,6 +250,7 @@ def sandbox_prefix(device: Path, evidence: Path, *, allow_device: bool = True) -
         "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
         "--tmpfs", "/run", "--tmpfs", "/tmp",
     ]
+    parts += resolver_bind_args()
     if allow_device:
         parts += ["--dir", "/dev/bus", "--dir", "/dev/bus/usb",
                   "--dir", str(device.parent), "--dev-bind", str(device), str(device)]
@@ -286,7 +388,7 @@ def write_watchdog_receipt(out: Path, result: str) -> None:
     os.replace(temp, out / "watchdog-receipt")
 
 
-def watchdog(out: Path, conn: str) -> int:
+def watchdog(out: Path, conn: str, private_logs: Path | None = None) -> int:
     worker_identity()
     if not re.fullmatch(r"[1-9][0-9]{0,2}\.[1-9][0-9]{0,2}", conn):
         return 2
@@ -300,7 +402,7 @@ def watchdog(out: Path, conn: str) -> int:
     # Physical command is still best-effort; do not claim output is LOW.
     try:
         pinned_app()
-        success = physical_off(conn, out / "watchdog-off-private.log")
+        success = physical_off(conn, (private_logs or out) / "watchdog-off-private.log")
     except (OSError, ValueError, subprocess.SubprocessError):
         success = False
     write_watchdog_receipt(
@@ -405,14 +507,14 @@ def preparation_namespace_test(prefix: list[str]) -> None:
         raise ValueError("PREPARATION_USB_MASK_NOT_PROVEN")
 
 
-def prepare_codex(out: Path) -> list[dict[str, object]]:
+def prepare_codex(out: Path, private_logs: Path | None = None) -> list[dict[str, object]]:
     """Retry ONLY an inert Codex planning session, never a real PWM session.
 
     The outer bwrap --dev mount hides LA and all other USB devices. No physical
     claim/control occurs in this function. Do not infer model authorization.
     """
     notes: list[dict[str, object]] = []
-    root = out / "preparation"
+    root = (private_logs or out) / "preparation"
     root.mkdir(mode=0o700)
     cmd = shutil.which("codex")
     if not cmd:
@@ -423,6 +525,7 @@ def prepare_codex(out: Path) -> list[dict[str, object]]:
         prefix = sandbox_prefix(Path("/dev/bus/usb/001/001"), folder,
                                 allow_device=False)
         preparation_namespace_test(prefix)
+        network_preflight(prefix)
         argv = prefix + [
             "--", cmd, "--ask-for-approval", "never", "exec", "--json",
             "--sandbox", "danger-full-access",
@@ -459,26 +562,36 @@ def run() -> int:
     if out.exists() or out.is_symlink():
         raise ValueError("EXISTING_OUTPUT_DENIED")
     out.mkdir(mode=0o700)
+    private_logs = None
     evidence=out/"evidence"
     evidence.mkdir(mode=0o700)
     report={"schema":"plasma.la2016.direct.v1","result":"NO_GO","agent_exec":"NOT_RUN",
             "failure_stage":"NOT_STARTED","primary_failure":"NONE",
             "agent_termination":"NOT_NEEDED","codex_elapsed_seconds":0,
             "preparation_attempts":[],"preparation_status":"NOT_RUN",
+            "network_preflight":"NOT_RUN","private_logs":"NOT_READY",
             "live_attempts":0,
             "cases":[],"pwm_off_command":"NOT_RUN","independent_off_watchdog":"NOT_ARMED",
             "z2_fpga":"NOT_RUN","usb_hub_power":"NOT_RUN","external_dut":"NOT_RUN"}
     rc=2
     conn=None
     try:
+        report["failure_stage"] = "PRIVATE_LOG_PREFLIGHT"
+        private_logs = private_run_directory(rid)
+        report["private_logs"] = "OWNER_ONLY_PERSISTENT"
         report["failure_stage"] = "APPIMAGE_PREFLIGHT"
         pinned_app()
         report["failure_stage"] = "CODEX_PREPARATION"
         try:
-            report["preparation_attempts"] = prepare_codex(out)
+            report["preparation_attempts"] = prepare_codex(out, private_logs)
             report["preparation_status"] = "PASS"
-        except ValueError:
+            report["network_preflight"] = "DNS_PASS_MODEL_API_UNVERIFIED"
+        except ValueError as exc:
             report["preparation_status"] = "FAILED_OR_RETRY_EXHAUSTED"
+            if str(exc).startswith(("CODEX_NETWORK_", "DNS_")):
+                report["failure_stage"] = "NETWORK_PREFLIGHT"
+                report["primary_failure"] = str(exc)
+                report["network_preflight"] = str(exc)
             receipt = out / "preparation-receipts.json"
             if receipt.is_file():
                 report["preparation_attempts"] = json.loads(
@@ -492,11 +605,14 @@ def run() -> int:
             report["failure_stage"] = "NAMESPACE_PREFLIGHT"
             prefix=sandbox_prefix(dev,evidence)
             namespace_test(prefix,dev)
+            report["failure_stage"] = "NETWORK_PREFLIGHT"
+            report["network_preflight"] = network_preflight(prefix)
             report["failure_stage"] = "WATCHDOG_ARM"
             # Secure the independent OFF attempt before asking Codex to actuate.
             guard=subprocess.Popen(
                 [sys.executable,str(Path(__file__).resolve()),"--watchdog",
-                 "--output",str(out),"--connection",conn],
+                 "--output",str(out),"--connection",conn,
+                 "--private-output",str(private_logs)],
                 stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,close_fds=True,start_new_session=True,
                 env={k:v for k,v in os.environ.items() if k!="RUNNER_TRACKING_ID"},
@@ -521,7 +637,7 @@ def run() -> int:
                 ]
                 # Full CLI sandbox disabled *inside* outer fail-closed bwrap:
                 # real /dev, host write paths and private Z2 credentials hidden.
-                outcome=invoke_codex(args,prompt(evidence,conn),out)
+                outcome=invoke_codex(args,prompt(evidence,conn),private_logs)
                 report["agent_exec"]=outcome["status"]
                 report["agent_termination"]=outcome["termination"]
                 report["codex_elapsed_seconds"]=outcome["elapsed_seconds"]
@@ -538,7 +654,7 @@ def run() -> int:
                 try:
                     # The model launch group has been reaped (or marked unknown)
                     # before the final OFF attempt; preserve first failure.
-                    if physical_off(conn, out / "parent-off-private.log"):
+                    if physical_off(conn, private_logs / "parent-off-private.log"):
                         report["pwm_off_command"]="COMMAND_OK"
                         (out/"off-confirmed").touch(exist_ok=False)
                     else:
@@ -554,7 +670,18 @@ def run() -> int:
                     report["result"]="NO_GO_OFF"
                     rc=2
     except (OSError,ValueError,subprocess.SubprocessError,zipfile.BadZipFile,
-            configparser.Error,KeyError,IndexError):
+            configparser.Error,KeyError,IndexError) as exc:
+        if (report["failure_stage"] == "NETWORK_PREFLIGHT"
+                and isinstance(exc, ValueError)
+                and str(exc) in {"CODEX_NETWORK_RESOLV_CONF_MISSING",
+                                 "CODEX_NETWORK_DNS_FAIL",
+                                 "CODEX_NETWORK_PREFLIGHT_ERROR",
+                                 "DNS_RESOLV_CONF_UNAVAILABLE",
+                                 "DNS_RESOLV_CONF_UNREADABLE",
+                                 "DNS_RUN_TARGET_NOT_ALLOWLISTED"}):
+            report["network_preflight"] = str(exc)
+            if report["primary_failure"] == "NONE":
+                report["primary_failure"] = str(exc)
         if report["result"]!="NO_GO_OFF":
             report["result"]="NO_GO"
         if report["primary_failure"] == "NONE":
@@ -628,6 +755,7 @@ def main() -> int:
     p.add_argument("--input",type=Path)
     p.add_argument("--output",type=Path)
     p.add_argument("--connection",type=str)
+    p.add_argument("--private-output",type=Path)
     opts=p.parse_args()
     if opts.self_test:
         return self_test()
@@ -641,8 +769,8 @@ def main() -> int:
         return 0
     if opts.watchdog:
         if opts.output is None or opts.connection is None: return 2
-        return watchdog(opts.output,opts.connection)
-    if opts.input or opts.output or opts.connection: return 2
+        return watchdog(opts.output,opts.connection,opts.private_output)
+    if opts.input or opts.output or opts.connection or opts.private_output: return 2
     return run()
 
 if __name__=="__main__":
