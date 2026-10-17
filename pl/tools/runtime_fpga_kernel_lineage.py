@@ -99,7 +99,7 @@ def validate_reference_manifest(manifest: object) -> dict:
     }
 
 
-def git_blob_sha256_safe_read(path: Path) -> str:
+def git_blob_object_id(path: Path) -> str:
     """Return *Git SHA-1 blob object ID* of a bounded regular file.
 
     This is NOT SHA-256 and never proves commit ancestry. Reject symlinks
@@ -137,7 +137,7 @@ def verify_reference_tree(root: Path, files: dict[str, str]) -> None:
             item = item / component
             require(not item.is_symlink(),
                     "symlink cannot be used in reference source")
-        require(item.is_file() and git_blob_sha256_safe_read(item) == sha,
+        require(item.is_file() and git_blob_object_id(item) == sha,
                 "missing or drifted source blob: " + name)
 
 
