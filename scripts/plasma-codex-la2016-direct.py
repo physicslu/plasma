@@ -336,7 +336,7 @@ def terminate_agent(proc: subprocess.Popen, *, sleep_grace: int = AGENT_TERM_GRA
 
 
 def invoke_codex(args: list[str], work: str, out: Path,
-                 *, timeout_seconds: int = CODEX_TIMEOUT_SECONDS) -> dict[str, object]:
+                 *, timeout_seconds: int | None = None) -> dict[str, object]:
     """Save *raw* stdout/stderr privately; release only enum diagnostics."""
     # Deliberately avoid putting arbitrary model/tool output in Actions logs.
     safe_env = {k: v for k, v in os.environ.items()
@@ -347,6 +347,8 @@ def invoke_codex(args: list[str], work: str, out: Path,
         "status": "NOT_STARTED", "termination": "NOT_NEEDED",
         "elapsed_seconds": 0
     }
+    if timeout_seconds is None:
+        timeout_seconds = CODEX_TIMEOUT_SECONDS
     started = time.monotonic()
     with (os.fdopen(os.open(out / "codex-stdout-private.jsonl",
                              os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stdout,
