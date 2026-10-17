@@ -67,6 +67,11 @@ def validate_board_descriptor(descriptor: dict, spec: dict) -> dict:
     """Validate a fully pinned synthetic Board Descriptor, not its provenance."""
     validate_abi(spec)
     reject_if(type(descriptor) is dict, "Board Descriptor must be an object")
+    reject_if(set(descriptor) == {
+        "schema", "soc", "image_policy", "board_id", "boot_id", "owner_epoch",
+        "generation", "source_sha256", "image_sha256", "manifest_sha256",
+        "hardware_authority", "uio_pin", "expected_identity",
+    }, "Unknown/missing Board Descriptor fields")
     reject_if(descriptor.get("schema") == "plasma-fixed-ppu-board-host-v1", "Wrong descriptor schema")
     reject_if(descriptor.get("soc") == "XC7Z020-1CLG400C", "Wrong development SoC")
     reject_if(descriptor.get("image_policy") == "FIXED_PER_BOOT", "Runtime reload is not allowed")
@@ -79,6 +84,9 @@ def validate_board_descriptor(descriptor: dict, spec: dict) -> dict:
     reject_if(descriptor.get("hardware_authority") is False, "Host descriptor must not grant hardware")
     pin = descriptor.get("uio_pin")
     reject_if(type(pin) is dict, "No UIO pin")
+    reject_if(set(pin) == {"label", "platform_device", "driver",
+                           "map_index", "physical_base", "size", "byte_offset"},
+              "Unknown UIO Board pin fields")
     reject_if(pin.get("map_index") == 0 and pin.get("size") == 65536 and
               u32(pin.get("physical_base")) and pin["physical_base"] % 65536 == 0 and
               pin.get("byte_offset") == 0 and
@@ -86,6 +94,10 @@ def validate_board_descriptor(descriptor: dict, spec: dict) -> dict:
               "No exact 64KiB map0 Board Descriptor binding")
     expected = descriptor.get("expected_identity")
     reject_if(type(expected) is dict, "Missing expected ABI Identity")
+    reject_if(set(expected) == {"image_id_words", "build_id_words",
+                                "hw_revision", "site_present_bitmap",
+                                "capabilities", "max_transfer_bits"},
+              "Unknown expected Identity fields")
     for name in ("image_id_words", "build_id_words"):
         words = expected.get(name)
         reject_if(type(words) is list and len(words) == 4 and all(u32(w) for w in words),
@@ -94,7 +106,9 @@ def validate_board_descriptor(descriptor: dict, spec: dict) -> dict:
               "Missing HW revision")
     reject_if(mask8(expected.get("site_present_bitmap")) and
               expected["site_present_bitmap"] != 0, "No reviewed RTL Site present")
-    reject_if(expected.get("capabilities") in (1, 2, 3), "Unsupported protocol capability")
+    reject_if(type(expected.get("capabilities")) is int and
+              expected["capabilities"] in (1, 2, 3),
+              "Unsupported protocol capability")
     reject_if(type(expected.get("max_transfer_bits")) is int and
               8 <= expected["max_transfer_bits"] <= 8192 and
               expected["max_transfer_bits"] % 8 == 0,
