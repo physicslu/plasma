@@ -183,3 +183,21 @@ async def site1_reset_then_virtual_dpidr(dut):
     assert await b.write(0x64, 8) == OKAY
     assert await b.read(0x68) == (OKAY, 2)
     dut._log.info("FIXED_ABI_SWDSITE_DPIDR_PASS")
+
+
+@cocotb.test()
+async def injected_sim_driver_through_axi_to_virtual_swd_target(dut):
+    """Pure Python driver -> real AXI-Lite RTL -> legacy SWD master -> virtual target."""
+    from fixed_swd_site_driver import FixedSWDSiteSimDriver
+
+    b = Bench(dut)
+    await b.init()
+    driver = FixedSWDSiteSimDriver(b, site_id=1)
+    reset = await driver.transact(sequence=100, opcode=2, bit_count=64)
+    assert reset.sequence == 100 and reset.status == 0
+    assert b.target.resets == 1
+    dpidr = await driver.transact(sequence=101, opcode=1, bit_count=32, arg0=2)
+    assert dpidr.sequence == 101 and dpidr.status == 0
+    assert dpidr.data == 0x2BA01477
+    assert not driver.poisoned
+    dut._log.info("FIXED_ABI_DRIVER_AXILITE_SWD_VIRTUAL_TARGET_PASS")
