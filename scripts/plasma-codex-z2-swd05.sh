@@ -22,7 +22,7 @@ cleanup() {
   rm -f "$socket"
 }
 trap cleanup EXIT INT TERM
-echo "Fixed Z2 SSH-based SWD-05 internal loopback test, no power/reset/flash; run ${GITHUB_RUN_ID}"
+echo "Fixed Z2 SSH-based SWD-05 internal loopback test, FPGA candidate and recovery only; no USB power/JTAG/DUT flash; run ${GITHUB_RUN_ID}"
 echo "SWPC read-only live monitor:"
 echo "tmux -S $socket attach-session -r -t $session"
 tmux -S "$socket" -f /dev/null new-session -d -s "$session" \
@@ -35,7 +35,7 @@ test -S "$socket"
 chmod 0660 "$socket"
 
 waited=0
-while ((waited < 165)); do
+while ((waited < 470)); do
   if test -f "$out/complete"; then
     rc="$(cat "$out/exit_code")"
     [[ "$rc" =~ ^[0-9]{1,3}$ ]] || exit 2
