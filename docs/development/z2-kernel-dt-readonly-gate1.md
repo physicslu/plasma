@@ -9,7 +9,7 @@ Use the operator-enrolled **real PYNQ-Z2** on SWPC, not `z2like` QEMU, to obtain
 `pl/tools/z2_kernel_dt_readonly.py` is a self-contained Python-3.11+ stdlib script. It only reads explicitly enumerated `/sys` and `/proc` paths with bounded byte counts. It does not SSH, run subprocesses, inspect `/dev`, mmap, send MMIO, write FPGA Manager, install packages, bind/unbind drivers, control clocks/reset/power or write a report. It prints one sanitized JSON document to stdout; the **caller** owns private evidence retention on SWPC.
 
 Observation fields:
-- UTC collection timestamp, kernel release, **SHA256 of boot ID** (not the raw ID), SHA256 of `/proc/version` (not the build-host string).
+- UTC collection start/end timestamps, kernel release, **SHA256 of boot ID** (not the raw ID), SHA256 of `/proc/version` (not the build-host string). The boot ID **and kernel release are sampled twice**; a mismatch fails closed rather than mixing pre/post-reboot records. Matching samples are only a bounded consistency check, **not** an atomic state proof.
 - Compressed and decompressed `/proc/config.gz` hashes, selected FPGA/UIO compile flags, with missing config explicitly marked `UNAVAILABLE`.
 - Device Tree model/compatible, optional `/sys/firmware/fdt` SHA256 (a byte snapshot only; not proof of active overlays), FPGA Manager state/driver/DT compatible/syscon property digest.
 - FPGA Region driver and hashed `fpga-mgr`/`fpga-bridges` DT properties; FPGA Bridge class entries (null=unavailable, []=empty snapshot); UIO mapN physical `addr/size/offset` and bound driver.
@@ -66,6 +66,23 @@ evidence location (private SWPC), actual exit code, SHA256 manifest,
 Kernel/DT/source limitations and next measurable AXI/ownership
 qualification. Keep M1 NO-GO and Gate 2 separate.
 ```
+
+## Trusted SWPC execution boundary
+
+The existing `plasma-codex` self-hosted GitHub workflows explicitly reject
+untrusted pull-request code. Their Z2 jobs require the owner-authored, exact
+Issue #981 command, a reviewed checkout from `main`, and the expected
+dedicated SWPC runner identity. **Do not** weaken those controls, post an
+impersonated owner command, insert a PR-triggered hardware job, or run an
+unreviewed branch on a hardware-enabled CI runner.
+
+For this Gate 1, a separate locally authorized SWPC Codex session may
+inspect the current branch's script and execute only its bounded read-only
+SSH inventory under the existing enrollment/credential rules. If that
+session or connection is absent, set `actual_z2_collection=NOT_RUN` and
+`execution_blocker=NO_TRUSTED_SWPC_SESSION`. Creating a GitHub work order,
+passing CI, or seeing prior Z2 readiness successes does not imply this
+specific inventory was executed.
 
 ## Independent offline verification (this PR's actual CI scope)
 
