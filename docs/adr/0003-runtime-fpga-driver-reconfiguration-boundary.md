@@ -1,10 +1,29 @@
 # ADR-0003 — PPU Runtime FPGA Driver and Reconfiguration Boundary
 
-> **Status: Proposed** — Phase 1 architecture candidate, **not** an Accepted hardware/runtime contract.
+> **Status: Proposed (amended fixed-image v1 Gate 1 candidate)** — **not Accepted**, M1 NO-GO. Original dynamic-switching content retained below as deferred research.
 >
 > **Date:** 2026-10-16. **Related:** [Runtime FPGA Architecture v1.0 roadmap](../architecture/runtime-fpga-architecture-v1.md), [Proposed Hardware ABI v1](../architecture/runtime-fpga-hardware-abi-v1.md), [Switching/HIL plan](../development/runtime-fpga-switching-hil-plan-v1.md).
 >
 > **Authorization:** documentation and host-only analysis. No live FPGA load, unbind, physical MMIO, deployment, firmware updates, HIL-B/C or merge is authorized by this proposal.
+
+## 2026-10-17 Gate 1 amendment — first-generation Universal **Fixed** Image (normative candidate)
+
+**Decision status: PROPOSED / owner M1 review required.** This amends the prior *candidate* runtime-reconfiguration roadmap without claiming that ADR-0003 is Accepted, M1 frozen, or any RTL/real UIO implementation complete. For first-generation normal programming, **a single fixed Universal FPGA image is the product baseline** on development PYNQ-Z2 **XC7Z020 (Zynq-7020)**. Future Zynq-7010 cost-down remains a measured option, not a present FPGA resource constraint.
+
+**Product requirement vs mechanism:** switching exact target IC and SWD/SPI supported protocol must not reboot PS/Linux/Ethernet/Gateway. A Profile/Algorithm/Engine selection within one image satisfies this; **runtime bitstream A/B reload is not required for first-generation normal Jobs**. Every normal FPGA Manager firmware/reload operation, driver unbind/rebind, and direct Worker/REST image-load path is excluded by design. Boot-time provisioning and maintenance recovery are separate future safety/authorization flows. If measured Zynq-7020 timing, FF/LUT/BRAM or 2→8 throughput makes one Universal Image infeasible, reopen dynamic switching as a distinct ADR/M1 redesign and independently qualify K0..K5; do not silently enable the old proposal's reload fallback.
+
+**Gate 1 deliverable sources:**
+
+- [First-generation **full minimum SWD/SPI PIO** ABI v1 review candidate](../architecture/fixed-fpga-hardware-abi-v1-gate1.md) and [machine-readable JSON](../../pl/verification/fixed_image_abi_v1_gate1.json) define PPU Identity/Capabilities, Site 1–8, Sequence/Command/Response/FIFO/Timeout/Abort/Acknowledge, reserved offsets, endianness and versioning. JTAG/I2C/ICSP, IRQ and DMA are explicitly unsupported in this candidate v1 pending measured scope, not silently claimed implemented.
+- [UIO Driver admission and mapping contract](../development/fixed-fpga-uio-driver-contract-gate1.md) chooses **one 64-KiB PPU UIO map0 as preferred PoC candidate**, not as an unconditional production decision. Match Driver/DT/physical resource and unique UIO identity, not `/dev/uio0`. Host `uio_backend.py` remains ordinary-file-only; real `/dev/uio*` has **not** been enabled or tested by this work.
+- [Single privileged Hardware Broker and eight-Site ownership](../architecture/fixed-fpga-hardware-broker-eight-site-gate1.md) separates logical Batch Execution Owner, MMIO hardware owner, per-Site Transaction leases and independent Site Power/Reset/OE safety owner. One Batch exact IC across all admitted Sites; per-DUT data/status/results remain separate. Old in-memory Site lease/advisory `flock` do not provide Kernel-enforced noncooperating/DMA exclusivity.
+- [Host-only ABI/Mapping/Admission validator](../../pl/tools/fixed_image_abi_contract.py) rejects a mis-stated implementation status, runtime reload, fabricated eight physical Sites, wrong ABI/offsets, ambiguous UIO/resource, stale owner/lease/generation, unsupported capability and malformed SWD/SPI transactions. Its output is an **offline proposal review**, not an FPGA Readback, a production Driver, or access authorization.
+
+**What prior sections below mean after amendment:** references to FPGA Manager/Bridge, general-purpose runtime reload, A/B images, and future custom Kernel Driver are **deferred architecture alternatives or eventual maintenance/upgrade requirements**, not current first-generation normal-programming obligations. The prior proposed dynamic Image Switching path is superseded for the v1 runtime requirement. Retain its technical hazard and K0..K5 reasoning as independent evidence for any *future* loader plan.
+
+**M1 Freeze acceptance for the revised v1 scope:** explicit owner-reviewed ABI and data-plane control semantics; independently reviewed Zynq-7020 Board Descriptor, fixed-image provisioning policy and silicon capacity budget; UIO-versus-Kernel Driver decision with non-cooperative access risk assigned; single Broker/8 Site concurrency/Exact IC and IO-safe ownership specification; all Host-only source/checker/negative tests passing; RTL/PS owners sign off on ordering/FIFO/resource feasibility. Only then may ADR-0003 transition Proposed→Accepted through separately approved Gate 2; **physical MMIO, FPGA reload, eight-Site performance, and product/HIL qualification remain separately gated**.
+
+**Current verdict: M1 = NO-GO / ABI v1 = REVIEW CANDIDATE / hardware execution = NOT AUTHORIZED.**
 
 ## Context / non-negotiable requirements
 

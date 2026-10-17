@@ -1,0 +1,1687 @@
+{
+  "contract": "plasma-universal-fixed-fpga-abi-v1-gate1",
+  "status": "review_candidate_not_implemented",
+  "revision": 1,
+  "hardware": {
+    "development_soc": "XC7Z020-1CLG400C",
+    "product_soc": "UNDECIDED",
+    "image_lifecycle": "FIXED_PER_BOOT",
+    "runtime_fpga_reload_supported": false,
+    "full_reload_in_regular_job": false,
+    "axi_base_source": "VERIFIED_BOARD_DESCRIPTOR_NOT_HTTP",
+    "ppu_window_base_example": 1073741824,
+    "ppu_window_bytes": 65536,
+    "site_count_ceiling": 8,
+    "sites_physically_verified": 0
+  },
+  "transport": {
+    "endianness": "little",
+    "access_bits": 32,
+    "alignment_bytes": 4,
+    "map_policy": "SINGLE_UIO_MAP0_CANDIDATE_NOT_QUALIFIED",
+    "irq_v1": false,
+    "dma_v1": false,
+    "io_external_safety": "OUT_OF_PL_INDEPENDENT_CONTROL_REQUIRED"
+  },
+  "geometry": {
+    "aperture_bytes": 4096,
+    "identity_base": 0,
+    "global_base": 4096,
+    "shared_reserved": [
+      8192,
+      12288
+    ],
+    "sites_base": 16384,
+    "site_stride": 4096,
+    "site_count": 8,
+    "reserved_tail_base": 49152
+  },
+  "capabilities": {
+    "SWD": 0,
+    "SPI": 1,
+    "JTAG_RESERVED": 2,
+    "I2C_RESERVED": 3,
+    "ICSP_RESERVED": 4
+  },
+  "protocols": {
+    "SWD": 1,
+    "SPI": 2
+  },
+  "commands": {
+    "SWD_XFER": 1,
+    "SWD_LINE_RESET": 2,
+    "SPI_TRANSFER": 3
+  },
+  "results": {
+    "OK": 0,
+    "SWD_WAIT": 1,
+    "SWD_FAULT": 2,
+    "SWD_NO_ACK": 3,
+    "PARITY": 4,
+    "TIMEOUT": 5,
+    "ABORTED": 6,
+    "BAD_ARGUMENT": 7,
+    "ENGINE_UNAVAILABLE": 8,
+    "INTERNAL_FAULT": 9
+  },
+  "regions": [
+    {
+      "name": "identity",
+      "base": 0,
+      "size": 4096,
+      "kind": "registers",
+      "registers": [
+        {
+          "name": "MAGIC",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "Fixed little-endian ASCII PLSM, 0x4D534C50."
+        },
+        {
+          "name": "ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "High16 major=1; low16 minor=0; reject unknown major."
+        },
+        {
+          "name": "IMAGE_ID_W0",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Immutable image UUID word; all four checked against manifest."
+        },
+        {
+          "name": "IMAGE_ID_W1",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Immutable image UUID word; all four checked against manifest."
+        },
+        {
+          "name": "IMAGE_ID_W2",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Immutable image UUID word; all four checked against manifest."
+        },
+        {
+          "name": "IMAGE_ID_W3",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Immutable image UUID word; all four checked against manifest."
+        },
+        {
+          "name": "BUILD_ID_W0",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Build identity word; diagnostic, not cryptographic image attestation."
+        },
+        {
+          "name": "BUILD_ID_W1",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Build identity word; diagnostic, not cryptographic image attestation."
+        },
+        {
+          "name": "BUILD_ID_W2",
+          "offset": 32,
+          "access": "ro",
+          "semantics": "Build identity word; diagnostic, not cryptographic image attestation."
+        },
+        {
+          "name": "BUILD_ID_W3",
+          "offset": 36,
+          "access": "ro",
+          "semantics": "Build identity word; diagnostic, not cryptographic image attestation."
+        },
+        {
+          "name": "CAPABILITIES_LO",
+          "offset": 40,
+          "access": "ro",
+          "semantics": "Capabilities bit0 SWD bit1 SPI; any unsupported protocol bit must be 0."
+        },
+        {
+          "name": "CAPABILITIES_HI",
+          "offset": 44,
+          "access": "ro",
+          "semantics": "Reserved 0 in v1."
+        },
+        {
+          "name": "SITE_PRESENT_BITMAP",
+          "offset": 48,
+          "access": "ro",
+          "semantics": "Bits0..7 actual instantiated Sites; never claim Sites by max capacity."
+        },
+        {
+          "name": "SITE_READY_BITMAP",
+          "offset": 52,
+          "access": "ro",
+          "semantics": "Subset of present; readiness alone insufficient to admit jobs."
+        },
+        {
+          "name": "PPU_STATUS",
+          "offset": 56,
+          "access": "ro",
+          "semantics": "Bit0 PL_READY; bit1 FAULT; reserved 0. NOT AXI isolation evidence."
+        },
+        {
+          "name": "HW_REVISION",
+          "offset": 60,
+          "access": "ro",
+          "semantics": "Board-defined nonzero revision matched to Board Descriptor."
+        },
+        {
+          "name": "PPU_ERROR",
+          "offset": 64,
+          "access": "ro",
+          "semantics": "Latched diagnostic code; software may refuse admission."
+        },
+        {
+          "name": "MAP_REVISION",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "Value 1, exact map revision."
+        },
+        {
+          "name": "SITE_STRIDE_BYTES",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Value 4096; 4KiB per Site."
+        },
+        {
+          "name": "MAX_TRANSFER_BITS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "8..8192, multiple of 8; actual FIFO implementation constrained by RTL."
+        },
+        {
+          "name": "RESET_CAUSE",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Diagnostic only; no safe-state guarantee."
+        }
+      ]
+    },
+    {
+      "name": "global",
+      "base": 4096,
+      "size": 4096,
+      "kind": "registers",
+      "registers": [
+        {
+          "name": "GLOBAL_STATUS",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "Bit0 READY bit1 FAULT; no cross-Site commands."
+        },
+        {
+          "name": "FAULT_SITE_BITMAP",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Bit per faulted Site; indicates error, not isolation."
+        },
+        {
+          "name": "GLOBAL_EVENT",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Event bits0..7 only diagnostic; polling v1; no IRQ needed."
+        },
+        {
+          "name": "BROKER_EPOCH_HINT",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Optional hardware boot epoch hint; 0 denotes unavailable; never authoritative ownership."
+        }
+      ]
+    },
+    {
+      "name": "shared_0_reserved",
+      "base": 8192,
+      "size": 4096,
+      "kind": "reserved",
+      "registers": []
+    },
+    {
+      "name": "shared_1_reserved",
+      "base": 12288,
+      "size": 4096,
+      "kind": "reserved",
+      "registers": []
+    },
+    {
+      "name": "site_1",
+      "base": 16384,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 1,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_2",
+      "base": 20480,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 2,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_3",
+      "base": 24576,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 3,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_4",
+      "base": 28672,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 4,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_5",
+      "base": 32768,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 5,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_6",
+      "base": 36864,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 6,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_7",
+      "base": 40960,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 7,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "site_8",
+      "base": 45056,
+      "size": 4096,
+      "kind": "site",
+      "site_id": 8,
+      "registers": [
+        {
+          "name": "SITE_ID",
+          "offset": 0,
+          "access": "ro",
+          "semantics": "1..8; must match window index."
+        },
+        {
+          "name": "SITE_ABI_VERSION",
+          "offset": 4,
+          "access": "ro",
+          "semantics": "Major1 minor0; checked before writes."
+        },
+        {
+          "name": "SITE_CAPABILITIES",
+          "offset": 8,
+          "access": "ro",
+          "semantics": "Subset of image and board capability."
+        },
+        {
+          "name": "SITE_STATUS",
+          "offset": 12,
+          "access": "ro",
+          "semantics": "Exactly one IDLE(1), BUSY(2), DONE(4), FAULT(8) bit; FAULT requires explicit recovery."
+        },
+        {
+          "name": "SITE_ERROR",
+          "offset": 16,
+          "access": "ro",
+          "semantics": "Latched error enum; no automatic replay."
+        },
+        {
+          "name": "INFLIGHT_SEQ",
+          "offset": 20,
+          "access": "ro",
+          "semantics": "Accepted 32-bit sequence ID while BUSY; zero otherwise."
+        },
+        {
+          "name": "RX_WORDS_AVAILABLE",
+          "offset": 24,
+          "access": "ro",
+          "semantics": "Count of FIFO words readable; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "TX_WORDS_FREE",
+          "offset": 28,
+          "access": "ro",
+          "semantics": "Count of writeable FIFO words; 0..CAPACITY_WORDS."
+        },
+        {
+          "name": "COMMAND",
+          "offset": 32,
+          "access": "wo",
+          "semantics": "1 SWD_XFER, 2 SWD_LINE_RESET, 3 SPI_TRANSFER; commit last after setup and barrier."
+        },
+        {
+          "name": "SEQUENCE",
+          "offset": 36,
+          "access": "wo",
+          "semantics": "Nonzero unique sequence per Site and boot epoch; no reuse while pending."
+        },
+        {
+          "name": "PROTOCOL",
+          "offset": 40,
+          "access": "wo",
+          "semantics": "1 SWD, 2 SPI; must match opcode/capability."
+        },
+        {
+          "name": "FLAGS",
+          "offset": 44,
+          "access": "wo",
+          "semantics": "Bit0 SPI_CS_HOLD (SPI only), others 0; default deassert CS at command end."
+        },
+        {
+          "name": "BIT_COUNT",
+          "offset": 48,
+          "access": "wo",
+          "semantics": "SWD_XFER=32; SWD_LINE_RESET=50..128; SPI=8..MAX_TRANSFER_BITS and multiple of 8."
+        },
+        {
+          "name": "ARG0",
+          "offset": 52,
+          "access": "wo",
+          "semantics": "SWD request bits0 APnDP,1 RnW,2 A2,3 A3; other bits 0; SPI chip select 0..3."
+        },
+        {
+          "name": "WDATA",
+          "offset": 56,
+          "access": "wo",
+          "semantics": "SWD write data, or 0 for reads / SPI."
+        },
+        {
+          "name": "TIMEOUT_TICKS",
+          "offset": 60,
+          "access": "wo",
+          "semantics": "Hardware bounded budget; implementation-specific tick rate from board descriptor."
+        },
+        {
+          "name": "TX_DATA",
+          "offset": 64,
+          "access": "wo",
+          "semantics": "SPI FIFO push: little-endian bytes per 32-bit word, final padding zero."
+        },
+        {
+          "name": "RX_DATA",
+          "offset": 68,
+          "access": "ro",
+          "semantics": "SPI FIFO pop; SWD read uses DONE_DATA, not this FIFO."
+        },
+        {
+          "name": "DONE_SEQ",
+          "offset": 72,
+          "access": "ro",
+          "semantics": "Completed sequence, must equal submitted SEQUENCE."
+        },
+        {
+          "name": "DONE_STATUS",
+          "offset": 76,
+          "access": "ro",
+          "semantics": "Result enum; distinguish transport failure and target ACK."
+        },
+        {
+          "name": "DONE_WORDS",
+          "offset": 80,
+          "access": "ro",
+          "semantics": "Number of available result words, bounded by CAPACITY_WORDS."
+        },
+        {
+          "name": "ABORT",
+          "offset": 84,
+          "access": "wo",
+          "semantics": "Write 1: request abort for current Site; acknowledgement may fail; not bus-drain evidence."
+        },
+        {
+          "name": "CAPACITY_WORDS",
+          "offset": 88,
+          "access": "ro",
+          "semantics": "Actual FIFO depth, 1..256, checked before SPI load."
+        },
+        {
+          "name": "CLOCK_DIV",
+          "offset": 92,
+          "access": "wo",
+          "semantics": "Hardware serial clock divider 1..65535, per Site; accepted only when IDLE."
+        },
+        {
+          "name": "DONE_DATA",
+          "offset": 96,
+          "access": "ro",
+          "semantics": "SWD 32-bit read payload when DONE_STATUS=OK."
+        },
+        {
+          "name": "ACK_SEQ",
+          "offset": 100,
+          "access": "wo",
+          "semantics": "Ack completed DONE_SEQ only after result drained; returns Site to IDLE; no clear-on-read."
+        },
+        {
+          "name": "TRANSACTION_COUNTER",
+          "offset": 104,
+          "access": "ro",
+          "semantics": "Wraparound diagnostic completed-command count, never a durable identity."
+        }
+      ]
+    },
+    {
+      "name": "tail_reserved",
+      "base": 49152,
+      "size": 16384,
+      "kind": "reserved",
+      "registers": []
+    }
+  ],
+  "software_contract": {
+    "batch_exact_ic": "ONE_NONEMPTY_CANONICAL_EXACT_IC_PER_ACTIVE_PPU_BATCH",
+    "site_payloads": "INDEPENDENT",
+    "site_jobs": "AT_MOST_ONE_INFLIGHT_COMMAND_PER_SITE",
+    "broker": "ONE_PRIVILEGED_BACKEND_OWNER_PER_PPU",
+    "site_leases": "GENERATION_AND_OWNER_EPOCH_SCOPED",
+    "uio_discovery": "MATCH_PLATFORM_DRIVER_RESOURCE_AND_UNIQUE_NAME_NOT_UIO_INDEX",
+    "failure": "FAIL_CLOSED_NO_BLIND_RETRY",
+    "power_reset": "EXTERNAL_SITE_SAFETY_SEQUENCER",
+    "fpga_manager": "NO_RUNTIME_RELOAD_IN_V1",
+    "register_policy": "DENY_RESERVED_REGIONS_AND_UNLISTED_OFFSETS"
+  },
+  "transaction_contract": {
+    "ordering": [
+      "Verify image receipt and board resource before any map",
+      "Read and match Identity/Site ID/Capabilities",
+      "Require Site lease, exact batch IC, READY and Idle",
+      "Write arguments and bounded payload to FIFO",
+      "Issue software/device ordering barrier before COMMAND (HAL/HIL TBD)",
+      "Write COMMAND last with nonzero SEQUENCE",
+      "Poll bounded DONE_SEQ and STATUS; no unbounded bus wait claim",
+      "Read DONE_STATUS/DONE_DATA or drain RX_DATA",
+      "Write matching ACK_SEQ after successful drain",
+      "Release Site lease; fault and require reconciliation on ambiguous result"
+    ],
+    "swd_xfer": {
+      "bits": 32,
+      "argument": "ARG0 bits0:3 encode APnDP/RnW/A2/A3; source driver handles request parity",
+      "outcome": "SWD acknowledgement and read/write payload; WAIT/FAULT are terminal command responses, no implicit replay"
+    },
+    "swd_line_reset": {
+      "min_bits": 50,
+      "max_bits": 128,
+      "output": "SWDIO logical high for BIT_COUNT cycles; no per-target power or reset"
+    },
+    "spi_transfer": {
+      "min_bits": 8,
+      "byte_multiple": true,
+      "default_cs_release": true,
+      "tx_rx": "Full duplex, little-endian byte packing, length <= MAX_TRANSFER_BITS and FIFO capacity",
+      "cs": "ARG0 selects CS0..CS3 only; board wiring subject to independent review"
+    },
+    "no_runtime_reconfiguration": true,
+    "reserved_in_v1": [
+      "JTAG",
+      "I2C",
+      "ICSP",
+      "DMA",
+      "IRQ",
+      "FPGA_IMAGE_SWITCH",
+      "POWER_CONTROL",
+      "RESET_CONTROL"
+    ]
+  },
+  "qualification": {
+    "host_contract": "REQUIRED",
+    "rtl_implemented": false,
+    "real_z2_abi_readback": false,
+    "real_uio_hil": false,
+    "eight_site_hil": false,
+    "m1_architecture_freeze": "NO_GO_PENDING_OWNER_REVIEW",
+    "hardware_authority": false
+  }
+}
