@@ -125,6 +125,17 @@ class Gate1DContracts(unittest.TestCase):
             with self.assertRaisesRegex(gate.Denied,"JSON_INPUT_INVALID"):
                 gate.read_json(link)
 
+    def test_missing_json_input_is_sanitized_no_go(self) -> None:
+        script=ROOT/"scripts/plasma_engineering_dispatch_gate1d.py"
+        result=subprocess.run([sys.executable,str(script),"proposal",
+             "--proposal","/does-not-exist-for-gate1d-fixture.json"],
+             capture_output=True,text=True,timeout=6)
+        self.assertEqual(result.returncode,2)
+        self.assertEqual(result.stderr,"")
+        report=json.loads(result.stdout)
+        self.assertEqual(report["status"],gate.STATUS_BLOCKED)
+        self.assertEqual(report["reason"],"JSON_INPUT_INVALID")
+
     def test_cli_defaults_to_not_applied_and_no_go_for_unprotected(self) -> None:
         script=ROOT/"scripts/plasma_engineering_dispatch_gate1d.py"
         def run(*args):
