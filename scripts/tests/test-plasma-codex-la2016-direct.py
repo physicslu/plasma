@@ -131,7 +131,7 @@ class OfflineDirectContracts(unittest.TestCase):
         assert "invoke_codex(args,prompt(evidence,conn),out)" in source
         assert "guard.wait(timeout=" in source
         assert "watchdog_final_receipt" in source
-        assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def run()")[0]
+        assert "stdout=subprocess.DEVNULL" not in source.split("def invoke_codex")[1].split("def preparation_prompt")[0]
         assert "CALL_SUPERVISOR" not in source
         assert "pwm-off-confirmed" not in source  # separate marker from legacy path
 
