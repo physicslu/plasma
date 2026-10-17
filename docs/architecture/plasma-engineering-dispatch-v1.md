@@ -457,3 +457,86 @@ deployment, hardware, or production batch scheduler changes.
 **Separate Gate 2 is required for merging this code.** Real
 Ruleset configuration and one-shot canary each require a distinct
 operational authorization and successful environment readiness.
+
+## 9. Gate 1 executor choice and SWPC hardware capability — simple dual-path contract
+
+**Owner decision (2026-10-18): Gate 1 asks only who executes the approved
+work: ChatGPT or Codex. Do not add another approval stage or require
+Codex for simple ChatGPT/GitHub edits. Hardware access is NOT globally
+forbidden merely because SWPC is the executor.**
+
+### 9.1 One Gate 1 selection; two execution actors
+
+At the end of a scoped task plan, offer two choices only:
+- **Gate 1 — Approve, ChatGPT executes:** ChatGPT may modify scoped
+  software directly through an available authorized GitHub connection,
+  open a PR and read applicable CI. A ChatGPT proposal alone does not
+  grant a GitHub owner identity or hardware access. Hardware tasks use
+  an *existing separately authorized controlled SWPC channel*, never
+  unrestricted cloud-to-device access.
+- **Gate 1 — Approve, Codex executes:** An approved legacy dedicated
+  workflow or, later, a qualified unified Dispatcher can route to Codex.
+  The new unified Dispatcher remains OFF, so this choice is not evidence
+  of actual dispatch or runtime qualification.
+
+**Both routes** terminate in PR + CI + an *independent owner Gate 2*
+merger. Automatic merging, silent retries and automatic actor
+substitution are prohibited. GitHub CI is not equivalent to CD:
+deployment, runtime installation, FPGA reload and device power/reset
+operations require separate exact authorization.
+
+The executor choice is **orthogonal** to the existing strict
+Work Order capability (`software-pr`, `la2016-loopback`,
+`z2-readonly`, `z2-privileged`, etc.). No Work Order schema
+extension is needed to merely ask this Gate 1 question. Do not use
+execution actor (`chatgpt` / `codex`) as a permission grant.
+
+### 9.2 Hardware permission follows capability, not executor
+
+For SWPC hardware tasks, the precise one-shot capability contract
+defines which **existing controlled runner and device path** is
+eligible:
+
+| Capability | Allowed resource after independent one-shot owner approval | Not implied |
+| --- | --- | --- |
+| `la2016-loopback` | dedicated LA2016 USB, waveform capture and fixed off/watchdog boundary | Z2, FPGA reload, DUT power |
+| `z2-readonly` | approved Z2 read-only SSH/inventory | MMIO writes, FPGA reload, reset |
+| `z2-privileged` | separately supervised Z2 owner route within the approved HIL scope | arbitrary USB devices, DUT/hub power, root access |
+| `software-pr` / `software-readonly` | repository/software only | any instrument or DUT |
+
+Hardware tasks must carry `authorization_kind=hardware-one-shot`,
+exact authorized resources, test/recovery/watchdog plan, and real
+measurement or read-back evidence. Approval to run a Z2 SWD reset is
+not an approval to reload FPGA or cycle target power. Existing
+LA2016/Z2 one-shot legacy workflow checks stay intact; no new device
+permission, self-hosted runner or privileged account is introduced.
+
+### 9.3 Read-only contract artifact
+
+`scripts/plasma_engineering_gate1_executor.py` is a **small offline
+selection planner**. It validates the existing frozen Work Order and
+capability policy, accepts only `chatgpt` or `codex`, and emits a
+SHA256-bound route intent including Work Order hash, executor,
+capability and reviewed main SHA. If a different actor is selected,
+the route intent hash changes; no silent fallback or switch is
+permitted. It does not modify the Work Order schema or bypass its
+strict validation.
+
+All planner responses explicitly report:
+`github_owner_approval_verified=false`,
+`hardware_permission_granted=false`,
+`qualified_runtime_path=false` and `runtime_enabled=false`.
+The plan is **not authenticated owner approval**, a real Codex
+dispatch, GitHub claim, tool command, or hardware operation. Any
+future runtime adapter must independently verify the selected
+actor *as part of the exact approved owner action* before performing
+work, and preserve the original GitHub provenance checks.
+
+The new `plasma-engineering-gate1-executor-contract.yml` only runs
+read-only hosted CI (PR/main-push); its regression tests cover both
+actor paths, every current hardware capability, privilege escalation,
+mandatory one-shot authorization, SHA change on actor change, and
+no automatic actor fallback. This PR does **not** change any of the
+eleven existing `plasma-codex-*.yml` workflows, install a new live
+Dispatcher, or authorize physical lab equipment. **Gate 2 merge
+requires a separate explicit owner instruction.**
