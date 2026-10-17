@@ -179,7 +179,7 @@ POST /repos/physicslu/plasma/git/refs
 ```
 
 A successful HTTP **201** with the expected exact ref and SHA yields a
-sanitized `CLAIMED_ONCE_IMMUTABLE_GITHUB_REF` receipt. An HTTP **422**
+sanitized `CLAIMED_ONCE_GITHUB_REF_CREATE_CONFIRMED` receipt. An HTTP **422**
 means an already-present or invalid ref and must fail closed. Any other
 HTTP status, timeout, transport failure or malformed response also
 fails closed; never retry an ambiguous claim write. This is an **atomic
