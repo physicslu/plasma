@@ -28,6 +28,9 @@ import time
 import tty
 
 BASE = Path(__file__).resolve().parent
+# Current pinned checkout is the only import source on the dedicated Runner.
+sys.path.insert(0, str(BASE.parent))
+sys.path.insert(0, str(BASE.parent / "software/python"))
 SPEC = importlib.util.spec_from_file_location("z2_login", BASE / "plasma-codex-z2-login.py")
 assert SPEC and SPEC.loader
 LOGIN = importlib.util.module_from_spec(SPEC)
