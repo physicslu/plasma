@@ -183,9 +183,9 @@ def test_swd_unsupported_or_unsafe_request_fails(abi, broker, lease, swd, field,
 
 
 def test_swd_line_reset_explicit_bounds(abi, broker, lease, swd):
-    swd.update(opcode="SWD_LINE_RESET", bit_count=50, arg0=0, wdata=0)
+    swd.update(opcode="SWD_LINE_RESET", bit_count=64, arg0=0, wdata=0)
     assert admit_host_transaction(abi, broker, lease, swd)["writes"][-1] == ("COMMAND", 2)
-    swd["bit_count"] = 49
+    swd["bit_count"] = 50
     with pytest.raises(ContractError):
         admit_host_transaction(abi, broker, lease, swd)
 
@@ -220,3 +220,32 @@ def test_no_device_io_from_host_contract(tmp_path, abi, broker, lease, swd):
     validate_abi(abi)
     admit_host_transaction(abi, broker, lease, swd)
     assert before == list(tmp_path.iterdir())
+
+
+def test_semantic_metadata_and_error_codes_cannot_silently_regress(abi):
+    validate_abi(abi)
+    assert abi["results"]["NEED_RESET"] == 10
+    assert abi["results"]["PHY_ERROR"] == 11
+    site = {reg["name"]: reg for reg in abi["regions"][4]["registers"]}
+    assert site["SWD_RESPONSE_META"]["offset"] == 0x6C
+    assert site["SWD_RAW_STATUS"]["offset"] == 0x70
+    assert abi["transaction_contract"]["swd_timing"]["minimum"] == 2
+    assert abi["transaction_contract"]["swd_line_reset"]["required_high_clocks"] == 64
+
+
+@pytest.mark.parametrize("change", [
+    ("swd_line_reset", "required_high_clocks", 50),
+    ("swd_timing", "minimum", 1),
+    ("swd_metadata", "offset", 0x74),
+])
+def test_reject_semantic_abi_drift(abi, change):
+    key, field, value = change
+    abi["transaction_contract"][key][field] = value
+    with pytest.raises(ContractError):
+        validate_abi(abi)
+
+
+def test_clock_half_period_one_rejected(abi, broker, lease, swd):
+    swd["clock_div"] = 1
+    with pytest.raises(ContractError):
+        admit_host_transaction(abi, broker, lease, swd)
