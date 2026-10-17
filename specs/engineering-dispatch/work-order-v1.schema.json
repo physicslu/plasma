@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open4th.com/plasma/schemas/engineering-work-order-v1.json",
+  "title": "PLASMA Engineering Dispatch Work Order v1 (authoritative schema)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "work_order_id",
+    "revision",
+    "repository",
+    "issue_number",
+    "requested_by",
+    "objective",
+    "capability",
+    "entrypoint",
+    "scope",
+    "timeout_seconds",
+    "acceptance",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "plasma.engineering.work_order.v1"
+    },
+    "work_order_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository": {
+      "const": "physicslu/plasma"
+    },
+    "issue_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "requested_by": {
+      "const": "physicslu"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 2048
+    },
+    "capability": {
+      "enum": [
+        "software-readonly",
+        "software-pr",
+        "la2016-loopback",
+        "z2-readonly",
+        "z2-privileged"
+      ]
+    },
+    "entrypoint": {
+      "enum": [
+        "offline-analysis",
+        "software-pr",
+        "la2016-direct",
+        "z2-inventory",
+        "z2-hil-protected"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_repo_paths",
+        "deny_resources",
+        "required_permissions"
+      ],
+      "properties": {
+        "allow_repo_paths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//)[a-zA-Z0-9._/-]{1,160}$"
+          }
+        },
+        "deny_resources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "usb",
+              "z2",
+              "fpga",
+              "mmio",
+              "dut",
+              "hub-power",
+              "network-instrument",
+              "repository-write",
+              "host-root"
+            ]
+          }
+        },
+        "required_permissions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "repo:read",
+              "repo:write-branch",
+              "usb:la2016",
+              "ssh:z2-readonly",
+              "z2:hardware-owner"
+            ]
+          }
+        }
+      }
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 256
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "sanitized-receipt",
+          "ci-checks",
+          "pr-url",
+          "sha256-manifest",
+          "sr-waveform",
+          "readonly-inventory",
+          "offline-test-report"
+        ]
+      }
+    }
+  }
+}
