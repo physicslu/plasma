@@ -149,6 +149,8 @@ class RealAgentLA2016Contract(unittest.TestCase):
                             self.assertEqual(subject.watchdog(out, "1.2"), 0)
                             sleeper.assert_called_once_with(125)
                             off.assert_called_once_with("1.2")
+                            self.assertTrue((out / "watchdog-armed").exists())
+                            (out / "watchdog-armed").unlink()
                             (out / "pwm-off-confirmed").touch()
                             self.assertEqual(subject.watchdog(out, "1.2"), 0)
                             self.assertEqual(off.call_count, 1)
