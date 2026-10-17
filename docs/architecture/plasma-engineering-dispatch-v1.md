@@ -256,3 +256,111 @@ approval**. Subsequent activation must separately qualify protected
 GitHub claim refs and an actual isolated software-only Codex runner,
 then obtain an independent explicitly approved one-shot smoke run;
 a passed fake-model CI test is insufficient.
+
+## 7. Gate 1C — security preflight and truthful NO-GO (offline only)
+
+**Status: Gate 1C isolated-PR implementation, NOT runtime activation.**
+
+The prior Gate 1B GitHub create-ref CAS is useful, but **create-once is not
+immutable** if another principal can delete/rewrite the claim ref. We
+independently checked repository state on 2026-10-17: only the active
+`Protect Plasma main` ruleset (ID 20964250) exists and its branch selector
+includes only `~DEFAULT_BRANCH`; no dedicated active claim namespace
+ruleset exists. There are currently zero
+`refs/heads/plasma-engineering-claims/**` refs. Both facts are a hard
+**NO-GO** for live dispatcher activation, not a reason to relax gating.
+
+The repository presently contains **322 YAML workflows** (baseline before
+adding Gate 1C CI). `product-release.yml` is one concrete example of
+`push.branches: ["**"]`; although it has `paths` filters, we will not
+treat those as a proof of safety for a newly created ref. GitHub `create`
+events also exist, and workflow chaining is possible. For this reason the
+full checkout must be scanned and each potential exposure reviewed, rather
+than assuming that all workflows only run on `main`.
+
+### 7.1 Claim Ruleset Preflight
+
+`scripts/plasma_engineering_dispatch_gate1c.py check-rulesets`
+examines a read-only JSON snapshot of GitHub's **detailed** rulesets.
+It requires an active branch ruleset with exact
+`refs/heads/plasma-engineering-claims/**/*` selector, no excluded
+patterns, no bypass actors, and protection rules `deletion`, `update`
+and `non_fast_forward`. An active `main` rule, disabled or
+evaluation-only rules, allowlisted bypass principals, or omitted
+protection rules all fail closed. The positive fixture is **synthetic**
+and may not be presented as the live repository configuration.
+
+Important: GitHub's `update` restriction could prevent a normal claim
+creator from working. A ruleset *configuration match* is not sufficient
+to establish a viable write-once claim path: an independently approved
+future canary must prove that the intended claimant **can create** a
+ref but cannot subsequently update, force-push or delete it, including
+after job cancellation. If GitHub policy cannot express this separation
+without over-privileged bypass, use a different durable claim ledger.
+Do not loosen the protection rules to make the canary pass.
+
+This PR does **not** change any GitHub repository settings, configure
+rulesets, create a real ref, or test a live GitHub API write.
+
+### 7.2 Entire-workflow trigger audit
+
+`audit-workflows --directory .github/workflows` statically enumerates
+**every** `*.yml` and `*.yaml` file. It reports the exact count and
+metadata-only per-file inventory. Any `create` event,
+`push` event whose branch pattern can match
+`plasma-engineering-claims/<issue>/<id>-r<revision>`, an unrestricted
+push, `workflow_run` chaining, unreadable workflow, or unsupported
+trigger syntax produces `NO_GO_WORKFLOW_TRIGGER_RISK`. The scanner
+is **conservative**, does not execute workflow expressions, and does
+not treat `paths` or job-level `if` conditions as hardware security
+boundaries. It also surfaces indicators of self-hosted runners, secrets,
+and write permissions for review.
+
+New hosted-only Gate 1C CI requires that every checked-in YAML workflow
+was scanned and emits a sanitized full inventory Artifact. A reported
+`NO_GO` is an **expected honest finding**, not a green light for live
+dispatch. Static parsing is not a proof of all GitHub YAML expression
+semantics; unsupported cases are review-required. Before activation
+also verify GitHub's actual event behavior and privilege scope for the
+selected claim token. Normal `GITHUB_TOKEN` event recursion differs from
+GitHub App/PAT event propagation; do not assume token interchangeability.
+
+### 7.3 Credential isolation contract
+
+`specs/engineering-dispatch/credential-boundaries-v1.json` describes
+**four future job boundaries**, but does not provision credentials:
+
+| Future job | Contents permission | Codex model | Scope |
+| --- | --- | --- | --- |
+| Owner authorizer | read | never | Exact immutable owner approval |
+| Claim creator | write | never | Single atomic GitHub claim, no Codex access |
+| Software-only worker | read | permitted later | Hosted disposable, no GitHub write token |
+| PR publisher | write + pull-requests write | never | Broker publishes reviewed/sanitized change |
+
+Each role must use ephemeral hosted execution, checkout
+`persist-credentials:false`, no GitHub write credential in the
+model-visible process, and a separate audited artifact handoff between
+worker and publisher. **Do not** run the general software worker as
+SWPC's existing `plasma-codex` hardware-capable account. Any role
+combination, repository-wide write token in Codex's environment,
+persisted checkout secret, unexpected permission or self-hosted worker
+is an explicit negative test. The live token and OS sandbox boundaries
+remain **unverified** in Gate 1C.
+
+### 7.4 Migration and activation gates
+
+The user's migration direction is authoritative: **do not touch the
+existing 11 `plasma-codex-*.yml` workflows**. New tasks will eventually
+use the unified architecture; each legacy task migrates independently
+when next required and after parity/rollback validation.
+
+This Gate 1C changes only new offline security-preflight code, tests,
+fixtures, a new hosted-only CI workflow, and this documentation.
+No Issue-comment listener, `workflow_dispatch`, new claim ref, active
+Dispatcher, real Codex execution, SWPC login, LA2016, Z2, FPGA, hub
+power or DUT action. Gate 2 merger is separately approved.
+
+**Actual activation blockers:** claim namespace ruleset, validated
+read/write token identity and protection behavior, classification of
+every potentially exposed workflow, strict credential handoff, and
+a separate one-shot *software-only* live Codex acceptance.
