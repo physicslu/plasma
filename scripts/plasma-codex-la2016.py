@@ -282,6 +282,7 @@ def watchdog(out: Path, conn: str) -> int:
     worker_identity()
     if not re.fullmatch(r"[1-9][0-9]{0,2}\.[1-9][0-9]{0,2}", conn):
         return 2
+    (out / "watchdog-armed").open("x").close()
     time.sleep(125)
     if (out / "pwm-off-confirmed").exists():
         return 0
@@ -339,8 +340,21 @@ def run() -> int:
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL, start_new_session=True,
                 close_fds=True,
+                # A job cancellation must not cause GitHub's orphan reaper
+                # to kill the independent OFF attempt by tracking ID.
+                env={k: v for k, v in os.environ.items()
+                     if k != "RUNNER_TRACKING_ID"},
             )
-            report["watchdog_armed"] = daemon.pid > 0
+            armed_marker = out / "watchdog-armed"
+            for _ in range(30):
+                if armed_marker.is_file() and daemon.poll() is None:
+                    break
+                if daemon.poll() is not None:
+                    raise ValueError("PWM_WATCHDOG_EXITED")
+                time.sleep(0.1)
+            else:
+                raise ValueError("PWM_WATCHDOG_NOT_ARMED")
+            report["watchdog_armed"] = True
             try:
                 for freq, duty in PROFILE:
                     label = str(freq) + "hz"
