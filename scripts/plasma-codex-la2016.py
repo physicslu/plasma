@@ -294,6 +294,10 @@ def watchdog(out: Path, conn: str) -> int:
 
 def run() -> int:
     worker_identity()
+    def terminate(_signum: int, _frame: object) -> None:
+        raise RuntimeError("SUPERVISOR_INTERRUPTED")
+    signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGINT, terminate)
     out = Path(os.environ["PLASMA_LA2016_OUT"])
     if out.is_symlink() or not out.is_dir() or out.stat().st_uid != os.geteuid():
         raise ValueError("BAD_PRIVATE_OUTPUT")
@@ -372,7 +376,7 @@ def run() -> int:
                     report["result"] = "NO_GO_PWM_SHUTDOWN"
     except (OSError, ValueError, subprocess.TimeoutExpired,
             subprocess.SubprocessError, zipfile.BadZipFile, KeyError,
-            configparser.Error, PermissionError):
+            configparser.Error, PermissionError, RuntimeError, KeyboardInterrupt):
         report["result"] = "NO_GO"
     if rc != 0:
         report["result"] = report["result"] if report["result"] == "NO_GO_PWM_SHUTDOWN" else "NO_GO"
@@ -408,7 +412,7 @@ def main() -> int:
         return 2
     try:
         return run()
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, RuntimeError, KeyboardInterrupt):
         print("[LA2016] NO_GO at trusted host boundary", flush=True)
         return 2
 
