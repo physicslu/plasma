@@ -1,0 +1,43 @@
+name: PLASMA Engineering Dispatch Gate 1B Software-only Offline Acceptance
+
+# Gate 1B test-only. Neither issue_comment nor workflow_dispatch is installed.
+# GitHub global CAS design is exercised with a fake in-memory REST transport.
+# NO SWPC runner, LA2016, Z2, credentials, real Codex or GitHub claim writes.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-dispatch-gate1b-contract.yml"
+      - "scripts/plasma_engineering_dispatch_gate1b.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_gate1b.py"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-dispatch-gate1b-contract.yml"
+      - "scripts/plasma_engineering_dispatch_gate1b.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_gate1b.py"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  software-only-offline-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Offline immutable-ref GitHub claim and Codex simulation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/plasma_engineering_dispatch_gate1b.py \
+            scripts/tests/test_plasma_engineering_dispatch_gate1b.py
+          python3 scripts/tests/test_plasma_engineering_dispatch_gate1b.py
