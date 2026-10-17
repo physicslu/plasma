@@ -170,7 +170,7 @@ class OfflineDirectContracts(unittest.TestCase):
             )
 
     def test_agent_env_excludes_ci_tokens(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, \\
+        with tempfile.TemporaryDirectory() as tmp, \
              mock.patch.dict(os.environ, {"GITHUB_TOKEN":"secret-token",
                                           "ACTIONS_RUNTIME_TOKEN":"secret-rtc"}):
             command=[sys.executable,"-c",
