@@ -58,6 +58,14 @@ class OfflineDirectContracts(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"WAVEFORM_OUTSIDE_TOLERANCE"):
                 direct.validate_pair(root/dir/"on.sr",root/dir/"off.sr",hz,60)
         with tempfile.TemporaryDirectory() as temp:
+            out=Path(temp)
+            for hz, folder in ((1000,"1khz-50pct"),(2000,"2khz-25pct")):
+                for state in ("on","off"):
+                    source=root/folder/(state+".sr")
+                    (out/f"{hz}hz-{state}.sr").write_bytes(source.read_bytes())
+            with self.assertRaisesRegex(ValueError,"ARCHIVED_CAPTURE_REPLAY_DENIED"):
+                direct.evidence_report(out)
+        with tempfile.TemporaryDirectory() as temp:
             rootpath=Path(temp)/"bad.sr"
             with zipfile.ZipFile(rootpath,"w") as z:
                 z.writestr("metadata","incorrect")
