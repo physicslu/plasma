@@ -138,3 +138,144 @@ async def unified_reset_forgets_partial_aw_and_pending_read(dut):
     assert await b.write(0x24, 777, first="w") == OKAY
     assert await global_read(b, 0x0030) == (OKAY, 1)
     dut._log.info("PPU_UNIFIED_AXI_RESET_PARTIAL_TRANSACTION_PASS")
+
+
+@cocotb.test()
+async def unified_production_fixed_abi_controller_dpidr(dut):
+    """Real PS control implementation -> unified router -> Site1 RTL -> virtual DUT.
+
+    Only the Cocotb backend is simulated. No ARM device stores or real MMIO.
+    """
+    from test_fixed_fpga_swd_site_axi import production_fixed_abi_port
+    from plasma_interfaces.fixed_abi_swd import FixedABISWDController, FixedABIStatus
+
+    b = Bench(dut)
+    await b.init()
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    assert await global_read(b, 0x0038) == (OKAY, 1)
+    port = production_fixed_abi_port(b)
+
+    @cocotb.external
+    def execute_production_control():
+        controller = FixedABISWDController(port, base=SITE_BASE, site_id=1)
+        assert port.operations == []  # constructor does not touch AXI
+        reset = controller.transact(sequence=801, opcode=2, bit_count=64)
+        assert reset.status == FixedABIStatus.OK
+        assert reset.link_state == 1 and not reset.data_valid
+        dpidr = controller.transact(
+            sequence=802, opcode=1, bit_count=32, arg0=2,
+        )
+        assert dpidr.status == FixedABIStatus.OK
+        assert dpidr.data == 0x2BA01477
+        assert (dpidr.ack, dpidr.data_valid, dpidr.attempts,
+                dpidr.link_state, dpidr.raw_status) == (1, True, 1, 2, 0)
+        assert not controller.poisoned
+        assert port.barriers == 2
+        for seq, opcode in ((801, 2), (802, 1)):
+            start_idx = port.operations.index(("write", SITE_BASE + 0x20, opcode))
+            ack_idx = port.operations.index(("write", SITE_BASE + 0x64, seq))
+            assert port.operations[start_idx - 1] == ("barrier",)
+            assert start_idx < ack_idx
+        assert all(
+            SITE_BASE <= op[1] < SITE_BASE + 0x100
+            for op in port.operations if op[0] in ("read", "write")
+        )
+        return len(port.operations)
+
+    operations = await execute_production_control()
+    assert operations > 20 and b.target.resets == 1
+    assert await b.read(0x000C) == (OKAY, 1)
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    assert await global_read(b, 0x1004) == (OKAY, 0)
+    dut._log.info("SIM2_PRODUCTION_CONTROL_UNIFIED_AXI_DPIDR_PASS operations=%d",
+                  operations)
+
+
+@cocotb.test()
+async def unified_production_fixed_abi_controller_timeout_sticky_fault(dut):
+    """The production controller sees a fatal Site1 RTL fault via the router."""
+    from test_fixed_fpga_swd_site_axi import production_fixed_abi_port
+    from plasma_interfaces.fixed_abi_swd import (
+        FixedABISWDController, FixedABIError, FixedABIStatus,
+    )
+
+    b = Bench(dut)
+    await b.init()
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    port = production_fixed_abi_port(b)
+
+    @cocotb.external
+    def execute_timeout():
+        controller = FixedABISWDController(port, base=SITE_BASE, site_id=1)
+        try:
+            controller.transact(
+                sequence=811, opcode=2, bit_count=64, timeout_ticks=1,
+            )
+        except FixedABIError as exc:
+            assert exc.result is not None
+            assert (exc.result.sequence, exc.result.status) == (
+                811, FixedABIStatus.TIMEOUT,
+            )
+            assert exc.uncertain_target_effects
+        else:
+            raise AssertionError("Production controller missed the actual RTL timeout")
+        assert controller.poisoned
+        assert port.barriers == 1
+        try:
+            controller.transact(sequence=812, opcode=2, bit_count=64)
+        except FixedABIError as exc:
+            assert "poisoned" in str(exc)
+        else:
+            raise AssertionError("Poisoned production controller attempted a retry")
+        assert not any(op[:2] == ("write", SITE_BASE + 0x24) and
+                       op[2] == 812 for op in port.operations)
+        return len(port.operations)
+
+    count = await execute_timeout()
+    assert count > 10
+    assert await b.read(0x000C) == (OKAY, 8)
+    assert await b.read(0x0010) == (OKAY, 5)
+    assert await b.read(0x0068) == (OKAY, 1)
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    assert await global_read(b, 0x0034) == (OKAY, 0)
+    assert await global_read(b, 0x0038) == (OKAY, 3)
+    assert await global_read(b, 0x1004) == (OKAY, 1)
+    assert await global_read(b, 0x1008) == (OKAY, 1)
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    dut._log.info("SIM2_PRODUCTION_CONTROL_UNIFIED_AXI_STICKY_FAULT_PASS")
+
+
+@cocotb.test()
+async def unified_production_fixed_abi_controller_rejects_partial_wstrb(dut):
+    """Bad WSTRB produces real AXI SLVERR without executing Site1 START."""
+    from test_fixed_fpga_swd_site_axi import production_fixed_abi_port
+    from plasma_interfaces.fixed_abi_swd import FixedABISWDController, FixedABIError
+
+    b = Bench(dut)
+    await b.init()
+    port = production_fixed_abi_port(b, partial_sequence=True)
+
+    @cocotb.external
+    def execute_bad_wstrb():
+        controller = FixedABISWDController(port, base=SITE_BASE, site_id=1)
+        try:
+            controller.transact(sequence=821, opcode=2, bit_count=64)
+        except FixedABIError as exc:
+            assert "AXI write uncertain" in str(exc)
+            assert exc.uncertain_target_effects
+        else:
+            raise AssertionError("RTL/router accepted unsupported partial WSTRB")
+        assert controller.poisoned
+        assert port.barriers == 0
+        assert not any(op[:2] == ("write", SITE_BASE + 0x20)
+                       for op in port.operations)
+
+    await execute_bad_wstrb()
+    assert await b.read(0x000C) == (OKAY, 1)
+    assert await b.read(0x0048) == (OKAY, 0)
+    assert await b.read(0x0068) == (OKAY, 0)
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    assert await global_read(b, 0x1004) == (OKAY, 0)
+    dut._log.info("SIM2_PRODUCTION_CONTROL_UNIFIED_AXI_WSTRB_FAIL_CLOSED_PASS")
