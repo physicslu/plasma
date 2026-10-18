@@ -150,7 +150,7 @@ def test_hardware_timeout_latches_fault_even_after_matching_ack():
     p = WordPort()
     p.sticky_fault = True
     _, d = driver(p)
-    with pytest.raises(FixedABIError, match="external recovery") as e:
+    with pytest.raises(FixedABIError, match="independent recovery required") as e:
         d.transact(sequence=8, opcode=2, bit_count=64, timeout_ticks=1)
     assert e.value.result is not None
     assert e.value.result.sequence == 8
