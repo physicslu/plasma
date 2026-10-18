@@ -16,22 +16,30 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-A = "Verified exact owner comment authorization in this source fixture with isolated runtime."
-B = "The named source component demonstrates the guard and evidence handling contract."
-C = "The tmux component launches a bounded process and waits for its completion receipt."
-D = "The other program provides a separate control on session cleanup and process status."
-E = "The evidence producer verifies SHA256 checksums before reporting successful completion."
-F = "The workflow uploads a restricted receipt but does not claim hardware was tested."
-WORDS = "This analysis cites both fixed source excerpts and explains their concrete relationship. "
-
+WORDS = "This analysis cites both fixed implementation details and explains their enforced relationship. "
 QUOTES = {
-    mod.FILES[0]: A,
-    mod.FILES[1]: F,
-    mod.FILES[2]: C + "\n" + E,
-    mod.FILES[3]: D,
-    mod.FILES[4]: B,
-    mod.FILES[5]: A,
+    mod.FILES[0]: "AGENTS.md defines the repository engineering constraints in a fixed public file.",
+    mod.FILES[1]: (
+        "github.event.comment.body == '/plasma-codex pilot 981' binds the owner command to the authorize job.\n"
+        "uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 records the final receipt."
+    ),
+    mod.FILES[2]: (
+        'tmux -S "$socket" has-session -t "$session" checks the bounded interactive session.\n'
+        "sha256sum -c SHA256SUMS checks the final evidence before accepting the job."
+    ),
+    mod.FILES[3]: (
+        "codex --ask-for-approval never exec starts the noninteractive model in read-only sandbox."
+    ),
+    mod.FILES[4]: (
+        'COMMAND = "/plasma-codex pilot 981" verifies exact action identity against owner context.'
+    ),
+    mod.FILES[5]: "docs/development/plasma-codex-pilot.md describes the verified evidence process.",
 }
+
+
+def source_quote(topic, path):
+    token = mod.REQUIRED_ANCHORS[topic][path]
+    return next(line for line in QUOTES[path].splitlines() if token in line)
 
 
 class PilotAcceptanceTests(unittest.TestCase):
@@ -55,10 +63,10 @@ class PilotAcceptanceTests(unittest.TestCase):
                 {
                     "topic": topic,
                     "file": sorted(paths)[0],
-                    "quote": QUOTES[sorted(paths)[0]].split("\n")[0],
+                    "quote": source_quote(topic, sorted(paths)[0]),
                     "related_file": sorted(paths)[1],
-                    "related_quote": QUOTES[sorted(paths)[1]].split("\n")[0],
-                    "analysis": WORDS * 2,
+                    "related_quote": source_quote(topic, sorted(paths)[1]),
+                    "analysis": WORDS * 2 + " ".join(mod.REQUIRED_ANCHORS[topic].values()),
                 } for topic, paths in mod.TOPICS.items()
             ],
         }
@@ -123,6 +131,16 @@ class PilotAcceptanceTests(unittest.TestCase):
         self.response["findings"][2]["topic"] = "guard"
         self.save_response()
         self.assert_denied("TOPIC_DENIED")
+
+    def test_generic_analysis_without_code_anchors_denied(self):
+        self.response["findings"][0]["analysis"] = WORDS * 2
+        self.save_response()
+        self.assert_denied("ANALYSIS_DOES_NOT_EXPLAIN_CODE_ANCHORS")
+
+    def test_irrelevant_quote_without_implementation_anchor_denied(self):
+        self.response["findings"][0]["quote"] = QUOTES[mod.FILES[0]]
+        self.save_response()
+        self.assert_denied("SOURCE_QUOTE_UNGROUNDED")
 
     def test_extra_response_field_denied(self):
         self.response["hardware_pass"] = True
