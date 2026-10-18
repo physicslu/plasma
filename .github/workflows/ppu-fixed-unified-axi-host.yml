@@ -27,7 +27,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y iverilog
-          python -m pip install 'pytest>=8.0' 'pytest-asyncio>=0.23' cocotb cocotb-test 'PyYAML>=6.0'
+          python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
+          python -m pip install -e ./software/python
       - name: Unified AXI / Global Identity / Site1 SWD virtual target E2E
         run: python -m pytest -q pl/verification/test_fixed_ppu_unified_axi_rtl.py
       - name: Standalone Identity and SWD regressions
