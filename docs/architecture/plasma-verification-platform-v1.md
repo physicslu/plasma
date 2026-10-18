@@ -102,17 +102,21 @@ Relevant already-established branches of evidence:
   `FixedABISWDController` (merged PR #1022) has been tested through
   Cocotb AXI BFM, the actual **standalone Site-1 RTL**, and a virtual SWD
   target. This does **not** qualify a physical `/dev/uio*` backend.
-- **Unified 64-KiB PPU AXI:** latest main includes a top-level
-  `fixed_ppu_unified_axi_site1` router (merged PR #1019) for Identity,
-  Global Status and Site 1. The existing unified-path Cocotb suite
-  exercises a **simulation-only** `FixedSWDSiteSimDriver`.
-  **The production Fixed ABI PS controller through the unified 64-KiB
-  router remains a separate, unclaimed end-to-end acceptance item.**
+- **Unified 64-KiB PPU AXI:** merged PR #1019 provides the top-level
+  `fixed_ppu_unified_axi_site1` router for Identity, Global Status
+  and actual Site-1 RTL. In addition to the retained simulation-only
+  `FixedSWDSiteSimDriver` cases, the SIM-2 increment in PR #1025
+  executes the **same production `FixedABISWDController`** via the
+  existing injected Cocotb AXI port and unified 64-KiB router.
+  Directed cases cover virtual DPIDR, fatal timeout / global sticky FAULT
+  and partial WSTRB refusal. Qualification applies only to the exact
+  hosted CI commit whose run completed successfully. This does **not**
+  prove physical PS7/ARM MMIO, XSim, FPGA timing or eight Site instances.
 - **Site count:** the fixed ABI describes eight logical windows. Unified
   Site-1 RTL must report only the physically instantiated Site 1;
   `SITE_PRESENT=0x01` does not establish eight RTL engines.
 
-Recommended next SIM-2 acceptance (separate future Gate):
+SIM-2 Site-1 integration topology (implemented as a Host-only PR #1025 test increment; merge and other verification stages remain separately gated):
 ```text
 FixedABISWDController (production PS control; explicit injected port)
         |
