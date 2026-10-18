@@ -249,3 +249,80 @@ async def site1_rejects_reset_timing_drift_before_commit(dut):
     assert await b.write(0x20, 2) == OKAY
     assert await b.wait_done() == 4
     dut._log.info("FIXED_ABI_TIMING_BOUNDARY_PASS")
+
+
+@cocotb.test()
+async def v2_driver_fault_snapshot_persists_after_ack(dut):
+    """V2: driver -> real AXI RTL TIMEOUT, acknowledged result, sticky FAULT.
+
+    Uses the existing simulation-only fixed ABI driver, NOT the Linux/Uio
+    backend. This catches the gap between a fake-bus driver test and RTL-only
+    fault inspection without reloading PL or touching a physical board.
+    """
+    from fixed_swd_site_driver import FixedSWDSiteSimDriver, FixedSWDSliceError
+
+    b = Bench(dut)
+    await b.init()
+    driver = FixedSWDSiteSimDriver(b, site_id=1)
+    try:
+        await driver.transact(
+            sequence=501, opcode=2, bit_count=64, timeout_ticks=1,
+        )
+    except FixedSWDSliceError as exc:
+        assert "external recovery required" in str(exc)
+        result = exc.response
+        assert result is not None
+        assert (result.sequence, result.status, result.raw_status) == (501, 5, 7)
+        assert not result.data_valid
+    else:
+        raise AssertionError("Real RTL timeout did not propagate through driver")
+
+    assert driver.poisoned
+    # The driver already wrote matching ACK_SEQ: completion is consumed, but
+    # a fatal Site FAULT and its diagnostic evidence must remain latched.
+    assert await b.read(0x0C) == (OKAY, 8)
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.read(0x48) == (OKAY, 501)
+    assert await b.read(0x4C) == (OKAY, 5)
+    assert await b.read(0x68) == (OKAY, 1)
+    assert await b.read(0x70) == (OKAY, 7)
+    assert await b.write(0x64, 501) == SLVERR  # no second ACK
+
+    try:
+        await driver.transact(sequence=502, opcode=2, bit_count=64)
+    except FixedSWDSliceError as exc:
+        assert "poisoned" in str(exc)
+    else:
+        raise AssertionError("Poisoned driver issued another transaction")
+
+    assert await b.read(0x68) == (OKAY, 1)  # no silent retry/second launch
+    assert await b.write(0x24, 502) == SLVERR  # RTL remains faulted
+    dut._log.info("V2_FIXED_ABI_DRIVER_RTL_FAULT_ISOLATION_PASS")
+
+
+@cocotb.test()
+async def v2_driver_rejects_partial_axi_store_before_command(dut):
+    """V2: AXI WSTRB byte-store rejection poisons the driver before START."""
+    from fixed_swd_site_driver import FixedSWDSiteSimDriver, FixedSWDSliceError
+
+    class PartialStoreBench(Bench):
+        async def write(self, off, value, strb=15, first="aw"):
+            if off == 0x24:  # SEQUENCE: simulate unsupported sub-word store
+                strb = 1
+            return await super().write(off, value, strb=strb, first=first)
+
+    b = PartialStoreBench(dut)
+    await b.init()
+    driver = FixedSWDSiteSimDriver(b, site_id=1)
+    try:
+        await driver.transact(sequence=601, opcode=2, bit_count=64)
+    except FixedSWDSliceError as exc:
+        assert "Simulation AXI write rejected: 0x24" in str(exc)
+    else:
+        raise AssertionError("Partial AXI write was accepted by the driver")
+
+    assert driver.poisoned
+    assert await b.read(0x0C) == (OKAY, 1)  # still IDLE
+    assert await b.read(0x68) == (OKAY, 0)  # no protocol transaction started
+    assert await b.read(0x48) == (OKAY, 0)  # no completion claimed
+    dut._log.info("V2_FIXED_ABI_DRIVER_RTL_PARTIAL_STORE_REJECT_PASS")
