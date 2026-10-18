@@ -1,0 +1,42 @@
+{
+  "schema_version": "plasma.engineering.work_order.v1",
+  "work_order_id": "gate1b-software-smoke",
+  "revision": 1,
+  "repository": "physicslu/plasma",
+  "issue_number": 900002,
+  "requested_by": "physicslu",
+  "reviewed_main_sha": "f075d1b0c9b60d232fe8d31cf2057552ff09fc5f",
+  "authorization_kind": "gate1-implementation",
+  "objective": "Modify an isolated temporary documentation fixture with a fake Codex executable; no hardware or real model requests.",
+  "capability": "software-pr",
+  "entrypoint": "software-pr",
+  "scope": {
+    "allow_repo_paths": [
+      "docs/development",
+      "scripts/tests"
+    ],
+    "deny_resources": [
+      "usb",
+      "z2",
+      "fpga",
+      "mmio",
+      "dut",
+      "hub-power",
+      "network-instrument",
+      "host-root"
+    ],
+    "required_permissions": [
+      "repo:read",
+      "repo:write-branch"
+    ]
+  },
+  "timeout_seconds": 120,
+  "acceptance": [
+    "Deterministic mock command completes safely",
+    "Validated sanitized receipt and work-order digest"
+  ],
+  "evidence": [
+    "sanitized-receipt",
+    "offline-test-report"
+  ]
+}

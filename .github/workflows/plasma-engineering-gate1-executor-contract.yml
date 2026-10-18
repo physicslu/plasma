@@ -1,0 +1,42 @@
+name: PLASMA Engineering Gate 1 Executor Choice Offline Contract
+
+# An executor choice is not operational authorization.
+# No issue_comment, workflow_dispatch, SWPC runner, hardware, or real Codex.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-gate1-executor-contract.yml"
+      - "scripts/plasma_engineering_gate1_executor.py"
+      - "scripts/tests/test_plasma_engineering_gate1_executor.py"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-gate1-executor-contract.yml"
+      - "scripts/plasma_engineering_gate1_executor.py"
+      - "scripts/tests/test_plasma_engineering_gate1_executor.py"
+      - "scripts/plasma_engineering_dispatch_v1.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-executor-selection:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Gate 1 executor/hardware selection negative contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/plasma_engineering_gate1_executor.py \
+            scripts/tests/test_plasma_engineering_gate1_executor.py
+          python3 scripts/tests/test_plasma_engineering_gate1_executor.py

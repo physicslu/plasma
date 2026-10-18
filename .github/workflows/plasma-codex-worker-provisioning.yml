@@ -1,0 +1,40 @@
+name: PLASMA Codex SWPC host provisioning contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/plasma-codex-host-provision.sh"
+      - "scripts/plasma-codex-worker-readiness.py"
+      - "docs/development/plasma-codex-worker-provisioning.md"
+      - ".github/workflows/plasma-codex-worker-provisioning.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/plasma-codex-host-provision.sh"
+      - "scripts/plasma-codex-worker-readiness.py"
+      - "docs/development/plasma-codex-worker-provisioning.md"
+      - ".github/workflows/plasma-codex-worker-provisioning.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  host-only-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Shell syntax and harmless help contract
+        run: |
+          set -euo pipefail
+          bash -n scripts/plasma-codex-host-provision.sh
+          bash scripts/plasma-codex-host-provision.sh --help
+      - name: Python source and isolated unit probes
+        run: |
+          python3 -m py_compile scripts/plasma-codex-worker-readiness.py
+          python3 scripts/plasma-codex-worker-readiness.py --self-test
+      - name: Confirm no provisioning or hardware ran
+        run: |
+          echo "PASS: host-only syntax/self-tests. No --apply, sudo, runner registration, Codex login or hardware operation." >> "$GITHUB_STEP_SUMMARY"

@@ -19,7 +19,12 @@
         "device_scope",
         "flash_capacity",
         "package_family",
-        "debug_interfaces"
+        "debug_interfaces",
+        "physical_pin_mapping",
+        "power_pin_requirements",
+        "nrst_electrical_characteristics",
+        "package_mechanical_geometry",
+        "socket_design_input"
       ]
     },
     {

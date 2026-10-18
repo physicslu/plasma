@@ -1,0 +1,31 @@
+{
+  "schema": "plasma-z2-kernel-lineage-reference-v1",
+  "evidence_class": "PUBLIC_REFERENCE_NOT_TARGET_ATTESTATION",
+  "target_observation": {
+    "board": "PYNQ-Z2",
+    "kernel_release": "6.6.10-xilinx-v2024.1-g3c0eca68c652",
+    "commit_prefix": "3c0eca68c652",
+    "config_sha256": "842cd4d4f17487123ca33c7b04f593dc85340df11da59c2059ccc12b699a5169",
+    "matching_source_commit": null,
+    "matching_source_patchset_sha256": null,
+    "deployed_kernel_binary_sha256": null,
+    "deployed_dtb_sha256": null,
+    "source_to_binary_attested": false,
+    "registered_bridge_count": 0
+  },
+  "public_reference": {
+    "repository": "Xilinx/linux-xlnx",
+    "tag": "xilinx-v2024.1",
+    "commit": "e475cc1c9432587298212570c2af2be66b820c41",
+    "files": {
+      "drivers/fpga/zynq-fpga.c": "96611d424a104ed25b3d618688fd806cff430a1e",
+      "drivers/fpga/fpga-mgr.c": "6e8c45974f289917fa6b5b4b6544e9bf644cdc31",
+      "drivers/fpga/fpga-region.c": "b364a929425ce9b54345a0098e28837894359495",
+      "drivers/fpga/of-fpga-region.c": "48ac7617296e83b7ad4eafeba8ad2c730e951e09"
+    }
+  },
+  "source_classification": "REFERENCE_ONLY",
+  "axi_drain_measured": false,
+  "hardware_ready": false,
+  "reload_authorized": false
+}

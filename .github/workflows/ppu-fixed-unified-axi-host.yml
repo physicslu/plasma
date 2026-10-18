@@ -1,0 +1,41 @@
+name: PPU Fixed Unified 64KiB AXI/SWD Site1 Host RTL
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ppu-fixed-unified-axi-host.yml'
+      - 'pl/rtl/bus/fixed_ppu_unified_axi_site1.sv'
+      - 'pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv'
+      - 'pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv'
+      - 'pl/verification/test_fixed_ppu_unified_axi_rtl.py'
+      - 'pl/verification/cocotb/test_fixed_ppu_unified_axi.py'
+      - 'docs/architecture/fixed-ppu-unified-axi-site1-gate1.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unified-axi-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Icarus and Cocotb (Host-only)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
+          python -m pip install -e ./software/python
+      - name: Unified AXI / Global Identity / Site1 SWD virtual target E2E
+        run: python -m pytest -q pl/verification/test_fixed_ppu_unified_axi_rtl.py
+      - name: Standalone Identity and SWD regressions
+        run: |
+          python -m pytest -q pl/verification/test_fixed_ppu_global_identity_rtl.py
+          python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
+      - name: ABI/Host Driver admission contracts
+        run: |
+          python -m pl.tools.fixed_image_abi_contract pl/verification/fixed_image_abi_v1_gate1.json
+          python -m pytest -q pl/tests/test_fixed_image_abi_contract.py pl/tests/test_fixed_swd_site_slice_source.py pl/tests/test_fixed_ppu_global_admission_host.py

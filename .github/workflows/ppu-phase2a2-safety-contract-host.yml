@@ -1,0 +1,29 @@
+name: PPU Phase 2A.2 Safety Contract Host-only
+on:
+  pull_request:
+    paths:
+      - 'software/python/plasma_interfaces/configuration_safety_contract.py'
+      - 'software/python/tests/test_configuration_safety_contract_host.py'
+      - 'software/python/plasma_interfaces/configuration_owner.py'
+      - 'software/python/tests/test_configuration_owner_host.py'
+      - '.github/workflows/ppu-phase2a2-safety-contract-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project test dependencies
+        run: python -m pip install 'software/python[dev]'
+      - name: Host-only regressions (no devices)
+        env:
+          PYTHONPATH: software/python
+        run: python -m pytest -q software/python/tests/test_configuration_safety_contract_host.py software/python/tests/test_configuration_owner_host.py software/python/tests/test_uio_backend_host.py software/python/tests/test_linux_mmio.py

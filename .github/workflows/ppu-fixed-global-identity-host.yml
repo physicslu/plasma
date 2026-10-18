@@ -1,0 +1,42 @@
+name: PPU Fixed Global Identity and Resource Admission Host Gates
+on:
+  pull_request:
+    paths:
+      - 'pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv'
+      - 'pl/tools/fixed_ppu_global_admission_host.py'
+      - 'pl/tests/test_fixed_ppu_global_admission_host.py'
+      - 'pl/verification/cocotb/test_fixed_ppu_global_identity.py'
+      - 'pl/verification/test_fixed_ppu_global_identity_rtl.py'
+      - 'pl/verification/fixed_ppu_board_descriptor_host_v1.schema.json'
+      - 'pl/verification/examples/fixed_ppu_board_descriptor_synthetic.json'
+      - 'docs/architecture/fixed-ppu-global-identity-resource-admission-gate1.md'
+      - '.github/workflows/ppu-fixed-global-identity-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity-admission-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated Host simulator and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          python -m pip install 'pytest>=8.0' 'pytest-asyncio>=0.23' 'PyYAML>=6.0' cocotb cocotb-test
+      - name: Isolated Global Identity RTL AXI-Lite simulation
+        run: python -m pytest -q pl/verification/test_fixed_ppu_global_identity_rtl.py
+      - name: Host-only Board Descriptor and Broker Admission negative cases
+        run: python -m pytest -q pl/tests/test_fixed_ppu_global_admission_host.py
+      - name: Existing fixed-image ABI contract, no physical authority
+        run: |
+          python -m pl.tools.fixed_image_abi_contract pl/verification/fixed_image_abi_v1_gate1.json
+          python -m pytest -q pl/tests/test_fixed_image_abi_contract.py
+      - name: Existing synthetic UIO Host regression
+        run: PYTHONPATH=software/python python -m pytest -q software/python/tests/test_uio_backend_host.py

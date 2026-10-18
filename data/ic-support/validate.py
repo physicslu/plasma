@@ -10,6 +10,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 PROFILE_ROOT = HERE / "profiles"
+SOCKET_PROFILE_FILE = HERE / "socket-profiles" / "stm32f103c8t6-lqfp48-swd-v1.json"
 BINDING_FILE = HERE / "bindings" / "stm32f103c-pilot-v0.json"
 SOURCE_FILE = HERE / "evidence" / "sources.json"
 SCHEMA_FILE = HERE / "schema" / "ic-support-v0.schema.json"
@@ -274,7 +275,62 @@ def main() -> int:
     validate_programming(c8["programming"])
     validate_option(c8["option"])
     validate_security(c8["security"])
-    print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles")
+
+    reviewed_hw = profiles.get("stm32f103-lqfp48-programming-hardware-v1")
+    require(reviewed_hw is not None, "reviewed LQFP48 programming hardware profile is required")
+    hardware_data = reviewed_hw["data"]
+    require(hardware_data.get("package") == "LQFP", "reviewed hardware package drift")
+    require(hardware_data.get("pin_count") == 48, "reviewed hardware pin-count drift")
+    physical = hardware_data.get("physical_pin_map")
+    require(isinstance(physical, list) and len(physical) == 48, "complete 48-pin physical map is required")
+    by_pin = {item.get("pin"): item.get("name") for item in physical if isinstance(item, dict)}
+    require(len(by_pin) == 48 and set(by_pin) == set(range(1, 49)), "physical pin map must cover pins 1..48 exactly once")
+    require(by_pin[7] == "NRST", "NRST physical pin drift")
+    require(by_pin[34] == "PA13" and by_pin[37] == "PA14", "SWD physical pin drift")
+    require(by_pin[44] == "BOOT0", "BOOT0 physical pin drift")
+    require({by_pin[p] for p in (24, 36, 48)} == {"VDD_1", "VDD_2", "VDD_3"}, "VDD physical pin set drift")
+    require({by_pin[p] for p in (23, 35, 47)} == {"VSS_1", "VSS_2", "VSS_3"}, "VSS physical pin set drift")
+    require(by_pin[9] == "VDDA" and by_pin[8] == "VSSA", "analog supply physical pin drift")
+    route_hw = hardware_data.get("programming_route", {})
+    signals = route_hw.get("signals", {})
+    require(route_hw.get("primary_interface") == "SWD", "SWD must be the primary socket route")
+    require(signals.get("SWDIO", {}).get("pin") == 34, "SWDIO contact drift")
+    require(signals.get("SWCLK", {}).get("pin") == 37, "SWCLK contact drift")
+    require(signals.get("NRST", {}).get("pin") == 7, "NRST contact drift")
+    power = hardware_data.get("power", {})
+    require(power.get("programming_vdd_v") == {"min": 2.0, "max": 3.6}, "programming VDD range drift")
+    require(power.get("external_vpp_required") is False, "external VPP must remain false")
+    require(power.get("all_main_power_and_ground_pins_must_be_connected") is True, "all main power/ground contacts must be mandatory")
+    boundary = hardware_data.get("hardware_readiness_boundary", {})
+    require(boundary.get("socket_design_input_complete") is True, "socket design input must be complete")
+    require(boundary.get("physical_socket_qualified") is False, "hardware profile must not claim physical socket qualification")
+    require(boundary.get("hardware_runtime_ready") is False, "hardware profile must not claim hardware runtime readiness")
+    require(boundary.get("execution_authorized") is False, "hardware profile must not authorize execution")
+
+    socket = load_json(SOCKET_PROFILE_FILE)
+    require(socket.get("socket_profile_id") == "stm32f103c8t6-lqfp48-swd-socket-v1", "unexpected socket profile identity")
+    validate_evidence(socket, known_sources, socket["socket_profile_id"])
+    require(socket.get("status") == "design_input_ready", "socket profile must be design_input_ready")
+    target = socket.get("target", {})
+    require(target.get("icpn") == "STM32F103C8T6", "socket profile exact ICPN drift")
+    require(socket.get("programming_hardware_profile_id") == reviewed_hw["profile_id"], "socket/profile authority mismatch")
+    route = socket.get("route", {})
+    require(route.get("provider_qualification_level") == "L2", "socket route must consume an L2 software-qualified target")
+    require(route.get("interface") == "SWD", "socket route must use SWD")
+    required_contacts = set(route.get("required_contacts", []))
+    require(
+        required_contacts == {"SWDIO", "SWCLK", "NRST", "VDD_1", "VDD_2", "VDD_3", "VSS_1", "VSS_2", "VSS_3", "VDDA", "VSSA"},
+        "socket required-contact set drift",
+    )
+    readiness = socket.get("readiness", {})
+    require(readiness.get("sufficient_for_socket_schematic_and_pin_assignment_development") is True, "socket schematic input must be ready")
+    require(readiness.get("sufficient_for_socket_vendor_selection") is False, "socket vendor selection must remain unqualified")
+    require(readiness.get("sufficient_for_production_release") is False, "socket profile must not claim production readiness")
+    require(readiness.get("physical_programming_qualified") is False, "socket profile must not claim physical programming qualification")
+    require(readiness.get("hil_verified") is False, "socket profile must not claim HIL")
+    require(readiness.get("execution_authorized") is False, "socket profile must not authorize execution")
+
+    print(f"IC Support validation PASS: {len(seen)} bindings, {len(profiles)} profiles + socket design contract")
     return 0
 
 
