@@ -1,0 +1,37 @@
+name: PLASMA Engineering claim canary offline security contracts
+
+# No live canary on PR or main-push. Only GitHub-hosted offline tests.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-claim-canary.yml"
+      - ".github/workflows/plasma-engineering-claim-canary-contract.yml"
+      - "scripts/plasma_engineering_claim_canary.py"
+      - "scripts/tests/test_plasma_engineering_claim_canary.py"
+      - "docs/development/plasma-engineering-claim-canary.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-claim-canary.yml"
+      - ".github/workflows/plasma-engineering-claim-canary-contract.yml"
+      - "scripts/plasma_engineering_claim_canary.py"
+      - "scripts/tests/test_plasma_engineering_claim_canary.py"
+      - "docs/development/plasma-engineering-claim-canary.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-claim-canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Compile and verify synthetic protected-claim negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma_engineering_claim_canary.py scripts/tests/test_plasma_engineering_claim_canary.py
+          python3 scripts/tests/test_plasma_engineering_claim_canary.py
