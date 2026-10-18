@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y iverilog
-          python -m pip install pytest cocotb cocotb-test
+          python -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
       - name: RTL AXI-Lite SWD v1 virtual DPIDR
         run: python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
       - name: Validate machine ABI semantic contract
