@@ -1,0 +1,67 @@
+name: PLASMA Engineering software-pr offline broker candidate (Issue 981)
+
+# Gate 1 only: deterministic FAKE-Codex fixture and broker contract.
+# This file must never dispatch real Codex or operate SWPC/lab hardware.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-software-pr-pilot-contract.yml"
+      - "scripts/plasma_engineering_software_pr_pilot.py"
+      - "scripts/plasma_engineering_software_pr_broker.py"
+      - "scripts/tests/test_plasma_engineering_software_pr_pilot.py"
+      - "scripts/tests/test_plasma_engineering_software_pr_broker.py"
+      - "specs/engineering-dispatch/examples/software-pr-issue981-offline-pilot.json"
+      - "docs/development/plasma-engineering-software-pr-pilot.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-software-pr-pilot-contract.yml"
+      - "scripts/plasma_engineering_software_pr_pilot.py"
+      - "scripts/tests/test_plasma_engineering_software_pr_pilot.py"
+      - "specs/engineering-dispatch/examples/software-pr-issue981-offline-pilot.json"
+      - "docs/development/plasma-engineering-software-pr-pilot.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-candidate:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Python syntax and offline malicious-input regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma_engineering_software_pr_pilot.py scripts/plasma_engineering_software_pr_broker.py scripts/tests/test_plasma_engineering_software_pr_pilot.py scripts/tests/test_plasma_engineering_software_pr_broker.py
+          python3 scripts/tests/test_plasma_engineering_software_pr_pilot.py
+          python3 scripts/tests/test_plasma_engineering_software_pr_broker.py
+      - name: Trusted synthetic candidate / SHA256 broker handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -m 0700 -p "$RUNNER_TEMP/plasma-software-pr-offline"
+          python3 scripts/plasma_engineering_software_pr_pilot.py \
+            --work-order specs/engineering-dispatch/examples/software-pr-issue981-offline-pilot.json \
+            --policy specs/engineering-dispatch/capabilities-v1.json \
+            --artifacts "$RUNNER_TEMP/plasma-software-pr-offline"
+          (cd "$RUNNER_TEMP/plasma-software-pr-offline" && sha256sum -c SHA256SUMS)
+          python3 -c 'import json,pathlib,sys; sys.path.insert(0,"scripts"); import plasma_engineering_dispatch_v1 as core, plasma_engineering_software_pr_broker as broker; root=pathlib.Path("specs/engineering-dispatch"); out=pathlib.Path(sys.argv[1]); print(json.dumps(broker.publish_bundle(core.load_json(root/"examples/software-pr-issue981-offline-pilot.json"),core.load_json(root/"capabilities-v1.json"),out),sort_keys=True))' "$RUNNER_TEMP/plasma-software-pr-offline"
+          (cd "$RUNNER_TEMP/plasma-software-pr-offline" &&
+            sha256sum mock-publisher-receipt.json >> SHA256SUMS &&
+            sha256sum -c SHA256SUMS)
+      - name: Archive only synthetic broker evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-software-pr-offline-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-software-pr-offline/candidate-receipt.json
+            ${{ runner.temp }}/plasma-software-pr-offline/candidate.patch
+            ${{ runner.temp }}/plasma-software-pr-offline/SHA256SUMS
+            ${{ runner.temp }}/plasma-software-pr-offline/mock-publisher-receipt.json
+          if-no-files-found: error
+          retention-days: 14
