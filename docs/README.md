@@ -25,6 +25,7 @@
 ## Architecture and contracts
 
 - **Plan / Offline-only Gate 1A** — [Unified Engineering Dispatch v1](architecture/plasma-engineering-dispatch-v1.md)：定義 versioned Work Order、SHA256 owner approval、Capability Policy、離線授權及去重契約；所有既有 Codex Workflows 不修改，僅在未來派工時逐條遷移，**尚未部署或啟用新的 Runtime Dispatcher**。
+- **Gate 1 / Unified AXI / M1 NO-GO** — [Fixed PPU Unified 64KiB AXI Site1](architecture/fixed-ppu-unified-axi-site1-gate1.md)：AXI AW/W 配對、Identity + Site1 同一入口、Global Fault 連動及虛擬 SWD E2E；Host-only，尚未實機驗證。
 - **Gate 1 / PPU Identity / M1 NO-GO** — [PPU Global Identity & Resource Admission](architecture/fixed-ppu-global-identity-resource-admission-gate1.md)：隔離 AXI-Lite Identity、Host-only Board Descriptor／UIO Resource Discovery／Broker Site 准入與負向測試；未授權真實硬體。
 - **Gate 1 / Semantic Convergence / M1 NO-GO** — [Fixed FPGA ABI v1 SWD Semantic Convergence](architecture/fixed-fpga-swd-semantics-gate1.md)：SWD 64-clock Reset、半週期、ACK／Error、FAULT ACK、Sequence／Driver 競態；Host-only，尚未實機驗證。
 - **Gate 1 / Simulation-only / M1 NO-GO** — [Fixed FPGA SWD Site 1 RTL Vertical Slice](architecture/fixed-fpga-swd-site1-rtl-gate1.md)：隔離的 AXI-Lite／SWD Site 1 RTL 與模擬 Driver，Cocotb 虛擬 DPIDR 測試；不代表實體 FPGA／UIO／八通道已驗收。

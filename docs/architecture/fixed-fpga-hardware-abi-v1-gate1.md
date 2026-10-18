@@ -1,9 +1,11 @@
 # PLASMA Zynq-7020 Universal Fixed FPGA Image — Hardware ABI v1 / Gate 1
 
-> **Status: REVIEW CANDIDATE, NOT ACCEPTED, NOT IMPLEMENTED IN RTL. M1 = NO-GO.**
+> **Status: REVIEW CANDIDATE, NOT ACCEPTED. Partial, isolated Host-only RTL exists; no physical fixed-image build. M1 = NO-GO.**
 > Machine-readable authoritative **proposal**: [`fixed_image_abi_v1_gate1.json`](../../pl/verification/fixed_image_abi_v1_gate1.json).
 > This review has no live FPGA, MMIO, UIO, DUT, deployment, FPGA Manager or reload permission.
 > A successful Host validator only establishes that the **proposal is internally consistent**.
+
+> **Unified Address Space Gate 1:** [Host-only AXI Global Identity + SWD Site1 integrated routing](fixed-ppu-unified-axi-site1-gate1.md). Single 64KiB address aperture, Site1 present only; no actual FPGA image, M1 NO-GO.
 
 > **Semantic convergence Gate 1 amendment:** [SWD reset, clock, metadata, fault/ACK semantics](fixed-fpga-swd-semantics-gate1.md) supersedes earlier ambiguous SWD descriptions. Candidate still not Accepted; M1 NO-GO. New Site RO registers: SWD_RESPONSE_META (+0x06C), SWD_RAW_STATUS (+0x070).
 
@@ -44,10 +46,12 @@ The v1 proposed hardware transport is **32-bit little-endian, naturally aligned*
 | `0x048–0x050` | DONE_SEQ, DONE_STATUS, DONE_WORDS | RO | Completion must echo exact sequence; terminal result explicit |
 | `0x054` | ABORT | WO | Write 1 requests Site abort, **not** guaranteed bus cancellation |
 | `0x058` | CAPACITY_WORDS | RO | 0 when no SPI capability; 1–256 for SPI FIFO only; real depth must be measured |
-| `0x05C` | CLOCK_DIV | WO | Bounded integer 1–65535, only while IDLE |
+| `0x05C` | CLOCK_DIV | WO | SWD half-period FCLK cycles 2–65535; only while IDLE |
 | `0x060` | DONE_DATA | RO | SWD read 32-bit result on successful completion |
 | `0x064` | ACK_SEQ | WO | Only matching DONE_SEQ ACK consumes completion; fatal FAULT remains latched |
 | `0x068` | TRANSACTION_COUNTER | RO | Diagnostics only, wraps; not durable identity |
+| `0x06C` | SWD_RESPONSE_META | RO | Raw ACK, data-valid, attempts and link state |
+| `0x070` | SWD_RAW_STATUS | RO | Original legacy master diagnostic status, not public error enum |
 
 These are proposed **wire contracts**, NOT safe speculative offsets for the current FPGA! No read-modify-write and no access outside the approved RO/WO sets. All slots must return defined AXI responses; malformed requests should be rejected by **software prior to issuing an AXI transaction**. Whether RTL can fail safely for arbitrary accesses remains an independent hardware verification task.
 
@@ -56,8 +60,8 @@ These are proposed **wire contracts**, NOT safe speculative offsets for the curr
 1. Broker checks current Board Descriptor, bitstream receipt, UIO binding/physical map, PPU image Identity, exact Site identity, ABI major, capability bits, one active Site lease, same exact IC across the active batch, and independently qualified Site Power/Reset.
 2. Exactly **one outstanding command per Site**. Only an IDLE Site can accept a new command. A Site's sequence ID is a nonzero 32-bit value and must not be reused while pending. The broker tracks a separate boot/owner/mapping generation to prevent stale completion or sequence wrap becoming a new command.
 3. Set `SEQUENCE`, `PROTOCOL`, `FLAGS`, `BIT_COUNT`, `ARG0`, `WDATA`, `TIMEOUT_TICKS`, `CLOCK_DIV` and fill `TX_DATA` as required. Enforce the real FIFO depth and Board Descriptor timing policy. Apply the platform-qualified **device MMIO ordering barrier** before committing `COMMAND`; Python Host contract merely emits a `BARRIER_REQUIRED` marker, not a real barrier.
-4. Commands: `SWD_XFER=1` (protocol SWD=1, 32 data bits, ARG0 bit0 APnDP / bit1 RnW / bits2–3 A2/A3), `SWD_LINE_RESET=2` (50..128 logical-high cycles), `SPI_TRANSFER=3` (protocol SPI=2, 8..MAX_TRANSFER_BITS byte-multiple, full-duplex FIFO, CS0..3 from ARG0, FLAGS bit0 CS_HOLD). SWD request parity/turnaround is engine behavior to qualify; SWD WAIT/FAULT is an explicit completion class, **not** permission to replay an uncertain write.
-5. `SITE_STATUS`: exactly one of `IDLE=1`, `BUSY=2`, `DONE=4`, `FAULT=8`; `DONE_SEQ` must match submission. `DONE_STATUS` is one of `OK=0`, `SWD_WAIT=1`, `SWD_FAULT=2`, `SWD_NO_ACK=3`, `PARITY=4`, `TIMEOUT=5`, `ABORTED=6`, `BAD_ARGUMENT=7`, `ENGINE_UNAVAILABLE=8`, `INTERNAL_FAULT=9`. Collect DONE_DATA/PIO RX and then acknowledge exact `ACK_SEQ`. Never auto-replay a transaction whose effect is ambiguous.
+4. Commands: `SWD_XFER=1` (protocol SWD=1, 32 data bits, ARG0 bit0 APnDP / bit1 RnW / bits2–3 A2/A3), `SWD_LINE_RESET=2` (exactly 64 actively driven-high cycles; 64 Hi-Z preamble not counted), `SPI_TRANSFER=3` (protocol SPI=2, 8..MAX_TRANSFER_BITS byte-multiple, full-duplex FIFO, CS0..3 from ARG0, FLAGS bit0 CS_HOLD). SWD request parity/turnaround is engine behavior to qualify; SWD WAIT/FAULT is an explicit completion class, **not** permission to replay an uncertain write.
+5. `SITE_STATUS`: exactly one of `IDLE=1`, `BUSY=2`, `DONE=4`, `FAULT=8`; `DONE_SEQ` must match submission. `DONE_STATUS` is one of `OK=0`, `SWD_WAIT=1`, `SWD_FAULT=2`, `SWD_NO_ACK=3`, `PARITY=4`, `TIMEOUT=5`, `ABORTED=6`, `BAD_ARGUMENT=7`, `ENGINE_UNAVAILABLE=8`, `INTERNAL_FAULT=9`, `NEED_RESET=10`, `PHY_ERROR=11`. Collect DONE_DATA/PIO RX and then acknowledge exact `ACK_SEQ`. Never auto-replay a transaction whose effect is ambiguous.
 6. SPI packing: bytes in ascending least-significant byte lane of TX_DATA/RX_DATA, final high unused bits must be 0; `ceil(BIT_COUNT/32)` TX words; no silent FIFO overflow or out-of-order inter-site results. `MAX_TRANSFER_BITS` and `CAPACITY_WORDS` must be read from qualified hardware and jointly limit admission.
 7. Timeout/abort is only a **control-plane intention**. It cannot prove that AXI requests drained or that an ARM process escaped a Kernel/AXI hang. Any ambiguous state faults the Site and blocks unattended retry. `ACK_SEQ` cannot erase `FAULT` without an independent validated recovery procedure.
 
