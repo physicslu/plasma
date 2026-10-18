@@ -1,0 +1,44 @@
+{
+  "schema_version": "plasma.engineering.work_order.v1",
+  "work_order_id": "issue981-software-pr-offline-pilot",
+  "revision": 1,
+  "repository": "physicslu/plasma",
+  "issue_number": 981,
+  "requested_by": "physicslu",
+  "reviewed_main_sha": "98dc012aefb7fd91155d92238ce414fc8ace1aba",
+  "authorization_kind": "gate1-implementation",
+  "objective": "Run a deterministic synthetic software-only file edit inside a disposable hosted fixture, validate its exact allowlist and independent acceptance, and produce a candidate patch plus SHA256 receipt for a future trusted PR publisher; NO real Codex or GitHub publish.",
+  "capability": "software-pr",
+  "entrypoint": "software-pr",
+  "scope": {
+    "allow_repo_paths": [
+      "docs/development/software-pr-pilot/RESULT.md"
+    ],
+    "deny_resources": [
+      "usb",
+      "z2",
+      "fpga",
+      "mmio",
+      "dut",
+      "hub-power",
+      "network-instrument",
+      "host-root"
+    ],
+    "required_permissions": [
+      "repo:read",
+      "repo:write-branch"
+    ]
+  },
+  "timeout_seconds": 120,
+  "acceptance": [
+    "Trusted synthetic fixture baseline is SHA256 pinned",
+    "Only the single allowlisted synthetic documentation path changes",
+    "Expected fixture content and independently calculated patch are verified",
+    "Broker candidate SHA256 receipt does not publish a GitHub PR"
+  ],
+  "evidence": [
+    "sanitized-receipt",
+    "offline-test-report",
+    "sha256-manifest"
+  ]
+}
