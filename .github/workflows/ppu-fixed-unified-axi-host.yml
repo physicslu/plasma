@@ -8,6 +8,9 @@ on:
       - 'pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv'
       - 'pl/verification/test_fixed_ppu_unified_axi_rtl.py'
       - 'pl/verification/cocotb/test_fixed_ppu_unified_axi.py'
+      - 'pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py'
+      - 'software/python/plasma_interfaces/fixed_abi_swd.py'
+      - 'pl/verification/models/fixed_swd_site_driver.py'
       - 'docs/architecture/fixed-ppu-unified-axi-site1-gate1.md'
   workflow_dispatch:
 permissions:
