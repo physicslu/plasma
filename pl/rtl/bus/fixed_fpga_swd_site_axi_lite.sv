@@ -29,7 +29,8 @@ module fixed_fpga_swd_site_axi_lite #(
     output logic s_axi_rvalid,
     input logic s_axi_rready,
     input logic swdio_in,
-    output logic swclk, swdio_out, swdio_oe
+    output logic swclk, swdio_out, swdio_oe,
+    output logic site_ready_o, site_fault_o
 );
     localparam logic [1:0] OKAY=2'b00, SLVERR=2'b10;
     localparam logic [31:0] SITE_ID=32'd1, ABI=32'h00010000;
@@ -68,6 +69,10 @@ module fixed_fpga_swd_site_axi_lite #(
     assign s_axi_awready=s_axi_aresetn && !aw_hold && !s_axi_bvalid;
     assign s_axi_wready=s_axi_aresetn && !w_hold && !s_axi_bvalid;
     assign s_axi_arready=s_axi_aresetn && !s_axi_rvalid;
+    // Physical RTL Site 1 status, not a synthetic Global readiness constant.
+    assign site_fault_o = fault_latched;
+    assign site_ready_o = s_axi_aresetn && master_ready && !active;
+
 
     swd_transaction_master master (
         .clk(s_axi_aclk), .rst_n(s_axi_aresetn), .cmd_abort(abort_pulse),
