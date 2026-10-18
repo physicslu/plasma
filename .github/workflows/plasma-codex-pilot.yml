@@ -9,6 +9,8 @@ on:
       - ".github/workflows/plasma-codex-pilot.yml"
       - "scripts/plasma-codex-pilot*.sh"
       - "scripts/plasma-codex-pilot-contract.py"
+      - "scripts/plasma-codex-pilot-acceptance.py"
+      - "scripts/tests/test_plasma_codex_pilot_acceptance.py"
       - "docs/development/plasma-codex-pilot.md"
   push:
     branches: [main]
@@ -16,6 +18,8 @@ on:
       - ".github/workflows/plasma-codex-pilot.yml"
       - "scripts/plasma-codex-pilot*.sh"
       - "scripts/plasma-codex-pilot-contract.py"
+      - "scripts/plasma-codex-pilot-acceptance.py"
+      - "scripts/tests/test_plasma_codex_pilot_acceptance.py"
       - "docs/development/plasma-codex-pilot.md"
 
 permissions:
@@ -37,6 +41,8 @@ jobs:
       - name: Verify pilot authorization and execution contracts
         run: |
           python3 scripts/plasma-codex-pilot-contract.py check
+          python3 scripts/tests/test_plasma_codex_pilot_acceptance.py
+          python3 -m py_compile scripts/plasma-codex-pilot-acceptance.py scripts/tests/test_plasma_codex_pilot_acceptance.py
           bash -n scripts/plasma-codex-pilot.sh scripts/plasma-codex-pilot-inner.sh
 
   authorize:
@@ -117,7 +123,9 @@ jobs:
           name: plasma-codex-pilot-981-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/exit_code
-            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/last-message.txt
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/acceptance-report.json
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/assessment.json
+            ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/input-manifest.json
             ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/SHA256SUMS
             ${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/metadata.txt
           if-no-files-found: warn
