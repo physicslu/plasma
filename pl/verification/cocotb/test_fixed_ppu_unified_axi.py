@@ -109,3 +109,32 @@ async def unified_fault_flows_to_global_and_stays_sticky(dut):
     # Read-only Identity unaffected by fatal Site1 transaction.
     assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
     dut._log.info("PPU_UNIFIED_AXI_FAULT_ISOLATION_PASS")
+
+
+@cocotb.test()
+async def unified_reset_forgets_partial_aw_and_pending_read(dut):
+    b = Bench(dut)
+    await b.init()
+    # Half-arrived Site1 AW must not be paired with new post-reset W.
+    dut.s_axi_awaddr.value = SITE_BASE + 0x24
+    dut.s_axi_awvalid.value = 1
+    await b.tick()
+    dut.s_axi_awvalid.value = 0
+    assert int(dut.s_axi_awready.value) == 0
+    # Start an Identity read, deliberately leave response unconsumed.
+    dut.s_axi_araddr.value = 0x40000000
+    dut.s_axi_arvalid.value = 1
+    await b.tick()
+    dut.s_axi_arvalid.value = 0
+    dut.s_axi_aresetn.value = 0
+    await b.tick(3)
+    assert int(dut.s_axi_bvalid.value) == 0
+    assert int(dut.s_axi_rvalid.value) == 0
+    dut.s_axi_aresetn.value = 1
+    await b.tick(3)
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    assert await b.read(0x000C) == (OKAY, 1)
+    assert await global_write(b, 0x0004, 99, first="w") == SLVERR
+    assert await b.write(0x24, 777, first="w") == OKAY
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    dut._log.info("PPU_UNIFIED_AXI_RESET_PARTIAL_TRANSACTION_PASS")
