@@ -59,3 +59,44 @@ parallelism and per-Site fault isolation be qualified in RTL.
 
 Real ARMv7 MMIO width/barriers, XSim/Vivado and Z2 HIL need their own
 separate authorization and verification evidence.
+
+## Follow-up Gate 1 — Production fixed-ABI control code over real RTL
+
+The original Gate 1 above qualified a **simulation-only driver**. The
+follow-up user-approved Gate 1 introduces:
+
+- `software/python/plasma_interfaces/fixed_abi_swd.py`:
+  transport-neutral **production PS control logic** for fixed ABI v1;
+  one owned Site; exact identity/capability preflight; serialized
+  command sequencing; explicit write_barrier before COMMAND; dual DONE_SEQ
+  snapshot; metadata validation; matching ACK; fail-closed ambiguous I/O;
+  no auto-retry or in-band recovery.
+- `software/python/tests/test_fixed_abi_swd_control.py`: fast Host-only
+  negative contracts for ordering, identity, bad arguments, stale
+  completion, partial-store rejection and sticky fault.
+- `pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py`: three
+  additional Cocotb scenarios that call the **same synchronous production
+  control class** from an external worker with `cocotb.function`
+  callbacks: full AXI4-Lite AW/W/B and AR/R to the existing real RTL;
+  successful line-reset + virtual DPIDR; RTL timeout/fault; partial
+  WSTRB/SLVERR with no command launch.
+
+### Controlled interface and limitations
+
+Production **control algorithm** does not mean production **MMIO device
+access is qualified**. The injected port requires read32, write32, and
+write_barrier. The Cocotb port supplies a no-op in-order simulation
+barrier; this does NOT prove an ARMv7/PS7/Kernel Device-memory ordering
+barrier. Existing Host-only UIO backend refuses real character devices
+and has not been integrated or authorized as a live port. Actual board
+admission, mapped ownership, external DUT power/OE/NRST and real MMIO
+are separate work requiring Gate approval.
+
+Only the actual simulated Site 1 RTL is tested. The fixed-ABI v1 map
+describes eight logical Sites but does not instantiate eight engines.
+Hardware ABI fields, candidate RTL, M1 Freeze and Hardware Broker
+admission rules remain unchanged. All tests run GitHub-hosted; SWPC,
+Vivado, Z2, FPGA reload, DUT and deployment are excluded.
+
+**Gate 2:** requires explicit owner approval after checking the exact
+PR HEAD, CI PASS, mergeability and retained ABI contract coverage.
