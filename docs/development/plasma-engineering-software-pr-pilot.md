@@ -54,7 +54,14 @@ deterministic FAKE-Codex edit (no real model, no shell)
         |
 candidate.patch + candidate-receipt.json + SHA256SUMS
         |
-        +-- offline review ONLY (NO publish, NO PR)
+trusted mock PR Publisher rechecks Work Order / content / provenance
+        |
+        +-- simulated branch + simulated PR (in-memory only)
+        +-- replay / forged privilege / changed SHA256 => DENY
+        |
+mock-publisher-receipt.json
+        |
+        +-- offline review ONLY (NO GitHub push, NO real PR)
 ```
 
 The synthetic fixture's only allowed path is
@@ -78,6 +85,15 @@ python3 scripts/plasma_engineering_software_pr_pilot.py \
 (cd /tmp/plasma-software-pr-artifacts && sha256sum -c SHA256SUMS)
 ```
 
+The hosted workflow also calls `scripts/plasma_engineering_software_pr_broker.py`
+after the candidate is produced. It uses a deterministic, in-memory
+`MockPublisher` to simulate branch creation and PR publication and
+produces `mock-publisher-receipt.json`; no actual GitHub ref/PR is
+created. The broker verifies the entire candidate receipt schema,
+allowlisted file path, expected patch bytes and SHA256. It rejects
+forged access attestations, stale Work Order hashes, token claims,
+replay attempts, altered patches and untrusted status flags.
+
 Use a fresh, empty artifact directory. The hosted workflow generates
 the artifact in the runner's temporary folder, and GitHub uploads only
 the sanitized synthetic candidate files. The output receipt explicitly
@@ -85,7 +101,9 @@ reports: `real_codex_executed=false`,
 `owner_approval_verified=false`, `github_claim_created=false`,
 `github_pr_created=false`, `publisher_enabled=false`,
 `runtime_enabled=false`, `os_sandbox_isolation_verified=false`
-and `credential_isolation_verified=false`.
+and `credential_isolation_verified=false`. The simulated broker returns
+`MOCK_PR_CREATED_IN_MEMORY_ONLY` and keeps
+`github_pr_created=false`.
 
 ## Remaining true live-pilot blockers
 
@@ -120,7 +138,7 @@ or submit a new real-model job from this offline PR.
 
 ## Gate 2 checklist for this PR only
 
-Verify exact PR HEAD, current `main`, six-file scoped diff,
+Verify exact PR HEAD, current `main`, seven-file scoped diff,
 `mergeable_state=clean`, hosted workflows and non-skipped checks,
 negative test evidence and zero legacy Codex workflow modifications.
 Then ask for explicit owner approval to merge this PR. A separate
