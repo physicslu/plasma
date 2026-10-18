@@ -51,6 +51,9 @@ jobs:
             --artifacts "$RUNNER_TEMP/plasma-software-pr-offline"
           (cd "$RUNNER_TEMP/plasma-software-pr-offline" && sha256sum -c SHA256SUMS)
           python3 -c 'import json,pathlib,sys; sys.path.insert(0,"scripts"); import plasma_engineering_dispatch_v1 as core, plasma_engineering_software_pr_broker as broker; root=pathlib.Path("specs/engineering-dispatch"); out=pathlib.Path(sys.argv[1]); print(json.dumps(broker.publish_bundle(core.load_json(root/"examples/software-pr-issue981-offline-pilot.json"),core.load_json(root/"capabilities-v1.json"),out),sort_keys=True))' "$RUNNER_TEMP/plasma-software-pr-offline"
+          (cd "$RUNNER_TEMP/plasma-software-pr-offline" &&
+            sha256sum mock-publisher-receipt.json >> SHA256SUMS &&
+            sha256sum -c SHA256SUMS)
       - name: Archive only synthetic broker evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
