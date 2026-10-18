@@ -1,0 +1,111 @@
+"""Host-only 64KiB unified AXI+Identity+SWD Site1 Cocotb integration tests.
+
+Router is the only external AXI slave. No real physical address probing,
+kernel memory, GPIO, RTL FPGA image synthesis, or board electrical evidence.
+"""
+import cocotb
+
+from test_fixed_fpga_swd_site_axi import Bench, OKAY, SLVERR
+from fixed_swd_site_driver import FixedSWDSiteSimDriver
+
+SITE_BASE = 0x40004000
+IDENT_OFF = -0x4000  # Bench base is SITE_BASE; negative offset addresses Global.
+
+
+async def global_read(b, offset):
+    return await b.read(IDENT_OFF + offset)
+
+
+async def global_write(b, offset, val, *, first="aw"):
+    return await b.write(IDENT_OFF + offset, val, first=first)
+
+
+@cocotb.test()
+async def unified_64k_address_decode_and_site_presence(dut):
+    b = Bench(dut)
+    await b.init()
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    assert await global_read(b, 0x0004) == (OKAY, 0x00010000)
+    assert await global_read(b, 0x0028) == (OKAY, 1)   # SWD-only
+    assert await global_read(b, 0x0030) == (OKAY, 1)   # Site 1 only
+    assert await global_read(b, 0x0034) == (OKAY, 1)   # Site1 RTL genuinely IDLE
+    assert await global_read(b, 0x0038) == (OKAY, 1)
+    assert await global_read(b, 0x1000) == (OKAY, 1)
+    assert await b.read(0x0000) == (OKAY, 1)  # Site ID at +0x4000
+    assert await b.read(0x0004) == (OKAY, 0x00010000)
+    assert await b.read(0x0008) == (OKAY, 1)
+    assert await b.read(0x000C) == (OKAY, 1)
+    dut._log.info("PPU_UNIFIED_AXI_ADDRESS_IDENTITY_PASS")
+
+
+@cocotb.test()
+async def unified_protected_decode_and_split_axi_aw_w(dut):
+    b = Bench(dut)
+    await b.init()
+    # These intentionally invalid addresses MUST remain Cocotb-only.
+    for off in (0x0001, 0x0002, 0x0054, 0x0FFC, 0x1010,
+                0x2000, 0x3000, 0x5000, 0xB000, 0xC000, 0xFFFC,
+                0x10000, -4):
+        assert await global_read(b, off) == (SLVERR, 0), hex(off)
+    # Global is readonly. Supply W before AW and do NOT forward it to Site1.
+    assert await global_write(b, 0x0004, 0xA55A, first="w") == SLVERR
+    assert await global_read(b, 0x0004) == (OKAY, 0x00010000)
+    assert await b.read(0x000C) == (OKAY, 1)
+    # Valid Site1 write uses the very same bus, with AW/W in either order.
+    assert await b.write(0x24, 0x4321, first="w") == OKAY
+    assert await b.write(0x5C, 2, first="aw") == OKAY
+    assert await b.write(0x24, 0, first="aw") == SLVERR
+    # AW in missing Site2 window + W must not mutate Site1.
+    assert await global_write(b, 0x5000 + 0x24, 0x4322, first="w") == SLVERR
+    assert await b.read(0x000C) == (OKAY, 1)
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    dut._log.info("PPU_UNIFIED_AXI_SPLIT_AW_W_SAFE_DECODE_PASS")
+
+
+@cocotb.test()
+async def unified_identity_then_driver_reset_and_virtual_dpidr(dut):
+    b = Bench(dut)
+    await b.init()
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    driver = FixedSWDSiteSimDriver(b)
+    reset = await driver.transact(sequence=300, opcode=2, bit_count=64)
+    assert reset.status == 0
+    assert b.target.resets == 1
+    dp = await driver.transact(sequence=301, opcode=1, bit_count=32, arg0=2)
+    assert dp.status == 0 and dp.data == 0x2BA01477
+    assert dp.ack == 1 and dp.data_valid
+    assert (dp.attempts, dp.link_state, dp.raw_status) == (1, 2, 0)
+    assert not driver.poisoned
+    assert await global_read(b, 0x0034) == (OKAY, 1)
+    assert await global_read(b, 0x1004) == (OKAY, 0)
+    dut._log.info("PPU_UNIFIED_AXI_IDENTITY_DRIVER_DPIDR_PASS")
+
+
+@cocotb.test()
+async def unified_fault_flows_to_global_and_stays_sticky(dut):
+    b = Bench(dut)
+    await b.init()
+    assert await b.write(0x24, 450) == OKAY
+    assert await b.write(0x30, 64) == OKAY
+    assert await b.write(0x34, 0) == OKAY
+    assert await b.write(0x38, 0) == OKAY
+    assert await b.write(0x3C, 1) == OKAY
+    assert await b.write(0x20, 2) == OKAY
+    assert await b.wait_done(3000) == 8
+    assert await global_read(b, 0x0030) == (OKAY, 1)
+    assert await global_read(b, 0x0034) == (OKAY, 0)
+    assert await global_read(b, 0x0038) == (OKAY, 3)
+    assert await global_read(b, 0x1004) == (OKAY, 1)
+    assert await global_read(b, 0x1008) == (OKAY, 1)
+    assert await b.read(0x0048) == (OKAY, 450)
+    assert await b.read(0x004C) == (OKAY, 5)
+    assert await b.write(0x64, 450) == OKAY
+    assert await b.read(0x000C) == (OKAY, 8)
+    assert await global_read(b, 0x0034) == (OKAY, 0)
+    assert await global_read(b, 0x1004) == (OKAY, 1)
+    assert await b.write(0x24, 451) == SLVERR
+    # Read-only Identity unaffected by fatal Site1 transaction.
+    assert await global_read(b, 0x0000) == (OKAY, 0x4D534C50)
+    dut._log.info("PPU_UNIFIED_AXI_FAULT_ISOLATION_PASS")
