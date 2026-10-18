@@ -326,3 +326,155 @@ async def v2_driver_rejects_partial_axi_store_before_command(dut):
     assert await b.read(0x68) == (OKAY, 0)  # no protocol transaction started
     assert await b.read(0x48) == (OKAY, 0)  # no completion claimed
     dut._log.info("V2_FIXED_ABI_DRIVER_RTL_PARTIAL_STORE_REJECT_PASS")
+
+
+def production_fixed_abi_port(bench, *, partial_sequence=False):
+    """Simulation-only transport used by the actual PS control controller.
+
+    Every read/write issues AXI-Lite AW/W/B or AR/R handshakes on real RTL.
+    write_barrier models software ordering ONLY; ARMv7 barriers remain unproved.
+    """
+    @cocotb.function
+    async def axi_read32(address):
+        if type(address) is not int or (address & 3) or not BASE <= address < BASE + 0x100:
+            raise OSError("V2 read rejected before AXI")
+        resp, value = await bench.read(address - BASE)
+        if resp != OKAY:
+            raise OSError("Real RTL AXI RRESP=%d" % resp)
+        return value
+
+    @cocotb.function
+    async def axi_write32(address, value):
+        if (type(address) is not int or address & 3 or
+                not BASE <= address < BASE + 0x100 or
+                type(value) is not int or not 0 <= value <= 0xFFFFFFFF):
+            raise OSError("V2 write rejected before AXI")
+        strobes = 1 if partial_sequence and address == BASE + 0x24 else 15
+        resp = await bench.write(address - BASE, value, strb=strobes)
+        if resp != OKAY:
+            raise OSError("Real RTL AXI BRESP=%d" % resp)
+
+    class Port:
+        def __init__(self):
+            self.operations = []
+            self.barriers = 0
+
+        def read32(self, address):
+            value = axi_read32(address)
+            self.operations.append(("read", address, value))
+            return value
+
+        def write32(self, address, value):
+            axi_write32(address, value)
+            self.operations.append(("write", address, value))
+
+        def write_barrier(self):
+            # Valid for simulated in-order BFM only; not an ARM/Linux barrier.
+            self.operations.append(("barrier",))
+            self.barriers += 1
+
+    return Port()
+
+
+@cocotb.test()
+async def production_fixed_abi_driver_line_reset_and_dpidr(dut):
+    """Production PS control -> real RTL -> independent virtual SWD target."""
+    from plasma_interfaces.fixed_abi_swd import FixedABISWDController, FixedABIStatus
+
+    b = Bench(dut)
+    await b.init()
+    port = production_fixed_abi_port(b)
+
+    @cocotb.external
+    def exercise():
+        controller = FixedABISWDController(port, base=BASE, site_id=1)
+        assert port.operations == []  # no construction-time register side effects
+        reset = controller.transact(sequence=701, opcode=2, bit_count=64)
+        assert reset.status == FixedABIStatus.OK and reset.link_state == 1
+        result = controller.transact(sequence=702, opcode=1, bit_count=32, arg0=2)
+        assert result.status == FixedABIStatus.OK
+        assert result.data == 0x2BA01477
+        assert (result.ack, result.data_valid, result.attempts, result.link_state) == (
+            1, True, 1, 2,
+        )
+        assert controller.poisoned is False
+        assert port.barriers == 2
+        for sequence, opcode in ((701, 2), (702, 1)):
+            command = port.operations.index(("write", BASE + 0x20, opcode))
+            ack = port.operations.index(("write", BASE + 0x64, sequence))
+            assert port.operations[command - 1] == ("barrier",)
+            assert command < ack
+        return len(port.operations)
+
+    count = await exercise()
+    assert count > 20 and b.target.resets == 1
+    dut._log.info("V2_PRODUCTION_FIXED_ABI_DRIVER_REAL_RTL_DPIDR_PASS operations=%d", count)
+
+
+@cocotb.test()
+async def production_fixed_abi_driver_timeout_sticky_fault(dut):
+    """TIMEOUT really propagates RTL -> AXI BFM -> production control error."""
+    from plasma_interfaces.fixed_abi_swd import FixedABISWDController, FixedABIError
+    from plasma_interfaces.fixed_abi_swd import FixedABIStatus
+
+    b = Bench(dut)
+    await b.init()
+    port = production_fixed_abi_port(b)
+
+    @cocotb.external
+    def exercise():
+        controller = FixedABISWDController(port, base=BASE, site_id=1)
+        try:
+            controller.transact(
+                sequence=711, opcode=2, bit_count=64, timeout_ticks=1,
+            )
+        except FixedABIError as exc:
+            assert exc.result is not None
+            assert exc.result.sequence == 711
+            assert exc.result.status == FixedABIStatus.TIMEOUT
+            assert exc.uncertain_target_effects
+        else:
+            raise AssertionError("Timeout failed to propagate through production control")
+        assert controller.poisoned
+        try:
+            controller.transact(sequence=712, opcode=2, bit_count=64)
+        except FixedABIError as exc:
+            assert "poisoned" in str(exc)
+        else:
+            raise AssertionError("Poisoned Site was silently retried")
+
+    await exercise()
+    assert await b.read(0x0C) == (OKAY, 8)  # sticky fault, even after ACK
+    assert await b.read(0x10) == (OKAY, 5)
+    assert await b.read(0x68) == (OKAY, 1)  # only one transaction executed
+    dut._log.info("V2_PRODUCTION_FIXED_ABI_DRIVER_REAL_RTL_TIMEOUT_PASS")
+
+
+@cocotb.test()
+async def production_fixed_abi_driver_partial_store_fails_closed(dut):
+    """Partial WSTRB is a real RTL SLVERR; no command or auto-retry."""
+    from plasma_interfaces.fixed_abi_swd import FixedABISWDController, FixedABIError
+
+    b = Bench(dut)
+    await b.init()
+    port = production_fixed_abi_port(b, partial_sequence=True)
+
+    @cocotb.external
+    def exercise():
+        controller = FixedABISWDController(port, base=BASE, site_id=1)
+        try:
+            controller.transact(sequence=721, opcode=2, bit_count=64)
+        except FixedABIError as exc:
+            assert "AXI write uncertain" in str(exc)
+            assert exc.uncertain_target_effects
+        else:
+            raise AssertionError("RTL accepted partial WSTRB in PS driver")
+        assert controller.poisoned
+        assert port.barriers == 0
+        assert not any(op[:2] == ("write", BASE + 0x20)
+                       for op in port.operations)
+
+    await exercise()
+    assert await b.read(0x0C) == (OKAY, 1)
+    assert await b.read(0x68) == (OKAY, 0)
+    dut._log.info("V2_PRODUCTION_FIXED_ABI_DRIVER_REAL_RTL_WSTRB_FAIL_CLOSED_PASS")
