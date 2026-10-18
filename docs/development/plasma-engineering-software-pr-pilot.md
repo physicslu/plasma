@@ -138,7 +138,7 @@ or submit a new real-model job from this offline PR.
 
 ## Gate 2 checklist for this PR only
 
-Verify exact PR HEAD, current `main`, seven-file scoped diff,
+Verify exact PR HEAD, current `main`, eight-file scoped diff,
 `mergeable_state=clean`, hosted workflows and non-skipped checks,
 negative test evidence and zero legacy Codex workflow modifications.
 Then ask for explicit owner approval to merge this PR. A separate
