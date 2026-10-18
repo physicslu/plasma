@@ -7,19 +7,10 @@ test "$(id -un)" = plasma-codex || exit 90
 test "$GITHUB_REPOSITORY" = physicslu/plasma || exit 91
 cd "${GITHUB_WORKSPACE:?missing checkout}" || exit 92
 
-cat > "$out/prompt.txt" <<'PROMPT'
-PLASMA Issue #981 isolated Codex read-only bootstrap acceptance.
-Read ONLY these PUBLIC checked-in source files under the current repository:
-AGENTS.md, .github/workflows/plasma-codex-pilot.yml,
-scripts/plasma-codex-pilot.sh, scripts/plasma-codex-pilot-inner.sh,
-scripts/plasma-codex-pilot-contract.py,
-docs/development/plasma-codex-pilot.md.
-Return a concise technical assessment of the guard, tmux and evidence flow.
-Do not edit any file, execute shell commands, access secret files, scan /proc,
-/dev, /run or the network, contact Z2, USB Hub, LA or external devices.
-Do not invoke any tools beyond reading the listed public files.
-Do not claim any hardware test, PR, deployment, or runner isolation test passed.
-PROMPT
+# A deterministic runner-owned preparer embeds ONLY six checked-in public files
+# in the prompt. The model is not asked to discover paths or invoke any tools.
+python3 scripts/plasma-codex-pilot-acceptance.py prepare \
+  --root "${GITHUB_WORKSPACE}" --out "$out" || exit 93
 
 date -u '+start_utc=%Y-%m-%dT%H:%M:%SZ' > "$out/metadata.txt"
 printf 'github_run_id=%s\nsource_sha=%s\n' \
@@ -34,8 +25,22 @@ timeout --signal=TERM --kill-after=10s 900s \
     - < "$out/prompt.txt" 2>&1 | tee "$out/codex.jsonl"
 rc="${PIPESTATUS[0]}"
 set -e
+# A successful Codex process is not accepted unless it returned trace-clean,
+# schema-valid guard/tmux/evidence findings grounded in supplied source bytes.
+if python3 scripts/plasma-codex-pilot-acceptance.py verify \
+  --root "${GITHUB_WORKSPACE}" --out "$out" --codex-exit "$rc"; then
+  final_rc=0
+else
+  final_rc=1
+fi
 printf 'end_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "$out/metadata.txt"
-printf '%s\n' "$rc" > "$out/exit_code"
-( cd "$out" && sha256sum exit_code metadata.txt > SHA256SUMS )
+printf '%s\n' "$final_rc" > "$out/exit_code"
+( cd "$out" && \
+  if test -f assessment.json; then
+    sha256sum exit_code metadata.txt input-manifest.json acceptance-report.json assessment.json > SHA256SUMS
+  else
+    sha256sum exit_code metadata.txt input-manifest.json acceptance-report.json > SHA256SUMS
+  fi )
 touch "$out/complete"
-printf '\nCodex ended with rc=%s. Terminal session available until Actions finalizes.\n' "$rc"
+printf '\nCodex rc=%s; verified pilot rc=%s. This is not hardware acceptance.\n' "$rc" "$final_rc"
+

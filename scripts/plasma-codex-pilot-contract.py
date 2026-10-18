@@ -116,8 +116,18 @@ def check() -> None:
         "codex --ask-for-approval never exec",
         "timeout --signal=TERM --kill-after=10s 900s",
         'rc="${PIPESTATUS[0]}"',
+        "plasma-codex-pilot-acceptance.py prepare",
+        "plasma-codex-pilot-acceptance.py verify",
+        "sha256sum exit_code metadata.txt input-manifest.json acceptance-report.json",
     ):
         assert piece in inner, f"missing bounded Codex contract: {piece}"
+    assert "scripts/tests/test_plasma_codex_pilot_acceptance.py" in workflow
+    assert "python3 scripts/tests/test_plasma_codex_pilot_acceptance.py" in workflow
+    assert "acceptance-report.json" in workflow and "input-manifest.json" in workflow
+    assert "${{ runner.temp }}/plasma-codex-981-${{ github.run_id }}/last-message.txt" not in workflow
+    assert "github.event.comment.body == '/plasma-codex pilot 981'" in workflow
+    assert "runs-on: [self-hosted, linux, x64, plasma-codex]" in workflow
+    assert "sha256sum -c SHA256SUMS" in shell
     # This is a global CLI flag. In Codex CLI 0.162.1, placing it AFTER
     # `exec` causes clap argument parsing to exit 2 before the pilot runs.
     assert "codex exec" not in inner, "Codex approval flag must precede exec"
