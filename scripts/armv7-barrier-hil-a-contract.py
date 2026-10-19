@@ -101,7 +101,7 @@ def validate(main: str, host_ci: str, hosted_script: str | None = None) -> None:
         'test "$GITHUB_REPOSITORY" = physicslu/plasma',
         'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
         '--platform linux/amd64',
-        '--cap-drop=ALL',
+        '--cap-drop=NET_RAW',
         '--security-opt no-new-privileges',
         'dst=/plasma,readonly',
         'https://snapshot.debian.org/archive/debian/',
@@ -111,6 +111,8 @@ def validate(main: str, host_ci: str, hosted_script: str | None = None) -> None:
         'sha256sum',
     ):
         _require(marker in script, f"Immutable hosted wrapper missing: {marker}")
+    _require("--privileged" not in script and "--cap-add=" not in script,
+             "Hosted container must not request extra Docker capabilities")
     _require(re.search(
         r"(?m)^\s*(?:ssh|scp|sftp|rsync|sudo|vivado|curl|wget|gh|eval)\b",
         script,
