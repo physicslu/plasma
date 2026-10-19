@@ -104,7 +104,7 @@ def validate(main: str, host_ci: str, hosted_script: str | None = None) -> None:
         '--cap-drop=NET_RAW',
         '--security-opt no-new-privileges',
         'dst=/plasma,readonly',
-        'https://snapshot.debian.org/archive/debian/',
+        'http://snapshot.debian.org/archive/debian/',
         'gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf',
         'python3 /plasma/scripts/armv7-barrier-hil-a1.py build',
         '--expected-sha "$GITHUB_SHA"',
