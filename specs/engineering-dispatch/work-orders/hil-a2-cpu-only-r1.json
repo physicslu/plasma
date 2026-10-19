@@ -7,10 +7,9 @@
   "requested_by": "physicslu",
   "reviewed_main_sha": "121a7b3da6ecc1513b47d397ad70e68c9820f789",
   "authorization_kind": "hardware-one-shot",
-  "objective": "Future separately approved real PYNQ-Z2 Cortex-A9 CPU-only execution of exact frozen HIL-A1 DMB SY library; no physical execution authorized by this Gate 1.",
+  "objective": "Owner-scoped one-shot execution of frozen ARMv7 Cortex-A9 DMB SY library on enrolled PYNQ-Z2; exact immutable A1 ELF, CPU-only, 1000 calls, no FPGA/MMIO/DUT operations.",
   "capability": "z2-cpu-only",
   "entrypoint": "z2-cpu-only",
-  "runtime_status": "DISABLED_GATE1",
   "scope": {
     "allow_repo_paths": [
       "scripts/plasma_hil_a2_cpu_only.py",
