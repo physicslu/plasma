@@ -406,7 +406,8 @@ jobs:
       needs.development-authorize.result == 'success' &&
       needs.development-authorize.outputs.execution_path == 'path3-codex'
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: 12
+    # Long RTL/Vivado implementation is expected in Development Mode.
+    timeout-minutes: 360
     permissions:
       contents: read
     steps:
@@ -441,7 +442,7 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
-      - name: Codex autonomously tests candidate; preserve actual evidence
+      - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
@@ -462,34 +463,18 @@ jobs:
             > "$RUNNER_TEMP/plasma-path3-receipt.json"
           cat "$RUNNER_TEMP/plasma-path3-receipt.json"
           git -C trusted diff --exit-code
-          python3 - "$RUNNER_TEMP/plasma-path3-receipt.json" \
-            "$RUNNER_TEMP/plasma-path3-source.patch" <<'PY'
-          import json,subprocess,sys
-          from pathlib import Path
-          with open(sys.argv[1],encoding="utf-8") as file:
-              receipt=json.load(file)
-          source=receipt["source_path"]
-          allowed={source,receipt["output_path"],receipt["test_log_path"],
-                   receipt["codex_log_path"]}
-          status=subprocess.run(
-              ["git","-C","candidate","status","--porcelain=v1",
-               "--untracked-files=all","-z"],
-              check=True,capture_output=True,
-          ).stdout
-          for entry in status.split(b"\0"):
-              if not entry:
-                  continue
-              mode=entry[:2].decode("ascii")
-              name=entry[3:].decode("utf-8")
-              assert name in allowed and (name==source or mode=="??"), (
-                  "CODEX_UNAPPROVED_WORKSPACE_CHANGE",name,mode)
-              assert mode in ("??"," M"),("CODEX_STAGE_OR_CHANGE_DENIED",name,mode)
-          patch=subprocess.run(
-              ["git","-C","candidate","diff","--binary","--",source],
-              check=True,capture_output=True,
-          )
-          Path(sys.argv[2]).write_bytes(patch.stdout)
-          PY
+          # Development Mode: capture *all* candidate engineering changes.
+          # Never reject RTL/Tcl/Python/doc edits because they are not one
+          # predeclared generated Python output.
+          git -C candidate diff --binary > "$RUNNER_TEMP/plasma-path3-source.patch"
+          git -C candidate status --porcelain=v1 --untracked-files=all \
+            > "$RUNNER_TEMP/plasma-path3-status.txt"
+          git -C candidate ls-files --others --exclude-standard -z \
+            > "$RUNNER_TEMP/plasma-path3-new-file-list.nul"
+          if [ -s "$RUNNER_TEMP/plasma-path3-new-file-list.nul" ]; then
+            tar -C candidate --null -T "$RUNNER_TEMP/plasma-path3-new-file-list.nul" \
+              -czf "$RUNNER_TEMP/plasma-path3-new-files.tar.gz"
+          fi
           git -C candidate status --short
           sha256sum "$RUNNER_TEMP/plasma-path3-receipt.json" \
             > "$RUNNER_TEMP/plasma-path3-receipt.json.sha256"
@@ -501,6 +486,14 @@ jobs:
             ${{ runner.temp }}/plasma-path3-receipt.json
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
             ${{ runner.temp }}/plasma-path3-source.patch
+            ${{ runner.temp }}/plasma-path3-status.txt
+            ${{ runner.temp }}/plasma-path3-new-files.tar.gz
+            candidate/.plasma-path3-evidence/**
+            candidate/pl/build/**/*.log
+            candidate/pl/build/**/*.rpt
+            candidate/pl/build/**/*.bit
+            candidate/pl/build/**/*.hwh
+            candidate/pl/build/**/reports/**
             candidate/scripts/experiments/plasma_*_generated.py
             candidate/scripts/experiments/plasma_*_generated.csv
             candidate/scripts/experiments/plasma_*_generated.txt
