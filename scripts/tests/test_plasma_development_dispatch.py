@@ -229,6 +229,131 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             with self.subTest(field=field),self.assertRaises(dev.Denied):
                 dev.request(self.branch_event(),ctx)
 
+    def test_generic_cpu_only_route_has_no_test_specific_task_allowlist(self):
+        wf = WORKFLOW.read_text()
+        guard = wf.split("  development-execute:", 1)[1].split(
+            "  development-codex:", 1
+        )[0].split("    if: >-", 1)[1].split("    runs-on:", 1)[0]
+        self.assertIn("needs.development-authorize.result == 'success'", guard)
+        self.assertIn("outputs.execution_path == 'path2-cli'", guard)
+        self.assertIn("outputs.execution_capability == 'cpu-only'", guard)
+        self.assertIn("needs.development-claim.result == 'skipped'", guard)
+        self.assertNotIn("'nine-nine-path2'", guard)
+        self.assertNotIn("'auto4-premerge-path2'", guard)
+        self.assertNotIn("'1055'", guard)
+        self.assertNotIn("'b19fd8f6c9806e99678d8c5c71fc0f8634379ac3'", guard)
+        self.assertIn("execution_capability: ${{ steps.approve.outputs.execution_capability }}", wf)
+        self.assertIn("--execution-capability \"$EXECUTION_CAPABILITY\"", wf)
+
+    def test_a2_hardware_claim_route_is_still_restricted(self):
+        wf = WORKFLOW.read_text()
+        guard = wf.split("  development-execute:", 1)[1].split(
+            "  development-codex:", 1
+        )[0].split("    if: >-", 1)[1].split("    runs-on:", 1)[0]
+        self.assertIn("outputs.execution_capability == 'z2-cpu-only'", guard)
+        self.assertIn("outputs.task_id == 'hil-a2-cpu-only'", guard)
+        self.assertIn("needs.development-claim.result == 'success'", guard)
+        self.assertIn("needs.development-claim.outputs.claim_ref ==", guard)
+        self.assertIn("needs.development-claim.outputs.work_order_sha256 ==", guard)
+        self.assertIn("github.run_attempt == 1", guard)
+        self.assertIn("github.event.issue.number == 981", wf)
+        self.assertIn("github.actor == 'physicslu'", wf)
+        self.assertIn("needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only'", wf)
+
+    def test_task_names_do_not_set_cpu_capability_and_hardware_is_denied(self):
+        base = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
+        for name in ("my-project-smoke", "eeprom-algorithm-unit", "maths-only"):
+            reg = {
+                "schema_version": dev.VERSION,
+                "mode": "development",
+                "tasks": {name: dict(base)},
+            }
+            self.assertEqual(dev.task_by_id(reg, name)["capability"], "cpu-only")
+            self.assertEqual(
+                dev.authorize(
+                    self.branch_event(task=name), self.context(),
+                    reg, pr_info=self.valid_pr()
+                )["execution_capability"], "cpu-only"
+            )
+        for cap in ("z2-cpu-only", "usb", "hardware", "network", ""):
+            bad = dict(base, capability=cap)
+            with self.subTest(cap=cap), self.assertRaisesRegex(
+                dev.Denied, "DEV_CAPABILITY_DENIED"
+            ):
+                dev.task_by_id({
+                    "schema_version": dev.VERSION,
+                    "mode": "development", "tasks": {"cpu-generic": bad},
+                }, "cpu-generic")
+        for field, bad in (("verification", "nine-nine-table-v1"),
+                           ("verification", "unchecked")):
+            bad_task = dict(base, **{field: bad})
+            with self.subTest(verification=bad), self.assertRaisesRegex(
+                dev.Denied, "TASK_VERIFICATION_DENIED"
+            ):
+                dev.task_by_id({
+                    "schema_version": dev.VERSION,
+                    "mode": "development", "tasks": {"cpu-generic": bad_task},
+                }, "cpu-generic")
+        legacy = dict(base)
+        del legacy["capability"]
+        self.assertIs(dev.task_by_id({
+            "schema_version": dev.VERSION,
+            "mode": "development", "tasks": {"legacy-cpu": legacy},
+        }, "legacy-cpu"), legacy)
+
+    def test_cpu_only_sandbox_fails_closed_without_bwrap(self):
+        task = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            script = workspace / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text("print('ok')\\n")
+            with patch.object(dev.shutil, "which", return_value=None):
+                with self.assertRaisesRegex(
+                    dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"
+                ):
+                    dev.run_task(task, workspace=workspace, sandbox=True)
+
+    def test_cpu_only_sandbox_blocks_network_and_host_devices(self):
+        task = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
+        stdout = (ROOT / task["script"]).read_bytes()
+        # The stub preserves the ordinary SHA receipt while inspecting the
+        # real argv. This is an offline sandbox-contract test, not SWPC proof.
+        captured = []
+        class Child:
+            returncode = 0
+            stdout = (ROOT / task["script"]).read_text()[:0].encode()
+            stderr = b""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            script = workspace / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text("print('sandbox-test')\\n")
+            expected = b"sandbox-test\\n"
+            task["expected_stdout_sha256"] = hashlib.sha256(expected).hexdigest()
+            def fake_executor(command, **kwargs):
+                captured.append((command, kwargs))
+                return type("Child", (), {
+                    "returncode": 0, "stdout": expected, "stderr": b"",
+                })()
+            with patch.object(dev.shutil, "which", return_value=sys.executable):
+                receipt = dev.run_task(
+                    task, workspace=workspace,
+                    executor=fake_executor, sandbox=True,
+                )
+            self.assertEqual(receipt["status"], "PASS")
+            command, kwargs = captured[0]
+            self.assertIn("--unshare-all", command)
+            self.assertIn("--clearenv", command)
+            self.assertIn("--die-with-parent", command)
+            self.assertIn("--dev", command)
+            self.assertIn("--ro-bind", command)
+            self.assertIn("-I", command)
+            self.assertIn("-S", command)
+            self.assertNotIn("--share-net", command)
+            self.assertNotIn("--bind", command)
+            self.assertEqual(kwargs["timeout"], 40)
+
     def test_sha_only_candidate_cli_preserves_real_stdout_not_fixed_9x9(self):
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
