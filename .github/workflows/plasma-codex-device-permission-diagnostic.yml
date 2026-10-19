@@ -38,7 +38,7 @@ concurrency:
 
 jobs:
   contract:
-    if: \${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -70,8 +70,8 @@ jobs:
     steps:
       - name: Owner-only exact scope; no checkout, no Codex
         env:
-          REQUESTED_ORIGINAL_RUN: \${{ inputs.original_run }}
-          CONFIRM_READ_ONLY: \${{ inputs.confirm_read_only }}
+          REQUESTED_ORIGINAL_RUN: ${{ inputs.original_run }}
+          CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -85,14 +85,14 @@ jobs:
 
   inspect:
     needs: authorize
-    if: \${{ needs.authorize.result == 'success' }}
+    if: ${{ needs.authorize.result == 'success' }}
     runs-on: [self-hosted, linux, x64, plasma-codex]
     timeout-minutes: 5
     permissions:
       contents: read
     env:
-      INPUT_ORIGINAL_RUN: \${{ inputs.original_run }}
-      INPUT_CONFIRM_READ_ONLY: \${{ inputs.confirm_read_only }}
+      INPUT_ORIGINAL_RUN: ${{ inputs.original_run }}
+      INPUT_CONFIRM_READ_ONLY: ${{ inputs.confirm_read_only }}
     steps:
       - name: Verify exact SWPC diagnostic-only Linux identity BEFORE checkout
         shell: bash
@@ -112,7 +112,7 @@ jobs:
           test "$(id -u)" -ne 0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           clean: true
       - name: Metadata-only scan matching the FAILED device preflight
@@ -145,7 +145,7 @@ jobs:
       - name: Save short-lived metadata report (not device contents)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: plasma-codex-device-permission-39190291831-\${{ github.run_id }}
-          path: \${{ runner.temp }}/plasma-codex-device-permission-39190291831.json
+          name: plasma-codex-device-permission-39190291831-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-codex-device-permission-39190291831.json
           if-no-files-found: error
           retention-days: 3
