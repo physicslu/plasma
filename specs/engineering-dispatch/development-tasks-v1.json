@@ -17,8 +17,7 @@
     "hil-a2-cpu-only": {
       "execution_path": "path2-cli",
       "capability": "z2-cpu-only",
-      "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
-      "activation": "DISABLED_GATE1"
+      "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
     }
   }
 }
