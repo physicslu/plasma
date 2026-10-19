@@ -1,0 +1,151 @@
+name: PLASMA SWPC Codex device-permission read-only diagnosis (Run 39190291831)
+
+# PR/main CI is hosted only. The SWPC inspection requires a separate,
+# owner-initiated workflow_dispatch on main after Gate 2.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-device-permission-diagnostic.yml"
+      - "scripts/plasma_codex_device_permission_diagnostic.py"
+      - "scripts/tests/test_plasma_codex_device_permission_diagnostic.py"
+      - "docs/development/plasma-codex-device-permission-diagnostic.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-device-permission-diagnostic.yml"
+      - "scripts/plasma_codex_device_permission_diagnostic.py"
+      - "scripts/tests/test_plasma_codex_device_permission_diagnostic.py"
+      - "docs/development/plasma-codex-device-permission-diagnostic.md"
+  workflow_dispatch:
+    inputs:
+      original_run:
+        description: Original failed SWPC Codex job to diagnose
+        required: true
+        type: choice
+        options: ['39190291831']
+      confirm_read_only:
+        description: Confirm metadata-only SWPC observation; never execute Codex
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-device-permission-diagnostic-39190291831
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: \${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Offline contract tests, no SWPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma_codex_device_permission_diagnostic.py scripts/tests/test_plasma_codex_device_permission_diagnostic.py
+          python3 scripts/tests/test_plasma_codex_device_permission_diagnostic.py
+
+  authorize:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_attempt == 1 &&
+      inputs.original_run == '39190291831' &&
+      inputs.confirm_read_only == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Owner-only exact scope; no checkout, no Codex
+        env:
+          REQUESTED_ORIGINAL_RUN: \${{ inputs.original_run }}
+          CONFIRM_READ_ONLY: \${{ inputs.confirm_read_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REQUESTED_ORIGINAL_RUN" = 39190291831
+          test "$CONFIRM_READ_ONLY" = true
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_ACTOR" = physicslu
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_RUN_ATTEMPT" = 1
+
+  inspect:
+    needs: authorize
+    if: \${{ needs.authorize.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      INPUT_ORIGINAL_RUN: \${{ inputs.original_run }}
+      INPUT_CONFIRM_READ_ONLY: \${{ inputs.confirm_read_only }}
+    steps:
+      - name: Verify exact SWPC diagnostic-only Linux identity BEFORE checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_ACTOR" = physicslu
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          test "$INPUT_ORIGINAL_RUN" = 39190291831
+          test "$INPUT_CONFIRM_READ_ONLY" = true
+          test "$RUNNER_ENVIRONMENT" = self-hosted
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: \${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Metadata-only scan matching the FAILED device preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          report="$RUNNER_TEMP/plasma-codex-device-permission-39190291831.json"
+          python3 scripts/plasma_codex_device_permission_diagnostic.py --output "$report"
+          python3 - "$report" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          data=json.loads(Path(sys.argv[1]).read_text())
+          lines=[
+              "### SWPC Codex device metadata diagnosis — Run #39190291831",
+              f"Result: {data['status']}; this is NOT approval for any hardware or Codex execution.",
+              f"First matching NO_GO node: {data['first_trigger'] or 'not reproduced'}",
+              f"SWPC identity: {data['username']}; supplementary groups: {', '.join(data['groups'])}",
+              "Nodes that reproduce the original preflight:",
+          ]
+          for node in data['nodes']:
+              if node['triggers_original_no_go']:
+                  lines.append(f"- {node['path']}: {node['kind']} {node['mode']}, owner={node['user']}, group={node['group']}, readable={node['readable']}, writable={node['writable']}, ACL={node['acl']['status']}")
+          lines.append("No device file was opened; no model, GCC, deployment or hardware command was run.")
+          print("\n".join(lines))
+          with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as stream:
+              stream.write("\n".join(lines)+"\n")
+          PY
+      - name: Save short-lived metadata report (not device contents)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-device-permission-39190291831-\${{ github.run_id }}
+          path: \${{ runner.temp }}/plasma-codex-device-permission-39190291831.json
+          if-no-files-found: error
+          retention-days: 3
