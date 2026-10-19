@@ -7,6 +7,10 @@ on:
       - 'pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py'
       - 'pl/verification/models/fixed_swd_site_driver.py'
       - 'software/python/plasma_interfaces/fixed_abi_swd.py'
+      - 'software/python/plasma_interfaces/fixed_abi_mmio_port.py'
+      - 'software/python/plasma_interfaces/linux_mmio.py'
+      - 'software/python/tests/test_fixed_abi_mmio_port_host.py'
+      - 'software/python/native/armv7_mmio_barrier.c'
       - 'software/python/tests/test_fixed_abi_swd_control.py'
       - 'docs/development/fixed-abi-v2-ps-pl-host-verification-gate1.md'
       - 'pl/verification/fixed_image_abi_v1_gate1.json'
@@ -38,6 +42,8 @@ jobs:
           python -m pip install -e ./software/python
       - name: RTL AXI-Lite SWD v1 virtual DPIDR
         run: python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
+      - name: Fixed ABI P0 native-word port and barrier Host-only contracts
+        run: python -m pytest -q software/python/tests/test_fixed_abi_mmio_port_host.py
       - name: Production fixed ABI PS control negative contracts (host only)
         run: python -m pytest -q software/python/tests/test_fixed_abi_swd_control.py
       - name: Validate machine ABI semantic contract
