@@ -785,7 +785,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
             calls=[]
             class Ready:
                 returncode=0
-                stdout=(str(board)+"\\n").encode()
+                stdout=(str(board)+"\n").encode()
                 stderr=b""
             def runner(command,**kwargs):
                 calls.append((command,kwargs))
@@ -845,7 +845,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                     env={})
             class BadOutput:
                 returncode=0
-                stdout=b"not-an-absolute-path\\n"
+                stdout=b"not-an-absolute-path\n"
                 stderr=b""
             with self.assertRaisesRegex(build.BuildDenied,
                                         "BUILD_BOARD_REPO_PATH_DENIED"):
