@@ -136,20 +136,78 @@ def _validate_semantics(doc: dict, *, verify_source: bool) -> None:
             raise EvidenceError("Source digest does not match current checkout")
 
 
+def _schema_check(value: object, schema: dict, *, where: str = "$") -> None:
+    """Validate the intentionally small Draft-2020-12 schema vocabulary.
+
+    Avoid a new dependency for every legacy FPGA workflow. Refuse unknown
+    schema keywords instead of silently treating an unimplemented rule as PASS.
+    """
+    allowed = {"$schema", "$id", "title", "description", "type", "const",
+               "enum", "properties", "required", "additionalProperties",
+               "minLength", "pattern", "minimum", "minItems", "uniqueItems", "items"}
+    unknown = set(schema) - allowed
+    if unknown:
+        raise EvidenceError("Unsupported JSON Schema keywords: " + ", ".join(sorted(unknown)))
+
+    names = schema.get("type")
+    if names is not None:
+        if isinstance(names, str):
+            names = [names]
+        check = {
+            "object": lambda x: type(x) is dict,
+            "array": lambda x: type(x) is list,
+            "string": lambda x: type(x) is str,
+            "integer": lambda x: type(x) is int,
+            "null": lambda x: x is None,
+            "boolean": lambda x: type(x) is bool,
+        }
+        if not isinstance(names, list) or not names or any(x not in check for x in names):
+            raise EvidenceError("Unsupported type in JSON Schema at " + where)
+        if not any(check[k](value) for k in names):
+            raise EvidenceError(where + " does not match JSON Schema type")
+    if "const" in schema and value != schema["const"]:
+        raise EvidenceError(where + " violates schema const")
+    if "enum" in schema and value not in schema["enum"]:
+        raise EvidenceError(where + " is outside schema enum")
+
+    if type(value) is dict:
+        required = schema.get("required", [])
+        if not set(required).issubset(value):
+            raise EvidenceError(where + " missing required fields")
+        properties = schema.get("properties", {})
+        if schema.get("additionalProperties") is False and set(value) - set(properties):
+            raise EvidenceError(where + " contains unexpected fields")
+        for key, child in properties.items():
+            if key in value:
+                _schema_check(value[key], child, where=where + "." + key)
+    if type(value) is str:
+        if len(value) < schema.get("minLength", 0):
+            raise EvidenceError(where + " is shorter than minLength")
+        if "pattern" in schema and not re.search(schema["pattern"], value):
+            raise EvidenceError(where + " violates schema pattern")
+    if type(value) is int and value < schema.get("minimum", value):
+        raise EvidenceError(where + " violates minimum")
+    if type(value) is list:
+        if len(value) < schema.get("minItems", 0):
+            raise EvidenceError(where + " has fewer than minItems")
+        if schema.get("uniqueItems") and len(
+            {json.dumps(item, sort_keys=True) for item in value}
+        ) != len(value):
+            raise EvidenceError(where + " has duplicate items")
+        if "items" in schema:
+            for idx, item in enumerate(value):
+                _schema_check(item, schema["items"], where=where + "[" + str(idx) + "]")
+
+
 def validate_receipt(doc: dict, *, verify_source: bool = False) -> None:
     try:
-        from jsonschema import Draft202012Validator
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-        Draft202012Validator.check_schema(schema)
-        Draft202012Validator(schema).validate(doc)
-    except ImportError as exc:
-        raise EvidenceError("jsonschema dependency missing: cannot validate") from exc
-    except Exception as exc:
-        if isinstance(exc, EvidenceError):
-            raise
-        raise EvidenceError("Evidence Schema validation failed: " + str(exc)) from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise EvidenceError("Unable to read versioned evidence Schema") from exc
+    if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        raise EvidenceError("Unexpected evidence JSON Schema dialect")
+    _schema_check(doc, schema)
     _validate_semantics(doc, verify_source=verify_source)
-
 
 def _report_path(value: str) -> Path:
     path, _ = _under_root(value)
