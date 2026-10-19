@@ -24,11 +24,11 @@ POLICY_VERSION = "plasma.engineering.capabilities.v1"
 NO_RUNTIME = "CONTRACT_ONLY_NO_RUNTIME_DISPATCH"
 CAPABILITIES = frozenset({
     "software-readonly", "software-pr", "la2016-loopback",
-    "z2-readonly", "z2-privileged",
+    "z2-readonly", "z2-privileged", "z2-cpu-only",
 })
 PERMISSIONS = frozenset({
     "repo:read", "repo:write-branch", "usb:la2016",
-    "ssh:z2-readonly", "z2:hardware-owner",
+    "ssh:z2-readonly", "ssh:z2-cpu-only", "z2:hardware-owner",
 })
 RESOURCES = frozenset({
     "usb", "z2", "fpga", "mmio", "dut", "hub-power",
@@ -180,6 +180,8 @@ def validate_work_order(order: object, policy: object) -> dict:
         "usb": "usb:la2016", "z2": "ssh:z2-readonly",
         "repository-write": "repo:write-branch",
     }
+    if "z2" in denied and "ssh:z2-cpu-only" in required:
+        deny("CAPABILITY_ALLOW_DENY_CONFLICT")
     if any(r in denied and p in required for r, p in conflicts.items()):
         deny("CAPABILITY_ALLOW_DENY_CONFLICT")
     return rule
