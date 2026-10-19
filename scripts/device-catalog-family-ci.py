@@ -178,6 +178,10 @@ def affected_families(changed_paths: Iterable[str]) -> list[str]:
         if path.startswith("data/device-catalog/research/test_st_"):
             return list(FAMILIES)
 
+        if path == ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml":
+            affected.add("stm32c0")
+            continue
+
         old_family = OLD_WORKFLOW_FAMILY.get(path)
         if old_family:
             affected.add(old_family)
@@ -219,49 +223,121 @@ def run_family(family: str) -> None:
 
 
 
+# Governance: these are the only live YAML-to-YAML trigger dependencies for the
+# STM32 family validation workflow. Historical OLD_WORKFLOW_FAMILY routing is
+# deliberately not consulted to discover active workflows.
 C0_STAGE_DISPATCHER_PATH = ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"
+ACTIVE_FAMILY_WORKFLOW_REFS = frozenset((DISPATCHER_PATH, C0_STAGE_DISPATCHER_PATH))
+RETIRED_FAMILY_WORKFLOW_REFS = tuple(".github/workflows/" + filename for filename in (
+    "device-catalog-stm32f0-validation.yml",
+    "device-catalog-stm32f2-bounded-validation.yml",
+    "device-catalog-stm32f3-foundation-validation.yml",
+    "device-catalog-stm32f7-validation.yml",
+    "device-catalog-stm32g0-validation.yml",
+    "device-catalog-stm32g4-validation.yml",
+    "device-catalog-stm32c0-c01-foundation-validation.yml",
+    "device-catalog-stm32c0-c02-discovery-validation.yml",
+    "device-catalog-stm32c0-c02-discovery-live.yml",
+    "device-catalog-stm32c0-c03-metadata-validation.yml",
+    "device-catalog-stm32c0-c04-admission-validation.yml",
+))
+REQUIRED_U0_TRIGGER_PATHS = frozenset((
+    "data/device-catalog/research/*stm32u0*",
+    "data/device-catalog/research/evidence/stm32u0*/**",
+))
+
+def active_event_paths(yaml_source: str, event: str) -> list[str]:
+    """Parse PR/main paths, fail-closed on missing/duplicate or nonliteral entries."""
+    if event not in ("pull_request", "push"):
+        raise AssertionError("Unsupported STM32 workflow event")
+    start = "\n  " + event + ":\n"
+    if yaml_source.count(start) != 1:
+        raise AssertionError(f"{event}: missing or duplicate event section")
+    section = yaml_source.split(start, 1)[1]
+    boundary = "\n  pull_request:\n" if event == "push" else "\nconcurrency:"
+    if boundary not in section:
+        raise AssertionError(f"{event}: missing end-of-event boundary")
+    section = section.split(boundary, 1)[0]
+    if section.count("    paths:\n") != 1:
+        raise AssertionError(f"{event}: missing or duplicated paths declaration")
+    pathlines = re.findall(r'(?m)^      - .*$', section)
+    matches = re.findall(r'(?m)^      - "([^"]+)"\s*$', section)
+    if not matches or len(pathlines) != len(matches):
+        raise AssertionError(f"{event}: nonliteral or missing path entries")
+    if len(matches) != len(set(matches)):
+        raise AssertionError(f"{event}: duplicate path entries")
+    return matches
 
 def assert_active_workflow_refs(yaml_source: str) -> None:
-    """Fail closed when active PR/push Workflows cite removed workflow filenames."""
-    for event in ("push", "pull_request"):
-        begin = "\n  " + event + ":\n"
-        if yaml_source.count(begin) != 1:
-            raise AssertionError(f"{event}: missing or duplicate event")
-        section = yaml_source.split(begin, 1)[1]
-        if event == "push":
-            section = section.split("\n  pull_request:\n", 1)[0]
-        else:
-            section = section.split("\nconcurrency:", 1)[0]
-        refs = re.findall(r'(?m)^      - "(\.github/workflows/[^"]+)"', section)
-        if len(refs) != len(set(refs)):
-            raise AssertionError(f"{event}: duplicated workflow path")
-        expected = {DISPATCHER_PATH, C0_STAGE_DISPATCHER_PATH}
-        if set(refs) != expected:
-            raise AssertionError(f"{event}: stale/missing workflow paths: {sorted(set(refs) ^ expected)}")
-        for ref in refs:
-            if not (REPO_ROOT / ref).is_file():
-                raise AssertionError(f"{event}: missing target {ref}")
+    """Keep PR/push parity and refuse all missing or retired Workflow targets."""
+    paths_by_event = {event: active_event_paths(yaml_source, event)
+                      for event in ("push", "pull_request")}
+    if paths_by_event["push"] != paths_by_event["pull_request"]:
+        raise AssertionError("STM32 workflow PR/push trigger parity drift")
+    for event, paths in paths_by_event.items():
+        refs = {p for p in paths if p.startswith(".github/workflows/")}
+        if refs != ACTIVE_FAMILY_WORKFLOW_REFS:
+            raise AssertionError(f"{event}: stale/missing Workflow paths: "
+                                 f"{sorted(refs ^ ACTIVE_FAMILY_WORKFLOW_REFS)}")
+        if not REQUIRED_U0_TRIGGER_PATHS.issubset(paths):
+            raise AssertionError(f"{event}: missing STM32U0 research/evidence trigger")
+        if any(p.startswith("data/device-catalog/production/") for p in paths):
+            raise AssertionError(f"{event}: forbidden Production trigger")
+        if set(paths).intersection(RETIRED_FAMILY_WORKFLOW_REFS):
+            raise AssertionError(f"{event}: retired STM32 trigger reintroduced")
+        for path in refs:
+            if not (REPO_ROOT / path).is_file():
+                raise AssertionError(f"{event}: missing Workflow file {path}")
+
+def assert_rejected_trigger_mutation(yaml_source: str, event: str,
+                                     old_path: str, new_path: str) -> None:
+    """Negative control: mutate exactly one event, require a fail-closed rejection."""
+    prefix = "\n  " + event + ":\n"
+    before, after = yaml_source.split(prefix, 1)
+    original = '      - "' + old_path + '"'
+    replacement = ('      - "' + new_path + '"' if new_path
+                   else "")
+    if after.count(original) < 1:
+        raise AssertionError(f"{event}: missing mutation fixture {old_path}")
+    tampered = before + prefix + after.replace(original, replacement, 1)
+    try:
+        assert_active_workflow_refs(tampered)
+    except AssertionError:
+        return
+    raise AssertionError(f"{event}: invalid path {new_path} accepted")
 
 
 def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32g4_phase4_9d_admission.py"]) == ["stm32g4"]
     assert affected_families(["data/device-catalog/research/stm32u0_phase_u0_2_discovery.py"]) == ["stm32u0"]
+    assert affected_families([".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"]) == ["stm32c0"]
+    # Verify the exact active graph plus all 11 already retired Workflow names.
+    workflow_source = (REPO_ROOT / DISPATCHER_PATH).read_text(encoding="utf-8")
+    assert_active_workflow_refs(workflow_source)
+    for event in ("push", "pull_request"):
+        for retired in RETIRED_FAMILY_WORKFLOW_REFS:
+            assert_rejected_trigger_mutation(
+                workflow_source, event, C0_STAGE_DISPATCHER_PATH, retired
+            )
+        for required_u0 in REQUIRED_U0_TRIGGER_PATHS:
+            assert_rejected_trigger_mutation(
+                workflow_source, event, required_u0, ""
+            )
+        assert_rejected_trigger_mutation(
+            workflow_source, event, C0_STAGE_DISPATCHER_PATH,
+            ".github/workflows/does-not-exist.yml"
+        )
+        assert_rejected_trigger_mutation(
+            workflow_source, event, C0_STAGE_DISPATCHER_PATH,
+            "data/device-catalog/production/icpn-v1-manifest.json"
+        )
+    print("STM32 family PR/push parity, U0, C0 and 11 retired Workflow negative controls: PASS")
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_2_discovery.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_3_policy.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_4_admission.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/device-catalog-phase4.5c-stm32f0-policy.md"]) == ["stm32f0"]
     assert affected_families([".github/workflows/device-catalog-stm32f2-bounded-validation.yml"]) == ["stm32f2"]
-    assert affected_families([C0_STAGE_DISPATCHER_PATH]) == ["stm32c0"]
-    workflow_text = (REPO_ROOT / DISPATCHER_PATH).read_text(encoding="utf-8")
-    assert_active_workflow_refs(workflow_text)
-    deleted_path = workflow_text.replace(C0_STAGE_DISPATCHER_PATH, ".github/workflows/does-not-exist.yml", 1)
-    try:
-        assert_active_workflow_refs(deleted_path)
-    except AssertionError:
-        pass
-    else:
-        raise AssertionError("Deleted-workflow path was not rejected")
     assert affected_families(["data/device-catalog/research/openocd-parts-canonical.csv"]) == list(FAMILIES)
     assert affected_families([RUNNER_PATH]) == []
     assert affected_families(["data/device-catalog/production/icpn-v1-manifest.json"]) == []

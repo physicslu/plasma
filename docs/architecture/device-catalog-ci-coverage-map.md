@@ -1,6 +1,6 @@
 # Device Catalog CI Coverage Map
 
-Status: **Historical Phase 2 inventory, with 2026-10-19 consolidation and trigger-hygiene update; this coverage map does not authorize further retirement**
+Status: **Historical Phase 2 inventory; updated for the merged #1044 U0/C0 trigger correction and #1057 Gate 1 hygiene; no further workflow retirement is authorized by this document alone**
 
 Baseline: `main` at `9aca1bb7bcb2c61105e56b195990e1ebbbeed9db`.
 
@@ -63,9 +63,9 @@ STM32U0
 STM32C0
 ```
 
-The dispatcher workflow covers F0/F2/F3/F7/G0/G4/C0 and shared catalog infrastructure, but **does not include normal STM32U0 research/evidence paths**. The implementation has a U0 profile, while the workflow trigger does not reliably invoke it for ordinary U0 changes. This is a coverage defect to repair before the dispatcher is considered authoritative for U0.
+As of merged PR #1044, the family dispatcher covers all eight listed families. On both `pull_request` and `main` `push`, the active trigger set includes `data/device-catalog/research/*stm32u0*`, `data/device-catalog/research/evidence/stm32u0*/**`, and the consolidated `.github/workflows/device-catalog-stm32c0-stage-dispatch.yml`. Retired family/C0 Workflow filename triggers have been removed.
 
-The workflow also carries path references to older family workflow filenames and a C0 live workflow filename that are no longer present. These are stale trigger references and should be removed in a hygiene PR only after the active trigger set is tested.
+PR #1057 strengthens the family CI self-test: the trigger lists must be equal, the only Workflow targets must be the two active dispatchers, U0 triggers must remain, Production paths are forbidden, and every one of the 11 retired historic family/C0 Workflow names is tested through fail-closed mutation. These are orchestration controls, **not** added or removed manufacturer coverage claims.
 
 ## 6. STM32C0 overlap pilot (historical five-stage chain)
 
@@ -77,9 +77,7 @@ The workflow also carries path references to older family workflow filenames and
 | `device-catalog-stm32c0-c04-admission-validation.yml` | PR + `main` | C0.4 admission plus retained-evidence/metadata prerequisites | Substantial dispatcher overlap; parity not yet proven | `stage-deterministic` |
 | `device-catalog-stm32c0-c05-publication-validation.yml` | PR + `main` | C0.5 tests, admission-plan validation, publication `--verify` | Dispatcher lacks full publication replay parity | `stage-deterministic` |
 
-Historical note (baseline `9aca1bb7`): C0 was an unmerged five-stage consolidation candidate. **PR #1054 has now merged**, preserving the five original job bodies and all C0.1–C0.5 unit/negative/retained-evidence/admission/publication `--verify` checks inside `.github/workflows/device-catalog-stm32c0-stage-dispatch.yml`. All five historical YAMLs are preserved byte-identically under `docs/archive/ci-workflows/stm32c0-stages/`. The five entries in the table above are **historical**, not active Workflow definitions.
-
-The STM32 family dispatcher must retain a path trigger on the new C0 stage dispatcher. The retired C0 files and six earlier F0/F2/F3/F7/G0/G4 Workflows are no longer valid trigger targets. The family CI self-test rejects future dead Workflow path references in both `pull_request` and `main` `push` trigger lists. Unmerged **PR #1044 (STM32U0 replay/trigger parity)** remains an independent task and is not claimed as part of this hygiene change.
+Historical snapshot: C0 was previously a consolidation candidate. Merged PR #1054 preserved the original five Job bodies and all C0.1–C0.5 tests under `.github/workflows/device-catalog-stm32c0-stage-dispatch.yml`; the five original YAMLs are byte-identically archived in `docs/archive/ci-workflows/stm32c0-stages/`. They no longer represent live Workflow definitions. Merged PR #1044 restored U0 research/evidence triggers and C0 dispatcher routing on both events. The still-Draft PR #1057 adds negative controls for retired Workflow references and updates this map.
 
 ## 7. STM32L0, L1 and L4 deterministic stage chains
 
