@@ -1,6 +1,6 @@
 name: PLASMA ARMv7 Barrier HIL-A1 GitHub-hosted Cross Build
 
-# Owner-only manual main trigger. No self-hosted runner, SWPC, SSH or Z2.
+# Owner-only manual main trigger. No persistent runner, SSH or Z2.
 on:
   workflow_dispatch:
 
