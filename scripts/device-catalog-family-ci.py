@@ -260,6 +260,8 @@ def active_event_paths(yaml_source: str, event: str) -> list[str]:
     section = section.split(boundary, 1)[0]
     if section.count("    paths:\n") != 1:
         raise AssertionError(f"{event}: missing or duplicated paths declaration")
+    # Ignore push.branches (- main); only YAML path bullets are relevant.
+    section = section.split("    paths:\n", 1)[1]
     pathlines = re.findall(r'(?m)^      - .*$', section)
     matches = re.findall(r'(?m)^      - "([^"]+)"\s*$', section)
     if not matches or len(pathlines) != len(matches):
