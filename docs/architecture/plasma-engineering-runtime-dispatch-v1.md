@@ -1,9 +1,12 @@
-# PLASMA Engineering Runtime Dispatcher v1 — Gate 1 implementation candidate
+# PLASMA Engineering Runtime Dispatcher v1 — current state and Development Mode gate
 
-**Status: DEPLOYMENT NO-GO / Runtime disabled.** This PR introduces one generic
-workflow plus deterministic authorization/worker adapters and adversarial tests.
-It **does not** approve live SWPC, Codex, QEMU, Z2, FPGA, LA, USB Hub or DUT
-operations. No merge occurs without the separate Gate 2.
+**Status:** Qualification `workflow_dispatch` Runtime remains **DISABLED**.
+The shared Workflow's owner-only Development Mode `issue_comment` entry is
+implemented and has successfully executed real Path 2 CLI and Path 3 Codex
+smoke tests on existing `SWPC-plasma-codex` (PRs #1047–#1049). This is not
+permission to run other tasks, operate devices, or deploy production Runtime.
+See `AGENTS.md` §11.1 and the canonical Three-Path execution model for
+approval and evidence requirements.
 
 ## Development Mode owner-only dispatch (PR #1046 alignment)
 
@@ -65,6 +68,45 @@ not a third approval gate.** Actual Path 2 PASS requires a GitHub
 `development-execute` job with `RUNNER_NAME=SWPC-plasma-codex`,
 exit code zero and a matching receipt. Hosted CI success is not real SWPC PASS.
 
+## Gate 1 before Gate 2: required pre-merge development capability
+
+**Normative Development Mode sequence:** owner's Gate 1 approval → execute
+the intended **real** SWPC Path 2 CLI or Path 3 Codex assignment → collect
+original logs/source/output/evidence → ChatGPT independent evidence review →
+within-Gate-1 repair/retest on FAIL → submit/finish PR and relevant CI →
+owner Gate 2 approval **only for Merge**. A successful GitHub Job means the
+worker ran; the reviewer decides whether the requested engineering test PASSes.
+Path 3's Codex does its own implementation, execution, self-tests and repairs;
+the Dispatcher should collect evidence rather than prescribe a Python AST or
+independently re-run every Codex program.
+
+**Current implementation gap (not fixed by this documentation PR):** the
+Development Mode `development-authorize` and worker use
+`GITHUB_REF=refs/heads/main`, `GITHUB_SHA` from that event, and a checked-in
+task registry on the default branch. GitHub `issue_comment` loads its
+Workflow definition from the default branch. Consequently a new or changed
+task defined **only in a PR branch** cannot yet be executed by this current
+entry before merge. In the #1048/#1049 smoke development this forced an
+undesirable merge-then-test sequence. **Do not repeat that pattern or
+misrepresent a hosted/offline CI PASS as SWPC E2E PASS.**
+
+**Minimal next implementation (future independent PR, not done here):**
+extend the *existing shared* owner-only Dispatcher to receive a reviewed
+development branch or exact commit SHA as the task's execution source,
+validate owner/task/ref/repository and relevant GitHub PR/commit provenance,
+pin the authorized revision through hosted admission and SWPC checkout, and
+run the already-approved real experiment **before** merge. Retain the existing
+`SWPC-plasma-codex` Runner, no new task-specific Workflow and no additional
+owner gate. The `main` Workflow itself can remain trusted; it must explicitly
+permit and validate a task's separate pre-merge source SHA rather than
+silently using `main` for both. Until that function really passes its own
+positive/negative tests and live verification, report the technical blocker
+and `NOT_RUN`; do not bypass guards or merge merely to activate a test.
+
+Gate 2 may exceptionally approve knowingly deferred development evidence
+only after the owner sees exactly which acceptance is missing. Such
+exceptions do **not** redefine the normal two-gate workflow.
+
 ## Authority and path mapping
 
 Use the existing [Three-Path Model](../development/plasma-three-path-execution-model.md)
@@ -77,8 +119,8 @@ not a new owner gate.
 | Path | Task type | Trusted executor | Output |
 | --- | --- | --- | --- |
 | 1 | Host-only | ChatGPT / GitHub-hosted CI | PR, CI, Gate 2 |
-| 2 | Fixed CLI | Trusted main → Actions → isolated SWPC CLI worker | bounded exit code + SHA256 receipt; PR only if sources changed |
-| 3 | Agentic | Trusted main → Actions → isolated SWPC Codex worker | bounded task evidence, then trusted broker PR/CI and Gate 2 |
+| 2 | Fixed CLI | Trusted current main entry → existing shared SWPC Runner | real CLI exit/output evidence, reviewed in Gate 1; PR/Gate 2 only if merging changes |
+| 3 | Agentic | Trusted current main entry → existing shared SWPC Codex Runner | Codex-created source, self-test, raw output, ChatGPT evidence review in Gate 1; PR/CI then Gate 2 only for Merge |
 
 **Only one** new reusable workflow:
 `.github/workflows/plasma-engineering-runtime-dispatch.yml`.
