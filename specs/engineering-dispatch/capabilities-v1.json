@@ -101,6 +101,27 @@
         "repository-write"
       ],
       "runtime_enabled": false
+    },
+    "z2-cpu-only": {
+      "entrypoint": "z2-cpu-only",
+      "worker_class": "z2-cpu-only",
+      "permissions": [
+        "repo:read",
+        "ssh:z2-cpu-only"
+      ],
+      "max_timeout_seconds": 120,
+      "hardware_authorization": true,
+      "must_deny": [
+        "usb",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "network-instrument",
+        "repository-write",
+        "host-root"
+      ],
+      "runtime_enabled": false
     }
   }
 }

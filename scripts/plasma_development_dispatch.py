@@ -75,6 +75,15 @@ def task_by_id(registry: object, task_id: str) -> dict:
     execution_path = task["execution_path"]
     require(execution_path in ("path2-cli", "path3-codex"),
             "PATH_NOT_SUPPORTED")
+    if task_id == "hil-a2-cpu-only":
+        require(execution_path == "path2-cli" and set(task) == {
+            "execution_path", "capability", "work_order",
+        }, "A2_TASK_FIELDS_DENIED")
+        require(task["capability"] == "z2-cpu-only" and
+                task["work_order"] ==
+                "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
+                "A2_TASK_BINDING_DENIED")
+        return task
     if execution_path == "path2-cli":
         require(set(task) in ({
             "execution_path", "script", "argv", "expected_stdout_sha256",
@@ -196,16 +205,60 @@ def authorize(event: object, context: dict, registry: object,
     else:
         require(pr_info is None, "UNEXPECTED_PR_METADATA")
     task = task_by_id(registry, req["task_id"])
+    a2_claim = {}
+    if req["task_id"] == "hil-a2-cpu-only":
+        # A hardware-capable task cannot use untrusted PR-candidate code.
+        # The main-only Issue command must pin trusted == source exactly.
+        require(req["pr_number"] == 0 and
+                req["source_sha"] == req["trusted_sha"],
+                "A2_TRUSTED_MAIN_ONLY")
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "A2_REPLAY_RUN_ATTEMPT_DENIED")
+        work_order = parse_json(ROOT / task["work_order"])
+        policy = parse_json(ROOT / "specs/engineering-dispatch/capabilities-v1.json")
+        import plasma_engineering_dispatch_v1 as contracts
+        try:
+            contracts.validate_work_order(work_order, policy)
+        except contracts.ContractDenied:
+            raise Denied("A2_WORK_ORDER_CONTRACT_DENIED") from None
+        require(work_order["work_order_id"] == req["task_id"] and
+                work_order["issue_number"] == ISSUE and
+                work_order["authorization_kind"] == "hardware-one-shot" and
+                work_order["capability"] == "z2-cpu-only" and
+                work_order["entrypoint"] == "z2-cpu-only",
+                "A2_WORK_ORDER_SCOPE_DENIED")
+        work_sha = contracts.digest(work_order)
+        a2_claim = {
+            "work_order_sha256": work_sha,
+            "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
+                          f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
+        }
     return {
         "status": "AUTHORIZED_DEV_TASK",
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
+        **a2_claim,
     }
 
 
 def run_task(task: dict, *, workspace: Path = ROOT,
-             executor=subprocess.run, evidence_dir: Path | None = None) -> dict:
+             executor=subprocess.run, evidence_dir: Path | None = None,
+             approval: dict | None = None) -> dict:
+    if task.get("capability") == "z2-cpu-only":
+        require(type(approval) is dict and
+                approval.get("task_id") == "hil-a2-cpu-only" and
+                approval.get("pr_number") == 0 and
+                approval.get("pinned_sha") == approval.get("trusted_sha") and
+                approval.get("claim_ref") ==
+                    os.environ.get("PLASMA_HIL_A2_CLAIM_REF") and
+                approval.get("work_order_sha256") ==
+                    os.environ.get("PLASMA_HIL_A2_WORK_ORDER_SHA256"),
+                "A2_TRUSTED_CLAIM_REQUIRED")
+        import plasma_hil_a2_cpu_only as a2
+        work_order = parse_json(ROOT / task["work_order"])
+        artifact_dir = Path(os.environ.get("PLASMA_HIL_A2_ARTIFACT_DIR", "/nonexistent"))
+        return a2.run_once(work_order, artifact_dir, approval=approval)
     script = workspace / task["script"]
     require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
     proc = executor(
@@ -371,11 +424,14 @@ def main() -> int:
                     "path3-codex" if args.action == "execute-codex"
                     else "path2-cli"
                 ), "WRONG_EXECUTION_PATH")
+                a2_approval = (authorize(event, os.environ, registry)
+                               if req["task_id"] == "hil-a2-cpu-only" else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace)
                     if args.action == "execute-codex"
                     else run_task(task, workspace=args.workspace,
-                                  evidence_dir=args.evidence_dir)
+                                  evidence_dir=args.evidence_dir,
+                                  approval=a2_approval)
                 )
                 plan = {
                     **receipt, **req,
