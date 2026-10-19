@@ -57,7 +57,7 @@ jobs:
           test "$(id -un)" = plasma-ci
           test "$(id -u)" -ne 0
           test -n "$RUNNER_TEMP"
-          test -z "$SSH_AUTH_SOCK"
+          test -z "${SSH_AUTH_SOCK:-}"
           umask 077
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
