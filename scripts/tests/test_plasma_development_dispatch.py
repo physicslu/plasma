@@ -777,16 +777,106 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
             with self.subTest(error=str(exc)):
                 self.assertEqual(dev.safe_error_reason(exc), "EXECUTION_ERROR")
 
-    def test_vivado_reuses_prior_board_repository_not_another_setup(self):
-        # Existing qualified cache and integrity check; no new workflow,
-        # runner, board download or first-run network access is introduced.
+    def test_vivado_invokes_original_board_prepare_with_pinned_source(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            board=Path(td)/"pynq-board"
+            board.mkdir()
+            calls=[]
+            class Ready:
+                returncode=0
+                stdout=(str(board)+"\\n").encode()
+                stderr=b""
+            def runner(command,**kwargs):
+                calls.append((command,kwargs))
+                return Ready()
+            selected=build.resolve_board_repository(
+                self.task,workspace=ROOT,executor=runner,
+                env={"HOME":"/nonexistent"})
+            self.assertEqual(selected,board)
+            self.assertEqual(len(calls),1)
+            command,kwargs=calls[0]
+            self.assertEqual(command[0],"/usr/bin/bash")
+            self.assertTrue(command[1].endswith(
+                "/pl/projects/z2-swd-gpio/prepare-board-repository.sh"))
+            self.assertEqual(kwargs["timeout"],180)
+            self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"],"0")
+            script=(ROOT/"pl/projects/z2-swd-gpio/prepare-board-repository.sh").read_text()
+            self.assertIn('source_commit="'+self.task["board_repo_sha"]+'"',script)
+            self.assertIn("git clone --quiet",script)
+            self.assertIn('status --porcelain --untracked-files=no',script)
+            self.assertIn("board.xml preset.xml part0_pins.xml",script)
+
+    def test_vivado_explicit_board_repo_preserves_override(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"board"
+            p.mkdir()
+            def forbidden(*args,**kwargs):
+                self.fail("PREPARE_MUST_NOT_EXECUTE_WHEN_EXPLICIT_PATH_EXISTS")
+            actual=build.resolve_board_repository(
+                self.task,workspace=ROOT,executor=forbidden,
+                env={"PLASMA_BOARD_REPO":str(p)})
+            self.assertEqual(actual,p)
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_PATH_DENIED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=forbidden,
+                    env={"PLASMA_BOARD_REPO":str(p)+"/../board"})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_MISSING"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=forbidden,
+                    env={"PLASMA_BOARD_REPO":str(p/"missing")})
+
+    def test_vivado_board_prepare_fails_closed_before_build(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            board=Path(td)/"board"
+            board.mkdir()
+            class Fail:
+                returncode=2
+                stdout=b""
+                stderr=b"BOARD_REPO_FAIL: pinned revision unavailable"
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_FAILED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=lambda *a,**k:Fail(),
+                    env={})
+            class BadOutput:
+                returncode=0
+                stdout=b"not-an-absolute-path\\n"
+                stderr=b""
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_PATH_DENIED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=lambda *a,**k:BadOutput(),
+                    env={})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_PIN_MISMATCH"):
+                build.resolve_board_repository(
+                    {**self.task,"board_repo_sha":"f"*40},
+                    workspace=ROOT,executor=lambda *a,**k:self.fail(
+                        "MUST_NOT_RUN_WRONG_BOARD_REVISION"),env={})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_SCRIPT_MISSING"):
+                build.resolve_board_repository(
+                    self.task,workspace=Path(td),
+                    executor=lambda *a,**k:self.fail(
+                        "MUST_NOT_RUN_MISSING_BOARD_PREPARE"),env={})
+
+    def test_vivado_preparation_has_no_new_workflow_or_runner(self):
         src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
-        self.assertIn('ROOT_FOR_BUILDS / "z2-swd-gpio" / "board-repository"', src)
-        self.assertIn('os.environ.get("PLASMA_BOARD_REPO") or str(existing_cache)',src)
+        self.assertIn("resolve_board_repository(task, workspace=workspace",src)
+        self.assertIn('"GIT_TERMINAL_PROMPT": "0"',src)
         self.assertIn('actual_board_sha == plan["board_sha"]',src)
-        self.assertIn('BUILD_BOARD_REPO_MISSING',src)
+        self.assertIn('BUILD_BOARD_REPO_DIRTY',src)
         self.assertNotIn("git clone",src)
-        self.assertNotIn("prepare-board-repository.sh",src)
+        self.assertIn("BUILD_BOARD_PREPARE_FAILED",src)
+        self.assertEqual(self.task["capability"],"vivado-host-build")
+        wf=WORKFLOW.read_text()
+        self.assertIn("  development-execute:",wf)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
 
 
 
