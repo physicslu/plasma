@@ -40,11 +40,9 @@
       "toolchain": "2026.1",
       "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
     },
-    "f1b-path3-diagnose-39274388453": {
+    "f1b-path3-codex-vivado-build": {
       "execution_path": "path3-codex",
-      "output_path": "scripts/experiments/plasma_f1b_host_failure_generated.py",
-      "output_format": "text",
-      "objective": "Run READ-ONLY SWPC diagnostics for F1-B Path 2 failure Run 39274388453; previous Codex mocks 9/9 PASSED but could not identify generic EXECUTION_ERROR. Inspect existing dispatcher and host build source. Via Python pathlib/os.stat/os.access only, report current effective UID/GID and existence, owner, mode, write-access status for /storage/projects/plasma/pl/build, its parent and /storage/tools/xilinx/2026.1/Vivado/settings64.sh. Check candidate board cache without cloning. Do NOT create, delete or write files outside the designated generated Python, .txt and .test.log. Demonstrate error-classification tests and propose a focused code fix, distinguish real observations from hypotheses, log commands/exits. No Vivado, shell helper, network, SSH, sudo, USB, FPGA, Z2, DUT or LA."
+      "objective": "Complete F1-B PYNQ-Z2 fixed unified Site 1 REAL Host-only FPGA build with Vivado 2026.1 using the existing pl/projects/z2-fixed-unified-site1 Tcl, the pinned board helper, and existing HWH verifier. This is Development Mode: run the actual Vivado synthesis, implementation, timing and DRC; generate BIT and HWH; diagnose failures, edit RTL/Tcl/Python/build scripts and documents as needed, rerun to qualified evidence. On failure, distinguish observed root causes from hypotheses and retain exact commands, logs, exit codes, minimal fixes and retest history. Save a chronological problem/solution engineering-report.md in .plasma-path3-evidence and preserve report/log/artifact SHA256. Do not falsely claim real Build PASS when NOT_RUN or failed. Host-only: do not connect to, program, reset or change power on physical Z2/FPGA/DUT/LA or use MMIO/USB/hardware deployment. Do not merge, push, or reconfigure GitHub CI. Prefer reuse of existing checked-in Vivado project and board helper, not a new build framework."
     }
   }
 }
