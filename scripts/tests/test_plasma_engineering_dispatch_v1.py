@@ -60,7 +60,8 @@ class DispatchGate1AContracts(unittest.TestCase):
                          "https://json-schema.org/draft/2020-12/schema")
         self.assertFalse(self.schema["additionalProperties"])
         self.assertEqual(set(self.schema["required"]), dispatch.ORDER_KEYS)
-        self.assertEqual(set(self.schema["properties"]), dispatch.ORDER_KEYS)
+        self.assertEqual(set(self.schema["properties"]),
+                         dispatch.ORDER_KEYS | {"runtime_status"})
         self.assertEqual(set(self.schema["properties"]["scope"]["required"]),
                          dispatch.SCOPE_KEYS)
         self.assertFalse(self.schema["properties"]["scope"]["additionalProperties"])
