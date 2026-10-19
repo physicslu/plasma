@@ -38,8 +38,10 @@ the **main** dispatcher, not by dispatcher Python from the PR.
    carries the candidate SHA, trusted main SHA, PR number and registry digest.
    The worker verifies these before invoking CLI or Codex.
 4. Path 2 accepts checked-in fixed Python CLI plus expected stdout SHA256,
-   retains optional `nine-nine-table-v1` semantic verification and archives
-   stdout/stderr and the receipt. Path 3 delegates the task objective to Codex,
+   uses one task-independent `cpu-only` capability contract and archives
+   stdout/stderr and the receipt. There is NO `nine-nine-path2` routing
+   exception or `nine-nine-table-v1` validation policy; multiplication tests
+   are only ordinary test fixtures. Path 3 delegates the objective to Codex,
    supports creating or repairing the approved Python file, and collects
    the source, text or CSV output (`output_format: text|csv`), self-test and
    Codex session logs. Its reference SHA256 is optional for new unknown-output
@@ -62,6 +64,37 @@ The owner must authorize a new full SHA to run a subsequent revision.
 executor tests only**. Do not call it a real pre-merge SWPC Path 2/3 PASS.
 The owner must separately approve Gate 2 before merging this dispatcher
 foundation; afterward later task PRs can be executed during their own Gate 1.
+
+## Development Mode capability-based Path 2 routing (AUTO-4)
+
+The Issue #981 owner-only hosted authorizer validates the live OPEN PR,
+exact pinned HEAD, candidate registry digest, and a typed execution path.
+It emits `execution_capability` from the **trusted main** dispatcher:
+`cpu-only` for ordinary bounded Python CLI, `codex-workspace` for Path 3,
+and `z2-cpu-only` only for the separately approved main-only HIL-A2 task.
+Task IDs are **identifiers**, not permissions. A new CPU-only task must NOT
+require a per-task Workflow edit or a reference to the former 9×9 pilot.
+Existing bounded development manifest entries without an explicit capability
+are treated as CPU-only for compatibility; any unrecognized capability or
+attempt to select an HIL capability from a candidate PR is denied.
+
+For CPU-only Path 2, the trusted SWPC Dispatcher requires Linux bubblewrap
+(`bwrap`) before executing the PR candidate program. It uses unshared
+namespaces (including network), a read-only candidate workspace and OS Python
+runtime, a minimal synthetic `/dev`, isolated `/proc`, empty temporary
+filesystem, cleared environment and `python -I -S`. No user hardware, USB,
+MMIO, SSH agent, host filesystem or network is intentionally mounted. Missing
+or unusable sandbox must **fail closed**; no fallback to unsandboxed Python.
+A GitHub-hosted unit test checks the constructed sandbox command but cannot
+prove that SWPC supports this kernel namespace configuration. The actual
+SWPC execution must be confirmed by a separate real Job, including raw
+stdout/stderr and Exit Code. This CPU-only Development boundary is not the
+independent production Qualification Runtime isolation standard.
+
+HIL-A2 is **not** admitted via the CPU-only branch. It retains the main-only
+Work Order, one-shot Claim create/readback, `github.run_attempt==1`, matching
+Claim digest and separate hardware approval. No hardware or Qualification
+Runtime deployment/activation is authorized by the capability routing change.
 
 ## Development Mode owner-only dispatch (PR #1046 alignment)
 
