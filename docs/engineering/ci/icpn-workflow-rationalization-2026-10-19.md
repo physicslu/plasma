@@ -54,3 +54,10 @@ Filename version age alone is **not** proof a Workflow is obsolete. An `on: work
 - Mapping is **not** run-history verification, dependency proof or authorization to archive. Each mapped entry still needs exact current triggers, callers, artifacts and required-check review before retirement.
 - Separately in [Draft PR #1044](https://github.com/physicslu/plasma/pull/1044), STM32U0 trigger-parity remediation uncovered a **failing historical U0.3 prestate regression**: `STM32F0: Production source drifted relative to U0.3 prestate`. Existing U0.3 planner dereferences mutable current source CSV against a frozen U0.3 manifest; no CI assertion or Production evidence should be weakened just to turn the check green. This is a **Gate 2 blocker** for #1044, which remains Draft.
 - `main` advanced after #1042 was opened. Recheck the exact base HEAD, mergeability, run history and all required checks before any future Gate 2 request; do not merge in Gate 1.
+
+## Gate 1 continuation: third Microchip one-shot archival proposal
+
+- **Additional proposed archive**: `device-catalog-microchip-live-evidence-10-replay.yml`. Its only trigger is `push` on former `agent/microchip-bulk-coverage-discovery-v1` when *that YAML itself* changes; no such branch was returned by branch search.
+- Default-branch indexed code search found only its own YAML reference; the source links to original evidence-run IDs `38338847345` and `38347572588`, but moving the YAML neither deletes Git history nor the original artifacts.
+- It is moved as a **byte-identical Git Blob** with the other two retired one-shot definitions, not deleted from repository history. The archived file does not execute as a normal Actions Workflow.
+- Updated triage: **ARCHIVE_PROPOSED 3**, **KEEP_CORE 4**, **KEEP_GOVERNANCE 3**, **PENDING_DEEP_AUDIT 252** (total 262). All three still require historical-run, caller/external-scheduler, Ruleset and classic required-check verification before Gate 2. The `ARCHIVE_PROPOSED` label does **not** authorize merge.
