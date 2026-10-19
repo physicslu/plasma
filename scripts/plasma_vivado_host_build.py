@@ -114,6 +114,143 @@ def _run_checked(args: list[str], *, executor, cwd: Path, timeout: int,
     return proc.stdout.strip()
 
 
+def resolve_board_repository(task: dict, *, workspace: Path,
+                             executor=subprocess.run,
+                             env: dict | None = None) -> Path:
+    """Reuse checked-in Z2 board preparation; never accept an unpinned clone.
+
+    The earlier SWPC build qualified this helper. An explicitly supplied
+    PLASMA_BOARD_REPO is preserved; otherwise the existing source-controlled
+    script reuses its cache and fetches the pinned revision only if absent.
+    """
+    env = os.environ if env is None else env
+    board_value = env.get("PLASMA_BOARD_REPO", "")
+    if not board_value:
+        script = workspace / "pl/projects/z2-swd-gpio/prepare-board-repository.sh"
+        require(script.is_file() and not script.is_symlink() and
+                script.resolve().is_relative_to(workspace.resolve()),
+                "BUILD_BOARD_PREPARE_SCRIPT_MISSING")
+        content = _read_safe_file(script)
+        match = re.search(r'(?m)^source_commit="([a-f0-9]{40})"
+    plan = preflight(task, workspace=workspace, approval=approval)
+    require(os.geteuid() != 0, "BUILD_ROOT_USER_DENIED")
+    require(evidence_dir is not None and evidence_dir.is_dir() and
+            not evidence_dir.is_symlink(), "BUILD_EVIDENCE_DIR_REQUIRED")
+    require(SETTINGS64.is_file() and not SETTINGS64.is_symlink(),
+            "BUILD_VIVADO_SETTINGS_UNAVAILABLE")
+    # Use existing pinned SWPC board preparation; do not add another setup.
+    board = resolve_board_repository(task, workspace=workspace,
+                                     executor=executor)
+    require(ROOT_FOR_BUILDS.is_dir() and
+            not ROOT_FOR_BUILDS.is_symlink(),
+            "BUILD_OUTPUT_ROOT_MISSING")
+    source_root = workspace.resolve(strict=True)
+    check_env = {"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"}
+    actual_board_sha = _run_checked(
+        ["git", "-C", str(board), "rev-parse", "HEAD"],
+        executor=executor, cwd=source_root, timeout=10, env=check_env
+    ).decode("ascii")
+    require(actual_board_sha == plan["board_sha"], "BUILD_BOARD_SHA_MISMATCH")
+    status = _run_checked(
+        ["git", "-C", str(board), "status", "--porcelain", "--untracked-files=no"],
+        executor=executor, cwd=source_root, timeout=10, env=check_env
+    )
+    require(status == b"", "BUILD_BOARD_REPO_DIRTY")
+    source_sha = _run_checked(
+        ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+        executor=executor, cwd=source_root, timeout=10, env=check_env
+    ).decode("ascii")
+    require(source_sha == plan["source_sha"], "BUILD_SOURCE_SHA_MISMATCH")
+    # Unique directory, never overwrite historic PSPL, LT02 or Fixed output.
+    build = Path(tempfile.mkdtemp(prefix="fixed-f1-", dir=ROOT_FOR_BUILDS))
+    (build / "reports").mkdir()
+    args = [
+        "/usr/bin/bash", "-c",
+        'set -euo pipefail; source "$1"; exec vivado -mode batch '
+        '-nojournal -log "$2" -source "$3"',
+        "plasma-fixed-f1", str(SETTINGS64),
+        str(build / "vivado.log"), plan["script"],
+    ]
+    build_env = {
+        "PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/nonexistent"),
+        "PLASMA_F1_BUILD": str(build),
+        "PLASMA_BOARD_REPO": str(board),
+        "PLASMA_VIVADO_JOBS": "4",
+    }
+    try:
+        proc = executor(args, cwd=source_root, env=build_env,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        timeout=2400, check=False)
+        # Logs are bounded so an unexpected tool run cannot swamp Actions.
+        require(len(proc.stdout) <= 2_000_000 and
+                len(proc.stderr) <= 2_000_000,
+                "BUILD_LOG_EXCESSIVE")
+        (build / "vivado-stdout.log").write_bytes(proc.stdout)
+        (build / "vivado-stderr.log").write_bytes(proc.stderr)
+        require(proc.returncode == 0 and
+                b"FIXED_F1_BITSTREAM_BUILD_PASS_HOST_ONLY_NOT_Z2" in proc.stdout,
+                "BUILD_VIVADO_IMPLEMENTATION_FAILED")
+        proj = build / "project"
+        hwh = proj / "z2_fixed_unified_site1.gen/sources_1/bd/system/hw_handoff/system.hwh"
+        bit = proj / "z2_fixed_unified_site1.runs/impl_1/system_wrapper.bit"
+        verifier_spec = importlib.util.spec_from_file_location(
+            "plasma_f1_host_hwh_verify", plan["verifier"])
+        require(verifier_spec is not None and verifier_spec.loader is not None,
+                "BUILD_VERIFIER_UNAVAILABLE")
+        mod = importlib.util.module_from_spec(verifier_spec)
+        verifier_spec.loader.exec_module(mod)
+        receipt = mod.verify_artifacts(
+            hwh=hwh, bit=bit, reports=build / "reports",
+            source_sha=plan["source_sha"]
+        )
+        receipt.update({
+            "status": "HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED",
+            "execution_path": "path2-cli",
+            "execution_capability": "vivado-host-build",
+            "build_dir": str(build),
+            "vivado_stdout_sha256": hashlib.sha256(proc.stdout).hexdigest(),
+            "vivado_stderr_sha256": hashlib.sha256(proc.stderr).hexdigest(),
+            "z2_hil": "NOT_RUN",
+            "physical_load": "NOT_RUN",
+            "m1": "NO_GO",
+        })
+        text = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+        require(len(text) <= 65536, "BUILD_EVIDENCE_TOO_LARGE")
+        (evidence_dir / "plasma-path2-vivado-host-receipt.json").write_text(text)
+        return receipt
+    except Exception:
+        # Retain uniquely scoped diagnostics on failure; never roll into a
+        # success receipt or attempt a retry of uncertain tool work.
+        raise
+, content)
+        require(match is not None and
+                match.group(1) == task["board_repo_sha"] and
+                'source_url="https://github.com/xupsh/pynq-supported-board-file.git"'
+                in content, "BUILD_BOARD_PREPARE_PIN_MISMATCH")
+        proc = executor(
+            ["/usr/bin/bash", str(script.resolve())],
+            cwd=workspace.resolve(), env={
+                "PATH": "/usr/bin:/bin",
+                "HOME": env.get("HOME", "/nonexistent"),
+                "GIT_TERMINAL_PROMPT": "0",
+            }, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=180, check=False,
+        )
+        require(proc.returncode == 0 and
+                len(proc.stdout) <= 4096 and len(proc.stderr) <= 65536,
+                "BUILD_BOARD_PREPARE_FAILED")
+        try:
+            board_value = proc.stdout.decode("utf-8").strip()
+        except UnicodeError as exc:
+            raise BuildDenied("BUILD_BOARD_PREPARE_OUTPUT_INVALID") from exc
+    require(board_value.startswith("/") and ".." not in board_value,
+            "BUILD_BOARD_REPO_PATH_DENIED")
+    board = Path(board_value)
+    require(board.is_dir() and not board.is_symlink(),
+            "BUILD_BOARD_REPO_MISSING")
+    return board
+
+
 def run(task: dict, *, workspace: Path, approval: dict,
         evidence_dir: Path | None = None,
         executor=subprocess.run) -> dict:
