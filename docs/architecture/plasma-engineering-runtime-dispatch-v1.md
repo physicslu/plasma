@@ -24,10 +24,26 @@ event/owner/ref/Runner identity and checks out the same SHA. It executes the
 checked-in Python program without shell interpolation, verifies **81 products**
 and the exact expected stdout SHA256, and uploads a short JSON receipt.
 
-The task registry is reusable: changing the task changes a reviewed registry
-entry rather than the GitHub Workflow. This first Development Mode route
-supports fixed Path 2 CLI Python tasks; Path 3 Codex remains on its existing
-owner-authorized pilot path until the generic agent-task admission is implemented.
+The task registry is reusable: a reviewed task changes only the registry,
+not the GitHub Workflow. Development Mode now supports both the proven fixed
+Path 2 CLI and a **bounded Path 3 Codex smoke** on the same existing Runner.
+
+The owner can trigger the Path 3 smoke by posting the exact comment to
+Issue #981:
+
+```text
+/plasma-dispatch run nine-nine-path3 981
+```
+
+The hosted admission checks the same owner/Issue/commit controls. Job
+`development-codex` on `SWPC-plasma-codex` runs **real Codex CLI**, instructs
+it to create one new source file, validates the generated Python AST before
+execution, checks 81 cells and exact stdout SHA256, then publishes the generated
+source file and JSON receipt as an artifact. No hardware, Git push, PR creation
+or merge is included in this smoke. A full agentic
+Codex → source PR → GitHub CI development loop is a separate acceptance stage.
+For the present smoke, Hosted CI can validate the contract and use a fake
+Codex, but only the actual SWPC Job is authoritative evidence of Path 3 PASS.
 Repeated idempotent development tests are allowed (no permanent Claim ref).
 No SWPC run is triggered by PR/push; they execute **hosted offline tests only**.
 The `PLASMA_ENGINEERING_DISPATCH_ENABLED` qualification guard and
