@@ -192,7 +192,7 @@ jobs:
           ref: ${{ needs.development-authorize.outputs.pinned_sha }}
           persist-credentials: false
           clean: true
-      - name: Real Codex generates 9x9 source, then bounded validator runs it
+      - name: Codex independently develops and tests; preserve its evidence
         shell: bash
         env:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
@@ -205,8 +205,7 @@ jobs:
             > "$RUNNER_TEMP/plasma-path3-receipt.json"
           cat "$RUNNER_TEMP/plasma-path3-receipt.json"
           git diff --exit-code
-          test "$(git status --porcelain --untracked-files=all)" = \
-            '?? scripts/experiments/plasma_nine_nine_codex_generated.py'
+          git status --short
           sha256sum "$RUNNER_TEMP/plasma-path3-receipt.json" \
             > "$RUNNER_TEMP/plasma-path3-receipt.json.sha256"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -217,6 +216,9 @@ jobs:
             ${{ runner.temp }}/plasma-path3-receipt.json
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
             scripts/experiments/plasma_nine_nine_codex_generated.py
+            scripts/experiments/plasma_nine_nine_codex_generated.csv
+            scripts/experiments/plasma_nine_nine_codex_generated.test.log
+            scripts/experiments/plasma_nine_nine_codex_generated.codex.log
           if-no-files-found: warn
           retention-days: 14
 
