@@ -88,7 +88,7 @@ def acl_metadata(path):
         return {"status": "NOT_CHECKED"}
     lines = done.stdout.decode("utf-8", errors="replace").splitlines()
     # ACL only: no paths, no optional comments or arbitrary udev environment.
-    allowed = tuple("user:", "group:", "mask:", "other:")
+    allowed = ("user:", "group:", "mask:", "other:")
     return {"status": "OBSERVED", "entries": [
         line for line in lines if line.startswith(allowed)
     ][:40]}
