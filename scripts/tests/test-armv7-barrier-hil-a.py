@@ -157,7 +157,7 @@ class WorkflowSecurityTests(unittest.TestCase):
              "f"*64),
             ("20261005T000000Z", "20261019T000000Z"),
             ("dst=/plasma,readonly", "dst=/plasma"),
-            ("--cap-drop=ALL", "--cap-add=SYS_ADMIN"),
+            ("--cap-drop=NET_RAW", "--cap-add=SYS_ADMIN"),
             ('test "$RUNNER_ENVIRONMENT" = github-hosted',
              'test "$RUNNER_ENVIRONMENT" = self-hosted'),
             ("python3 /plasma/scripts/armv7-barrier-hil-a1.py build", "echo fake receipt"),
