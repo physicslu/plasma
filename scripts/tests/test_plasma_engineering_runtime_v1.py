@@ -88,6 +88,21 @@ class RuntimeContracts(unittest.TestCase):
         with self.assertRaisesRegex(legacy.ContractDenied, code):
             runtime.verify_bundle(b, self.policy)
 
+    def test_live_activation_is_repository_pinned_and_default_denied(self):
+        activation = json.loads(
+            (ROOT / "specs/engineering-dispatch/runtime-activation-v1.json").read_text()
+        )
+        self.assertEqual(activation["status"], "DISABLED_GATE1")
+        for path in runtime.PATHS:
+            with self.assertRaisesRegex(
+                legacy.ContractDenied, "RUNTIME_ACTIVATION_NOT_APPROVED"
+            ):
+                runtime.require_reviewed_activation(path, activation)
+        self.assertIn(
+            "require_reviewed_activation(",
+            (ROOT / "scripts/plasma_engineering_runtime_v1.py").read_text(),
+        )
+
     def test_both_path_bindings_and_digest(self):
         for path in runtime.PATHS:
             with self.subTest(path=path):
