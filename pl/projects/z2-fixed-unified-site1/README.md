@@ -1,4 +1,33 @@
-# F1 Gate 1 — PYNQ-Z2 Fixed ABI Site1 PS7 integration (source only)
+# PYNQ-Z2 Fixed ABI Site1 PS7 integration
+
+## F1-B Host-only Vivado implementation — real SWPC run
+
+**2026-10-20:** [Path 3 Run #39342622512](https://github.com/physicslu/plasma/actions/runs/39342622512)
+ran Vivado 2026.1 build 6511674 on SWPC, using board-files commit
+`e02d6a3866b5465218f777168cdc51344ac94e07`. Real synthesis,
+implementation, routing and bitstream generation completed on attempt 03
+(exit 0); existing HWH/artifact verifier exit 0, F1 host source contracts
+22 passed. Reports independently recovered from Run Artifact
+`12229802904`: routed setup slack +1.829 ns, hold slack
++0.018 ns; TNS and THS zero; final DRC and methodology reported zero
+violations; all 12 check_timing categories were zero.
+
+The first attempt failed at license discovery; the second identified
+incorrect comparison of relative versus fully resolved Vivado BD pin paths.
+Using `get_bd_pins` to resolve the expected FCLK and reset pins fixes
+these two comparisons. No RTL/wiring changes or timing waivers were made.
+See `docs/architecture/plasma-path2-fixed-host-build-capability.md` for
+the dated problem/solution ledger.
+
+**Evidence limitation:** The first GitHub Run Artifact contains the five
+real routed reports, engineering report, Git patch and BIT/HWH SHA256 values,
+but omitted the raw BIT/HWH binaries because they were written under the
+hidden evidence directory and excluded from the uploaded file set. A follow-up
+delivery run must put raw BIT/HWH under `pl/build` and verify their
+downloaded hashes before declaring portable deliverables complete.
+Physical image load, Z2 HIL and M1 remain **NOT_RUN / NO_GO**.
+
+## Historical F1 source-only milestone
 
 **State: HOST-ONLY Vivado project candidate; image BUILD/LOAD NOT_RUN; M1 NO_GO.**
 
