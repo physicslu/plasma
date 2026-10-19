@@ -264,6 +264,8 @@ def _report_path(value: str) -> Path:
 
 def _runner_identity() -> tuple[str, str]:
     if os.getenv("GITHUB_ACTIONS") == "true":
+        if os.getenv("RUNNER_ENVIRONMENT") != "github-hosted":
+            raise EvidenceError("Phase 2 SIM-2 pilot refuses self-hosted runners")
         # ImageOS/ImageVersion are observed runner metadata, not a pin.
         name = os.getenv("RUNNER_NAME")
         image = os.getenv("ImageOS")
