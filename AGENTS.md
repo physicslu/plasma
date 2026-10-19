@@ -4,6 +4,14 @@ This file is the primary operating contract for AI coding agents working on the 
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
+**Current default operating mode: DEVELOPMENT MODE (single-owner lab).**
+PLASMA is being developed by one owner; unless the owner expressly declares
+qualification, release or production work, prioritize the shortest working
+Build -> Run -> Observe -> Fix loop. Do not silently apply future fleet,
+factory, multi-tenant or enterprise security requirements to a prototype
+smoke test. See Sections 1A.1 and 11.1B. This is an engineering priority,
+not a declaration that disabled executable controls are already enabled.
+
 **PLASMA execution routing:** At Gate 1, recommend and have the owner choose one of the three Paths in Section 11.1B (ChatGPT Direct Work, SWPC CLI Work, SWPC Codex Work). This path selection is part of Gate 1, not a new gate.
 
 ## 1. Project purpose and canonical domain
@@ -145,6 +153,68 @@ restrictions. When a lower-level procedure is unnecessarily stricter for a
 prototype, propose and implement a scoped Development Mode change through
 normal engineering review rather than fabricate evidence or silently bypass
 executable checks.
+
+### 1A.1 Development Mode — single-owner, shared-runner, efficiency-first (normative)
+
+**Default stage: DEVELOPMENT MODE.** The owner is the only PLASMA developer
+and laboratory operator. Apply this stage by default to all PLASMA software,
+FPGA, SWPC and Z2 *development* tasks, unless the owner explicitly requests
+qualification/production behavior. Risk controls must be proportional to
+the actual command and physical effect, not the technology label `SW` or
+`HW`. Do not invent SW/HW-separated administrative lanes.
+
+- **Execute the experiment before designing a platform around it.** For a
+  trivial smoke test (for example, printing and checking the 9x9
+  multiplication table), first obtain the real CLI/Codex process result,
+  exit code and essential output. Do not precondition that test on a
+  factory-grade dispatcher, a new identity/enrollment program, expansive
+  audits, a task-specific workflow, or a production-readiness milestone.
+- **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
+  (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
+  and Linux account when the reviewed task and actual current permissions
+  allow it. A separate software/hardware Runner, OS image, VM, namespace
+  or new host is **not a default prerequisite** for owner-operated
+  Development Mode. Add isolation only for a demonstrated technical hazard,
+  an actual permission boundary, or explicit owner scope.
+- **Reuse one generic dispatcher.** A new Work Order should describe the
+  bounded task, selected Path, reviewed source/ref, acceptance and minimal
+  evidence; it must not require a newly written GitHub Actions YAML for
+  each experiment. Prefer direct use of existing approved workflows and
+  commands. When the current generic runtime is disabled or incomplete,
+  report the exact executable blocker and implement the *smallest reviewed
+  change* to make the approved development test work; do not replace the
+  entire architecture or claim `NOT_RUN` is `PASS`.
+- **Avoid development ceremony.** Do not demand a new Gate 1, another
+  `continue`, a new Runner, a new risk tier, an elaborate immutable
+  claim/evidence system, or separate deployment approval for work already
+  covered by the owner's Gate 1. For idempotent, CPU-only checks, prioritize
+  bounded execution and a truthful run ID/output over heavyweight
+  once-only operational controls; where existing live controls enforce
+  stricter behavior, change them through a scoped reviewed PR rather than
+  bypassing them.
+- **Keep one obvious result.** A development smoke-test report should
+  normally include: actual executor and Runner, GitHub run/job ID if used,
+  command or task/ref, exit status, expected versus observed output, and
+  `PASS`/`FAIL`/`NOT_RUN`. Hosted CI success cannot substitute for a
+  requested real SWPC execution. Do not require a full qualification
+  evidence package unless the experiment makes it necessary.
+- **Retain only real boundaries.** Gate 1 authorizes the specified work;
+  Gate 2 remains required only to merge a PR. Running as the owner on a
+  shared hardware-capable account is not equivalent to hardware isolation:
+  do not access Z2, LA, USB devices, FPGA, MMIO, hub power or DUT unless
+  the task's approved scope includes the operation and applicable electrical,
+  state-ownership and recovery safeguards. No unapproved deployment,
+  destructive mutation, credential disclosure or privilege escalation.
+- **Transition deliberately.** Production Mode controls are introduced
+  for a specific release, multi-user operation or demonstrated hazard, with
+  an explicit scope and verification. Do not move PLASMA out of
+  Development Mode merely because a future production design mentions
+  controls that are not needed for today's lab experiment.
+
+If these priorities and existing offline-only runtime policies conflict,
+**do not silently bypass an executable guard**. State the precise conflict,
+make the minimum Gate-1-scoped fix and verify it; reserve Gate 2 for the
+resulting PR. Do not use safety terminology to invent another owner gate.
 
 ## 1B. Canonical Codex task/SSH execution contract (normative)
 
@@ -624,8 +694,8 @@ trigger constraints and completion reports are in
 | Path | Executor and route | Recommend when |
 | --- | --- | --- |
 | **Path 1 — ChatGPT Direct Work** | ChatGPT (chat or Work Mode) -> GitHub branch/PR -> GitHub-hosted CI | Source, docs, analysis or host-only builds/tests do not require SWPC/local hardware. |
-| **Path 2 — SWPC CLI Work** | ChatGPT -> authorized GitHub Actions -> SWPC self-hosted Runner -> predefined CLI/shell commands -> evidence; PR if source changes | Actual SWPC access is necessary and fixed, deterministic commands suffice. No Codex agent is required. |
-| **Path 3 — SWPC Codex Work** | ChatGPT -> authorized GitHub Actions -> dedicated SWPC Codex Runner -> Codex CLI iterative development/test -> PR -> relevant CI | Actual SWPC access and agentic diagnosis, cross-module edits or iterative repair are both necessary. |
+| **Path 2 — SWPC CLI Work** | ChatGPT -> authorized GitHub Actions -> existing SWPC self-hosted Runner (shared with Path 3 when suitable) -> predefined CLI/shell commands -> evidence; PR if source changes | Actual SWPC access is necessary and fixed, deterministic commands suffice. No Codex agent is required. |
+| **Path 3 — SWPC Codex Work** | ChatGPT -> authorized GitHub Actions -> existing SWPC `plasma-codex` Runner -> Codex CLI iterative development/test -> PR -> relevant CI | Actual SWPC access and agentic diagnosis, cross-module edits or iterative repair are both necessary. |
 
 Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
 
@@ -655,9 +725,11 @@ Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
    another owner confirmation for already approved execution.
 5. **Path 2** executes reviewed, bounded CLI commands on the intended
    SWPC Runner. It must not silently delegate the job to Codex or use
-   different hardware resources. **Path 3** uses a real dedicated
-   `plasma-codex` Runner and a currently implemented, authorized work
-   workflow. The repository's unified Engineering Dispatch design may
+   different hardware resources. **Path 3** uses the existing
+   `SWPC-plasma-codex` Runner and a currently implemented, authorized work
+   workflow. In single-owner Development Mode, Path 2 and Path 3 can reuse
+   that same Runner/account where commands and approved resources permit;
+   no separate SW/HW Runner is required merely because of the Path label. The repository's unified Engineering Dispatch design may
    remain contract-only; a Gate 1 selection does **not** deploy, enable or
    grant a generic autonomous dispatcher. Existing Codex fixed-workload
    triggers and capabilities are not general-purpose routes.
