@@ -152,11 +152,12 @@ class Gate1ExecutorContracts(unittest.TestCase):
                           "runs-on: [self-hosted","contents: write",
                           "OPENAI_API_KEY:","GITHUB_TOKEN:"):
             self.assertNotIn(forbidden,s)
-        # The eleven original hardware/read-only workflows remain unchanged;
-        # PR #1030 introduced a separate twelfth software-only MVP workflow.
+        # Current main already has twelve legacy Codex workflows other than
+        # the separate fixed software MVP. Keep this baseline explicit;
+        # the reusable Dispatcher must not add a new plasma-codex-* workflow.
         existing=[p for p in OLD_WFS.glob("plasma-codex-*.yml")
                   if p.name != "plasma-codex-software-mvp.yml"]
-        self.assertEqual(len(existing),11)
+        self.assertEqual(len(existing),12)
         self.assertTrue((OLD_WFS/"plasma-codex-software-mvp.yml").is_file())
         src=(ROOT/"scripts/plasma_engineering_gate1_executor.py").read_text()
         for forbidden in ("import subprocess","urllib.request","os.system(", "paramiko",
