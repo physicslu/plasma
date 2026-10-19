@@ -166,5 +166,110 @@ class DiagnosticContracts(unittest.TestCase):
         self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"),1)
 
 
+    def test_all_github_actions_expressions_are_evaluated_not_escaped(self):
+        wf = (ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
+        expression = "$" + "{{"
+        self.assertEqual(wf.count(expression), 9)
+        self.assertNotIn(chr(92) + expression, wf)
+        # Stronger than mere presence: verify all nine expressions and their sites.
+        expected = (
+            "    if: " + expression + " github.event_name == 'pull_request' || github.event_name == 'push' }}",
+            "          REQUESTED_ORIGINAL_RUN: " + expression + " inputs.original_run }}",
+            "          CONFIRM_READ_ONLY: " + expression + " inputs.confirm_read_only }}",
+            "    if: " + expression + " needs.authorize.result == 'success' }}",
+            "      INPUT_ORIGINAL_RUN: " + expression + " inputs.original_run }}",
+            "      INPUT_CONFIRM_READ_ONLY: " + expression + " inputs.confirm_read_only }}",
+            "          ref: " + expression + " github.sha }}",
+            "          name: plasma-codex-device-permission-39190291831-" + expression + " github.run_id }}",
+            "          path: " + expression + " runner.temp }}/plasma-codex-device-permission-39190291831.json",
+        )
+        self.assertEqual(len(set(expected)), 9)
+        for line in expected:
+            with self.subTest(line=line):
+                self.assertEqual(wf.splitlines().count(line), 1)
+
+    def test_workflow_dispatch_never_runs_offline_contract(self):
+        wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
+        section=wf.split("\n  contract:\n",1)[1].split("\n  authorize:\n",1)[0]
+        contract_if="    if: " + "$" + "{{ github.event_name == 'pull_request' || github.event_name == 'push' }}"
+        self.assertEqual([s for s in section.splitlines() if s.strip().startswith("if:")],[contract_if])
+        for event,expected in (
+            ("pull_request",True),("push",True),
+            ("workflow_dispatch",False),("issue_comment",False),
+            ("workflow_run",False),
+        ):
+            with self.subTest(event=event):
+                self.assertIs(event in ("pull_request","push"),expected)
+        self.assertNotIn("runs-on: [self-hosted",section)
+
+    def test_hosted_authorize_has_exact_manual_input_and_owner_gate(self):
+        wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
+        section=wf.split("\n  authorize:\n",1)[1].split("\n  inspect:\n",1)[0]
+        expression_start=section.split("    if: >-\n",1)[1].split("    runs-on:",1)[0]
+        checks=[x.strip() for x in expression_start.splitlines() if x.strip()]
+        self.assertEqual(checks,[
+            "github.event_name == 'workflow_dispatch' &&",
+            "github.repository == 'physicslu/plasma' &&",
+            "github.actor == 'physicslu' &&",
+            "github.ref == 'refs/heads/main' &&",
+            "github.run_attempt == 1 &&",
+            "inputs.original_run == '39190291831' &&",
+            "inputs.confirm_read_only == true",
+        ])
+        for line in (
+            'test "$REQUESTED_ORIGINAL_RUN" = 39190291831',
+            'test "$CONFIRM_READ_ONLY" = true',
+            'test "$GITHUB_EVENT_NAME" = workflow_dispatch',
+            'test "$GITHUB_ACTOR" = physicslu',
+            'test "$GITHUB_REPOSITORY" = physicslu/plasma',
+            'test "$GITHUB_REF" = refs/heads/main',
+            'test "$GITHUB_RUN_ATTEMPT" = 1',
+        ):
+            with self.subTest(line=line):
+                self.assertIn(line,section)
+        self.assertIn("runs-on: ubuntu-24.04", section)
+        self.assertNotIn("self-hosted",section)
+
+    def test_authorize_gate_rejects_wrong_dispatch_metadata_offline(self):
+        expected=dict(event="workflow_dispatch",repo="physicslu/plasma",
+                      actor="physicslu",ref="refs/heads/main",
+                      attempt=1,original="39190291831",confirmed=True)
+        def approved(c):
+            return (c["event"]=="workflow_dispatch"
+                    and c["repo"]=="physicslu/plasma"
+                    and c["actor"]=="physicslu"
+                    and c["ref"]=="refs/heads/main"
+                    and c["attempt"]==1
+                    and c["original"]=="39190291831"
+                    and c["confirmed"] is True)
+        self.assertTrue(approved(expected))
+        for key,bad in (
+            ("event","push"),("event","pull_request"),
+            ("repo","another/plasma"),("actor","attacker"),
+            ("ref","refs/heads/test"),("attempt",2),
+            ("original","39190291830"),("confirmed",False),
+            ("confirmed","true"),
+        ):
+            with self.subTest(key=key,bad=bad):
+                self.assertFalse(approved({**expected,key:bad}))
+        # The predicate is a model: the test above pins the exact YAML clauses.
+
+    def test_inspect_is_only_after_hosted_authorization_and_inputs_are_bound(self):
+        wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
+        section=wf.split("\n  inspect:\n",1)[1]
+        prefix="$"+"{{"
+        self.assertIn("    needs: authorize\n    if: "+prefix+" needs.authorize.result == 'success' }}",section)
+        self.assertIn("      INPUT_ORIGINAL_RUN: "+prefix+" inputs.original_run }}",section)
+        self.assertIn("      INPUT_CONFIRM_READ_ONLY: "+prefix+" inputs.confirm_read_only }}",section)
+        self.assertIn("          ref: "+prefix+" github.sha }}",section)
+        self.assertIn('test "$INPUT_ORIGINAL_RUN" = 39190291831',section)
+        self.assertIn('test "$INPUT_CONFIRM_READ_ONLY" = true',section)
+        self.assertIn('test "$RUNNER_NAME" = SWPC-plasma-codex',section)
+        self.assertIn("        with:\n          ref: "+prefix+" github.sha }}\n          persist-credentials: false",section)
+        self.assertIn("path: "+prefix+" runner.temp }}/plasma-codex-device-permission-39190291831.json",section)
+        self.assertNotIn("codex exec",wf)
+        self.assertNotIn("contents: write",wf)
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
