@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Single-owner, single-work-order LIVE Codex MVP. No general dispatcher.
+"""Exact owner-triggered C11 SW task on the unified SWPC HIL worker.
 
-The Codex worker uses SWPC-plasma-codex and its existing ChatGPT login, not
-an OPENAI_API_KEY or GitHub write token. The hosted publisher is separate.
-Both jobs use the owner-approved Gate 2 squash-merge SHA. A hosted provenance
-check independently binds the single activation PR #1034 to Gate 1 Codex PR #1033.
-No issue comment is required and no hardware operations are authorized.
+Uses the existing SWPC-plasma-codex identity and its ChatGPT CLI login,
+without GitHub write tokens or API secrets on the worker. A separate hosted
+Publisher verifies the model-generated single-file patch. All live execution
+requires an explicit owner-created Issue #981 command on main; legacy
+PR #1034 postmerge auto activation is archived and must NOT be replayed.
+The SW command is not permission for Z2/LA/USB hardware operations.
 """
 from __future__ import annotations
 import argparse
@@ -50,37 +51,9 @@ def load_event(path: Path) -> dict:
     return x
 
 def authorize(event: dict, environ: dict[str, str], sha: str) -> dict:
-    # The selected Mode 2 pilot is now a single verified main-branch merge
-    # event. A separate GitHub-hosted provenance job MUST succeed first.
-    # This local admission is repeated on worker and publisher with zero
-    # model/PR-writing credentials, binding each job to the same GitHub run.
-    if environ.get("GITHUB_EVENT_NAME") == "push":
-        if (
-            environ.get("GITHUB_ACTOR") != OWNER
-            or environ.get("GITHUB_REPOSITORY") != REPO
-            or environ.get("GITHUB_REF") != "refs/heads/main"
-            or environ.get("GITHUB_SHA") != sha
-            or not SHA40.fullmatch(sha)
-            or environ.get("GITHUB_RUN_ATTEMPT") != "1"
-            or type(event) is not dict
-            or event.get("ref") != "refs/heads/main"
-            or event.get("after") != sha
-            or type(event.get("repository")) is not dict
-            or event["repository"].get("full_name") != REPO
-            or type(event.get("head_commit")) is not dict
-            or event["head_commit"].get("id") != sha
-            or event.get("created") is not False
-            or event.get("deleted") is not False
-            or event.get("forced") is not False
-        ):
-            fail("UNTRUSTED_AUTO_MERGE_CONTEXT")
-        run = environ.get("GITHUB_RUN_ID", "")
-        if not re.fullmatch(r"[1-9][0-9]{0,19}", run):
-            fail("UNTRUSTED_RUN_ID")
-        return {"repository": REPO, "issue": ISSUE,
-                "command": "auto-after-gate2-merge-pr1034",
-                "executor": "codex", "source_sha": sha,
-                "comment_id": 0, "run_id": int(run), "run_attempt": 1}
+    # Unified HIL only admits an explicit owner-created Issue comment.
+    # The historical PR #1034 one-shot push may not be replayed by a new merge.
+    # Require the same context again on the worker and hosted publisher.
     if (environ.get("GITHUB_EVENT_NAME") != "issue_comment"
             or environ.get("GITHUB_ACTOR") != OWNER
             or environ.get("GITHUB_REPOSITORY") != REPO
