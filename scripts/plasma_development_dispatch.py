@@ -278,8 +278,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
              approval: dict | None = None, sandbox: bool = False) -> dict:
     if task.get("capability") == "vivado-host-build":
         require(type(approval) is dict and
-                approval.get("task_id") in
-                    ("fixed-site1-vivado-host-build",) and
+                approval.get("execution_capability") == "vivado-host-build" and
+                approval.get("execution_path") == "path2-cli" and
                 approval.get("pr_number") == 0 and
                 approval.get("pinned_sha") == approval.get("trusted_sha"),
                 "HOST_BUILD_APPROVAL_REQUIRED")
