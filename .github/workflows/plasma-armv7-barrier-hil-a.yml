@@ -1,0 +1,92 @@
+name: PLASMA ARMv7 Barrier HIL-A1 SWPC Cross Build
+
+# Only reviewed main may be run by an explicit authenticated owner dispatch.
+# The PR lane lives in a separate GitHub-hosted contract workflow.
+# This workflow has NO Z2, SSH, DUT, Vivado, /dev/mem or /dev/uio access.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: plasma-armv7-barrier-hil-a1
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'physicslu'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Enforce reviewed main SHA and explicit owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_ACTOR" = physicslu
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+
+  swpc-cross-compile:
+    needs: authorize
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'physicslu' &&
+      needs.authorize.result == 'success'
+    runs-on: [self-hosted, linux, x64, plasma-integration]
+    timeout-minutes: 15
+    steps:
+      - name: Validate trusted SWPC-plasma-ci execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_ACTOR" = physicslu
+          test "$RUNNER_NAME" = SWPC-plasma-ci
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-ci
+          test "$(id -u)" -ne 0
+          test -n "$RUNNER_TEMP"
+          test -z "${SSH_AUTH_SOCK:-}"
+          umask 077
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+      - name: Verify commit and build ARMv7 DMB SY as an ELF shared library
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$RUNNER_NAME" = SWPC-plasma-ci
+          umask 077
+          python3 scripts/armv7-barrier-hil-a1.py build \
+            --output-dir "$RUNNER_TEMP/plasma-armv7-hil-a1-$GITHUB_RUN_ID" \
+            --expected-sha "$GITHUB_SHA"
+      - name: Publish strictly scoped A1 build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-armv7-hil-a1-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-armv7-hil-a1-${{ github.run_id }}/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Declare HIL boundary
+        if: success()
+        shell: bash
+        run: |
+          echo "A1 SWPC Cross Build / ELF DMB SY: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Z2 native execution: NOT_RUN" >> "$GITHUB_STEP_SUMMARY"
+          echo "Live MMIO/UIO, FPGA and DUT: NOT_RUN; M1 NO-GO" >> "$GITHUB_STEP_SUMMARY"
