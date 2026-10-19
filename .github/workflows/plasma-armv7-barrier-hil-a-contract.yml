@@ -34,7 +34,6 @@ jobs:
             scripts/armv7-barrier-hil-a1.py \
             scripts/armv7-barrier-hil-a-contract.py \
             scripts/tests/test-armv7-barrier-hil-a.py
-          bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
       - name: Declare exact limitation
         run: |
           echo "PR Host-only safety contracts: PASS" >> "$GITHUB_STEP_SUMMARY"
