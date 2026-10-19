@@ -89,10 +89,12 @@ flowchart TD
   G -- "是" --> I --> J --> K
 ```
 
+**Development Mode 實作修訂（2026-10-20）：** Path 3 是 Codex 自主工程執行模式，不再以單一 generated Python／CSV 作為唯一工作成果。Codex 可在已授權的候選工作樹內修改 RTL、Tcl、Python、測試和文件，允許執行 Vivado 2026.1 真正的 **Host-only** Synthesis、Implementation、Timing、DRC 和 BIT／HWH 建置，記錄實際錯誤、根因／假設、修正、重測以及 SHA256。原有 480 秒 Codex 子程序上限已移除；Workflow 原 12 分鐘上限改為 360 分鐘的外部故障保護，而非要求設計在數分鐘內完成。既有 Candidate 檔案白名單拒絕改碼的檢查已移除，改保存完整 Git diff、未追蹤來源檔與工程報告，由 Reviewer 判讀真實證據。開發階段不因軟體編譯涉及 FPGA 而禁止 Vivado；唯 **Host-only ≠ 實體 FPGA 授權**，不允許載入 Bitstream、Z2／DUT／LA／USB／MMIO／Power／部署。這是可用權限邊界，不是為每次重試新增審批或系統。
+
 **執行者：** 既有 SWPC `SWPC-plasma-codex` Runner 與 Codex CLI；GitHub Actions 負責派工與收集 Code／Output／Log，Codex 負責自行開發、自行執行、自行測試與修正，**ChatGPT 審閱真實證據並判定 PASS/FAIL**。不要讓 SWPC Dispatcher 額外實作一個驗證 Codex 寫法的 AST/特定輸出格式檢查器。Job `SUCCESS`、Codex 自稱 `PASS`、有 Artifact，均不能直接代替獨立驗收。已知限制：
 
 1. **批准 Gate 1 ≠ GitHub Workflow 自動發生。** ChatGPT／授權工具必須確實呼叫可用 Trigger，並以 GitHub Job 證據核對是否執行。若無法觸發，報告 `NOT_RUN`；不要求已批准事項再重複授權。
-2. 現在已有共用 `plasma-engineering-runtime-dispatch.yml` 的 **Development Mode owner-only Issue #981 入口**，Path 2/3 均曾成功在既有 SWPC Runner 執行。然而這個入口**只從 main 讀取任務及 SHA**，尚不具備受控的 Gate 1 開發分支／PR Commit 派工能力。正式 qualification `workflow_dispatch` Runtime 仍停用。政策改成「先測、後 Merge」**不表示**技術入口已同步完成；下一項需要的任務應先修正此限制，或誠實回報 `NOT_RUN`，不得拿 Gate 2 合併來解鎖測試。
+2. 現有共用 `plasma-engineering-runtime-dispatch.yml` 提供 **Development Mode owner-only Issue #981 入口**。可信 Dispatcher 仍來自 `main`，但已支援在 Owner 核准後讀取同儲存庫未合併 PR 的精確 HEAD SHA 與候選任務 Registry／工作樹；該路徑適用 Path 2/3。新的 Path 3 開發契約仍須先合併到 `main` 的可信 Dispatcher 後，才可能在既有 Runner 生效。正式 qualification `workflow_dispatch` Runtime 仍停用。
 3. Codex 建 PR 時，若使用預設 `GITHUB_TOKEN`，**通常不會觸發新的 `pull_request` workflows**。須確保使用核准的 GitHub App token 或其他受控事件機制，讓必要 CI 真正開始。PR 建立成功不能代替 CI PASS。
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
 5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
@@ -145,7 +147,7 @@ flowchart TD
 
 **開發階段強制順序：Gate 1 = Build → Real Run → Evidence Review → Fix/Retest → PR/CI Ready；Gate 2 = Merge Decision。**
 
-目前 GitHub `issue_comment` 的 owner-only Development Mode 入口仍要求 `main`，不支援讓 PR 分支程式直接實測。更新本文件**不會自行解除這個技術限制**；遇到此阻礙應在 Gate 1 先完成最小 Dispatcher 改進的獨立驗證，或清楚回報 `NOT_RUN`，不可為此提前 Merge。
+目前 GitHub `issue_comment` 的 owner-only Development Mode 入口使用 `main` 的可信 Dispatcher 驗證 Owner、PR HEAD SHA 與指定執行能力，候選工程內容可來自未合併 PR；**文件變更不代表 Runner 已載入新版 Dispatcher**。只有相應 Workflow／Dispatcher 真正合併至 `main` 並實際執行後，才能回報新能力已生效。
 
 **Gate 1 已批准後即可執行**，不額外要求每次 SSH、測試、建立 PR、Draft → Ready 的核准；但工具不通、硬體安全事實不符或需新權限時必須安全停止並回報。經核准而可以到達的 Gate 2，只授權合併該特定 PR。
 
