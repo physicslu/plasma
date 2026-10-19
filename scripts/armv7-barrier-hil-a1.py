@@ -67,8 +67,13 @@ def _run(argv: list[str], *, timeout: int = 90) -> str:
             argv, cwd=REPO, check=True, text=True,
             capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL,
         )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise HILA1Error(f"Trusted tool failed: {Path(argv[0]).name}") from exc
+    except subprocess.CalledProcessError as exc:
+        # All argv are fixed, audited cross-tool commands; report bounded compiler
+        # diagnostics so CI failures are actionable without an SSH session.
+        stderr = (exc.stderr or "").strip()[-1000:]
+        raise HILA1Error(f"Trusted tool failed: {Path(argv[0]).name} (exit {exc.returncode}): {stderr}") from exc
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HILA1Error(f"Trusted tool unavailable or timed out: {Path(argv[0]).name}") from exc
     return result.stdout
 
 
