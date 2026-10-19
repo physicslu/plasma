@@ -108,42 +108,66 @@ class WorkflowSecurityTests(unittest.TestCase):
     def setUpClass(cls):
         cls.main = contract.WORKFLOW.read_text()
         cls.host_ci = contract.HOST_CI.read_text()
+        cls.wrapper = contract.HOST_SCRIPT.read_text()
 
-    def test_safe_manual_main_a1_workflow_and_hosted_ci(self):
-        contract.validate(self.main, self.host_ci)
+    def test_hosted_manual_and_pr_cross_build_are_identical(self):
+        contract.validate(self.main, self.host_ci, self.wrapper)
 
-    def test_a1_authority_and_runner_guards_fail_closed_when_mutated(self):
-        unsafe_variants = (
-            self.main.replace("  workflow_dispatch:", "  push:"),
-            self.main.replace("  workflow_dispatch:", "  workflow_dispatch:\n  pull_request:"),
-            self.main.replace("github.actor == 'physicslu'", "github.actor == 'intruder'", 1),
-            self.main.replace("github.ref == 'refs/heads/main'", "github.ref == 'refs/heads/agent'", 1),
-            self.main.replace("needs: authorize", "needs: other_job"),
-            self.main.replace("runs-on: [self-hosted, linux, x64, plasma-integration]",
-                              "runs-on: ubuntu-24.04"),
-            self.main.replace('test "$RUNNER_NAME" = SWPC-plasma-ci',
-                              'test "$RUNNER_NAME" = stranger'),
-            self.main.replace("persist-credentials: false", "persist-credentials: true"),
-            self.main.replace("jobs:\n", "jobs:\n  z2:\n    runs-on: self-hosted\n"),
-            self.main.replace("      - name: Declare HIL boundary",
-                              "      - run: ssh z2.local uptime\n      - name: Declare HIL boundary"),
+    def test_manual_requires_owner_main_hosted_only(self):
+        changes = (
+            ("  workflow_dispatch:", "  push:"),
+            ("  workflow_dispatch:", "  workflow_dispatch:\n  pull_request:"),
+            ("github.actor == 'physicslu'", "github.actor == 'intruder'"),
+            ("github.ref == 'refs/heads/main'", "github.ref == 'refs/heads/agent'"),
+            ("runs-on: ubuntu-24.04", "runs-on: [self-hosted, linux, x64]"),
+            ('test "$RUNNER_ENVIRONMENT" = github-hosted',
+             'test "$RUNNER_ENVIRONMENT" = self-hosted'),
+            ("persist-credentials: false", "persist-credentials: true"),
+            ("jobs:\n", "jobs:\n  z2:\n    runs-on: self-hosted\n"),
+            ("      - name: Declare exact qualification boundary",
+             "      - run: ssh z2.local uptime\n      - name: Declare exact qualification boundary"),
+            ("bash scripts/armv7-barrier-hil-a1-hosted.sh", "echo bypass"),
         )
-        for version in unsafe_variants:
-            with self.subTest(mutated=version != self.main):
-                self.assertNotEqual(version, self.main)
+        for old, new in changes:
+            changed = self.main.replace(old, new, 1)
+            with self.subTest(old=old):
+                self.assertNotEqual(self.main, changed)
                 with self.assertRaises(contract.ContractError):
-                    contract.validate(version, self.host_ci)
+                    contract.validate(changed, self.host_ci, self.wrapper)
 
-    def test_pr_tests_cannot_be_redirected_to_swpc(self):
-        unsafe = (
-            self.host_ci.replace("runs-on: ubuntu-24.04", "runs-on: self-hosted"),
-            self.host_ci.replace("  pull_request:", "  workflow_dispatch:"),
-            self.host_ci.replace("  pull_request:", "  pull_request:\n  push:"),
-            self.host_ci.replace("persist-credentials: false", "persist-credentials: true"),
+    def test_pr_uses_real_compiler_but_no_self_hosted_runner(self):
+        changes = (
+            ("runs-on: ubuntu-24.04", "runs-on: self-hosted"),
+            ("  pull_request:", "  workflow_dispatch:"),
+            ("  pull_request:", "  pull_request:\n  push:"),
+            ("persist-credentials: false", "persist-credentials: true"),
+            ("bash scripts/armv7-barrier-hil-a1-hosted.sh", "echo no build"),
+            ("if-no-files-found: error", "if-no-files-found: warn"),
         )
-        for version in unsafe:
-            with self.assertRaises(contract.ContractError):
-                contract.validate(self.main, version)
+        for old, new in changes:
+            changed = self.host_ci.replace(old, new, 1)
+            with self.subTest(old=old):
+                self.assertNotEqual(changed, self.host_ci)
+                with self.assertRaises(contract.ContractError):
+                    contract.validate(self.main, changed, self.wrapper)
+
+    def test_fail_closed_toolchain_image_snapshot_or_host_access(self):
+        changes = (
+            ("bc49dc1918ee1a47a93e65b5e4676e8680fb754b133197b92ca52bfe6731d5f0",
+             "f"*64),
+            ("20261005T000000Z", "20261019T000000Z"),
+            ("dst=/plasma,readonly", "dst=/plasma"),
+            ("--cap-drop=ALL", "--cap-add=SYS_ADMIN"),
+            ('test "$RUNNER_ENVIRONMENT" = github-hosted',
+             'test "$RUNNER_ENVIRONMENT" = self-hosted'),
+            ("python3 /plasma/scripts/armv7-barrier-hil-a1.py build", "echo fake receipt"),
+        )
+        for old, new in changes:
+            changed = self.wrapper.replace(old, new, 1)
+            with self.subTest(old=old):
+                self.assertNotEqual(changed, self.wrapper)
+                with self.assertRaises(contract.ContractError):
+                    contract.validate(self.main, self.host_ci, changed)
 
 
 if __name__ == "__main__":
