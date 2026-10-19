@@ -1,6 +1,6 @@
 name: PLASMA ARMv7 Barrier HIL-A Host-only Contracts
 
-# PRs run only a GitHub-hosted static/negative-test lane, never SWPC or Z2.
+# PRs perform real pinned ARMv7 cross-build and negative tests on GitHub-hosted only.
 on:
   pull_request:
     paths:
