@@ -30,7 +30,7 @@ docker run --rm --platform linux/amd64 \
   "$IMAGE" bash -euo pipefail -c '
     export DEBIAN_FRONTEND=noninteractive
     printf "%s\n" \
-      "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/$PLASMA_TOOLCHAIN_SNAPSHOT/ bookworm main" \
+      "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/$PLASMA_TOOLCHAIN_SNAPSHOT/ bookworm main" \
       > /etc/apt/sources.list
     rm -f /etc/apt/sources.list.d/debian.sources
     apt-get update -qq -o Acquire::Check-Valid-Until=false
