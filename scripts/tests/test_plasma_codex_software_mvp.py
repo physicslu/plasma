@@ -18,6 +18,34 @@ def command(*args: str) -> str:
     return subprocess.check_output(["git",*args],stderr=subprocess.DEVNULL,text=True).strip()
 
 class MVPTests(unittest.TestCase):
+    @staticmethod
+    def minimal_c_fixture() -> str:
+        # Local ephemeral test fixture; never published as a target program.
+        return ('#include <stdio.h>\\n\\n'
+                'int main(void)\\n'
+                '{\\n'
+                '    puts("Hello, World!");\\n'
+                '    return 0;\\n'
+                '}\\n').replace('\\n', '\n')
+
+    def test_denies_other_c_source_and_malicious_side_effects(self):
+        for bad in (
+            b'#include <stdlib.h>\\nint main(void){system("id"); return 0;}',
+            b'#include <stdio.h>\\nint main(void){printf("Wrong\\\\n");return 0;}',
+            b'#include <stdio.h>\\nint main(void){puts("Hello, World!");system("id");return 0;}',
+            b'#include <stdio.h>\\nint main(void){puts("Hello, World!");return 0;} /* nope */',
+            b'#include <stdio.h>\\nint main(void){puts("Hello, World!");return 0;}\\n#define ESCALATE 1',
+        ):
+            with self.subTest(src=bad), self.assertRaises(mvp.Refused):
+                mvp.validate_c_source(bad)
+
+    def test_exact_c11_program_and_stdout_contract(self):
+        src=self.minimal_c_fixture().encode()
+        mvp.validate_c_source(src)
+        self.assertEqual(mvp.EXPECTED_STDOUT, b"Hello, World!\\n".replace(b"\\n",b"\n"))
+        self.assertEqual(mvp.TARGET,"examples/hello-world/main.c")
+        self.assertEqual(mvp.COMMAND,"/plasma-codex hello-c 981")
+
     def event(self) -> dict:
         return {"action":"created","issue":{"number":981},
                 "comment":{"id":123,"body":mvp.COMMAND,
@@ -75,7 +103,9 @@ class MVPTests(unittest.TestCase):
                 sha=command("rev-parse","HEAD")
                 env=self.env(sha);event=self.event()
                 path=Path(mvp.TARGET);path.parent.mkdir(parents=True)
-                path.write_text("# Codex MVP\n\nVerified manual operator guide.\n")
+                # CI-only disposable fixture; the deliverable main.c is
+                # intentionally NOT authored in the repository by ChatGPT.
+                path.write_text(self.minimal_c_fixture())
                 bundle=mvp.create_bundle(root/"bundle",event,env)
                 self.assertEqual(bundle["source_sha"],sha)
                 self.assertTrue((root/"bundle/candidate.patch").is_file())
