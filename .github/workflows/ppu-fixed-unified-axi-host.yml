@@ -14,6 +14,11 @@ on:
       - 'docs/architecture/plasma-verification-platform-v1.md'
       - 'pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py'
       - 'software/python/plasma_interfaces/fixed_abi_swd.py'
+      - 'software/python/plasma_interfaces/fixed_abi_mmio_port.py'
+      - 'software/python/plasma_interfaces/linux_mmio.py'
+      - 'software/python/tests/test_fixed_abi_mmio_port_host.py'
+      - 'software/python/native/armv7_mmio_barrier.c'
+      - 'pl/verification/fixed_image_abi_v1_gate1.json'
       - 'pl/verification/models/fixed_swd_site_driver.py'
       - 'docs/architecture/fixed-ppu-unified-axi-site1-gate1.md'
   workflow_dispatch:
@@ -60,6 +65,8 @@ jobs:
         run: |
           python -m pytest -q pl/verification/test_fixed_ppu_global_identity_rtl.py
           python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
+      - name: P0 Site1 native MMIO port and DMB boundary Host contracts
+        run: python -m pytest -q software/python/tests/test_fixed_abi_mmio_port_host.py
       - name: ABI/Host Driver admission contracts
         run: |
           python -m pl.tools.fixed_image_abi_contract pl/verification/fixed_image_abi_v1_gate1.json
