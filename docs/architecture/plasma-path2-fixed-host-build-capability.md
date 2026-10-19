@@ -64,3 +64,58 @@ Its candidate registry entry is replaced by `f1b-path3-codex-vivado-build`, a re
 This eliminates the former generated-file-only change allowlist, Python subprocess 480-second deadline and 12-minute Path 3 job deadline. The job has an operational 360-minute watchdog, not a mandated target build time. **No FPGA programming, Z2/DUT/LA/USB/MMIO/power manipulation or deployment is authorized.** These are separate from Host-only compiling.
 
 Until actual SWPC/Codex/Vivado execution proves otherwise, synthesis, implementation, BIT/HWH, timing and DRC are **NOT_RUN**. A registry update alone is not a successful build.
+
+
+## F1-B real Path 3 Build / problems and resolutions — 2026-10-20
+
+**Executed evidence, not an offline mock:** [Actions Run 39342622512](https://github.com/physicslu/plasma/actions/runs/39342622512), SWPC `SWPC-plasma-codex`, trusted Dispatcher main
+`78d3ca70f43a13523da8b6d3cdd578ec91d79b39`, candidate #1064
+`92306f0b988d6546ac4d45f487fc6486d8959d51`, board-files commit
+`e02d6a3866b5465218f777168cdc51344ac94e07`.
+Codex exit 0 and GitHub Job SUCCESS. Independent review recovered actual
+Vivado reports and the chronological report from artifact `12229802904`
+(SHA256 of GitHub artifact ZIP:
+`4d137b626fefa1107c81dd669e62873ffc6b6940b25c2bbad1473d136652d030`).
+
+| Attempt / issue | Root cause / corrective action | Retest |
+| --- | --- | --- |
+| 01, exit 42 | Vivado executable not on PATH and License file not automatically discovered; use existing installed Vivado 2026.1 and configure existing Xilinx License via `XILINXD_LICENSE_FILE`. No license file copied or committed | Attempt 02 reached Tcl |
+| 02, exit 1 | `create_block_design.tcl` compared relative string `ps7_0/FCLK_CLK0` (and reset pin) against full Vivado pin object paths. Actual net endpoints were correct. Compare against resolved `get_bd_pins` objects, preserving connection assertion | Attempt 03 exited 0 |
+| 03, exit 0 | Real Vivado synthesis, implementation, routing, BIT and HWH generation | 22 host tests PASS; existing HWH/artifact verifier exit 0 |
+
+**Independent host report review:** 100MHz clock, WNS +1.829ns / TNS 0;
+WHS +0.018ns / THS 0; pulse-width slack +4.020ns, total violation 0;
+zero failing setup/hold endpoints; all twelve `check_timing` issue
+categories zero; DRC and methodology reports each `Checks found: 0`.
+Reported utilization: 1,339 LUTs, 1,672 flip-flops, zero latches.
+This substantiates **Host-only implementation PASS**, not Z2 physical
+qualification or deployed product readiness.
+
+**Recovered report SHA256 independently recomputed and matched the
+manifest:**
+
+- `timing_summary.rpt`: `9806fa1a6a61f1d18fdb6b365c96c7aee83abd3b6245a4021865fb532ede73de`
+- `drc.rpt`: `07836b1165e032fe8d8f1f4667252f7a9bc71184f5ac0e6cdf4a58ae3055d490`
+- `methodology.rpt`: `e418e9ba7f3592c8cb74bdc0740f8c8f1c77d9c2405a8dd6dbf873fd75150104`
+- `check_timing.rpt`: `7ff59f27430da0dfa03ad1a63e4140ad3a635b353a827338ed1a4e7f65f47dd3`
+- `utilization.rpt`: `2b382b28f7c81220789a381f052c1aa1abc261bd2924c23cb04920430c2cde1e`
+- Engineering report: `5a8c899017ada58522d440029f3350c50833a5bf2b5c81deba9a4e5476ec276d`
+
+**Binary-delivery caveat:** The in-run verifier records BIT
+SHA256 `134e4f6103f25cbb9a9e2ea1e5e947ced29a508bbe799becb2a08f680b769cfc`
+(4,045,769 bytes), HWH SHA256
+`885808eee923cc5f27723452d663e928cd5c0c8869ec927df6e5d6c71cf49722`.
+However **the initial uploaded artifact ZIP does not contain either binary**:
+both were written under hidden/ignored `.plasma-path3-evidence/artifacts/`,
+which did not match the effective upload set. Their hashes in the
+manifest/report are original run claims, **not independently recomputed from
+the downloaded binaries**. Subsequent Path 3 must place unmodified BIT/HWH
+under `pl/build` (which the existing trusted workflow uploads by
+`candidate/pl/build/**/*.bit` and `**/*.hwh`), retain full
+logs, and independently verify downloaded binaries. Do not silently mark
+portable artifact custody complete until this is done.
+
+**Scope:** No FPGA load, Z2/DUT/LA/MMIO/USB/power, production release or
+hardware HIL. M1 remains `NO_GO`. PR #1064 remains Gate 1 until
+new source HEAD CI and portable artifact evidence are verified; its
+merger requires the owner's independent Gate 2 authorization.
