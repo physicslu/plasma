@@ -42,7 +42,8 @@ the **main** dispatcher, not by dispatcher Python from the PR.
    stdout/stderr and the receipt. Path 3 delegates the task objective to Codex,
    supports creating or repairing the approved Python file, and collects
    the source, text or CSV output (`output_format: text|csv`), self-test and
-   Codex session logs. Only the approved source file may be changed, and its
+   Codex session logs. Its reference SHA256 is optional for new unknown-output
+   objectives. Only the approved source file may be changed, and its
    tracked diff is preserved in a source patch artifact for review;
    **ChatGPT** reviews evidence, not AST shape or fixed CSV column labels.
 5. Both use the *existing* `SWPC-plasma-codex` self-hosted Runner, with
