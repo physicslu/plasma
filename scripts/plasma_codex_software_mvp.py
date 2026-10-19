@@ -157,7 +157,7 @@ def verify_bundle(root: Path, event: dict, env: dict[str,str]) -> dict:
     if not status.startswith("100644 "):
         fail("PUBLISH_MODE_DENIED")
     # Require a new file, not deletion or modification to existing source.
-    if git("cat-file","-e",base+":"+TARGET,input=None) == b"":
+    if git("ls-tree", "HEAD", "--", TARGET) != b"":
         fail("PUBLISH_EXISTING_FILE_DENIED")
     return receipt
 
