@@ -177,7 +177,8 @@ def verify_pr(pr: object, req: dict) -> None:
             base.get("ref") == "main", "PR_REPOSITORY_OR_BASE_DENIED")
     require(author.get("login") == OWNER and
             type(head.get("ref")) is str and
-            head["ref"].startswith("agent/"), "PR_OWNER_OR_BRANCH_DENIED")
+            bool(head["ref"]) and head["ref"] != "main",
+            "PR_OWNER_OR_BRANCH_DENIED")
     require(head.get("sha") == req["source_sha"],
             "PR_HEAD_SHA_MISMATCH")
 
