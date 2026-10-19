@@ -296,6 +296,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
     def test_codex_can_repair_existing_source_and_return_text_evidence(self):
         task=dict(self.registry["tasks"]["nine-nine-path3"])
         task["output_format"]="text"
+        del task["expected_stdout_sha256"]  # New task: output is not known yet.
         dev.task_by_id({**self.registry,"tasks":{"branch-codex":task}},
                        "branch-codex")
         with tempfile.TemporaryDirectory() as td:
