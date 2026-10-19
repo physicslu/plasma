@@ -67,6 +67,32 @@ class MVPTests(unittest.TestCase):
         self.assertEqual(r["comment_id"],123)
         self.assertEqual(r["executor"],"codex")
 
+    def test_auto_merge_event_admission_without_live_codex(self):
+        sha="b"*40
+        env=self.env(sha)
+        env["GITHUB_EVENT_NAME"]="push"
+        event={"ref":"refs/heads/main", "after":sha,
+               "head_commit":{"id":sha},
+               "repository":{"full_name":"physicslu/plasma"},
+               "forced":False,"created":False,"deleted":False}
+        receipt=mvp.authorize(event,env,sha)
+        self.assertEqual(receipt["executor"],"codex")
+        self.assertEqual(receipt["command"],"auto-after-gate2-merge-pr1034")
+        self.assertEqual(receipt["source_sha"],sha)
+        self.assertEqual(receipt["comment_id"],0)
+        for change in (
+            {"GITHUB_RUN_ATTEMPT":"2"},
+            {"GITHUB_ACTOR":"somebody-else"},
+            {"GITHUB_REF":"refs/heads/not-main"},
+            {"GITHUB_SHA":"0"*40},
+        ):
+            bad_env={**env,**change}
+            with self.subTest(change=change),self.assertRaises(mvp.Refused):
+                mvp.authorize(event,bad_env,sha)
+        bad_event={**event,"forced":True}
+        with self.assertRaises(mvp.Refused):
+            mvp.authorize(bad_event,env,sha)
+
     def test_other_actor_rejected(self):
         env=self.env("a"*40);env["GITHUB_ACTOR"]="attacker"
         with self.assertRaises(mvp.Refused):
@@ -171,7 +197,13 @@ class MVPTests(unittest.TestCase):
         self.assertIn("GH_TOKEN:",publisher)
         self.assertNotIn("codex --",publisher)
         self.assertIn("runs-on: ubuntu-24.04",authorize)
-        self.assertIn(mvp.COMMAND,wf)
+        # The exact owner issue command is now intentionally inactive:
+        # only a verified Gate 2 squash merge of activation PR #1034 may dispatch.
+        self.assertNotIn("issue_comment:",wf)
+        self.assertNotIn(mvp.COMMAND,wf)
+        self.assertIn("github.event_name == 'push'",wf)
+        self.assertIn("plasma_codex_postmerge_dispatch.py --event",wf)
+        self.assertIn("needs.authorize.outputs.approved_sha == github.sha",wf)
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertNotIn("codex --dangerously-bypass",wf)
 
