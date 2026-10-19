@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""HIL-A1 SWPC cross-build/ELF inspection. Never opens hardware or networks.
+"""HIL-A1 GitHub-hosted ARMv7 cross-build/ELF inspection. No hardware access.
 
-Only intended for the separately authorized, main-only workflow_dispatch.
-Host CI tests validate_elf() with synthetic binutils output; they do not cross
-compile ARMv7 or execute the resulting library.
+Shared by pinned-toolchain PR CI and reviewed-main workflow_dispatch.
+Host CI compiles a real ARMv7 ELF but never executes it on the Z2.
 """
 from __future__ import annotations
 
@@ -128,7 +127,9 @@ def build(output_dir: Path, expected_sha: str) -> dict[str, object]:
     receipt = {
         "schema": "plasma-hil-a1-armv7-barrier-build-v1",
         "result": "PASS",
-        "scope": "SWPC cross-build and ELF inspection only",
+        "scope": "GitHub-hosted ARMv7 cross-build and ELF inspection only",
+        "toolchain_image": os.getenv("PLASMA_TOOLCHAIN_IMAGE", "NOT_ATTESTED"),
+        "toolchain_snapshot": os.getenv("PLASMA_TOOLCHAIN_SNAPSHOT", "NOT_ATTESTED"),
         "github_sha": expected_sha,
         "source_path": SOURCE.relative_to(REPO).as_posix(),
         "source_sha256": _sha256(SOURCE),
@@ -148,7 +149,7 @@ def build(output_dir: Path, expected_sha: str) -> dict[str, object]:
     (output_dir / "receipt.json").write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8",
     )
-    print("HIL-A1 Cross Compile / ELF / DMB SY: PASS; Z2: NOT_RUN")
+    print("HIL-A1 GitHub-hosted Cross Compile / ELF / DMB SY: PASS; Z2: NOT_RUN")
     print(f"Binary SHA256: {receipt['binary_sha256']}")
     return receipt
 
