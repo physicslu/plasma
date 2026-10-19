@@ -262,6 +262,10 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
          needs.development-claim.result == 'skipped') ||
+        (needs.development-authorize.outputs.execution_capability == 'vivado-host-build' &&
+         needs.development-authorize.outputs.pr_number == '0' &&
+         needs.development-claim.result == 'skipped' &&
+         github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
          needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
          needs.development-claim.result == 'success' &&
@@ -271,7 +275,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: 5
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || 5 }}
     permissions:
       contents: read
       actions: read
