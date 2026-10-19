@@ -18,6 +18,7 @@
 |---|---|---|---|
 | `device-catalog-microchip-all-lanes-sweep-once-v1.yml` | `push` only on `agent/microchip-bulk-coverage-discovery-v1`, and only when its own file changes | GitHub code search finds only its source file; branch search finds no matching branch | Dormant original-run one-shot research |
 | `device-catalog-microchip-bulk-research-once-v1.yml` | Same branch and own-file-only `push` | GitHub code search finds only its source file; branch search finds no matching branch | Dormant original-run one-shot research |
+| `device-catalog-microchip-live-evidence-10-replay.yml` | Same branch and own-file-only `push` | GitHub code search finds only its source file; branch search finds no matching branch | Dormant 10-query evidence replay |
 
 - The original YAML blob bytes are retained unchanged under `docs/archive/ci-workflows/microchip/`.
 - This PR does **not** touch source IC catalog data, Programming Route, qualification, ADR-0002, hardware drivers, tests, or release materials.
@@ -29,15 +30,15 @@
 
 - **KEEP_CORE (4):** `device-catalog-validation.yml`, `device-catalog-current-validation.yml`, `device-catalog-stm32-family-validation.yml`, `device-catalog-production-doc-contract.yml`.
 - **KEEP_GOVERNANCE (3):** `device-catalog-production-invariants.yml`, `catalog-promotion-framework.yml`, `icpn-catalog-admission-separation-validation.yml`.
-- **ARCHIVE_PROPOSED (2):** the two original-run Microchip YAMLs listed above.
-- **PENDING_DEEP_AUDIT (253):** *not* authorized for deletion or archival.
+- **ARCHIVE_PROPOSED (3):** the three historical Microchip YAMLs listed above.
+- **PENDING_DEEP_AUDIT (252):** *not* authorized for deletion or archival.
 
 For each remaining workflow, collect: trigger events, paths/branches, manually dispatchable status, callers (`workflow_call`, `workflow_run`, `gh workflow run`), consumed/produced artifacts, active PR check contexts, last runs and business owner, successor test coverage, hardware/system integration impact, and archival restore plan. Do not convert `PENDING_DEEP_AUDIT` to `ARCHIVE_PROPOSED` without evidence.
 
 ## Batch validation gates
 
-1. Compare base HEAD and two original blobs against the archived copies.
-2. Verify only two workflow definitions are removed from `.github/workflows`, and two byte-identical archival copies added.
+1. Compare base HEAD and three original blobs against the archived copies.
+2. Verify only three workflow definitions are removed from `.github/workflows`, and three byte-identical archival copies added.
 3. Validate `scripts/ci/device-catalog-trigger-governance.py` and repository contracts on GitHub-hosted runners; do not trigger any hardware workflow.
 4. Obtain current PR checks, full required-check configuration (including classic protection), and reviewer response.
 5. Request explicit **Gate 2 approval** before merge. No auto-merge.
@@ -52,12 +53,12 @@ Filename version age alone is **not** proof a Workflow is obsolete. An `on: work
 - The CSV now records each of those 70 baseline lifecycles and its documented disposition; **192** Catalog workflows remain not covered by that pre-existing map. `UNMAPPED` means unclassified, **not obsolete**.
 - Breakdown of mapped Catalog entries: `core-regression` 2; `domain-contract` 1; `family-dispatch` 1; `governance-campaign` 12; `manual-live` 2; `production-contract` 5; `security-hil` 27; `stage-deterministic` 20.
 - Mapping is **not** run-history verification, dependency proof or authorization to archive. Each mapped entry still needs exact current triggers, callers, artifacts and required-check review before retirement.
-- Separately in [Draft PR #1044](https://github.com/physicslu/plasma/pull/1044), STM32U0 trigger-parity remediation uncovered a **failing historical U0.3 prestate regression**: `STM32F0: Production source drifted relative to U0.3 prestate`. Existing U0.3 planner dereferences mutable current source CSV against a frozen U0.3 manifest; no CI assertion or Production evidence should be weakened just to turn the check green. This is a **Gate 2 blocker** for #1044, which remains Draft.
+- Separately in [Draft PR #1044](https://github.com/physicslu/plasma/pull/1044), STM32U0 trigger-parity remediation exposed a **historical U0.3 prestate regression**: `STM32F0: Production source drifted relative to U0.3 prestate`. Draft PR #1044 now preserves eight original manifest-pinned CSV Git blobs as immutable fixtures, enforces SHA-256/Git-blob verification and negative tests, and its latest head `d54f935cb14f22f5ce50829f3b2af12d2905cb11` passed 16 checks (2 skipped, 0 failed). It remains Draft and requires independent Gate 2 approval.
 - `main` advanced after #1042 was opened. Recheck the exact base HEAD, mergeability, run history and all required checks before any future Gate 2 request; do not merge in Gate 1.
 
 ## Gate 1 continuation: third Microchip one-shot archival proposal
 
 - **Additional proposed archive**: `device-catalog-microchip-live-evidence-10-replay.yml`. Its only trigger is `push` on former `agent/microchip-bulk-coverage-discovery-v1` when *that YAML itself* changes; no such branch was returned by branch search.
 - Default-branch indexed code search found only its own YAML reference; the source links to original evidence-run IDs `38338847345` and `38347572588`, but moving the YAML neither deletes Git history nor the original artifacts.
-- It is moved as a **byte-identical Git Blob** with the other two retired one-shot definitions, not deleted from repository history. The archived file does not execute as a normal Actions Workflow.
+- It is moved as a **byte-identical Git Blob** with the other two *proposed* one-shot archive candidates, not deleted from repository history. The archived file does not execute as a normal Actions Workflow.
 - Updated triage: **ARCHIVE_PROPOSED 3**, **KEEP_CORE 4**, **KEEP_GOVERNANCE 3**, **PENDING_DEEP_AUDIT 252** (total 262). All three still require historical-run, caller/external-scheduler, Ruleset and classic required-check verification before Gate 2. The `ARCHIVE_PROPOSED` label does **not** authorize merge.
