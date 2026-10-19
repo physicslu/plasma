@@ -259,11 +259,17 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         work_order = parse_json(ROOT / task["work_order"])
         artifact_dir = Path(os.environ.get("PLASMA_HIL_A2_ARTIFACT_DIR", "/nonexistent"))
         return a2.run_once(work_order, artifact_dir, approval=approval)
-    script = workspace / task["script"]
-    require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
+    # Resolve before switching cwd: otherwise a relative candidate workspace
+    # doubles the prefix (candidate/candidate/scripts/...).
+    workspace_root = workspace.resolve()
+    requested_script = workspace / task["script"]
+    script = requested_script.resolve()
+    require(script.is_relative_to(workspace_root) and
+            requested_script.is_file() and not requested_script.is_symlink(),
+            "SCRIPT_NOT_FOUND")
     proc = executor(
         [sys.executable, str(script), *task["argv"]],
-        cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        cwd=workspace_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         timeout=40, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,

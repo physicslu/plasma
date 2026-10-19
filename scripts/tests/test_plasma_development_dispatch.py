@@ -251,6 +251,54 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             self.assertEqual(
                 (work/"plasma-path2-stderr.txt").read_bytes(),b"")
 
+    def test_relative_candidate_workspace_executes_single_prefix_and_captures_stdout(self):
+        # Mirrors the live SWPC Path 2 call: --workspace candidate.
+        # The earlier implementation produced candidate/candidate/scripts/...
+        # after switching cwd and exited 2; this must execute real Python.
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td) / "candidate"
+            script = workspace / "scripts/experiments/plasma_auto4_relative_probe.py"
+            script.parent.mkdir(parents=True)
+            script.write_text("print('relative-workspace-pass')\n", encoding="utf-8")
+            expected = b"relative-workspace-pass\n"
+            task = {
+                "script": "scripts/experiments/plasma_auto4_relative_probe.py",
+                "argv": [],
+                "verification": "sha256-only",
+                "expected_stdout_sha256": hashlib.sha256(expected).hexdigest(),
+            }
+            previous = Path.cwd()
+            try:
+                os.chdir(td)
+                receipt = dev.run_task(
+                    task, workspace=Path("candidate"), evidence_dir=Path("candidate"),
+                )
+            finally:
+                os.chdir(previous)
+            self.assertEqual(receipt["status"], "PASS")
+            self.assertEqual(receipt["exit_code"], 0)
+            self.assertEqual((workspace / "plasma-path2-stdout.txt").read_bytes(),
+                             expected)
+            self.assertEqual((workspace / "plasma-path2-stderr.txt").read_bytes(), b"")
+
+    def test_candidate_script_cannot_escape_through_parent_symlink(self):
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td) / "candidate"
+            outside = Path(td) / "outside"
+            outside.mkdir()
+            (outside / "escape.py").write_text("print('outside')\n", encoding="utf-8")
+            (workspace / "scripts").mkdir(parents=True)
+            (workspace / "scripts/experiments").symlink_to(
+                outside, target_is_directory=True,
+            )
+            task = {
+                "script": "scripts/experiments/escape.py",
+                "argv": [],
+                "expected_stdout_sha256": "0" * 64,
+            }
+            with self.assertRaisesRegex(dev.Denied, "SCRIPT_NOT_FOUND"):
+                dev.run_task(task, workspace=workspace)
+
     def test_worker_requires_authorization_digest_and_matching_pr(self):
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
