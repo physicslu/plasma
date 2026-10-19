@@ -1,0 +1,41 @@
+name: PLASMA ARMv7 Barrier HIL-A Host-only Contracts
+
+# PRs run only a GitHub-hosted static/negative-test lane, never SWPC or Z2.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/plasma-armv7-barrier-hil-a.yml'
+      - '.github/workflows/plasma-armv7-barrier-hil-a-contract.yml'
+      - 'scripts/armv7-barrier-hil-a1.py'
+      - 'scripts/armv7-barrier-hil-a-contract.py'
+      - 'scripts/tests/test-armv7-barrier-hil-a.py'
+      - 'software/python/native/armv7_mmio_barrier.c'
+      - 'docs/development/armv7-barrier-hil-a.md'
+      - 'docs/README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Enforce manual A1 and no SWPC/Z2 execution from a PR
+        run: python3 scripts/armv7-barrier-hil-a-contract.py check
+      - name: Synthetic ARMv7 ELF, source and negative security contracts
+        run: python3 scripts/tests/test-armv7-barrier-hil-a.py
+      - name: Validate source syntax without invoking any cross compiler
+        run: |
+          python3 -m py_compile \
+            scripts/armv7-barrier-hil-a1.py \
+            scripts/armv7-barrier-hil-a-contract.py \
+            scripts/tests/test-armv7-barrier-hil-a.py
+          bash -n pl/projects/z2-swd-gpio/build-on-swpc.sh
+      - name: Declare exact limitation
+        run: |
+          echo "PR Host-only safety contracts: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "SWPC cross-compile, ARMv7 ELF real build, Z2 HIL: NOT_RUN" >> "$GITHUB_STEP_SUMMARY"
