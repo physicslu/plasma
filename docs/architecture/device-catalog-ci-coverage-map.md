@@ -65,7 +65,7 @@ STM32C0
 
 As of merged PR #1044, the family dispatcher covers all eight listed families. On both `pull_request` and `main` `push`, the active trigger set includes `data/device-catalog/research/*stm32u0*`, `data/device-catalog/research/evidence/stm32u0*/**`, and the consolidated `.github/workflows/device-catalog-stm32c0-stage-dispatch.yml`. Retired family/C0 Workflow filename triggers have been removed.
 
-PR #1057 strengthens the family CI self-test: the trigger lists must be equal, the only Workflow targets must be the two active dispatchers, U0 triggers must remain, Production paths are forbidden, and every one of the 11 retired historic family/C0 Workflow names is tested through fail-closed mutation. These are orchestration controls, **not** added or removed manufacturer coverage claims.
+PR #1057 strengthens the family CI self-test: the trigger lists must be equal, the only Workflow targets must be the two active dispatchers, U0 triggers must remain, Production paths are forbidden, and all 25 known retired Workflow paths (seven previously retired family/C0 entries plus eighteen byte-identical archived Microchip, STM32 metadata and C0 originals, with overlap deduplicated) are rejected by **symmetric PR+Push mutations** that prove the specific guard fired rather than merely breaking event parity. These are orchestration controls, **not** added or removed manufacturer coverage claims.
 
 ## 6. STM32C0 overlap pilot (historical five-stage chain)
 

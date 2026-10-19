@@ -85,9 +85,22 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
+    if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
+        # Path 2 is an execution method, NOT synonymous with CPU-only Python.
+        # Host builds use a fixed, reviewed Vivado project in trusted main.
+        require(set(task) == {"execution_path", "capability", "project",
+                              "toolchain", "board_repo_sha"},
+                "HOST_BUILD_TASK_FIELDS_DENIED")
+        require(type(task["project"]) is str and re.fullmatch(
+            r"pl/projects/[a-z0-9-]{3,70}", task["project"]
+        ) is not None, "HOST_BUILD_PROJECT_DENIED")
+        require(task["toolchain"] == "2026.1" and
+                type(task["board_repo_sha"]) is str and
+                SHA40.fullmatch(task["board_repo_sha"]) is not None,
+                "HOST_BUILD_TOOLCHAIN_DENIED")
+        return task
     if execution_path == "path2-cli":
-        # One generic CPU-only route, independent of task name. Older
-        # development fixtures without capability are treated as cpu-only.
+        # Legacy CPU-only CLI fixtures keep their independent sandbox.
         require(set(task) >= {
             "execution_path", "script", "argv", "expected_stdout_sha256",
         } and set(task) <= {
@@ -237,6 +250,14 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
+    if task.get("capability") == "vivado-host-build":
+        # No untrusted branch candidate or GitHub Actions replay may run a
+        # host toolchain with filesystem write access on the SWPC runner.
+        require(req["pr_number"] == 0 and
+                req["source_sha"] == req["trusted_sha"],
+                "HOST_BUILD_TRUSTED_MAIN_ONLY")
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "HOST_BUILD_RERUN_DENIED")
     return {
         "status": "AUTHORIZED_DEV_TASK",
         **req,
@@ -244,7 +265,8 @@ def authorize(event: object, context: dict, registry: object,
         "execution_path": task["execution_path"],
         "execution_capability": (
             "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
-            else "cpu-only" if task["execution_path"] == "path2-cli"
+            else task.get("capability", "cpu-only")
+                 if task["execution_path"] == "path2-cli"
             else "codex-workspace"
         ),
         **a2_claim,
@@ -254,6 +276,16 @@ def authorize(event: object, context: dict, registry: object,
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None,
              approval: dict | None = None, sandbox: bool = False) -> dict:
+    if task.get("capability") == "vivado-host-build":
+        require(type(approval) is dict and
+                approval.get("execution_capability") == "vivado-host-build" and
+                approval.get("execution_path") == "path2-cli" and
+                approval.get("pr_number") == 0 and
+                approval.get("pinned_sha") == approval.get("trusted_sha"),
+                "HOST_BUILD_APPROVAL_REQUIRED")
+        import plasma_vivado_host_build as build
+        return build.run(task, workspace=workspace, approval=approval,
+                         evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -457,7 +489,8 @@ def main() -> int:
                 task = task_by_id(registry, req["task_id"])
                 expected_capability = (
                     "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
-                    else "cpu-only" if task["execution_path"] == "path2-cli"
+                    else task.get("capability", "cpu-only")
+                         if task["execution_path"] == "path2-cli"
                     else "codex-workspace"
                 )
                 require(args.execution_capability in (None, expected_capability),
@@ -466,15 +499,17 @@ def main() -> int:
                     "path3-codex" if args.action == "execute-codex"
                     else "path2-cli"
                 ), "WRONG_EXECUTION_PATH")
-                a2_approval = (authorize(event, os.environ, registry)
-                               if req["task_id"] == "hil-a2-cpu-only" else None)
+                task_approval = (authorize(event, os.environ, registry)
+                                 if task.get("capability") in
+                                    ("z2-cpu-only", "vivado-host-build")
+                                 else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace)
                     if args.action == "execute-codex"
                     else run_task(task, workspace=args.workspace,
                                   evidence_dir=args.evidence_dir,
-                                  approval=a2_approval,
-                                  sandbox=a2_approval is None)
+                                  approval=task_approval,
+                                  sandbox=task.get("capability", "cpu-only") == "cpu-only")
                 )
                 plan = {
                     **receipt, **req,

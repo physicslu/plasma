@@ -19,6 +19,26 @@
       "execution_path": "path2-cli",
       "capability": "z2-cpu-only",
       "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
+    },
+    "auto4-premerge-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_auto4_branch_probe.py",
+      "argv": [],
+      "expected_stdout_sha256": "9727532e69a8f60b50dca893192de734bb15d1b92b2ebd4ec639a04ffb0ead0d",
+      "verification": "sha256-only"
+    },
+    "auto4-premerge-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
+      "output_format": "csv",
+      "objective": "Implement a CPU-only Python program that prints CSV with exactly header n,triangular and 12 ordered rows for n=1 through 12, using the integer triangular-number result n*(n+1)//2. Run it on this runner, independently verify all twelve rows and edge cases n=1 and n=12, record actual commands, exit codes, and observed outcomes. Do not use hardware, network, SSH, sudo, or any non-Python package."
+    },
+    "fixed-site1-vivado-host-build": {
+      "execution_path": "path2-cli",
+      "capability": "vivado-host-build",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "toolchain": "2026.1",
+      "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
     }
   }
 }
