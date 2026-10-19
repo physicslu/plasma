@@ -49,7 +49,7 @@ def validate(main: str, host_ci: str) -> None:
         'test "$(hostname)" = SWPC',
         'test "$(id -un)" = plasma-ci',
         'test "$(id -u)" -ne 0',
-        'test -z "$SSH_AUTH_SOCK"',
+        'test -z "${SSH_AUTH_SOCK:-}"',
         'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
         "ref: " + "$" + "{{ github.sha }}",
         "persist-credentials: false",
