@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Single-owner, single-work-order LIVE Codex MVP. No general dispatcher.
+
+Worker has only a read-only GitHub checkout and model credential.
+Publisher receives validated patch artifact in a different hosted job.
+Both jobs use immutable main event SHA; no hardware or SWPC access.
+"""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+OWNER = "physicslu"
+REPO = "physicslu/plasma"
+ISSUE = 981
+COMMAND = "/plasma-codex software-mvp 981"
+# A deliberately small real-Codex acceptance task; expand scope through a new Gate 1.
+TARGET = "docs/development/plasma-codex-mvp-first-change.md"
+SHA40 = re.compile(r"[a-f0-9]{40}\Z")
+STATUS_LIMIT = 20
+MAX_PATCH = 16 * 1024
+
+class Refused(Exception):
+    pass
+
+def fail(code: str) -> None:
+    raise Refused(code)
+
+def git(*args: str, input: bytes | None = None) -> bytes:
+    return subprocess.run(["git", *args], input=input, stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, check=True).stdout
+
+def load_event(path: Path) -> dict:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 131072:
+        fail("EVENT_NOT_REGULAR")
+    with path.open(encoding="utf-8") as stream:
+        x = json.load(stream)
+    if type(x) is not dict:
+        fail("EVENT_NOT_OBJECT")
+    return x
+
+def authorize(event: dict, environ: dict[str, str], sha: str) -> dict:
+    if (environ.get("GITHUB_EVENT_NAME") != "issue_comment"
+            or environ.get("GITHUB_ACTOR") != OWNER
+            or environ.get("GITHUB_REPOSITORY") != REPO
+            or environ.get("GITHUB_REF") != "refs/heads/main"
+            or environ.get("GITHUB_SHA") != sha
+            or not SHA40.fullmatch(sha)
+            or environ.get("GITHUB_RUN_ATTEMPT") != "1"):
+        fail("UNTRUSTED_GITHUB_CONTEXT")
+    if (event.get("action") != "created"
+            or type(event.get("issue")) is not dict
+            or event["issue"].get("number") != ISSUE
+            or "pull_request" in event["issue"]
+            or type(event.get("comment")) is not dict
+            or type(event["comment"].get("user")) is not dict
+            or event["comment"].get("body") != COMMAND
+            or event["comment"]["user"].get("login") != OWNER
+            or type(event.get("sender")) is not dict
+            or event["sender"].get("login") != OWNER
+            or type(event.get("repository")) is not dict
+            or event["repository"].get("full_name") != REPO
+            or type(event["comment"].get("id")) is not int):
+        fail("UNAUTHORIZED_OWNER_COMMAND")
+    run = environ.get("GITHUB_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", run):
+        fail("UNTRUSTED_RUN_ID")
+    return {"repository": REPO, "issue": ISSUE, "command": COMMAND,
+            "source_sha": sha, "comment_id": event["comment"]["id"],
+            "run_id": int(run), "run_attempt": 1}
+
+def inventory() -> list[str]:
+    """Only one new documentation path may be edited; no tracked modifications."""
+    raw = git("status", "--porcelain=v1", "-z", "--untracked-files=all")
+    entries = raw.split(b"\0")
+    found = []
+    for entry in filter(None, entries):
+        try:
+            text = entry.decode("utf-8", errors="strict")
+        except UnicodeError:
+            fail("INVALID_UTF8_PATH")
+        if len(text) < 4 or text[:2] != "??":
+            fail("TRACKED_MODIFICATION_OR_RENAME_DENIED")
+        p = text[3:]
+        if p != TARGET or p in found:
+            fail("UNAUTHORIZED_PATH")
+        found.append(p)
+    if found != [TARGET]:
+        fail("NO_SINGLE_CHANGE")
+    path = Path(TARGET)
+    if (path.is_symlink() or not path.is_file() or path.stat().st_size > 8192
+            or not path.read_bytes().endswith(b"\n")
+            or b"\x00" in path.read_bytes()):
+        fail("UNSAFE_OUTPUT")
+    path.read_text(encoding="utf-8")
+    return found
+
+def create_bundle(output: Path, event: dict, env: dict[str,str]) -> dict:
+    base = git("rev-parse", "HEAD").decode().strip()
+    receipt = authorize(event, env, base)
+    paths = inventory()
+    git("add", "-N", "--", TARGET)
+    patch = git("diff", "--binary", "--", TARGET)
+    if not 40 < len(patch) <= MAX_PATCH:
+        fail("PATCH_SIZE_DENIED")
+    if not patch.startswith(("diff --git a/"+TARGET+" b/"+TARGET+"\n").encode()):
+        fail("PATCH_HEADER_DENIED")
+    # 'git apply' parses patch; output file is still untrusted.
+    output.mkdir(parents=True, exist_ok=False)
+    (output/"candidate.patch").write_bytes(patch)
+    receipt.update({"allowed_paths": paths, "patch_sha256": hashlib.sha256(patch).hexdigest(),
+                    "codex_executed": True, "model_exit_code": 0,
+                    "tests_passed": True, "runtime_dispatcher_enabled": False})
+    (output/"receipt.json").write_text(json.dumps(receipt,sort_keys=True,indent=2)+"\n")
+    return receipt
+
+def verify_bundle(root: Path, event: dict, env: dict[str,str]) -> dict:
+    base = git("rev-parse","HEAD").decode().strip()
+    expected = authorize(event, env, base)
+    if (root.is_symlink() or not root.is_dir()
+            or set(x.name for x in root.iterdir()) != {"candidate.patch","receipt.json"}):
+        fail("ARTIFACT_SET_DENIED")
+    patch_path = root/"candidate.patch"
+    receipt_path = root/"receipt.json"
+    if (patch_path.is_symlink() or receipt_path.is_symlink()
+            or not patch_path.is_file() or not receipt_path.is_file()
+            or patch_path.stat().st_size > MAX_PATCH
+            or receipt_path.stat().st_size > 4096):
+        fail("ARTIFACT_FILE_DENIED")
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if (type(receipt) is not dict or
+            set(receipt) != set(expected) | {"allowed_paths","patch_sha256",
+                "codex_executed","model_exit_code","tests_passed","runtime_dispatcher_enabled"}
+            or any(receipt.get(k) != v for k,v in expected.items())
+            or receipt["allowed_paths"] != [TARGET]
+            or receipt["codex_executed"] is not True
+            or receipt["model_exit_code"] != 0
+            or receipt["tests_passed"] is not True
+            or receipt["runtime_dispatcher_enabled"] is not False):
+        fail("RECEIPT_INVALID")
+    patch = patch_path.read_bytes()
+    if (not patch or hashlib.sha256(patch).hexdigest()!=receipt["patch_sha256"]
+            or not patch.startswith(("diff --git a/"+TARGET+" b/"+TARGET+"\n").encode())):
+        fail("PATCH_HASH_OR_SCOPE_DENIED")
+    # Publisher never runs any code from the model output.
+    git("apply","--check","--cached",input=patch)
+    git("apply","--cached",input=patch)
+    names = git("diff","--cached","--name-only","-z").split(b"\0")
+    if [n for n in names if n] != [TARGET.encode()]:
+        fail("PUBLISH_PATH_DENIED")
+    status = git("ls-files","--stage","--",TARGET).decode()
+    if not status.startswith("100644 "):
+        fail("PUBLISH_MODE_DENIED")
+    # Require a new file, not deletion or modification to existing source.
+    if git("cat-file","-e",base+":"+TARGET,input=None) == b"":
+        fail("PUBLISH_EXISTING_FILE_DENIED")
+    return receipt
+
+def main() -> int:
+    parser=argparse.ArgumentParser()
+    parser.add_argument("mode",choices=("authorize","bundle","publish"))
+    parser.add_argument("--event",required=True,type=Path)
+    parser.add_argument("--artifact-dir",type=Path)
+    args=parser.parse_args()
+    try:
+        event=load_event(args.event)
+        base=git("rev-parse","HEAD").decode().strip()
+        if args.mode=="authorize":
+            receipt=authorize(event,os.environ,base)
+        elif args.mode=="bundle":
+            if args.artifact_dir is None: fail("ARTIFACT_MISSING")
+            receipt=create_bundle(args.artifact_dir,event,os.environ)
+        else:
+            if args.artifact_dir is None: fail("ARTIFACT_MISSING")
+            receipt=verify_bundle(args.artifact_dir,event,os.environ)
+        print(json.dumps({"status":"PASS","mode":args.mode,
+                          "source_sha":receipt["source_sha"],
+                          "run_id":receipt["run_id"]},sort_keys=True))
+        return 0
+    except (Refused,OSError,subprocess.CalledProcessError,ValueError,
+            UnicodeError,json.JSONDecodeError) as ex:
+        reason=str(ex) if isinstance(ex,Refused) else "MVP_IO_OR_GIT_FAILURE"
+        print(json.dumps({"status":"NO_GO","reason":reason,"mode":args.mode},sort_keys=True))
+        return 2
+
+if __name__=="__main__":
+    sys.exit(main())
