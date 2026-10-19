@@ -820,6 +820,63 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                  sandbox=False)
                 builder.assert_not_called()
 
+    def test_candidate_vivado_driver_is_reviewed_and_not_trusted_main(self):
+        # Host-only unit fixture. Do not start Vivado or access SWPC/hardware.
+        import plasma_vivado_host_build as trusted_build
+        task=self.task
+        approval={
+            "task_id":"fixed-site1-vivado-host-build",
+            "execution_path":"path2-cli",
+            "execution_capability":"vivado-host-build",
+            "pr_number":1064,"pinned_sha":"b"*40,"trusted_sha":"a"*40,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)/"candidate"
+            scripts=work/"scripts"
+            scripts.mkdir(parents=True)
+            driver=scripts/"plasma_vivado_host_build.py"
+            driver.write_text(
+                "def run(task, *, workspace, approval, evidence_dir=None, "
+                "executor=None):\n"
+                "    return {'status':'CANDIDATE_DRIVER_TEST_ONLY'}\n",
+                encoding="utf-8")
+            with patch.object(trusted_build,"run") as main_driver:
+                result=dev.run_task(task,workspace=work,approval=approval)
+                self.assertEqual(result["status"],"CANDIDATE_DRIVER_TEST_ONLY")
+                main_driver.assert_not_called()
+            # PR driver is not admissible if absent or a symlink escape.
+            driver.unlink()
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+            outside=Path(td)/"unreviewed.py"
+            outside.write_text("raise RuntimeError('must not import')\n")
+            driver.symlink_to(outside)
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+            driver.unlink()
+            driver.write_text("x"*65537)
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+
+    def test_workflow_transports_authorized_pr_identity_to_existing_runner(self):
+        wf=WORKFLOW.read_text()
+        self.assertIn("pr_info_base64: ${{ steps.approve.outputs.pr_info_base64 }}",wf)
+        self.assertIn("PR_INFO_BASE64: ${{ needs.development-authorize.outputs.pr_info_base64 }}",wf)
+        self.assertIn('pr_info_args+=(--pr-info "$RUNNER_TEMP/plasma-dev-pr.json")',wf)
+        self.assertIn('"${pr_info_args[@]}"',wf)
+        self.assertIn("ref: ${{ needs.development-authorize.outputs.trusted_sha }}",wf)
+        self.assertIn("ref: ${{ needs.development-authorize.outputs.pinned_sha }}",wf)
+        self.assertIn("python3 trusted/scripts/plasma_development_dispatch.py execute",wf)
+        dispatch=(ROOT/"scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("authorize(event, os.environ, registry, pr_info=pr)",dispatch)
+        self.assertNotIn("sudo ",wf)
+
     def test_sanitize_real_swpc_build_failure_codes(self):
         import plasma_vivado_host_build as build
         self.assertEqual(
