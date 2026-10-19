@@ -251,11 +251,15 @@ def authorize(event: object, context: dict, registry: object,
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
     if task.get("capability") == "vivado-host-build":
-        # No untrusted branch candidate or GitHub Actions replay may run a
-        # host toolchain with filesystem write access on the SWPC runner.
-        require(req["pr_number"] == 0 and
-                req["source_sha"] == req["trusted_sha"],
-                "HOST_BUILD_TRUSTED_MAIN_ONLY")
+        # Owner-approved immutable PR SHA is admissible before merge.
+        # verify_pr() above has already checked the live same-repo owner PR,
+        # exact current HEAD and main base; do not equate merge with trust.
+        require(
+            (req["pr_number"] == 0 and
+             req["source_sha"] == req["trusted_sha"]) or
+            (req["pr_number"] > 0 and
+             req["source_sha"] != req["trusted_sha"]),
+            "HOST_BUILD_SOURCE_BINDING_DENIED")
         require(context.get("GITHUB_RUN_ATTEMPT") == "1",
                 "HOST_BUILD_RERUN_DENIED")
     return {
@@ -280,8 +284,16 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
-                approval.get("pr_number") == 0 and
-                approval.get("pinned_sha") == approval.get("trusted_sha"),
+                approval.get("task_id") == "fixed-site1-vivado-host-build" and
+                type(approval.get("pinned_sha")) is str and
+                SHA40.fullmatch(approval["pinned_sha"]) is not None and
+                type(approval.get("trusted_sha")) is str and
+                SHA40.fullmatch(approval["trusted_sha"]) is not None and
+                ((approval.get("pr_number") == 0 and
+                  approval["pinned_sha"] == approval["trusted_sha"]) or
+                 (type(approval.get("pr_number")) is int and
+                  approval["pr_number"] > 0 and
+                  approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
         import plasma_vivado_host_build as build
         return build.run(task, workspace=workspace, approval=approval,

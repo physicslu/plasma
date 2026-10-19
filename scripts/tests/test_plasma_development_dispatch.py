@@ -659,7 +659,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         cpu=dev.task_by_id(self.registry,"nine-nine-path2")
         self.assertEqual(cpu["capability"],"cpu-only")
 
-    def test_host_build_main_only_and_no_replays(self):
+    def test_host_build_approved_pr_head_and_no_replays(self):
         ctx=self.context()
         for attempt in ("2","0","","abc"):
             with self.subTest(attempt=attempt),self.assertRaisesRegex(
@@ -670,10 +670,33 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         fixture=DevelopmentBranchDispatchContracts()
         branch_event=fixture.branch_event(
             task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
-        branch_context=ctx
-        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_TRUSTED_MAIN_ONLY"):
-            dev.authorize(branch_event,branch_context,self.registry,
-                          pr_info=fixture.valid_pr())
+        plan=dev.authorize(branch_event,ctx,self.registry,
+                           pr_info=fixture.valid_pr())
+        self.assertEqual(plan["pr_number"],1100)
+        self.assertEqual(plan["pinned_sha"],"b"*40)
+        self.assertEqual(plan["trusted_sha"],"a"*40)
+        self.assertEqual(plan["execution_capability"],"vivado-host-build")
+        for attempt in ("2", "0"):
+            with self.subTest(attempt=attempt),self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_RERUN_DENIED"):
+                dev.authorize(branch_event,
+                              ctx | {"GITHUB_RUN_ATTEMPT":attempt},
+                              self.registry,pr_info=fixture.valid_pr())
+        for change in ("sha","repo","owner","base","state"):
+            pr=fixture.valid_pr()
+            if change=="sha": pr["head"]["sha"]="c"*40
+            elif change=="repo": pr["head"]["repo"]["full_name"]="other/plasma"
+            elif change=="owner": pr["user"]["login"]="other"
+            elif change=="base": pr["base"]["ref"]="not-main"
+            elif change=="state": pr["state"]="closed"
+            with self.subTest(change=change),self.assertRaises(dev.Denied):
+                dev.authorize(branch_event,ctx,self.registry,pr_info=pr)
+        with self.assertRaisesRegex(dev.Denied,"PR_METADATA_DENIED"):
+            dev.authorize(branch_event,ctx,self.registry)
+        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_SOURCE_BINDING_DENIED"):
+            dev.authorize(fixture.branch_event(
+                task="fixed-site1-vivado-host-build",sha="a"*40),
+                ctx,self.registry,pr_info=fixture.valid_pr(sha="a"*40))
 
     def test_host_build_schema_rejects_arbitrary_cli_and_capabilities(self):
         task=dict(self.task)
@@ -694,13 +717,14 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                          dict(task,argv=["--program-fpga"])}}
             dev.task_by_id(reg,"fixed-site1-vivado-host-build")
 
-    def test_runner_guard_is_host_build_capability_and_main_only(self):
+    def test_runner_guard_allows_approved_pr_host_build_without_new_runner(self):
         wf=WORKFLOW.read_text()
         guard=wf.split("  development-execute:",1)[1].split(
             "  development-codex:",1)[0].split(
             "    if: >-",1)[1].split("    runs-on:",1)[0]
         self.assertIn("execution_capability == 'vivado-host-build'",guard)
-        self.assertIn("outputs.pr_number == '0'",guard)
+        self.assertIn("outputs.task_id == 'fixed-site1-vivado-host-build'",guard)
+        self.assertNotIn("outputs.pr_number == '0'",guard)
         self.assertIn("github.run_attempt == 1",guard)
         self.assertIn("execution_capability == 'cpu-only'",guard)
         self.assertIn("execution_capability == 'z2-cpu-only'",guard)
@@ -739,6 +763,17 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         with self.assertRaises(build.BuildDenied):
             build.preflight(self.task,workspace=ROOT,
                             approval=dict(approval,pr_number=1059),env=env)
+        fixture=DevelopmentBranchDispatchContracts()
+        candidate=dev.authorize(
+            fixture.branch_event(task="fixed-site1-vivado-host-build",
+                                 pr=1100,sha="b"*40),
+            self.context(),self.registry,pr_info=fixture.valid_pr())
+        accepted=build.preflight(self.task,workspace=ROOT,
+                                 approval=candidate,env=env)
+        self.assertEqual(accepted["source_sha"],"b"*40)
+        with self.assertRaises(build.BuildDenied):
+            build.preflight(self.task,workspace=ROOT,
+                            approval=dict(candidate,pinned_sha="a"*40),env=env)
         with self.assertRaises(build.BuildDenied):
             build.preflight(dict(self.task,project="pl/projects/../bad"),
                             workspace=ROOT,approval=approval,env=env)
@@ -758,6 +793,32 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                    "pinned_sha":"a"*40,"trusted_sha":"a"*40},
                          sandbox=False)
             builder.assert_called_once()
+        with patch("plasma_vivado_host_build.run") as builder:
+            dev.run_task(task,workspace=ROOT,
+                         approval={"task_id":"fixed-site1-vivado-host-build",
+                                   "execution_path":"path2-cli",
+                                   "execution_capability":"vivado-host-build",
+                                   "pr_number":1063,
+                                   "pinned_sha":"b"*40,"trusted_sha":"a"*40},
+                         sandbox=False)
+            builder.assert_called_once()
+        for invalid in (
+            {"task_id":"wrong"},
+            {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
+            {"pr_number":0,"pinned_sha":"b"*40,"trusted_sha":"a"*40},
+        ):
+            base={"task_id":"fixed-site1-vivado-host-build",
+                  "execution_path":"path2-cli",
+                  "execution_capability":"vivado-host-build",
+                  "pr_number":0,
+                  "pinned_sha":"a"*40,"trusted_sha":"a"*40}
+            with self.subTest(invalid=invalid),patch(
+                "plasma_vivado_host_build.run") as builder:
+                with self.assertRaisesRegex(dev.Denied,
+                                            "HOST_BUILD_APPROVAL_REQUIRED"):
+                    dev.run_task(task,workspace=ROOT,approval=base|invalid,
+                                 sandbox=False)
+                builder.assert_not_called()
 
     def test_sanitize_real_swpc_build_failure_codes(self):
         import plasma_vivado_host_build as build
@@ -777,16 +838,106 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
             with self.subTest(error=str(exc)):
                 self.assertEqual(dev.safe_error_reason(exc), "EXECUTION_ERROR")
 
-    def test_vivado_reuses_prior_board_repository_not_another_setup(self):
-        # Existing qualified cache and integrity check; no new workflow,
-        # runner, board download or first-run network access is introduced.
+    def test_vivado_invokes_original_board_prepare_with_pinned_source(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            board=Path(td)/"pynq-board"
+            board.mkdir()
+            calls=[]
+            class Ready:
+                returncode=0
+                stdout=(str(board)+"\n").encode()
+                stderr=b""
+            def runner(command,**kwargs):
+                calls.append((command,kwargs))
+                return Ready()
+            selected=build.resolve_board_repository(
+                self.task,workspace=ROOT,executor=runner,
+                env={"HOME":"/nonexistent"})
+            self.assertEqual(selected,board)
+            self.assertEqual(len(calls),1)
+            command,kwargs=calls[0]
+            self.assertEqual(command[0],"/usr/bin/bash")
+            self.assertTrue(command[1].endswith(
+                "/pl/projects/z2-swd-gpio/prepare-board-repository.sh"))
+            self.assertEqual(kwargs["timeout"],180)
+            self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"],"0")
+            script=(ROOT/"pl/projects/z2-swd-gpio/prepare-board-repository.sh").read_text()
+            self.assertIn('source_commit="'+self.task["board_repo_sha"]+'"',script)
+            self.assertIn("git clone --quiet",script)
+            self.assertIn('status --porcelain --untracked-files=no',script)
+            self.assertIn("board.xml preset.xml part0_pins.xml",script)
+
+    def test_vivado_explicit_board_repo_preserves_override(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"board"
+            p.mkdir()
+            def forbidden(*args,**kwargs):
+                self.fail("PREPARE_MUST_NOT_EXECUTE_WHEN_EXPLICIT_PATH_EXISTS")
+            actual=build.resolve_board_repository(
+                self.task,workspace=ROOT,executor=forbidden,
+                env={"PLASMA_BOARD_REPO":str(p)})
+            self.assertEqual(actual,p)
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_PATH_DENIED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=forbidden,
+                    env={"PLASMA_BOARD_REPO":str(p)+"/../board"})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_MISSING"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=forbidden,
+                    env={"PLASMA_BOARD_REPO":str(p/"missing")})
+
+    def test_vivado_board_prepare_fails_closed_before_build(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            board=Path(td)/"board"
+            board.mkdir()
+            class Fail:
+                returncode=2
+                stdout=b""
+                stderr=b"BOARD_REPO_FAIL: pinned revision unavailable"
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_FAILED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=lambda *a,**k:Fail(),
+                    env={})
+            class BadOutput:
+                returncode=0
+                stdout=b"not-an-absolute-path\n"
+                stderr=b""
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_REPO_PATH_DENIED"):
+                build.resolve_board_repository(
+                    self.task,workspace=ROOT,executor=lambda *a,**k:BadOutput(),
+                    env={})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_PIN_MISMATCH"):
+                build.resolve_board_repository(
+                    {**self.task,"board_repo_sha":"f"*40},
+                    workspace=ROOT,executor=lambda *a,**k:self.fail(
+                        "MUST_NOT_RUN_WRONG_BOARD_REVISION"),env={})
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_BOARD_PREPARE_SCRIPT_MISSING"):
+                build.resolve_board_repository(
+                    self.task,workspace=Path(td),
+                    executor=lambda *a,**k:self.fail(
+                        "MUST_NOT_RUN_MISSING_BOARD_PREPARE"),env={})
+
+    def test_vivado_preparation_has_no_new_workflow_or_runner(self):
         src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
-        self.assertIn('ROOT_FOR_BUILDS / "z2-swd-gpio" / "board-repository"', src)
-        self.assertIn('os.environ.get("PLASMA_BOARD_REPO") or str(existing_cache)',src)
+        self.assertIn("resolve_board_repository(task, workspace=workspace",src)
+        self.assertIn('"GIT_TERMINAL_PROMPT": "0"',src)
         self.assertIn('actual_board_sha == plan["board_sha"]',src)
-        self.assertIn('BUILD_BOARD_REPO_MISSING',src)
+        self.assertIn('BUILD_BOARD_REPO_DIRTY',src)
         self.assertNotIn("git clone",src)
-        self.assertNotIn("prepare-board-repository.sh",src)
+        self.assertIn("BUILD_BOARD_PREPARE_FAILED",src)
+        self.assertEqual(self.task["capability"],"vivado-host-build")
+        wf=WORKFLOW.read_text()
+        self.assertIn("  development-execute:",wf)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
 
 
 

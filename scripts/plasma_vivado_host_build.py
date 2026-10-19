@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Trusted Path 2 fixed Vivado HOST build. No target load, device or deployment.
 
-A reviewed main-only owner Issue #981 request is mandatory. The CLI selection
-is a typed project name, not arbitrary bash/python from a candidate PR.
+A reviewed owner Issue #981 request is mandatory. It may pin trusted main
+or the exact head of an explicitly authorized open owner PR. The CLI
+selection is a typed fixed project, not arbitrary bash/python. Existing
+F1-B build_bitstream.tcl, PYNQ-Z2 board helper and verify_hwh.py are reused;
+this driver does not implement a second Vivado build workflow.
 """
 from __future__ import annotations
 
@@ -57,11 +60,17 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
     require(type(approval) is dict and
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == "path2-cli" and
-            approval.get("pr_number") == 0 and
-            approval.get("trusted_sha") == approval.get("pinned_sha") and
+            approval.get("task_id") == "fixed-site1-vivado-host-build" and
             type(approval.get("pinned_sha")) is str and
-            BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None,
-            "BUILD_TRUSTED_MAIN_APPROVAL_DENIED")
+            BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None and
+            type(approval.get("trusted_sha")) is str and
+            BOARD_SHA40.fullmatch(approval["trusted_sha"]) is not None and
+            ((approval.get("pr_number") == 0 and
+              approval["pinned_sha"] == approval["trusted_sha"]) or
+             (type(approval.get("pr_number")) is int and
+              approval["pr_number"] > 0 and
+              approval["pinned_sha"] != approval["trusted_sha"])),
+            "BUILD_APPROVED_SOURCE_BINDING_DENIED")
     require(env.get("GITHUB_REPOSITORY") == "physicslu/plasma" and
             env.get("RUNNER_NAME") == EXPECTED_RUNNER and
             env.get("RUNNER_ENVIRONMENT") == "self-hosted" and
@@ -114,6 +123,45 @@ def _run_checked(args: list[str], *, executor, cwd: Path, timeout: int,
     return proc.stdout.strip()
 
 
+def resolve_board_repository(task: dict, *, workspace: Path,
+                             executor=subprocess.run,
+                             env: dict | None = None) -> Path:
+    """Invoke the existing SHA-pinned Z2 board helper, retaining overrides."""
+    env = os.environ if env is None else env
+    board_value = env.get("PLASMA_BOARD_REPO", "")
+    if not board_value:
+        script = workspace / "pl/projects/z2-swd-gpio/prepare-board-repository.sh"
+        require(script.is_file() and not script.is_symlink() and
+                script.resolve().is_relative_to(workspace.resolve()),
+                "BUILD_BOARD_PREPARE_SCRIPT_MISSING")
+        content = _read_safe_file(script)
+        expected_pin = "source_commit=" + chr(34) + task["board_repo_sha"] + chr(34)
+        require(expected_pin in content.splitlines() and
+                "source_url=" + chr(34) +
+                "https://github.com/xupsh/pynq-supported-board-file.git" + chr(34)
+                in content.splitlines(), "BUILD_BOARD_PREPARE_PIN_MISMATCH")
+        proc = executor(
+            ["/usr/bin/bash", str(script.resolve())],
+            cwd=workspace.resolve(),
+            env={"PATH": "/usr/bin:/bin",
+                 "HOME": env.get("HOME", "/nonexistent"),
+                 "GIT_TERMINAL_PROMPT": "0"},
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=180, check=False,
+        )
+        require(proc.returncode == 0 and len(proc.stdout) <= 4096 and
+                len(proc.stderr) <= 65536, "BUILD_BOARD_PREPARE_FAILED")
+        try:
+            board_value = proc.stdout.decode("utf-8").strip()
+        except UnicodeError as exc:
+            raise BuildDenied("BUILD_BOARD_PREPARE_OUTPUT_INVALID") from exc
+    require(board_value.startswith("/") and ".." not in board_value,
+            "BUILD_BOARD_REPO_PATH_DENIED")
+    board = Path(board_value)
+    require(board.is_dir() and not board.is_symlink(),
+            "BUILD_BOARD_REPO_MISSING")
+    return board
+
 def run(task: dict, *, workspace: Path, approval: dict,
         evidence_dir: Path | None = None,
         executor=subprocess.run) -> dict:
@@ -123,16 +171,9 @@ def run(task: dict, *, workspace: Path, approval: dict,
             not evidence_dir.is_symlink(), "BUILD_EVIDENCE_DIR_REQUIRED")
     require(SETTINGS64.is_file() and not SETTINGS64.is_symlink(),
             "BUILD_VIVADO_SETTINGS_UNAVAILABLE")
-    # Reuse the existing SWPC-qualified pinned board cache from the older
-    # z2-swd-gpio Vivado build; no fresh network fetch or second board setup.
-    # An explicit PLASMA_BOARD_REPO still takes precedence.
-    existing_cache = ROOT_FOR_BUILDS / "z2-swd-gpio" / "board-repository"
-    board_value = os.environ.get("PLASMA_BOARD_REPO") or str(existing_cache)
-    require(board_value.startswith("/") and ".." not in board_value,
-            "BUILD_BOARD_REPO_PATH_DENIED")
-    board = Path(board_value)
-    require(board.is_dir() and not board.is_symlink(),
-            "BUILD_BOARD_REPO_MISSING")
+    # Existing board preparation uses its own pinned cache or first-fetch.
+    board = resolve_board_repository(task, workspace=workspace,
+                                     executor=executor)
     require(ROOT_FOR_BUILDS.is_dir() and
             not ROOT_FOR_BUILDS.is_symlink(),
             "BUILD_OUTPUT_ROOT_MISSING")
