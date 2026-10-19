@@ -170,7 +170,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertEqual(plan["execution_path"],"path3-codex")
         self.assertEqual(plan["pinned_sha"],"a"*40)
 
-    def test_codex_objective_asks_for_real_work_not_source_structure(self):
+    def test_real_reference_runs_as_bounded_process_in_hosted_ci(self):
         self.assertEqual(self.task["execution_path"], "path3-codex")
         self.assertIn("independently check all 81", self.task["objective"])
         self.assertNotIn("print(", self.task["objective"])
