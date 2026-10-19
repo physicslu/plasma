@@ -416,9 +416,9 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIn("scripts/plasma_development_dispatch.py execute-codex",wf)
         self.assertIn("persist-credentials: false",wf)
         self.assertNotIn("plasma-path3-nine-nine.yml",wf)
-        self.assertIn("plasma_nine_nine_codex_generated.csv",wf)
-        self.assertIn("plasma_nine_nine_codex_generated.test.log",wf)
-        self.assertIn("plasma_nine_nine_codex_generated.codex.log",wf)
+        self.assertIn("candidate/scripts/experiments/plasma_*_generated.csv",wf)
+        self.assertIn("candidate/scripts/experiments/plasma_*_generated.test.log",wf)
+        self.assertIn("candidate/scripts/experiments/plasma_*_generated.codex.log",wf)
         self.assertNotIn("bounded validator runs it",wf)
 
 
