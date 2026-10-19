@@ -2,13 +2,13 @@ name: PLASMA Real Software-only Codex MVP (Issue 981)
 
 # MVP: exact owner-only, single fixed development task, never a generic dispatcher.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-software-mvp.yml"
       - "scripts/plasma_codex_software_mvp.py"
       - "scripts/tests/test_plasma_codex_software_mvp.py"
+      - "scripts/plasma_codex_postmerge_dispatch.py"
+      - "scripts/tests/test_plasma_codex_postmerge_dispatch.py"
       - "docs/development/plasma-codex-software-mvp.md"
       - "examples/hello-world/main.c"
   push:
@@ -17,6 +17,8 @@ on:
       - ".github/workflows/plasma-codex-software-mvp.yml"
       - "scripts/plasma_codex_software_mvp.py"
       - "scripts/tests/test_plasma_codex_software_mvp.py"
+      - "scripts/plasma_codex_postmerge_dispatch.py"
+      - "scripts/tests/test_plasma_codex_postmerge_dispatch.py"
 permissions:
   contents: read
 concurrency:
@@ -24,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   contract:
-    if: ${{ github.event_name != 'issue_comment' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -32,31 +34,48 @@ jobs:
         with:
           persist-credentials: false
       - run: |
-          python3 -m py_compile scripts/plasma_codex_software_mvp.py scripts/tests/test_plasma_codex_software_mvp.py
+          python3 -m py_compile scripts/plasma_codex_software_mvp.py scripts/tests/test_plasma_codex_software_mvp.py scripts/plasma_codex_postmerge_dispatch.py scripts/tests/test_plasma_codex_postmerge_dispatch.py
           python3 scripts/tests/test_plasma_codex_software_mvp.py
+          python3 scripts/tests/test_plasma_codex_postmerge_dispatch.py
 
   authorize:
+    needs: contract
+    # Only owner-approved SQUASH MERGE of activation PR #1034.
+    # Other pushes and merged PRs are rejected by read-only GitHub provenance.
     if: >-
-      github.event_name == 'issue_comment' &&
+      github.event_name == 'push' &&
       github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main' &&
       github.actor == 'physicslu' &&
-      github.event.issue.number == 981 &&
-      !github.event.issue.pull_request &&
-      github.event.comment.body == '/plasma-codex hello-c 981'
+      needs.contract.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      approved_sha: ${{ steps.provenance.outputs.approved_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - run: python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+      - id: provenance
+        name: Verify exact owner-approved Gate 1 and Gate 2 merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma_codex_postmerge_dispatch.py --event "$GITHUB_EVENT_PATH"
+          python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+          echo "approved_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
   codex:
     needs: authorize
-    if: ${{ needs.authorize.result == 'success' }}
+    if: ${{ needs.authorize.result == 'success' && needs.authorize.outputs.approved_sha == github.sha }}
     # SWPC's already-registered dedicated Codex runner, NOT plasma-integration.
-    # This job is reachable only through an exact trusted owner Issue comment.
+    # This job is reachable only through verified one-shot Gate 2 merge provenance.
     runs-on: [self-hosted, linux, x64, plasma-codex]
     timeout-minutes: 15
     permissions:
@@ -69,8 +88,11 @@ jobs:
           clean: true
       - name: Verify SWPC dedicated identity, owner event and software-only boundaries
         shell: bash
+        env:
+          APPROVED_SHA: ${{ needs.authorize.outputs.approved_sha }}
         run: |
           set -euo pipefail
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
           python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
           test "$RUNNER_ENVIRONMENT" = self-hosted
           test "$RUNNER_NAME" = SWPC-plasma-codex
@@ -141,8 +163,8 @@ jobs:
           retention-days: 14
 
   publisher:
-    needs: codex
-    if: ${{ needs.codex.result == 'success' }}
+    needs: [authorize, codex]
+    if: ${{ needs.codex.result == 'success' && needs.authorize.outputs.approved_sha == github.sha }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     permissions:
@@ -159,8 +181,11 @@ jobs:
           name: real-codex-mvp-${{ github.run_id }}
           path: ${{ runner.temp }}/mvp-candidate
       - name: Verify model patch in a separate trusted job
+        env:
+          APPROVED_SHA: ${{ needs.authorize.outputs.approved_sha }}
         run: |
           set -euo pipefail
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
           python3 scripts/plasma_codex_software_mvp.py publish \
             --event "$GITHUB_EVENT_PATH" --artifact-dir "$RUNNER_TEMP/mvp-candidate"
           git diff --cached --check
