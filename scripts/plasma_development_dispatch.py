@@ -445,6 +445,17 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     }
 
 
+def safe_error_reason(exc: Exception) -> str:
+    """Keep one trusted, constant build error code; never leak host paths."""
+    if isinstance(exc, Denied):
+        return str(exc)
+    detail = str(exc)
+    if (type(exc).__name__ == "BuildDenied" and
+            re.fullmatch(r"BUILD_[A-Z0-9_]{3,80}", detail) is not None):
+        return detail
+    return "EXECUTION_ERROR"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=(
@@ -529,7 +540,7 @@ def main() -> int:
             subprocess.SubprocessError, ValueError) as exc:
         print(json.dumps({
             "status": "NOT_RUN_OR_FAIL",
-            "reason": str(exc) if isinstance(exc, Denied) else "EXECUTION_ERROR",
+            "reason": safe_error_reason(exc),
         }, sort_keys=True))
         return 2
 
