@@ -41,12 +41,13 @@ docker run --rm --platform linux/amd64 \
       --output-dir /out/build --expected-sha "$GITHUB_SHA"
     test -s /out/build/libplasma_mmio_barrier.so
     test -s /out/build/receipt.json
+    (cd /out/build && sha256sum \
+      libplasma_mmio_barrier.so receipt.json \
+      elf-header.txt elf-attributes.txt elf-symbols.txt barrier-disassembly.txt \
+      > SHA256SUMS)
     chmod -R a+rX /out/build
   '
 
 test -f "$ROOT/build/receipt.json"
-(cd "$ROOT/build" && sha256sum \
-  libplasma_mmio_barrier.so receipt.json \
-  elf-header.txt elf-attributes.txt elf-symbols.txt barrier-disassembly.txt \
-  > SHA256SUMS)
+(cd "$ROOT/build" && sha256sum --check SHA256SUMS)
 echo "HIL-A1 GitHub-hosted ARMv7 cross-build: PASS; Z2: NOT_RUN"
