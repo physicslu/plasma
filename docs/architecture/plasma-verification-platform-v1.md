@@ -197,6 +197,40 @@ Only compare outcomes when source/RTL scope, tool versions, test vectors,
 model/board descriptor and verification stage are comparable. Explicitly
 track **ABI revision** and **FPGA image identity** for vendor/HIL evidence.
 
+### Phase 2 Core / Unified AXI evidence pilot (separate Gate 1)
+
+The Phase 2 implementation increment adds a **Host-only SIM-2 pilot**, not a
+blanket adoption of this proposed policy for every FPGA test:
+
+- `pl/verification/verification-result-v1.schema.json`: versioned, strict receipt
+  shape. `pl/tools/verification_evidence.py`: one reusable
+  `run` / `validate` CLI for pytest-driven SIM evidence. The first enabled
+  profile is SIM-2 against the Unified 64-KiB Site-1 RTL; existing
+  `pl/tools/fpga.py` and other verification routes are preserved.
+- Runner exports exact checked-out Git SHA, measured Python/pytest/Cocotb and
+  Icarus versions, observed GitHub runner image identity, actual RTL source
+  SHA256 list and aggregate digest, pytest JUnit case counts, logs and
+  installed dependency fingerprint. Every reported PASS requires a real
+  successful pytest command plus independently validated JUnit cases.
+- The outer pytest wrapper counts as **one** case; nested Cocotb subcases are
+  validated by the existing simulator runner but are **not** reported as
+  separate counts in this receipt. Distinguish those boundaries in claims.
+- Runner/Schema reject a false PASS, skipped-only run, missing toolchain
+  fingerprint, mismatched source digest and contradictory NOT_RUN/BLOCKED.
+  A tool, XML or source preflight problem is not silently coerced to PASS.
+- Only the GitHub-hosted Unified AXI workflow emits this pilot receipt under
+  `pl/build/verification/unified-sim2/verification-result.json` and uploads
+  measured logs and receipts as Actions artifacts. It does not trigger
+  SWPC, vendor tools or real-board activity.
+- Full workflow inventory/migration, SIM-0/1 evidence parity, reusable GitHub
+  workflow extraction, required-check policy, immutable image qualification,
+  and SIM-3/4 XSim/Vivado remain **future independent work**. Preserve existing
+  verification lanes until demonstrated equivalent; no green generic check
+  may grant a stage that did not actually run.
+
+The Phase 2 PR must pass Gate 1 CI and a **separate owner Gate 2** before
+merging; an implementation proposal is not production acceptance.
+
 ## 7. Governance, rollout, and migration gates
 
 **Gate A — this PR:** approve the target roles, definitions, exclusions,
