@@ -35,7 +35,7 @@ docker run --rm --platform linux/amd64 \
     rm -f /etc/apt/sources.list.d/debian.sources
     apt-get update -qq -o Acquire::Check-Valid-Until=false
     apt-get install -y -qq --no-install-recommends \
-      python3 git gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf
+      python3 git gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross
     git config --global --add safe.directory /plasma
     python3 /plasma/scripts/armv7-barrier-hil-a1.py build \
       --output-dir /out/build --expected-sha "$GITHUB_SHA"
