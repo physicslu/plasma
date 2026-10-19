@@ -50,10 +50,10 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         task = self.task
         work = self.work_order
         capability = self.policy["capabilities"]["z2-cpu-only"]
-        self.assertEqual(task["activation"], "DISABLED_GATE1")
+        self.assertNotIn("activation", task)
         self.assertEqual(task["execution_path"], "path2-cli")
         self.assertEqual(task["capability"], "z2-cpu-only")
-        self.assertEqual(work["runtime_status"], "DISABLED_GATE1")
+        self.assertNotIn("runtime_status", work)
         self.assertEqual(work["reviewed_main_sha"], "121a7b3da6ecc1513b47d397ad70e68c9820f789")
         self.assertEqual(work["authorization_kind"], "hardware-one-shot")
         self.assertEqual(work["capability"], capability["entrypoint"])
@@ -62,8 +62,7 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         self.assertFalse(capability["runtime_enabled"])
         self.assertTrue(capability["hardware_authorization"])
         self.assertEqual(self.policy["status"], "CONTRACT_ONLY_NO_RUNTIME_DISPATCH")
-        self.assertEqual(self.schema["properties"]["runtime_status"]["enum"],
-                         ["DISABLED_GATE1", "OWNER_APPROVED_ONE_SHOT"])
+        self.assertNotIn("runtime_status", self.schema["properties"])
         for forbidden in ("usb", "fpga", "mmio", "dut", "hub-power",
                           "network-instrument", "repository-write", "host-root"):
             self.assertIn(forbidden, work["scope"]["deny_resources"])
@@ -71,33 +70,53 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         self.assertNotIn("z2:hardware-owner", capability["permissions"])
         self.assertNotIn("sudo", capability["permissions"])
 
-    def test_work_order_rejects_live_admission_with_no_side_effects(self):
-        with self.assertRaisesRegex(a2.Denied, "A2_WORK_ORDER_DISABLED"):
+    def test_live_admission_needs_exact_claim_and_first_attempt(self):
+        with self.assertRaisesRegex(a2.Denied, "A2_APPROVAL_RECEIPT_INVALID"):
             a2.live_gate(self.work_order, env={})
-        changed = copy.deepcopy(self.work_order)
-        changed["runtime_status"] = "OWNER_APPROVED_ONE_SHOT"
-        with self.assertRaisesRegex(a2.Denied, "A2_LIVE_GATE_DENIED"):
-            a2.live_gate(changed, env={})
+        claim = self.owner_plan()
+        work_sha = claim["work_order_sha256"]
+        expected = "refs/heads/plasma-engineering-claims/981/a2-1234-" + work_sha[:16] + "-r1"
+        self.assertEqual(claim["claim_ref"], expected)
+        trusted = {
+            "PLASMA_HIL_A2_CLAIM_REF": expected,
+            "PLASMA_HIL_A2_WORK_ORDER_SHA256": work_sha,
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_EVENT_NAME": "issue_comment",
+            "GITHUB_REF": "refs/heads/main",
+            "RUNNER_NAME": "SWPC-plasma-codex",
+            "RUNNER_ENVIRONMENT": "self-hosted",
+            "GITHUB_REPOSITORY": "physicslu/plasma",
+            "GITHUB_SHA": claim["pinned_sha"],
+        }
+        with patch.object(a2.os, "geteuid", return_value=1001):
+            a2.live_gate(self.work_order, approval=claim, env=trusted)
+            for key, bad in (
+                ("GITHUB_RUN_ATTEMPT", "2"),
+                ("PLASMA_HIL_A2_CLAIM_REF", "wrong"),
+                ("PLASMA_HIL_A2_WORK_ORDER_SHA256", "0" * 64),
+                ("GITHUB_SHA", "f" * 40),
+                ("RUNNER_NAME", "other-runner"),
+                ("GITHUB_EVENT_NAME", "pull_request"),
+            ):
+                env = dict(trusted, **{key: bad})
+                with self.subTest(key=key), self.assertRaisesRegex(
+                    a2.Denied, "A2_LIVE_GATE_DENIED"
+                ):
+                    a2.live_gate(self.work_order, approval=claim, env=env)
+            forged = dict(claim, comment_id=9999)
+            with self.assertRaisesRegex(a2.Denied, "A2_CLAIM_BINDING_DENIED"):
+                a2.live_gate(self.work_order, approval=forged, env=trusted)
+        with patch.object(a2.os, "geteuid", return_value=0):
+            with self.assertRaisesRegex(a2.Denied, "A2_LIVE_GATE_DENIED"):
+                a2.live_gate(self.work_order, approval=claim, env=trusted)
 
-    def test_registry_wrong_scope_and_event_stay_denied(self):
-        reg = copy.deepcopy(self.registry)
-        reg["tasks"][TASK_ID]["execution_path"] = "path3-codex"
-        with self.assertRaisesRegex(dev.Denied, "A2_TASK_FIELDS_DENIED"):
-            dev.task_by_id(reg, TASK_ID)
-        reg = copy.deepcopy(self.registry)
-        reg["tasks"][TASK_ID]["work_order"] = "../../../untrusted.json"
-        with self.assertRaisesRegex(dev.Denied, "A2_TASK_BINDING_DENIED"):
-            dev.task_by_id(reg, TASK_ID)
-        reg = copy.deepcopy(self.registry)
-        reg["tasks"][TASK_ID]["activation"] = "enabled"
-        with self.assertRaisesRegex(dev.Denied, "A2_TASK_ACTIVATION_DENIED"):
-            dev.task_by_id(reg, TASK_ID)
+    def event_and_context(self):
         ctx = {
             "GITHUB_EVENT_NAME": "issue_comment", "GITHUB_ACTOR": "physicslu",
             "GITHUB_REPOSITORY": "physicslu/plasma",
             "GITHUB_REF": "refs/heads/main",
-            "GITHUB_SHA": self.work_order["reviewed_main_sha"],
-            "PLASMA_HIL_A2_CPU_ONLY_ENABLED": "true",
+            "GITHUB_SHA": "a" * 40,
+            "GITHUB_RUN_ATTEMPT": "1",
         }
         event = {
             "action": "created",
@@ -107,8 +126,47 @@ class A2Gate1OfflineContracts(unittest.TestCase):
             "sender": {"login": "physicslu"},
             "repository": {"full_name": "physicslu/plasma"},
         }
-        with self.assertRaisesRegex(dev.Denied, "A2_NOT_AUTHORIZED_DISABLED"):
-            dev.authorize(event, ctx, self.registry)
+        return event, ctx
+
+    def owner_plan(self):
+        event, ctx = self.event_and_context()
+        return dev.authorize(event, ctx, self.registry)
+
+    def test_immutable_owner_task_authorization_and_hostile_negative(self):
+        self.assertEqual(self.owner_plan()["task_id"], TASK_ID)
+        plan = self.owner_plan()
+        self.assertEqual(plan["pinned_sha"], "a" * 40)
+        self.assertRegex(plan["work_order_sha256"], r"^[0-9a-f]{64}$")
+        reg = copy.deepcopy(self.registry)
+        reg["tasks"][TASK_ID]["execution_path"] = "path3-codex"
+        with self.assertRaisesRegex(dev.Denied, "A2_TASK_FIELDS_DENIED"):
+            dev.task_by_id(reg, TASK_ID)
+        reg = copy.deepcopy(self.registry)
+        reg["tasks"][TASK_ID]["work_order"] = "../../../untrusted.json"
+        with self.assertRaisesRegex(dev.Denied, "A2_TASK_BINDING_DENIED"):
+            dev.task_by_id(reg, TASK_ID)
+        reg = copy.deepcopy(self.registry)
+        reg["tasks"][TASK_ID]["activation"] = "OWNER_APPROVED_ONE_SHOT"
+        with self.assertRaisesRegex(dev.Denied, "A2_TASK_FIELDS_DENIED"):
+            dev.task_by_id(reg, TASK_ID)
+        ev, ctx = self.event_and_context()
+        for key, value in (
+            ("GITHUB_RUN_ATTEMPT", "2"),
+            ("GITHUB_REF", "refs/heads/feature"),
+            ("GITHUB_ACTOR", "attacker"),
+            ("GITHUB_EVENT_NAME", "pull_request"),
+        ):
+            with self.subTest(key=key), self.assertRaises(dev.Denied):
+                dev.authorize(ev, dict(ctx, **{key: value}), self.registry)
+        for field, value in (
+            ("body", "/plasma-dispatch run hil-a2-cpu-only 981; echo bad"),
+            ("body", "/plasma-dispatch run hil-a2-cpu-only 981\\n"),
+            ("id", -2),
+        ):
+            forged = copy.deepcopy(ev)
+            forged["comment"][field] = value
+            with self.subTest(field=field), self.assertRaises(dev.Denied):
+                dev.authorize(forged, ctx, self.registry)
 
     def test_remote_report_exact_positive_and_hostile_negative(self):
         report = expected_report()
@@ -145,8 +203,8 @@ class A2Gate1OfflineContracts(unittest.TestCase):
 
     def test_no_network_before_double_gate(self):
         with patch.object(a2, "load_module", side_effect=AssertionError("MUST_NOT_IMPORT_SSH")):
-            with self.assertRaisesRegex(a2.Denied, "A2_WORK_ORDER_DISABLED"):
-                a2.run_once(self.work_order, Path("/nonexistent/a1"))
+            with self.assertRaisesRegex(a2.Denied, "A2_APPROVAL_RECEIPT_INVALID"):
+                a2.run_once(self.work_order, Path("/nonexistent/a1"), approval={})
 
     def test_source_mismatch_fails_before_ssh(self):
         with self.assertRaises((a2.Denied, FileNotFoundError, ValueError, OSError)):
@@ -159,7 +217,14 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path2-cli'", workflow)
         self.assertIn("plasma-hil-a2-source", workflow)
         self.assertIn("scripts/tests/test_plasma_hil_a2_cpu_only.py", workflow)
-        self.assertIn("PLASMA_HIL_A2_CPU_ONLY_ENABLED:", workflow)
+        self.assertIn("development-claim:", workflow)
+        self.assertIn("needs: [development-authorize, development-claim]", workflow)
+        self.assertIn("github.rest.git.createRef", workflow)
+        self.assertIn("github.rest.git.getRef", workflow)
+        self.assertIn("github.run_attempt == 1", workflow)
+        self.assertIn("always() &&", workflow)
+        self.assertIn("PLASMA_HIL_A2_CLAIM_REF:", workflow)
+        self.assertNotIn("PLASMA_HIL_A2_CPU_ONLY_ENABLED", workflow)
         self.assertIn("actions/download-artifact@", workflow)
         self.assertNotIn("plasma-hil-a2-cpu-only.yml", workflow)
         self.assertFalse((ROOT / ".github/workflows/plasma-hil-a2-cpu-only.yml").exists())
