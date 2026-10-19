@@ -10,7 +10,6 @@ on:
       - 'data/device-catalog/research/stm32u5-security-state-model.json'
       - 'data/device-catalog/research/stm32u5-runtime-enforcement-policy.json'
       - 'data/device-catalog/research/stm32u5-security-state-observer-debug-policy.json'
-      - '.github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml'
       - 'data/device-catalog/research/device-catalog-stm32u5-hil-observer-debug-readiness-gate.md'
       - 'data/device-catalog/research/stm32u5-hil-observer-debug-readiness.json'
       - 'data/device-catalog/research/stm32u5_hil_observer_debug_readiness.py'

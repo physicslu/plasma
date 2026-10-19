@@ -177,6 +177,10 @@ def affected_families(changed_paths: Iterable[str]) -> list[str]:
         if path.startswith("data/device-catalog/research/test_st_"):
             return list(FAMILIES)
 
+        if path == ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml":
+            affected.add("stm32c0")
+            continue
+
         old_family = OLD_WORKFLOW_FAMILY.get(path)
         if old_family:
             affected.add(old_family)
@@ -220,6 +224,7 @@ def run_family(family: str) -> None:
 def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32g4_phase4_9d_admission.py"]) == ["stm32g4"]
     assert affected_families(["data/device-catalog/research/stm32u0_phase_u0_2_discovery.py"]) == ["stm32u0"]
+    assert affected_families([".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_2_discovery.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_3_policy.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_4_admission.py"]) == ["stm32c0"]
