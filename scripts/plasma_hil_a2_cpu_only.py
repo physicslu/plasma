@@ -222,26 +222,45 @@ def bounded_ssh(argv: list[str], password: str) -> dict:
         os.close(master)
 
 
-def live_gate(work_order: dict, *, env=os.environ) -> None:
-    """Both reviewed Work Order and external owner flag are required."""
+def live_gate(work_order: dict, *, approval: dict | None = None,
+              env=os.environ) -> None:
+    """Fail closed unless the hosted CAS receipt matches this exact Issue event."""
+    import plasma_engineering_dispatch_v1 as contracts
     require(work_order["authorization_kind"] == "hardware-one-shot" and
             work_order["capability"] == "z2-cpu-only" and
-            work_order["entrypoint"] == "z2-cpu-only",
+            work_order["entrypoint"] == "z2-cpu-only" and
+            work_order["work_order_id"] == "hil-a2-cpu-only",
             "A2_WORK_ORDER_SCOPE_DENIED")
-    require(work_order.get("runtime_status") == "OWNER_APPROVED_ONE_SHOT",
-            "A2_WORK_ORDER_DISABLED")
-    require(env.get("PLASMA_HIL_A2_CPU_ONLY_ENABLED") == "true" and
+    require(type(approval) is dict and
+            approval.get("task_id") == "hil-a2-cpu-only" and
+            approval.get("execution_path") == "path2-cli" and
+            approval.get("issue_number") == 981 and
+            type(approval.get("comment_id")) is int and
+            approval["comment_id"] > 0 and
+            type(approval.get("pinned_sha")) is str and
+            bool(re.fullmatch(r"[0-9a-f]{40}", approval["pinned_sha"])),
+            "A2_APPROVAL_RECEIPT_INVALID")
+    digest = contracts.digest(work_order)
+    claim = (f"refs/heads/plasma-engineering-claims/981/"
+             f"a2-{approval['comment_id']}-{digest[:16]}-r1")
+    require(approval.get("work_order_sha256") == digest and
+            approval.get("claim_ref") == claim,
+            "A2_CLAIM_BINDING_DENIED")
+    require(env.get("PLASMA_HIL_A2_CLAIM_REF") == claim and
+            env.get("PLASMA_HIL_A2_WORK_ORDER_SHA256") == digest and
+            env.get("GITHUB_RUN_ATTEMPT") == "1" and
             env.get("GITHUB_EVENT_NAME") == "issue_comment" and
             env.get("GITHUB_REF") == "refs/heads/main" and
             env.get("RUNNER_NAME") == "SWPC-plasma-codex" and
             env.get("RUNNER_ENVIRONMENT") == "self-hosted" and
             env.get("GITHUB_REPOSITORY") == "physicslu/plasma" and
-            env.get("GITHUB_SHA") == work_order["reviewed_main_sha"] and
-            os.geteuid() != 0, "A2_LIVE_GATE_DENIED")
+            env.get("GITHUB_SHA") == approval["pinned_sha"] and
+            os.geteuid() != 0,
+            "A2_LIVE_GATE_DENIED")
 
 
-def run_once(work_order: dict, artifact_dir: Path) -> dict:
-    live_gate(work_order)
+def run_once(work_order: dict, artifact_dir: Path, *, approval: dict) -> dict:
+    live_gate(work_order, approval=approval)
     login = load_module(SSH_HELPER, "plasma_z2_known_host_login")
     login.expect_worker()
     binary = verify_source(artifact_dir)
@@ -259,7 +278,10 @@ def run_once(work_order: dict, artifact_dir: Path) -> dict:
         "artifact_sha256_verified": True,
         "runner": "SWPC-plasma-codex",
         "github_run_id": os.environ["GITHUB_RUN_ID"],
-        "reviewed_main_sha": work_order["reviewed_main_sha"],
+        "reviewed_main_sha": approval["pinned_sha"],
+        "work_order_sha256": approval["work_order_sha256"],
+        "claim_ref": approval["claim_ref"],
+        "comment_id": approval["comment_id"],
         "ssh_host_verified": True,
         "exit_code": 0,
     }
