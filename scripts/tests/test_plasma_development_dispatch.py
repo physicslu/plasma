@@ -153,6 +153,161 @@ class DevelopmentPath2Contracts(unittest.TestCase):
         self.assertEqual(self.registry["mode"],"development")
 
 
+class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
+    """Hosted-only positive and adversarial PR branch admission contracts."""
+
+    def branch_event(self, task="nine-nine-path2", pr=1100, sha="b"*40):
+        e=self.event()
+        e["comment"]["body"]=(
+            f"/plasma-dispatch run {task} --pr {pr} --sha {sha} 981"
+        )
+        return e
+
+    def valid_pr(self, pr=1100, sha="b"*40):
+        return {
+            "number":pr, "state":"open", "merged_at":None,
+            "user":{"login":"physicslu"},
+            "base":{"ref":"main","repo":{"full_name":"physicslu/plasma"}},
+            "head":{"ref":"agent/example-software",
+                    "sha":sha,
+                    "repo":{"full_name":"physicslu/plasma"}},
+        }
+
+    def test_valid_pr_head_is_routed_without_merging_to_main(self):
+        event=self.branch_event()
+        request=dev.request(event,self.context())
+        self.assertEqual(request["pr_number"],1100)
+        self.assertEqual(request["source_sha"],"b"*40)
+        self.assertEqual(request["trusted_sha"],"a"*40)
+        plan=dev.authorize(event,self.context(),self.registry,
+                           pr_info=self.valid_pr())
+        self.assertEqual(plan["status"],"AUTHORIZED_DEV_TASK")
+        self.assertEqual(plan["execution_path"],"path2-cli")
+        self.assertEqual(plan["pinned_sha"],"b"*40)
+        self.assertEqual(plan["trusted_sha"],"a"*40)
+        event=self.branch_event(task="nine-nine-path3")
+        plan=dev.authorize(event,self.context(),self.registry,
+                           pr_info=self.valid_pr())
+        self.assertEqual(plan["execution_path"],"path3-codex")
+
+    def test_branch_rejects_bad_pr_head_owner_repo_base_state(self):
+        event=self.branch_event()
+        for label, mutate in (
+            ("wrong head",lambda p:p["head"].update(sha="c"*40)),
+            ("fork head",lambda p:p["head"]["repo"].update(full_name="other/plasma")),
+            ("wrong base",lambda p:p["base"].update(ref="release")),
+            ("fork base",lambda p:p["base"]["repo"].update(full_name="other/plasma")),
+            ("not owner",lambda p:p["user"].update(login="other")),
+            ("bad branch",lambda p:p["head"].update(ref="main")),
+            ("not open",lambda p:p.update(state="closed")),
+            ("merged",lambda p:p.update(merged_at="2026-10-19")),
+            ("wrong number",lambda p:p.update(number=99)),
+        ):
+            pr=self.valid_pr()
+            mutate(pr)
+            with self.subTest(label=label),self.assertRaises(dev.Denied):
+                dev.authorize(event,self.context(),self.registry,pr_info=pr)
+        with self.assertRaisesRegex(dev.Denied,"PR_METADATA_DENIED"):
+            dev.authorize(event,self.context(),self.registry)
+
+    def test_branch_rejects_command_injection_non_exact_sha_and_untrusted_actor(self):
+        for command in (
+            "/plasma-dispatch run nine-nine-path2 --pr 1100 --sha abc 981",
+            "/plasma-dispatch run nine-nine-path2 --pr 01100 --sha "+"b"*40+" 981",
+            "/plasma-dispatch run nine-nine-path2 --pr 1100 --sha "+"b"*40+" 981\n",
+            "/plasma-dispatch run nine-nine-path2 --pr 1100 --sha "+"b"*40+" 981;id",
+            "/plasma-dispatch run nine-nine-path2 --pr 1100 --sha "+"b"*40+" 981 && true",
+            "/plasma-dispatch run nine-nine-path2 --pr 1100 --sha "+"b"*40+" 982",
+        ):
+            event=self.event()
+            event["comment"]["body"]=command
+            with self.subTest(command=command),self.assertRaises(dev.Denied):
+                dev.request(event,self.context())
+        for field in ("GITHUB_ACTOR","GITHUB_REF","GITHUB_REPOSITORY"):
+            ctx=self.context()
+            ctx[field]="untrusted"
+            with self.subTest(field=field),self.assertRaises(dev.Denied):
+                dev.request(self.branch_event(),ctx)
+
+    def test_sha_only_candidate_cli_preserves_real_stdout_not_fixed_9x9(self):
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            script=work/"scripts/experiments/plasma_branch_smoke.py"
+            script.parent.mkdir(parents=True)
+            script.write_text("print('branch-only-test')\n")
+            output=b"branch-only-test\n"
+            task={
+                "script":"scripts/experiments/plasma_branch_smoke.py",
+                "argv":[],
+                "verification":"sha256-only",
+                "expected_stdout_sha256":hashlib.sha256(output).hexdigest(),
+            }
+            receipt=dev.run_task(task,workspace=work,evidence_dir=work)
+            self.assertEqual(receipt["status"],"PASS")
+            self.assertEqual(receipt["stdout_sha256"],
+                             task["expected_stdout_sha256"])
+            self.assertEqual(
+                (work/"plasma-path2-stdout.txt").read_bytes(),output)
+            self.assertEqual(
+                (work/"plasma-path2-stderr.txt").read_bytes(),b"")
+
+    def test_worker_requires_authorization_digest_and_matching_pr(self):
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            reg=work/"registry.json"
+            reg.write_text(json.dumps(self.registry))
+            eventfile=work/"event.json"
+            eventfile.write_text(json.dumps(self.branch_event()))
+            env=self.context() | {
+                "RUNNER_NAME":"SWPC-plasma-codex",
+                "RUNNER_ENVIRONMENT":"self-hosted",
+            }
+            args=["execute","--event",str(eventfile),
+                  "--registry",str(reg),"--workspace",str(work),
+                  "--trusted-sha","a"*40,"--pinned-sha","b"*40,
+                  "--pr-number","1100",
+                  "--registry-sha256",hashlib.sha256(reg.read_bytes()).hexdigest()]
+            from io import StringIO
+            from contextlib import redirect_stdout
+            with patch.dict(os.environ,env):
+                with patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock:
+                    with redirect_stdout(StringIO()) as out:
+                        self.assertEqual(self._call_main(args),0)
+                    self.assertEqual(json.loads(out.getvalue())["pinned_sha"],"b"*40)
+                    mock.assert_called_once()
+                for index,incorrect in (
+                    (args.index("--pr-number")+1,"1200"),
+                    (args.index("--pinned-sha")+1,"c"*40),
+                    (args.index("--trusted-sha")+1,"d"*40),
+                    (args.index("--registry-sha256")+1,"0"*64),
+                ):
+                    tampered=list(args)
+                    tampered[index]=incorrect
+                    with self.subTest(index=index), redirect_stdout(StringIO()) as out:
+                        self.assertEqual(self._call_main(tampered),2)
+                        self.assertEqual(json.loads(out.getvalue())["status"],
+                                         "NOT_RUN_OR_FAIL")
+
+    @staticmethod
+    def _call_main(args):
+        with patch.object(sys,"argv",["dispatch.py",*args]):
+            return dev.main()
+
+    def test_one_trusted_main_dispatcher_two_checkouts_no_task_workflow(self):
+        wf=WORKFLOW.read_text()
+        self.assertIn("path: trusted",wf)
+        self.assertIn("path: candidate",wf)
+        self.assertIn("gh api \"repos/physicslu/plasma/pulls/$PR_NUMBER\"",wf)
+        self.assertIn("trusted/scripts/plasma_development_dispatch.py",wf)
+        self.assertIn("candidate/specs/engineering-dispatch/development-tasks-v1.json",wf)
+        self.assertIn("needs.development-authorize.outputs.pinned_sha",wf)
+        self.assertIn("runner.temp",wf)
+        self.assertIn("plasma-path2-stdout.txt",wf)
+        self.assertIn("candidate/scripts/experiments/plasma_*_generated.csv",wf)
+        self.assertNotIn("plasma-path3-nine-nine.yml",wf)
+        self.assertIn("github.event_name == 'issue_comment'",wf)
+
+
 class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
     @classmethod
     def setUpClass(cls):
