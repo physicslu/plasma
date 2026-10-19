@@ -1,0 +1,189 @@
+name: PLASMA Engineering Reusable Runtime Dispatcher (Path 2 / Path 3)
+
+# ONE reusable workflow, never task-specific workflows.
+# Gate 1 candidate is OFF until owner-approved activation and isolated provisioning.
+on:
+  workflow_dispatch:
+    inputs:
+      work_order_id:
+        description: Reviewed immutable Work Order ID from main
+        required: true
+        type: string
+      bundle_sha256:
+        description: SHA256 of full canonical runtime request
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
+      - "scripts/plasma_engineering_runtime_v1.py"
+      - "scripts/tests/test_plasma_engineering_runtime_v1.py"
+      - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
+      - "scripts/plasma_engineering_runtime_v1.py"
+      - "scripts/tests/test_plasma_engineering_runtime_v1.py"
+      - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-engineering-runtime-${{ inputs.work_order_id || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-contract:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run offline runtime and adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 scripts/tests/test_plasma_engineering_runtime_v1.py
+          git diff --exit-code
+
+  authorize:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.ref == 'refs/heads/main' &&
+      vars.PLASMA_ENGINEERING_DISPATCH_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      execution_path: ${{ steps.plan.outputs.execution_path }}
+      pinned_sha: ${{ steps.plan.outputs.pinned_sha }}
+      bundle_sha256: ${{ steps.plan.outputs.bundle_sha256 }}
+      work_order_id: ${{ steps.plan.outputs.work_order_id }}
+      claim_ref: ${{ steps.plan.outputs.claim_ref }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate trusted owner, reviewed SHA and immutable bundle
+        id: plan
+        shell: bash
+        env:
+          WORK_ORDER_ID: ${{ inputs.work_order_id }}
+          EXPECTED_SHA256: ${{ inputs.bundle_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "$WORK_ORDER_ID" =~ ^[a-z0-9][a-z0-9-]{2,63}$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bundle="specs/engineering-dispatch/runtime-requests/$WORK_ORDER_ID.json"
+          test -f "$bundle" && test ! -L "$bundle"
+          python3 scripts/plasma_engineering_runtime_v1.py authorize \
+            --bundle "$bundle" \
+            --policy specs/engineering-dispatch/capabilities-v1.json \
+            --event "$GITHUB_EVENT_PATH" \
+            --expected-sha256 "$EXPECTED_SHA256" \
+            > "$RUNNER_TEMP/authorization.json"
+          python3 - "$RUNNER_TEMP/authorization.json" "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert data["status"] == "AUTHORIZED_PENDING_ATOMIC_CLAIM"
+          with open(sys.argv[2],"a",encoding="utf-8") as f:
+              for field in ("execution_path","bundle_sha256","work_order_id","claim_ref"):
+                  f.write(f"{field}={data[field]}\n")
+              f.write(f"pinned_sha={data['reviewed_main_sha']}\n")
+          PY
+      - name: Atomically claim work order revision in protected Git ref
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          CLAIM_REF: ${{ steps.plan.outputs.claim_ref }}
+          PINNED_SHA: ${{ steps.plan.outputs.pinned_sha }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ref = process.env.CLAIM_REF;
+            const sha = process.env.PINNED_SHA;
+            if (!/^refs\/heads\/plasma-engineering-claims\/[a-z0-9][a-z0-9-]{2,63}\/r[1-9][0-9]*$/.test(ref)) {
+              throw new Error("INVALID_CLAIM_REF");
+            }
+            if (!/^[a-f0-9]{40}$/.test(sha) || sha !== context.sha) {
+              throw new Error("INVALID_PINNED_SHA");
+            }
+            // createRef is an atomic GitHub API create: existing ref fails.
+            // The active claims ruleset forbids subsequent mutation/deletion.
+            await github.rest.git.createRef({
+              owner: context.repo.owner, repo: context.repo.repo, ref, sha
+            });
+            const bare = ref.slice("refs/".length);
+            const readback = await github.rest.git.getRef({
+              owner: context.repo.owner, repo: context.repo.repo, ref: bare
+            });
+            if (readback.data.ref !== ref || readback.data.object.sha !== sha) {
+              throw new Error("CLAIM_READBACK_FAILED");
+            }
+
+  execute:
+    needs: authorize
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      needs.authorize.result == 'success' &&
+      vars.PLASMA_ENGINEERING_DISPATCH_ENABLED == 'true' &&
+      (needs.authorize.outputs.execution_path == 'path2-cli' ||
+       needs.authorize.outputs.execution_path == 'path3-codex')
+    # Do not assign this label to the current hardware-capable plasma-codex worker.
+    runs-on: [self-hosted, linux, x64, plasma-dispatch-isolated]
+    timeout-minutes: 17
+    permissions:
+      contents: read
+    steps:
+      - name: Trusted worker event / runner admission before checkout
+        shell: bash
+        env:
+          PINNED_SHA: ${{ needs.authorize.outputs.pinned_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_SHA" = "$PINNED_SHA"
+          test "$RUNNER_NAME" = SWPC-plasma-dispatch-isolated
+          test "$RUNNER_ENVIRONMENT" = self-hosted
+          test "$(id -u)" -ne 0
+          test -z "${SSH_AUTH_SOCK:-}"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.pinned_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Execute only claimed, bounded CLI/Codex task in OS-isolated worker
+        shell: bash
+        env:
+          WORK_ORDER_ID: ${{ needs.authorize.outputs.work_order_id }}
+          EXPECTED_SHA256: ${{ needs.authorize.outputs.bundle_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "$WORK_ORDER_ID" =~ ^[a-z0-9][a-z0-9-]{2,63}$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          bundle="specs/engineering-dispatch/runtime-requests/$WORK_ORDER_ID.json"
+          python3 scripts/plasma_engineering_runtime_v1.py worker \
+            --bundle "$bundle" \
+            --policy specs/engineering-dispatch/capabilities-v1.json \
+            --expected-sha256 "$EXPECTED_SHA256" > "$RUNNER_TEMP/dispatch-result.json"
+          sha256sum "$RUNNER_TEMP/dispatch-result.json" > "$RUNNER_TEMP/dispatch-result.json.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-runtime-dispatch-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/dispatch-result.json
+            ${{ runner.temp }}/dispatch-result.json.sha256
+          if-no-files-found: warn
+          retention-days: 14
