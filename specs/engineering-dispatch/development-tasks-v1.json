@@ -1,0 +1,12 @@
+{
+  "schema_version": "plasma.engineering.development_tasks.v1",
+  "mode": "development",
+  "tasks": {
+    "nine-nine-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_three_path_nine_nine.py",
+      "argv": [],
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
+    }
+  }
+}

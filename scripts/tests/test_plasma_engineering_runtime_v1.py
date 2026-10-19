@@ -262,10 +262,17 @@ class RuntimeContracts(unittest.TestCase):
         self.assertIn("persist-credentials: false", yml)
         self.assertIn("pull_request:", yml)
         self.assertIn("scripts/tests/test_plasma_engineering_runtime_v1.py", yml)
-        self.assertNotIn("issue_comment:", yml)
+        # Development Mode owner-only fixed CLI admission is permitted.
+        # Qualification workflow_dispatch remains independently disabled.
+        self.assertIn("issue_comment:", yml)
+        self.assertIn("development-authorize:", yml)
+        self.assertIn("development-execute:", yml)
         self.assertNotIn("sudo ", yml)
         self.assertNotIn("run: codex", yml)
-        self.assertNotIn("runs-on: [self-hosted, linux, x64, plasma-codex]", yml)
+        # Development Mode reuses the existing SWPC Codex Runner for fixed
+        # Path 2 CLI. Qualification's separate 'execute' job stays gated.
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]", yml)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-dispatch-isolated]", yml)
 
 
 if __name__ == "__main__":

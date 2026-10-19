@@ -1,7 +1,8 @@
 name: PLASMA Engineering Reusable Runtime Dispatcher (Path 2 / Path 3)
 
 # ONE reusable workflow, never task-specific workflows.
-# Gate 1 candidate is OFF until owner-approved activation and isolated provisioning.
+# Qualification workflow_dispatch remains OFF; owner-only Development Mode
+# issue_comment runs reviewed tasks using existing SWPC Runner.
 on:
   workflow_dispatch:
     inputs:
@@ -13,10 +14,15 @@ on:
         description: SHA256 of full canonical runtime request
         required: true
         type: string
+  issue_comment:
+    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "scripts/plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_development_dispatch.py"
+      - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
@@ -25,6 +31,9 @@ on:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "scripts/plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_development_dispatch.py"
+      - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
@@ -49,9 +58,105 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 scripts/tests/test_plasma_development_dispatch.py
           git diff --exit-code
+
+  development-authorize:
+    # Development Mode: user-approved idempotent tasks from trusted main.
+    # Owner-only Issue #981 command; PR/push never schedule SWPC.
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/plasma-dispatch run ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      pinned_sha: ${{ steps.approve.outputs.pinned_sha }}
+      execution_path: ${{ steps.approve.outputs.execution_path }}
+      task_id: ${{ steps.approve.outputs.task_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify owner command against reviewed main registry
+        id: approve
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 scripts/plasma_development_dispatch.py authorize \
+            --event "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/plasma-dev-auth.json"
+          python3 - "$RUNNER_TEMP/plasma-dev-auth.json" "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data=json.load(f)
+          assert data["status"] == "AUTHORIZED_DEV_TASK"
+          with open(sys.argv[2],"a",encoding="utf-8") as f:
+              for k in ("pinned_sha","execution_path","task_id"):
+                  f.write(f"{k}={data[k]}\n")
+          PY
+
+  development-execute:
+    needs: development-authorize
+    if: >-
+      github.event_name == 'issue_comment' &&
+      needs.development-authorize.result == 'success' &&
+      needs.development-authorize.outputs.execution_path == 'path2-cli'
+    # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check approved SWPC executor and pinned source
+        shell: bash
+        env:
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_SHA" = "$PINNED_SHA"
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.development-authorize.outputs.pinned_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Run reviewed fixed CLI and verify all 81 products
+        shell: bash
+        env:
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PINNED_SHA"
+          python3 scripts/plasma_development_dispatch.py execute \
+            --event "$GITHUB_EVENT_PATH" \
+            --pinned-sha "$PINNED_SHA" \
+            > "$RUNNER_TEMP/plasma-path2-receipt.json"
+          cat "$RUNNER_TEMP/plasma-path2-receipt.json"
+          sha256sum "$RUNNER_TEMP/plasma-path2-receipt.json" > "$RUNNER_TEMP/plasma-path2-receipt.json.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-development-cli-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-path2-receipt.json
+            ${{ runner.temp }}/plasma-path2-receipt.json.sha256
+          if-no-files-found: warn
+          retention-days: 14
 
   authorize:
     if: >-
