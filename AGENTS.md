@@ -198,6 +198,12 @@ the actual command and physical effect, not the technology label `SW` or
   `PASS`/`FAIL`/`NOT_RUN`. Hosted CI success cannot substitute for a
   requested real SWPC execution. Do not require a full qualification
   evidence package unless the experiment makes it necessary.
+- **Run real SWPC acceptance before merging.** When an approved Path 2/3
+  task requires a real SWPC test, include its execution, evidence review and
+  autonomous fix/retest loop in Gate 1. Gate 2 is strictly the PR merge
+  decision. Do not use a `main`-only dispatcher as a justification to merge
+  untested development code; resolve the branch/ref admission issue within
+  the approved scope or report a precise `NOT_RUN` blocker.
 - **Retain only real boundaries.** Gate 1 authorizes the specified work;
   Gate 2 remains required only to merge a PR. Running as the owner on a
   shared hardware-capable account is not equivalent to hardware isolation:
@@ -596,10 +602,13 @@ There are exactly two user approval gate types:
 Request
   -> read-only inspection as needed
   -> Gate 1: Plan Approval
-  -> autonomous implementation / validation / PR / CI repair / Ready
-  -> Gate 2: Merge Approval
-  -> merge to main
-  -> approved post-merge deployment/runtime/hardware acceptance, when in plan
+  -> autonomously implement and perform real Gate 1 acceptance
+     (Path 2 SWPC CLI / Path 3 SWPC Codex when in scope)
+  -> collect evidence; ChatGPT reviews and loops FAIL -> fix -> retest
+  -> PR + relevant CI + merge-ready evidence
+  -> Gate 2: Merge Approval (merge decision ONLY)
+  -> merge to main and verify merge commit/parents
+  -> separately scoped post-merge operational rollout, if any
   -> completion report
 ```
 
@@ -613,11 +622,37 @@ Before creating or changing code, configuration, tests, documentation, branches,
 
 The user's approval authorizes autonomous execution of the stated plan. If the plan explicitly includes post-merge deployment, service restart, runtime acceptance, Z2/FPGA work, or real-target validation, those steps do not require another approval when their turn arrives.
 
+**Development Mode real-test acceptance belongs to Gate 1 (normative).**
+
+For Path 2/3 tasks whose acceptance requires a real SWPC executor, Gate 1
+includes actually dispatching and executing the approved CLI/Codex work,
+collecting authentic Runner logs/artifacts, analyzing any failures, and
+iterating until the specified acceptance conditions pass (or honestly
+reporting `FAIL`/`NOT_RUN` with the blocker). Do this **before requesting
+Gate 2**. In Path 3, Codex owns implementation, execution, self-tests and
+repairs; ChatGPT independently reviews the returned source, logs and data
+and decides `PASS`/`FAIL`. A successful GitHub job or an agent claim alone
+is not acceptance. No extra owner `continue` or approval is required for
+fix/retest steps already covered by Gate 1.
+
+**Never merge an untested development change merely to unlock its test
+trigger.** The reviewed development branch/commit SHA must be executable
+by the actual authorized development workflow *before merging*. If a
+current dispatcher only loads work from `main` (as the existing owner-only
+Issue #981 development entry currently does), treat this as a concrete
+implementation blocker, not as a reason to invert the gates. Make the
+minimum separately reviewed Gate-1-scoped dispatcher/branch-SHA change,
+or disclose the blocker and mark the real test `NOT_RUN`; do **not** claim
+that branch execution is already implemented or bypass an active guard.
+A Gate 2 exception for deferred development acceptance requires the
+owner's explicit understanding of the missing evidence; it is not the
+normal Development Mode path.
+
 **Gate 2 — Merge Approval**
 
-After Gate 1 approval, continue autonomously through implementation, tests, commits, PR creation/update, CI observation/repair, and Ready-for-review. When the PR satisfies the merge-ready definition, stop and request Merge Approval.
+After Gate 1 approval, continue autonomously through implementation, **real in-scope environment tests**, evidence review and repair cycles, commits, PR creation/update, CI observation/repair, and Ready-for-review. Request Gate 2 only when the PR is merge-ready **and all required Gate 1 acceptance evidence is available and independently reviewed**, unless the owner explicitly accepts a documented deferral.
 
-After Merge Approval, merge to `main`, verify the resulting repository state, and continue any post-merge deployment/runtime/hardware acceptance already included in the Gate 1 plan. Do not stop for a third approval gate.
+After Merge Approval, merge to `main` and verify the resulting repository state. **Gate 2 approval never substitutes for missing Development Mode tests or re-dispatches the same development task.** Separately scoped post-merge operational acceptance (e.g., a genuine release deployment) may still proceed when explicitly covered by Gate 1, without creating another gate.
 
 If continuing would materially exceed the approved scope, stop and propose a revised plan. Approval of that revision is another Gate 1 decision, not a new gate type.
 
@@ -733,20 +768,29 @@ Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
    remain contract-only; a Gate 1 selection does **not** deploy, enable or
    grant a generic autonomous dispatcher. Existing Codex fixed-workload
    triggers and capabilities are not general-purpose routes.
-6. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
+6. **Gate 1 owns the complete Path 2/3 test loop before merge.** Execute
+   the approved source/ref on SWPC, review the real evidence, and repair/retest
+   under the same Gate 1 until the user-defined acceptance is satisfied.
+   Path 3 delegates development/self-test to Codex; ChatGPT owns independent
+   evidence review and the final PASS/FAIL judgment. Do not require SWPC to
+   duplicate Codex's task-specific calculations simply to satisfy a smoke
+   test. A `main`-only Issue Comment dispatcher does not yet implement
+   pre-merge branch/commit routing; do not confuse this policy with a
+   delivered capability.
+7. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
    `pull_request` CI will trigger. Ensure an authorized GitHub App token,
    dedicated dispatch or other reviewed CI trigger **actually** runs the
    required checks. Never infer CI PASS or PR readiness from successful
    publication. The approved Codex repair loop ends at Ready/Gate 2; a
    `main` push/merge must not rerun the same Codex development assignment.
-7. **Gate 2 exclusively governs merges of specific PRs.** Recheck PR HEAD,
+8. **Gate 2 exclusively governs merges of specific PRs.** Recheck PR HEAD,
    current `main`, required CI, mergeability, rulesets, review threads and
    authorized merge method immediately before merging. Gate 1-only tasks
    that produce **no PR** (read-only diagnostics or bounded test/evidence)
    finish with a verified execution report, **without inventing a Gate 2**.
    Post-merge work requires explicit coverage in the original Gate 1 plan
    or a revised Gate 1; a merge never silently authorizes deployment.
-8. **Evidence is environment-specific**: GitHub-hosted, SWPC CLI,
+9. **Evidence is environment-specific**: GitHub-hosted, SWPC CLI,
    SWPC Codex/QEMU, real Z2 CPU, PS/AXI/PL and external DUT are distinct
    acceptance boundaries. Reuse existing accepted evidence and avoid
    repeating equivalent tests without a concrete new failure mode. Neither
@@ -760,8 +804,10 @@ authorization):
 
 ```text
 Path 1: Gate 1 -> ChatGPT -> PR -> hosted CI -> Gate 2 -> merge
-Path 2: Gate 1 -> Actions -> SWPC CLI -> evidence -> [PR/CI/Gate 2/merge if needed]
-Path 3: Gate 1 -> Actions -> SWPC Codex -> PR -> CI/repair -> Gate 2 -> merge
+Path 2: Gate 1 -> SWPC CLI -> real result/evidence -> fix/retest -> [PR + CI -> Gate 2 -> merge if needed]
+Path 3: Gate 1 -> SWPC Codex self-develop/self-test -> ChatGPT evidence review
+               -> FAIL: Codex fix/retest (same Gate 1)
+               -> PASS: PR + CI -> Gate 2 -> merge
 ```
 
 The two-gate model in Section 11.1 remains authoritative. No additional
