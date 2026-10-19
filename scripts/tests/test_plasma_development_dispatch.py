@@ -259,8 +259,8 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             workspace = Path(td) / "candidate"
             script = workspace / "scripts/experiments/plasma_auto4_relative_probe.py"
             script.parent.mkdir(parents=True)
-            script.write_text("print('relative-workspace-pass')\\n", encoding="utf-8")
-            expected = b"relative-workspace-pass\\n"
+            script.write_text("print('relative-workspace-pass')\n", encoding="utf-8")
+            expected = b"relative-workspace-pass\n"
             task = {
                 "script": "scripts/experiments/plasma_auto4_relative_probe.py",
                 "argv": [],
@@ -286,7 +286,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             workspace = Path(td) / "candidate"
             outside = Path(td) / "outside"
             outside.mkdir()
-            (outside / "escape.py").write_text("print('outside')\\n", encoding="utf-8")
+            (outside / "escape.py").write_text("print('outside')\n", encoding="utf-8")
             (workspace / "scripts").mkdir(parents=True)
             (workspace / "scripts/experiments").symlink_to(
                 outside, target_is_directory=True,
