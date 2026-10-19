@@ -46,9 +46,13 @@ jobs:
             --directory .github/workflows > gate1c-workflow-audit.json
           python3 - <<'PY'
           import json
+          from pathlib import Path
           with open("gate1c-workflow-audit.json",encoding="utf8") as f:
               r=json.load(f)
-          assert r["scanned"] == r["total"] and r["total"] >= 322
+          archives=list(Path("docs/archive/ci-workflows/stm32c0-stages").glob("*.yml"))
+          assert len(archives) == 5
+          assert Path(".github/workflows/device-catalog-stm32c0-stage-dispatch.yml").is_file()
+          assert r["scanned"] == r["total"] and r["total"] + len(archives) - 1 >= 325
           assert r["status"] == "NO_GO_WORKFLOW_TRIGGER_RISK"
           assert r["runtime_enabled"] is False
           assert r["potential_exposures"] > 0
