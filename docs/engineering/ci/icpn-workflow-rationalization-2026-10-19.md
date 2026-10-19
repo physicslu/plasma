@@ -2,6 +2,22 @@
 
 > **DRAFT PR ONLY — not an authorization to merge, dispatch Actions, deploy, or operate hardware.** This is an initial source-level inventory, **not** a completed run-history and dependency audit of all workflows.
 
+## Gate 1 update — five proposed archive candidates, observed historical runs (2026-10-19)
+
+Static trigger triage is **262/262**, but only the **five archive candidates** have now received branch/event-scoped historical run evidence. GitHub's repository Actions run listing returned all seven `push` runs for `agent/microchip-bulk-coverage-discovery-v1`, and two for `agent/microchip-research-recovery-v2`. Two of the former were separate *live canary* runs, **not** archive candidates; exactly **7 candidate runs** remain, with **4 successful and 3 failed**.
+
+| Proposed archive Workflow | Observed candidate Push runs | Last observed conclusion | Important distinction |
+|---|---|---|---|
+| `microchip-all-lanes-sweep-once-v1` | [38357332332](https://github.com/physicslu/plasma/actions/runs/38357332332) FAIL; [38357451545](https://github.com/physicslu/plasma/actions/runs/38357451545) PASS | PASS, 12/12 sharded jobs, 12 raw artifacts | Does not certify complete Microchip denominator |
+| `microchip-bulk-research-once-v1` | [38348043707](https://github.com/physicslu/plasma/actions/runs/38348043707) PASS | PASS | Workflow log explicitly says 7/16 batches partial/failed; only 137 queries independently replayed, 3,061 unreplayed/unattempted. **Success ≠ full coverage** |
+| `microchip-live-evidence-10-replay` | [38348231778](https://github.com/physicslu/plasma/actions/runs/38348231778) FAIL | FAIL | Original replay failed; subsequent [crosslane Recovery Run 38348398967](https://github.com/physicslu/plasma/actions/runs/38348398967) successfully verified its ten queries |
+| `microchip-crosslane-recovery-v1` | [38348398967](https://github.com/physicslu/plasma/actions/runs/38348398967) PASS | PASS | 10 source-backed queries and 151 exact-prefix research orderings; not Production admission |
+| `microchip-recovery-v2` | [38373094121](https://github.com/physicslu/plasma/actions/runs/38373094121) FAIL; [38373429583](https://github.com/physicslu/plasma/actions/runs/38373429583) PASS | PASS, 8/8 source-pinned jobs, 8 raw artifacts | Retain partial/failed predecessor in audit trail |
+
+Supporting structured evidence: `docs/engineering/ci/icpn-workflow-archival-run-evidence-2026-10-19.csv`. Relevant artifacts on these seven runs were non-expired at verification time; GitHub retention policy may cause future expiry. The historical evidence belongs to the **original GitHub-hosted research execution**, not this Gate 1 audit; no Workflow dispatch occurred during the audit.
+
+**Archival proposition remains conditional**: all five YAMLs use exclusively old-branch/self-YAML `push` triggers, no `workflow_dispatch`, and no default-branch indexed callers beyond each YAML itself. Before Gate 2, still verify classic branch-protection required checks and off-repository/scheduled callers. Archive status does not constitute manufacturer coverage approval, ADR-0002 L1/L2 admission, hardware qualification, or production-write authority.
+
 ## Frozen baseline
 
 - Repository: `physicslu/plasma`; branch: `main`; base commit `17382d889a7643dd9986639ab50601d65b4cbf12`.
@@ -10,7 +26,7 @@
 - Exact 262-row manifest: `docs/engineering/ci/icpn-workflow-inventory-2026-10-19.csv`. Each row records the immutable Git blob SHA and triage state.
 - `.github/ci-workstreams.json` identifies four ICPN core workflows. `.github/device-catalog-ci-trigger-debt.json` limits Production-wide path ownership to four named validators and reports zero existing exceptions.
 - Active branch Ruleset `Protect Plasma main` (20964250) has pull-request and review-thread restrictions, but no `required_status_checks` rule in the ruleset response. **Classic branch-protection checks could not be verified** (HTTP 403); no claim is made that none exist.
-- API connector does not expose a complete per-workflow Actions run listing. Prior execution counts, last run, artifacts, and required check use remain `UNKNOWN` unless individually confirmed.
+- The repository Actions runs endpoint supports branch/event-filtered listing. All returned `push` runs of the **five proposed archive candidates** have now been verified against their former source branches; the complete run histories and required check usage of the other 257 workflow definitions remain unverified.
 
 ## Batch 1: non-runnable one-shot workflows proposed for archive
 
