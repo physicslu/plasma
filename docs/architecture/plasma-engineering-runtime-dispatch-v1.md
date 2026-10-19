@@ -5,6 +5,41 @@ workflow plus deterministic authorization/worker adapters and adversarial tests.
 It **does not** approve live SWPC, Codex, QEMU, Z2, FPGA, LA, USB Hub or DUT
 operations. No merge occurs without the separate Gate 2.
 
+## Development Mode owner-only dispatch (PR #1046 alignment)
+
+This is a separate **development entry** within the **same reusable Workflow**,
+not a new task-specific Workflow, Runner or Production Mode activation.
+The earlier `workflow_dispatch` qualification path remains dormant.
+The approved owner can issue an exact GitHub Issue **#981** comment:
+
+```text
+/plasma-dispatch run nine-nine-path2 981
+```
+
+The issue-comment event must come from `physicslu`; the hosted authorization
+job loads `specs/engineering-dispatch/development-tasks-v1.json` from
+**the event-pinned main commit**, resolves the fixed task, and passes its SHA
+to the existing `SWPC-plasma-codex` Runner. The worker revalidates the
+event/owner/ref/Runner identity and checks out the same SHA. It executes the
+checked-in Python program without shell interpolation, verifies **81 products**
+and the exact expected stdout SHA256, and uploads a short JSON receipt.
+
+The task registry is reusable: changing the task changes a reviewed registry
+entry rather than the GitHub Workflow. This first Development Mode route
+supports fixed Path 2 CLI Python tasks; Path 3 Codex remains on its existing
+owner-authorized pilot path until the generic agent-task admission is implemented.
+Repeated idempotent development tests are allowed (no permanent Claim ref).
+No SWPC run is triggered by PR/push; they execute **hosted offline tests only**.
+The `PLASMA_ENGINEERING_DISPATCH_ENABLED` qualification guard and
+`runtime-activation-v1.json` stay OFF, and no production capability is granted.
+A shared, hardware-capable development Runner is not an implicit authorization
+to operate USB, LA, Z2, FPGA, MMIO, hub power or a DUT.
+
+**Gate 1 authorizes the test; GitHub issue comment is the executable event,
+not a third approval gate.** Actual Path 2 PASS requires a GitHub
+`development-execute` job with `RUNNER_NAME=SWPC-plasma-codex`,
+exit code zero and a matching receipt. Hosted CI success is not real SWPC PASS.
+
 ## Authority and path mapping
 
 Use the existing [Three-Path Model](../development/plasma-three-path-execution-model.md)
