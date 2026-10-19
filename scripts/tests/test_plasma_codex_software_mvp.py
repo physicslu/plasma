@@ -184,7 +184,11 @@ class MVPTests(unittest.TestCase):
         self.assertIn("exec --sandbox workspace-write",worker)
         self.assertIn("sandbox_workspace_write.network_access=false",worker)
         self.assertIn("grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'",worker)
-        self.assertIn("/dev/uio*",worker)
+        self.assertNotIn("for device in /dev/mem",worker)
+        self.assertNotIn("NO_GO: software Codex can access a hardware device",worker)
+        self.assertIn("for group in plasma-codex-io plasma-monitor; do",worker)
+        self.assertIn('grep -Fxq "$group"',worker)
+        self.assertIn('test -z "$(git status --porcelain)"',worker)
         self.assertIn("SSH_AUTH_SOCK",worker)
         self.assertNotIn("OPENAI_API_KEY",worker)
         self.assertNotIn("GH_TOKEN",worker)
@@ -197,15 +201,73 @@ class MVPTests(unittest.TestCase):
         self.assertIn("GH_TOKEN:",publisher)
         self.assertNotIn("codex --",publisher)
         self.assertIn("runs-on: ubuntu-24.04",authorize)
-        # The exact owner issue command is now intentionally inactive:
-        # only a verified Gate 2 squash merge of activation PR #1034 may dispatch.
-        self.assertNotIn("issue_comment:",wf)
-        self.assertNotIn(mvp.COMMAND,wf)
-        self.assertIn("github.event_name == 'push'",wf)
-        self.assertIn("plasma_codex_postmerge_dispatch.py --event",wf)
+        # SW uses the SAME one-operator Issue dispatch pattern as LA and Z2.
+        self.assertIn("issue_comment:",wf)
+        self.assertIn("types: [created]",wf)
+        self.assertIn(mvp.COMMAND,wf)
+        self.assertIn("github.event_name == 'issue_comment'",authorize)
+        self.assertIn("github.actor == 'physicslu'",authorize)
+        self.assertIn("github.event.issue.number == 981",authorize)
+        self.assertIn("!github.event.issue.pull_request",authorize)
+        self.assertIn("github.event.comment.body == '/plasma-codex hello-c 981'",authorize)
+        self.assertNotIn("needs: contract",authorize)
+        self.assertNotIn("plasma_codex_postmerge_dispatch.py --event",wf)
+        self.assertNotIn("github.event_name == 'push'",authorize)
         self.assertIn("needs.authorize.outputs.approved_sha == github.sha",wf)
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertNotIn("codex --dangerously-bypass",wf)
+
+    def test_unified_hil_reuses_existing_runner_for_sw_z2_and_la(self):
+        sw = (ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
+        cases = (
+            (".github/workflows/plasma-codex-software-mvp.yml",
+             "/plasma-codex hello-c 981", "codex"),
+            (".github/workflows/plasma-codex-z2-swd05.yml",
+             "/plasma-codex z2-swd05 981", "oneshot"),
+            (".github/workflows/plasma-codex-la2016-direct.yml",
+             "/plasma-codex la2016-direct 981", "loopback"),
+        )
+        for path, exact_owner_command, job in cases:
+            with self.subTest(path=path):
+                wf=(ROOT/path).read_text()
+                self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"),1)
+                worker=wf.split("\n  "+job+":\n",1)[1]
+                self.assertIn("    needs: authorize\n",wf)
+                self.assertIn("needs.authorize.result == 'success'",worker)
+                self.assertIn("test \"$(id -un)\" = plasma-codex",worker)
+                self.assertIn("test \"$RUNNER_NAME\" = SWPC-plasma-codex",worker)
+                self.assertIn("github.actor == 'physicslu'",wf)
+                self.assertIn("github.event.issue.number == 981",wf)
+                self.assertIn("github.event.comment.body == '"+exact_owner_command+"'",wf)
+                self.assertIn("!github.event.issue.pull_request",wf)
+                self.assertIn("persist-credentials: false",worker)
+        self.assertNotIn("gh pr merge",sw)
+        self.assertNotIn("sudo bash",sw)
+        self.assertNotIn("uhubctl ",sw)
+
+    def test_unified_hil_does_not_authorize_hardware_from_pr_or_main_push(self):
+        for path in (
+            ".github/workflows/plasma-codex-software-mvp.yml",
+            ".github/workflows/plasma-codex-z2-swd05.yml",
+            ".github/workflows/plasma-codex-la2016-direct.yml",
+        ):
+            with self.subTest(path=path):
+                wf=(ROOT/path).read_text()
+                self.assertIn("  pull_request:\n",wf)
+                self.assertIn("  push:\n",wf)
+                self.assertIn("    runs-on: ubuntu-24.04",wf)
+                self.assertIn("    if: >-\n      github.event_name == 'issue_comment'",wf)
+                self.assertNotIn("workflow_dispatch:\n",wf)
+                self.assertNotIn("pull_request_target:\n",wf)
+        sw=(ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
+        auth=sw.split("\n  authorize:\n",1)[1].split("\n  codex:\n",1)[0]
+        self.assertNotIn("github.event_name == 'push'",auth)
+        self.assertIn("    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}".replace(chr(92)+ "$"+"{{", "$"+"{{"),sw)
+        self.assertIn("test -z \"${SSH_AUTH_SOCK:-}\"".replace(chr(92)+ "$", "$"),sw)
+        self.assertIn("network_access=false",sw)
+        self.assertIn("Do not use external programs, sudo, SSH, networks, Z2/FPGA/USB/LA,",sw)
+        self.assertIn("no API secret",sw)
+
 
 if __name__=="__main__":
     unittest.main(verbosity=2)
