@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import copy
+import errno
 import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -925,6 +927,67 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                     self.task,workspace=Path(td),
                     executor=lambda *a,**k:self.fail(
                         "MUST_NOT_RUN_MISSING_BOARD_PREPARE"),env={})
+
+    def test_vivado_uses_existing_candidate_local_build_root(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td) / "candidate"
+            output = work / "pl/build"
+            output.mkdir(parents=True)
+            folder = build.prepare_host_build_dir(work)
+            self.assertEqual(folder.parent, output)
+            self.assertTrue(folder.name.startswith("fixed-f1-"))
+            self.assertTrue((folder / "reports").is_dir())
+            self.assertFalse(str(folder).startswith("/storage/projects/plasma/"))
+            self.assertTrue(folder.resolve().is_relative_to(work.resolve()))
+            # Never follow a candidate symlink into arbitrary host folders.
+            import shutil
+            shutil.rmtree(output)
+            outside = Path(td) / "outside"
+            outside.mkdir()
+            output.symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(build.BuildDenied,
+                                        "BUILD_OUTPUT_ROOT_MISSING"):
+                build.prepare_host_build_dir(work)
+
+    def test_vivado_output_errors_are_actionable_and_path_sanitized(self):
+        import plasma_vivado_host_build as build
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td) / "candidate"
+            (work / "pl/build").mkdir(parents=True)
+            for number, reason in (
+                (errno.EACCES, "BUILD_OUTPUT_PERMISSION_DENIED"),
+                (errno.EPERM, "BUILD_OUTPUT_PERMISSION_DENIED"),
+                (errno.EROFS, "BUILD_OUTPUT_READ_ONLY"),
+                (errno.ENOSPC, "BUILD_OUTPUT_NO_SPACE"),
+                (errno.EIO, "BUILD_OUTPUT_CREATE_FAILED"),
+            ):
+                exc = OSError(number, "private path should stay hidden")
+                with self.subTest(errno=number),patch.object(
+                        build.tempfile, "mkdtemp", side_effect=exc):
+                    with self.assertRaisesRegex(build.BuildDenied, reason) as ctx:
+                        build.prepare_host_build_dir(work)
+                    self.assertEqual(dev.safe_error_reason(ctx.exception), reason)
+                    self.assertNotIn("private path", str(ctx.exception))
+
+    def test_vivado_board_helper_launch_and_timeout_codes(self):
+        import plasma_vivado_host_build as build
+        for exc, reason in (
+            (FileNotFoundError(errno.ENOENT, "missing bash"),
+             "BUILD_BOARD_PREPARE_LAUNCH_FAILED"),
+            (PermissionError(errno.EACCES, "private helper"),
+             "BUILD_BOARD_PREPARE_LAUNCH_FAILED"),
+            (subprocess.TimeoutExpired("mock-board-helper", 180),
+             "BUILD_BOARD_PREPARE_TIMEOUT"),
+        ):
+            def stub(*args, **kwargs):
+                raise exc
+            with self.subTest(reason=reason,type=type(exc).__name__):
+                with self.assertRaisesRegex(build.BuildDenied, reason) as ctx:
+                    build.resolve_board_repository(
+                        self.task, workspace=ROOT,
+                        executor=stub,env={"HOME": "/nonexistent"})
+                self.assertEqual(dev.safe_error_reason(ctx.exception), reason)
 
     def test_vivado_preparation_has_no_new_workflow_or_runner(self):
         src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
