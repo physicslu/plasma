@@ -206,11 +206,18 @@ def authorize(event: object, context: dict, registry: object,
 
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None) -> dict:
-    script = workspace / task["script"]
-    require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
+    # The worker passes workspace=Path("candidate"), relative to its job
+    # directory. Resolve the program to an absolute path before changing cwd:
+    # otherwise Python attempts candidate/candidate/scripts/... .
+    workspace_root = workspace.resolve()
+    requested_script = workspace / task["script"]
+    script = requested_script.resolve()
+    require(script.is_relative_to(workspace_root) and
+            requested_script.is_file() and not requested_script.is_symlink(),
+            "SCRIPT_NOT_FOUND")
     proc = executor(
         [sys.executable, str(script), *task["argv"]],
-        cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        cwd=workspace_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         timeout=40, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,
