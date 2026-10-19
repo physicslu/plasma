@@ -158,6 +158,68 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  development-codex:
+    needs: development-authorize
+    if: >-
+      github.event_name == 'issue_comment' &&
+      needs.development-authorize.result == 'success' &&
+      needs.development-authorize.outputs.execution_path == 'path3-codex'
+    # Reuse SWPC-plasma-codex; no new Runner or task-specific Workflow.
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Verify approved real SWPC Codex environment
+        shell: bash
+        env:
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_SHA" = "$PINNED_SHA"
+          test "$RUNNER_ENVIRONMENT" = self-hosted
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          command -v codex
+          codex --version
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.development-authorize.outputs.pinned_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Real Codex generates 9x9 source, then bounded validator runs it
+        shell: bash
+        env:
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PINNED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/plasma_development_dispatch.py execute-codex \
+            --event "$GITHUB_EVENT_PATH" --pinned-sha "$PINNED_SHA" \
+            > "$RUNNER_TEMP/plasma-path3-receipt.json"
+          cat "$RUNNER_TEMP/plasma-path3-receipt.json"
+          git diff --exit-code
+          test "$(git status --porcelain --untracked-files=all)" = \
+            '?? scripts/experiments/plasma_nine_nine_codex_generated.py'
+          sha256sum "$RUNNER_TEMP/plasma-path3-receipt.json" \
+            > "$RUNNER_TEMP/plasma-path3-receipt.json.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-development-codex-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-path3-receipt.json
+            ${{ runner.temp }}/plasma-path3-receipt.json.sha256
+            scripts/experiments/plasma_nine_nine_codex_generated.py
+          if-no-files-found: warn
+          retention-days: 14
+
   authorize:
     if: >-
       github.event_name == 'workflow_dispatch' &&
