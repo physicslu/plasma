@@ -317,34 +317,67 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("authorize", "execute", "execute-codex"))
+    parser.add_argument("action", choices=(
+        "request", "authorize", "execute", "execute-codex",
+    ))
     parser.add_argument("--event", type=Path, required=True)
     parser.add_argument("--registry", type=Path, default=MANIFEST)
+    parser.add_argument("--pr-info", type=Path)
     parser.add_argument("--pinned-sha")
+    parser.add_argument("--trusted-sha")
+    parser.add_argument("--pr-number", type=int)
+    parser.add_argument("--registry-sha256")
+    parser.add_argument("--workspace", type=Path, default=ROOT)
+    parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
     try:
-        registry = parse_json(args.registry)
         event = parse_json(args.event)
-        plan = authorize(event, os.environ, registry)
-        if args.action in ("execute", "execute-codex"):
-            require(os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted"
-                    and os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER
-                    and os.geteuid() != 0, "SWPC_RUNNER_DENIED")
-            require(args.pinned_sha == plan["pinned_sha"],
-                    "PINNED_SHA_MISMATCH")
-            task = task_by_id(registry, plan["task_id"])
-            require(task["execution_path"] == (
-                "path3-codex" if args.action == "execute-codex" else "path2-cli"
-            ), "WRONG_EXECUTION_PATH")
-            receipt = (run_codex_task(task) if args.action == "execute-codex"
-                       else run_task(task))
-            receipt.update({
-                "task_id": plan["task_id"],
-                "pinned_sha": plan["pinned_sha"],
-                "comment_id": plan["comment_id"],
-                "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
-            })
-            plan = receipt
+        req = request(event, os.environ)
+        if args.action == "request":
+            plan = {"status": "VALID_OWNER_REQUEST", **req}
+        else:
+            registry = parse_json(args.registry)
+            pr = parse_json(args.pr_info) if args.pr_info else None
+            if args.action in ("execute", "execute-codex"):
+                require(os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted"
+                        and os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER
+                        and os.geteuid() != 0, "SWPC_RUNNER_DENIED")
+                require(args.trusted_sha == req["trusted_sha"] and
+                        args.pinned_sha == req["source_sha"] and
+                        args.pr_number == req["pr_number"],
+                        "AUTHORIZED_SOURCE_MISMATCH")
+                require(type(args.registry_sha256) is str and
+                        SHA256.fullmatch(args.registry_sha256) is not None
+                        and hashlib.sha256(
+                            args.registry.read_bytes()
+                        ).hexdigest() == args.registry_sha256,
+                        "AUTHORIZED_REGISTRY_MISMATCH")
+                require(args.workspace.is_dir() and
+                        args.workspace.resolve() != ROOT.resolve(),
+                        "WORKSPACE_DENIED")
+                task = task_by_id(registry, req["task_id"])
+                require(task["execution_path"] == (
+                    "path3-codex" if args.action == "execute-codex"
+                    else "path2-cli"
+                ), "WRONG_EXECUTION_PATH")
+                receipt = (
+                    run_codex_task(task, workspace=args.workspace)
+                    if args.action == "execute-codex"
+                    else run_task(task, workspace=args.workspace,
+                                  evidence_dir=args.evidence_dir)
+                )
+                plan = {
+                    **receipt, **req,
+                    "task_id": req["task_id"],
+                    "pinned_sha": req["source_sha"],
+                    "registry_sha256": args.registry_sha256,
+                    "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+                }
+            else:
+                plan = authorize(event, os.environ, registry, pr)
+                plan["registry_sha256"] = hashlib.sha256(
+                    args.registry.read_bytes()
+                ).hexdigest()
         print(json.dumps(plan, sort_keys=True))
         return 0
     except (Denied, OSError, UnicodeError, json.JSONDecodeError,
