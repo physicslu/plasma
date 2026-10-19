@@ -90,6 +90,7 @@ jobs:
       pr_number: ${{ steps.approve.outputs.pr_number }}
       registry_sha256: ${{ steps.approve.outputs.registry_sha256 }}
       execution_path: ${{ steps.approve.outputs.execution_path }}
+      execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
@@ -160,7 +161,7 @@ jobs:
           assert data["status"] == "AUTHORIZED_DEV_TASK"
           with open(sys.argv[2],"a",encoding="utf-8") as f:
               for k in ("pinned_sha","trusted_sha","pr_number",
-                        "registry_sha256","execution_path","task_id"):
+                        "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
               for k in ("comment_id","claim_ref","work_order_sha256"):
                   f.write(f"{k}={data.get(k,'')}\n")
@@ -250,8 +251,8 @@ jobs:
           retention-days: 14
 
   development-execute:
-    # AUTO-4: exact CPU-only PR #1055 canary in the Path 2 allowlist;
-    # preserve HIL-A2's separate main-only one-shot claimed route.
+    # Dispatch by trusted, validated capability, NOT by task-specific test
+    # names. Hardware-capable A2 retains its separate one-shot claim gate.
     needs: [development-authorize, development-claim]
     if: >-
       always() &&
@@ -259,13 +260,10 @@ jobs:
       needs.development-authorize.result == 'success' &&
       needs.development-authorize.outputs.execution_path == 'path2-cli' &&
       (
-        (needs.development-authorize.outputs.task_id == 'nine-nine-path2' &&
+        (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
          needs.development-claim.result == 'skipped') ||
-        (needs.development-authorize.outputs.task_id == 'auto4-premerge-path2' &&
-         needs.development-authorize.outputs.pr_number == '1055' &&
-         needs.development-authorize.outputs.pinned_sha == 'b19fd8f6c9806e99678d8c5c71fc0f8634379ac3' &&
-         needs.development-claim.result == 'skipped') ||
-        (needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+        (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
+         needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
          needs.development-claim.result == 'success' &&
          needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
          needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
@@ -325,6 +323,7 @@ jobs:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
           PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
@@ -338,6 +337,7 @@ jobs:
             --workspace candidate --evidence-dir "$RUNNER_TEMP" \
             --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+            --execution-capability "$EXECUTION_CAPABILITY" \
             > "$RUNNER_TEMP/plasma-path2-receipt.json"
           cat "$RUNNER_TEMP/plasma-path2-receipt.json"
           git -C trusted diff --exit-code
