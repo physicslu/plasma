@@ -170,15 +170,15 @@ def test_validate_cli_rejects_tampered_receipt(valid_receipt, tmp_path):
 
 def test_receipt_sources_are_exactly_the_compiled_cocotb_sources(valid_receipt):
     suite, _ = ev._under_root(valid_receipt["suite"])
-    ev.assert_pilot_source_contract(
-        suite, valid_receipt["rtl_sources"] + [
-            {"path": "pl/rtl/site/swd_waveform_engine.sv", "sha256": "0" * 64},
-            {"path": "pl/rtl/site/swd_transaction_master.sv", "sha256": "0" * 64},
-            {"path": "pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv",
-             "sha256": "0" * 64},
-        ], "fixed_ppu_unified_axi_site1",
-    )
-
+    names = [
+        "pl/rtl/site/swd_waveform_engine.sv",
+        "pl/rtl/site/swd_transaction_master.sv",
+        "pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv",
+        "pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv",
+        "pl/rtl/bus/fixed_ppu_unified_axi_site1.sv",
+    ]
+    measured, _ = ev.source_fingerprint(names)
+    ev.assert_pilot_source_contract(suite, measured, "fixed_ppu_unified_axi_site1")
 
 def test_receipt_must_reject_unmeasured_compiled_rtl(valid_receipt):
     suite, _ = ev._under_root(valid_receipt["suite"])
