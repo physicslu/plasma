@@ -37,6 +37,7 @@ class MVPTests(unittest.TestCase):
     def test_exact_owner_pass(self):
         r=mvp.authorize(self.event(),self.env("a"*40),"a"*40)
         self.assertEqual(r["comment_id"],123)
+        self.assertEqual(r["executor"],"codex")
 
     def test_other_actor_rejected(self):
         env=self.env("a"*40);env["GITHUB_ACTOR"]="attacker"
@@ -110,17 +111,37 @@ class MVPTests(unittest.TestCase):
             finally:
                 os.chdir(saved)
 
-    def test_workflow_is_hosted_separated_and_inert_for_pr(self):
+    def test_swpc_codex_and_hosted_publisher_are_separate(self):
         wf=(ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
-        self.assertIn("runs-on: ubuntu-24.04",wf)
-        self.assertNotIn("self-hosted",wf)
+        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"),1)
+        self.assertEqual(wf.count("runs-on: ubuntu-24.04"),3)
+        authorize=wf.split("\n  authorize:",1)[1].split("\n  codex:",1)[0]
+        worker=wf.split("\n  codex:",1)[1].split("\n  publisher:",1)[0]
+        publisher=wf.split("\n  publisher:",1)[1]
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",worker)
+        self.assertIn("test \"$RUNNER_NAME\" = SWPC-plasma-codex",worker)
+        self.assertIn("test \"$(hostname)\" = SWPC",worker)
+        self.assertIn("test \"$(id -un)\" = plasma-codex",worker)
+        self.assertIn("persist-credentials: false",worker)
+        self.assertIn("needs: authorize",worker)
+        self.assertIn("codex --ask-for-approval never",worker)
+        self.assertIn("exec --sandbox workspace-write",worker)
+        self.assertIn("sandbox_workspace_write.network_access=false",worker)
+        self.assertIn("grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'",worker)
+        self.assertIn("/dev/uio*",worker)
+        self.assertIn("SSH_AUTH_SOCK",worker)
+        self.assertNotIn("OPENAI_API_KEY",worker)
+        self.assertNotIn("GH_TOKEN",worker)
+        self.assertNotIn("contents: write",worker)
+        self.assertNotIn("npm install",worker)
+        self.assertIn("runs-on: ubuntu-24.04",publisher)
+        self.assertIn("needs: codex",publisher)
+        self.assertIn("pull-requests: write",publisher)
+        self.assertIn("contents: write",publisher)
+        self.assertIn("GH_TOKEN:",publisher)
+        self.assertNotIn("codex --",publisher)
+        self.assertIn("runs-on: ubuntu-24.04",authorize)
         self.assertIn(mvp.COMMAND,wf)
-        self.assertIn("needs: authorize",wf)
-        self.assertIn("needs: codex",wf)
-        self.assertIn("persist-credentials: false",wf)
-        self.assertIn("pull-requests: write",wf)
-        self.assertIn("OPENAI_API_KEY",wf)
-        self.assertIn("codex --ask-for-approval never exec",wf)
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertNotIn("codex --dangerously-bypass",wf)
 

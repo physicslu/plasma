@@ -54,7 +54,9 @@ jobs:
   codex:
     needs: authorize
     if: ${{ needs.authorize.result == 'success' }}
-    runs-on: ubuntu-24.04
+    # SWPC's already-registered dedicated Codex runner, NOT plasma-integration.
+    # This job is reachable only through an exact trusted owner Issue comment.
+    runs-on: [self-hosted, linux, x64, plasma-codex]
     timeout-minutes: 15
     permissions:
       contents: read
@@ -63,23 +65,40 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Install pinned Codex CLI without any model secret
+          clean: true
+      - name: Verify SWPC dedicated identity, owner event and software-only boundaries
         shell: bash
         run: |
           set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/plasma-codex-cli" --no-save @openai/codex@0.163.0
-          echo "$RUNNER_TEMP/plasma-codex-cli/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Real Codex (API credential, never GitHub write credential)
-        shell: bash
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          set -euo pipefail
-          test -n "$OPENAI_API_KEY" || { echo "NO_GO: OPENAI_API_KEY not configured"; exit 2; }
-          test ! -e docs/development/plasma-codex-mvp-first-change.md
+          python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+          test "$RUNNER_ENVIRONMENT" = self-hosted
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
           test -z "$(git status --porcelain)"
+          test ! -e docs/development/plasma-codex-mvp-first-change.md
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "NO_GO: software Codex has a privileged hardware group" >&2
+            exit 2
+          fi
+          test -z "${SSH_AUTH_SOCK:-}" || { echo "NO_GO: SSH agent exposed"; exit 2; }
+          for device in /dev/mem /dev/uio* /dev/ttyUSB* /dev/ttyACM* /dev/hidraw* /dev/gpiochip* /dev/bus/usb/*/*; do
+            if test -e "$device" && { test -r "$device" || test -w "$device"; }; then
+              echo "NO_GO: software Codex can access a hardware device" >&2
+              exit 2
+            fi
+          done
+          command -v codex
+          command -v timeout
+          # Negative host preflight, NOT proof of host-wide network isolation.
+      - name: Real SWPC Codex (existing ChatGPT CLI authentication; no API secret)
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
           codex --version
-          cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF'
+          cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF
           Read AGENTS.md and relevant PLASMA docs.
           Perform ONE genuine, scoped software-only change: create a useful
           operator guide at docs/development/plasma-codex-mvp-first-change.md.
@@ -89,9 +108,13 @@ jobs:
           Modify no other path. Do not run hardware, sudo, deployment, HIL,
           instrument, USB, FPGA, DUT, service commands, git push or git commit.
           EOF
-          timeout 480s codex --ask-for-approval never exec \
-            --sandbox workspace-write --ephemeral \
-            - < "$RUNNER_TEMP/codex-task.txt"
+          # Existing SWPC Codex CLI login; no API key is supplied.
+          # Spawned tools should not have network access to laboratory endpoints.
+          timeout --signal=TERM --kill-after=10s 480s \
+            codex --ask-for-approval never \
+              -c sandbox_workspace_write.network_access=false \
+              exec --sandbox workspace-write \
+              - < "$RUNNER_TEMP/codex-task.txt"
       - name: Independent tests and patch artifact
         shell: bash
         run: |
