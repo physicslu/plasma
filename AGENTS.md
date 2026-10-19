@@ -565,8 +565,19 @@ surface supports them. The owner should normally be able to approve by
   first report the exact PR, target branch, current head/CI/readiness and
   any deployment or hardware consequences covered by the approved plan.
   **Never display an actionable Gate 2 approval choice before merge-ready.**
-- Recommended Gate 1 choices: **「批准 Gate 1：執行此計畫」**,
-  **「要求修改計畫」**, **「暫緩」**, **「不批准」**.
+- For PLASMA engineering work, **Gate 1 must identify the execution actor**:
+  **「批准 Gate 1：ChatGPT 執行」** or **「批准 Gate 1：SWPC Codex 執行」**.
+  Show these as two clickable actions after the scoped plan. Do not silently
+  infer, replace, or fall back between actors. If the owner explicitly
+  supplies the actor in ordinary text, that is sufficient; do not ask again.
+  Mode ChatGPT uses the connected authorized GitHub path; Mode Codex uses
+  an existing, owner-authorized GitHub Actions workflow and SWPC dedicated
+  `plasma-codex` Runner, not a new generic Dispatcher.
+- When either mode is not presently executable, disclose its actual blocker
+  without claiming a workflow ran. Executor choice is independent of Work
+  Order capability and never authorizes hardware or automatic merging.
+  For non-PLASMA tasks where executor choice does not apply, ordinary
+  Gate 1 approval wording remains valid.
   Recommended Gate 2 choices: **「批准 Gate 2：合併 PR #N」**,
   **「要求修改」**, **「暫緩」**, **「關閉 PR（不合併）」**.
   Tailor or omit choices as appropriate; these are examples, not extra
