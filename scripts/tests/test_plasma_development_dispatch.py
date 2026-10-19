@@ -171,8 +171,9 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertEqual(plan["pinned_sha"],"a"*40)
 
     def test_real_reference_runs_as_bounded_process_in_hosted_ci(self):
-        # This class tests Codex with a fake agent, never calls real Codex.
-        self.assertEqual(self.task["execution_path"],"path3-codex")
+        self.assertEqual(self.task["execution_path"], "path3-codex")
+        self.assertIn("independently check all 81", self.task["objective"])
+        self.assertNotIn("print(", self.task["objective"])
         self.assertEqual(self.task["expected_stdout_sha256"],
                          "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d")
 
@@ -195,25 +196,12 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         with self.assertRaisesRegex(dev.Denied,"TASK_FIELDS_DENIED"):
             dev.task_by_id(task,"nine-nine-path3")
 
-    def test_codex_source_ast_rejects_hardware_or_shell_commands(self):
-        program='print("multiplicand,multiplier,product")\nfor a in range(1, 10):\n    for b in range(1, 10):\n        print(f"{a},{b},{a*b}")\n'
-        dev.validate_generated_source(program)
-        attacks=[
-            'import os\n'+program,
-            program+'\nimport subprocess\n',
-            program+'\nopen("/dev/mem")\n',
-            program.replace('print(f"{a},{b},{a*b}")',
-                            'print(__import__("os").system("id"))'),
-            program.replace('range(1, 10)','range(0, 10)'),
-            program.replace('print(f"{a},{b},{a*b}")',
-                            'print(f"{a},{b},{a*b}"); print("bad")'),
-        ]
-        for attack in attacks:
-            with self.subTest(attack=attack[:45]),self.assertRaises(dev.Denied):
-                dev.validate_generated_source(attack)
-
-    def test_fake_codex_produces_validated_81_cell_program(self):
-        program='print("multiplicand,multiplier,product")\nfor a in range(1, 10):\n    for b in range(1, 10):\n        print(f"{a},{b},{a*b}")\n'
+    def test_fake_codex_returns_unreviewed_evidence_without_local_reexecution(self):
+        # Fake agent deliberately emits an incorrect multiplication; runner
+        # only collects evidence and must NOT certify PASS or execute Python.
+        program='print("a,b,product")\nprint("1,1,999")\n'
+        csv='a,b,product\n1,1,999\n'
+        report='python3 generated.py > generated.csv\nFAIL: 1/81\nexit=0\n'
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
             target=work/self.task["output_path"]
@@ -221,27 +209,48 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             calls=[]
             class Result:
                 returncode=0
-                stdout=b"fake Codex CLI success"
+                stdout=b"fake Codex CLI session"
                 stderr=b""
             def fake_codex(command, **kwargs):
                 calls.append((command,kwargs))
                 target.write_text(program)
+                target.with_suffix(".csv").write_text(csv)
+                target.with_suffix(".test.log").write_text(report)
                 return Result()
             receipt=dev.run_codex_task(self.task,workspace=work,executor=fake_codex)
-            self.assertEqual(receipt["status"],"PASS")
-            self.assertEqual(receipt["rows"],81)
-            self.assertEqual(receipt["stdout_bytes"],576)
-            self.assertEqual(receipt["exit_code"],0)
+            self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(receipt["codex_exit_code"],0)
-            self.assertEqual(receipt["first_row"],"1,1,1")
-            self.assertEqual(receipt["last_row"],"9,9,81")
-            self.assertEqual(receipt["stdout_sha256"],
-                             "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d")
-            self.assertEqual(len(calls),1)
+            self.assertEqual(receipt["acceptance"],
+                             "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG")
+            self.assertEqual(receipt["output_sha256"],
+                             hashlib.sha256(csv.encode()).hexdigest())
+            self.assertEqual(receipt["test_log_sha256"],
+                             hashlib.sha256(report.encode()).hexdigest())
+            self.assertNotIn("rows",receipt)
+            self.assertNotIn("PASS",receipt["status"])
+            self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("workspace-write",calls[0][0])
             self.assertIn("No Z2, FPGA, USB",calls[0][1]["input"].decode())
+            self.assertIn("independently check",calls[0][1]["input"].decode())
             self.assertNotIn("shell",calls[0][1])
+            self.assertTrue(target.with_suffix(".codex.log").is_file())
+
+    def test_codex_failure_preserves_session_log(self):
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            target=work/self.task["output_path"]
+            target.parent.mkdir(parents=True)
+            class Failure:
+                returncode=5
+                stdout=b"attempt failed"
+                stderr=b"problem detail"
+            with self.assertRaisesRegex(dev.Denied,"CODEX_CLI_NONZERO"):
+                dev.run_codex_task(self.task,workspace=work,
+                                   executor=lambda *args,**kwargs:Failure())
+            log=target.with_suffix(".codex.log").read_text()
+            self.assertIn("attempt failed",log)
+            self.assertIn("problem detail",log)
 
     def test_one_existing_shared_runner_and_no_per_task_workflow(self):
         wf=WORKFLOW.read_text()
@@ -252,6 +261,10 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIn("scripts/plasma_development_dispatch.py execute-codex",wf)
         self.assertIn("persist-credentials: false",wf)
         self.assertNotIn("plasma-path3-nine-nine.yml",wf)
+        self.assertIn("plasma_nine_nine_codex_generated.csv",wf)
+        self.assertIn("plasma_nine_nine_codex_generated.test.log",wf)
+        self.assertIn("plasma_nine_nine_codex_generated.codex.log",wf)
+        self.assertNotIn("bounded validator runs it",wf)
 
 
 

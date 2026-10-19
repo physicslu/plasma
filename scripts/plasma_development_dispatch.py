@@ -8,7 +8,6 @@ The product/qualification Runtime dispatcher remains independently disabled.
 from __future__ import annotations
 
 import argparse
-import ast
 import hashlib
 import json
 import os
@@ -178,133 +177,82 @@ def run_task(task: dict, *, executor=subprocess.run) -> dict:
     }
 
 
-def validate_generated_source(source: str) -> None:
-    """Admit only pure Python print + two range loops before execution.
-
-    This is not a general Python sandbox: it is a narrow, fixed smoke-test
-    grammar so a generated script cannot invoke hardware APIs or shell.
-    """
-    require(len(source.encode("utf-8")) <= 2048,
-            "CODEX_SOURCE_TOO_LARGE")
-    try:
-        tree = ast.parse(source)
-    except SyntaxError as exc:
-        raise Denied("CODEX_SOURCE_SYNTAX_DENIED") from exc
-    allowed = (
-        ast.Module, ast.Expr, ast.Call, ast.Name, ast.Load, ast.Store,
-        ast.For, ast.Constant, ast.JoinedStr, ast.FormattedValue,
-        ast.BinOp, ast.Mult,
-    )
-    for node in ast.walk(tree):
-        require(type(node) in allowed, "CODEX_SOURCE_NODE_DENIED")
-        if isinstance(node, ast.Name):
-            require(node.id in {"a", "b", "print", "range"},
-                    "CODEX_SOURCE_NAME_DENIED")
-        if isinstance(node, ast.Call):
-            require(type(node.func) is ast.Name and
-                    node.func.id in ("print", "range") and
-                    not node.keywords, "CODEX_SOURCE_CALL_DENIED")
-        if isinstance(node, ast.For):
-            require(not node.orelse and type(node.target) is ast.Name,
-                    "CODEX_SOURCE_LOOP_DENIED")
-    require(len(tree.body) == 2 and
-            type(tree.body[0]) is ast.Expr and
-            type(tree.body[1]) is ast.For,
-            "CODEX_SOURCE_SHAPE_DENIED")
-    header = tree.body[0].value
-    require(type(header) is ast.Call and len(header.args) == 1 and
-            type(header.args[0]) is ast.Constant and
-            header.args[0].value == "multiplicand,multiplier,product",
-            "CODEX_SOURCE_HEADER_DENIED")
-    outer = tree.body[1]
-    require(outer.target.id == "a" and len(outer.body) == 1 and
-            type(outer.body[0]) is ast.For,
-            "CODEX_SOURCE_OUTER_LOOP_DENIED")
-    inner = outer.body[0]
-    require(inner.target.id == "b" and len(inner.body) == 1 and
-            type(inner.body[0]) is ast.Expr,
-            "CODEX_SOURCE_INNER_LOOP_DENIED")
-    for loop in (outer, inner):
-        it = loop.iter
-        require(type(it) is ast.Call and type(it.func) is ast.Name and
-                it.func.id == "range" and len(it.args) == 2 and
-                all(type(arg) is ast.Constant for arg in it.args) and
-                [arg.value for arg in it.args] == [1, 10],
-                "CODEX_SOURCE_RANGE_DENIED")
-    row = inner.body[0].value
-    require(type(row) is ast.Call and type(row.func) is ast.Name and
-            row.func.id == "print" and len(row.args) == 1 and
-            type(row.args[0]) is ast.JoinedStr,
-            "CODEX_SOURCE_PRINT_DENIED")
-
-
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run) -> dict:
-    """Invoke real Codex CLI to create one new source file, then run it."""
-    path = workspace / task["output_path"]
-    require(not path.exists() and path.parent.is_dir(),
-            "CODEX_OUTPUT_ALREADY_EXISTS")
+    """Delegate creation AND testing to Codex; collect evidence for ChatGPT.
+
+    Dispatcher does not evaluate Python AST, re-run generated software, or
+    declare the work correct. Only actual reviewer evidence can prove PASS.
+    """
+    source = workspace / task["output_path"]
+    output = source.with_suffix(".csv")
+    test_log = source.with_suffix(".test.log")
+    codex_log = source.with_suffix(".codex.log")
+    require(source.parent.is_dir() and not any(
+        p.exists() for p in (source, output, test_log, codex_log)
+    ), "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
     prompt = (
-        "PLASMA Development Mode single-owner Path 3 approved 9x9 smoke test.\n"
-        "Generate exactly ONE new Python 3 file at "
-        + task["output_path"] + " inside the current repository.\n"
-        "Objective: " + task["objective"] + "\n"
-        "Use precisely a print statement for the CSV header, then two "
-        "nested for loops with a in range(1,10), b in range(1,10), "
-        "and an f-string print of a,b,a*b on every row. "
-        "No imports, functions, assignments, comprehensions, attributes, "
-        "external commands, extra text, or other file writes. "
-        "No Z2, FPGA, USB, LA, DUT, MMIO, SSH, sudo, network or Git operations. "
-        "Do not modify any existing file; return only the generated file.\n"
+        "PLASMA single-owner Development Mode Path 3. You are the engineer. "
+        "Independently implement, run, test, debug and finish the task.\n"
+        "Goal: " + task["objective"] + "\n"
+        "Write your Python implementation to " + task["output_path"] + ".\n"
+        "Execute that code yourself using Python on this Runner. Capture "
+        "the program's ACTUAL complete output as CSV in " +
+        str(output.relative_to(workspace)) + ".\n"
+        "Independently check that the 9 x 9 results are mathematically "
+        "correct and complete (81 products); if not, fix the code and "
+        "rerun it yourself. Write a short honest test report, with the "
+        "actual command(s), observed test outcome, test counts and exit "
+        "status, to " + str(test_log.relative_to(workspace)) + ".\n"
+        "Any Python implementation is acceptable. Header labels or AST "
+        "shape need NOT match the Path 2 implementation. Do not falsely "
+        "claim a test passed or fabricate outputs. Keep all generated "
+        "source and evidence files, including on failure.\n"
+        "Only create the specified implementation, CSV and test report. "
+        "Do not modify existing files, Git state or repositories. "
+        "No Z2, FPGA, USB, LA, DUT, MMIO, SSH, sudo, physical device, "
+        "network or deployment actions. Stop if these are required.\n"
     )
     command = [
         "codex", "--ask-for-approval", "never",
         "-c", "sandbox_workspace_write.network_access=false",
         "exec", "--sandbox", "workspace-write", "-",
     ]
-    model = executor(
+    proc = executor(
         command, input=prompt.encode("utf-8"), cwd=workspace,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         timeout=480, check=False,
     )
-    require(model.returncode == 0, "CODEX_CLI_NONZERO")
-    require(path.is_file() and not path.is_symlink(),
-            "CODEX_SOURCE_NOT_CREATED")
-    source = path.read_text(encoding="utf-8")
-    validate_generated_source(source)
-    result = subprocess.run(
-        [sys.executable, str(path)], cwd=workspace,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        timeout=20, check=False,
-    )
-    require(result.returncode == 0 and result.stderr == b"",
-            "GENERATED_PROGRAM_FAILED")
-    require(len(result.stdout) <= 65536, "OUTPUT_EXCEEDS_LIMIT")
-    digest = hashlib.sha256(result.stdout).hexdigest()
-    lines = result.stdout.decode("ascii").splitlines()
-    require(digest == task["expected_stdout_sha256"],
-            "OUTPUT_SHA256_MISMATCH")
-    require(len(lines) == 82 and
-            lines[0] == "multiplicand,multiplier,product",
-            "TABLE_FORMAT_DENIED")
-    for a in range(1, 10):
-        for b in range(1, 10):
-            require(lines[1 + (a - 1) * 9 + (b - 1)] == f"{a},{b},{a*b}",
-                    "MULTIPLICATION_MISMATCH")
+    require(len(proc.stdout) <= 262144 and len(proc.stderr) <= 262144,
+            "CODEX_LOG_TOO_LARGE")
+    codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
+                          b"\n=== Codex stderr ===\n" + proc.stderr)
+    require(proc.returncode == 0, "CODEX_CLI_NONZERO")
+    require(all(p.is_file() and not p.is_symlink() for p in (
+        source, output, test_log
+    )), "CODEX_EVIDENCE_INCOMPLETE")
+    require(all(p.stat().st_size <= 65536 for p in (
+        source, output, test_log
+    )), "CODEX_EVIDENCE_TOO_LARGE")
+    def digest(p: Path) -> str:
+        return hashlib.sha256(p.read_bytes()).hexdigest()
     return {
-        "status": "PASS",
+        "status": "EVIDENCE_READY_REVIEW_REQUIRED",
         "execution_path": "path3-codex",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
-        "codex_exit_code": model.returncode,
-        "exit_code": result.returncode,
-        "rows": 81,
-        "stdout_bytes": len(result.stdout),
-        "stdout_sha256": digest,
+        "codex_exit_code": proc.returncode,
         "source_path": task["output_path"],
-        "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
-        "first_row": lines[1],
-        "last_row": lines[-1],
+        "source_sha256": digest(source),
+        "output_path": str(output.relative_to(workspace)),
+        "output_sha256": digest(output),
+        "test_log_path": str(test_log.relative_to(workspace)),
+        "test_log_sha256": digest(test_log),
+        "codex_log_path": str(codex_log.relative_to(workspace)),
+        "codex_log_sha256": digest(codex_log),
+        "reference_stdout_sha256": task["expected_stdout_sha256"],
+        "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
     }
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
