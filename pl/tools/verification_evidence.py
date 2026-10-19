@@ -6,6 +6,7 @@ A receipt is measured evidence for one pytest wrapper, NOT a blanket SIM claim.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import importlib.metadata
 import json
@@ -75,6 +76,50 @@ def source_fingerprint(paths: list[str]) -> tuple[list[dict], str]:
     for item in records:
         digest.update((item["path"] + "\0" + item["sha256"] + "\n").encode())
     return records, digest.hexdigest()
+
+
+def assert_pilot_source_contract(suite_path: Path, sources: list[dict],
+                                 expected_top: str) -> None:
+    """Fail closed unless the receipt exactly matches the RTL that Cocotb compiles.
+
+    First SIM-2 pilot supports the static Cocotb-test runner shape already
+    used in this repository; unsupported shapes MUST NOT receive a PASS.
+    """
+    tree = ast.parse(suite_path.read_text(encoding="utf-8"))
+    calls = [node for node in ast.walk(tree)
+             if isinstance(node, ast.Call) and
+             isinstance(node.func, ast.Name) and node.func.id == "run"]
+    if len(calls) != 1:
+        raise EvidenceError("Cannot prove exactly one Cocotb simulator invocation")
+    fields = {kw.arg: kw.value for kw in calls[0].keywords}
+    try:
+        if (ast.literal_eval(fields["simulator"]) != "icarus" or
+                ast.literal_eval(fields["toplevel"]) != expected_top):
+            raise EvidenceError("RTL simulator/top mismatch with measured evidence")
+        entries = fields["verilog_sources"].elts
+        parsed = []
+        for value in entries:
+            if (not isinstance(value, ast.Call) or
+                    not isinstance(value.func, ast.Name) or
+                    value.func.id != "str" or len(value.args) != 1):
+                raise EvidenceError("Unsupported simulator RTL source expression")
+            term = value.args[0]
+            if (not isinstance(term, ast.BinOp) or
+                    not isinstance(term.op, ast.Div) or
+                    not isinstance(term.left, ast.Name) or
+                    term.left.id != "PL" or
+                    not isinstance(term.right, ast.Constant) or
+                    not isinstance(term.right.value, str)):
+                raise EvidenceError("Cannot prove simulator's RTL source path")
+            actual, rel = _under_root("pl/" + term.right.value)
+            if not actual.is_file():
+                raise EvidenceError("Simulator source file missing: " + rel)
+            parsed.append(rel)
+        if len(set(parsed)) != len(parsed) or sorted(parsed) != [
+                item["path"] for item in sources]:
+            raise EvidenceError("Receipt RTL list differs from real Cocotb compilation")
+    except (KeyError, AttributeError, ValueError, TypeError) as exc:
+        raise EvidenceError("Cannot inspect Cocotb compile inputs fail-closed") from exc
 
 
 def measured_tools() -> dict:
@@ -270,7 +315,8 @@ def execute(args: argparse.Namespace) -> int:
             raise EvidenceError("Phase 2 pilot currently supports SIM-2 only")
         if not suite_path.is_file() or not suite.startswith("pl/verification/"):
             raise EvidenceError("Explicit pytest verification suite does not exist")
-        receipt["rtl_sources"], receipt["rtl_source_digest"] = source_fingerprint(args.rtl_source)
+                receipt["rtl_sources"], receipt["rtl_source_digest"] = source_fingerprint(args.rtl_source)
+        assert_pilot_source_contract(suite_path, receipt["rtl_sources"], args.rtl_top)
         receipt["tools"] = measured_tools()
         tools_file.write_text(_run_capture([sys.executable, "-m", "pip", "freeze"]) + "\n",
                               encoding="utf-8")
