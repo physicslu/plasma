@@ -13,7 +13,7 @@ approval and evidence requirements.
 **Gate 1 implementation candidate in this PR; no live SWPC confirmation yet.**
 The same trusted main `.github/workflows/plasma-engineering-runtime-dispatch.yml`
 now supports an owner-authored Issue #981 command for an existing, open,
-same-repository, owner-created `agent/*` PR, with its **exact current head SHA**:
+same-repository, owner-created non-`main` PR, with its **exact current head SHA**:
 
 ```text
 /plasma-dispatch run <task-id> --pr <number> --sha <full-40-character-commit-sha> 981
