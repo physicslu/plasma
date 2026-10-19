@@ -1,6 +1,6 @@
 /* PLASMA ARMv7-A ordering primitive candidate.
  *
- * Build on a trusted ARMv7 toolchain (not in a GitHub-hosted CI job):
+ * Build on a pinned ARMv7 hard-float cross-toolchain (GitHub-hosted A1):
  *   cc -O2 -fPIC -shared -o libplasma_mmio_barrier.so armv7_mmio_barrier.c
  *
  * DMB SY orders prior explicit MMIO stores before a subsequent COMMAND
