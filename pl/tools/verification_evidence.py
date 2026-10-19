@@ -315,7 +315,7 @@ def execute(args: argparse.Namespace) -> int:
             raise EvidenceError("Phase 2 pilot currently supports SIM-2 only")
         if not suite_path.is_file() or not suite.startswith("pl/verification/"):
             raise EvidenceError("Explicit pytest verification suite does not exist")
-                receipt["rtl_sources"], receipt["rtl_source_digest"] = source_fingerprint(args.rtl_source)
+        receipt["rtl_sources"], receipt["rtl_source_digest"] = source_fingerprint(args.rtl_source)
         assert_pilot_source_contract(suite_path, receipt["rtl_sources"], args.rtl_top)
         receipt["tools"] = measured_tools()
         tools_file.write_text(_run_capture([sys.executable, "-m", "pip", "freeze"]) + "\n",
