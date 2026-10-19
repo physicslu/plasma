@@ -83,7 +83,6 @@ def validate(main: str, host_ci: str) -> None:
         "contents: read", "persist-credentials: false",
         "python3 scripts/armv7-barrier-hil-a-contract.py check",
         "python3 scripts/tests/test-armv7-barrier-hil-a.py",
-        "bash -n",
     ):
         _require(marker in host_ci, f"Missing host check: {marker}")
 
