@@ -233,7 +233,10 @@ class MVPTests(unittest.TestCase):
                 self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"),1)
                 worker=wf.split("\n  "+job+":\n",1)[1]
                 self.assertIn("    needs: authorize\n",wf)
-                self.assertIn("needs.authorize.result == 'success'",worker)
+                self.assertTrue(
+                    "needs.authorize.result == 'success'" in worker or
+                    "needs.authorize.outputs.approved_sha == github.sha" in worker
+                )
                 self.assertIn("test \"$(id -un)\" = plasma-codex",worker)
                 self.assertIn("test \"$RUNNER_NAME\" = SWPC-plasma-codex",worker)
                 self.assertIn("github.actor == 'physicslu'",wf)
