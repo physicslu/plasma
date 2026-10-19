@@ -26,6 +26,9 @@ on:
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
+      - "scripts/plasma_hil_a2_cpu_only.py"
+      - "scripts/tests/test_plasma_hil_a2_cpu_only.py"
+      - "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
   push:
     branches: [main]
     paths:
@@ -61,6 +64,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
   development-authorize:
@@ -77,6 +81,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+    env:
+      PLASMA_HIL_A2_CPU_ONLY_ENABLED: ${{ vars.PLASMA_HIL_A2_CPU_ONLY_ENABLED }}
     outputs:
       pinned_sha: ${{ steps.approve.outputs.pinned_sha }}
       execution_path: ${{ steps.approve.outputs.execution_path }}
@@ -115,6 +121,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Check approved SWPC executor and pinned source
         shell: bash
@@ -135,10 +142,23 @@ jobs:
           ref: ${{ needs.development-authorize.outputs.pinned_sha }}
           persist-credentials: false
           clean: true
-      - name: Run reviewed fixed CLI and verify all 81 products
+      - name: Download exact pinned A1 artifact for separately authorized A2 only
+        if: >-
+          needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+          vars.PLASMA_HIL_A2_CPU_ONLY_ENABLED == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: 39192248348
+          name: plasma-armv7-hil-a1-pr-39192248348
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-hil-a2-source
+      - name: Run reviewed fixed CLI with capability-specific acceptance
         shell: bash
         env:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          PLASMA_HIL_A2_CPU_ONLY_ENABLED: ${{ vars.PLASMA_HIL_A2_CPU_ONLY_ENABLED }}
+          PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$PINNED_SHA"
