@@ -67,6 +67,17 @@ def task_by_id(registry: object, task_id: str) -> dict:
     execution_path = task["execution_path"]
     require(execution_path in ("path2-cli", "path3-codex"),
             "PATH_NOT_SUPPORTED")
+    if task_id == "hil-a2-cpu-only":
+        require(execution_path == "path2-cli" and set(task) == {
+            "execution_path", "capability", "work_order", "activation",
+        }, "A2_TASK_FIELDS_DENIED")
+        require(task["capability"] == "z2-cpu-only" and
+                task["work_order"] ==
+                "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
+                "A2_TASK_BINDING_DENIED")
+        require(task["activation"] in ("DISABLED_GATE1", "OWNER_APPROVED_ONE_SHOT"),
+                "A2_TASK_ACTIVATION_DENIED")
+        return task
     if execution_path == "path2-cli":
         require(set(task) == {
             "execution_path", "script", "argv", "expected_stdout_sha256",
@@ -131,6 +142,21 @@ def authorize(event: object, context: dict, registry: object) -> dict:
             and body.endswith(" " + str(ISSUE)), "COMMAND_DENIED")
     task_id = body[len(COMMAND_PREFIX):-len(" " + str(ISSUE))]
     task = task_by_id(registry, task_id)
+    if task_id == "hil-a2-cpu-only":
+        # The new task is inert at PR/merge time. A later hardware Gate 1
+        # must re-pin the work order, approve the task and set an owner var.
+        require(task["activation"] == "OWNER_APPROVED_ONE_SHOT",
+                "A2_NOT_AUTHORIZED_DISABLED")
+        require(context.get("PLASMA_HIL_A2_CPU_ONLY_ENABLED") == "true",
+                "A2_OWNER_VARIABLE_NOT_ENABLED")
+        work_order = parse_json(ROOT / task["work_order"])
+        require(type(work_order) is dict and
+                work_order.get("reviewed_main_sha") == sha and
+                work_order.get("runtime_status") == "OWNER_APPROVED_ONE_SHOT" and
+                work_order.get("authorization_kind") == "hardware-one-shot" and
+                work_order.get("capability") == "z2-cpu-only" and
+                work_order.get("entrypoint") == "z2-cpu-only",
+                "A2_WORK_ORDER_NOT_AUTHORIZED")
     require(body == f"{COMMAND_PREFIX}{task_id} {ISSUE}",
             "EXACT_COMMAND_DENIED")
     return {
@@ -144,6 +170,13 @@ def authorize(event: object, context: dict, registry: object) -> dict:
 
 
 def run_task(task: dict, *, executor=subprocess.run) -> dict:
+    if task.get("capability") == "z2-cpu-only":
+        import plasma_hil_a2_cpu_only as a2
+        work_order = parse_json(ROOT / task["work_order"])
+        # Live gate is repeated on SWPC, not just by hosted authorization.
+        a2.live_gate(work_order)
+        artifact_dir = Path(os.environ.get("PLASMA_HIL_A2_ARTIFACT_DIR", "/nonexistent"))
+        return a2.run_once(work_order, artifact_dir)
     script = ROOT / task["script"]
     require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
     proc = executor(
