@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -87,7 +88,7 @@ def task_by_id(registry: object, task_id: str) -> dict:
         return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
         # Path 2 is an execution method, NOT synonymous with CPU-only Python.
-        # Host builds use a fixed, reviewed Vivado project in trusted main.
+        # Host builds use a fixed, reviewed Vivado capability and project.
         require(set(task) == {"execution_path", "capability", "project",
                               "toolchain", "board_repo_sha"},
                 "HOST_BUILD_TASK_FIELDS_DENIED")
@@ -277,6 +278,30 @@ def authorize(event: object, context: dict, registry: object,
     }
 
 
+
+def reviewed_host_build_driver(*, workspace: Path, approval: dict):
+    """Use trusted main for main builds, an exact owner-pinned PR driver otherwise.
+
+    The trusted dispatcher owns all authorization; this capability is limited
+    to the fixed Vivado host build, never generic candidate Python execution.
+    """
+    if approval["pr_number"] == 0:
+        import plasma_vivado_host_build as build
+        return build
+    root = workspace.resolve(strict=True)
+    candidate = root / "scripts/plasma_vivado_host_build.py"
+    require(candidate.is_file() and not candidate.is_symlink() and
+            candidate.resolve(strict=True).is_relative_to(root) and
+            candidate.stat().st_size <= 65536,
+            "HOST_BUILD_CANDIDATE_DRIVER_DENIED")
+    spec = importlib.util.spec_from_file_location(
+        "plasma_reviewed_candidate_vivado_host_build", candidate)
+    require(spec is not None and spec.loader is not None,
+            "HOST_BUILD_CANDIDATE_DRIVER_INVALID")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    return build
+
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None,
              approval: dict | None = None, sandbox: bool = False) -> dict:
@@ -295,7 +320,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
-        import plasma_vivado_host_build as build
+        build = reviewed_host_build_driver(workspace=workspace,
+                                           approval=approval)
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-cpu-only":
@@ -522,7 +548,7 @@ def main() -> int:
                     "path3-codex" if args.action == "execute-codex"
                     else "path2-cli"
                 ), "WRONG_EXECUTION_PATH")
-                task_approval = (authorize(event, os.environ, registry)
+                task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build")
                                  else None)
