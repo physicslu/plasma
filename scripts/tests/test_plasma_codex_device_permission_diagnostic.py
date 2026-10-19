@@ -169,11 +169,12 @@ class DiagnosticContracts(unittest.TestCase):
     def test_all_github_actions_expressions_are_evaluated_not_escaped(self):
         wf = (ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
         expression = "$" + "{{"
-        self.assertEqual(wf.count(expression), 9)
+        self.assertEqual(wf.count(expression), 10)
         self.assertNotIn(chr(92) + expression, wf)
-        # Stronger than mere presence: verify all nine expressions and their sites.
+        # Stronger than mere presence: verify all ten expressions and their sites.
         expected = (
             "    if: " + expression + " github.event_name == 'pull_request' || github.event_name == 'push' }}",
+            "    if: " + expression + " github.event_name == 'workflow_dispatch' }}",
             "          REQUESTED_ORIGINAL_RUN: " + expression + " inputs.original_run }}",
             "          CONFIRM_READ_ONLY: " + expression + " inputs.confirm_read_only }}",
             "    if: " + expression + " needs.authorize.result == 'success' }}",
@@ -183,7 +184,7 @@ class DiagnosticContracts(unittest.TestCase):
             "          name: plasma-codex-device-permission-39190291831-" + expression + " github.run_id }}",
             "          path: " + expression + " runner.temp }}/plasma-codex-device-permission-39190291831.json",
         )
-        self.assertEqual(len(set(expected)), 9)
+        self.assertEqual(len(set(expected)), 10)
         for line in expected:
             with self.subTest(line=line):
                 self.assertEqual(wf.splitlines().count(line), 1)
@@ -205,17 +206,12 @@ class DiagnosticContracts(unittest.TestCase):
     def test_hosted_authorize_has_exact_manual_input_and_owner_gate(self):
         wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
         section=wf.split("\n  authorize:\n",1)[1].split("\n  inspect:\n",1)[0]
-        expression_start=section.split("    if: >-\n",1)[1].split("    runs-on:",1)[0]
-        checks=[x.strip() for x in expression_start.splitlines() if x.strip()]
-        self.assertEqual(checks,[
-            "github.event_name == 'workflow_dispatch' &&",
-            "github.repository == 'physicslu/plasma' &&",
-            "github.actor == 'physicslu' &&",
-            "github.ref == 'refs/heads/main' &&",
-            "github.run_attempt == 1 &&",
-            "inputs.original_run == '39190291831' &&",
-            "inputs.confirm_read_only == true",
-        ])
+        hosted_if="    if: " + "$" + "{{ github.event_name == 'workflow_dispatch' }}"
+        self.assertEqual([line for line in section.splitlines() if line.strip().startswith("if:")],[hosted_if])
+        # Both empty/unchecked confirmation and a non-owner dispatch now
+        # produce a hosted FAIL. The SWPC job still needs hosted SUCCESS.
+        self.assertIn("REQUESTED_ORIGINAL_RUN: " + "$" + "{{ inputs.original_run }}",section)
+        self.assertIn("CONFIRM_READ_ONLY: " + "$" + "{{ inputs.confirm_read_only }}",section)
         for line in (
             'test "$REQUESTED_ORIGINAL_RUN" = 39190291831',
             'test "$CONFIRM_READ_ONLY" = true',
