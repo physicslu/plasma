@@ -192,3 +192,23 @@ def test_receipt_must_reject_wrong_simulator_top(valid_receipt):
     with pytest.raises(ev.EvidenceError, match="RTL simulator/top mismatch"):
         ev.assert_pilot_source_contract(suite, valid_receipt["rtl_sources"],
                                         "not_the_simulated_top")
+
+
+def test_ci_pilot_refuses_self_hosted_runner(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_ENVIRONMENT", "self-hosted")
+    monkeypatch.setenv("RUNNER_NAME", "SWPC-plasma-ci")
+    monkeypatch.setenv("ImageOS", "ubuntu24")
+    monkeypatch.setenv("ImageVersion", "2026")
+    with pytest.raises(ev.EvidenceError, match="refuses self-hosted"):
+        ev._runner_identity()
+
+
+def test_ci_pilot_fails_closed_on_missing_image_identity(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_ENVIRONMENT", "github-hosted")
+    monkeypatch.delenv("ImageVersion", raising=False)
+    monkeypatch.setenv("ImageOS", "ubuntu24")
+    monkeypatch.setenv("RUNNER_NAME", "Hosted Agent")
+    with pytest.raises(ev.EvidenceError, match="identity/image version"):
+        ev._runner_identity()
