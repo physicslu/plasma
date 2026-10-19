@@ -57,6 +57,23 @@ def test_hwh_valid_one_64k_gp0_with_no_pl_pins():
     assert result["z2_hil"] == "NOT_RUN"
 
 
+def test_hwh_real_vivado_numeric_encodings_are_accepted():
+    r = fake_hwh()
+    r.find("./MODULE[@INSTANCE='unified_0']/PARAMETER[@NAME='PPU_BASE']").set(
+        "VALUE", f"{v.GP0_BASE:032b}")
+    ps = r.find("./MODULE[@INSTANCE='ps7_0']")
+    ps.find("./PARAMETER[@NAME='PCW_USE_M_AXI_GP0']").set("VALUE", "true")
+    ps.find("./PARAMETER[@NAME='PCW_GPIO_EMIO_GPIO_ENABLE']").set("VALUE", "false")
+    ps.find("./PARAMETER[@NAME='PCW_FPGA0_PERIPHERAL_FREQMHZ']").set(
+        "VALUE", "100.000000")
+    assert v.validate_hwh(r)["bytes"] == 65536
+    assert v.number("00000000000000000000000000000001") == 1
+    with pytest.raises(v.F1Denied):
+        v.number("NaN")
+    with pytest.raises(v.F1Denied):
+        v.number("infinity")
+
+
 @pytest.mark.parametrize("fault", [
     "missing_ps", "missing_reset", "missing_unified", "wrong_base", "wrong_high",
     "legacy_second_segment", "wrong_master", "extra_memrange", "wrong_decoder",
