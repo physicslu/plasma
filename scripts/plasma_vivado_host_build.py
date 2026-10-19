@@ -123,7 +123,11 @@ def run(task: dict, *, workspace: Path, approval: dict,
             not evidence_dir.is_symlink(), "BUILD_EVIDENCE_DIR_REQUIRED")
     require(SETTINGS64.is_file() and not SETTINGS64.is_symlink(),
             "BUILD_VIVADO_SETTINGS_UNAVAILABLE")
-    board_value = os.environ.get("PLASMA_BOARD_REPO", "")
+    # Reuse the existing SWPC-qualified pinned board cache from the older
+    # z2-swd-gpio Vivado build; no fresh network fetch or second board setup.
+    # An explicit PLASMA_BOARD_REPO still takes precedence.
+    existing_cache = ROOT_FOR_BUILDS / "z2-swd-gpio" / "board-repository"
+    board_value = os.environ.get("PLASMA_BOARD_REPO") or str(existing_cache)
     require(board_value.startswith("/") and ".." not in board_value,
             "BUILD_BOARD_REPO_PATH_DENIED")
     board = Path(board_value)

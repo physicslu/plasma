@@ -16,6 +16,7 @@
 - **CI 不等於 CD**：合併 PR 不自動授權部署、重啟、改 FPGA、DUT 電源或燒錄 IC。部署、Runtime 和硬體行為必須明列 Gate 1 授權範圍。
 - **Gate 1 選 Path 是授權與執行計畫的一部分**，不是第三個 Gate。
 - **Gate 1 必須完成已授權的開發與真實驗收**：Path 2/3 若要求 SWPC 實測，應在合併前取得 Runner 執行證據並由 ChatGPT 判定；失敗在原 Gate 1 內修正、重測。
+- **Evidence Reuse / Execute-first**：已有同一工具鏈、板卡版號、Runner 與適用契約的真實有效證據時，不再新增第二套 preflight、Workflow、Runner 或重複要求 Owner 批准；已批准的任務應直接執行既有受控 Path，失敗才依 Exit Code／實際 Receipt 在同一 Gate 1 修補。仍保留當次執行所必須的身分、SHA、權限、硬體隔離及範圍保護，不得因省略重複確認而繞過安全控制；缺少執行證據須標示 NOT_RUN。
 - **Gate 2 只批准特定 PR Merge**：不得為了讓 main-only Dispatcher 能執行，先合併尚未完成真實驗收的開發內容。Post-merge release/deployment 的獨立操作按原 Gate 1 明示範圍處理，不取代開發階段 E2E。
 
 
