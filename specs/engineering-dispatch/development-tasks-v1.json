@@ -11,7 +11,7 @@
     "nine-nine-path3": {
       "execution_path": "path3-codex",
       "output_path": "scripts/experiments/plasma_nine_nine_codex_generated.py",
-      "objective": "Use Codex CLI to independently create a tiny Python program printing the exact 81-cell canonical 9x9 multiplication CSV. The program may only print, loop over range(1,10), and multiply a*b. Do not import any module or read any files.",
+      "objective": "Use real Codex CLI to independently create one Python program that prints exactly the header multiplicand,multiplier,product followed by all 81 rows in row-major a then b order, each row formatted a,b,a*b for a,b from 1 to 9. Use exactly print(\"multiplicand,multiplier,product\") for the header. Use only two nested range(1,10) loops and one f-string print statement for the rows. No imports, functions, other files, network, Git or hardware.",
       "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
     }
   }
