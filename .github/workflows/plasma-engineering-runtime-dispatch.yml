@@ -1,7 +1,7 @@
 name: PLASMA Engineering Reusable Runtime Dispatcher (Path 2 / Path 3)
 
 # ONE reusable workflow, never task-specific workflows.
-# Gate 1 candidate is OFF until owner-approved activation and isolated provisioning.
+# Qualification workflow_dispatch remains OFF; owner-only Development Mode\n# issue_comment runs reviewed tasks using existing SWPC Runner.
 on:
   workflow_dispatch:
     inputs:
@@ -57,8 +57,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 scripts/tests/test_plasma_development_dispatch.py
           git diff --exit-code
 
   development-authorize:
