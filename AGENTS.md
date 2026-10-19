@@ -4,6 +4,8 @@ This file is the primary operating contract for AI coding agents working on the 
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
+**PLASMA execution routing:** At Gate 1, recommend and have the owner choose one of the three Paths in Section 11.1B (ChatGPT Direct Work, SWPC CLI Work, SWPC Codex Work). This path selection is part of Gate 1, not a new gate.
+
 ## 1. Project purpose and canonical domain
 
 Plasma is a configurable multi-Site IC programming system. The current hardware development platform is PYNQ-Z2 (Z2).
@@ -565,23 +567,28 @@ surface supports them. The owner should normally be able to approve by
   first report the exact PR, target branch, current head/CI/readiness and
   any deployment or hardware consequences covered by the approved plan.
   **Never display an actionable Gate 2 approval choice before merge-ready.**
-- For PLASMA engineering work, **Gate 1 must identify the execution actor**:
-  **「批准 Gate 1：ChatGPT 執行」** or **「批准 Gate 1：SWPC Codex 執行」**.
-  Show these as two clickable actions after the scoped plan. Do not silently
-  infer, replace, or fall back between actors. If the owner explicitly
-  supplies the actor in ordinary text, that is sufficient; do not ask again.
-  Mode ChatGPT uses the connected authorized GitHub path; Mode Codex uses
-  an existing, owner-authorized GitHub Actions workflow and SWPC dedicated
-  `plasma-codex` Runner, not a new generic Dispatcher.
-- When either mode is not presently executable, disclose its actual blocker
-  without claiming a workflow ran. Executor choice is independent of Work
-  Order capability and never authorizes hardware or automatic merging.
-  For non-PLASMA tasks where executor choice does not apply, ordinary
-  Gate 1 approval wording remains valid.
-  Recommended Gate 2 choices: **「批准 Gate 2：合併 PR #N」**,
+- For PLASMA engineering work, **Gate 1 must recommend and identify one
+  explicit execution path** from Section 11.1B, including its actor, execution
+  host, approved resources, CI/evidence, acceptance conditions and stop rules.
+  The user chooses the recommended path or a feasible alternative using up to
+  three scoped, clickable Gate 1 approval actions, with an optional fourth
+  defer/revise action. Label choices in Traditional Chinese:
+  **「批准 Gate 1 — Path 1（ChatGPT Direct Work）」**,
+  **「批准 Gate 1 — Path 2（SWPC CLI Work）」**, and
+  **「批准 Gate 1 — Path 3（SWPC Codex Work）」**. Mark one recommendation
+  with its actual reason. No default/selection is approval until deliberately
+  submitted. If the user explicitly approves a path in normal text, do not
+  request a redundant click.
+- **No silent execution-path fallback**. If a path lacks a working GitHub
+  workflow, dispatch permission, required runner or tool access, disclose the
+  blocker; never report a dispatch, Codex execution, SWPC HIL or CI result
+  that did not actually occur. Selecting a path never itself authorizes
+  real hardware, deployment, credential expansion or merging. For
+  non-PLASMA tasks without an execution-path decision, ordinary Gate 1
+  wording remains valid.
+- Recommended Gate 2 choices: **「批准 Gate 2：合併 PR #N」**,
   **「要求修改」**, **「暫緩」**, **「關閉 PR（不合併）」**.
-  Tailor or omit choices as appropriate; these are examples, not extra
-  approval gate types or a mandatory fixed menu.
+  Tailor or omit choices; these do not introduce any new approval gate.
 - Each approval control must convey an **explicit, scoped owner approval**
   identifying **Gate 1 + the plan**, or **Gate 2 + the specific PR/target**
   when deliberately selected (for example, by submitting a clear approval
@@ -603,6 +610,90 @@ surface supports them. The owner should normally be able to approve by
   already-approved execution must not ask for redundant confirmations.
   No click may silently bypass readiness, repository safety, or physical
   hardware safeguards.
+
+### 11.1B Three-Path Work Execution Model (normative)
+
+PLASMA uses **three execution paths**, selected by the owner at **Gate 1**;
+this is a routing policy, **not** three additional approval gates. A ChatGPT
+conversation and ChatGPT Work Mode are both possible user-facing entry points
+for **all three paths**. Classify by the executor and execution boundary,
+not by the ChatGPT UI surface. The detailed diagrams, decision matrix,
+trigger constraints and completion reports are in
+[`docs/development/plasma-three-path-execution-model.md`](docs/development/plasma-three-path-execution-model.md).
+
+| Path | Executor and route | Recommend when |
+| --- | --- | --- |
+| **Path 1 — ChatGPT Direct Work** | ChatGPT (chat or Work Mode) -> GitHub branch/PR -> GitHub-hosted CI | Source, docs, analysis or host-only builds/tests do not require SWPC/local hardware. |
+| **Path 2 — SWPC CLI Work** | ChatGPT -> authorized GitHub Actions -> SWPC self-hosted Runner -> predefined CLI/shell commands -> evidence; PR if source changes | Actual SWPC access is necessary and fixed, deterministic commands suffice. No Codex agent is required. |
+| **Path 3 — SWPC Codex Work** | ChatGPT -> authorized GitHub Actions -> dedicated SWPC Codex Runner -> Codex CLI iterative development/test -> PR -> relevant CI | Actual SWPC access and agentic diagnosis, cross-module edits or iterative repair are both necessary. |
+
+Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
+
+1. Briefly state the task, immediate measurable PASS/FAIL, proposed path,
+   **why that path instead of the other two**, expected executor/runner,
+   GitHub event/dispatch admission, scoped files/commands/resources,
+   evidence/CI, safety/recovery conditions and anything expected after
+   merge. Report non-executable options as unavailable rather than
+   displaying them as working approval choices.
+2. Prefer **Path 1** unless execution genuinely needs SWPC; prefer
+   **Path 2** over Path 3 when fixed CLI commands suffice. Use **Path 3**
+   only when Codex autonomy adds necessary value. A task may move between
+   paths only when the planned, approved scope explicitly describes those
+   stages; otherwise request a revised Gate 1 before moving.
+3. Offer no more than **four owner-facing choices**: up to three explicitly
+   scoped Gate 1 path buttons and optional defer/revise. A selected path's
+   button must submit a concrete approval of the task, path and included
+   operating scope; it is not a generic permission for all SWPC or Codex
+   operations. Gate 1 approved by plain text is equally valid.
+4. **After owner Gate 1 approval, execute without redundant `continue` or
+   reapproval**, progressing through the authorized branch/PR, CI fixes,
+   documented tests, evidence and Ready-for-review. Stop only for a material
+   scope change, an actual access/safety blocker or Gate 2. Owner approval
+   is not itself a GitHub event: for Path 2/3 the agent must actually invoke
+   an available, owner-authorized GitHub workflow/dispatch and verify its
+   run and gate checks. Do not assume or simulate an event. Do not require
+   another owner confirmation for already approved execution.
+5. **Path 2** executes reviewed, bounded CLI commands on the intended
+   SWPC Runner. It must not silently delegate the job to Codex or use
+   different hardware resources. **Path 3** uses a real dedicated
+   `plasma-codex` Runner and a currently implemented, authorized work
+   workflow. The repository's unified Engineering Dispatch design may
+   remain contract-only; a Gate 1 selection does **not** deploy, enable or
+   grant a generic autonomous dispatcher. Existing Codex fixed-workload
+   triggers and capabilities are not general-purpose routes.
+6. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
+   `pull_request` CI will trigger. Ensure an authorized GitHub App token,
+   dedicated dispatch or other reviewed CI trigger **actually** runs the
+   required checks. Never infer CI PASS or PR readiness from successful
+   publication. The approved Codex repair loop ends at Ready/Gate 2; a
+   `main` push/merge must not rerun the same Codex development assignment.
+7. **Gate 2 exclusively governs merges of specific PRs.** Recheck PR HEAD,
+   current `main`, required CI, mergeability, rulesets, review threads and
+   authorized merge method immediately before merging. Gate 1-only tasks
+   that produce **no PR** (read-only diagnostics or bounded test/evidence)
+   finish with a verified execution report, **without inventing a Gate 2**.
+   Post-merge work requires explicit coverage in the original Gate 1 plan
+   or a revised Gate 1; a merge never silently authorizes deployment.
+8. **Evidence is environment-specific**: GitHub-hosted, SWPC CLI,
+   SWPC Codex/QEMU, real Z2 CPU, PS/AXI/PL and external DUT are distinct
+   acceptance boundaries. Reuse existing accepted evidence and avoid
+   repeating equivalent tests without a concrete new failure mode. Neither
+   host nor QEMU PASS qualifies physical hardware. SWPC's Codex account
+   may have existing hardware device access; a software-only Codex
+   instruction or sandbox setting is **not** an OS-level hardware isolation
+   guarantee. Enforce the actual approved work order and hardware policy.
+
+Execution examples (the arrow denotes control/data flow, **not** implicit
+authorization):
+
+```text
+Path 1: Gate 1 -> ChatGPT -> PR -> hosted CI -> Gate 2 -> merge
+Path 2: Gate 1 -> Actions -> SWPC CLI -> evidence -> [PR/CI/Gate 2/merge if needed]
+Path 3: Gate 1 -> Actions -> SWPC Codex -> PR -> CI/repair -> Gate 2 -> merge
+```
+
+The two-gate model in Section 11.1 remains authoritative. No additional
+Ready-for-review, runtime, hardware or deployment approval gate is introduced.
 
 ### 11.2 Routine autonomous work after Gate 1
 
