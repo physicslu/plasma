@@ -1,6 +1,6 @@
 # PLASMA — Three-Path Work Execution Model（三路徑工作執行模型）
 
-> **狀態：Owner 已同意採用的工作調度決策；本文件隨 AGENTS.md 的 PR 合併後成為 repo 治理規範。**
+> **狀態：PLASMA Development Mode 三路徑規範；正式治理條款同步定義於根目錄 AGENTS.md。**
 >
 > **範圍：開發、CI、SWPC 工程工作調度，不是產品 PPU 的八 Site 燒錄排程器。**
 >
@@ -15,6 +15,9 @@
 - **CLI 與 Codex 不同**：CLI 執行事先固定的指令；Codex 在核准的工作契約內自主修改、測試、迭代。不能把 Codex 存在視為可以任意存取硬體。
 - **CI 不等於 CD**：合併 PR 不自動授權部署、重啟、改 FPGA、DUT 電源或燒錄 IC。部署、Runtime 和硬體行為必須明列 Gate 1 授權範圍。
 - **Gate 1 選 Path 是授權與執行計畫的一部分**，不是第三個 Gate。
+- **Gate 1 必須完成已授權的開發與真實驗收**：Path 2/3 若要求 SWPC 實測，應在合併前取得 Runner 執行證據並由 ChatGPT 判定；失敗在原 Gate 1 內修正、重測。
+- **Gate 2 只批准特定 PR Merge**：不得為了讓 main-only Dispatcher 能執行，先合併尚未完成真實驗收的開發內容。Post-merge release/deployment 的獨立操作按原 Gate 1 明示範圍處理，不取代開發階段 E2E。
+
 
 ## 二、Path 1 — ChatGPT Direct Work
 
@@ -43,18 +46,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["Gate 1｜使用者批准 Path 2、確定性命令和資源"]
-  B["ChatGPT 建立／確認被授權的 Work Order／Workflow"]
-  C["實際觸發 GitHub Actions｜驗證事件與權限"]
-  D["SWPC Self-hosted Runner｜固定 CLI／Shell"]
-  E["結果／Exit Code／Log／SHA256／Evidence"]
-  F{"需要合併程式變更？"}
-  G["更新 PR／GitHub CI"]
-  H["Gate 2 審查及 Merge to main"]
-  I["完成報告｜不需要虛構 Gate 2"]
+  A["Gate 1｜使用者批准 Path 2 固定 CLI 與驗收條件"]
+  B["開發分支及受控 Work Order｜綁定核准來源 SHA"]
+  C["GitHub Actions｜實際觸發共用 Dispatcher"]
+  D["既有 SWPC-plasma-codex Runner｜執行固定 CLI"]
+  E["蒐集真實 Exit Code／Output／Run ID／Evidence"]
+  F{"Gate 1 真實驗收 PASS？"}
+  G["同一 Gate 1 修改、重新執行並取得證據"]
+  H{"有需要合併的程式變更？"}
+  I["PR Ready + CI｜Gate 2 只批准 Merge"]
+  J["完成報告｜無 PR 不需要 Gate 2"]
   A --> B --> C --> D --> E --> F
-  F -- "是" --> G --> H
-  F -- "否" --> I
+  F -- "否" --> G --> C
+  F -- "是" --> H
+  H -- "是" --> I
+  H -- "否" --> J
 ```
 
 **執行者：** SWPC Runner 執行已審查的固定 CLI 命令；不是讓 Codex 推理與改碼。CLI 任務不可偷偷轉為 Path 3。沒有符合 Gate 1 條件的已啟用 Trigger／Runner 時，必須回報 `NOT_RUN` 和具體阻礙，不能把批准訊息當作 GitHub Job 已經啟動。
@@ -65,29 +71,29 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["Gate 1｜使用者批准 Path 3／Codex 範圍"]
-  B["ChatGPT 實際觸發授權的 GitHub Actions"]
-  C["GitHub Authorization｜驗證 Work Order／Actor／SHA／資源"]
-  D["SWPC 專用 Runner → Codex CLI"]
-  E["Codex 修改／Build／Test／修正／Evidence"]
-  F["Codex 或隔離 Publisher 建立 Pull Request"]
-  G["GitHub CI／Contracts／核准的 HIL"]
-  H{"CI 與驗收證據合格？"}
-  I["Codex 在原 Gate 1 權限內修正 PR"]
-  J["PR Ready｜Gate 2 使用者審查"]
-  K["Merge to main｜不重啟相同 Codex 任務"]
-  A --> B --> C --> D --> E --> F --> G --> H
-  H -- "否" --> I --> G
-  H -- "是" --> J --> K
+  A["Gate 1｜批准 Path 3 工作範圍與驗收"]
+  B["受控開發分支／SHA → GitHub 共用 Dispatcher"]
+  C["既有 SWPC-plasma-codex Runner → Codex CLI"]
+  D["Codex 自主開發、執行、自測、修正"]
+  E["GitHub 收集 Code／Output／Test Log／Run ID"]
+  F["ChatGPT 獨立審查真實 Evidence"]
+  G{"Gate 1 驗收 PASS？"}
+  H["Codex 在相同 Gate 1 修正／重測"]
+  I["完成／更新 PR + 必要 CI"]
+  J["Gate 2｜只審核與批准 Merge"]
+  K["Merge to main｜不重派相同開發任務"]
+  A --> B --> C --> D --> E --> F --> G
+  G -- "否" --> H --> C
+  G -- "是" --> I --> J --> K
 ```
 
-**執行者：** SWPC `plasma-codex` Runner 與 Codex CLI；GitHub Actions 負責真正的調度和 PR CI。已知限制：
+**執行者：** 既有 SWPC `SWPC-plasma-codex` Runner 與 Codex CLI；GitHub Actions 負責派工與收集 Code／Output／Log，Codex 負責自行開發、自行執行、自行測試與修正，**ChatGPT 審閱真實證據並判定 PASS/FAIL**。不要讓 SWPC Dispatcher 額外實作一個驗證 Codex 寫法的 AST/特定輸出格式檢查器。Job `SUCCESS`、Codex 自稱 `PASS`、有 Artifact，均不能直接代替獨立驗收。已知限制：
 
 1. **批准 Gate 1 ≠ GitHub Workflow 自動發生。** ChatGPT／授權工具必須確實呼叫可用 Trigger，並以 GitHub Job 證據核對是否執行。若無法觸發，報告 `NOT_RUN`；不要求已批准事項再重複授權。
-2. 現有 `plasma-codex-*.yml` 為不同工作負載的專用流程，不等同於已啟用任意工作內容的通用 Dispatcher。`docs/architecture/plasma-engineering-dispatch-v1.md` 所述統一 Dispatcher 仍是 contract-only，不能因選 Path 3 就聲稱已上線。
+2. 現在已有共用 `plasma-engineering-runtime-dispatch.yml` 的 **Development Mode owner-only Issue #981 入口**，Path 2/3 均曾成功在既有 SWPC Runner 執行。然而這個入口**只從 main 讀取任務及 SHA**，尚不具備受控的 Gate 1 開發分支／PR Commit 派工能力。正式 qualification `workflow_dispatch` Runtime 仍停用。政策改成「先測、後 Merge」**不表示**技術入口已同步完成；下一項需要的任務應先修正此限制，或誠實回報 `NOT_RUN`，不得拿 Gate 2 合併來解鎖測試。
 3. Codex 建 PR 時，若使用預設 `GITHUB_TOKEN`，**通常不會觸發新的 `pull_request` workflows**。須確保使用核准的 GitHub App token 或其他受控事件機制，讓必要 CI 真正開始。PR 建立成功不能代替 CI PASS。
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
-5. Gate 2 只合併既有審查完成的 PR。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
+5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
 
 ## 五、Gate 1 — 推薦與選擇矩陣
 
@@ -100,7 +106,7 @@ flowchart TD
 | 需要 PR？ | 程式變更時 | 有程式變更時 | 一般需要 |
 | 需要硬體？ | 不會接觸本機硬體 | 視 Gate 1 範圍 | 視 Gate 1 範圍 |
 | 優先選用條件 | Host-only 已足夠 | 必須 SWPC，固定命令足夠 | 必須 SWPC，且需 Agent 自主性 |
-| 成功證據 | Hosted CI／PR | SWPC Job／CLI／Evidence | Codex Job＋PR＋必要 CI |
+| 成功證據 | Hosted CI／PR | SWPC CLI 真實執行輸出＋ChatGPT 審閱 | Codex Code／Output／Test Log＋ChatGPT 獨立審閱；需要 PR 時再加 CI |
 
 **Path 的最佳化目標：以最少資源、最小實際權限與最短迴圈，取得能回答工程假設的證據。** 刻意避免把同一個 ARMv7 QEMU 函式測試搬到另一台主機重跑，卻沒有額外測試假設。
 
@@ -129,11 +135,15 @@ flowchart TD
 | 項目 | Gate 1 — Plan Approval | Gate 2 — Merge Approval |
 | --- | --- | --- |
 | 使用者決策 | 指定工作計畫、Path、許可範圍 | 指定 PR、HEAD 和合併方法 |
-| 開發／測試／Codex | 已授權即自動執行，不逐步要求 `continue` | 不再啟動同一開發任務 |
+| 開發／測試／Codex | 已授權即執行真實環境測試、取得證據、FAIL 則修正重測直到符合驗收，或誠實回報阻礙 | 不啟動同一開發任務、不用 Merge 解鎖缺少的測試 |
 | CI／Evidence | 實際觸發、修正、採集、核對 | 檢查現有的 CI、Evidence |
 | Merge | 不允許 | 即時核對後才允許 |
 | 實體 Z2／LA／DUT／部署 | 必須明確列入 Gate 1 才可操作 | 不因合併而擴權 |
 | 範圍有重大變更 | 停止並提出修訂 Gate 1 | 不以 Gate 2 掩蓋超範圍 |
+
+**開發階段強制順序：Gate 1 = Build → Real Run → Evidence Review → Fix/Retest → PR/CI Ready；Gate 2 = Merge Decision。**
+
+目前 GitHub `issue_comment` 的 owner-only Development Mode 入口仍要求 `main`，不支援讓 PR 分支程式直接實測。更新本文件**不會自行解除這個技術限制**；遇到此阻礙應在 Gate 1 先完成最小 Dispatcher 改進的獨立驗證，或清楚回報 `NOT_RUN`，不可為此提前 Merge。
 
 **Gate 1 已批准後即可執行**，不額外要求每次 SSH、測試、建立 PR、Draft → Ready 的核准；但工具不通、硬體安全事實不符或需新權限時必須安全停止並回報。經核准而可以到達的 Gate 2，只授權合併該特定 PR。
 

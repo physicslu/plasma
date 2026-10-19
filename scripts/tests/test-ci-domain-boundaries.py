@@ -115,7 +115,7 @@ def validate_catalog_family_trigger_parity() -> None:
     required = {
         "data/device-catalog/research/*stm32u0*",
         "data/device-catalog/research/evidence/stm32u0*/**",
-        ".github/workflows/device-catalog-stm32c0-c05-publication-validation.yml",
+        ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml",
     }
     event_paths: dict[str, set[str]] = {}
     current_event: str | None = None
@@ -147,6 +147,18 @@ def validate_catalog_family_trigger_parity() -> None:
             raise SystemExit(f"{event}: forbidden Production trigger in family dispatcher")
     if event_paths["push"] != event_paths["pull_request"]:
         raise SystemExit("STM32 family dispatcher PR/main trigger parity drift")
+
+    # Negative controls guard the intentionally retired stage filenames.
+    retired = {
+        ".github/workflows/device-catalog-stm32c0-c01-foundation-validation.yml",
+        ".github/workflows/device-catalog-stm32c0-c02-discovery-validation.yml",
+        ".github/workflows/device-catalog-stm32c0-c03-metadata-validation.yml",
+        ".github/workflows/device-catalog-stm32c0-c04-admission-validation.yml",
+        ".github/workflows/device-catalog-stm32c0-c05-publication-validation.yml",
+    }
+    for event in ("push", "pull_request"):
+        if event_paths[event].intersection(retired):
+            raise SystemExit(f"{event}: retired STM32C0 workflow trigger unexpectedly reintroduced")
 
     u5 = read("device-catalog-stm32u5-catalog-runtime-governance-correction-validation.yml")
     if ".github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml" in u5:

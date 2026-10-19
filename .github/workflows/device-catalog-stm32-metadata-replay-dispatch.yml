@@ -1,0 +1,111 @@
+name: STM32 metadata replay deterministic dispatcher (8-family Gate 1)
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/analyze_stm32c5_metadata_replay_v42.py'
+      - 'data/device-catalog/research/test_analyze_stm32c5_metadata_replay_v42.py'
+      - 'data/device-catalog/research/stm32c5-ordering-authority-v4.2.json'
+      - 'data/device-catalog/research/STM32C5_METADATA_REPLAY_V42.md'
+      - '.github/workflows/device-catalog-stm32c5-metadata-replay-v42.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32c5-metadata-replay-v42.yml'
+      - 'data/device-catalog/research/analyze_stm32f2_metadata_replay_v39.py'
+      - 'data/device-catalog/research/test_analyze_stm32f2_metadata_replay_v39.py'
+      - 'data/device-catalog/research/stm32f2-ordering-authority-v3.9.json'
+      - 'data/device-catalog/research/STM32F2_METADATA_REPLAY_V39.md'
+      - '.github/workflows/device-catalog-stm32f2-metadata-replay-v39.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32f2-metadata-replay-v39.yml'
+      - 'scripts/device-catalog-family-ci.py'
+      - 'data/device-catalog/research/analyze_stm32f3_metadata_replay_v31.py'
+      - 'data/device-catalog/research/test_analyze_stm32f3_metadata_replay_v31.py'
+      - 'data/device-catalog/research/stm32f3-ordering-authority-v3.1.json'
+      - 'data/device-catalog/research/STM32F3_METADATA_REPLAY_V31.md'
+      - '.github/workflows/device-catalog-stm32f3-metadata-replay-v31.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32f3-metadata-replay-v31.yml'
+      - 'data/device-catalog/research/analyze_stm32f7_metadata_replay_v35.py'
+      - 'data/device-catalog/research/test_analyze_stm32f7_metadata_replay_v35.py'
+      - 'data/device-catalog/research/stm32f7-ordering-authority-v3.5.json'
+      - 'data/device-catalog/research/STM32F7_METADATA_REPLAY_V35.md'
+      - '.github/workflows/device-catalog-stm32f7-metadata-replay-v35.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32f7-metadata-replay-v35.yml'
+      - 'data/device-catalog/research/analyze_stm32h5_metadata_replay_v27.py'
+      - 'data/device-catalog/research/test_analyze_stm32h5_metadata_replay_v27.py'
+      - 'data/device-catalog/research/stm32h5-ordering-authority-v2.7.json'
+      - 'data/device-catalog/research/STM32H5_METADATA_REPLAY_V27.md'
+      - '.github/workflows/device-catalog-stm32h5-metadata-replay-v27.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32h5-metadata-replay-v27.yml'
+      - 'data/device-catalog/research/analyze_stm32n6_metadata_replay_v48.py'
+      - 'data/device-catalog/research/test_analyze_stm32n6_metadata_replay_v48.py'
+      - 'data/device-catalog/research/stm32n6-ordering-authority-v4.8.json'
+      - 'data/device-catalog/research/STM32N6_METADATA_REPLAY_V48.md'
+      - '.github/workflows/device-catalog-stm32n6-metadata-replay-v48.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32n6-metadata-replay-v48.yml'
+      - 'data/device-catalog/research/analyze_stm32wb0_metadata_replay_v51.py'
+      - 'data/device-catalog/research/test_analyze_stm32wb0_metadata_replay_v51.py'
+      - 'data/device-catalog/research/stm32wb0-ordering-authority-v5.1.json'
+      - 'data/device-catalog/research/STM32WB0_METADATA_REPLAY_V51.md'
+      - '.github/workflows/device-catalog-stm32wb0-metadata-replay-v51.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32wb0-metadata-replay-v51.yml'
+      - 'data/device-catalog/research/analyze_stm32wl3_metadata_replay_v45.py'
+      - 'data/device-catalog/research/test_analyze_stm32wl3_metadata_replay_v45.py'
+      - 'data/device-catalog/research/stm32wl3-ordering-authority-v4.5.json'
+      - 'data/device-catalog/research/STM32WL3_METADATA_REPLAY_V45.md'
+      - '.github/workflows/device-catalog-stm32wl3-metadata-replay-v45.yml'
+      - 'docs/archive/ci-workflows/stm32-metadata-replay/device-catalog-stm32wl3-metadata-replay-v45.yml'
+      - '.github/workflows/device-catalog-stm32-metadata-replay-dispatch.yml'
+      - 'scripts/ci/icpn_stm32_metadata_replay_dispatch.py'
+      - 'scripts/tests/test-icpn-stm32-metadata-replay-dispatch.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32-metadata-replay-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      has-families: ${{ steps.select.outputs.has-families }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate archived originals and path ownership
+        run: python scripts/ci/icpn_stm32_metadata_replay_dispatch.py self-test
+      - name: Select exact affected families
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+          matrix="$(python scripts/ci/icpn_stm32_metadata_replay_dispatch.py detect --base "${{ github.event.pull_request.base.sha }}" --head "$GITHUB_SHA")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          count="$(python -c 'import json,sys; print(len(json.loads(sys.argv[1])["include"]))' "$matrix")"
+          if [[ "$count" -gt 0 ]]; then
+            echo "has-families=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-families=false" >> "$GITHUB_OUTPUT"
+          fi
+  metadata-replay:
+    needs: detect
+    if: needs.detect.outputs.has-families == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay retained family metadata authority and exact test
+        run: python scripts/ci/icpn_stm32_metadata_replay_dispatch.py run --family "${{ matrix.family }}"

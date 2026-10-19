@@ -1,0 +1,24 @@
+{
+  "schema_version": "plasma.engineering.development_tasks.v1",
+  "mode": "development",
+  "tasks": {
+    "nine-nine-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_three_path_nine_nine.py",
+      "argv": [],
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d",
+      "verification": "nine-nine-table-v1"
+    },
+    "nine-nine-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_nine_nine_codex_generated.py",
+      "objective": "Build a Python 9x9 multiplication-table program for factors 1 through 9. Choose the implementation and CSV column labels yourself. Run your program, independently check all 81 mathematical results, fix any failures, and return real source code, program output, and a test report for reviewer analysis.",
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
+    },
+    "hil-a2-cpu-only": {
+      "execution_path": "path2-cli",
+      "capability": "z2-cpu-only",
+      "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
+    }
+  }
+}

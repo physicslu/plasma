@@ -4,6 +4,14 @@ This file is the primary operating contract for AI coding agents working on the 
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
+**Current default operating mode: DEVELOPMENT MODE (single-owner lab).**
+PLASMA is being developed by one owner; unless the owner expressly declares
+qualification, release or production work, prioritize the shortest working
+Build -> Run -> Observe -> Fix loop. Do not silently apply future fleet,
+factory, multi-tenant or enterprise security requirements to a prototype
+smoke test. See Sections 1A.1 and 11.1B. This is an engineering priority,
+not a declaration that disabled executable controls are already enabled.
+
 **PLASMA execution routing:** At Gate 1, recommend and have the owner choose one of the three Paths in Section 11.1B (ChatGPT Direct Work, SWPC CLI Work, SWPC Codex Work). This path selection is part of Gate 1, not a new gate.
 
 ## 1. Project purpose and canonical domain
@@ -145,6 +153,74 @@ restrictions. When a lower-level procedure is unnecessarily stricter for a
 prototype, propose and implement a scoped Development Mode change through
 normal engineering review rather than fabricate evidence or silently bypass
 executable checks.
+
+### 1A.1 Development Mode — single-owner, shared-runner, efficiency-first (normative)
+
+**Default stage: DEVELOPMENT MODE.** The owner is the only PLASMA developer
+and laboratory operator. Apply this stage by default to all PLASMA software,
+FPGA, SWPC and Z2 *development* tasks, unless the owner explicitly requests
+qualification/production behavior. Risk controls must be proportional to
+the actual command and physical effect, not the technology label `SW` or
+`HW`. Do not invent SW/HW-separated administrative lanes.
+
+- **Execute the experiment before designing a platform around it.** For a
+  trivial smoke test (for example, printing and checking the 9x9
+  multiplication table), first obtain the real CLI/Codex process result,
+  exit code and essential output. Do not precondition that test on a
+  factory-grade dispatcher, a new identity/enrollment program, expansive
+  audits, a task-specific workflow, or a production-readiness milestone.
+- **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
+  (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
+  and Linux account when the reviewed task and actual current permissions
+  allow it. A separate software/hardware Runner, OS image, VM, namespace
+  or new host is **not a default prerequisite** for owner-operated
+  Development Mode. Add isolation only for a demonstrated technical hazard,
+  an actual permission boundary, or explicit owner scope.
+- **Reuse one generic dispatcher.** A new Work Order should describe the
+  bounded task, selected Path, reviewed source/ref, acceptance and minimal
+  evidence; it must not require a newly written GitHub Actions YAML for
+  each experiment. Prefer direct use of existing approved workflows and
+  commands. When the current generic runtime is disabled or incomplete,
+  report the exact executable blocker and implement the *smallest reviewed
+  change* to make the approved development test work; do not replace the
+  entire architecture or claim `NOT_RUN` is `PASS`.
+- **Avoid development ceremony.** Do not demand a new Gate 1, another
+  `continue`, a new Runner, a new risk tier, an elaborate immutable
+  claim/evidence system, or separate deployment approval for work already
+  covered by the owner's Gate 1. For idempotent, CPU-only checks, prioritize
+  bounded execution and a truthful run ID/output over heavyweight
+  once-only operational controls; where existing live controls enforce
+  stricter behavior, change them through a scoped reviewed PR rather than
+  bypassing them.
+- **Keep one obvious result.** A development smoke-test report should
+  normally include: actual executor and Runner, GitHub run/job ID if used,
+  command or task/ref, exit status, expected versus observed output, and
+  `PASS`/`FAIL`/`NOT_RUN`. Hosted CI success cannot substitute for a
+  requested real SWPC execution. Do not require a full qualification
+  evidence package unless the experiment makes it necessary.
+- **Run real SWPC acceptance before merging.** When an approved Path 2/3
+  task requires a real SWPC test, include its execution, evidence review and
+  autonomous fix/retest loop in Gate 1. Gate 2 is strictly the PR merge
+  decision. Do not use a `main`-only dispatcher as a justification to merge
+  untested development code; resolve the branch/ref admission issue within
+  the approved scope or report a precise `NOT_RUN` blocker.
+- **Retain only real boundaries.** Gate 1 authorizes the specified work;
+  Gate 2 remains required only to merge a PR. Running as the owner on a
+  shared hardware-capable account is not equivalent to hardware isolation:
+  do not access Z2, LA, USB devices, FPGA, MMIO, hub power or DUT unless
+  the task's approved scope includes the operation and applicable electrical,
+  state-ownership and recovery safeguards. No unapproved deployment,
+  destructive mutation, credential disclosure or privilege escalation.
+- **Transition deliberately.** Production Mode controls are introduced
+  for a specific release, multi-user operation or demonstrated hazard, with
+  an explicit scope and verification. Do not move PLASMA out of
+  Development Mode merely because a future production design mentions
+  controls that are not needed for today's lab experiment.
+
+If these priorities and existing offline-only runtime policies conflict,
+**do not silently bypass an executable guard**. State the precise conflict,
+make the minimum Gate-1-scoped fix and verify it; reserve Gate 2 for the
+resulting PR. Do not use safety terminology to invent another owner gate.
 
 ## 1B. Canonical Codex task/SSH execution contract (normative)
 
@@ -526,10 +602,13 @@ There are exactly two user approval gate types:
 Request
   -> read-only inspection as needed
   -> Gate 1: Plan Approval
-  -> autonomous implementation / validation / PR / CI repair / Ready
-  -> Gate 2: Merge Approval
-  -> merge to main
-  -> approved post-merge deployment/runtime/hardware acceptance, when in plan
+  -> autonomously implement and perform real Gate 1 acceptance
+     (Path 2 SWPC CLI / Path 3 SWPC Codex when in scope)
+  -> collect evidence; ChatGPT reviews and loops FAIL -> fix -> retest
+  -> PR + relevant CI + merge-ready evidence
+  -> Gate 2: Merge Approval (merge decision ONLY)
+  -> merge to main and verify merge commit/parents
+  -> separately scoped post-merge operational rollout, if any
   -> completion report
 ```
 
@@ -543,11 +622,37 @@ Before creating or changing code, configuration, tests, documentation, branches,
 
 The user's approval authorizes autonomous execution of the stated plan. If the plan explicitly includes post-merge deployment, service restart, runtime acceptance, Z2/FPGA work, or real-target validation, those steps do not require another approval when their turn arrives.
 
+**Development Mode real-test acceptance belongs to Gate 1 (normative).**
+
+For Path 2/3 tasks whose acceptance requires a real SWPC executor, Gate 1
+includes actually dispatching and executing the approved CLI/Codex work,
+collecting authentic Runner logs/artifacts, analyzing any failures, and
+iterating until the specified acceptance conditions pass (or honestly
+reporting `FAIL`/`NOT_RUN` with the blocker). Do this **before requesting
+Gate 2**. In Path 3, Codex owns implementation, execution, self-tests and
+repairs; ChatGPT independently reviews the returned source, logs and data
+and decides `PASS`/`FAIL`. A successful GitHub job or an agent claim alone
+is not acceptance. No extra owner `continue` or approval is required for
+fix/retest steps already covered by Gate 1.
+
+**Never merge an untested development change merely to unlock its test
+trigger.** The reviewed development branch/commit SHA must be executable
+by the actual authorized development workflow *before merging*. If a
+current dispatcher only loads work from `main` (as the existing owner-only
+Issue #981 development entry currently does), treat this as a concrete
+implementation blocker, not as a reason to invert the gates. Make the
+minimum separately reviewed Gate-1-scoped dispatcher/branch-SHA change,
+or disclose the blocker and mark the real test `NOT_RUN`; do **not** claim
+that branch execution is already implemented or bypass an active guard.
+A Gate 2 exception for deferred development acceptance requires the
+owner's explicit understanding of the missing evidence; it is not the
+normal Development Mode path.
+
 **Gate 2 — Merge Approval**
 
-After Gate 1 approval, continue autonomously through implementation, tests, commits, PR creation/update, CI observation/repair, and Ready-for-review. When the PR satisfies the merge-ready definition, stop and request Merge Approval.
+After Gate 1 approval, continue autonomously through implementation, **real in-scope environment tests**, evidence review and repair cycles, commits, PR creation/update, CI observation/repair, and Ready-for-review. Request Gate 2 only when the PR is merge-ready **and all required Gate 1 acceptance evidence is available and independently reviewed**, unless the owner explicitly accepts a documented deferral.
 
-After Merge Approval, merge to `main`, verify the resulting repository state, and continue any post-merge deployment/runtime/hardware acceptance already included in the Gate 1 plan. Do not stop for a third approval gate.
+After Merge Approval, merge to `main` and verify the resulting repository state. **Gate 2 approval never substitutes for missing Development Mode tests or re-dispatches the same development task.** Separately scoped post-merge operational acceptance (e.g., a genuine release deployment) may still proceed when explicitly covered by Gate 1, without creating another gate.
 
 If continuing would materially exceed the approved scope, stop and propose a revised plan. Approval of that revision is another Gate 1 decision, not a new gate type.
 
@@ -624,8 +729,8 @@ trigger constraints and completion reports are in
 | Path | Executor and route | Recommend when |
 | --- | --- | --- |
 | **Path 1 — ChatGPT Direct Work** | ChatGPT (chat or Work Mode) -> GitHub branch/PR -> GitHub-hosted CI | Source, docs, analysis or host-only builds/tests do not require SWPC/local hardware. |
-| **Path 2 — SWPC CLI Work** | ChatGPT -> authorized GitHub Actions -> SWPC self-hosted Runner -> predefined CLI/shell commands -> evidence; PR if source changes | Actual SWPC access is necessary and fixed, deterministic commands suffice. No Codex agent is required. |
-| **Path 3 — SWPC Codex Work** | ChatGPT -> authorized GitHub Actions -> dedicated SWPC Codex Runner -> Codex CLI iterative development/test -> PR -> relevant CI | Actual SWPC access and agentic diagnosis, cross-module edits or iterative repair are both necessary. |
+| **Path 2 — SWPC CLI Work** | ChatGPT -> authorized GitHub Actions -> existing SWPC self-hosted Runner (shared with Path 3 when suitable) -> predefined CLI/shell commands -> evidence; PR if source changes | Actual SWPC access is necessary and fixed, deterministic commands suffice. No Codex agent is required. |
+| **Path 3 — SWPC Codex Work** | ChatGPT -> authorized GitHub Actions -> existing SWPC `plasma-codex` Runner -> Codex CLI iterative development/test -> PR -> relevant CI | Actual SWPC access and agentic diagnosis, cross-module edits or iterative repair are both necessary. |
 
 Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
 
@@ -655,26 +760,37 @@ Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
    another owner confirmation for already approved execution.
 5. **Path 2** executes reviewed, bounded CLI commands on the intended
    SWPC Runner. It must not silently delegate the job to Codex or use
-   different hardware resources. **Path 3** uses a real dedicated
-   `plasma-codex` Runner and a currently implemented, authorized work
-   workflow. The repository's unified Engineering Dispatch design may
+   different hardware resources. **Path 3** uses the existing
+   `SWPC-plasma-codex` Runner and a currently implemented, authorized work
+   workflow. In single-owner Development Mode, Path 2 and Path 3 can reuse
+   that same Runner/account where commands and approved resources permit;
+   no separate SW/HW Runner is required merely because of the Path label. The repository's unified Engineering Dispatch design may
    remain contract-only; a Gate 1 selection does **not** deploy, enable or
    grant a generic autonomous dispatcher. Existing Codex fixed-workload
    triggers and capabilities are not general-purpose routes.
-6. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
+6. **Gate 1 owns the complete Path 2/3 test loop before merge.** Execute
+   the approved source/ref on SWPC, review the real evidence, and repair/retest
+   under the same Gate 1 until the user-defined acceptance is satisfied.
+   Path 3 delegates development/self-test to Codex; ChatGPT owns independent
+   evidence review and the final PASS/FAIL judgment. Do not require SWPC to
+   duplicate Codex's task-specific calculations simply to satisfy a smoke
+   test. A `main`-only Issue Comment dispatcher does not yet implement
+   pre-merge branch/commit routing; do not confuse this policy with a
+   delivered capability.
+7. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
    `pull_request` CI will trigger. Ensure an authorized GitHub App token,
    dedicated dispatch or other reviewed CI trigger **actually** runs the
    required checks. Never infer CI PASS or PR readiness from successful
    publication. The approved Codex repair loop ends at Ready/Gate 2; a
    `main` push/merge must not rerun the same Codex development assignment.
-7. **Gate 2 exclusively governs merges of specific PRs.** Recheck PR HEAD,
+8. **Gate 2 exclusively governs merges of specific PRs.** Recheck PR HEAD,
    current `main`, required CI, mergeability, rulesets, review threads and
    authorized merge method immediately before merging. Gate 1-only tasks
    that produce **no PR** (read-only diagnostics or bounded test/evidence)
    finish with a verified execution report, **without inventing a Gate 2**.
    Post-merge work requires explicit coverage in the original Gate 1 plan
    or a revised Gate 1; a merge never silently authorizes deployment.
-8. **Evidence is environment-specific**: GitHub-hosted, SWPC CLI,
+9. **Evidence is environment-specific**: GitHub-hosted, SWPC CLI,
    SWPC Codex/QEMU, real Z2 CPU, PS/AXI/PL and external DUT are distinct
    acceptance boundaries. Reuse existing accepted evidence and avoid
    repeating equivalent tests without a concrete new failure mode. Neither
@@ -688,8 +804,10 @@ authorization):
 
 ```text
 Path 1: Gate 1 -> ChatGPT -> PR -> hosted CI -> Gate 2 -> merge
-Path 2: Gate 1 -> Actions -> SWPC CLI -> evidence -> [PR/CI/Gate 2/merge if needed]
-Path 3: Gate 1 -> Actions -> SWPC Codex -> PR -> CI/repair -> Gate 2 -> merge
+Path 2: Gate 1 -> SWPC CLI -> real result/evidence -> fix/retest -> [PR + CI -> Gate 2 -> merge if needed]
+Path 3: Gate 1 -> SWPC Codex self-develop/self-test -> ChatGPT evidence review
+               -> FAIL: Codex fix/retest (same Gate 1)
+               -> PASS: PR + CI -> Gate 2 -> merge
 ```
 
 The two-gate model in Section 11.1 remains authoritative. No additional
