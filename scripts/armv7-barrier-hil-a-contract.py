@@ -67,7 +67,7 @@ def validate(main: str, host_ci: str) -> None:
         _require(marker in main, f"Missing SWPC guard: {marker}")
     commands = main.split("\n    steps:", 1)[-1]
     _require(re.search(
-        r"(?m)^\s+(?:ssh|scp|sftp|rsync|sudo|docker|vivado|curl|wget|"
+        r"(?m)^\s+(?:-\s+run:\s*)?(?:ssh|scp|sftp|rsync|sudo|docker|vivado|curl|wget|"
         r"gh|eval|bash -c|python -c)\b", commands,
     ) is None, "A1 contains forbidden hardware, remote or privilege command")
 
