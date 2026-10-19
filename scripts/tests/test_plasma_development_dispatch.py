@@ -173,6 +173,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
     def test_real_reference_runs_as_bounded_process_in_hosted_ci(self):
         # This class tests Codex with a fake agent, never calls real Codex.
         self.assertEqual(self.task["execution_path"],"path3-codex")
+        self.assertIn('print("multiplicand,multiplier,product")',
+                      self.task["objective"])
         self.assertEqual(self.task["expected_stdout_sha256"],
                          "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d")
 
