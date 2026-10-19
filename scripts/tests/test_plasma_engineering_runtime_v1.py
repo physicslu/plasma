@@ -269,7 +269,10 @@ class RuntimeContracts(unittest.TestCase):
         self.assertIn("development-execute:", yml)
         self.assertNotIn("sudo ", yml)
         self.assertNotIn("run: codex", yml)
-        self.assertNotIn("runs-on: [self-hosted, linux, x64, plasma-codex]", yml)
+        # Development Mode reuses the existing SWPC Codex Runner for fixed
+        # Path 2 CLI. Qualification's separate 'execute' job stays gated.
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]", yml)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-dispatch-isolated]", yml)
 
 
 if __name__ == "__main__":
