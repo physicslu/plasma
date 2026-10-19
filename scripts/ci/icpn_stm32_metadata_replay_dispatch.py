@@ -95,6 +95,24 @@ def self_test() -> None:
         raise SystemExit("Production is not the owner of historical metadata replay")
     if affected_families(["docs/README.md"]):
         raise SystemExit("unrelated docs should not trigger metadata replay")
+    # The GitHub event filter must be an exact union of the frozen original
+    # path owners plus this dispatcher and its contract. Missing a trigger
+    # silently drops validation; extra triggers introduce unintended fanout.
+    workflow_body = (ROOT / WORKFLOW).read_text(encoding="utf-8")
+    token = "on:\n  pull_request:\n    paths:\n"
+    if workflow_body.count(token) != 1 or "\npermissions:" not in workflow_body:
+        raise SystemExit("expected explicit pull_request path-scoped dispatch")
+    trigger_section = workflow_body.split(token, 1)[1].split("\npermissions:", 1)[0]
+    got = set()
+    for line in trigger_section.splitlines():
+        if not line.startswith("      - '") or not line.endswith("'"):
+            raise SystemExit("unexpected pull_request path filter syntax")
+        got.add(line.split("'", 2)[1])
+    expected = {WORKFLOW, RUNNER, CONTRACT_TEST, FAMILY_CI}
+    for item in ARCHIVED.values():
+        expected.update(item[k] for k in ("analysis", "test", "authority", "doc", "original", "archive"))
+    if got != expected or len(trigger_section.splitlines()) != len(expected):
+        raise SystemExit(f"metadata replay workflow filter parity drift: missing={sorted(expected - got)} extra={sorted(got - expected)}")
     print("STM32 metadata replay dispatch route/ownership self-test: PASS")
 
 def execute(family: str) -> None:
