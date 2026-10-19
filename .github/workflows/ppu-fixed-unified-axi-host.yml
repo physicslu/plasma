@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y iverilog
-          python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0' 'jsonschema==4.23.0'
+          python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
           python -m pip install -e ./software/python
       - name: Strict verification evidence Schema and negative contracts
         run: python -m pytest -q pl/tests/test_verification_evidence.py
