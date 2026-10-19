@@ -36,14 +36,23 @@ Issue #981:
 ```
 
 The hosted admission checks the same owner/Issue/commit controls. Job
-`development-codex` on `SWPC-plasma-codex` runs **real Codex CLI**, instructs
-it to create one new source file, validates the generated Python AST before
-execution, checks 81 cells and exact stdout SHA256, then publishes the generated
-source file and JSON receipt as an artifact. No hardware, Git push, PR creation
-or merge is included in this smoke. A full agentic
-Codex → source PR → GitHub CI development loop is a separate acceptance stage.
-For the present smoke, Hosted CI can validate the contract and use a fake
-Codex, but only the actual SWPC Job is authoritative evidence of Path 3 PASS.
+`development-codex` on `SWPC-plasma-codex` runs **real Codex CLI** and
+assigns it an outcome, not a prescribed implementation. Codex independently
+writes Python source, executes it, verifies all 81 products, and may debug
+and rerun. The Dispatcher does **not** parse/limit generated source AST,
+re-execute the Python program, or certify that 81 products are correct.
+GitHub Actions only checks that the Codex process exited and that the
+source, actual CSV, self-test report and Codex session log can be collected.
+It archives all four with a JSON **EVIDENCE_READY_REVIEW_REQUIRED** receipt;
+this is not an acceptance PASS. ChatGPT examines original code and evidence,
+checks the actual products and explicitly reports PASS/FAIL and, if needed,
+new Codex instructions. The Path 2 reference SHA256 is a comparison aid,
+not a Path 3 Run-side gate, because Codex can choose CSV header labels.
+
+This smoke does not authorize hardware actions, Git push, PR creation or
+merge. A full Codex → source PR → CI development loop is a separate test.
+Hosted CI may exercise the evidence adapter with a fake Codex, but only
+a real SWPC Job and independently reviewed evidence support Path 3 E2E PASS.
 Repeated idempotent development tests are allowed (no permanent Claim ref).
 No SWPC run is triggered by PR/push; they execute **hosted offline tests only**.
 The `PLASMA_ENGINEERING_DISPATCH_ENABLED` qualification guard and
