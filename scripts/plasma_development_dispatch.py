@@ -95,13 +95,12 @@ def task_by_id(registry: object, task_id: str) -> dict:
             and not x.startswith("-") and ".." not in x for x in argv
         ), "TASK_ARGS_DENIED")
     else:
-        require(set(task) in ({
+        require({
             "execution_path", "output_path", "objective",
-            "expected_stdout_sha256",
-        }, {
+        } <= set(task) and set(task) <= {
             "execution_path", "output_path", "objective",
             "expected_stdout_sha256", "output_format",
-        }), "TASK_FIELDS_DENIED")
+        }, "TASK_FIELDS_DENIED")
         require(task.get("output_format", "csv") in ("csv", "text"),
                 "CODEX_EVIDENCE_FORMAT_DENIED")
         output_path = task["output_path"]
@@ -113,9 +112,10 @@ def task_by_id(registry: object, task_id: str) -> dict:
         require(type(objective) is str and 40 <= len(objective) <= 800
                 and all(32 <= ord(c) <= 126 for c in objective),
                 "CODEX_OBJECTIVE_DENIED")
-    require(type(task["expected_stdout_sha256"]) is str
-            and SHA256.fullmatch(task["expected_stdout_sha256"]) is not None,
-            "OUTPUT_DIGEST_INVALID")
+    if execution_path == "path2-cli" or "expected_stdout_sha256" in task:
+        require(type(task["expected_stdout_sha256"]) is str
+                and SHA256.fullmatch(task["expected_stdout_sha256"]) is not None,
+                "OUTPUT_DIGEST_INVALID")
     return task
 
 def request(event: object, context: dict) -> dict:
@@ -321,7 +321,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "test_log_sha256": digest(test_log),
         "codex_log_path": str(codex_log.relative_to(workspace)),
         "codex_log_sha256": digest(codex_log),
-        "reference_stdout_sha256": task["expected_stdout_sha256"],
+        "reference_stdout_sha256": task.get("expected_stdout_sha256", ""),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
     }
 
