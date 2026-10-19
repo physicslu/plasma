@@ -98,15 +98,7 @@ def strings(value: object, *, allowed: frozenset[str] | None = None,
 
 
 def validate_work_order(order: object, policy: object) -> dict:
-    # Existing v1 orders have no runtime_status. Allow the optional A2
-    # disabled/owner-approved marker without relaxing exact-key validation.
-    keys = ORDER_KEYS | ({"runtime_status"} if
-                         type(order) is dict and "runtime_status" in order else set())
-    order = exact_keys(order, frozenset(keys), "WORK_ORDER_FIELDS_INVALID")
-    if "runtime_status" in order and order["runtime_status"] not in {
-        "DISABLED_GATE1", "OWNER_APPROVED_ONE_SHOT"
-    }:
-        deny("WORK_ORDER_RUNTIME_STATUS_INVALID")
+    order = exact_keys(order, ORDER_KEYS, "WORK_ORDER_FIELDS_INVALID")
     if order["schema_version"] != SCHEMA_VERSION:
         deny("WORK_ORDER_VERSION_DENIED")
     if (type(order["work_order_id"]) is not str
