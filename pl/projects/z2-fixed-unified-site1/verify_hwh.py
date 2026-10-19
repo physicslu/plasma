@@ -24,12 +24,24 @@ def require(ok: bool, code: str) -> None:
         raise F1Denied(code)
 
 
-def number(v: str | None) -> int:
+def number(v: str | None) -> int | float:
+    """Match existing Z2 HWH encodings: binary vectors and PS7 bool/floats."""
     require(v is not None and bool(v.strip()), "HWH_NUMBER_MISSING")
+    value = v.strip().lower()
+    if len(value) == 32 and set(value) <= {"0", "1"}:
+        return int(value, 2)
+    if value in {"true", "false"}:
+        return int(value == "true")
     try:
-        return int(v.strip(), 0)
-    except ValueError as exc:
-        raise F1Denied("HWH_NUMBER_INVALID") from exc
+        return int(value, 0)
+    except ValueError:
+        try:
+            from math import isfinite
+            parsed = float(value)
+            require(isfinite(parsed), "HWH_NUMBER_NONFINITE")
+            return parsed
+        except ValueError as exc:
+            raise F1Denied("HWH_NUMBER_INVALID") from exc
 
 
 def parameters(module: ET.Element) -> dict[str, str]:
