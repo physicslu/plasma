@@ -55,14 +55,10 @@ jobs:
           python3 scripts/tests/test_plasma_codex_device_permission_diagnostic.py
 
   authorize:
-    if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.repository == 'physicslu/plasma' &&
-      github.actor == 'physicslu' &&
-      github.ref == 'refs/heads/main' &&
-      github.run_attempt == 1 &&
-      inputs.original_run == '39190291831' &&
-      inputs.confirm_read_only == true
+    # Run a hosted admission check on every manual request. Invalid owner,
+    # inputs, ref or rerun become visible FAIL instead of green SKIPPED.
+    # The SWPC inspect job still requires authorize SUCCESS.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
