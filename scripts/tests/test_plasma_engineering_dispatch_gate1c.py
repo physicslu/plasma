@@ -91,7 +91,15 @@ class Gate1CSafetyTests(unittest.TestCase):
 
     def test_every_workflow_is_scanned_and_baseline_is_blocked(self):
         files=sorted([*WORKFLOWS.glob("*.yml"),*WORKFLOWS.glob("*.yaml")])
-        self.assertGreaterEqual(len(files),322)
+        # Gate 1 Catalog consolidation: five original C0 workflow bodies are
+        # preserved as Git-identical archives and one dispatcher remains live.
+        # Normalize the fleet count without weakening the scanner's exact
+        # observed-file equality and fail-closed exposure assertions below.
+        archived = sorted((ROOT / "docs/archive/ci-workflows/stm32c0-stages").glob("*.yml"))
+        self.assertEqual(len(archived), 5)
+        self.assertIn("device-catalog-stm32c0-stage-dispatch.yml",
+                      {f.name for f in files})
+        self.assertGreaterEqual(len(files) + len(archived) - 1, 325)
         report=gate.workflow_audit(WORKFLOWS)
         self.assertEqual(report["total"],len(files))
         self.assertEqual(report["scanned"],len(files))
