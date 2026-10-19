@@ -1,7 +1,8 @@
 name: PLASMA Engineering Reusable Runtime Dispatcher (Path 2 / Path 3)
 
 # ONE reusable workflow, never task-specific workflows.
-# Qualification workflow_dispatch remains OFF; owner-only Development Mode\n# issue_comment runs reviewed tasks using existing SWPC Runner.
+# Qualification workflow_dispatch remains OFF; owner-only Development Mode
+# issue_comment runs reviewed tasks using existing SWPC Runner.
 on:
   workflow_dispatch:
     inputs:
