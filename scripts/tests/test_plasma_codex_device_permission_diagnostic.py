@@ -149,7 +149,7 @@ class DiagnosticContracts(unittest.TestCase):
         wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
         self.assertIn("workflow_dispatch:",wf)
         self.assertIn('test "$CONFIRM_READ_ONLY" = true',wf)
-        self.assertIn("github.actor == 'physicslu'",wf)
+        self.assertIn('test "$GITHUB_ACTOR" = physicslu',wf)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
         self.assertIn("needs: authorize",wf)
         self.assertIn("persist-credentials: false",wf)
