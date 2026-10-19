@@ -229,6 +229,33 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             with self.subTest(field=field),self.assertRaises(dev.Denied):
                 dev.request(self.branch_event(),ctx)
 
+    def test_auto4_exact_branch_canary_and_a2_claim_remain_separate(self):
+        # The live AUTO-4 Path 2 was authorized but skipped by the A2-only
+        # job allowlist. This contract must be checked at the workflow boundary,
+        # not only in Python's owner / PR SHA authorization tests.
+        wf = WORKFLOW.read_text()
+        execute = wf.split("  development-execute:", 1)[1].split(
+            "  development-codex:", 1
+        )[0]
+        guard = execute.split("    if: >-", 1)[1].split("    runs-on:", 1)[0]
+        self.assertIn("needs.development-authorize.result == 'success'", guard)
+        self.assertIn("needs.development-authorize.outputs.execution_path == 'path2-cli'", guard)
+        self.assertIn("needs.development-claim.result == 'skipped'", guard)
+        self.assertIn("needs.development-authorize.outputs.task_id == 'auto4-premerge-path2'", guard)
+        self.assertIn("needs.development-authorize.outputs.pr_number == '1055'", guard)
+        self.assertIn(
+            "needs.development-authorize.outputs.pinned_sha == "
+            "'b19fd8f6c9806e99678d8c5c71fc0f8634379ac3'", guard
+        )
+        self.assertIn("needs.development-authorize.outputs.task_id == 'nine-nine-path2'", guard)
+        self.assertIn("needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only'", guard)
+        self.assertIn("needs.development-claim.result == 'success'", guard)
+        self.assertIn("needs.development-claim.outputs.claim_ref ==", guard)
+        self.assertIn("needs.development-claim.outputs.work_order_sha256 ==", guard)
+        self.assertIn("github.run_attempt == 1", guard)
+        self.assertEqual(guard.count("'auto4-premerge-path2'"), 1)
+        self.assertNotIn("pr_number != '0'", guard)
+
     def test_sha_only_candidate_cli_preserves_real_stdout_not_fixed_9x9(self):
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
