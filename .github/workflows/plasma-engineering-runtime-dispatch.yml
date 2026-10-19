@@ -333,6 +333,7 @@ jobs:
             ${{ runner.temp }}/plasma-path3-source.patch
             candidate/scripts/experiments/plasma_*_generated.py
             candidate/scripts/experiments/plasma_*_generated.csv
+            candidate/scripts/experiments/plasma_*_generated.txt
             candidate/scripts/experiments/plasma_*_generated.test.log
             candidate/scripts/experiments/plasma_*_generated.codex.log
           if-no-files-found: warn
