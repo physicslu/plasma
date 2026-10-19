@@ -7,6 +7,12 @@
       "script": "scripts/experiments/plasma_three_path_nine_nine.py",
       "argv": [],
       "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
+    },
+    "nine-nine-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_nine_nine_codex_generated.py",
+      "objective": "Use Codex CLI to independently create a tiny Python program printing the exact 81-cell canonical 9x9 multiplication CSV. The program may only print, loop over range(1,10), and multiply a*b. Do not import any module or read any files.",
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
     }
   }
 }
