@@ -63,6 +63,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Install pinned Codex CLI without any model secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/plasma-codex-cli" --no-save @openai/codex@0.163.0
+          echo "$RUNNER_TEMP/plasma-codex-cli/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Real Codex (API credential, never GitHub write credential)
         shell: bash
         env:
@@ -72,7 +78,6 @@ jobs:
           test -n "$OPENAI_API_KEY" || { echo "NO_GO: OPENAI_API_KEY not configured"; exit 2; }
           test ! -e docs/development/plasma-codex-mvp-first-change.md
           test -z "$(git status --porcelain)"
-          npm install -g @openai/codex@0.163.0
           codex --version
           cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF'
           Read AGENTS.md and relevant PLASMA docs.
