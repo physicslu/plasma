@@ -38,3 +38,19 @@ requesting the merge-only Gate 2. The original trusted main Dispatcher must
 also have this policy revision; a PR-only edit cannot change the trusted
 code that an Issue #981 event actually executes. No automatic permission to
 touch FPGA Manager, Z2, MMIO, LA, DUT, power or deployment is implied.
+
+## F1-B Path 3 diagnosis and evidence reuse — 2026-10-19 (Gate 1, PR #1064)
+
+**Original real failure:** [Path 2 Run 39274388453](https://github.com/physicslu/plasma/actions/runs/39274388453), main `f789629060595ff98695d515eb3225fcc0a370a8`: owner authorization and SWPC checkout succeeded; actual `development-execute` stopped with exit 2 and a real receipt `NOT_RUN_OR_FAIL / EXECUTION_ERROR`. The receipt did **not** preserve the originating exception. No synthesis, implementation, BIT or HWH PASS evidence exists from this run.
+
+**Existing Path 3 Codex / SWPC Runner, no new mechanism:**
+- [Run 39276831321](https://github.com/physicslu/plasma/actions/runs/39276831321): Codex exit 0; 9 mock-based positive/negative tests PASS, eight independent evidence assertions PASS. Artifact `12197498283` includes the generated Python source, real command and output, test log, full Codex session log, SHA256 receipt and source patch. Root cause explicitly unconfirmed by offline mocks.
+- [Run 39277523452](https://github.com/physicslu/plasma/actions/runs/39277523452): Codex exit 0; 17 error-mapping tests PASS and nine independent evidence assertions PASS. Artifact `12198690561` preserves the same evidence types. ChatGPT independently downloaded both Artifacts and recomputed all **8/8** component SHA256 digests; all match their respective receipts.
+
+**Real read-only SWPC observation from Run 39277523452:** `SWPC-plasma-codex` runs with effective UID 998/GID 997. The historical fixed output root `/storage/projects/plasma/pl/build` exists but belongs to UID/GID 65534/65534 with mode 0755; effective **write access is false**. The Vivado 2026.1 `settings64.sh` exists and is readable. The fresh candidate checkout did not contain a prepared board cache. These facts establish an actual output-path blocker **if code reaches the mkdtemp stage**; the exact first exception in Run 39274388453 is not proven because board preparation occurs earlier and the failure receipt was generic.
+
+**Minimal reused-code repair in PR #1064:** The existing `scripts/plasma_vivado_host_build.py` continues to call the SHA-pinned `prepare-board-repository.sh`, F1-B Tcl and `verify_hwh.py`, but places its unique disposable build directory beneath the already-authorized candidate Worktree's ignored `pl/build`, instead of the unwritable persistent SWPC root. It refuses symlinks/path escapes and maps preparation timeout/launch failures and output creation permission/read-only/full-disk errors to constant `BUILD_*` codes. Existing hosted tests exercise successful path selection and fail-closed cases; **this is not evidence that the patched build has run on SWPC**.
+
+**Boundary and reusable lesson:** Make the dispatcher dispatch a proven fixed build rather than reinventing it; take the output directory from the executable worktree, not an assumed global SWPC cache; preserve concrete stage error codes without leaking host paths; read actual runner permissions rather than inferring them from prior unrelated account builds. Existing Path 3 intentionally permits only generated-source/evidence edits, so Codex produced and tested a proposal and ChatGPT applied a reviewed minimal production patch through the PR. GitHub Actions artifacts have finite retention; do not count link existence as perpetual archival.
+
+**State:** PR #1064 Open / NOT MERGED. F1-B fixed build on the patched code is **NOT_RUN**. Current Issue #981 trusted main dispatcher still uses merged main source; a PR code change is not automatically deployed. No extra Runner/Workflow, no FPGA load, Z2/DUT, MMIO, LA, power or deployment.
