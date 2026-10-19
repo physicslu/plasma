@@ -166,3 +166,29 @@ def test_validate_cli_rejects_tampered_receipt(valid_receipt, tmp_path):
     doc["test_counts"]["passed"] = 0
     path.write_text(json.dumps(doc), encoding="utf-8")
     assert ev.main(["validate", "--receipt", str(path)]) != 0
+
+
+def test_receipt_sources_are_exactly_the_compiled_cocotb_sources(valid_receipt):
+    suite, _ = ev._under_root(valid_receipt["suite"])
+    ev.assert_pilot_source_contract(
+        suite, valid_receipt["rtl_sources"] + [
+            {"path": "pl/rtl/site/swd_waveform_engine.sv", "sha256": "0" * 64},
+            {"path": "pl/rtl/site/swd_transaction_master.sv", "sha256": "0" * 64},
+            {"path": "pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv",
+             "sha256": "0" * 64},
+        ], "fixed_ppu_unified_axi_site1",
+    )
+
+
+def test_receipt_must_reject_unmeasured_compiled_rtl(valid_receipt):
+    suite, _ = ev._under_root(valid_receipt["suite"])
+    with pytest.raises(ev.EvidenceError, match="Receipt RTL list differs"):
+        ev.assert_pilot_source_contract(suite, valid_receipt["rtl_sources"],
+                                        "fixed_ppu_unified_axi_site1")
+
+
+def test_receipt_must_reject_wrong_simulator_top(valid_receipt):
+    suite, _ = ev._under_root(valid_receipt["suite"])
+    with pytest.raises(ev.EvidenceError, match="RTL simulator/top mismatch"):
+        ev.assert_pilot_source_contract(suite, valid_receipt["rtl_sources"],
+                                        "not_the_simulated_top")
