@@ -39,6 +39,12 @@
       "project": "pl/projects/z2-fixed-unified-site1",
       "toolchain": "2026.1",
       "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+    },
+    "f1b-path3-diagnose-39274388453": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_f1b_host_failure_generated.py",
+      "output_format": "text",
+      "objective": "Analyze F1-B Path 2 GitHub Run 39274388453: real SWPC job exited 2, receipt NOT_RUN_OR_FAIL reason EXECUTION_ERROR. Read existing scripts/plasma_development_dispatch.py, scripts/plasma_vivado_host_build.py and pl/projects/z2-swd-gpio/prepare-board-repository.sh. Create an offline Python diagnosis that reproduces exception paths using mocks, distinguishes proven facts from hypotheses, and prints a minimal proposed source diff or blocker. Run it; record actual commands, exit codes, test results and failures in the test log. Only modify the designated generated Python source, .txt output and .test.log. Do not run Vivado, SSH, sudo, network, Z2, FPGA, USB, LA, MMIO, DUT or power."
     }
   }
 }
