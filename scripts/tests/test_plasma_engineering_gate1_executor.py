@@ -49,7 +49,7 @@ class Gate1ExecutorContracts(unittest.TestCase):
                 with self.subTest(capability=cap,executor=executor):
                     result=self.route(order,executor)
                     expected=("chatgpt-direct-github" if executor=="chatgpt" else
-                              "hosted-software-codex")
+                              "swpc-dedicated-codex")
                     self.assertEqual(result["lane"],expected)
                     self.assertFalse(result["hardware"])
                     self.assertFalse(result["hardware_permission_granted"])
