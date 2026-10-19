@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -87,7 +88,7 @@ def task_by_id(registry: object, task_id: str) -> dict:
         return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
         # Path 2 is an execution method, NOT synonymous with CPU-only Python.
-        # Host builds use a fixed, reviewed Vivado project in trusted main.
+        # Host builds use a fixed, reviewed Vivado capability and project.
         require(set(task) == {"execution_path", "capability", "project",
                               "toolchain", "board_repo_sha"},
                 "HOST_BUILD_TASK_FIELDS_DENIED")
@@ -121,23 +122,27 @@ def task_by_id(registry: object, task_id: str) -> dict:
             and not x.startswith("-") and ".." not in x for x in argv
         ), "TASK_ARGS_DENIED")
     else:
-        require({
-            "execution_path", "output_path", "objective",
-        } <= set(task) and set(task) <= {
-            "execution_path", "output_path", "objective",
-            "expected_stdout_sha256", "output_format",
-        }, "TASK_FIELDS_DENIED")
-        require(task.get("output_format", "csv") in ("csv", "text"),
-                "CODEX_EVIDENCE_FORMAT_DENIED")
-        output_path = task["output_path"]
-        require(type(output_path) is str and re.fullmatch(
-            r"scripts/experiments/plasma_[a-z0-9_]+_generated\.py",
-            output_path,
-        ) is not None, "CODEX_OUTPUT_PATH_DENIED")
+        # Development Path 3 is a general engineering agent, not a
+        # generated-Python-file-only fixture. The objective names the work;
+        # the authorized candidate workspace may contain RTL, Tcl, docs, etc.
+        require({"execution_path", "objective"} <= set(task)
+                and set(task) <= {
+                    "execution_path", "objective", "output_path",
+                    "expected_stdout_sha256", "output_format",
+                }, "TASK_FIELDS_DENIED")
         objective = task["objective"]
-        require(type(objective) is str and 40 <= len(objective) <= 800
-                and all(32 <= ord(c) <= 126 for c in objective),
+        require(type(objective) is str and 20 <= len(objective) <= 8192
+                and not any(ord(c) < 32 and c not in "\n\r\t"
+                            for c in objective),
                 "CODEX_OBJECTIVE_DENIED")
+        if "output_path" in task:
+            path = task["output_path"]
+            require(type(path) is str and re.fullmatch(
+                r"scripts/experiments/plasma_[a-z0-9_]+_generated\.py",
+                path,
+            ) is not None, "CODEX_OUTPUT_PATH_DENIED")
+        require(task.get("output_format", "text") in ("csv", "text"),
+                "CODEX_EVIDENCE_FORMAT_DENIED")
     if execution_path == "path2-cli" or "expected_stdout_sha256" in task:
         require(type(task["expected_stdout_sha256"]) is str
                 and SHA256.fullmatch(task["expected_stdout_sha256"]) is not None,
@@ -277,6 +282,30 @@ def authorize(event: object, context: dict, registry: object,
     }
 
 
+
+def reviewed_host_build_driver(*, workspace: Path, approval: dict):
+    """Use trusted main for main builds, an exact owner-pinned PR driver otherwise.
+
+    The trusted dispatcher owns all authorization; this capability is limited
+    to the fixed Vivado host build, never generic candidate Python execution.
+    """
+    if approval["pr_number"] == 0:
+        import plasma_vivado_host_build as build
+        return build
+    root = workspace.resolve(strict=True)
+    candidate = root / "scripts/plasma_vivado_host_build.py"
+    require(candidate.is_file() and not candidate.is_symlink() and
+            candidate.resolve(strict=True).is_relative_to(root) and
+            candidate.stat().st_size <= 65536,
+            "HOST_BUILD_CANDIDATE_DRIVER_DENIED")
+    spec = importlib.util.spec_from_file_location(
+        "plasma_reviewed_candidate_vivado_host_build", candidate)
+    require(spec is not None and spec.loader is not None,
+            "HOST_BUILD_CANDIDATE_DRIVER_INVALID")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    return build
+
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None,
              approval: dict | None = None, sandbox: bool = False) -> dict:
@@ -295,7 +324,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
-        import plasma_vivado_host_build as build
+        build = reviewed_host_build_driver(workspace=workspace,
+                                           approval=approval)
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-cpu-only":
@@ -377,85 +407,104 @@ def run_task(task: dict, *, workspace: Path = ROOT,
 
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run) -> dict:
-    """Delegate creation AND testing to Codex; collect evidence for ChatGPT.
+    """Run the owner-authorized Development Mode engineer with real evidence.
 
-    Dispatcher does not evaluate Python AST, re-run generated software, or
-    declare the work correct. Only actual reviewer evidence can prove PASS.
+    Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
+    and invoke host-only Vivado. The fixed PR SHA remains the INPUT identity;
+    the candidate Git diff and evidence are captured before review/commit.
     """
-    source = workspace / task["output_path"]
-    output = source.with_suffix(".txt" if task.get("output_format") == "text" else ".csv")
-    test_log = source.with_suffix(".test.log")
-    codex_log = source.with_suffix(".codex.log")
-    require(source.parent.is_dir() and not any(
-        p.exists() for p in (output, test_log, codex_log)
-    ), "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
-    require(not source.exists() or (
-        source.is_file() and not source.is_symlink()
-    ), "CODEX_SOURCE_PATH_DENIED")
+    root = workspace.resolve(strict=True)
+    evidence = root / ".plasma-path3-evidence"
+    require(not evidence.exists() and not evidence.is_symlink(),
+            "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
+    evidence.mkdir(mode=0o700)
+    report = evidence / "engineering-report.md"
+    codex_log = evidence / "codex.log"
+    output_path = task.get("output_path")
+    source = root / output_path if output_path else None
+    output = (source.with_suffix(
+        ".txt" if task.get("output_format") == "text" else ".csv"
+    ) if source is not None else None)
+    test_log = source.with_suffix(".test.log") if source is not None else None
     prompt = (
-        "PLASMA single-owner Development Mode Path 3. You are the engineer. "
-        "Independently implement, run, test, debug and finish the task.\n"
-        "Goal: " + task["objective"] + "\n"
-        "Create or update the approved Python file " + task["output_path"] +
-        " (it may already exist in this candidate revision).\n"
-        "Execute that code yourself using Python on this Runner. Capture "
-        "the program's ACTUAL complete output as text in " +
-        str(output.relative_to(workspace)) + ".\n"
-        "Independently check that your output satisfies the stated "
-        "objective and covers the relevant positive/negative cases; "
-        "if not, fix the source and rerun it yourself. "
-        "Write a short honest test report, with the "
-        "actual command(s), observed test outcome, test counts and exit "
-        "status, to " + str(test_log.relative_to(workspace)) + ".\n"
-        "Any Python implementation is acceptable. Header labels or AST "
-        "shape need NOT match the Path 2 implementation. Do not falsely "
-        "claim a test passed or fabricate outputs. Keep all generated "
-        "source and evidence files, including on failure.\n"
-        "Create or modify ONLY the specified source and its output/test "
-        "evidence. Do not modify other project files or Git state. "
-        "No Z2, FPGA, USB, LA, DUT, MMIO, SSH, sudo, physical device, "
-        "network or deployment actions. Stop if these are required.\n"
+        "PLASMA Development Mode Path 3: you are the autonomous engineer. "
+        "Prioritize completing the user-approved engineering goal quickly. "
+        "Run tools, diagnose failures, edit RTL/Tcl/Python/build scripts/docs, "
+        "repeat tests and host builds as needed. Do not stop at an offline "
+        "mock when a real Vivado Host-only build is needed.\n"
+        "Goal:\n" + task["objective"] + "\n"
+        "You may edit files inside this candidate workspace and run "
+        "commands required for development, including Vivado 2026.1 "
+        "synthesis/implementation/timing/DRC and BIT/HWH generation. "
+        "Do not program or access physical FPGA/Z2/DUT/LA, USB, MMIO, "
+        "device power or deploy firmware. Do not use sudo or SSH to a "
+        "device. Host-only Vivado does not equal FPGA programming.\n"
+        "Record actual commands, exit codes, observed errors, proven versus "
+        "hypothesized root causes, minimal fixes, retries, final build "
+        "stage results and hashes in .plasma-path3-evidence/engineering-report.md. "
+        "Include a chronological problem/solution ledger. Do not fabricate "
+        "PASS or claim BIT/HWH if not produced. Preserve relevant raw build "
+        "logs/reports/artifacts under the workspace. The workflow captures "
+        "your complete tracked-source Git diff, newly created files and "
+        "this report for review; do not commit, push or change Git refs.\n"
     )
+    if output_path:
+        prompt += (
+            "For this legacy task, also update " + output_path +
+            " when useful and record its ACTUAL complete output as text "
+            "plus a short .test.log, but do not restrict other engineering "
+            "edits merely to satisfy the old generated-file convention.\n"
+        )
     command = [
         "codex", "--ask-for-approval", "never",
-        "-c", "sandbox_workspace_write.network_access=false",
+        "-c", "sandbox_workspace_write.network_access=true",
         "exec", "--sandbox", "workspace-write", "-",
     ]
+    # GitHub Actions job timeout is the operational limit; a fixed 480-second
+    # Python timer would terminate normal Vivado implementation.
     proc = executor(
-        command, input=prompt.encode("utf-8"), cwd=workspace,
+        command, input=prompt.encode("utf-8"), cwd=root,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        timeout=480, check=False,
+        timeout=None, check=False,
     )
-    require(len(proc.stdout) <= 262144 and len(proc.stderr) <= 262144,
-            "CODEX_LOG_TOO_LARGE")
     codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
                           b"\n=== Codex stderr ===\n" + proc.stderr)
     require(proc.returncode == 0, "CODEX_CLI_NONZERO")
-    require(all(p.is_file() and not p.is_symlink() for p in (
-        source, output, test_log
-    )), "CODEX_EVIDENCE_INCOMPLETE")
-    require(all(p.stat().st_size <= 65536 for p in (
-        source, output, test_log
-    )), "CODEX_EVIDENCE_TOO_LARGE")
     def digest(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
-    return {
+    receipt = {
         "status": "EVIDENCE_READY_REVIEW_REQUIRED",
         "execution_path": "path3-codex",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
         "codex_exit_code": proc.returncode,
-        "source_path": task["output_path"],
-        "source_sha256": digest(source),
-        "output_path": str(output.relative_to(workspace)),
-        "output_sha256": digest(output),
-        "test_log_path": str(test_log.relative_to(workspace)),
-        "test_log_sha256": digest(test_log),
-        "codex_log_path": str(codex_log.relative_to(workspace)),
+        "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
-        "reference_stdout_sha256": task.get("expected_stdout_sha256", ""),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
     }
-
+    if report.is_file() and not report.is_symlink():
+        receipt.update({
+            "engineering_report_path": str(report.relative_to(root)),
+            "engineering_report_sha256": digest(report),
+        })
+    # Preserve backward compatibility with older generated-file tasks;
+    # these artifacts are optional rather than a universal Path 3 allowlist.
+    if source is not None and source.is_file() and not source.is_symlink():
+        receipt.update({"source_path": output_path, "source_sha256": digest(source)})
+    if output is not None and output.is_file() and not output.is_symlink():
+        receipt.update({
+            "output_path": str(output.relative_to(root)),
+            "output_sha256": digest(output),
+        })
+    if test_log is not None and test_log.is_file() and not test_log.is_symlink():
+        receipt.update({
+            "test_log_path": str(test_log.relative_to(root)),
+            "test_log_sha256": digest(test_log),
+        })
+    require("engineering_report_sha256" in receipt or
+            all(k in receipt for k in (
+                "source_sha256", "output_sha256", "test_log_sha256")),
+            "CODEX_EVIDENCE_INCOMPLETE")
+    return receipt
 
 def safe_error_reason(exc: Exception) -> str:
     """Keep one trusted, constant build error code; never leak host paths."""
@@ -522,7 +571,7 @@ def main() -> int:
                     "path3-codex" if args.action == "execute-codex"
                     else "path2-cli"
                 ), "WRONG_EXECUTION_PATH")
-                task_approval = (authorize(event, os.environ, registry)
+                task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build")
                                  else None)

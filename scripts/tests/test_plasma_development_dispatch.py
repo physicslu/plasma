@@ -548,7 +548,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             task["tasks"]["nine-nine-path3"]["output_path"]=path
             with self.subTest(path=path), self.assertRaises(dev.Denied):
                 dev.task_by_id(task,"nine-nine-path3")
-        for prompt in ("", "x\nmalicious", "a"*801):
+        for prompt in ("", "x\x00malicious", "a"*8193):
             task=copy.deepcopy(self.registry)
             task["tasks"]["nine-nine-path3"]["objective"]=prompt
             with self.assertRaises(dev.Denied):
@@ -593,10 +593,10 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("workspace-write",calls[0][0])
-            self.assertIn("No Z2, FPGA, USB",calls[0][1]["input"].decode())
-            self.assertIn("independently check",calls[0][1]["input"].decode())
+            self.assertIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
+            self.assertIn("Record actual commands",calls[0][1]["input"].decode())
             self.assertNotIn("shell",calls[0][1])
-            self.assertTrue(target.with_suffix(".codex.log").is_file())
+            self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
 
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
@@ -610,9 +610,61 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             with self.assertRaisesRegex(dev.Denied,"CODEX_CLI_NONZERO"):
                 dev.run_codex_task(self.task,workspace=work,
                                    executor=lambda *args,**kwargs:Failure())
-            log=target.with_suffix(".codex.log").read_text()
+            log=(work/".plasma-path3-evidence/codex.log").read_text()
             self.assertIn("attempt failed",log)
             self.assertIn("problem detail",log)
+
+    def test_development_path3_supports_vivado_and_full_source_edits(self):
+        # Stub-only contract: no Vivado or physical device is invoked by CI.
+        task={
+            "execution_path":"path3-codex",
+            "objective":"Complete actual Vivado 2026.1 F1-B Host-only implementation, "
+                        "record all errors/fixes and real BIT HWH timing DRC evidence.",
+        }
+        dev.task_by_id({
+            "schema_version":dev.VERSION, "mode":"development",
+            "tasks":{"f1b-vivado-development":task},
+        },"f1b-vivado-development")
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            rtl=work/"pl/rtl/host_fixture.sv"
+            rtl.parent.mkdir(parents=True)
+            rtl.write_text("module placeholder; endmodule\n")
+            calls=[]
+            class Result:
+                returncode=0
+                stdout=b"host-build trial logged by stub"
+                stderr=b""
+            def fake_codex(command, **kwargs):
+                calls.append((command,kwargs))
+                rtl.write_text("module host_fixture; endmodule\n")
+                evidence=work/".plasma-path3-evidence"
+                (evidence/"engineering-report.md").write_text(
+                    "Actual host-only build log (stub fixture; NOT_RUN).\n"
+                    "Root cause and fix entries required in real execution.\n")
+                return Result()
+            receipt=dev.run_codex_task(task,workspace=work,
+                                       executor=fake_codex)
+            self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertNotIn("source_path",receipt)
+            self.assertIn("engineering_report_sha256",receipt)
+            self.assertIn("module host_fixture",rtl.read_text())
+            args,kwargs=calls[0]
+            self.assertEqual(kwargs["timeout"],None)
+            self.assertIn("workspace-write",args)
+            self.assertIn("sandbox_workspace_write.network_access=true",args)
+            self.assertIn("Vivado 2026.1",kwargs["input"].decode())
+            self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())
+            self.assertIn("Do not program or access physical FPGA",
+                          kwargs["input"].decode())
+            self.assertNotIn("Create or modify ONLY",kwargs["input"].decode())
+        workflow=WORKFLOW.read_text()
+        codex_job=workflow.split("  development-codex:",1)[1]
+        self.assertIn("timeout-minutes: 360",codex_job)
+        self.assertIn("git -C candidate diff --binary",codex_job)
+        self.assertIn("plasma-path3-new-files.tar.gz",codex_job)
+        self.assertIn("candidate/.plasma-path3-evidence/**",codex_job)
+        self.assertNotIn("CODEX_UNAPPROVED_WORKSPACE_CHANGE",codex_job)
 
     def test_one_existing_shared_runner_and_no_per_task_workflow(self):
         wf=WORKFLOW.read_text()
@@ -793,15 +845,25 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                    "pinned_sha":"a"*40,"trusted_sha":"a"*40},
                          sandbox=False)
             builder.assert_called_once()
-        with patch("plasma_vivado_host_build.run") as builder:
-            dev.run_task(task,workspace=ROOT,
-                         approval={"task_id":"fixed-site1-vivado-host-build",
-                                   "execution_path":"path2-cli",
-                                   "execution_capability":"vivado-host-build",
-                                   "pr_number":1063,
-                                   "pinned_sha":"b"*40,"trusted_sha":"a"*40},
-                         sandbox=False)
-            builder.assert_called_once()
+        # An approved PR must not silently fall back to the trusted main
+        # driver when its own fixed candidate driver is missing.
+        with tempfile.TemporaryDirectory() as td:
+            candidate = Path(td) / "candidate"
+            candidate.mkdir()
+            with patch("plasma_vivado_host_build.run") as builder:
+                with self.assertRaisesRegex(
+                    dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+                ):
+                    dev.run_task(task, workspace=candidate,
+                                 approval={
+                                     "task_id":"fixed-site1-vivado-host-build",
+                                     "execution_path":"path2-cli",
+                                     "execution_capability":"vivado-host-build",
+                                     "pr_number":1063,
+                                     "pinned_sha":"b"*40,
+                                     "trusted_sha":"a"*40},
+                                 sandbox=False)
+                builder.assert_not_called()
         for invalid in (
             {"task_id":"wrong"},
             {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
@@ -819,6 +881,63 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                     dev.run_task(task,workspace=ROOT,approval=base|invalid,
                                  sandbox=False)
                 builder.assert_not_called()
+
+    def test_candidate_vivado_driver_is_reviewed_and_not_trusted_main(self):
+        # Host-only unit fixture. Do not start Vivado or access SWPC/hardware.
+        import plasma_vivado_host_build as trusted_build
+        task=self.task
+        approval={
+            "task_id":"fixed-site1-vivado-host-build",
+            "execution_path":"path2-cli",
+            "execution_capability":"vivado-host-build",
+            "pr_number":1064,"pinned_sha":"b"*40,"trusted_sha":"a"*40,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)/"candidate"
+            scripts=work/"scripts"
+            scripts.mkdir(parents=True)
+            driver=scripts/"plasma_vivado_host_build.py"
+            driver.write_text(
+                "def run(task, *, workspace, approval, evidence_dir=None, "
+                "executor=None):\n"
+                "    return {'status':'CANDIDATE_DRIVER_TEST_ONLY'}\n",
+                encoding="utf-8")
+            with patch.object(trusted_build,"run") as main_driver:
+                result=dev.run_task(task,workspace=work,approval=approval)
+                self.assertEqual(result["status"],"CANDIDATE_DRIVER_TEST_ONLY")
+                main_driver.assert_not_called()
+            # PR driver is not admissible if absent or a symlink escape.
+            driver.unlink()
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+            outside=Path(td)/"unreviewed.py"
+            outside.write_text("raise RuntimeError('must not import')\n")
+            driver.symlink_to(outside)
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+            driver.unlink()
+            driver.write_text("x"*65537)
+            with self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+            ):
+                dev.run_task(task,workspace=work,approval=approval)
+
+    def test_workflow_transports_authorized_pr_identity_to_existing_runner(self):
+        wf=WORKFLOW.read_text()
+        self.assertIn("pr_info_base64: ${{ steps.approve.outputs.pr_info_base64 }}",wf)
+        self.assertIn("PR_INFO_BASE64: ${{ needs.development-authorize.outputs.pr_info_base64 }}",wf)
+        self.assertIn('pr_info_args+=(--pr-info "$RUNNER_TEMP/plasma-dev-pr.json")',wf)
+        self.assertIn('"${pr_info_args[@]}"',wf)
+        self.assertIn("ref: ${{ needs.development-authorize.outputs.trusted_sha }}",wf)
+        self.assertIn("ref: ${{ needs.development-authorize.outputs.pinned_sha }}",wf)
+        self.assertIn("python3 trusted/scripts/plasma_development_dispatch.py execute",wf)
+        dispatch=(ROOT/"scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("authorize(event, os.environ, registry, pr_info=pr)",dispatch)
+        self.assertNotIn("sudo ",wf)
 
     def test_sanitize_real_swpc_build_failure_codes(self):
         import plasma_vivado_host_build as build
