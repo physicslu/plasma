@@ -88,6 +88,7 @@ jobs:
       pinned_sha: ${{ steps.approve.outputs.pinned_sha }}
       trusted_sha: ${{ steps.approve.outputs.trusted_sha }}
       pr_number: ${{ steps.approve.outputs.pr_number }}
+      pr_info_base64: ${{ steps.approve.outputs.pr_info_base64 }}
       registry_sha256: ${{ steps.approve.outputs.registry_sha256 }}
       execution_path: ${{ steps.approve.outputs.execution_path }}
       execution_capability: ${{ steps.approve.outputs.execution_capability }}
@@ -154,8 +155,8 @@ jobs:
             --event "$GITHUB_EVENT_PATH" \
             --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
             "${args[@]}" > "$RUNNER_TEMP/plasma-dev-auth.json"
-          python3 - "$RUNNER_TEMP/plasma-dev-auth.json" "$GITHUB_OUTPUT" <<'PY'
-          import json,sys
+          python3 - "$RUNNER_TEMP/plasma-dev-auth.json" "$GITHUB_OUTPUT" "$RUNNER_TEMP/plasma-dev-pr.json" <<'PY'
+          import base64,json,sys
           with open(sys.argv[1], encoding="utf-8") as f:
               data=json.load(f)
           assert data["status"] == "AUTHORIZED_DEV_TASK"
@@ -165,6 +166,24 @@ jobs:
                   f.write(f"{k}={data[k]}\n")
               for k in ("comment_id","claim_ref","work_order_sha256"):
                   f.write(f"{k}={data.get(k,'')}\n")
+              # Pass only the minimal, already-verified PR identity snapshot.
+              # No second PR API client or runner is required on SWPC.
+              if data["pr_number"]:
+                  with open(sys.argv[3],encoding="utf-8") as pr_file:
+                      raw=json.load(pr_file)
+                  snapshot={
+                      "number":raw["number"],"state":raw["state"],
+                      "merged_at":raw["merged_at"],
+                      "user":{"login":raw["user"]["login"]},
+                      "head":{"ref":raw["head"]["ref"],"sha":raw["head"]["sha"],
+                              "repo":{"full_name":raw["head"]["repo"]["full_name"]}},
+                      "base":{"ref":raw["base"]["ref"],
+                              "repo":{"full_name":raw["base"]["repo"]["full_name"]}},
+                  }
+                  packed=base64.b64encode(json.dumps(
+                      snapshot,sort_keys=True,separators=(",",":")
+                  ).encode("utf-8")).decode("ascii")
+                  f.write(f"pr_info_base64={packed}\n")
           PY
 
   development-claim:
@@ -326,6 +345,7 @@ jobs:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
+          PR_INFO_BASE64: ${{ needs.development-authorize.outputs.pr_info_base64 }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
@@ -335,9 +355,28 @@ jobs:
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
+          pr_info_args=()
+          if [ "$PR_NUMBER" != "0" ]; then
+            # A completed trusted authorization job supplied this pinned
+            # PR identity; revalidate it inside the trusted SWPC dispatcher.
+            python3 - "$RUNNER_TEMP/plasma-dev-pr.json" <<'PY'
+          import base64,json,os,sys
+          from pathlib import Path
+          encoded=os.environ.get("PR_INFO_BASE64","")
+          assert 0 < len(encoded) <= 8192,"AUTHORIZED_PR_SNAPSHOT_MISSING"
+          data=base64.b64decode(encoded,validate=True)
+          assert len(data) <= 4096,"AUTHORIZED_PR_SNAPSHOT_TOO_LARGE"
+          record=json.loads(data)
+          Path(sys.argv[1]).write_text(json.dumps(record),encoding="utf-8")
+          PY
+            pr_info_args+=(--pr-info "$RUNNER_TEMP/plasma-dev-pr.json")
+          else
+            test -z "$PR_INFO_BASE64"
+          fi
           python3 trusted/scripts/plasma_development_dispatch.py execute \
             --event "$GITHUB_EVENT_PATH" \
             --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
+            "${pr_info_args[@]}" \
             --workspace candidate --evidence-dir "$RUNNER_TEMP" \
             --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
