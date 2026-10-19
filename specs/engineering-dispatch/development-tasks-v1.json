@@ -44,7 +44,7 @@
       "execution_path": "path3-codex",
       "output_path": "scripts/experiments/plasma_f1b_host_failure_generated.py",
       "output_format": "text",
-      "objective": "Analyze F1-B Path 2 GitHub Run 39274388453: real SWPC job exited 2, receipt NOT_RUN_OR_FAIL reason EXECUTION_ERROR. Read existing scripts/plasma_development_dispatch.py, scripts/plasma_vivado_host_build.py and pl/projects/z2-swd-gpio/prepare-board-repository.sh. Create an offline Python diagnosis that reproduces exception paths using mocks, distinguishes proven facts from hypotheses, and prints a minimal proposed source diff or blocker. Run it; record actual commands, exit codes, test results and failures in the test log. Only modify the designated generated Python source, .txt output and .test.log. Do not run Vivado, SSH, sudo, network, Z2, FPGA, USB, LA, MMIO, DUT or power."
+      "objective": "Run READ-ONLY SWPC diagnostics for F1-B Path 2 failure Run 39274388453; previous Codex mocks 9/9 PASSED but could not identify generic EXECUTION_ERROR. Inspect existing dispatcher and host build source. Via Python pathlib/os.stat/os.access only, report current effective UID/GID and existence, owner, mode, write-access status for /storage/projects/plasma/pl/build, its parent and /storage/tools/xilinx/2026.1/Vivado/settings64.sh. Check candidate board cache without cloning. Do NOT create, delete or write files outside the designated generated Python, .txt and .test.log. Demonstrate error-classification tests and propose a focused code fix, distinguish real observations from hypotheses, log commands/exits. No Vivado, shell helper, network, SSH, sudo, USB, FPGA, Z2, DUT or LA."
     }
   }
 }
