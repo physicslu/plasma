@@ -632,3 +632,136 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 if __name__=="__main__":
     unittest.main(verbosity=2)
+
+
+class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
+    """Offline-only Path 2 host-build policy tests; never invokes Vivado."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.registry=json.loads(REGISTRY.read_text())
+        cls.task=dev.task_by_id(cls.registry,"fixed-site1-vivado-host-build")
+
+    def event(self):
+        e=DevelopmentPath2Contracts().event()
+        e["comment"]["body"]="/plasma-dispatch run fixed-site1-vivado-host-build 981"
+        return e
+
+    def context(self):
+        return DevelopmentPath2Contracts().context() | {"GITHUB_RUN_ATTEMPT":"1"}
+
+    def test_path2_is_not_synonymous_with_cpu_only(self):
+        task=self.task
+        self.assertEqual(task["execution_path"],"path2-cli")
+        self.assertEqual(task["capability"],"vivado-host-build")
+        approved=dev.authorize(self.event(),self.context(),self.registry)
+        self.assertEqual(approved["execution_capability"],"vivado-host-build")
+        self.assertEqual(approved["pr_number"],0)
+        self.assertEqual(approved["pinned_sha"],approved["trusted_sha"])
+        # Existing CPU-only path and original bwrap isolation remain intact.
+        cpu=dev.task_by_id(self.registry,"nine-nine-path2")
+        self.assertEqual(cpu["capability"],"cpu-only")
+
+    def test_host_build_main_only_and_no_replays(self):
+        ctx=self.context()
+        for attempt in ("2","0","","abc"):
+            with self.subTest(attempt=attempt),self.assertRaisesRegex(
+                dev.Denied,"HOST_BUILD_RERUN_DENIED"
+            ):
+                dev.authorize(self.event(),ctx | {"GITHUB_RUN_ATTEMPT":attempt},
+                              self.registry)
+        fixture=DevelopmentBranchDispatchContracts()
+        branch_event=fixture.branch_event(
+            task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
+        branch_context=ctx
+        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_TRUSTED_MAIN_ONLY"):
+            dev.authorize(branch_event,branch_context,self.registry,
+                          pr_info=fixture.valid_pr())
+
+    def test_host_build_schema_rejects_arbitrary_cli_and_capabilities(self):
+        task=dict(self.task)
+        for key,value in (
+            ("project","../../scripts"),
+            ("project","/tmp/my-project"),
+            ("project","pl/projects/../danger"),
+            ("toolchain","2025.2"),
+            ("board_repo_sha","bad"),
+            ("capability","host-root"),
+        ):
+            with self.subTest(field=key,bad=value),self.assertRaises(dev.Denied):
+                bad=dict(task,**{key:value})
+                reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":bad}}
+                dev.task_by_id(reg,"fixed-site1-vivado-host-build")
+        with self.assertRaises(dev.Denied):
+            reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":
+                                         dict(task,argv=["--program-fpga"])}}
+            dev.task_by_id(reg,"fixed-site1-vivado-host-build")
+
+    def test_runner_guard_is_host_build_capability_and_main_only(self):
+        wf=WORKFLOW.read_text()
+        guard=wf.split("  development-execute:",1)[1].split(
+            "  development-codex:",1)[0].split(
+            "    if: >-",1)[1].split("    runs-on:",1)[0]
+        self.assertIn("execution_capability == 'vivado-host-build'",guard)
+        self.assertIn("outputs.pr_number == '0'",guard)
+        self.assertIn("github.run_attempt == 1",guard)
+        self.assertIn("execution_capability == 'cpu-only'",guard)
+        self.assertIn("execution_capability == 'z2-cpu-only'",guard)
+        self.assertIn("needs.development-claim.result == 'success'",guard)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
+        self.assertIn("== 'vivado-host-build' && 50 || 5",wf)
+        self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
+
+    def test_host_build_source_preflight_is_pure_and_strict(self):
+        import plasma_vivado_host_build as build
+        approval=dev.authorize(self.event(),self.context(),self.registry)
+        env={
+            "GITHUB_REPOSITORY":"physicslu/plasma",
+            "RUNNER_NAME":"SWPC-plasma-codex",
+            "RUNNER_ENVIRONMENT":"self-hosted",
+            "GITHUB_EVENT_NAME":"issue_comment",
+            "GITHUB_REF":"refs/heads/main",
+            "GITHUB_RUN_ATTEMPT":"1",
+            "GITHUB_SHA":approval["trusted_sha"],
+        }
+        # This uses only local tracked source. No SWPC or Vivado call.
+        p=build.preflight(self.task,workspace=ROOT,approval=approval,env=env)
+        self.assertEqual(p["toolchain"],"2026.1")
+        self.assertIn("z2-fixed-unified-site1",p["project"])
+        self.assertEqual(p["board_sha"],self.task["board_repo_sha"])
+        for changed in (
+            {"RUNNER_NAME":"some-runner"},
+            {"GITHUB_RUN_ATTEMPT":"2"},
+            {"GITHUB_SHA":"b"*40},
+            {"GITHUB_EVENT_NAME":"pull_request"},
+            {"GITHUB_REF":"refs/heads/feature"},
+        ):
+            with self.subTest(change=changed),self.assertRaises(build.BuildDenied):
+                build.preflight(self.task,workspace=ROOT,approval=approval,
+                                env=env|changed)
+        with self.assertRaises(build.BuildDenied):
+            build.preflight(self.task,workspace=ROOT,
+                            approval=dict(approval,pr_number=1059),env=env)
+        with self.assertRaises(build.BuildDenied):
+            build.preflight(dict(self.task,project="pl/projects/../bad"),
+                            workspace=ROOT,approval=approval,env=env)
+
+    def test_host_build_exec_requires_authorization_before_any_process(self):
+        task=self.task
+        with patch("plasma_vivado_host_build.run") as dangerous:
+            with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_APPROVAL_REQUIRED"):
+                dev.run_task(task,workspace=ROOT,approval=None,sandbox=False)
+            dangerous.assert_not_called()
+        with patch("plasma_vivado_host_build.run") as builder:
+            dev.run_task(task,workspace=ROOT,
+                         approval={"task_id":"fixed-site1-vivado-host-build",
+                                   "execution_path":"path2-cli",
+                                   "execution_capability":"vivado-host-build",
+                                   "pr_number":0,
+                                   "pinned_sha":"a"*40,"trusted_sha":"a"*40},
+                         sandbox=False)
+            builder.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()
