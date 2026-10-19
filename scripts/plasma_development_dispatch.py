@@ -251,27 +251,32 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     test_log = source.with_suffix(".test.log")
     codex_log = source.with_suffix(".codex.log")
     require(source.parent.is_dir() and not any(
-        p.exists() for p in (source, output, test_log, codex_log)
+        p.exists() for p in (output, test_log, codex_log)
     ), "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
+    require(not source.exists() or (
+        source.is_file() and not source.is_symlink()
+    ), "CODEX_SOURCE_PATH_DENIED")
     prompt = (
         "PLASMA single-owner Development Mode Path 3. You are the engineer. "
         "Independently implement, run, test, debug and finish the task.\n"
         "Goal: " + task["objective"] + "\n"
-        "Write your Python implementation to " + task["output_path"] + ".\n"
+        "Create or update the approved Python file " + task["output_path"] +
+        " (it may already exist in this candidate revision).\n"
         "Execute that code yourself using Python on this Runner. Capture "
         "the program's ACTUAL complete output as CSV in " +
         str(output.relative_to(workspace)) + ".\n"
-        "Independently check that the 9 x 9 results are mathematically "
-        "correct and complete (81 products); if not, fix the code and "
-        "rerun it yourself. Write a short honest test report, with the "
+        "Independently check that your output satisfies the stated "
+        "objective and covers the relevant positive/negative cases; "
+        "if not, fix the source and rerun it yourself. "
+        "Write a short honest test report, with the "
         "actual command(s), observed test outcome, test counts and exit "
         "status, to " + str(test_log.relative_to(workspace)) + ".\n"
         "Any Python implementation is acceptable. Header labels or AST "
         "shape need NOT match the Path 2 implementation. Do not falsely "
         "claim a test passed or fabricate outputs. Keep all generated "
         "source and evidence files, including on failure.\n"
-        "Only create the specified implementation, CSV and test report. "
-        "Do not modify existing files, Git state or repositories. "
+        "Create or modify ONLY the specified source and its CSV/test "
+        "evidence. Do not modify other project files or Git state. "
         "No Z2, FPGA, USB, LA, DUT, MMIO, SSH, sudo, physical device, "
         "network or deployment actions. Stop if these are required.\n"
     )
