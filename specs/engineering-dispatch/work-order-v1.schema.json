@@ -54,7 +54,8 @@
         "software-pr",
         "la2016-loopback",
         "z2-readonly",
-        "z2-privileged"
+        "z2-privileged",
+        "z2-cpu-only"
       ]
     },
     "entrypoint": {
@@ -63,7 +64,8 @@
         "software-pr",
         "la2016-direct",
         "z2-inventory",
-        "z2-hil-protected"
+        "z2-hil-protected",
+        "z2-cpu-only"
       ]
     },
     "scope": {
@@ -115,7 +117,8 @@
               "repo:write-branch",
               "usb:la2016",
               "ssh:z2-readonly",
-              "z2:hardware-owner"
+              "z2:hardware-owner",
+              "ssh:z2-cpu-only"
             ]
           }
         }
@@ -162,6 +165,12 @@
       "enum": [
         "gate1-implementation",
         "hardware-one-shot"
+      ]
+    },
+    "runtime_status": {
+      "enum": [
+        "DISABLED_GATE1",
+        "OWNER_APPROVED_ONE_SHOT"
       ]
     }
   }
