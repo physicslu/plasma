@@ -152,7 +152,7 @@ class PostmergeGateTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(adm.Refused):
                 self.good(x)
 
-    def test_contract_wiring_offline_only_and_no_comment_trigger(self):
+    def test_archived_postmerge_logic_not_wired_and_owner_comment_is_required(self):
         wf=(ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
         # The 2026-10-19 one-shot #1034 admission is historical only.
         # New software tasks require the same separate owner Issue trigger as HIL.
