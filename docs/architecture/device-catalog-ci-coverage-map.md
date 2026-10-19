@@ -1,6 +1,6 @@
 # Device Catalog CI Coverage Map
 
-Status: **Phase 2 inventory complete for the current workflow set; no workflow retirement is authorized by this document alone**
+Status: **Historical Phase 2 inventory, with 2026-10-19 consolidation and trigger-hygiene update; this coverage map does not authorize further retirement**
 
 Baseline: `main` at `9aca1bb7bcb2c61105e56b195990e1ebbbeed9db`.
 
@@ -67,7 +67,7 @@ The dispatcher workflow covers F0/F2/F3/F7/G0/G4/C0 and shared catalog infrastru
 
 The workflow also carries path references to older family workflow filenames and a C0 live workflow filename that are no longer present. These are stale trigger references and should be removed in a hygiene PR only after the active trigger set is tested.
 
-## 6. STM32C0 overlap pilot
+## 6. STM32C0 overlap pilot (historical five-stage chain)
 
 | Workflow | Trigger | Authority / validator coverage | Overlap / disposition | Lifecycle |
 |---|---|---|---|---|
@@ -77,7 +77,9 @@ The workflow also carries path references to older family workflow filenames and
 | `device-catalog-stm32c0-c04-admission-validation.yml` | PR + `main` | C0.4 admission plus retained-evidence/metadata prerequisites | Substantial dispatcher overlap; parity not yet proven | `stage-deterministic` |
 | `device-catalog-stm32c0-c05-publication-validation.yml` | PR + `main` | C0.5 tests, admission-plan validation, publication `--verify` | Dispatcher lacks full publication replay parity | `stage-deterministic` |
 
-C0 is the first safe consolidation target, but none of these five workflows is retireable yet. Replacement coverage must absorb every stage-only check, preserve trigger parity, and pass negative controls before deletion.
+Historical note (baseline `9aca1bb7`): C0 was an unmerged five-stage consolidation candidate. **PR #1054 has now merged**, preserving the five original job bodies and all C0.1–C0.5 unit/negative/retained-evidence/admission/publication `--verify` checks inside `.github/workflows/device-catalog-stm32c0-stage-dispatch.yml`. All five historical YAMLs are preserved byte-identically under `docs/archive/ci-workflows/stm32c0-stages/`. The five entries in the table above are **historical**, not active Workflow definitions.
+
+The STM32 family dispatcher must retain a path trigger on the new C0 stage dispatcher. The retired C0 files and six earlier F0/F2/F3/F7/G0/G4 Workflows are no longer valid trigger targets. The family CI self-test rejects future dead Workflow path references in both `pull_request` and `main` `push` trigger lists. Unmerged **PR #1044 (STM32U0 replay/trigger parity)** remains an independent task and is not claimed as part of this hygiene change.
 
 ## 7. STM32L0, L1 and L4 deterministic stage chains
 

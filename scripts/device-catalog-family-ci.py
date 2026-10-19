@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -217,6 +218,31 @@ def run_family(family: str) -> None:
         subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 
+
+C0_STAGE_DISPATCHER_PATH = ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"
+
+def assert_active_workflow_refs(yaml_source: str) -> None:
+    """Fail closed when active PR/push Workflows cite removed workflow filenames."""
+    for event in ("push", "pull_request"):
+        begin = "\n  " + event + ":\n"
+        if yaml_source.count(begin) != 1:
+            raise AssertionError(f"{event}: missing or duplicate event")
+        section = yaml_source.split(begin, 1)[1]
+        if event == "push":
+            section = section.split("\n  pull_request:\n", 1)[0]
+        else:
+            section = section.split("\nconcurrency:", 1)[0]
+        refs = re.findall(r'(?m)^      - "(\.github/workflows/[^"]+)"', section)
+        if len(refs) != len(set(refs)):
+            raise AssertionError(f"{event}: duplicated workflow path")
+        expected = {DISPATCHER_PATH, C0_STAGE_DISPATCHER_PATH}
+        if set(refs) != expected:
+            raise AssertionError(f"{event}: stale/missing workflow paths: {sorted(set(refs) ^ expected)}")
+        for ref in refs:
+            if not (REPO_ROOT / ref).is_file():
+                raise AssertionError(f"{event}: missing target {ref}")
+
+
 def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32g4_phase4_9d_admission.py"]) == ["stm32g4"]
     assert affected_families(["data/device-catalog/research/stm32u0_phase_u0_2_discovery.py"]) == ["stm32u0"]
@@ -226,6 +252,16 @@ def self_test() -> None:
     assert affected_families(["data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/device-catalog-phase4.5c-stm32f0-policy.md"]) == ["stm32f0"]
     assert affected_families([".github/workflows/device-catalog-stm32f2-bounded-validation.yml"]) == ["stm32f2"]
+    assert affected_families([C0_STAGE_DISPATCHER_PATH]) == ["stm32c0"]
+    workflow_text = (REPO_ROOT / DISPATCHER_PATH).read_text(encoding="utf-8")
+    assert_active_workflow_refs(workflow_text)
+    deleted_path = workflow_text.replace(C0_STAGE_DISPATCHER_PATH, ".github/workflows/does-not-exist.yml", 1)
+    try:
+        assert_active_workflow_refs(deleted_path)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Deleted-workflow path was not rejected")
     assert affected_families(["data/device-catalog/research/openocd-parts-canonical.csv"]) == list(FAMILIES)
     assert affected_families([RUNNER_PATH]) == []
     assert affected_families(["data/device-catalog/production/icpn-v1-manifest.json"]) == []
