@@ -55,3 +55,11 @@ Hosted CI runs scripts/tests/test_plasma_hil_a2_cpu_only.py: positive synthetic 
 Before any future real HIL, verify the live Claim-ref CREATE/readback canary under the same Actions identity and enforce actual safe Z2 site ownership and recovery facts; a generic Zynq-7000 Device Tree and Cortex-A9 do not establish exact PYNQ-Z2 board identity. The historical hardware-capable Linux worker group cannot be called a true OS sandbox.
 
 **This PR stops at Gate 2 review. Real Z2 A2 = NOT_RUN; M1 = NO_GO.**
+
+## PR #1052 Development Branch Dispatch integration
+
+HIL-A2 is **trusted main-only**. The A2 task is not admitted through a PR candidate checkout even when the PR is owner-created and its SHA is pinned: an A2 request must use the owner Issue #981 main-only form and has PR number zero. This prevents a branch-supplied A2 Work Order or Python candidate from accessing the hardware-capable worker. All non-A2 Path 2/3 PR HEAD admissions from PR #1052 remain available with separate `trusted` and `candidate` checkouts.
+
+The shared hosted `development-authorize` validates the main-only A2 Work Order and computes the Comment-ID + Work-Order-SHA256 claim. The hosted `development-claim` then atomically creates the protected one-shot ref, verifies readback, and only on success can `development-execute` run the pinned trusted main A2 CLI. No new task Workflow or per-run Registry/Work Order/Variable toggles. GitHub-hosted contract tests cannot establish live Claim creation or physical Z2 readiness.
+
+Live A2 Claim, actual SWPC, Z2 SSH, FPGA, MMIO and DUT remain NOT_RUN under this Gate 1; M1 stays NO_GO.
