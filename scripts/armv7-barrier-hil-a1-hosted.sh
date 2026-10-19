@@ -41,6 +41,7 @@ docker run --rm --platform linux/amd64 \
       --output-dir /out/build --expected-sha "$GITHUB_SHA"
     test -s /out/build/libplasma_mmio_barrier.so
     test -s /out/build/receipt.json
+    chmod -R a+rX /out/build
   '
 
 test -f "$ROOT/build/receipt.json"
