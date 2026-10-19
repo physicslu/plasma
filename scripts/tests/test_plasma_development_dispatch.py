@@ -630,9 +630,6 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 
 
-if __name__=="__main__":
-    unittest.main(verbosity=2)
-
 
 class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
     """Offline-only Path 2 host-build policy tests; never invokes Vivado."""
@@ -761,6 +758,36 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                    "pinned_sha":"a"*40,"trusted_sha":"a"*40},
                          sandbox=False)
             builder.assert_called_once()
+
+    def test_sanitize_real_swpc_build_failure_codes(self):
+        import plasma_vivado_host_build as build
+        self.assertEqual(
+            dev.safe_error_reason(build.BuildDenied("BUILD_BOARD_REPO_MISSING")),
+            "BUILD_BOARD_REPO_MISSING",
+        )
+        self.assertEqual(
+            dev.safe_error_reason(build.BuildDenied("BUILD_BOARD_SHA_MISMATCH")),
+            "BUILD_BOARD_SHA_MISMATCH",
+        )
+        self.assertEqual(dev.safe_error_reason(dev.Denied("OWNER_DENIED")),
+                         "OWNER_DENIED")
+        for exc in (ValueError("/home/private/ssh/id_rsa"),
+                    OSError("/etc/private/secret"),
+                    build.BuildDenied("unsafe secret: /home/user")):
+            with self.subTest(error=str(exc)):
+                self.assertEqual(dev.safe_error_reason(exc), "EXECUTION_ERROR")
+
+    def test_vivado_reuses_prior_board_repository_not_another_setup(self):
+        # Existing qualified cache and integrity check; no new workflow,
+        # runner, board download or first-run network access is introduced.
+        src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
+        self.assertIn('ROOT_FOR_BUILDS / "z2-swd-gpio" / "board-repository"', src)
+        self.assertIn('os.environ.get("PLASMA_BOARD_REPO") or str(existing_cache)',src)
+        self.assertIn('actual_board_sha == plan["board_sha"]',src)
+        self.assertIn('BUILD_BOARD_REPO_MISSING',src)
+        self.assertNotIn("git clone",src)
+        self.assertNotIn("prepare-board-repository.sh",src)
+
 
 
 if __name__ == "__main__":
