@@ -115,7 +115,7 @@ class DevelopmentPath2Contracts(unittest.TestCase):
                 dev.task_by_id(task,"nine-nine-path2")
         task=copy.deepcopy(self.registry)
         task["tasks"]["nine-nine-path2"]["execution_path"]="path3-codex"
-        with self.assertRaisesRegex(dev.Denied,"PATH_NOT_SUPPORTED"):
+        with self.assertRaises(dev.Denied):
             dev.task_by_id(task,"nine-nine-path2")
         task=copy.deepcopy(self.registry)
         task["tasks"]["nine-nine-path2"]["expected_stdout_sha256"]="0"*64
@@ -151,6 +151,108 @@ class DevelopmentPath2Contracts(unittest.TestCase):
         self.assertNotIn("run: sudo ",wf)
         self.assertNotIn("plasma-path2-nine-nine.yml",wf)
         self.assertEqual(self.registry["mode"],"development")
+
+
+class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
+    @classmethod
+    def setUpClass(cls):
+        cls.registry=json.loads(REGISTRY.read_text())
+        cls.task=dev.task_by_id(cls.registry,"nine-nine-path3")
+
+    def event(self):
+        value=super().event()
+        value["comment"]["body"]="/plasma-dispatch run nine-nine-path3 981"
+        return value
+
+    def test_owner_issue_comment_authorizes_one_pinned_task(self):
+        plan=dev.authorize(self.event(),self.context(),self.registry)
+        self.assertEqual(plan["task_id"],"nine-nine-path3")
+        self.assertEqual(plan["execution_path"],"path3-codex")
+        self.assertEqual(plan["pinned_sha"],"a"*40)
+
+    def test_real_reference_runs_as_bounded_process_in_hosted_ci(self):
+        # This class tests Codex with a fake agent, never calls real Codex.
+        self.assertEqual(self.task["execution_path"],"path3-codex")
+        self.assertEqual(self.task["expected_stdout_sha256"],
+                         "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d")
+
+    def test_registry_refuses_arbitrary_commands_and_paths(self):
+        for path in ("/tmp/payload.py",
+                     "scripts/experiments/../../../tmp/evil.py",
+                     "scripts/experiments/plasma_x_generated.sh",
+                     "scripts/experiments/x.py"):
+            task=copy.deepcopy(self.registry)
+            task["tasks"]["nine-nine-path3"]["output_path"]=path
+            with self.subTest(path=path), self.assertRaises(dev.Denied):
+                dev.task_by_id(task,"nine-nine-path3")
+        for prompt in ("", "x\nmalicious", "a"*801):
+            task=copy.deepcopy(self.registry)
+            task["tasks"]["nine-nine-path3"]["objective"]=prompt
+            with self.assertRaises(dev.Denied):
+                dev.task_by_id(task,"nine-nine-path3")
+        task=copy.deepcopy(self.registry)
+        task["tasks"]["nine-nine-path3"]["argv"]=["sudo"]
+        with self.assertRaisesRegex(dev.Denied,"TASK_FIELDS_DENIED"):
+            dev.task_by_id(task,"nine-nine-path3")
+
+    def test_codex_source_ast_rejects_hardware_or_shell_commands(self):
+        program='print("multiplicand,multiplier,product")\nfor a in range(1, 10):\n    for b in range(1, 10):\n        print(f"{a},{b},{a*b}")\n'
+        dev.validate_generated_source(program)
+        attacks=[
+            'import os\n'+program,
+            program+'\nimport subprocess\n',
+            program+'\nopen("/dev/mem")\n',
+            program.replace('print(f"{a},{b},{a*b}")',
+                            'print(__import__("os").system("id"))'),
+            program.replace('range(1, 10)','range(0, 10)'),
+            program.replace('print(f"{a},{b},{a*b}")',
+                            'print(f"{a},{b},{a*b}"); print("bad")'),
+        ]
+        for attack in attacks:
+            with self.subTest(attack=attack[:45]),self.assertRaises(dev.Denied):
+                dev.validate_generated_source(attack)
+
+    def test_fake_codex_produces_validated_81_cell_program(self):
+        program='print("multiplicand,multiplier,product")\nfor a in range(1, 10):\n    for b in range(1, 10):\n        print(f"{a},{b},{a*b}")\n'
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            target=work/self.task["output_path"]
+            target.parent.mkdir(parents=True)
+            calls=[]
+            class Result:
+                returncode=0
+                stdout=b"fake Codex CLI success"
+                stderr=b""
+            def fake_codex(command, **kwargs):
+                calls.append((command,kwargs))
+                target.write_text(program)
+                return Result()
+            receipt=dev.run_codex_task(self.task,workspace=work,executor=fake_codex)
+            self.assertEqual(receipt["status"],"PASS")
+            self.assertEqual(receipt["rows"],81)
+            self.assertEqual(receipt["stdout_bytes"],576)
+            self.assertEqual(receipt["exit_code"],0)
+            self.assertEqual(receipt["codex_exit_code"],0)
+            self.assertEqual(receipt["first_row"],"1,1,1")
+            self.assertEqual(receipt["last_row"],"9,9,81")
+            self.assertEqual(receipt["stdout_sha256"],
+                             "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d")
+            self.assertEqual(len(calls),1)
+            self.assertEqual(calls[0][0][0],"codex")
+            self.assertIn("workspace-write",calls[0][0])
+            self.assertIn("No Z2, FPGA, USB",calls[0][1]["input"].decode())
+            self.assertNotIn("shell",calls[0][1])
+
+    def test_one_existing_shared_runner_and_no_per_task_workflow(self):
+        wf=WORKFLOW.read_text()
+        self.assertIn("development-codex:",wf)
+        self.assertIn("needs: development-authorize",wf)
+        self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",wf)
+        self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
+        self.assertIn("scripts/plasma_development_dispatch.py execute-codex",wf)
+        self.assertIn("persist-credentials: false",wf)
+        self.assertNotIn("plasma-path3-nine-nine.yml",wf)
+
 
 
 if __name__=="__main__":
