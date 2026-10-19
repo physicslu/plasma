@@ -95,10 +95,15 @@ def task_by_id(registry: object, task_id: str) -> dict:
             and not x.startswith("-") and ".." not in x for x in argv
         ), "TASK_ARGS_DENIED")
     else:
-        require(set(task) == {
+        require(set(task) in ({
             "execution_path", "output_path", "objective",
             "expected_stdout_sha256",
-        }, "TASK_FIELDS_DENIED")
+        }, {
+            "execution_path", "output_path", "objective",
+            "expected_stdout_sha256", "output_format",
+        }), "TASK_FIELDS_DENIED")
+        require(task.get("output_format", "csv") in ("csv", "text"),
+                "CODEX_EVIDENCE_FORMAT_DENIED")
         output_path = task["output_path"]
         require(type(output_path) is str and re.fullmatch(
             r"scripts/experiments/plasma_[a-z0-9_]+_generated\.py",
@@ -247,7 +252,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     declare the work correct. Only actual reviewer evidence can prove PASS.
     """
     source = workspace / task["output_path"]
-    output = source.with_suffix(".csv")
+    output = source.with_suffix(".txt" if task.get("output_format") == "text" else ".csv")
     test_log = source.with_suffix(".test.log")
     codex_log = source.with_suffix(".codex.log")
     require(source.parent.is_dir() and not any(
