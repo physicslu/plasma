@@ -325,11 +325,15 @@ def assert_rejected_trigger_mutation(yaml_source: str, event: str,
     """One-event negative control: PR/main trigger parity must fail."""
     prefix = "\n  " + event + ":\n"
     before, after = yaml_source.split(prefix, 1)
+    boundary = "\n  pull_request:\n" if event == "push" else "\nconcurrency:"
+    if after.count(boundary) != 1:
+        raise AssertionError(f"{event}: missing mutation event boundary")
+    event_section, suffix = after.split(boundary, 1)
     original = '      - "' + old_path + '"'
     replacement = ('      - "' + new_path + '"' if new_path else "")
-    if after.count(original) != 1:
+    if event_section.count(original) != 1:
         raise AssertionError(f"{event}: missing/duplicate mutation fixture {old_path}")
-    tampered = before + prefix + after.replace(original, replacement, 1)
+    tampered = before + prefix + event_section.replace(original, replacement, 1) + boundary + suffix
     try:
         assert_active_workflow_refs(tampered)
     except AssertionError as exc:
