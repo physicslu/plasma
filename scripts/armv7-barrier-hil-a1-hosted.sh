@@ -20,7 +20,7 @@ umask 077
 mkdir -m 700 "$ROOT"
 
 docker run --rm --platform linux/amd64 \
-  --cap-drop=ALL --security-opt no-new-privileges \
+  --cap-drop=NET_RAW --security-opt no-new-privileges \
   --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/plasma,readonly" \
   --mount "type=bind,src=$ROOT,dst=/out" \
   -e GITHUB_SHA="$GITHUB_SHA" \
