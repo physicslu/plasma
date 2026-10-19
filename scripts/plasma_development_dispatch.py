@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -85,15 +86,18 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "A2_TASK_BINDING_DENIED")
         return task
     if execution_path == "path2-cli":
-        require(set(task) in ({
+        # One generic CPU-only route, independent of task name. Older
+        # development fixtures without capability are treated as cpu-only.
+        require(set(task) >= {
             "execution_path", "script", "argv", "expected_stdout_sha256",
-        }, {
+        } and set(task) <= {
             "execution_path", "script", "argv", "expected_stdout_sha256",
-            "verification",
-        }), "TASK_FIELDS_DENIED")
-        require(task.get("verification", "sha256-only") in (
-            "sha256-only", "nine-nine-table-v1",
-        ), "TASK_VERIFICATION_DENIED")
+            "verification", "capability",
+        }, "TASK_FIELDS_DENIED")
+        require(task.get("capability", "cpu-only") == "cpu-only",
+                "DEV_CAPABILITY_DENIED")
+        require(task.get("verification", "sha256-only") == "sha256-only",
+                "TASK_VERIFICATION_DENIED")
         path = task["script"]
         require(type(path) is str and re.fullmatch(
             r"scripts/experiments/[a-zA-Z0-9_-]+\.py", path
@@ -238,13 +242,18 @@ def authorize(event: object, context: dict, registry: object,
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
+        "execution_capability": (
+            "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
+            else "cpu-only" if task["execution_path"] == "path2-cli"
+            else "codex-workspace"
+        ),
         **a2_claim,
     }
 
 
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None,
-             approval: dict | None = None) -> dict:
+             approval: dict | None = None, sandbox: bool = False) -> dict:
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -259,12 +268,45 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         work_order = parse_json(ROOT / task["work_order"])
         artifact_dir = Path(os.environ.get("PLASMA_HIL_A2_ARTIFACT_DIR", "/nonexistent"))
         return a2.run_once(work_order, artifact_dir, approval=approval)
-    script = workspace / task["script"]
-    require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
+    # Resolve before switching cwd: otherwise a relative candidate workspace
+    # doubles the prefix (candidate/candidate/scripts/...).
+    workspace_root = workspace.resolve()
+    requested_script = workspace / task["script"]
+    script = requested_script.resolve()
+    require(script.is_relative_to(workspace_root) and
+            requested_script.is_file() and not requested_script.is_symlink(),
+            "SCRIPT_NOT_FOUND")
+    command = [sys.executable, str(script), *task["argv"]]
+    if sandbox:
+        # Fail closed on SWPC if the OS-level CPU-only namespace sandbox
+        # is missing/unavailable. Never execute untrusted candidate Python
+        # with the host's original device or network privileges.
+        wrapper = shutil.which("bwrap")
+        require(wrapper is not None and Path(wrapper).is_file(),
+                "CPU_ONLY_SANDBOX_UNAVAILABLE")
+        executable = Path(sys.executable).resolve()
+        require(executable.is_relative_to(Path("/usr")) or
+                executable.is_relative_to(Path("/bin")),
+                "CPU_ONLY_PYTHON_OUTSIDE_RO_BIND")
+        binds = []
+        for system_dir in ("/usr", "/bin", "/lib", "/lib64"):
+            if Path(system_dir).exists():
+                binds.extend(["--ro-bind", system_dir, system_dir])
+        command = [
+            wrapper, "--die-with-parent", "--new-session", "--unshare-all",
+            "--clearenv", *binds,
+            "--ro-bind", str(workspace_root), "/work",
+            "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+            "--setenv", "HOME", "/tmp",
+            "--setenv", "PATH", "/usr/bin:/bin",
+            "--setenv", "PYTHONNOUSERSITE", "1",
+            "--chdir", "/work", "--",
+            sys.executable, "-I", "-S",
+            str(Path("/work") / task["script"]), *task["argv"],
+        ]
     proc = executor(
-        [sys.executable, str(script), *task["argv"]],
-        cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        timeout=40, check=False,
+        command, cwd=workspace_root, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, timeout=40, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,
             "OUTPUT_EXCEEDS_LIMIT")
@@ -276,14 +318,6 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     lines = proc.stdout.decode("ascii").splitlines()
     require(proc.returncode == 0 and proc.stderr == b"", "COMMAND_FAILED")
     require(digest == task["expected_stdout_sha256"], "OUTPUT_SHA256_MISMATCH")
-    if task.get("verification", "sha256-only") == "nine-nine-table-v1":
-        require(len(lines) == 82
-                and lines[0] == "multiplicand,multiplier,product",
-                "TABLE_FORMAT_DENIED")
-        for a in range(1, 10):
-            for b in range(1, 10):
-                require(lines[1 + (a - 1) * 9 + (b - 1)] == f"{a},{b},{a*b}",
-                        "MULTIPLICATION_MISMATCH")
     return {
         "status": "PASS",
         "execution_path": "path2-cli",
@@ -391,6 +425,7 @@ def main() -> int:
     parser.add_argument("--trusted-sha")
     parser.add_argument("--pr-number", type=int)
     parser.add_argument("--registry-sha256")
+    parser.add_argument("--execution-capability")
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
@@ -420,6 +455,13 @@ def main() -> int:
                         args.workspace.resolve() != ROOT.resolve(),
                         "WORKSPACE_DENIED")
                 task = task_by_id(registry, req["task_id"])
+                expected_capability = (
+                    "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
+                    else "cpu-only" if task["execution_path"] == "path2-cli"
+                    else "codex-workspace"
+                )
+                require(args.execution_capability in (None, expected_capability),
+                        "CAPABILITY_ROUTE_MISMATCH")
                 require(task["execution_path"] == (
                     "path3-codex" if args.action == "execute-codex"
                     else "path2-cli"
@@ -431,7 +473,8 @@ def main() -> int:
                     if args.action == "execute-codex"
                     else run_task(task, workspace=args.workspace,
                                   evidence_dir=args.evidence_dir,
-                                  approval=a2_approval)
+                                  approval=a2_approval,
+                                  sandbox=a2_approval is None)
                 )
                 plan = {
                     **receipt, **req,

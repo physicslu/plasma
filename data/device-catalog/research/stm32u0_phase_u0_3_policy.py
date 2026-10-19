@@ -44,6 +44,7 @@ ADAPTER_ID = "stm32u0-u0.3-metadata"
 DEFAULT_POLICY_BASELINE = HERE / "stm32u0-phase-u0.3-policy-baseline.json"
 DEFAULT_PRODUCTION_MANIFEST = HERE / "stm32u0-phase-u0.3-production-manifest-prestate.json"
 EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB = "34ad9299ff0c063a8c8b5de1c253dfee47b63428"
+FROZEN_PRESTATE_SOURCE_ROOT = HERE / "evidence" / "stm32u0-u0.3-production-prestate"
 EXPECTED_PRODUCTION_EXACT_COUNT = 635
 EXPECTED_PRODUCTION_BASE_DEVICE_COUNT = 217
 EXPECTED_PRODUCTION_FAMILY_COUNTS = {
@@ -103,6 +104,36 @@ def metadata_contract() -> dict[str, Any]:
     }
 
 
+
+def historical_prestate_source_rows(
+    source: dict[str, Any], *, evidence_root: Path | None = None
+) -> list[dict[str, str]]:
+    """Replay the exact U0.3 snapshot, not mutable current Production CSV paths.
+
+    Every fixture is the byte-identical Git blob pinned by the original signed-off
+    U0.3 manifest. This deliberately performs no network access or Git checkout.
+    """
+    family = source.get("family")
+    relative = source.get("path")
+    if family not in EXPECTED_PRODUCTION_FAMILY_COUNTS:
+        raise STM32U0PolicyError(f"U0.3 unexpected historical source family: {family!r}")
+    expected_relative = f"../research/{family.lower()}-commercial-icpn.csv"
+    if relative != expected_relative:
+        raise STM32U0PolicyError(f"{family}: unexpected U0.3 prestate source path")
+    root = FROZEN_PRESTATE_SOURCE_ROOT if evidence_root is None else evidence_root
+    fixture = root / f"{family.lower()}-commercial-icpn.csv"
+    content = fixture.read_bytes()
+    if hashlib.sha256(content).hexdigest() != source.get("sha256"):
+        raise STM32U0PolicyError(f"{family}: frozen U0.3 source SHA-256 mismatch")
+    if _git_blob_sha(fixture) != source.get("git_blob_sha"):
+        raise STM32U0PolicyError(f"{family}: frozen U0.3 source Git blob mismatch")
+    _, rows = read_csv(fixture)
+    if len(rows) != source.get("row_count"):
+        raise STM32U0PolicyError(f"{family}: frozen U0.3 source row count mismatch")
+    if any(row.get("family") != family or not row.get("base_device") for row in rows):
+        raise STM32U0PolicyError(f"{family}: invalid frozen U0.3 source row")
+    return rows
+
 def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> dict[str, Any]:
     manifest = read_json(manifest_path)
     if _git_blob_sha(manifest_path) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
@@ -122,10 +153,9 @@ def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> di
             raise STM32U0PolicyError("Production prestate source is incomplete")
         if family == FAMILY:
             raise STM32U0PolicyError("U0.3 requires STM32U0 absent from Production prestate")
-        source_path = (manifest_path.parent / relative).resolve()
-        _, rows = read_csv(source_path)
-        if len(rows) != declared or any(row.get("family") != family for row in rows):
-            raise STM32U0PolicyError(f"{family}: Production source drifted relative to U0.3 prestate")
+        rows = historical_prestate_source_rows(source)
+        if len(rows) != declared:
+            raise STM32U0PolicyError(f"{family}: historical U0.3 row count drifted")
         family_counts[family] = len(rows)
         base_devices.update((family, row.get("base_device", "")) for row in rows)
     if family_counts != EXPECTED_PRODUCTION_FAMILY_COUNTS:

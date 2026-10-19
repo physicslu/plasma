@@ -10,7 +10,7 @@ approval and evidence requirements.
 
 ## Development Branch Dispatch v1 — Gate 1 pre-merge source pinning
 
-**Gate 1 implementation candidate in this PR; no live SWPC confirmation yet.**
+**Implemented in main by PR #1052; pre-merge validation is partial.**
 The same trusted main `.github/workflows/plasma-engineering-runtime-dispatch.yml`
 now supports an owner-authored Issue #981 command for an existing, open,
 same-repository, owner-created non-`main` PR, with its **exact current head SHA**:
@@ -38,8 +38,10 @@ the **main** dispatcher, not by dispatcher Python from the PR.
    carries the candidate SHA, trusted main SHA, PR number and registry digest.
    The worker verifies these before invoking CLI or Codex.
 4. Path 2 accepts checked-in fixed Python CLI plus expected stdout SHA256,
-   retains optional `nine-nine-table-v1` semantic verification and archives
-   stdout/stderr and the receipt. Path 3 delegates the task objective to Codex,
+   uses one task-independent `cpu-only` capability contract and archives
+   stdout/stderr and the receipt. There is NO `nine-nine-path2` routing
+   exception or `nine-nine-table-v1` validation policy; multiplication tests
+   are only ordinary test fixtures. Path 3 delegates the objective to Codex,
    supports creating or repairing the approved Python file, and collects
    the source, text or CSV output (`output_format: text|csv`), self-test and
    Codex session logs. Its reference SHA256 is optional for new unknown-output
@@ -58,10 +60,44 @@ this feature. PR metadata is checked at hosted authorization time; changes
 to a PR after approval cannot silently change the pinned checkout SHA.
 The owner must authorize a new full SHA to run a subsequent revision.
 
-**This PR's Gate 1 test evidence is hosted/offline contract and simulated
-executor tests only**. Do not call it a real pre-merge SWPC Path 2/3 PASS.
-The owner must separately approve Gate 2 before merging this dispatcher
-foundation; afterward later task PRs can be executed during their own Gate 1.
+**Observed AUTO-4 baseline:** #1055 Path 3 completed a real SWPC Codex
+run with artifact evidence. Path 2 first reached SWPC but failed relative
+candidate CWD; #1056 fixed that driver bug and was merged. The later
+pre-merge Path 2 request passed owner admission but the original job-level
+task-name allowlist skipped its SWPC execution. This capability-based change
+addresses that route; **it has only hosted/offline evidence until its own
+Gate 2 merge and a separate real #1055 Path 2 re-execution.**
+
+## Development Mode capability-based Path 2 routing (AUTO-4)
+
+The Issue #981 owner-only hosted authorizer validates the live OPEN PR,
+exact pinned HEAD, candidate registry digest, and a typed execution path.
+It emits `execution_capability` from the **trusted main** dispatcher:
+`cpu-only` for ordinary bounded Python CLI, `codex-workspace` for Path 3,
+and `z2-cpu-only` only for the separately approved main-only HIL-A2 task.
+Task IDs are **identifiers**, not permissions. A new CPU-only task must NOT
+require a per-task Workflow edit or a reference to the former 9×9 pilot.
+Existing bounded development manifest entries without an explicit capability
+are treated as CPU-only for compatibility; any unrecognized capability or
+attempt to select an HIL capability from a candidate PR is denied.
+
+For CPU-only Path 2, the trusted SWPC Dispatcher requires Linux bubblewrap
+(`bwrap`) before executing the PR candidate program. It uses unshared
+namespaces (including network), a read-only candidate workspace and OS Python
+runtime, a minimal synthetic `/dev`, isolated `/proc`, empty temporary
+filesystem, cleared environment and `python -I -S`. No user hardware, USB,
+MMIO, SSH agent, host filesystem or network is intentionally mounted. Missing
+or unusable sandbox must **fail closed**; no fallback to unsandboxed Python.
+A GitHub-hosted unit test checks the constructed sandbox command but cannot
+prove that SWPC supports this kernel namespace configuration. The actual
+SWPC execution must be confirmed by a separate real Job, including raw
+stdout/stderr and Exit Code. This CPU-only Development boundary is not the
+independent production Qualification Runtime isolation standard.
+
+HIL-A2 is **not** admitted via the CPU-only branch. It retains the main-only
+Work Order, one-shot Claim create/readback, `github.run_attempt==1`, matching
+Claim digest and separate hardware approval. No hardware or Qualification
+Runtime deployment/activation is authorized by the capability routing change.
 
 ## Development Mode owner-only dispatch (PR #1046 alignment)
 
@@ -135,26 +171,15 @@ Path 3's Codex does its own implementation, execution, self-tests and repairs;
 the Dispatcher should collect evidence rather than prescribe a Python AST or
 independently re-run every Codex program.
 
-**Historical pre-v1 implementation gap (addressed in this candidate PR, pending merge and live validation):** the
-Development Mode `development-authorize` and worker use
-`GITHUB_REF=refs/heads/main`, `GITHUB_SHA` from that event, and a checked-in
-task registry on the default branch. GitHub `issue_comment` loads its
-Workflow definition from the default branch. Consequently a new or changed
-task defined **only in a PR branch** cannot yet be executed by this current
-entry before merge. In the #1048/#1049 smoke development this forced an
-undesirable merge-then-test sequence. **Do not repeat that pattern or
-misrepresent a hosted/offline CI PASS as SWPC E2E PASS.**
-
-**Minimal next implementation (future independent PR, not done here):**
-extend the *existing shared* owner-only Dispatcher to receive a reviewed
-development branch or exact commit SHA as the task's execution source,
-validate owner/task/ref/repository and relevant GitHub PR/commit provenance,
-pin the authorized revision through hosted admission and SWPC checkout, and
-run the already-approved real experiment **before** merge. Retain the existing
-`SWPC-plasma-codex` Runner, no new task-specific Workflow and no additional
-owner gate. The `main` Workflow itself can remain trusted; it must explicitly
-permit and validate a task's separate pre-merge source SHA rather than
-silently using `main` for both. Until the new branch-dispatch code is merged and proves real SWPC operation, report its current validation boundary accurately; do not bypass guards or merge other task PRs merely to activate their tests.
+**Historical pre-v1 gap (now addressed in #1052):** an `issue_comment`
+Workflow always uses trusted `main` source, while a pre-merge task may
+reside only in an OPEN PR. Development Branch Dispatch now admits an exact
+owner-authorized, same-repository candidate HEAD SHA separately from the
+trusted main dispatcher and verifies it at both hosted and worker stages.
+The remaining AUTO-4 qualification gap is real Path 2 execution after the
+generic capability-routing change; successful hosted admission, skipped
+workers, and offline CI must not be represented as SWPC E2E PASS.
+No additional task-specific Workflow or approval gate is permitted.
 
 Gate 2 may exceptionally approve knowingly deferred development evidence
 only after the owner sees exactly which acceptance is missing. Such
