@@ -39,9 +39,12 @@ the **main** dispatcher, not by dispatcher Python from the PR.
    The worker verifies these before invoking CLI or Codex.
 4. Path 2 accepts checked-in fixed Python CLI plus expected stdout SHA256,
    retains optional `nine-nine-table-v1` semantic verification and archives
-   stdout/stderr and the receipt. Path 3 gives Codex the objective and
-   collects real generated source, CSV, self-test and session logs for
-   **ChatGPT** review, not an AST shape or fixed-CSV-label gate.
+   stdout/stderr and the receipt. Path 3 delegates the task objective to Codex,
+   supports creating or repairing the approved Python file, and collects
+   the source, text or CSV output (`output_format: text|csv`), self-test and
+   Codex session logs. Only the approved source file may be changed, and its
+   tracked diff is preserved in a source patch artifact for review;
+   **ChatGPT** reviews evidence, not AST shape or fixed CSV column labels.
 5. Both use the *existing* `SWPC-plasma-codex` self-hosted Runner, with
    no new task-specific Workflow. PR/push checks are GitHub-hosted offline
    only. The formal qualification `workflow_dispatch` Runtime stays OFF.
