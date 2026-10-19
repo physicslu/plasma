@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 DIR = ROOT / "pl/projects/z2-fixed-unified-site1"
 spec = importlib.util.spec_from_file_location("fixed_f1_hwh_verifier",
                                              DIR / "verify_hwh.py")
@@ -53,7 +53,7 @@ def test_hwh_valid_one_64k_gp0_with_no_pl_pins():
     assert result["base"] == "0x40000000"
     assert result["bytes"] == 65536
     assert result["external_pl_io"] is False
-    assert result["site2_8"] if "site2_8" in result else result["regions"]["site2_8"] == "ABSENT"
+    assert result["regions"]["site2_8"] == "ABSENT"
     assert result["z2_hil"] == "NOT_RUN"
 
 
