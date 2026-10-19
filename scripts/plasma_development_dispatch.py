@@ -73,7 +73,7 @@ def task_by_id(registry: object, task_id: str) -> dict:
     argv = task["argv"]
     require(type(argv) is list and len(argv) <= 8 and all(
         type(x) is str and re.fullmatch(r"[A-Za-z0-9._=/:-]{1,80}", x)
-        and ".." not in x for x in argv
+        and not x.startswith("-") and ".." not in x for x in argv
     ), "TASK_ARGS_DENIED")
     require(type(task["expected_stdout_sha256"]) is str
             and SHA256.fullmatch(task["expected_stdout_sha256"]) is not None,
