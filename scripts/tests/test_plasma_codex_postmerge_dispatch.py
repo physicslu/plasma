@@ -154,11 +154,14 @@ class PostmergeGateTests(unittest.TestCase):
 
     def test_contract_wiring_offline_only_and_no_comment_trigger(self):
         wf=(ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
-        self.assertNotIn("issue_comment:",wf)
+        # The 2026-10-19 one-shot #1034 admission is historical only.
+        # New software tasks require the same separate owner Issue trigger as HIL.
+        self.assertIn("issue_comment:",wf)
         self.assertNotIn("workflow_dispatch:",wf)
-        self.assertIn("github.event_name == 'push'",wf)
-        self.assertIn("needs: contract",wf)
-        self.assertIn("plasma_codex_postmerge_dispatch.py --event",wf)
+        self.assertIn("github.event_name == 'issue_comment'",wf)
+        self.assertIn("github.event.comment.body == '/plasma-codex hello-c 981'",wf)
+        self.assertNotIn("needs: contract",wf)
+        self.assertNotIn("plasma_codex_postmerge_dispatch.py --event",wf)
         self.assertIn("needs.authorize.outputs.approved_sha == github.sha",wf)
         self.assertIn("test \"$APPROVED_SHA\" = \"$GITHUB_SHA\"",wf)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
