@@ -10,6 +10,7 @@ on:
       - "scripts/plasma_codex_software_mvp.py"
       - "scripts/tests/test_plasma_codex_software_mvp.py"
       - "docs/development/plasma-codex-software-mvp.md"
+      - "examples/hello-world/main.c"
   push:
     branches: [main]
     paths:
@@ -41,7 +42,7 @@ jobs:
       github.actor == 'physicslu' &&
       github.event.issue.number == 981 &&
       !github.event.issue.pull_request &&
-      github.event.comment.body == '/plasma-codex software-mvp 981'
+      github.event.comment.body == '/plasma-codex hello-c 981'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -77,7 +78,7 @@ jobs:
           test "$(id -un)" = plasma-codex
           test "$(id -u)" -ne 0
           test -z "$(git status --porcelain)"
-          test ! -e docs/development/plasma-codex-mvp-first-change.md
+          test ! -e examples/hello-world/main.c
           if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
             echo "NO_GO: software Codex has a privileged hardware group" >&2
             exit 2
@@ -99,14 +100,20 @@ jobs:
           umask 077
           codex --version
           cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF
-          Read AGENTS.md and relevant PLASMA docs.
-          Perform ONE genuine, scoped software-only change: create a useful
-          operator guide at docs/development/plasma-codex-mvp-first-change.md.
-          Explain the currently verified read-only Codex pilot and distinguish it
-          from simulated offline broker tests. Do NOT claim this MVP was deployed.
-          Include how a user can inspect the resulting PR and verify provenance.
-          Modify no other path. Do not run hardware, sudo, deployment, HIL,
-          instrument, USB, FPGA, DUT, service commands, git push or git commit.
+          PLASMA Issue #981, approved first C11 Hello World development pilot.
+          You are the real SWPC Codex CLI author. Create EXACTLY ONE NEW
+          source file: examples/hello-world/main.c (directory if necessary).
+          It must be a C11 program using ONLY #include <stdio.h>, int main(void),
+          a single puts("Hello, World!") OR printf("Hello, World!\\n") call,
+          followed by return 0;. No other includes, declarations, functions,
+          macros, comments, calls or side effects. Output exactly the bytes
+          Hello, World! followed by newline. Do not copy an existing file.
+          Read AGENTS.md for project conventions but change no tracked files.
+          Do not use external programs, sudo, SSH, networks, Z2/FPGA/USB/LA,
+          hardware, deployment, git push, git commit or GitHub PR commands.
+          The trusted worker wrapper will separately compile, run and publish
+          your patch after validating this tiny grammar. Do not create tests
+          or documentation: ONLY examples/hello-world/main.c.
           EOF
           # Existing SWPC Codex CLI login; no API key is supplied.
           # Spawned tools should not have network access to laboratory endpoints.
@@ -115,7 +122,7 @@ jobs:
               -c sandbox_workspace_write.network_access=false \
               exec --sandbox workspace-write \
               - < "$RUNNER_TEMP/codex-task.txt"
-      - name: Independent tests and patch artifact
+      - name: GCC C11 Hello World runtime acceptance and scoped patch artifact
         shell: bash
         run: |
           set -euo pipefail
@@ -167,9 +174,9 @@ jobs:
           git switch -c "$branch"
           git -c user.name="plasma-codex-mvp[bot]" \
               -c user.email="plasma-codex-mvp@users.noreply.github.com" \
-              commit -m "docs(codex): first real software-only agent result (#981)"
+              commit -m "feat(examples): SWPC Codex C11 Hello World (#981)"
           git push -u origin "$branch"
           gh pr create --base main --head "$branch" \
-            --title "docs(codex): first real software-only agent result (#981)" \
-            --body "Created from a REAL Codex model run, admitted by an independent Publisher with one-file SHA256 scope. No general Dispatcher, deployment, hardware, or merge authorized. Verify CI; a GitHub Actions token-created PR may require owner approval to run workflows."
+            --title "feat(examples): real SWPC Codex C11 Hello World (#981)" \
+            --body "Produced by REAL SWPC Codex for C11 Hello World. Independent worker compiled with gcc -std=c11 -Wall -Wextra -Werror -pedantic and verified exact stdout, then Publisher admitted SHA256 and one-file patch without running model-generated source. No auto merge, hardware or deployment authorized. Gate 2 required. GitHub Actions token-generated PR might need manual CI approval."
           gh pr view "$branch" --json url,number,headRefOid
