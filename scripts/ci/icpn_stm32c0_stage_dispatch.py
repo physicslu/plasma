@@ -6,6 +6,7 @@ import argparse
 import fnmatch
 import hashlib
 import json
+import sys
 import re
 import subprocess
 from pathlib import Path
@@ -89,7 +90,7 @@ def self_test():
             raise ValueError("Missing archival trigger")
     assert affected(["data/device-catalog/production/icpn-v1-manifest.json"],"push")==[]
     assert affected([WF],"pull_request")==list(STAGES)
-    print("C0 original Git SHA, trigger union and stage routing PASS")
+    print("C0 original Git SHA, trigger union and stage routing PASS", file=sys.stderr)
 
 def git_changes(base,head):
     r=subprocess.run(["git","diff","--name-only","--diff-filter=ACDMRT",base,head],
