@@ -1,55 +1,39 @@
-# PLASMA HIL-A — ARMv7 Native Barrier, SWPC A1 / Z2 A2
+# PLASMA HIL-A — GitHub-hosted ARMv7 cross-build (A1) / Z2 CPU execution (A2)
 
-**State: Gate 1 implementation candidate. Host-only acceptance; no SWPC or Z2 execution. M1 NO-GO.**
+**Status: Gate 1 candidate, independent PR; no merge without Gate 2. M1 NO-GO.**
 
-## Objective and boundary
+## Why the build host changed
 
-The Fixed ABI Site 1 controller requires a qualified write_barrier() between eight setup register writes and COMMAND. The merged source at software/python/native/armv7_mmio_barrier.c implements an ARMv7-A `dmb sy` candidate, but GitHub-hosted x86 tests cannot prove a compiled ARMv7 shared library or its behavior on the Z2. This experiment isolates that question from PS7/AXI/PL tests and real target programming.
+Original A1 SWPC run [#39190582095](https://github.com/physicslu/plasma/actions/runs/39190582095) reached real `SWPC-plasma-ci`, passed authentication/checkout and then exited 2 before compilation: ARM cross compiler or binutils missing from the Runner PATH. This is not an ARMv7 compiler defect or Z2 HIL observation.
 
-HIL-A is explicitly divided into **A1 (SWPC compilation and static ELF proof)** and **A2 (future Z2 CPU-only execution)**. A successful A1 must **never** be called ARMv7 live execution. A successful A2 must **never** be called MMIO Ordering or physical SWD qualification.
+The new A1 moves **only compilation and static ELF inspection** to GitHub-hosted Ubuntu. A2 stays future Z2 ARMv7 native CPU execution and remains **NOT_IMPLEMENTED / NOT_RUN**. No SSH, physical MMIO/UIO, FPGA configuration, DUT, deployment or SWPC runner is invoked by the new A1 workflows.
 
-## A1 — fixed Workflow, reusable manual runs
+## A1 workflow & reproducible toolchain
 
-Workflow: `.github/workflows/plasma-armv7-barrier-hil-a.yml`.
+- Manual/main-only workflow: `.github/workflows/plasma-armv7-barrier-hil-a.yml`; only `workflow_dispatch`, repository `physicslu/plasma`, `refs/heads/main`, actor `physicslu`, GitHub-hosted `ubuntu-24.04`.
+- PR build: `.github/workflows/plasma-armv7-barrier-hil-a-contract.yml`. All PR jobs execute on GitHub-hosted `ubuntu-24.04`; they run negative/contract tests **and real ARMv7 ELF cross-compilation**, not just a synthetic `objdump` fixture. This PR route is not a hardware dispatch.
+- Both workflows call exactly the same committed `scripts/armv7-barrier-hil-a1-hosted.sh` script. The script uses `docker run --platform linux/amd64` **on the GitHub-hosted VM** (never the user's SWPC Docker host).
+- OCI base: `debian:bookworm-20261005@sha256:bc49dc1918ee1a47a93e65b5e4676e8680fb754b133197b92ca52bfe6731d5f0` (pinned official Debian amd64 manifest).
+- Package archive: `http://snapshot.debian.org/archive/debian/20261005T000000Z/`, `bookworm main`, Debian package signatures still verified by APT over the HTTP bootstrap transport (minimal OCI image lacks CA certificates); date-pinned package indexes. TLS downgrade is limited to the APT bootstrap and does not disable GPG signature validation. Packages: `python3`, `git`, `gcc-arm-linux-gnueabihf`, `binutils-arm-linux-gnueabihf`, `libc6-dev-armhf-cross` (ARM runtime startup objects) and dependencies. No host package install, host sudo or privilege escalation.
+- Checked-out source is mounted **read-only**, build results are written to the ephemeral runner temp directory. `contents: read`, pinned GitHub Actions revisions, no persisted checkout token, Docker default restricted capabilities with NET_RAW removed (APT needs UID/GID switching).
+- `scripts/armv7-barrier-hil-a1.py` compiles `software/python/native/armv7_mmio_barrier.c` with `-march=armv7-a -marm -mfpu=vfpv3 -mfloat-abi=hard -O2 -fPIC -shared`, validates ELF32/little-endian/ARM/EABI5/v7/VFP registers/global symbol and exactly one `dmb sy` instruction within `plasma_mmio_dmb_sy`.
+- On PASS, each run uploads `libplasma_mmio_barrier.so`, `receipt.json`, `SHA256SUMS`, four readelf/objdump reports as GitHub Actions Artifact (14 days). Receipt records GitHub event SHA, source/library SHA256, compiler path/version, fixed OCI reference and archive snapshot. A missing artifact is a **hard failure**.
+- The pinned environment constrains input provenance. **Bit-for-bit rebuild reproducibility is NOT asserted** without two observed clean-run binary hash matches; artifacts do not constitute a signed release or Z2 qualification.
 
-- Only `workflow_dispatch`, on `refs/heads/main`, by GitHub actor `physicslu`; no PR/push/issue_comment trigger.
-- Hosted authorization job runs first. Self-hosted A1 runs only after authorization on `[self-hosted, linux, x64, plasma-integration]` and verifies actual Runner Name `SWPC-plasma-ci`, hostname `SWPC`, non-root Linux user `plasma-ci`, no SSH agent, reviewed Git commit.
-- Checkout is exactly GitHub event SHA, with `persist-credentials: false`. No shell payload input, unreviewed PR checkout, artifact download, SSH, FPGA, `sudo`, real /dev/mem, real /dev/uio or Z2 instruction execution.
-- `scripts/armv7-barrier-hil-a1.py build` invokes the installed ARM hard-float cross-tools with fixed argv, without `shell=True`:
-  - `arm-linux-gnueabihf-gcc -march=armv7-a -marm -mfpu=vfpv3 -mfloat-abi=hard -O2 -fPIC -shared -Wl,-z,relro -Wl,-z,now -o <runner-temp>/libplasma_mmio_barrier.so software/python/native/armv7_mmio_barrier.c`
-  - `arm-linux-gnueabihf-readelf -h/-A/-Ws` and `arm-linux-gnueabihf-objdump -d --disassemble=plasma_mmio_dmb_sy`
-- Verify ELF32, little-endian, ARM, EABI5, ARMv7 attributes, hard-float calling convention, defined globally exported barrier symbol, and exactly one `dmb sy` inside that function; reject missing/mismatched ABI and unexpected call/trap.
-- Save `receipt.json` with main SHA, source SHA256, ELF SHA256, compiler triplet/version, absolute compiler paths and inspection hashes. Output directory is a child of GitHub Runner TEMP. Always mark Z2, real MMIO, FPGA and DUT as NOT_RUN.
-- Upload bounded logs/ELF/receipt as a 14-day GitHub Artifact. A workflow Run is **one execution**; the YAML stays versioned for later dispatch.
+## Acceptance and risk boundary
 
-**A1 acceptance:** one explicitly authorized run on actual SWPC Runner reports PASS, demonstrates real ARM cross tool versions and accepted ELF/disassembly hashes; evidence corresponds to the exact main SHA. Cross-compiler availability/licensing/environment **not yet observed**. A1 currently NOT_RUN.
+1. Host PR security contracts PASS, including mutations that would introduce self-hosted execution, unapproved actor/ref, SSH commands, unpinned image/snapshot, weakened read-only checkout, or skipped compilation.
+2. The PR CI actually compiles and verifies ARMv7 ELF and uploads SHA256 evidence on GitHub-hosted.
+3. After an explicit **Gate 2 merge**, the reviewed main workflow can be manually triggered for A1. This Gate 1 does not authorize SWPC/Z2 operations; there is no A2 Job here.
+4. Compilation and `dmb sy` disassembly are **A1 Host PASS only**. They cannot establish executable native Z2 behavior, MMIO memory attributes, AXI posted-write completion or production SWD readiness. M1 remains **NO-GO**.
 
-## Host-only CI / pre-merge safety
+## A2 — future Z2 CPU-only run, not implemented here
 
-Workflow: `.github/workflows/plasma-armv7-barrier-hil-a-contract.yml`; triggers only on PR changes and always uses GitHub-hosted Ubuntu, never the self-hosted Runner.
+Preserve the existing controlled design:
 
-- Static executable-policy guard validates trigger, owner/main, trust boundary, runner identity, pinning, absence of a Z2 job, and read-only GitHub credentials.
-- Synthetic ELF/disassembly negative tests exercise missing `dmb sy`, wrong instruction variant, wrong architecture, wrong hard-float ABI, undefined symbol, extra calls and branch changes.
-- Negative workflow mutation tests reject changes that weaken actor/ref/runner constraints, add PR/push triggers, add a Z2 job, or redirect PR tests to SWPC.
-- `python3 -m py_compile` validates source syntax. No ARM compiler or target is invoked in this CI.
+1. Select approved A1 GitHub artifact and verify run SHA/receipt/source/ELF SHA256, ABI and package dependencies.
+2. Use a separately approved, authenticated Z2 operator/SSH route to validate the actual Z2 ARMv7 Linux environment and install the library only in a temporary, non-system directory.
+3. Call `plasma_mmio_dmb_sy` in an isolated subprocess under an external timeout; inspect result, architecture, SHA256, relevant dynamic dependencies and signal/exit code. Do **not** open real MMIO/UIO, touch FPGA Manager, power, reset, I/O or DUT.
+4. Report true A2 PASS/FAIL/NOT RUN; separate HIL-B remains necessary for PS7/AXI memory-ordering and FPGA qualification.
 
-## A2 — Z2 native CPU execution design ONLY (NOT IMPLEMENTED / NOT RUN)
-
-A2 must be a separately designed, owner-scoped hardware execution stage. **No A2 job, SSH transfer, dynamic runner command, access token or Z2 endpoint is created by this PR.**
-
-Proposed controlled sequence after approval and an explicit transport capability:
-
-1. Pin the verified A1 `receipt.json`, exact main source SHA and ELF SHA256; verify the chosen artifact download/checkpoint against GitHub's immutable run metadata and independent SHA256. A digest proves file integrity, not authorization.
-2. Verify Z2 identity, enrolled SSH trust, non-root OS user, and exact 32-bit little-endian ARMv7 environment; confirm Python 3.12.13 and required shared-library dependencies/loader compatibility; do not invent a Z2 IP or credentials.
-3. Transfer the single digest-pinned shared library into a private, non-system temporary directory. Refuse symlinks and unexpected ELF dependencies. Do not overwrite installed Python/PL components.
-4. On Z2, call the exported function via a minimal dedicated `ctypes` child process under a bounded external timeout. Check exit code, SHA256 before and after, CPU/ABI/OS metadata and repeatability, with failure reported FAIL (never guessed PASS). CPU-only execution requires no FPGA Manager, bitstream, Device Tree mutation, real MMIO or DUT.
-5. Clean up temporary files and upload sanitized run receipt; log any observed failure honestly. Loss of SSH, timeout or abnormal signal are FAIL/INCOMPLETE, **not** evidence of a safe AXI barrier.
-
-**A2 acceptance:** exact Z2 native CPU execution PASS with matching ELF hash and validated ABI, plus an explicit no-hardware-MMIO/no-FPGA/no-DUT audit. Even then PS7 → AXI order/completion is **not qualified**; that remains HIL-B after a physical Unified AXI bitstream has been approved and tested.
-
-## Engineering risks and next decision
-
-- SWPC `plasma-ci` Runner toolchain availability has not been proven for `arm-linux-gnueabihf-*`. Missing cross compiler should cause A1 FAIL with a concrete dependency, not installation or privilege escalation.
-- GNU `dmb sy` confirms the compiler emitted a CPU instruction; it does not prove ARM/Linux Device memory mapping, posted AXI write completion, or that Python MMIO emitted 32-bit transactions.
-- A2 execution and A1 manual dispatch are **not authorized by this Gate 1**. Do not run either before Gate 2 and a separately explicit execution authorization. No deployment, FPGA changes, device access, network hardware tests or changes to production MMIO Driver are included.
-- Existing #1026 / #1029 BFM/VIP investigations remain deferred. M1 remains NO-GO.
+This PR does not create A2 transfer scripts, Z2 jobs, credentials, SSH endpoints, bitstreams or privileged access. Issue #1026/#1029 remain deferred.
