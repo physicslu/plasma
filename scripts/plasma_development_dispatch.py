@@ -268,7 +268,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "Create or update the approved Python file " + task["output_path"] +
         " (it may already exist in this candidate revision).\n"
         "Execute that code yourself using Python on this Runner. Capture "
-        "the program's ACTUAL complete output as CSV in " +
+        "the program's ACTUAL complete output as text in " +
         str(output.relative_to(workspace)) + ".\n"
         "Independently check that your output satisfies the stated "
         "objective and covers the relevant positive/negative cases; "
@@ -280,7 +280,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "shape need NOT match the Path 2 implementation. Do not falsely "
         "claim a test passed or fabricate outputs. Keep all generated "
         "source and evidence files, including on failure.\n"
-        "Create or modify ONLY the specified source and its CSV/test "
+        "Create or modify ONLY the specified source and its output/test "
         "evidence. Do not modify other project files or Git state. "
         "No Z2, FPGA, USB, LA, DUT, MMIO, SSH, sudo, physical device, "
         "network or deployment actions. Stop if these are required.\n"
