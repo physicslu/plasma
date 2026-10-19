@@ -214,6 +214,25 @@ def run_worker(bundle: dict, policy: dict, expected_digest: str,
     }
 
 
+ACTIVATION_PATH = REPO_ROOT / "specs/engineering-dispatch/runtime-activation-v1.json"
+
+
+def require_reviewed_activation(path: str, activation: object) -> None:
+    """Repository-pinned second interlock, never inferred from Actions vars."""
+    activation = contract.exact_keys(
+        activation, frozenset({"schema_version", "status", "paths", "notes"}),
+        "RUNTIME_ACTIVATION_POLICY_INVALID",
+    )
+    paths = contract.exact_keys(
+        activation["paths"], frozenset(PATHS), "RUNTIME_ACTIVATION_PATHS_INVALID",
+    )
+    if (activation["schema_version"] != "plasma.engineering.runtime_activation.v1"
+            or activation["status"] != "ENABLED_BY_SEPARATE_APPROVAL"
+            or any(type(flag) is not bool for flag in paths.values())
+            or paths[path] is not True):
+        refuse("RUNTIME_ACTIVATION_NOT_APPROVED")
+
+
 def load_bundle(path: Path, policy_path: Path) -> tuple[dict, dict]:
     raw = contract.load_json(path)
     policy = contract.load_json(policy_path)
@@ -231,6 +250,10 @@ def main() -> int:
     args = parser.parse_args()
     try:
         bundle, policy = load_bundle(args.bundle, args.policy)
+        if args.mode != "validate":
+            require_reviewed_activation(
+                bundle["execution_path"], contract.load_json(ACTIVATION_PATH),
+            )
         if args.mode == "validate":
             result = verify_bundle(bundle, policy)
         elif args.mode == "authorize":
