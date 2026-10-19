@@ -26,6 +26,9 @@ on:
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
+      - "scripts/plasma_hil_a2_cpu_only.py"
+      - "scripts/tests/test_plasma_hil_a2_cpu_only.py"
+      - "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
   push:
     branches: [main]
     paths:
@@ -37,6 +40,9 @@ on:
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
+      - "scripts/plasma_hil_a2_cpu_only.py"
+      - "scripts/tests/test_plasma_hil_a2_cpu_only.py"
+      - "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
 
 permissions:
   contents: read
@@ -61,6 +67,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
   development-authorize:
@@ -83,7 +90,11 @@ jobs:
       pr_number: ${{ steps.approve.outputs.pr_number }}
       registry_sha256: ${{ steps.approve.outputs.registry_sha256 }}
       execution_path: ${{ steps.approve.outputs.execution_path }}
+      execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
+      comment_id: ${{ steps.approve.outputs.comment_id }}
+      claim_ref: ${{ steps.approve.outputs.claim_ref }}
+      work_order_sha256: ${{ steps.approve.outputs.work_order_sha256 }}
     steps:
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -150,20 +161,120 @@ jobs:
           assert data["status"] == "AUTHORIZED_DEV_TASK"
           with open(sys.argv[2],"a",encoding="utf-8") as f:
               for k in ("pinned_sha","trusted_sha","pr_number",
-                        "registry_sha256","execution_path","task_id"):
+                        "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
+              for k in ("comment_id","claim_ref","work_order_sha256"):
+                  f.write(f"{k}={data.get(k,'')}\n")
           PY
 
-  development-execute:
+  development-claim:
+    # A2 only: hosted atomic Git ref creation is the one-shot idempotency gate.
+    # If ruleset or GitHub token cannot prove CREATE/readback, fail closed.
     needs: development-authorize
     if: >-
       github.event_name == 'issue_comment' &&
       needs.development-authorize.result == 'success' &&
-      needs.development-authorize.outputs.execution_path == 'path2-cli'
+      needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      claim_ref: ${{ steps.claim.outputs.claim_ref }}
+      work_order_sha256: ${{ steps.claim.outputs.work_order_sha256 }}
+    steps:
+      - name: Atomically claim exact Owner A2 comment and pinned Work Order
+        id: claim
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          A2_CLAIM_REF: ${{ needs.development-authorize.outputs.claim_ref }}
+          A2_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          A2_WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
+          A2_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ref = process.env.A2_CLAIM_REF;
+            const sha = process.env.A2_PINNED_SHA;
+            const digest = process.env.A2_WORK_ORDER_SHA256;
+            const cid = process.env.A2_COMMENT_ID;
+            if (context.eventName !== 'issue_comment' ||
+                context.actor !== 'physicslu' ||
+                context.repo.owner !== 'physicslu' ||
+                context.repo.repo !== 'plasma' ||
+                context.issue.number !== 981 ||
+                context.payload.issue.pull_request ||
+                context.payload.action !== 'created' ||
+                String(context.payload.comment?.id) !== cid ||
+                context.payload.comment?.user?.login !== 'physicslu' ||
+                process.env.GITHUB_RUN_ATTEMPT !== '1' ||
+                !/^[0-9a-f]{40}$/.test(sha) || sha !== context.sha ||
+                !/^[0-9a-f]{64}$/.test(digest) ||
+                !/^[1-9][0-9]*$/.test(cid) ||
+                ref !== `refs/heads/plasma-engineering-claims/981/a2-${cid}-${digest.slice(0,16)}-r1`) {
+              throw new Error('A2_CLAIM_AUTHORIZATION_DENIED');
+            }
+            // Atomic create: a duplicate/ambiguous failure never retries.
+            // Never update or delete the protected claim ref.
+            await github.rest.git.createRef({owner: 'physicslu', repo: 'plasma', ref, sha});
+            const readback = await github.rest.git.getRef({
+              owner: 'physicslu', repo: 'plasma', ref: ref.slice('refs/'.length)
+            });
+            if (readback.data.ref !== ref || readback.data.object.sha !== sha) {
+              throw new Error('A2_CLAIM_READBACK_DENIED');
+            }
+            const evidence = {
+              status: 'CLAIM_CREATED_AND_READBACK',
+              schema: 'plasma.hil.a2.claim.v1',
+              claim_ref: ref,
+              main_sha: sha,
+              work_order_sha256: digest,
+              issue_number: 981,
+              comment_id: Number(cid),
+              run_id: context.runId,
+              run_attempt: 1
+            };
+            require('fs').writeFileSync(
+              process.env.RUNNER_TEMP + '/plasma-a2-claim.json',
+              JSON.stringify(evidence, null, 2) + '\n',
+              {flag: 'wx', mode: 0o600}
+            );
+            core.setOutput('claim_ref', ref);
+            core.setOutput('work_order_sha256', digest);
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-a2-claim-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-a2-claim.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  development-execute:
+    # Dispatch by trusted, validated capability, NOT by task-specific test
+    # names. Hardware-capable A2 retains its separate one-shot claim gate.
+    needs: [development-authorize, development-claim]
+    if: >-
+      always() &&
+      github.event_name == 'issue_comment' &&
+      needs.development-authorize.result == 'success' &&
+      needs.development-authorize.outputs.execution_path == 'path2-cli' &&
+      (
+        (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
+         needs.development-claim.result == 'skipped') ||
+        (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
+         needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+         needs.development-claim.result == 'success' &&
+         needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
+         needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
+         github.run_attempt == 1)
+      )
+    # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -194,6 +305,17 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
+      - name: Download exact pinned A1 artifact for claimed A2 only
+        if: >-
+          needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+          needs.development-claim.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: 39192248348
+          name: plasma-armv7-hil-a1-pr-39192248348
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-hil-a2-source
       - name: Execute candidate CLI using trusted dispatcher
         shell: bash
         env:
@@ -201,6 +323,10 @@ jobs:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
+          PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
+          PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
+          PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
@@ -211,6 +337,7 @@ jobs:
             --workspace candidate --evidence-dir "$RUNNER_TEMP" \
             --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+            --execution-capability "$EXECUTION_CAPABILITY" \
             > "$RUNNER_TEMP/plasma-path2-receipt.json"
           cat "$RUNNER_TEMP/plasma-path2-receipt.json"
           git -C trusted diff --exit-code
