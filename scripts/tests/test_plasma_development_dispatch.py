@@ -293,6 +293,37 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
         with patch.object(sys,"argv",["dispatch.py",*args]):
             return dev.main()
 
+    def test_codex_can_repair_existing_source_and_return_text_evidence(self):
+        task=dict(self.registry["tasks"]["nine-nine-path3"])
+        task["output_format"]="text"
+        dev.task_by_id({**self.registry,"tasks":{"branch-codex":task}},
+                       "branch-codex")
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)
+            source=work/task["output_path"]
+            source.parent.mkdir(parents=True)
+            source.write_text("print('wrong')\n")
+            class Result:
+                returncode=0
+                stdout=b"fake Codex independently repaired and tested"
+                stderr=b""
+            def fake_codex(command, **kwargs):
+                self.assertIn("ACTUAL complete output as text",
+                              kwargs["input"].decode())
+                self.assertNotIn("9 x 9 results",
+                                 kwargs["input"].decode())
+                source.write_text("print('corrected')\n")
+                source.with_suffix(".txt").write_text("corrected\n")
+                source.with_suffix(".test.log").write_text(
+                    "python3 -B generated.py\n1 positive PASS\nexit=0\n")
+                return Result()
+            receipt=dev.run_codex_task(task,workspace=work,
+                                       executor=fake_codex)
+            self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertTrue(receipt["output_path"].endswith(".txt"))
+            self.assertEqual(source.read_text(),"print('corrected')\n")
+            self.assertIn("corrected",source.with_suffix(".txt").read_text())
+
     def test_one_trusted_main_dispatcher_two_checkouts_no_task_workflow(self):
         wf=WORKFLOW.read_text()
         self.assertIn("path: trusted",wf)
@@ -304,6 +335,8 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
         self.assertIn("runner.temp",wf)
         self.assertIn("plasma-path2-stdout.txt",wf)
         self.assertIn("candidate/scripts/experiments/plasma_*_generated.csv",wf)
+        self.assertIn("candidate/scripts/experiments/plasma_*_generated.txt",wf)
+        self.assertIn("plasma-path3-source.patch",wf)
         self.assertNotIn("plasma-path3-nine-nine.yml",wf)
         self.assertIn("github.event_name == 'issue_comment'",wf)
 
