@@ -54,3 +54,13 @@ touch FPGA Manager, Z2, MMIO, LA, DUT, power or deployment is implied.
 **Boundary and reusable lesson:** Make the dispatcher dispatch a proven fixed build rather than reinventing it; take the output directory from the executable worktree, not an assumed global SWPC cache; preserve concrete stage error codes without leaking host paths; read actual runner permissions rather than inferring them from prior unrelated account builds. Existing Path 3 intentionally permits only generated-source/evidence edits, so Codex produced and tested a proposal and ChatGPT applied a reviewed minimal production patch through the PR. GitHub Actions artifacts have finite retention; do not count link existence as perpetual archival.
 
 **State:** PR #1064 Open / NOT MERGED. F1-B fixed build on the patched code is **NOT_RUN**. Current Issue #981 trusted main dispatcher still uses merged main source; a PR code change is not automatically deployed. No extra Runner/Workflow, no FPGA load, Z2/DUT, MMIO, LA, power or deployment.
+
+## F1-B Development Mode acceleration — 2026-10-20 (Gate 1)
+
+The owner explicitly retired the former `f1b-path3-diagnose-39274388453` task. **Do not trigger it again.** Its original Run IDs, observations and SHA evidence above remain historical facts, not a command to repeat the old diagnosis.
+
+Its candidate registry entry is replaced by `f1b-path3-codex-vivado-build`, a real Host-only Vivado 2026.1 engineering task. After the separately controlled trusted Dispatcher/Workflow changes in PR #1065 are merged and active, the owner-approved **Path 3 Codex engineer** may edit RTL, Tcl, Python, build scripts, and documents in the pinned candidate worktree, run actual synthesis/implementation/timing/DRC, generate BIT/HWH, diagnose failures, rerun and provide a chronological root-cause/fix/retest ledger in `.plasma-path3-evidence/engineering-report.md`. Source diffs and raw artifacts must be captured with SHA256.
+
+This eliminates the former generated-file-only change allowlist, Python subprocess 480-second deadline and 12-minute Path 3 job deadline. The job has an operational 360-minute watchdog, not a mandated target build time. **No FPGA programming, Z2/DUT/LA/USB/MMIO/power manipulation or deployment is authorized.** These are separate from Host-only compiling.
+
+Until actual SWPC/Codex/Vivado execution proves otherwise, synthesis, implementation, BIT/HWH, timing and DRC are **NOT_RUN**. A registry update alone is not a successful build.
