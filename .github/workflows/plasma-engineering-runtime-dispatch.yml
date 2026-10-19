@@ -64,8 +64,7 @@ jobs:
           git diff --exit-code
 
   development-authorize:
-    # Development Mode: user-approved idempotent tasks from trusted main.
-    # Owner-only Issue #981 command; PR/push never schedule SWPC.
+    # Trusted main adapter; PR candidate fetched only after owner request.
     if: >-
       github.event_name == 'issue_comment' &&
       github.repository == 'physicslu/plasma' &&
@@ -77,30 +76,81 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       pinned_sha: ${{ steps.approve.outputs.pinned_sha }}
+      trusted_sha: ${{ steps.approve.outputs.trusted_sha }}
+      pr_number: ${{ steps.approve.outputs.pr_number }}
+      registry_sha256: ${{ steps.approve.outputs.registry_sha256 }}
       execution_path: ${{ steps.approve.outputs.execution_path }}
       task_id: ${{ steps.approve.outputs.task_id }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Checkout trusted main dispatcher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
+          path: trusted
           persist-credentials: false
-      - name: Verify owner command against reviewed main registry
-        id: approve
+      - name: Parse owner command before PR API access
+        id: request
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          python3 scripts/plasma_development_dispatch.py authorize \
-            --event "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/plasma-dev-auth.json"
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git -C trusted rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 trusted/scripts/plasma_development_dispatch.py request \
+            --event "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/plasma-dev-request.json"
+          python3 - "$RUNNER_TEMP/plasma-dev-request.json" "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data=json.load(f)
+          assert data["status"] == "VALID_OWNER_REQUEST"
+          with open(sys.argv[2],"a",encoding="utf-8") as f:
+              f.write(f"pr_number={data['pr_number']}\n")
+              f.write(f"source_sha={data['source_sha']}\n")
+          PY
+      - name: Read live PR metadata for branch request only
+        if: ${{ steps.request.outputs.pr_number != '0' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.request.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          gh api "repos/physicslu/plasma/pulls/$PR_NUMBER" \
+            > "$RUNNER_TEMP/plasma-dev-pr.json"
+      - name: Checkout exact candidate SHA without running candidate logic
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.request.outputs.source_sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Approve candidate contract with trusted main code
+        id: approve
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          PR_NUMBER: ${{ steps.request.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          test "$(git -C trusted rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C candidate rev-parse HEAD)" = "$SOURCE_SHA"
+          args=()
+          if [ "$PR_NUMBER" != 0 ]; then
+            args+=(--pr-info "$RUNNER_TEMP/plasma-dev-pr.json")
+          fi
+          python3 trusted/scripts/plasma_development_dispatch.py authorize \
+            --event "$GITHUB_EVENT_PATH" \
+            --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
+            "${args[@]}" > "$RUNNER_TEMP/plasma-dev-auth.json"
           python3 - "$RUNNER_TEMP/plasma-dev-auth.json" "$GITHUB_OUTPUT" <<'PY'
           import json,sys
           with open(sys.argv[1], encoding="utf-8") as f:
               data=json.load(f)
           assert data["status"] == "AUTHORIZED_DEV_TASK"
           with open(sys.argv[2],"a",encoding="utf-8") as f:
-              for k in ("pinned_sha","execution_path","task_id"):
+              for k in ("pinned_sha","trusted_sha","pr_number",
+                        "registry_sha256","execution_path","task_id"):
                   f.write(f"{k}={data[k]}\n")
           PY
 
