@@ -1,0 +1,152 @@
+name: PLASMA Real Software-only Codex MVP (Issue 981)
+
+# MVP: exact owner-only, single fixed development task, never a generic dispatcher.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-software-mvp.yml"
+      - "scripts/plasma_codex_software_mvp.py"
+      - "scripts/tests/test_plasma_codex_software_mvp.py"
+      - "docs/development/plasma-codex-software-mvp.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-software-mvp.yml"
+      - "scripts/plasma_codex_software_mvp.py"
+      - "scripts/tests/test_plasma_codex_software_mvp.py"
+permissions:
+  contents: read
+concurrency:
+  group: plasma-codex-software-mvp-981
+  cancel-in-progress: false
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m py_compile scripts/plasma_codex_software_mvp.py scripts/tests/test_plasma_codex_software_mvp.py
+          python3 scripts/tests/test_plasma_codex_software_mvp.py
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex software-mvp 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+
+  codex:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install pinned Codex CLI without any model secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/plasma-codex-cli" --no-save @openai/codex@0.163.0
+          echo "$RUNNER_TEMP/plasma-codex-cli/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Real Codex (API credential, never GitHub write credential)
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OPENAI_API_KEY" || { echo "NO_GO: OPENAI_API_KEY not configured"; exit 2; }
+          test ! -e docs/development/plasma-codex-mvp-first-change.md
+          test -z "$(git status --porcelain)"
+          codex --version
+          cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF'
+          Read AGENTS.md and relevant PLASMA docs.
+          Perform ONE genuine, scoped software-only change: create a useful
+          operator guide at docs/development/plasma-codex-mvp-first-change.md.
+          Explain the currently verified read-only Codex pilot and distinguish it
+          from simulated offline broker tests. Do NOT claim this MVP was deployed.
+          Include how a user can inspect the resulting PR and verify provenance.
+          Modify no other path. Do not run hardware, sudo, deployment, HIL,
+          instrument, USB, FPGA, DUT, service commands, git push or git commit.
+          EOF
+          timeout 480s codex --ask-for-approval never exec \
+            --sandbox workspace-write --ephemeral \
+            - < "$RUNNER_TEMP/codex-task.txt"
+      - name: Independent tests and patch artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/tests/test_plasma_codex_software_mvp.py
+          mkdir -p "$RUNNER_TEMP/mvp-parent"
+          python3 scripts/plasma_codex_software_mvp.py bundle \
+            --event "$GITHUB_EVENT_PATH" --artifact-dir "$RUNNER_TEMP/mvp-parent/bundle"
+          (cd "$RUNNER_TEMP/mvp-parent/bundle" && sha256sum candidate.patch receipt.json)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: real-codex-mvp-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/mvp-parent/bundle/candidate.patch
+            ${{ runner.temp }}/mvp-parent/bundle/receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publisher:
+    needs: codex
+    if: ${{ needs.codex.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: real-codex-mvp-${{ github.run_id }}
+          path: ${{ runner.temp }}/mvp-candidate
+      - name: Verify model patch in a separate trusted job
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma_codex_software_mvp.py publish \
+            --event "$GITHUB_EVENT_PATH" --artifact-dir "$RUNNER_TEMP/mvp-candidate"
+          git diff --cached --check
+      - name: Open real GitHub PR, never merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="codex-mvp/issue981-$GITHUB_RUN_ID"
+          git switch -c "$branch"
+          git -c user.name="plasma-codex-mvp[bot]" \
+              -c user.email="plasma-codex-mvp@users.noreply.github.com" \
+              commit -m "docs(codex): first real software-only agent result (#981)"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "docs(codex): first real software-only agent result (#981)" \
+            --body "Created from a REAL Codex model run, admitted by an independent Publisher with one-file SHA256 scope. No general Dispatcher, deployment, hardware, or merge authorized. Verify CI; a GitHub Actions token-created PR may require owner approval to run workflows."
+          gh pr view "$branch" --json url,number,headRefOid
