@@ -45,3 +45,12 @@ For each remaining workflow, collect: trigger events, paths/branches, manually d
 ### Risk note
 
 Filename version age alone is **not** proof a Workflow is obsolete. An `on: workflow_dispatch` research or live-evidence workflow may remain strategically valuable even with no recent runs. Preserve immutable source/evidence and reconcile all callers before retiring it.
+
+## Gate 1 continuation: reconcile documented lifecycle vs 262-row inventory
+
+- Existing baseline `docs/architecture/device-catalog-ci-coverage-map.md` defines **71** workflow lifecycle rows, of which **70** are inside the 262-name Catalog scope and **one** (`stm32f1-live-acquisition-pilot.yml`) is outside that filename filter.
+- The CSV now records each of those 70 baseline lifecycles and its documented disposition; **192** Catalog workflows remain not covered by that pre-existing map. `UNMAPPED` means unclassified, **not obsolete**.
+- Breakdown of mapped Catalog entries: `core-regression` 2; `domain-contract` 1; `family-dispatch` 1; `governance-campaign` 12; `manual-live` 2; `production-contract` 5; `security-hil` 27; `stage-deterministic` 20.
+- Mapping is **not** run-history verification, dependency proof or authorization to archive. Each mapped entry still needs exact current triggers, callers, artifacts and required-check review before retirement.
+- Separately in [Draft PR #1044](https://github.com/physicslu/plasma/pull/1044), STM32U0 trigger-parity remediation uncovered a **failing historical U0.3 prestate regression**: `STM32F0: Production source drifted relative to U0.3 prestate`. Existing U0.3 planner dereferences mutable current source CSV against a frozen U0.3 manifest; no CI assertion or Production evidence should be weakened just to turn the check green. This is a **Gate 2 blocker** for #1044, which remains Draft.
+- `main` advanced after #1042 was opened. Recheck the exact base HEAD, mergeability, run history and all required checks before any future Gate 2 request; do not merge in Gate 1.
