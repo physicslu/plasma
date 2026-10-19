@@ -191,7 +191,7 @@ class MVPTests(unittest.TestCase):
         self.assertNotIn("contents: write",worker)
         self.assertNotIn("npm install",worker)
         self.assertIn("runs-on: ubuntu-24.04",publisher)
-        self.assertIn("needs: codex",publisher)
+        self.assertIn("needs: [authorize, codex]",publisher)
         self.assertIn("pull-requests: write",publisher)
         self.assertIn("contents: write",publisher)
         self.assertIn("GH_TOKEN:",publisher)
