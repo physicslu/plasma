@@ -166,12 +166,6 @@
         "gate1-implementation",
         "hardware-one-shot"
       ]
-    },
-    "runtime_status": {
-      "enum": [
-        "DISABLED_GATE1",
-        "OWNER_APPROVED_ONE_SHOT"
-      ]
     }
   }
 }
