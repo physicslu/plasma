@@ -168,7 +168,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             "number":pr, "state":"open", "merged_at":None,
             "user":{"login":"physicslu"},
             "base":{"ref":"main","repo":{"full_name":"physicslu/plasma"}},
-            "head":{"ref":"agent/example-software",
+            "head":{"ref":"feature/example-software",
                     "sha":sha,
                     "repo":{"full_name":"physicslu/plasma"}},
         }
