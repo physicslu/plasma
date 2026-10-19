@@ -8,6 +8,61 @@ permission to run other tasks, operate devices, or deploy production Runtime.
 See `AGENTS.md` §11.1 and the canonical Three-Path execution model for
 approval and evidence requirements.
 
+## Development Branch Dispatch v1 — Gate 1 pre-merge source pinning
+
+**Gate 1 implementation candidate in this PR; no live SWPC confirmation yet.**
+The same trusted main `.github/workflows/plasma-engineering-runtime-dispatch.yml`
+now supports an owner-authored Issue #981 command for an existing, open,
+same-repository, owner-created non-`main` PR, with its **exact current head SHA**:
+
+```text
+/plasma-dispatch run <task-id> --pr <number> --sha <full-40-character-commit-sha> 981
+```
+
+This is a new branch-mode syntax. The legacy main-only owner command remains
+supported without `--pr` and `--sha`. The exact task ID must exist in the
+candidate commit's `specs/engineering-dispatch/development-tasks-v1.json`;
+the requested Path and relevant command/output contract are validated by
+the **main** dispatcher, not by dispatcher Python from the PR.
+
+1. The owner-only GitHub-hosted admission job parses the strict request
+   *before* GitHub API access; only approved Issue #981 created comments
+   from `physicslu` proceed.
+2. It retrieves the live PR metadata using a read-only GitHub token,
+   rejects non-open/non-owner/fork/wrong-base PRs and stale or mismatched
+   PR HEAD SHA, and checks out the **exact SHA** into a separate `candidate`
+   tree without executing that tree's code.
+3. Trusted authorization and worker adapter code is always checked out
+   from the `main` event SHA under `trusted`. Worker source and registry
+   are a separate, pinned candidate checkout. GitHub-hosted authorization
+   carries the candidate SHA, trusted main SHA, PR number and registry digest.
+   The worker verifies these before invoking CLI or Codex.
+4. Path 2 accepts checked-in fixed Python CLI plus expected stdout SHA256,
+   retains optional `nine-nine-table-v1` semantic verification and archives
+   stdout/stderr and the receipt. Path 3 delegates the task objective to Codex,
+   supports creating or repairing the approved Python file, and collects
+   the source, text or CSV output (`output_format: text|csv`), self-test and
+   Codex session logs. Its reference SHA256 is optional for new unknown-output
+   objectives. Only the approved source file may be changed, and its
+   tracked diff is preserved in a source patch artifact for review;
+   **ChatGPT** reviews evidence, not AST shape or fixed CSV column labels.
+5. Both use the *existing* `SWPC-plasma-codex` self-hosted Runner, with
+   no new task-specific Workflow. PR/push checks are GitHub-hosted offline
+   only. The formal qualification `workflow_dispatch` Runtime stays OFF.
+
+This is **not** blanket trust of PR code: only the owner-authorized exact
+same-repository candidate commit enters the existing development workers.
+The shared SWPC Linux account is hardware-capable, and prompt restrictions
+do not substitute for OS isolation; no hardware operation is authorized by
+this feature. PR metadata is checked at hosted authorization time; changes
+to a PR after approval cannot silently change the pinned checkout SHA.
+The owner must authorize a new full SHA to run a subsequent revision.
+
+**This PR's Gate 1 test evidence is hosted/offline contract and simulated
+executor tests only**. Do not call it a real pre-merge SWPC Path 2/3 PASS.
+The owner must separately approve Gate 2 before merging this dispatcher
+foundation; afterward later task PRs can be executed during their own Gate 1.
+
 ## Development Mode owner-only dispatch (PR #1046 alignment)
 
 This is a separate **development entry** within the **same reusable Workflow**,
@@ -80,7 +135,7 @@ Path 3's Codex does its own implementation, execution, self-tests and repairs;
 the Dispatcher should collect evidence rather than prescribe a Python AST or
 independently re-run every Codex program.
 
-**Current implementation gap (not fixed by this documentation PR):** the
+**Historical pre-v1 implementation gap (addressed in this candidate PR, pending merge and live validation):** the
 Development Mode `development-authorize` and worker use
 `GITHUB_REF=refs/heads/main`, `GITHUB_SHA` from that event, and a checked-in
 task registry on the default branch. GitHub `issue_comment` loads its
@@ -99,9 +154,7 @@ run the already-approved real experiment **before** merge. Retain the existing
 `SWPC-plasma-codex` Runner, no new task-specific Workflow and no additional
 owner gate. The `main` Workflow itself can remain trusted; it must explicitly
 permit and validate a task's separate pre-merge source SHA rather than
-silently using `main` for both. Until that function really passes its own
-positive/negative tests and live verification, report the technical blocker
-and `NOT_RUN`; do not bypass guards or merge merely to activate a test.
+silently using `main` for both. Until the new branch-dispatch code is merged and proves real SWPC operation, report its current validation boundary accurately; do not bypass guards or merge other task PRs merely to activate their tests.
 
 Gate 2 may exceptionally approve knowingly deferred development evidence
 only after the owner sees exactly which acceptance is missing. Such
