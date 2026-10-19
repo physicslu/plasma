@@ -31,7 +31,7 @@
 - **KEEP_CORE (4):** `device-catalog-validation.yml`, `device-catalog-current-validation.yml`, `device-catalog-stm32-family-validation.yml`, `device-catalog-production-doc-contract.yml`.
 - **KEEP_GOVERNANCE (3):** `device-catalog-production-invariants.yml`, `catalog-promotion-framework.yml`, `icpn-catalog-admission-separation-validation.yml`.
 - **ARCHIVE_PROPOSED (5):** three historical Microchip YAMLs from batch 1, plus the two strictly branch-bound recovery candidates below.
-- **PENDING_DEEP_AUDIT (204):** *not* authorized for deletion or archival.
+- **PENDING_DEEP_AUDIT (0) for static trigger screening:** no original Workflow remains unclassified at the source/trigger layer. **Historical Runs, external callers, required checks and parity remain unverified and are not retired by this result.**
 
 For each remaining workflow, collect: trigger events, paths/branches, manually dispatchable status, callers (`workflow_call`, `workflow_run`, `gh workflow run`), consumed/produced artifacts, active PR check contexts, last runs and business owner, successor test coverage, hardware/system integration impact, and archival restore plan. Do not convert `PENDING_DEEP_AUDIT` to `ARCHIVE_PROPOSED` without evidence.
 
@@ -82,3 +82,35 @@ For the two additional archival proposals, preserve original Git blobs under `do
 - `ARCHIVE_PROPOSED` means a *Draft* change with rollback copy, **not** an approved retirement.
 - `PENDING_DEEP_AUDIT` remains the 204 definitions that still require source inspection; all 262 continue to require complete Actions run-history / required-check proof for retirement decisions.
 - This continuation neither enables the Engineering Runtime Dispatcher nor changes SWPC/PS/PL/HIL execution authority.
+
+## Gate 1 continuation — all 262 original workflows source-trigger screened
+
+**Source-only triage completed for the original 262 definitions. This is NOT an exhaustive historical run / dependency / required-check audit, and is NOT Gate 2 acceptance.**
+
+| Retention disposition | Count | Scope |
+|---|---:|---|
+| KEEP_CORE | 4 | Permanent registered core validation owners |
+| KEEP_GOVERNANCE | 3 | Explicit Production / admission governance owners |
+| RETAIN_ACTIVE_VALIDATOR | 244 | Triggered by path-scoped `pull_request` (some also allow `push` or manual dispatch); retain independent checks |
+| RETAIN_MANUAL_DISPATCH | 6 | Three Microchip manual research/canary workflows and three STM32 L0/L4/U0 Live Discovery workflows |
+| ARCHIVE_PROPOSED | 5 | Five no-dispatch, stale-branch/self-YAML-only Microchip one-shots; preserved byte-identically in `docs/archive/ci-workflows/microchip/` |
+| PENDING_DEEP_AUDIT (source-only) | 0 | Means every original YAML was screened for *triggers*, **not** that its run history or callers have been validated |
+| **Total original cohort** | **262** | Historical 2026-10-19 snapshot; archived files no longer count as live Actions workflows only after Gate 2 merge |
+
+### Cohort-specific retention decisions
+
+- **NXP (30)**: all 30 retain path-scoped PR validation. The Kinetis/KL25, LPC81x/82x and cross-vendor Phase admission tests remain distinct domain contracts, even if many also permit manual dispatch.
+- **Cross-cutting and ST backbone (26)**: all 26 retain PR validation, including backend provenance, ST commercial-gap and ST H5 host/ARMv7 build/flash-matrix tests. Do not infer real HIL coverage from `ubuntu-24.04` build job names.
+- **STM32-marked definitions (149 including the shared family core)**: 146 have PR validation (the shared core counts in KEEP_CORE), **three** are manual-only Live Discovery: `stm32l0-l02-live-discovery`, `stm32l4-l42-live-discovery`, `stm32u0-u02-live-discovery`. Preserve staged L0/L1/L4 and TrustZone/security/HIL evidence owners until explicit parity proof.
+- **Microchip (20)**: 5 static archive candidates, 12 PR validators and 3 manually dispatchable workflows; see prior section.
+- **OpenOCD (31)**: all retain PR validation; keep exact production/route/metadata boundary gates.
+
+### Incomplete Gate 1 verification (must remain explicit)
+
+1. **Per-workflow historical Actions runs:** no API-wide exhaustively paginated run history available through the connected GitHub interface. Certain known Runs and Artifacts have been checked individually; this does not complete the 262-run history.
+2. **External callers:** GitHub indexed default-branch code search is not exhaustive over scripts, off-repository automation, retired branches or scheduled external dispatch.
+3. **Required checks:** active Ruleset reads do not establish classic branch-protection required status contexts (connector returned 403 previously). No required-check equivalence is asserted for any archive.
+4. **Validator parity:** retaining a PR validator is conservative. Consolidating or retiring PR stages requires explicit identical test/trigger/evidence/release contract coverage, not a filename or age heuristic.
+5. **Source change vs current state:** 262 is the original baseline; do not reinterpret it as the live workflow count after the five proposed archives. Recheck current main and PR diff before Gate 2.
+
+Nothing in this audit authorizes production catalog mutation, software/runtime activation, self-hosted operation, hardware tests, or merge.
