@@ -10,11 +10,13 @@ Vivado. It is now replaced with a typed capability route:
 
 - `cpu-only`: unchanged bubblewrap, Python -I -S, 40s and output digest.
 - `z2-cpu-only`: unchanged exceptional A2 one-shot hardware Claim.
-- `vivado-host-build`: fixed **host** CLI via reviewed `main` project
-  scripts, registered in the existing Development Task registry. Only the
-  owner-created Issue #981 **main-only** command with exact pinned main SHA
-  is admissible; PR-head candidates, re-runs, unknown capabilities and
-  arbitrary executable paths fail closed.
+- `vivado-host-build`: fixed **host** CLI via the existing Development
+  Task registry. Owner-created Issue #981 commands may name either an exact
+  trusted main SHA or an **open, same-repository, owner-created PR HEAD**
+  whose immutable SHA exactly matches the command and live GitHub metadata.
+  Source and trusted SHA must be different for a PR request. Reruns, wrong
+  PR metadata, mismatched SHA, unknown capabilities, and arbitrary executable
+  paths fail closed. No Gate 2 merge is needed merely to *qualify* a PR.
 
 No new Workflow, GitHub self-hosted Runner or per-task Workflow exists.
 The existing `development-execute` job and `SWPC-plasma-codex` Runner are
@@ -29,8 +31,10 @@ not proof of a real FPGA image being loaded or identity provenance.
 The manifest entry `fixed-site1-vivado-host-build` is the reusable typed
 project definition and *not* a second Work Order system.
 
-**Gate 1:** source and hosted negative contracts only. Actual SWPC toolchain,
-filesystem ownership/isolation, board-cache access, host Vivado synthesis,
-timing, DRC, BIT/HWH and signed Build ID are **NOT_RUN/NOT_QUALIFIED**.
-A separate owner's explicit approval is necessary before posting a real
-Issue #981 Path 2 execution request. No Gate 2 merge consent is implicit.
+**Gate 1:** GitHub CI is not a substitute for the actual SWPC Host Build.
+Run the reviewed, fixed PR SHA on the existing Path 2 Runner after explicit
+Owner approval; qualify synthesis, timing, DRC, BIT/HWH and evidence before
+requesting the merge-only Gate 2. The original trusted main Dispatcher must
+also have this policy revision; a PR-only edit cannot change the trusted
+code that an Issue #981 event actually executes. No automatic permission to
+touch FPGA Manager, Z2, MMIO, LA, DUT, power or deployment is implied.

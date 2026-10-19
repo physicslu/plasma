@@ -57,11 +57,17 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
     require(type(approval) is dict and
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == "path2-cli" and
-            approval.get("pr_number") == 0 and
-            approval.get("trusted_sha") == approval.get("pinned_sha") and
+            approval.get("task_id") == "fixed-site1-vivado-host-build" and
             type(approval.get("pinned_sha")) is str and
-            BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None,
-            "BUILD_TRUSTED_MAIN_APPROVAL_DENIED")
+            BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None and
+            type(approval.get("trusted_sha")) is str and
+            BOARD_SHA40.fullmatch(approval["trusted_sha"]) is not None and
+            ((approval.get("pr_number") == 0 and
+              approval["pinned_sha"] == approval["trusted_sha"]) or
+             (type(approval.get("pr_number")) is int and
+              approval["pr_number"] > 0 and
+              approval["pinned_sha"] != approval["trusted_sha"])),
+            "BUILD_APPROVED_SOURCE_BINDING_DENIED")
     require(env.get("GITHUB_REPOSITORY") == "physicslu/plasma" and
             env.get("RUNNER_NAME") == EXPECTED_RUNNER and
             env.get("RUNNER_ENVIRONMENT") == "self-hosted" and
