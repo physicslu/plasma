@@ -793,15 +793,25 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
                                    "pinned_sha":"a"*40,"trusted_sha":"a"*40},
                          sandbox=False)
             builder.assert_called_once()
-        with patch("plasma_vivado_host_build.run") as builder:
-            dev.run_task(task,workspace=ROOT,
-                         approval={"task_id":"fixed-site1-vivado-host-build",
-                                   "execution_path":"path2-cli",
-                                   "execution_capability":"vivado-host-build",
-                                   "pr_number":1063,
-                                   "pinned_sha":"b"*40,"trusted_sha":"a"*40},
-                         sandbox=False)
-            builder.assert_called_once()
+        # An approved PR must not silently fall back to the trusted main
+        # driver when its own fixed candidate driver is missing.
+        with tempfile.TemporaryDirectory() as td:
+            candidate = Path(td) / "candidate"
+            candidate.mkdir()
+            with patch("plasma_vivado_host_build.run") as builder:
+                with self.assertRaisesRegex(
+                    dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"
+                ):
+                    dev.run_task(task, workspace=candidate,
+                                 approval={
+                                     "task_id":"fixed-site1-vivado-host-build",
+                                     "execution_path":"path2-cli",
+                                     "execution_capability":"vivado-host-build",
+                                     "pr_number":1063,
+                                     "pinned_sha":"b"*40,
+                                     "trusted_sha":"a"*40},
+                                 sandbox=False)
+                builder.assert_not_called()
         for invalid in (
             {"task_id":"wrong"},
             {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
