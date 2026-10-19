@@ -94,7 +94,8 @@ def check_artifact(path: Path) -> dict:
         for name in sorted(FILES & {"elf-header.txt", "elf-attributes.txt",
                                     "elf-symbols.txt", "barrier-disassembly.txt"})
     }, "A1 inspection digest mismatch")
-    require("dmb sy" in (path / "barrier-disassembly.txt").read_text().lower(),
+    require(re.search(r"\bdmb\s+sy\b", (path / "barrier-disassembly.txt").read_text(),
+                      re.IGNORECASE) is not None,
             "No DMB SY instruction in pinned disassembly")
     return {
         "schema": "plasma-hil-a15-artifact-check-v1",
