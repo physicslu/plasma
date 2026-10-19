@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Single-owner, single-work-order LIVE Codex MVP. No general dispatcher.
+"""Exact owner-triggered C11 SW task on the unified SWPC HIL worker.
 
-The Codex worker uses SWPC-plasma-codex and its existing ChatGPT login, not
-an OPENAI_API_KEY or GitHub write token. The hosted publisher is separate.
-Both jobs use the owner-approved Gate 2 squash-merge SHA. A hosted provenance
-check independently binds the single activation PR #1034 to Gate 1 Codex PR #1033.
-No issue comment is required and no hardware operations are authorized.
+Uses the existing SWPC-plasma-codex identity and its ChatGPT CLI login,
+without GitHub write tokens or API secrets on the worker. A separate hosted
+Publisher verifies the model-generated single-file patch. All live execution
+requires an explicit owner-created Issue #981 command on main; legacy
+PR #1034 postmerge auto activation is archived and must NOT be replayed.
+The SW command is not permission for Z2/LA/USB hardware operations.
 """
 from __future__ import annotations
 import argparse
