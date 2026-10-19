@@ -17,6 +17,7 @@ on:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
   push:
@@ -24,6 +25,7 @@ on:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
       - "docs/architecture/plasma-engineering-runtime-dispatch-v1.md"
 
