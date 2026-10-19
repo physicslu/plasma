@@ -111,9 +111,9 @@ jobs:
           # Existing SWPC Codex CLI login; no API key is supplied.
           # Spawned tools should not have network access to laboratory endpoints.
           timeout --signal=TERM --kill-after=10s 480s \
-            codex --ask-for-approval never exec \
-              --sandbox workspace-write \
+            codex --ask-for-approval never \
               -c sandbox_workspace_write.network_access=false \
+              exec --sandbox workspace-write \
               - < "$RUNNER_TEMP/codex-task.txt"
       - name: Independent tests and patch artifact
         shell: bash
