@@ -1,0 +1,48 @@
+{
+  "schema_version": "plasma.engineering.work_order.v1",
+  "work_order_id": "hil-a2-cpu-only",
+  "revision": 1,
+  "repository": "physicslu/plasma",
+  "issue_number": 981,
+  "requested_by": "physicslu",
+  "reviewed_main_sha": "121a7b3da6ecc1513b47d397ad70e68c9820f789",
+  "authorization_kind": "hardware-one-shot",
+  "objective": "Future separately approved real PYNQ-Z2 Cortex-A9 CPU-only execution of exact frozen HIL-A1 DMB SY library; no physical execution authorized by this Gate 1.",
+  "capability": "z2-cpu-only",
+  "entrypoint": "z2-cpu-only",
+  "runtime_status": "DISABLED_GATE1",
+  "scope": {
+    "allow_repo_paths": [
+      "scripts/plasma_hil_a2_cpu_only.py",
+      "scripts/hil-a15-armv7-qemu.py",
+      "scripts/plasma-codex-z2-login.py"
+    ],
+    "deny_resources": [
+      "usb",
+      "fpga",
+      "mmio",
+      "dut",
+      "hub-power",
+      "network-instrument",
+      "repository-write",
+      "host-root"
+    ],
+    "required_permissions": [
+      "repo:read",
+      "ssh:z2-cpu-only"
+    ]
+  },
+  "timeout_seconds": 120,
+  "acceptance": [
+    "Enrolled pinned SSH host and non-root xilinx account",
+    "ARMv7 32-bit little endian Cortex-A9 CPU part 0xc09",
+    "A1 seven-file manifest, ELF32 EABI5, frozen binary SHA256 exact",
+    "1000 calls to plasma_mmio_dmb_sy and successful shared library load",
+    "Only restricted temporary path, no real MMIO UIO FPGA or DUT",
+    "Sanitized Z2-native evidence plus SHA256 and cleanup PASS"
+  ],
+  "evidence": [
+    "sanitized-receipt",
+    "sha256-manifest"
+  ]
+}
