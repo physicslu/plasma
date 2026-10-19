@@ -168,6 +168,37 @@ class A2Gate1OfflineContracts(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(dev.Denied):
                 dev.authorize(forged, ctx, self.registry)
 
+    def test_a2_rejects_pr_candidate_even_if_owner_and_sha_are_valid(self):
+        event, context = self.event_and_context()
+        candidate_sha = "b" * 40
+        event["comment"]["body"] = (
+            "/plasma-dispatch run hil-a2-cpu-only --pr 1053 --sha "
+            + candidate_sha + " 981"
+        )
+        pr = {
+            "number": 1053, "state": "open", "merged_at": None,
+            "user": {"login": "physicslu"},
+            "base": {"ref": "main", "repo": {"full_name": "physicslu/plasma"}},
+            "head": {
+                "ref": "agent/hil-a2-cpu-only-path2-gate1-20261019",
+                "sha": candidate_sha,
+                "repo": {"full_name": "physicslu/plasma"}
+            },
+        }
+        with self.assertRaisesRegex(dev.Denied, "A2_TRUSTED_MAIN_ONLY"):
+            dev.authorize(event, context, self.registry, pr_info=pr)
+
+    def test_a2_contract_never_uses_per_run_activation_toggles(self):
+        self.assertNotIn("activation", self.task)
+        self.assertNotIn("runtime_status", self.work_order)
+        workflow = WORKFLOW.read_text()
+        self.assertIn("path: trusted", workflow)
+        self.assertIn("path: candidate", workflow)
+        self.assertIn("  development-codex:", workflow)
+        self.assertIn("plasma-path3-source.patch", workflow)
+        self.assertIn("  development-claim:", workflow)
+        self.assertNotIn("PLASMA_HIL_A2_CPU_ONLY_ENABLED", workflow)
+
     def test_remote_report_exact_positive_and_hostile_negative(self):
         report = expected_report()
         self.assertEqual(a2.verify_cpu_report(report)["calls"], 1000)
