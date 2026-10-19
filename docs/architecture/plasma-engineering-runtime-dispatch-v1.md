@@ -96,6 +96,17 @@ activation and operational test plan**):
 A successful Gate 1 **offline** CI is not operational readiness. The
 enable flag must not be switched on in this PR or from a merged PR.
 
+**Two independent activation interlocks:** GitHub repository variable
+`PLASMA_ENGINEERING_DISPATCH_ENABLED=true` **and** checked-in
+`specs/engineering-dispatch/runtime-activation-v1.json` status
+`ENABLED_BY_SEPARATE_APPROVAL`, with an explicit per-path switch. The latter
+is checked by the Python CLI before `authorize` or `worker`. It currently
+contains `DISABLED_GATE1` and both paths `false`. Changing only the GitHub
+variable cannot permit task execution. The legacy capability policy remains
+contract-only: a reviewed runtime policy migration and real isolation
+acceptance are still required before production readiness.
+
+
 ## Test contract / status vocabulary
 
 - `RUNTIME_BUNDLE_VALIDATED_NO_EXECUTION`: deterministic offline validation.
