@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Owner-triggered PLASMA Development Mode dispatcher, shared Workflow/Runner.
 
-A reviewed task registry on pinned main defines the exact fixed command. This
-adapter uses no privilege elevation, device APIs, network calls or shell.
+Trusted dispatcher code stays on main; a reviewed development PR SHA may
+supply a candidate task registry/workspace. No shell-based dispatch.
 The product/qualification Runtime dispatcher remains independently disabled.
 """
 from __future__ import annotations
@@ -27,6 +27,14 @@ EXPECTED_RUNNER = "SWPC-plasma-codex"
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+
+BRANCH_COMMAND = re.compile(
+    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) "
+    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40}) 981\Z"
+)
+LEGACY_COMMAND = re.compile(
+    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) 981\Z"
+)
 
 
 class Denied(ValueError):
@@ -68,9 +76,15 @@ def task_by_id(registry: object, task_id: str) -> dict:
     require(execution_path in ("path2-cli", "path3-codex"),
             "PATH_NOT_SUPPORTED")
     if execution_path == "path2-cli":
-        require(set(task) == {
+        require(set(task) in ({
             "execution_path", "script", "argv", "expected_stdout_sha256",
-        }, "TASK_FIELDS_DENIED")
+        }, {
+            "execution_path", "script", "argv", "expected_stdout_sha256",
+            "verification",
+        }), "TASK_FIELDS_DENIED")
+        require(task.get("verification", "sha256-only") in (
+            "sha256-only", "nine-nine-table-v1",
+        ), "TASK_VERIFICATION_DENIED")
         path = task["script"]
         require(type(path) is str and re.fullmatch(
             r"scripts/experiments/[a-zA-Z0-9_-]+\.py", path
@@ -99,7 +113,8 @@ def task_by_id(registry: object, task_id: str) -> dict:
             "OUTPUT_DIGEST_INVALID")
     return task
 
-def authorize(event: object, context: dict, registry: object) -> dict:
+def request(event: object, context: dict) -> dict:
+    """Verify owner, issue and exact command before any candidate checkout."""
     require(type(event) is dict and event.get("action") == "created",
             "EVENT_ACTION_DENIED")
     require(context.get("GITHUB_EVENT_NAME") == "issue_comment"
@@ -117,8 +132,8 @@ def authorize(event: object, context: dict, registry: object) -> dict:
     require(all(type(x) is dict for x in (
         issue, comment, sender, repository,
     )), "EVENT_SHAPE_DENIED")
-    require(issue.get("number") == ISSUE and "pull_request" not in issue,
-            "EVENT_ISSUE_DENIED")
+    require(type(issue.get("number")) is int and issue["number"] == ISSUE
+            and "pull_request" not in issue, "EVENT_ISSUE_DENIED")
     require(sender.get("login") == OWNER
             and type(comment.get("user")) is dict
             and comment["user"].get("login") == OWNER
@@ -127,53 +142,99 @@ def authorize(event: object, context: dict, registry: object) -> dict:
     require(type(comment.get("id")) is int and comment["id"] > 0,
             "EVENT_COMMENT_ID_DENIED")
     body = comment.get("body")
-    require(type(body) is str and body.startswith(COMMAND_PREFIX)
-            and body.endswith(" " + str(ISSUE)), "COMMAND_DENIED")
-    task_id = body[len(COMMAND_PREFIX):-len(" " + str(ISSUE))]
-    task = task_by_id(registry, task_id)
-    require(body == f"{COMMAND_PREFIX}{task_id} {ISSUE}",
+    require(type(body) is str and 0 < len(body) <= 200,
+            "COMMAND_DENIED")
+    branch_match = BRANCH_COMMAND.fullmatch(body)
+    legacy_match = LEGACY_COMMAND.fullmatch(body)
+    require(branch_match is not None or legacy_match is not None,
             "EXACT_COMMAND_DENIED")
+    match = branch_match or legacy_match
     return {
-        "status": "AUTHORIZED_DEV_TASK",
-        "task_id": task_id,
-        "execution_path": task["execution_path"],
-        "pinned_sha": sha,
+        "task_id": match.group("task"),
+        "pr_number": int(branch_match.group("pr")) if branch_match else 0,
+        "source_sha": branch_match.group("sha") if branch_match else sha,
+        "trusted_sha": sha,
         "comment_id": comment["id"],
         "issue_number": ISSUE,
     }
 
 
-def run_task(task: dict, *, executor=subprocess.run) -> dict:
-    script = ROOT / task["script"]
+def verify_pr(pr: object, req: dict) -> None:
+    """Authorize exact, open, same-repository, owner-created PR HEAD."""
+    require(type(pr) is dict and req["pr_number"] > 0,
+            "PR_METADATA_DENIED")
+    require(type(pr.get("number")) is int and
+            pr["number"] == req["pr_number"], "PR_NUMBER_MISMATCH")
+    require(pr.get("state") == "open" and
+            pr.get("merged_at") is None, "PR_NOT_OPEN")
+    head, base, author = pr.get("head"), pr.get("base"), pr.get("user")
+    require(all(type(x) is dict for x in (head, base, author)),
+            "PR_SHAPE_DENIED")
+    require(type(head.get("repo")) is dict and
+            head["repo"].get("full_name") == REPO and
+            type(base.get("repo")) is dict and
+            base["repo"].get("full_name") == REPO and
+            base.get("ref") == "main", "PR_REPOSITORY_OR_BASE_DENIED")
+    require(author.get("login") == OWNER and
+            type(head.get("ref")) is str and
+            head["ref"].startswith("agent/"), "PR_OWNER_OR_BRANCH_DENIED")
+    require(head.get("sha") == req["source_sha"],
+            "PR_HEAD_SHA_MISMATCH")
+
+
+def authorize(event: object, context: dict, registry: object,
+              pr_info: object = None) -> dict:
+    req = request(event, context)
+    if req["pr_number"]:
+        verify_pr(pr_info, req)
+    else:
+        require(pr_info is None, "UNEXPECTED_PR_METADATA")
+    task = task_by_id(registry, req["task_id"])
+    return {
+        "status": "AUTHORIZED_DEV_TASK",
+        **req,
+        "pinned_sha": req["source_sha"],
+        "execution_path": task["execution_path"],
+    }
+
+
+def run_task(task: dict, *, workspace: Path = ROOT,
+             executor=subprocess.run, evidence_dir: Path | None = None) -> dict:
+    script = workspace / task["script"]
     require(script.is_file() and not script.is_symlink(), "SCRIPT_NOT_FOUND")
     proc = executor(
         [sys.executable, str(script), *task["argv"]],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         timeout=40, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,
             "OUTPUT_EXCEEDS_LIMIT")
+    if evidence_dir is not None:
+        require(evidence_dir.is_dir(), "EVIDENCE_DIR_DENIED")
+        (evidence_dir / "plasma-path2-stdout.txt").write_bytes(proc.stdout)
+        (evidence_dir / "plasma-path2-stderr.txt").write_bytes(proc.stderr)
     digest = hashlib.sha256(proc.stdout).hexdigest()
     lines = proc.stdout.decode("ascii").splitlines()
     require(proc.returncode == 0 and proc.stderr == b"", "COMMAND_FAILED")
     require(digest == task["expected_stdout_sha256"], "OUTPUT_SHA256_MISMATCH")
-    require(len(lines) == 82
-            and lines[0] == "multiplicand,multiplier,product",
-            "TABLE_FORMAT_DENIED")
-    for a in range(1, 10):
-        for b in range(1, 10):
-            require(lines[1 + (a - 1) * 9 + (b - 1)] == f"{a},{b},{a*b}",
-                    "MULTIPLICATION_MISMATCH")
+    if task.get("verification", "sha256-only") == "nine-nine-table-v1":
+        require(len(lines) == 82
+                and lines[0] == "multiplicand,multiplier,product",
+                "TABLE_FORMAT_DENIED")
+        for a in range(1, 10):
+            for b in range(1, 10):
+                require(lines[1 + (a - 1) * 9 + (b - 1)] == f"{a},{b},{a*b}",
+                        "MULTIPLICATION_MISMATCH")
     return {
         "status": "PASS",
         "execution_path": "path2-cli",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
         "exit_code": proc.returncode,
-        "rows": 81,
+        "rows": max(0, len(lines) - 1),
         "stdout_bytes": len(proc.stdout),
         "stdout_sha256": digest,
-        "first_row": lines[1],
-        "last_row": lines[-1],
+        "first_row": lines[1] if len(lines) > 1 else "",
+        "last_row": lines[-1] if lines else "",
     }
 
 
