@@ -148,7 +148,7 @@ class DiagnosticContracts(unittest.TestCase):
     def test_workflow_does_not_trigger_swpc_on_pr_or_merge(self):
         wf=(ROOT/".github/workflows/plasma-codex-device-permission-diagnostic.yml").read_text()
         self.assertIn("workflow_dispatch:",wf)
-        self.assertIn("inputs.confirm_read_only == true",wf)
+        self.assertIn('test "$CONFIRM_READ_ONLY" = true',wf)
         self.assertIn("github.actor == 'physicslu'",wf)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
         self.assertIn("needs: authorize",wf)
