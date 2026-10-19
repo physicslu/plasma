@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Trusted Path 2 fixed Vivado HOST build. No target load, device or deployment.
 
-A reviewed main-only owner Issue #981 request is mandatory. The CLI selection
-is a typed project name, not arbitrary bash/python from a candidate PR.
+A reviewed owner Issue #981 request is mandatory. It may pin trusted main
+or the exact head of an explicitly authorized open owner PR. The CLI
+selection is a typed fixed project, not arbitrary bash/python. Existing
+F1-B build_bitstream.tcl, PYNQ-Z2 board helper and verify_hwh.py are reused;
+this driver does not implement a second Vivado build workflow.
 """
 from __future__ import annotations
 
