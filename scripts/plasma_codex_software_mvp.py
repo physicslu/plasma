@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Single-owner, single-work-order LIVE Codex MVP. No general dispatcher.
 
-Worker has only a read-only GitHub checkout and model credential.
-Publisher receives validated patch artifact in a different hosted job.
-Both jobs use immutable main event SHA; no hardware or SWPC access.
+The Codex worker uses SWPC-plasma-codex and its existing ChatGPT login, not
+an OPENAI_API_KEY or GitHub write token. The hosted publisher is separate.
+Both jobs use the immutable main event SHA. No hardware operations are authorized.
 """
 from __future__ import annotations
 import argparse
@@ -70,8 +70,10 @@ def authorize(event: dict, environ: dict[str, str], sha: str) -> dict:
     run = environ.get("GITHUB_RUN_ID", "")
     if not re.fullmatch(r"[1-9][0-9]{0,19}", run):
         fail("UNTRUSTED_RUN_ID")
+    # The owner command is a fixed Codex-executor selection; never fall back
+    # silently to ChatGPT, a hosted model, or a hardware capability.
     return {"repository": REPO, "issue": ISSUE, "command": COMMAND,
-            "source_sha": sha, "comment_id": event["comment"]["id"],
+            "executor": "codex", "source_sha": sha, "comment_id": event["comment"]["id"],
             "run_id": int(run), "run_attempt": 1}
 
 def inventory() -> list[str]:
