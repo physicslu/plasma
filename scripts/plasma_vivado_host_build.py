@@ -91,31 +91,17 @@ def discover_vivado_license(*, env: dict | None = None,
                 "BUILD_LICENSE_FILE_INVALID")
         return str(path)
 
+    # Deterministic, host-verified license. Never scan installed tools.
+    fixed = trusted_root / "xic" / "Xilinx.lic"
     inherited = [env.get(key) for key in (
         "XILINXD_LICENSE_FILE", "LM_LICENSE_FILE") if env.get(key)]
     if inherited:
-        require(all(x == inherited[0] for x in inherited),
+        require(all(value == inherited[0] for value in inherited),
                 "BUILD_LICENSE_SOURCE_AMBIGUOUS")
-        return {"XILINXD_LICENSE_FILE": checked_file(inherited[0])}
-
-    # Inspect only an allowlisted installed tool tree. Never scan workspace,
-    # device nodes or arbitrary home directories. Do not follow symlinks.
-    matches: list[str] = []
-    scanned = 0
-    for directory, dirs, filenames in os.walk(trusted_root, followlinks=False):
-        scanned += 1
-        require(scanned <= 20000, "BUILD_LICENSE_DISCOVERY_BOUNDS")
-        dirs[:] = [name for name in dirs
-                   if not (Path(directory) / name).is_symlink()]
-        if "Xilinx.lic" in filenames:
-            candidate = Path(directory) / "Xilinx.lic"
-            # A duplicate or unsafe candidate requires operator review.
-            require(not candidate.is_symlink(),
-                    "BUILD_LICENSE_SOURCE_DENIED")
-            matches.append(str(candidate))
-            require(len(matches) <= 1, "BUILD_LICENSE_SOURCE_AMBIGUOUS")
-    require(matches, "BUILD_LICENSE_NOT_FOUND")
-    return {"XILINXD_LICENSE_FILE": checked_file(matches[0])}
+        require(inherited[0] == str(fixed),
+                "BUILD_LICENSE_SOURCE_DENIED")
+    require(fixed.is_file(), "BUILD_LICENSE_NOT_FOUND")
+    return {"XILINXD_LICENSE_FILE": checked_file(str(fixed))}
 
 
 def _read_safe_file(path: Path) -> str:
