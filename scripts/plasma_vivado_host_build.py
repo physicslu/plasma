@@ -56,6 +56,68 @@ def diagnostics_type():
     return module.DiagnosticSession
 
 
+
+def discover_vivado_license(*, env: dict | None = None,
+                            settings: Path | None = None) -> dict[str, str]:
+    """Resolve one existing Xilinx.lic from a pinned installed tool tree.
+
+    The root is derived from the fixed, trusted Vivado installation, never
+    candidate worktree, arbitrary HOME, or PR/task text. Only metadata is
+    inspected: no license contents are read, modified, logged or uploaded.
+    """
+    env = os.environ if env is None else env
+    settings = SETTINGS64 if settings is None else settings
+    require(settings.name == "settings64.sh" and
+            settings.parent.name == "Vivado",
+            "BUILD_LICENSE_TOOL_ROOT_DENIED")
+    root = settings.parents[2]
+    require(root.is_dir() and not root.is_symlink(),
+            "BUILD_LICENSE_TOOL_ROOT_DENIED")
+    trusted_root = root.resolve(strict=True)
+
+    def checked_file(value: str) -> str:
+        require(type(value) is str and 0 < len(value) <= 1024 and
+                value.startswith("/") and not any(ord(c) < 32 for c in value),
+                "BUILD_LICENSE_SOURCE_DENIED")
+        path = Path(value)
+        require(path.name == "Xilinx.lic" and not path.is_symlink() and
+                path.is_file(), "BUILD_LICENSE_SOURCE_DENIED")
+        # Reject symlinks in any parent component, not just the leaf.
+        require(path.resolve(strict=True).is_relative_to(trusted_root) and
+                path.resolve(strict=True) == path,
+                "BUILD_LICENSE_SOURCE_DENIED")
+        require(os.access(path, os.R_OK), "BUILD_LICENSE_FILE_UNREADABLE")
+        require(0 < path.stat().st_size <= 1024 * 1024,
+                "BUILD_LICENSE_FILE_INVALID")
+        return str(path)
+
+    inherited = [env.get(key) for key in (
+        "XILINXD_LICENSE_FILE", "LM_LICENSE_FILE") if env.get(key)]
+    if inherited:
+        require(all(x == inherited[0] for x in inherited),
+                "BUILD_LICENSE_SOURCE_AMBIGUOUS")
+        return {"XILINXD_LICENSE_FILE": checked_file(inherited[0])}
+
+    # Inspect only an allowlisted installed tool tree. Never scan workspace,
+    # device nodes or arbitrary home directories. Do not follow symlinks.
+    matches: list[str] = []
+    scanned = 0
+    for directory, dirs, filenames in os.walk(trusted_root, followlinks=False):
+        scanned += 1
+        require(scanned <= 20000, "BUILD_LICENSE_DISCOVERY_BOUNDS")
+        dirs[:] = [name for name in dirs
+                   if not (Path(directory) / name).is_symlink()]
+        if "Xilinx.lic" in filenames:
+            candidate = Path(directory) / "Xilinx.lic"
+            # A duplicate or unsafe candidate requires operator review.
+            require(not candidate.is_symlink(),
+                    "BUILD_LICENSE_SOURCE_DENIED")
+            matches.append(str(candidate))
+            require(len(matches) <= 1, "BUILD_LICENSE_SOURCE_AMBIGUOUS")
+    require(matches, "BUILD_LICENSE_NOT_FOUND")
+    return {"XILINXD_LICENSE_FILE": checked_file(matches[0])}
+
+
 def _read_safe_file(path: Path) -> str:
     require(path.is_file() and not path.is_symlink() and
             path.stat().st_size <= 65536, "BUILD_SOURCE_DENIED")
@@ -237,9 +299,13 @@ def _run_pipeline(task: dict, *, workspace: Path, approval: dict,
                       SETTINGS64.is_file() and not SETTINGS64.is_symlink())
     require(SETTINGS64.is_file() and not SETTINGS64.is_symlink(),
             "BUILD_VIVADO_SETTINGS_UNAVAILABLE")
-    diagnostics.check("license_environment_present",
-                      bool(os.environ.get("XILINXD_LICENSE_FILE") or
-                           os.environ.get("LM_LICENSE_FILE")))
+    try:
+        # Fail before Board checkout / Vivado if discovery is unsafe or absent.
+        license_env = discover_vivado_license()
+    except BuildDenied:
+        diagnostics.check("license_environment_present", False)
+        raise
+    diagnostics.check("license_environment_present", True)
     diagnostics.enter("BOARD_PREPARE")
     # Existing board preparation uses its own pinned cache or first-fetch.
     board = resolve_board_repository(task, workspace=workspace,
@@ -281,10 +347,9 @@ def _run_pipeline(task: dict, *, workspace: Path, approval: dict,
         "PLASMA_BOARD_REPO": str(board),
         "PLASMA_VIVADO_JOBS": "4",
     }
-    for key in ("XILINXD_LICENSE_FILE", "LM_LICENSE_FILE"):
-        if os.environ.get(key):
-            # Copy only the two known license discovery keys, never log values.
-            build_env[key] = os.environ[key]
+    # Use the already checked, allowlisted license; never export its location
+    # into diagnostic JSON, receipt, Workflow output or command arguments.
+    build_env.update(license_env)
     try:
         proc = executor(args, cwd=source_root, env=build_env,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
