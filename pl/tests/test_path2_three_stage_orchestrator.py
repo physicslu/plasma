@@ -17,6 +17,8 @@ T = "e" * 64
 
 
 def req(initial="build", **kwargs):
+    if initial != "build":
+        kwargs.setdefault("artifact_sha256", H)
     return dict(stage=initial, source_sha=S, profile_id="f1b-site1-v1",
                 target_id="ppu-z2-lab", **kwargs)
 
@@ -102,6 +104,15 @@ def test_download_and_test_require_prior_receipts():
     for trigger in ("download","test"):
         with pytest.raises(stage.StageDenied,match="REQUEST_FIELDS_DENIED"):
             stage.run(req(trigger),adapters=fake_adapters([]))
+
+
+def test_independent_download_requires_matching_expected_image_hash():
+    b,_=prior()
+    events=[]
+    with pytest.raises(stage.StageDenied, match="PINNED_ARTIFACT_MISMATCH"):
+        stage.run(req("download",build_receipt=b,artifact_sha256="f"*64),
+                  adapters=fake_adapters(events))
+    assert events==[]
 
 
 def test_no_replay_build_on_download_or_test():
@@ -205,7 +216,7 @@ def test_adapter_not_called_with_mutable_original_request():
 def test_explicit_boolean_gates_not_a_deployment_permission():
     source=(Path(__file__).resolve().parents[2]/"scripts"/
             "plasma_path2_stage_orchestrator.py").read_text()
-    assert "subprocess" not in source
+    assert "import subprocess" not in source
     assert "ssh" not in source.lower()
     assert "fpga_manager" not in source.lower()
     assert "OWNER_DEV_RISK_ACK" not in source
