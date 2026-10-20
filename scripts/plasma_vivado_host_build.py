@@ -13,7 +13,6 @@ import errno
 import hashlib
 import argparse
 import sys
-from plasma_fpga_build_diagnostics import DiagnosticSession
 import importlib.util
 import json
 import os
@@ -35,6 +34,26 @@ class BuildDenied(ValueError):
 def require(ok: bool, code: str) -> None:
     if not ok:
         raise BuildDenied(code)
+
+
+def diagnostics_type():
+    """Load the co-versioned diagnostics beside the reviewed driver.
+
+    A pinned candidate PR may introduce this library before it reaches trusted
+    main; loading an unrelated trusted-main copy would violate source pairing.
+    """
+    source = Path(__file__).resolve().with_name(
+        "plasma_fpga_build_diagnostics.py")
+    require(source.is_file() and not source.is_symlink() and
+            source.stat().st_size <= 65536,
+            "BUILD_DIAGNOSTICS_LIBRARY_DENIED")
+    spec = importlib.util.spec_from_file_location(
+        "plasma_reviewed_fpga_diagnostics", source)
+    require(spec is not None and spec.loader is not None,
+            "BUILD_DIAGNOSTICS_LIBRARY_INVALID")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.DiagnosticSession
 
 
 def _read_safe_file(path: Path) -> str:
@@ -206,7 +225,7 @@ def prepare_host_build_dir(workspace: Path) -> Path:
 
 
 def _run_pipeline(task: dict, *, workspace: Path, approval: dict,
-                  evidence_dir: Path, executor, diagnostics: DiagnosticSession,
+                  evidence_dir: Path, executor, diagnostics,
                   execution_path: str) -> dict:
     diagnostics.enter("PREFLIGHT")
     plan = preflight(task, workspace=workspace, approval=approval,
@@ -332,7 +351,7 @@ def run(task: dict, *, workspace: Path, approval: dict,
     """Both authorized paths use this same host build and diagnostic engine."""
     require(evidence_dir is not None and evidence_dir.is_dir() and
             not evidence_dir.is_symlink(), "BUILD_EVIDENCE_DIR_REQUIRED")
-    diagnostic = DiagnosticSession(
+    diagnostic = diagnostics_type()(
         execution_path=execution_path, source_sha=approval.get("pinned_sha", ""),
         evidence_dir=evidence_dir,
     )
