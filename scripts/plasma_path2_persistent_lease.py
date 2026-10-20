@@ -93,6 +93,20 @@ def validate_record(value: object) -> dict:
          "LEDGER_CLOCK_DENIED")
     need(type(record["reason"]) is str and len(record["reason"]) <= 100,
          "LEDGER_REASON_DENIED")
+    if record["status"] in ("LOAD_IN_FLIGHT", "LOADED_AND_HELD",
+                            "TEST_IN_FLIGHT", "RESTORE_IN_FLIGHT",
+                            "RESTORED_VERIFIED"):
+        need(record["load_attempts"] == 1, "LOAD_ATTEMPT_PROVENANCE_DENIED")
+    if record["status"] in ("LOADED_AND_HELD", "TEST_IN_FLIGHT",
+                            "RESTORE_IN_FLIGHT", "RESTORED_VERIFIED"):
+        need(digest(record["load_evidence_sha256"]), "LOADED_PROVENANCE_DENIED")
+    if record["status"] == "TEST_IN_FLIGHT":
+        need(record["test_attempts"] >= 1, "TEST_ATTEMPT_PROVENANCE_DENIED")
+    if record["status"] in ("RESTORE_IN_FLIGHT", "RESTORED_VERIFIED"):
+        need(record["restore_attempts"] == 1, "RESTORE_ATTEMPT_PROVENANCE_DENIED")
+    if record["status"] == "RESTORED_VERIFIED":
+        need(digest(record["restore_evidence_sha256"]),
+             "RESTORE_PROOF_REQUIRED")
     return deepcopy(record)
 
 
@@ -297,7 +311,11 @@ class LeaseLedger:
         tmp = self.path.with_name(self.path.name + "." + uuid.uuid4().hex + ".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
-            os.write(fd, payload)
+            view = memoryview(payload)
+            while view:
+                written = os.write(fd, view)
+                need(written > 0, "LEDGER_WRITE_INCOMPLETE")
+                view = view[written:]
             os.fsync(fd)
         finally:
             os.close(fd)
