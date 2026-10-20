@@ -46,6 +46,8 @@ def verify_pins(receipt: Mapping[str, object]) -> None:
     require(type(receipt.get("candidate_bin_sha256")) is str
             and HEX64.fullmatch(receipt["candidate_bin_sha256"]) is not None,
             "B1_CANDIDATE_BIN_UNPINNED")
+    require(receipt["candidate_bin_sha256"] == CANDIDATE_BIN_SHA256,
+            "B1_CANDIDATE_BIN_NOT_PINNED")
     # A digest field is necessary but not sufficient: independent BIT-to-BIN
     # conversion and root-protected live staging remain outside this module.
 

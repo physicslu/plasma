@@ -106,6 +106,20 @@ class B1TargetOfflineContracts(unittest.TestCase):
             self.assertTrue(all(service_snapshot().values()))
         self.assertEqual(tuple(seen), REQUIRED_SERVICES)
 
+    def test_supervised_interrupt_restores_handlers(self):
+        from pl.hil.fixed_b1_supervisor import with_supervised_signals
+        import signal
+        old_handlers = (signal.getsignal(signal.SIGTERM),
+                        signal.getsignal(signal.SIGHUP))
+        with self.assertRaisesRegex(B1Blocked, "SUPERVISOR_INTERRUPTED"):
+            def interrupt():
+                handler = signal.getsignal(signal.SIGTERM)
+                self.assertTrue(callable(handler))
+                handler(signal.SIGTERM, None)
+            with_supervised_signals(interrupt)
+        self.assertEqual((signal.getsignal(signal.SIGTERM),
+                          signal.getsignal(signal.SIGHUP)), old_handlers)
+
     def test_unreaped_child_forbids_restoration(self):
         child = IsolatedIdentity()
         fake = type("Fake", (), {"poll": lambda self: None})()

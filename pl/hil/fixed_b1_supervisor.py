@@ -246,6 +246,29 @@ def service_snapshot() -> dict[str, bool]:
     return states
 
 
+def with_supervised_signals(callback):
+    """Convert supervised termination into an exception for finally recovery.
+
+    SIGKILL, kernel stalls and power loss remain outside software recovery.
+    Only use in the main-thread Owner Supervisor context.
+    """
+    watched = (signal.SIGTERM, signal.SIGHUP)
+    previous = {s: signal.getsignal(s) for s in watched}
+
+    def interrupt(_sig, _frame):
+        raise B1Blocked("B1_SUPERVISOR_INTERRUPTED")
+
+    installed = []
+    try:
+        for s in watched:
+            signal.signal(s, interrupt)
+            installed.append(s)
+        return callback()
+    finally:
+        for s in reversed(installed):
+            signal.signal(s, previous[s])
+
+
 def run_live(i: Inputs) -> dict[str, str]:
     """No CLI/dispatcher: integration cannot run without a later approved route.
 
@@ -292,14 +315,14 @@ def run_live(i: Inputs) -> dict[str, str]:
                 raise B1Blocked("B1_RESTORATION_MISMATCH")
             clock_and_original_image(i)
             check_ownership_full_64k()
-        result = one_shot(
+        result = with_supervised_signals(lambda: one_shot(
             preflight=preflight,
             load_candidate=lambda: manager_write_firmware(i.candidate_bin.name),
             identity_child=isolated.read,
             child_stopped_and_unmapped=isolated.stopped_and_unmapped,
             restore_original=restore,
             verify_restoration=verify,
-        )
+        ))
         (i.output / "result.json").write_text(json.dumps({
             "schema": "plasma.f1b.b1.target.result.v1",
             "stages": result,

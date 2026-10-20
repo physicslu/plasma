@@ -4,6 +4,7 @@ from pl.hil.fixed_b1_contract import (
     B1Blocked, FPGA_BASE, FPGA_END, IDENTITY_OFFSETS, admit_ownership,
     one_shot, overlaps_64k, read_identity, verify_pins,
     F1_BIT_SHA256, F1_HWH_SHA256, BASE_BIN_SHA256, BASE_HWH_SHA256,
+    CANDIDATE_BIN_SHA256,
 )
 
 
@@ -12,7 +13,7 @@ class B1OfflineContracts(unittest.TestCase):
         return dict(bit_sha256=F1_BIT_SHA256, hwh_sha256=F1_HWH_SHA256,
                     recovery_bin_sha256=BASE_BIN_SHA256,
                     recovery_hwh_sha256=BASE_HWH_SHA256,
-                    candidate_bin_sha256="a" * 64)
+                    candidate_bin_sha256=CANDIDATE_BIN_SHA256)
 
     def test_exact_build_and_recovery_pins(self):
         verify_pins(self.pins())
@@ -24,6 +25,8 @@ class B1OfflineContracts(unittest.TestCase):
         with self.assertRaisesRegex(B1Blocked, "BIN_UNPINNED"):
             verify_pins({k: v for k, v in self.pins().items()
                          if k != "candidate_bin_sha256"})
+        with self.assertRaisesRegex(B1Blocked, "BIN_NOT_PINNED"):
+            verify_pins(self.pins() | {"candidate_bin_sha256": "a" * 64})
 
     def test_full_64k_conflicts_and_bound_fabric(self):
         self.assertEqual(FPGA_END - FPGA_BASE, 65536)
