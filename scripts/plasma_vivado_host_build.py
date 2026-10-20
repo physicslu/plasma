@@ -132,9 +132,10 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
     require(type(approval) is dict and
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == execution_path and
-            approval.get("task_id") == (
-                "fixed-site1-vivado-host-build" if execution_path == "path2-cli"
-                else "f1b-path3-codex-vivado-build"
+            approval.get("task_id") in (
+                ("fixed-site1-vivado-host-build", "z2-path2-build")
+                if execution_path == "path2-cli"
+                else ("f1b-path3-codex-vivado-build",)
             ) and
             type(approval.get("pinned_sha")) is str and
             BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None and

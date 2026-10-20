@@ -25,6 +25,12 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
+      - "scripts/plasma_path2_build_qualification.py"
+      - "scripts/plasma_path2_runtime_integration.py"
+      - "scripts/tests/test_plasma_path2_runtime_integration.py"
+      - "scripts/plasma_path2_stage_orchestrator.py"
+      - "scripts/plasma_path2_f1b_adapters.py"
+      - "scripts/plasma_path2_persistent_lease.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -42,6 +48,12 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
+      - "scripts/plasma_path2_build_qualification.py"
+      - "scripts/plasma_path2_runtime_integration.py"
+      - "scripts/tests/test_plasma_path2_runtime_integration.py"
+      - "scripts/plasma_path2_stage_orchestrator.py"
+      - "scripts/plasma_path2_f1b_adapters.py"
+      - "scripts/plasma_path2_persistent_lease.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -75,6 +87,8 @@ jobs:
           python3 scripts/tests/test_plasma_development_dispatch.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
+          python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
+          python3 scripts/tests/test_plasma_path2_runtime_integration.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -290,7 +304,13 @@ jobs:
         (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
          needs.development-claim.result == 'skipped') ||
         (needs.development-authorize.outputs.execution_capability == 'vivado-host-build' &&
-         needs.development-authorize.outputs.task_id == 'fixed-site1-vivado-host-build' &&
+         (needs.development-authorize.outputs.task_id == 'fixed-site1-vivado-host-build' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-build') &&
+         needs.development-claim.result == 'skipped' &&
+         github.run_attempt == 1) ||
+        (needs.development-authorize.outputs.execution_capability == 'path2-stage-contract' &&
+         (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-testing') &&
          needs.development-claim.result == 'skipped' &&
          github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&

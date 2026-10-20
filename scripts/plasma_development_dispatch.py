@@ -32,10 +32,12 @@ SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 
 BRANCH_COMMAND = re.compile(
     r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) "
-    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40}) 981\Z"
+    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 LEGACY_COMMAND = re.compile(
-    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) 981\Z"
+    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 
 
@@ -86,7 +88,18 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
+    if task_id in ("z2-path2-download", "z2-path2-testing"):
+        expected = {"z2-path2-download": "download", "z2-path2-testing": "test"}
+        require(execution_path == "path2-cli" and set(task) == {
+            "execution_path", "capability", "project", "stage",
+        } and task["capability"] == "path2-stage-contract"
+                and task["project"] == "pl/projects/z2-fixed-unified-site1"
+                and task["stage"] == expected[task_id],
+                "PATH2_STAGE_TASK_FIELDS_DENIED")
+        return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
+        require(task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"),
+                "PATH2_BUILD_TASK_ID_DENIED")
         # Path 2 is an execution method, NOT synonymous with CPU-only Python.
         # Host builds use a fixed, reviewed Vivado capability and project.
         require(set(task) == {"execution_path", "capability", "project",
@@ -185,8 +198,19 @@ def request(event: object, context: dict) -> dict:
     require(branch_match is not None or legacy_match is not None,
             "EXACT_COMMAND_DENIED")
     match = branch_match or legacy_match
+    task_id = match.group("task")
+    flags = match.group("flags") or ""
+    auto_download = " --auto-download" in flags
+    auto_testing = " --auto-testing" in flags
+    require(not auto_download or task_id == "z2-path2-build",
+            "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
+    require(not auto_testing or task_id in (
+        "z2-path2-build", "z2-path2-download"),
+        "PATH2_AUTO_TEST_TASK_DENIED")
     return {
-        "task_id": match.group("task"),
+        "task_id": task_id,
+        "auto_download_after_build_success": auto_download,
+        "auto_test_after_download_success": auto_testing,
         "pr_number": int(branch_match.group("pr")) if branch_match else 0,
         "source_sha": branch_match.group("sha") if branch_match else sha,
         "trusted_sha": sha,
@@ -255,7 +279,7 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
-    if task.get("capability") == "vivado-host-build":
+    if task.get("capability") in ("vivado-host-build", "path2-stage-contract"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
         # exact current HEAD and main base; do not equate merge with trust.
@@ -313,7 +337,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
-                approval.get("task_id") == "fixed-site1-vivado-host-build" and
+                approval.get("task_id") in (
+                    "fixed-site1-vivado-host-build", "z2-path2-build") and
                 type(approval.get("pinned_sha")) is str and
                 SHA40.fullmatch(approval["pinned_sha"]) is not None and
                 type(approval.get("trusted_sha")) is str and
@@ -324,10 +349,26 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
+        # A request requiring an unregistered live Download provider must
+        # fail before importing candidate Build code or starting Vivado.
+        if (approval["task_id"] == "z2-path2-build" and
+                approval.get("auto_download_after_build_success") is True):
+            raise Denied("PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
+        if approval["task_id"] == "z2-path2-build":
+            import plasma_path2_runtime_integration as integration
+            return integration.host_build(
+                task, workspace=workspace, approval=approval,
+                evidence_dir=evidence_dir,
+                build_driver=lambda _ctx: build.run(
+                    task, workspace=workspace, approval=approval,
+                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
+    if task.get("capability") == "path2-stage-contract":
+        import plasma_path2_runtime_integration as integration
+        return integration.disabled_hardware_stage(task, approval)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -526,6 +567,9 @@ def safe_error_reason(exc: Exception) -> str:
     if isinstance(exc, Denied):
         return str(exc)
     detail = str(exc)
+    if type(exc).__name__ in ("RuntimeDenied", "QualificationDenied"):
+        if re.fullmatch(r"PATH2_[A-Z0-9_]{3,80}|BUILD_[A-Z0-9_]{3,80}", detail):
+            return detail
     if (type(exc).__name__ == "BuildDenied" and
             re.fullmatch(r"BUILD_[A-Z0-9_]{3,80}", detail) is not None):
         return detail
@@ -588,7 +632,7 @@ def main() -> int:
                 ), "WRONG_EXECUTION_PATH")
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build")
+                                    ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace,
