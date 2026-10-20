@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install declared Python test dependencies
+        run: python3 -m pip install -e software/python
       - name: Verify frozen Catalog exact ICPNs and source-only Microchip projections
         env:
           PYTHONPATH: software/python
