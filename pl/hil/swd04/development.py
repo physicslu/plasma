@@ -6,6 +6,7 @@ No UART/operator attestation or unrelated service/process inventory is used.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,30 @@ import subprocess
 from pl.hil.swd04 import contract as c
 from pl.hil.swd04.collect import fclk0_from_summary
 
+@dataclass(frozen=True)
+class HardwareProfile:
+    """Immutable image pins and physical apertures supplied by the caller."""
+    source: str
+    bit_sha256: str
+    hwh_sha256: str
+    bin_sha256: str
+    recovery_sha256: str
+    apertures: tuple[tuple[str, int, int], ...]
+    abis: tuple[tuple[str, int], ...]
+    recovery_hwh_sha256: str = c.RECOVERY_HWH_SHA256
+    identity_words: tuple[tuple[int, int], ...] = ()
+
+    @property
+    def bases(self):
+        return {name: base for name, base, size in self.apertures}
+
+
+SWD04_PROFILE = HardwareProfile(
+    c.SOURCE_SHA, c.BIT_SHA256, c.HWH_SHA256, c.CANDIDATE_BIN_SHA256,
+    c.RECOVERY_BIN_SHA256,
+    tuple((name, base, c.SEGMENT_SIZE) for name, base in c.AXI_BASES.items()),
+    (('identity', 1), ('waveform', 1), ('transaction', 1)))
+
 
 def last_load(log: str) -> str:
     loads = [s for s in log.splitlines()
@@ -23,20 +48,22 @@ def last_load(log: str) -> str:
     return loads[-1]
 
 
-def verify_receipt(record: dict, *, boot_id: str, load_line: str) -> None:
+def verify_receipt(record: dict, *, boot_id: str, load_line: str,
+                   profile: HardwareProfile = SWD04_PROFILE) -> None:
     c._require(type(record) is dict, 'Load receipt must be an object')
     expected = {
         'boot_id': boot_id, 'load_line': load_line,
-        'candidate_bin_sha256': c.CANDIDATE_BIN_SHA256,
-        'build_id': c.SOURCE_SHA[:32], 'axi_address_map': c.AXI_BASES,
-        'abis': {'identity': 1, 'waveform': 1, 'transaction': 1},
+        'candidate_bin_sha256': profile.bin_sha256,
+        'build_id': profile.source[:32], 'axi_address_map': profile.bases,
+        'abis': dict(profile.abis),
         'external_pl_io': False,
     }
     c._require(all(record.get(k) == v for k, v in expected.items()),
                'Loaded image provenance/Build ID/ABI/internal fixture mismatch')
 
 
-def check_ownership(*, sys: Path = Path('/sys'), proc: Path = Path('/proc')) -> None:
+def check_ownership(*, sys: Path = Path('/sys'), proc: Path = Path('/proc'),
+                    profile: HardwareProfile = SWD04_PROFILE) -> None:
     """Only aperture-overlapping kernel resources and PL device fds/maps.
 
     Read fd symlinks and mapping ranges, never enumerate process commands or
@@ -44,9 +71,9 @@ def check_ownership(*, sys: Path = Path('/sys'), proc: Path = Path('/proc')) -> 
     retained mapping is checked even after the fd was closed. Permission
     errors fail closed; processes disappearing during the scan are normal.
     """
-    start, end = min(c.AXI_BASES.values()), max(c.AXI_BASES.values()) + c.SEGMENT_SIZE
+    ranges = tuple((base, base + size) for _, base, size in profile.apertures)
     def overlaps(lo, hi):
-        return lo < end and hi > start
+        return any(lo < end and hi > start for start, end in ranges)
     relevant_uio, unrelated_uio = set(), set()
     for uio in (sys/'class/uio').glob('uio*'):
         known, conflict = False, False
@@ -64,7 +91,7 @@ def check_ownership(*, sys: Path = Path('/sys'), proc: Path = Path('/proc')) -> 
         if not (device/'driver').exists():
             continue
         match = re.match(r'^([0-9a-fA-F]+)\.', device.name)
-        conflict = bool(match and start <= int(match[1], 16) < end)
+        conflict = bool(match and overlaps(int(match[1], 16), int(match[1], 16) + 1))
         resource = device/'resource'
         if resource.exists():
             for line in resource.read_text().splitlines():
@@ -73,17 +100,18 @@ def check_ownership(*, sys: Path = Path('/sys'), proc: Path = Path('/proc')) -> 
                     conflict = True
         c._require(not conflict, 'Conflicting platform driver: ' + device.name)
     check_users({'/dev/mem', '/dev/xdevcfg', '/dev/fpga0'} | relevant_uio,
-                proc=proc, unrelated_uio=unrelated_uio)
+                proc=proc, unrelated_uio=unrelated_uio, profile=profile)
 
 
 def check_users(nodes: set[str], *, proc: Path = Path('/proc'),
-                unrelated_uio: set[str] | None = None) -> None:
+                unrelated_uio: set[str] | None = None,
+                profile: HardwareProfile = SWD04_PROFILE) -> None:
     unrelated_uio = unrelated_uio or set()
     def relevant(path):
         return path in nodes or (path.startswith('/dev/uio') and path not in unrelated_uio)
-    start, end = min(c.AXI_BASES.values()), max(c.AXI_BASES.values()) + c.SEGMENT_SIZE
+    ranges = tuple((base, base + size) for _, base, size in profile.apertures)
     def overlaps(lo, hi):
-        return lo < end and hi > start
+        return any(lo < end and hi > start for start, end in ranges)
     for process in proc.iterdir():
         if not process.name.isdigit():
             continue
@@ -133,7 +161,8 @@ def preflight(receipt: Path, candidate_bin: Path) -> dict:
     return record
 
 
-def record_loaded_image(candidate_bin: Path, output: Path) -> dict:
+def record_loaded_image(candidate_bin: Path, output: Path, *,
+                        profile: HardwareProfile = SWD04_PROFILE) -> dict:
     """Capture evidence immediately after a supervised load; never loads PL.
 
     Use the actual firmware file named by FPGA Manager, in a root-owned
@@ -146,7 +175,7 @@ def record_loaded_image(candidate_bin: Path, output: Path) -> dict:
         info = path.stat()
         c._require(info.st_uid == 0 and not info.st_mode & 0o022,
                    'Firmware and receipt directory must be protected root-owned paths')
-    c._require(c.sha256_file(candidate_bin) == c.CANDIDATE_BIN_SHA256,
+    c._require(c.sha256_file(candidate_bin) == profile.bin_sha256,
                'Candidate firmware digest mismatch')
     c._require(Path('/sys/class/fpga_manager/fpga0/state').read_text().strip() == 'operating',
                'FPGA Manager not operating')
@@ -157,15 +186,22 @@ def record_loaded_image(candidate_bin: Path, output: Path) -> dict:
                'Last FPGA Manager load does not name the candidate firmware')
     record = dict(
         boot_id=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
-        load_line=line, candidate_bin_sha256=c.CANDIDATE_BIN_SHA256,
-        build_id=c.SOURCE_SHA[:32], axi_address_map=c.AXI_BASES,
-        abis={'identity': 1, 'waveform': 1, 'transaction': 1}, external_pl_io=False,
+        load_line=line, candidate_bin_sha256=profile.bin_sha256,
+        build_id=profile.source[:32], axi_address_map=profile.bases,
+        abis=dict(profile.abis), external_pl_io=False,
     )
     # Never replace a receipt for an earlier load.
     fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as stream:
         json.dump(record, stream, indent=2, sort_keys=True)
         stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory = os.open(output.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
     return record
 
 
