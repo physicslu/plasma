@@ -2,8 +2,16 @@
   "boot": "b65a5deb-78c1-4763-982a-c6d69b4f4fc8",
   "manager": "operating",
   "owners": [
-    ["audio-codec-ctrl", "True", "/sys/devices/soc0/43c00000.audio-codec-ctrl/uio/uio0"],
-    ["fabric", "True", "/sys/devices/soc0/40000000.fabric/uio/uio1"]
+    [
+      "audio-codec-ctrl",
+      "True",
+      "/sys/devices/soc0/43c00000.audio-codec-ctrl/uio/uio0"
+    ],
+    [
+      "fabric",
+      "True",
+      "/sys/devices/soc0/40000000.fabric/uio/uio1"
+    ]
   ],
   "services": {
     "jupyter.service": "active",
