@@ -18,6 +18,11 @@ execution is NOT qualified or registered.** Existing main base:
   `LeaseLedger` and F1-B identity ABI, with a typed external
   `TargetPort`. Three entry functions have no CLI or default device access:
   `download_held`, `testing_held` and `restore_guarded`.
+  The `bind_injected_stage_callbacks` function wires these as the existing
+  F1-B Adapter's `held_download` and `identity_test` callbacks, allowing
+  the **unchanged** Orchestrator to run independently triggered Download
+  and Testing. It is a pure callback factory, **not** a trusted Dispatcher
+  registration or an independently qualified target transport.
 - Host-only unit tests use an explicitly fake target and a real local
   fsync/flock-backed ledger file. Negative cases include AXI/owner denial,
   image/Bootgen mismatch, competing persistent lease, expired lease, wrong
