@@ -64,15 +64,15 @@ class B1TargetOfflineContracts(unittest.TestCase):
             sysroot, procroot = base / "sys", base / "proc"
             mapping = sysroot / "class/uio/uio1/maps/map0"
             mapping.mkdir(parents=True)
-            (mapping / "addr").write_text("0x43C00000\\n")
-            (mapping / "size").write_text("0x1000\\n")
+            (mapping / "addr").write_text("0x43C00000\n")
+            (mapping / "size").write_text("0x1000\n")
             (mapping.parent.parent / "device/driver").mkdir(parents=True)
             (sysroot / "bus/platform/devices").mkdir(parents=True)
             pid = procroot / "1234"
             (pid / "fd").mkdir(parents=True)
             (pid / "fd/3").symlink_to("/dev/uio1")
             (pid / "maps").write_text(
-                "abcd0000-abcd1000 r--s 00000000 00:00 0 /dev/uio1\\n")
+                "abcd0000-abcd1000 r--s 00000000 00:00 0 /dev/uio1\n")
             check_ownership_full_64k(sysroot=sysroot, procroot=procroot)
 
     def test_latest_manager_load_must_match_requested_name(self):
