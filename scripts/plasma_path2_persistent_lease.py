@@ -82,10 +82,14 @@ def validate_record(value: object) -> dict:
     need(all(type(record[k]) is int and record[k] >= 0 for k in
              ("revision", "load_attempts", "test_attempts", "restore_attempts")),
          "LEDGER_COUNTER_DENIED")
+    terminal = record["status"] in ("RESTORED_VERIFIED",
+                                    "UNKNOWN_MANUAL_RECOVERY",
+                                    "EXPIRED_REVIEW_REQUIRED")
     need(type(record["lease_deadline"]) is int and
          type(record["step_deadline"]) is int and
          type(record["last_seen"]) is int and
-         record["lease_deadline"] > record["last_seen"] >= 0,
+         record["last_seen"] >= 0 and
+         (terminal or record["last_seen"] < record["lease_deadline"]),
          "LEDGER_CLOCK_DENIED")
     need(type(record["reason"]) is str and len(record["reason"]) <= 100,
          "LEDGER_REASON_DENIED")
