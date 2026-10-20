@@ -113,6 +113,9 @@
 
 ## Development and validation
 
+- **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
+- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
+
 - **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
