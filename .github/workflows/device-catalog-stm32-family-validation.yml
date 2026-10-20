@@ -1,5 +1,9 @@
 name: STM32 family validation
 
+# Trigger governance contract: PR/main paths retain STM32U0 research/evidence
+# and the active STM32C0 Stage Dispatcher. The family runner self-test rejects
+# all 11 retired family/C0 workflow filenames and missing live YAML targets.
+# No job commands, rights, events or trigger globs are modified in this audit.
 on:
   push:
     branches:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -221,10 +222,186 @@ def run_family(family: str) -> None:
         subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 
+
+# Governance: these are the only live YAML-to-YAML trigger dependencies for the
+# STM32 family validation workflow. Historical OLD_WORKFLOW_FAMILY routing is
+# deliberately not consulted to discover active workflows.
+C0_STAGE_DISPATCHER_PATH = ".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"
+ACTIVE_FAMILY_WORKFLOW_REFS = frozenset((DISPATCHER_PATH, C0_STAGE_DISPATCHER_PATH))
+RETIRED_FAMILY_WORKFLOW_REFS = tuple(".github/workflows/" + filename for filename in (
+    "device-catalog-stm32f0-validation.yml",
+    "device-catalog-stm32f2-bounded-validation.yml",
+    "device-catalog-stm32f3-foundation-validation.yml",
+    "device-catalog-stm32f7-validation.yml",
+    "device-catalog-stm32g0-validation.yml",
+    "device-catalog-stm32g4-validation.yml",
+    "device-catalog-stm32c0-c01-foundation-validation.yml",
+    "device-catalog-stm32c0-c02-discovery-validation.yml",
+    "device-catalog-stm32c0-c02-discovery-live.yml",
+    "device-catalog-stm32c0-c03-metadata-validation.yml",
+    "device-catalog-stm32c0-c04-admission-validation.yml",
+    "device-catalog-stm32c0-c05-publication-validation.yml",
+))
+REQUIRED_U0_TRIGGER_PATHS = frozenset((
+    "data/device-catalog/research/*stm32u0*",
+    "data/device-catalog/research/evidence/stm32u0*/**",
+))
+
+# Three approved immutable retirement cohorts (5 + 8 + 5 exact archived
+# originals) plus seven older nonarchived family/C0 retirements. Active jobs
+# must never silently regain references to these old Workflow YAML filenames.
+ARCHIVED_WORKFLOW_COHORTS = {
+    "microchip": 5,
+    "stm32-metadata-replay": 8,
+    "stm32c0-stages": 5,
+}
+
+def all_retired_workflow_refs() -> frozenset[str]:
+    result = set(RETIRED_FAMILY_WORKFLOW_REFS)
+    for cohort, count in ARCHIVED_WORKFLOW_COHORTS.items():
+        folder = REPO_ROOT / "docs" / "archive" / "ci-workflows" / cohort
+        archived = list(folder.glob("*.yml"))
+        if len(archived) != count:
+            raise AssertionError(
+                f"archived {cohort} cohort has {len(archived)} original YAMLs, expected {count}"
+            )
+        for archived_yaml in archived:
+            original_path = ".github/workflows/" + archived_yaml.name
+            if (REPO_ROOT / original_path).exists():
+                raise AssertionError(f"retired Workflow has live duplicate {original_path}")
+            result.add(original_path)
+    if len(result) != 25:
+        raise AssertionError(f"expected 25 distinct retired Workflow paths, got {len(result)}")
+    return frozenset(result)
+
+def active_event_paths(yaml_source: str, event: str) -> list[str]:
+    """Parse PR/main paths, fail-closed on missing/duplicate or nonliteral entries."""
+    if event not in ("pull_request", "push"):
+        raise AssertionError("Unsupported STM32 workflow event")
+    start = "\n  " + event + ":\n"
+    if yaml_source.count(start) != 1:
+        raise AssertionError(f"{event}: missing or duplicate event section")
+    section = yaml_source.split(start, 1)[1]
+    boundary = "\n  pull_request:\n" if event == "push" else "\nconcurrency:"
+    if boundary not in section:
+        raise AssertionError(f"{event}: missing end-of-event boundary")
+    section = section.split(boundary, 1)[0]
+    if section.count("    paths:\n") != 1:
+        raise AssertionError(f"{event}: missing or duplicated paths declaration")
+    # Ignore push.branches (- main); only YAML path bullets are relevant.
+    section = section.split("    paths:\n", 1)[1]
+    pathlines = re.findall(r'(?m)^      - .*$', section)
+    matches = re.findall(r'(?m)^      - "([^"]+)"\s*$', section)
+    if not matches or len(pathlines) != len(matches):
+        raise AssertionError(f"{event}: nonliteral or missing path entries")
+    if len(matches) != len(set(matches)):
+        raise AssertionError(f"{event}: duplicate path entries")
+    return matches
+
+def assert_active_workflow_refs(yaml_source: str) -> None:
+    """Keep PR/push parity and refuse all missing or retired Workflow targets."""
+    paths_by_event = {event: active_event_paths(yaml_source, event)
+                      for event in ("push", "pull_request")}
+    if paths_by_event["push"] != paths_by_event["pull_request"]:
+        raise AssertionError("STM32 workflow PR/push trigger parity drift")
+    for event, paths in paths_by_event.items():
+        refs = {p for p in paths if p.startswith(".github/workflows/")}
+        retired = set(paths).intersection(all_retired_workflow_refs())
+        if retired:
+            raise AssertionError(f"{event}: retired Workflow trigger reintroduced: {sorted(retired)}")
+        if any(p.startswith("data/device-catalog/production/") for p in paths):
+            raise AssertionError(f"{event}: forbidden Production trigger")
+        if not REQUIRED_U0_TRIGGER_PATHS.issubset(paths):
+            raise AssertionError(f"{event}: missing STM32U0 research/evidence trigger")
+        if refs != ACTIVE_FAMILY_WORKFLOW_REFS:
+            raise AssertionError(f"{event}: stale/missing Workflow paths: "
+                                 f"{sorted(refs ^ ACTIVE_FAMILY_WORKFLOW_REFS)}")
+        for path in refs:
+            if not (REPO_ROOT / path).is_file():
+                raise AssertionError(f"{event}: missing Workflow file {path}")
+
+def assert_rejected_trigger_mutation(yaml_source: str, event: str,
+                                     old_path: str, new_path: str) -> None:
+    """One-event negative control: PR/main trigger parity must fail."""
+    prefix = "\n  " + event + ":\n"
+    before, after = yaml_source.split(prefix, 1)
+    boundary = "\n  pull_request:\n" if event == "push" else "\nconcurrency:"
+    if after.count(boundary) != 1:
+        raise AssertionError(f"{event}: missing mutation event boundary")
+    event_section, suffix = after.split(boundary, 1)
+    original = '      - "' + old_path + '"'
+    replacement = ('      - "' + new_path + '"' if new_path else "")
+    if event_section.count(original) != 1:
+        raise AssertionError(f"{event}: missing/duplicate mutation fixture {old_path}")
+    tampered = before + prefix + event_section.replace(original, replacement, 1) + boundary + suffix
+    try:
+        assert_active_workflow_refs(tampered)
+    except AssertionError as exc:
+        if "parity drift" not in str(exc):
+            raise AssertionError(f"{event}: expected parity rejection, got {exc}") from exc
+        return
+    raise AssertionError(f"{event}: asymmetric mutation unexpectedly accepted")
+
+def assert_rejected_symmetric_mutation(yaml_source: str, old_path: str,
+                                       new_path: str, expected_reason: str) -> None:
+    """Mutate BOTH event filters so only the specific invariant can reject it."""
+    original = '      - "' + old_path + '"'
+    replacement = ('      - "' + new_path + '"' if new_path else "")
+    if yaml_source.count(original) != 2:
+        raise AssertionError(f"missing/duplicate two-event fixture {old_path}")
+    tampered = yaml_source.replace(original, replacement)
+    # Critical: a passing test cannot merely be an incidental parity failure.
+    if active_event_paths(tampered, "push") != active_event_paths(tampered, "pull_request"):
+        raise AssertionError("symmetric mutation was not symmetric")
+    try:
+        assert_active_workflow_refs(tampered)
+    except AssertionError as exc:
+        if expected_reason not in str(exc):
+            raise AssertionError(
+                f"expected {expected_reason!r} rejection, got {exc!s}"
+            ) from exc
+        return
+    raise AssertionError(f"symmetric forbidden trigger {new_path} accepted")
+
+
 def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32g4_phase4_9d_admission.py"]) == ["stm32g4"]
     assert affected_families(["data/device-catalog/research/stm32u0_phase_u0_2_discovery.py"]) == ["stm32u0"]
     assert affected_families([".github/workflows/device-catalog-stm32c0-stage-dispatch.yml"]) == ["stm32c0"]
+    # Guard the complete 25-name retired cohort, including C0.5 and the
+    # archived Microchip/STM32 metadata replay files. Fail for the right reason
+    # even when BOTH PR and push filters are changed consistently.
+    workflow_source = (REPO_ROOT / DISPATCHER_PATH).read_text(encoding="utf-8")
+    assert_active_workflow_refs(workflow_source)
+    retired = all_retired_workflow_refs()
+    for candidate in sorted(retired):
+        assert_rejected_symmetric_mutation(
+            workflow_source, C0_STAGE_DISPATCHER_PATH, candidate,
+            "retired Workflow trigger reintroduced",
+        )
+    for required_u0 in REQUIRED_U0_TRIGGER_PATHS:
+        assert_rejected_symmetric_mutation(
+            workflow_source, required_u0, "",
+            "missing STM32U0 research/evidence trigger",
+        )
+    assert_rejected_symmetric_mutation(
+        workflow_source, C0_STAGE_DISPATCHER_PATH, "",
+        "stale/missing Workflow paths",
+    )
+    assert_rejected_symmetric_mutation(
+        workflow_source, C0_STAGE_DISPATCHER_PATH,
+        ".github/workflows/does-not-exist.yml", "stale/missing Workflow paths",
+    )
+    assert_rejected_symmetric_mutation(
+        workflow_source, C0_STAGE_DISPATCHER_PATH,
+        "data/device-catalog/production/icpn-v1-manifest.json",
+        "forbidden Production trigger",
+    )
+    for event in ("push", "pull_request"):
+        assert_rejected_trigger_mutation(
+            workflow_source, event, C0_STAGE_DISPATCHER_PATH, ""
+        )
+    print("STM32 family parity, 25 retired names, U0, C0 and Production negative controls: PASS")
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_2_discovery.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_3_policy.py"]) == ["stm32c0"]
     assert affected_families(["data/device-catalog/research/stm32c0_phase_c0_4_admission.py"]) == ["stm32c0"]
