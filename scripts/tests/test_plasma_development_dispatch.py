@@ -595,7 +595,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("workspace-write",calls[0][0])
-            self.assertIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
+            self.assertNotIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
             self.assertIn("Record actual commands",calls[0][1]["input"].decode())
             self.assertNotIn("shell",calls[0][1])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
@@ -660,7 +660,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("--path3-engineering-host-only",kwargs["input"].decode())
             self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
             self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())
-            self.assertIn("Do not program or access physical FPGA",
+            self.assertNotIn("Do not program or access physical FPGA",
                           kwargs["input"].decode())
             self.assertNotIn("Create or modify ONLY",kwargs["input"].decode())
         workflow=WORKFLOW.read_text()
