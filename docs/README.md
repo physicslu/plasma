@@ -115,6 +115,8 @@
 
 ## Development and validation
 
+- **Gate 1 / Host-only Draft** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：重用 Vivado Host Build、F1-B Hardware Profile、FPGA Supervisor 與三暫存器 Test Callback；維持 Build／Download／Testing 獨立 Trigger 與兩個預設關閉的自動銜接。僅 Mock/Schema Contract，不提供實機權限。
+
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
 - **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
 
