@@ -17,8 +17,8 @@ STAGES = (
     "PREFLIGHT", "BOARD_PREPARE", "OUTPUT_PREPARE",
     "VIVADO_IMPLEMENTATION", "ARTIFACT_VERIFY", "EVIDENCE_WRITE",
 )
-_SAFE_CODE = re.compile(r"BUILD_[A-Z0-9_]{3,80}\\Z")
-_SAFE_SHA = re.compile(r"[0-9a-f]{40}\\Z")
+_SAFE_CODE = re.compile(r"BUILD_[A-Z0-9_]{3,80}\Z")
+_SAFE_SHA = re.compile(r"[0-9a-f]{40}\Z")
 _SAFE_TYPES = frozenset((
     "PermissionError", "FileNotFoundError", "TimeoutExpired",
     "OSError", "ValueError", "RuntimeError", "CalledProcessError",
@@ -140,7 +140,7 @@ class DiagnosticSession:
         manifest = self.evidence_dir / "plasma-fpga-build-diagnostics.json.sha256"
         if path.is_symlink() or manifest.is_symlink():
             raise ValueError("BUILD_DIAG_SYMLINK_DENIED")
-        data = (json.dumps(self.as_dict(), sort_keys=True, indent=2) + "\\n").encode("utf-8")
+        data = (json.dumps(self.as_dict(), sort_keys=True, indent=2) + "\n").encode("utf-8")
         flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
@@ -150,5 +150,5 @@ class DiagnosticSession:
         digest = hashlib.sha256(data).hexdigest()
         fd = os.open(manifest, flags, 0o600)
         with os.fdopen(fd, "w", encoding="ascii") as stream:
-            stream.write(digest + "  plasma-fpga-build-diagnostics.json\\n")
+            stream.write(digest + "  plasma-fpga-build-diagnostics.json\n")
         return path
