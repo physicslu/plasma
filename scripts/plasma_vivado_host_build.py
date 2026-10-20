@@ -355,19 +355,22 @@ def run(task: dict, *, workspace: Path, approval: dict,
         execution_path=execution_path, source_sha=approval.get("pinned_sha", ""),
         evidence_dir=evidence_dir,
     )
+    pipeline_failed = False
     try:
         return _run_pipeline(task, workspace=workspace, approval=approval,
                              evidence_dir=evidence_dir, executor=executor,
                              diagnostics=diagnostic, execution_path=execution_path)
     except Exception as exc:
+        pipeline_failed = True
         diagnostic.fail(exc)
         raise
     finally:
         try:
             diagnostic.persist()
-        except OSError:
-            # Do not replace the first exception with a second evidence error.
-            if sys.exc_info()[0] is None:
+        except (OSError, ValueError):
+            # Never report build success without a persisted diagnostic.
+            # On build failure, preserve the earlier first exception.
+            if not pipeline_failed:
                 raise
 
 
