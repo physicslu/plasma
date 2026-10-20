@@ -176,6 +176,14 @@ the actual command and physical effect, not the technology label `SW` or
   or new host is **not a default prerequisite** for owner-operated
   Development Mode. Add isolation only for a demonstrated technical hazard,
   an actual permission boundary, or explicit owner scope.
+- **Owner approval before introducing new mechanisms.** Prefer proven
+  source-controlled build scripts, existing board preparation, runners,
+  dispatcher routing and artifact checks. Do not invent a new script, workflow,
+  runner, validator, isolation platform or additional architectural layer merely
+  to repeat a previously successful procedure. If a genuinely new mechanism is
+  necessary, explain the measured gap, minimum change, alternatives and impact,
+  and obtain explicit owner approval before implementing it. Routine fixes and
+  reuse within the already approved Gate 1 proceed without another approval.
 - **Reuse one generic dispatcher.** A new Work Order should describe the
   bounded task, selected Path, reviewed source/ref, acceptance and minimal
   evidence; it must not require a newly written GitHub Actions YAML for

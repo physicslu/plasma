@@ -1,4 +1,43 @@
-# F1 Gate 1 — PYNQ-Z2 Fixed ABI Site1 PS7 integration (source only)
+# PYNQ-Z2 Fixed ABI Site1 PS7 integration
+
+## Latest F1-B Gate 1 Host-only qualification — 2026-10-20
+
+**PASS:** [new clean-build Run 39344221935](https://github.com/physicslu/plasma/actions/runs/39344221935) built exact source HEAD `00336106ad89eaa9fa0603dbe9e65024a27a6fe6` with Vivado 2026.1 from scratch. Synthesis, implementation, routing, bitstream generation, final DRC and methodology all PASS. WNS +1.829 ns, WHS +0.018 ns; TNS/THS zero, all twelve `check_timing` checks zero. HWH verifier passed on both original and delivered copies.
+
+**Delivered binaries confirmed by independent hashing of the downloaded GitHub Artifact [12229639751](https://github.com/physicslu/plasma/actions/runs/39344221935/artifacts/12229639751):**
+
+- `system_wrapper.bit` — 4,045,769 bytes, SHA256 `fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075`
+- `system.hwh` — 138,977 bytes, SHA256 `bf3690d69fefc8da3fc62964209776466894cd4353aec0a475b373257899ca76`
+
+Full Vivado logs, reports, engineering root-cause ledger, manifests and verifier receipts are in the same Artifact. The previous missing-BIT/HWH upload problem is resolved. The 10 relevant GitHub-hosted CI workflows for the source HEAD passed; optional SWPC `pytest` did not execute because the system interpreter lacked pytest. This is **Host-only build acceptance**, not device-image load or product runtime acceptance. Physical Z2/HIL/DUT tests remain **NOT_RUN**, M1 **NO_GO**. PR #1064 Gate 2 merge still requires separate owner authorization.
+
+## F1-B Host-only Vivado implementation — real SWPC run
+
+**2026-10-20:** [Path 3 Run #39342622512](https://github.com/physicslu/plasma/actions/runs/39342622512)
+ran Vivado 2026.1 build 6511674 on SWPC, using board-files commit
+`e02d6a3866b5465218f777168cdc51344ac94e07`. Real synthesis,
+implementation, routing and bitstream generation completed on attempt 03
+(exit 0); existing HWH/artifact verifier exit 0, F1 host source contracts
+22 passed. Reports independently recovered from Run Artifact
+`12229802904`: routed setup slack +1.829 ns, hold slack
++0.018 ns; TNS and THS zero; final DRC and methodology reported zero
+violations; all 12 check_timing categories were zero.
+
+The first attempt failed at license discovery; the second identified
+incorrect comparison of relative versus fully resolved Vivado BD pin paths.
+Using `get_bd_pins` to resolve the expected FCLK and reset pins fixes
+these two comparisons. No RTL/wiring changes or timing waivers were made.
+See `docs/architecture/plasma-path2-fixed-host-build-capability.md` for
+the dated problem/solution ledger.
+
+**First-run historical evidence limitation (now resolved):** That run's
+Artifact omitted the BIT/HWH raw files because they were stored under a hidden
+evidence directory. The later Run 39344221935 independently built the
+current corrected source and delivered verified raw binaries in its downloadable
+GitHub Artifact, as recorded above. Physical image load and Z2 HIL remain
+**NOT_RUN**, M1 **NO_GO**.
+
+## Historical F1 source-only milestone
 
 **State: HOST-ONLY Vivado project candidate; image BUILD/LOAD NOT_RUN; M1 NO_GO.**
 
