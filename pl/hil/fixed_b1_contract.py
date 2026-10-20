@@ -126,7 +126,12 @@ def one_shot(*, preflight: Callable[[], None],
     try:
         load_candidate()
         state["load"] = "PASS"
-        identity_child()
+        observed = identity_child()
+        require(type(observed) is dict and observed == {
+            "magic": 0x4D534C50, "abi": 0x00010000,
+            "capabilities": 1, "site_present": 1,
+            "map_revision": 1, "site_stride": 4096,
+        }, "B1_IDENTITY_RESULT_INVALID")
         state["identity"] = "PASS"
     except Exception:
         state["overall"] = "FAIL_OR_BLOCKED"

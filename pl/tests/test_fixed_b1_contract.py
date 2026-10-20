@@ -76,12 +76,29 @@ class B1OfflineContracts(unittest.TestCase):
             return lambda: called.append(name)
         out = one_shot(preflight=cb("preflight"),
                        load_candidate=cb("load"),
-                       identity_child=lambda: self.identity(),
+                       identity_child=lambda: {
+                           "magic": 0x4D534C50, "abi": 0x00010000,
+                           "capabilities": 1, "site_present": 1,
+                           "map_revision": 1, "site_stride": 4096,
+                       },
                        child_stopped_and_unmapped=lambda: True,
                        restore_original=cb("restore"),
                        verify_restoration=cb("verify"))
         self.assertEqual(out["overall"], "PASS_INTERNAL_IDENTITY_ONLY")
         self.assertEqual(called, ["preflight", "load", "restore", "verify"])
+
+    def test_oneshot_rejects_missing_or_fake_identity_and_restores(self):
+        for fake in ({}, {"magic": 0x4D534C50}, None):
+            restored = []
+            outcome = one_shot(
+                preflight=lambda: None, load_candidate=lambda: None,
+                identity_child=lambda: fake,
+                child_stopped_and_unmapped=lambda: True,
+                restore_original=lambda: restored.append("restore"),
+                verify_restoration=lambda: restored.append("verify"))
+            self.assertEqual(outcome["overall"], "FAIL_OR_BLOCKED")
+            self.assertEqual(outcome["identity"], "NOT_RUN")
+            self.assertEqual(restored, ["restore", "verify"])
 
     def test_preflight_block_does_not_load_or_restore(self):
         called = []
@@ -127,7 +144,11 @@ class B1OfflineContracts(unittest.TestCase):
             raise B1Blocked("restore unavailable")
         out = one_shot(preflight=lambda: None,
                        load_candidate=lambda: None,
-                       identity_child=lambda: self.identity(),
+                       identity_child=lambda: {
+                           "magic": 0x4D534C50, "abi": 0x00010000,
+                           "capabilities": 1, "site_present": 1,
+                           "map_revision": 1, "site_stride": 4096,
+                       },
                        child_stopped_and_unmapped=lambda: True,
                        restore_original=fail,
                        verify_restoration=lambda: None)
