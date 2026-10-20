@@ -21,6 +21,7 @@ from pl.hil.fixed_b1_contract import (
     BASE_BIN_SHA256, BASE_HWH_SHA256, overlaps_64k, one_shot,
 )
 from pl.hil.fixed_b1_staging import CANDIDATE_BIN_SHA256, derive_candidate
+from pl.hil.swd04.contract import REQUIRED_SERVICES
 
 OWNER_LOCK = Path("/run/lock/plasma-f1b-owner.lock")
 MANAGER = Path("/sys/class/fpga_manager/fpga0")
@@ -65,18 +66,23 @@ def check_ownership_full_64k(*, sysroot: Path = Path("/sys"),
     if not (sysroot / "class/uio").is_dir() or not (sysroot / "bus/platform/devices").is_dir():
         raise B1Blocked("B1_KERNEL_INVENTORY_INCOMPLETE")
     conflict_nodes = {"/dev/mem", "/dev/fpga0", "/dev/xdevcfg"}
+    unrelated_uio = set()
     for node in (sysroot / "class/uio").glob("uio*"):
         known = False
+        conflicted = False
         for mapping in (node / "maps").glob("map*"):
             known = True
             addr = int((mapping / "addr").read_text(), 0)
             size = int((mapping / "size").read_text(), 0)
             if overlaps_64k(addr, size):
+                conflicted = True
                 conflict_nodes.add("/dev/" + node.name)
                 if (node / "device/driver").exists():
                     raise B1Blocked("B1_BOUND_UIO_DRIVER")
         if not known:
             raise B1Blocked("B1_UIO_MAP_UNKNOWN")
+        if not conflicted:
+            unrelated_uio.add("/dev/" + node.name)
     for device in (sysroot / "bus/platform/devices").iterdir():
         if not (device / "driver").exists():
             continue
@@ -98,13 +104,18 @@ def check_ownership_full_64k(*, sysroot: Path = Path("/sys"),
         try:
             for fd in (proc / "fd").iterdir():
                 target = os.readlink(fd)
-                if target in conflict_nodes or target.startswith("/dev/uio"):
+                if target in conflict_nodes or (
+                    target.startswith("/dev/uio") and target not in unrelated_uio
+                ):
                     raise B1Blocked("B1_ACTIVE_PL_CONSUMER")
             # Mappings persist after the underlying FD is closed.
             for line in (proc / "maps").read_text().splitlines():
                 fields = line.split()
                 if len(fields) >= 6 and (
-                    fields[5] in conflict_nodes or fields[5].startswith("/dev/uio")
+                    fields[5] in conflict_nodes or (
+                        fields[5].startswith("/dev/uio")
+                        and fields[5] not in unrelated_uio
+                    )
                 ):
                     raise B1Blocked("B1_RETAINED_PL_MAPPING")
         except FileNotFoundError:
@@ -151,6 +162,16 @@ def exact_pins(i: Inputs) -> None:
         raise B1Blocked("B1_EVIDENCE_OUTPUT_ALREADY_EXISTS")
 
 
+def manager_last_load() -> str:
+    """Return latest FPGA Manager event for this boot; do not trust just operating."""
+    from pl.hil.swd04.development import last_load
+    result = subprocess.run(
+        ["dmesg", "--color=never"], check=True, text=True,
+        capture_output=True, timeout=10,
+    )
+    return last_load(result.stdout)
+
+
 def manager_write_firmware(name: str) -> None:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
         raise B1Blocked("B1_INVALID_MANAGER_FIRMWARE_NAME")
@@ -158,6 +179,8 @@ def manager_write_firmware(name: str) -> None:
         f.write(name)
     if (MANAGER / "state").read_text().strip() != "operating":
         raise B1Blocked("B1_FPGA_MANAGER_NOT_OPERATING")
+    if f": writing {name} to " not in manager_last_load():
+        raise B1Blocked("B1_FPGA_MANAGER_LOAD_PROVENANCE_MISMATCH")
 
 
 class IsolatedIdentity:
@@ -204,22 +227,17 @@ class IsolatedIdentity:
 def clock_and_original_image(i: Inputs) -> None:
     """Relevant load-time facts, NOT a repeated HIL-B0 checklist."""
     from pl.hil.swd04.collect import fclk0_from_summary
-    from pl.hil.swd04.development import last_load
     summary = Path("/sys/kernel/debug/clk/clk_summary").read_text()
     if fclk0_from_summary(summary) != 100000000:
         raise B1Blocked("B1_LIVE_FCLK_NOT_100MHZ")
-    log = subprocess.run(
-        ["dmesg", "--color=never"], check=True, text=True,
-        capture_output=True, timeout=10).stdout
-    if (": writing " + i.recovery_bin.name + " to ") not in last_load(log):
+    if (": writing " + i.recovery_bin.name + " to ") not in manager_last_load():
         raise B1Blocked("B1_ORIGINAL_IMAGE_PROVENANCE_UNKNOWN")
 
 
 def service_snapshot() -> dict[str, bool]:
     """Only the same four known runtime services, no restart or quiesce."""
     states = {}
-    for name in ("plasma-bootstrap", "plasma-server", "plasma-web",
-                 "plasma-runtime-activation"):
+    for name in REQUIRED_SERVICES:
         result = subprocess.run(
             ["systemctl", "is-active", "--quiet", name],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

@@ -13,12 +13,11 @@ from pathlib import Path
 import zipfile
 
 from pl.hil.fixed_b1_contract import (
-    B1Blocked, F1_BIT_SHA256, F1_HWH_SHA256,
+    B1Blocked, F1_BIT_SHA256, F1_HWH_SHA256, CANDIDATE_BIN_SHA256,
 )
 from pl.hil.swd04.staging import bit_payload
 
 HOST_SOURCE_SHA = "5473176a5ca6a04f9fe9359b4406c38208f9498f"
-CANDIDATE_BIN_SHA256 = "c351f668094a2b841426c64681d44c76cb8c14b61766d90a0e10adcf3a22a3c3"
 EXPECTED_PAYLOAD_BYTES = 4045564
 EXPECTED_BIN_BYTES = EXPECTED_PAYLOAD_BYTES + 4
 TAIL_NOP = bytes.fromhex("00000020")
