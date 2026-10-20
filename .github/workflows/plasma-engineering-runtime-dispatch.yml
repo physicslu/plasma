@@ -67,6 +67,8 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
+          python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -396,6 +398,13 @@ jobs:
             ${{ runner.temp }}/plasma-path2-receipt.json.sha256
             ${{ runner.temp }}/plasma-path2-stdout.txt
             ${{ runner.temp }}/plasma-path2-stderr.txt
+            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json
+            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json.sha256
+            ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
+            candidate/pl/build/**/*.log
+            candidate/pl/build/**/*.rpt
+            candidate/pl/build/**/*.bit
+            candidate/pl/build/**/*.hwh
           if-no-files-found: warn
           retention-days: 14
 
@@ -449,6 +458,10 @@ jobs:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          # Only the owner-authorized F1-B engineering task admits Vivado.
+          PLASMA_FPGA_PATH3_APPROVED: ${{ needs.development-authorize.outputs.task_id == 'f1b-path3-codex-vivado-build' && '1' || '0' }}
+          PLASMA_FPGA_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          PLASMA_FPGA_PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"

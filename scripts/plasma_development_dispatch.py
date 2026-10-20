@@ -406,7 +406,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
 
 
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
-                   executor=subprocess.run) -> dict:
+                   executor=subprocess.run,
+                   task_id: str | None = None) -> dict:
     """Run the owner-authorized Development Mode engineer with real evidence.
 
     Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
@@ -448,6 +449,22 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "your complete tracked-source Git diff, newly created files and "
         "this report for review; do not commit, push or change Git refs.\n"
     )
+    if task_id == "f1b-path3-codex-vivado-build":
+        prompt += (
+            "For this F1-B task, run every Vivado build through the SAME "
+            "reviewed host-only Python Build Engine as Path 2: "
+            "python3 scripts/plasma_vivado_host_build.py "
+            "--path3-engineering-host-only "
+            "--evidence-dir .plasma-path3-evidence. "
+            "Use the authorized task-specific environment supplied by the "
+            "trusted dispatcher, never synthesize fake admission variables. "
+            "The engine owns board preparation, license propagation, "
+            "worktree build directories, stage receipts, BIT/HWH and SHA256. "
+            "On failure inspect plasma-fpga-build-diagnostics.json first; "
+            "retain the first observed error and never assert an unproven "
+            "root cause. Do not bypass the engine with a separate Vivado "
+            "invocation or fabricate successful evidence.\n"
+        )
     if output_path:
         prompt += (
             "For this legacy task, also update " + output_path +
@@ -576,7 +593,8 @@ def main() -> int:
                                     ("z2-cpu-only", "vivado-host-build")
                                  else None)
                 receipt = (
-                    run_codex_task(task, workspace=args.workspace)
+                    run_codex_task(task, workspace=args.workspace,
+                                   task_id=req["task_id"])
                     if args.action == "execute-codex"
                     else run_task(task, workspace=args.workspace,
                                   evidence_dir=args.evidence_dir,
