@@ -92,7 +92,6 @@ class Admission(unittest.TestCase):
         self.assertEqual(state['restoration_verified'], 'PASS')
 
 
-
 class ExtendedAdmission(unittest.TestCase):
     def evidence(self, **changes):
         from dataclasses import replace
