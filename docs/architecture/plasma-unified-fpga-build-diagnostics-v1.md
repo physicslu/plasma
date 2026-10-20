@@ -53,11 +53,29 @@ Operator-invented environment variables are **not** an authorization method.
 6. `EVIDENCE_WRITE`: complete the existing Host Build receipt and the
    unified diagnostic receipt.
 
-License environment variables `XILINXD_LICENSE_FILE` and
-`LM_LICENSE_FILE` are propagated **only if provided**. The diagnostic
-contains a boolean `license_environment_present`, never their values.
-This boolean is **not** a license checkout or entitlement test; actual
-Vivado execution remains the authoritative License/Toolchain test.
+### Path 2 License Discovery Gate 1 (candidate; no SWPC build)
+
+The single shared driver first validates the owner/runner/source preflight,
+then resolves a usable **existing** `Xilinx.lic` from the pinned installed
+Vivado tools tree. It accepts a direct `XILINXD_LICENSE_FILE` or
+`LM_LICENSE_FILE` only when it is the same, regular, readable license file
+inside that allowlisted tree. Otherwise, with neither variable present, it
+performs a bounded, non-symlink-following name-only search for exactly one
+`Xilinx.lic`. It rejects missing, ambiguous, escaped, unreadable or oversized
+sources with a fixed `BUILD_LICENSE_*` code.
+
+Discovery happens in PREFLIGHT before Board checkout, build directory
+creation, or Vivado invocation; only the validated `XILINXD_LICENSE_FILE`
+is passed to the already existing **host-only** subprocess. No license
+contents are read, copied, committed, uploaded, logged or reported. It does
+not change SWPC system configuration or create a second Build Engine.
+
+The diagnostic retains only `license_environment_present` (safe boolean).
+This says **a trusted readable file was found**, not that a Vivado license
+checkout succeeded. Only a separately authorized real host-only run can prove
+license entitlement, synthesis/implementation and timing/DRC qualification.
+The Gate 1 pull request is verified entirely with Github-hosted synthetic
+positive/negative tests, never a live SWPC build.
 
 ## Evidence and first-failure semantics
 
