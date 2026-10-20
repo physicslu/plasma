@@ -40,7 +40,7 @@ jobs:
         run: |
           # PL HIL tests import the production Python interfaces and its declared PyYAML dependency.
           python3 -m pip install pytest 'PyYAML>=6.0'
-          python3 -m pytest -q pl/tests
+          PYTHONPATH=software/python:. python3 -m pytest -q pl/tests
       - name: Install RTL simulators and cocotb test requirements
         run: |
           sudo apt-get update -qq
