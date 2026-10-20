@@ -119,3 +119,22 @@ portable artifact custody complete until this is done.
 hardware HIL. M1 remains `NO_GO`. PR #1064 remains Gate 1 until
 new source HEAD CI and portable artifact evidence are verified; its
 merger requires the owner's independent Gate 2 authorization.
+
+
+## F1-B Gate 1 closure — second clean-HEAD Vivado rebuild and portable custody PASS (2026-10-20)
+
+**Live SWPC evidence:** [Path 3 Run 39344221935](https://github.com/physicslu/plasma/actions/runs/39344221935), GitHub Artifact [12229639751](https://github.com/physicslu/plasma/actions/runs/39344221935/artifacts/12229639751), ZIP SHA256 `f64356602431dc991060ef303470a8f051a8dab7edc8ec249e250974445b1b00`. Exact authorized PR #1064 input HEAD `00336106ad89eaa9fa0603dbe9e65024a27a6fe6`; trusted main dispatcher `78d3ca70f43a13523da8b6d3cdd578ec91d79b39`; board files `e02d6a3866b5465218f777168cdc51344ac94e07`.
+
+This is a **fresh** Vivado 2026.1 Host-only synthesis, implementation, routing and bitstream build of the fixed Tcl in the above candidate HEAD, **exit 0**. Source patch in this run is empty: no additional RTL/Tcl/checked-in file changes. Original and delivered HWH verifier both exited 0. Setup WNS +1.829 ns / TNS 0; Hold WHS +0.018 ns / THS 0; pulse-width slack +4.020 ns; 100MHz clock; twelve check_timing categories zero; final DRC and methodology each reported zero findings. GitHub-hosted CI for the exact input commit completed **10/10 SUCCESS**. The optional on-SWPC `python3 -m pytest` invocation **did not run tests** because its default Python lacks pytest; do not equate this with a passed on-SWPC pytest run. The GitHub-hosted source-contract tests did pass.
+
+**Binary custody is now independently verified from the DOWNLOADED GitHub Artifact, not merely the Codex manifest:** both raw original and delivered copies were present and SHA256-matched each other and the `delivery-manifest.json`:
+- `pl/build/f1b-deliverables/system_wrapper.bit`, **4,045,769 bytes** — SHA256 `fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075`
+- `pl/build/f1b-deliverables/system.hwh`, **138,977 bytes** — SHA256 `bf3690d69fefc8da3fc62964209776466894cd4353aec0a475b373257899ca76`
+- `timing_summary.rpt`: `7805d56523022edb095a4ed59ebd93b5bae86fcffa92149bb486a569c3db7919`
+- `drc.rpt`: `21c2cbf0995e386f6db0bac041d27d9285a0695fce8171903ce953148af37b78`
+- `methodology.rpt`: `9a18c015a8469831541e91726995331200bf0885b2c0775f502bbc19279119b3`
+- `check_timing.rpt`: `482162887546260f3e54bb0972df98abc08370f47779b1b258d074a4f1ac5898`
+
+The second run removes the **initial Artifact's missing BIT/HWH** deficiency; its prior caveat is historical only, not the current status. Persistent provenance includes the real Vivado logs/reports, original and copied hashes, two HWH verifier receipts, and problem/solution engineering reports. GitHub Artifact retention is limited (14 days by current workflow setting), so preserve a reviewed external copy when planning release.
+
+**Gate 1 Host-only qualification = PASS**, pending only new latest-HEAD CI after this documentation change. **Gate 2 merge of PR #1064 remains owner-reserved; do not auto-merge**. This image has **not** been loaded onto FPGA; actual Z2/DUT/LA, power, USB/MMIO, hardware HIL and deployment remain NOT_RUN, and M1 is NO_GO.
