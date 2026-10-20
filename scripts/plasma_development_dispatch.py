@@ -349,6 +349,11 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
+        # A request requiring an unregistered live Download provider must
+        # fail before importing candidate Build code or starting Vivado.
+        if (approval["task_id"] == "z2-path2-build" and
+                approval.get("auto_download_after_build_success") is True):
+            raise Denied("PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
         if approval["task_id"] == "z2-path2-build":
