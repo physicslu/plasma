@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_path2_held_provider as provider
 import plasma_path2_bin_provenance as provenance
@@ -293,6 +294,43 @@ class LifecycleTests(unittest.TestCase):
         self.assertNotIn("if __name__ == \"__main__\"", prov)
         self.assertNotIn("subprocess", prov)
         self.assertNotIn("paramiko", prov)
+
+
+class ExistingF1BAdapterIntegrationTests(unittest.TestCase):
+    def test_exact_adapter_abi_with_two_separate_triggers_and_restore(self):
+        import plasma_path2_f1b_adapters as f1b_adapter
+        import plasma_path2_stage_orchestrator as stages
+        tmp, store, port = setup()
+        with tmp:
+            callbacks = provider.bind_injected_stage_callbacks(
+                store=store, port=port,
+                intent=lease_intent(), provenance=provenance_data())
+            bound = f1b_adapter.bind_f1b_adapters(**callbacks)
+            build_receipt = {
+                "stage": "build", "status": "PASS",
+                "source_sha": SRC, "profile_id": "f1b-site1-v1",
+                "artifact_sha256": BIT, "evidence_sha256": "8" * 64}
+            first = stages.run({
+                "stage": "download", "source_sha": SRC,
+                "profile_id": "f1b-site1-v1", "target_id": "z2-bench",
+                "artifact_sha256": BIT, "build_receipt": build_receipt},
+                adapters=bound)
+            self.assertEqual(first["completed"], ["download"])
+            self.assertEqual(first["status"], "RECEIPTS_VALIDATED")
+            self.assertEqual(port.image, BIN)
+            independent = stages.run({
+                "stage": "test", "source_sha": SRC,
+                "profile_id": "f1b-site1-v1", "target_id": "z2-bench",
+                "artifact_sha256": BIT,
+                "load_receipt": first["receipts"]["download"]},
+                adapters=bound)
+            self.assertEqual(independent["completed"], ["test"])
+            self.assertEqual(independent["status"], "RECEIPTS_VALIDATED")
+            self.assertEqual(port.image, BIN)
+            self.assertEqual(port.actions.count("load"), 1)
+            self.assertEqual(port.actions.count("test"), 1)
+            result = provider.restore_guarded(store=store, port=port)
+            self.assertEqual(result["result"], "RESTORED_VERIFIED")
 
 
 class BitBinProvenanceTests(unittest.TestCase):
