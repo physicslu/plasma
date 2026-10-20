@@ -562,6 +562,9 @@ def safe_error_reason(exc: Exception) -> str:
     if isinstance(exc, Denied):
         return str(exc)
     detail = str(exc)
+    if type(exc).__name__ in ("RuntimeDenied", "QualificationDenied"):
+        if re.fullmatch(r"PATH2_[A-Z0-9_]{3,80}|BUILD_[A-Z0-9_]{3,80}", detail):
+            return detail
     if (type(exc).__name__ == "BuildDenied" and
             re.fullmatch(r"BUILD_[A-Z0-9_]{3,80}", detail) is not None):
         return detail
