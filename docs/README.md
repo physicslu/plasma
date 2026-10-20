@@ -115,6 +115,8 @@
 
 ## Development and validation
 
+- **Gate 1 / Host-only Draft** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：跨階段 Loaded State、Lease、映像來源、Restore Intent、Timeout、不可盲目重試及 Testing 重入之離線安全契約；不提供實機下載或恢復權限。
+
 - **Gate 1 / Host-only Draft** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：重用 Vivado Host Build、F1-B Hardware Profile、FPGA Supervisor 與三暫存器 Test Callback；維持 Build／Download／Testing 獨立 Trigger 與兩個預設關閉的自動銜接。僅 Mock/Schema Contract，不提供實機權限。
 
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
