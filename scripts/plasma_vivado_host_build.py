@@ -9,6 +9,7 @@ this driver does not implement a second Vivado build workflow.
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
@@ -21,7 +22,6 @@ import tempfile
 EXPECTED_RUNNER = "SWPC-plasma-codex"
 BOARD_SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 PROJECT_NAME = re.compile(r"pl/projects/[a-z0-9-]{3,70}\Z")
-ROOT_FOR_BUILDS = Path("/storage/projects/plasma/pl/build")
 SETTINGS64 = Path("/storage/tools/xilinx/2026.1/Vivado/settings64.sh")
 
 
@@ -140,15 +140,20 @@ def resolve_board_repository(task: dict, *, workspace: Path,
                 "source_url=" + chr(34) +
                 "https://github.com/xupsh/pynq-supported-board-file.git" + chr(34)
                 in content.splitlines(), "BUILD_BOARD_PREPARE_PIN_MISMATCH")
-        proc = executor(
-            ["/usr/bin/bash", str(script.resolve())],
-            cwd=workspace.resolve(),
-            env={"PATH": "/usr/bin:/bin",
-                 "HOME": env.get("HOME", "/nonexistent"),
-                 "GIT_TERMINAL_PROMPT": "0"},
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=180, check=False,
-        )
+        try:
+            proc = executor(
+                ["/usr/bin/bash", str(script.resolve())],
+                cwd=workspace.resolve(),
+                env={"PATH": "/usr/bin:/bin",
+                     "HOME": env.get("HOME", "/nonexistent"),
+                     "GIT_TERMINAL_PROMPT": "0"},
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=180, check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise BuildDenied("BUILD_BOARD_PREPARE_TIMEOUT") from exc
+        except OSError as exc:
+            raise BuildDenied("BUILD_BOARD_PREPARE_LAUNCH_FAILED") from exc
         require(proc.returncode == 0 and len(proc.stdout) <= 4096 and
                 len(proc.stderr) <= 65536, "BUILD_BOARD_PREPARE_FAILED")
         try:
@@ -162,6 +167,29 @@ def resolve_board_repository(task: dict, *, workspace: Path,
             "BUILD_BOARD_REPO_MISSING")
     return board
 
+
+def prepare_host_build_dir(workspace: Path) -> Path:
+    """Reuse Git-ignored candidate/pl/build; never mutate persistent SWPC root."""
+    root = workspace.resolve(strict=True)
+    output = workspace / "pl/build"
+    require(output.is_dir() and not output.is_symlink() and
+            output.resolve().is_relative_to(root), "BUILD_OUTPUT_ROOT_MISSING")
+    try:
+        result = Path(tempfile.mkdtemp(prefix="fixed-f1-", dir=output))
+        (result / "reports").mkdir()
+    except OSError as exc:
+        # Stage-specific constant codes retain a useful failure signal while
+        # keeping private host paths and OS error messages out of the receipt.
+        code = {
+            errno.EACCES: "BUILD_OUTPUT_PERMISSION_DENIED",
+            errno.EPERM: "BUILD_OUTPUT_PERMISSION_DENIED",
+            errno.EROFS: "BUILD_OUTPUT_READ_ONLY",
+            errno.ENOSPC: "BUILD_OUTPUT_NO_SPACE",
+        }.get(exc.errno, "BUILD_OUTPUT_CREATE_FAILED")
+        raise BuildDenied(code) from exc
+    return result
+
+
 def run(task: dict, *, workspace: Path, approval: dict,
         evidence_dir: Path | None = None,
         executor=subprocess.run) -> dict:
@@ -174,9 +202,6 @@ def run(task: dict, *, workspace: Path, approval: dict,
     # Existing board preparation uses its own pinned cache or first-fetch.
     board = resolve_board_repository(task, workspace=workspace,
                                      executor=executor)
-    require(ROOT_FOR_BUILDS.is_dir() and
-            not ROOT_FOR_BUILDS.is_symlink(),
-            "BUILD_OUTPUT_ROOT_MISSING")
     source_root = workspace.resolve(strict=True)
     check_env = {"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"}
     actual_board_sha = _run_checked(
@@ -194,9 +219,10 @@ def run(task: dict, *, workspace: Path, approval: dict,
         executor=executor, cwd=source_root, timeout=10, env=check_env
     ).decode("ascii")
     require(source_sha == plan["source_sha"], "BUILD_SOURCE_SHA_MISMATCH")
-    # Unique directory, never overwrite historic PSPL, LT02 or Fixed output.
-    build = Path(tempfile.mkdtemp(prefix="fixed-f1-", dir=ROOT_FOR_BUILDS))
-    (build / "reports").mkdir()
+    # Use the same candidate/worktree-local ignored pl/build already created
+    # by the pinned board helper; the historical SWPC root is not writable by
+    # plasma-codex (observed on Run 39277523452).
+    build = prepare_host_build_dir(workspace)
     args = [
         "/usr/bin/bash", "-c",
         'set -euo pipefail; source "$1"; exec vivado -mode batch '

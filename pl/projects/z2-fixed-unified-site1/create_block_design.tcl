@@ -27,10 +27,10 @@ set rst [get_bd_nets -quiet -of_objects [get_bd_pins unified_0/s_axi_aresetn]]
 if {[llength $clks] != 1 || [llength $rst] != 1} {
     error "F1 AXI clock/reset not connected"
 }
-if {[lsearch -exact [get_bd_pins -quiet -of_objects $clks] "ps7_0/FCLK_CLK0"] == -1} {
+if {[lsearch -exact [get_bd_pins -quiet -of_objects $clks] [get_bd_pins ps7_0/FCLK_CLK0]] == -1} {
     error "F1 AXI clock not driven by FCLK0"
 }
-if {[lsearch -exact [get_bd_pins -quiet -of_objects $rst] "rst_ps7_0_100M/peripheral_aresetn"] == -1} {
+if {[lsearch -exact [get_bd_pins -quiet -of_objects $rst] [get_bd_pins rst_ps7_0_100M/peripheral_aresetn]] == -1} {
     error "F1 AXI reset not synchronized"
 }
 set segments [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]]
