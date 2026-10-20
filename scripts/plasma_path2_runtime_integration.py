@@ -36,7 +36,7 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
     the trusted Dispatcher calls with no hooks and no device backend.
     """
     require(type(approval) is dict
-            and approval.get("task_id") == "fixed-site1-vivado-host-build"
+            and approval.get("task_id") == "z2-path2-build"
             and approval.get("execution_capability") == "vivado-host-build"
             and approval.get("execution_path") == "path2-cli"
             and coordinator._sha(approval.get("pinned_sha"), 40)
