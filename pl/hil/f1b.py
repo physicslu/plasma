@@ -59,8 +59,6 @@ def identity_callback(output: Path) -> one_shot.TestCallback:
     return test
 
 
-
-
 def require(ok: bool, reason: str) -> None:
     if not ok:
         raise ValueError(reason)
