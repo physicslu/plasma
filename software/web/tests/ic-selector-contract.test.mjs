@@ -52,7 +52,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(selector, /icSelectorStatusStack/);
   assert.match(selector, /icSelectorStatusPhysical[\s\S]*physicalValidationLabel\("PPU"[\s\S]*physicalValidationLabel\("Socket"/);
   assert.match(selector, /icSelectorStatusEvidence[\s\S]*softwareQualificationLabel[\s\S]*openOcdConfigLabel[\s\S]*manufacturerPartLabel/);
-  assert.match(selector, /OpenOCD 設定 · 已存在/);
+  assert.match(selector, /PLASMA CFG · 已綁定/);
   assert.match(selector, /原廠料號 · 已確認/);
   assert.match(selector, /未實機測試/);
   assert.match(selector, /實機測試通過/);
@@ -96,7 +96,7 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(selector, /Qualified Operations/);
   assert.match(selector, /Flash Driver/);
   assert.match(selector, /Programming Profile/);
-  assert.match(selector, /CFG Mapping/);
+  assert.match(selector, /PLASMA Production CFG Binding/);
   assert.match(selector, /CFG mapping 不能視為燒錄支援/);
   assert.match(selector, /L2 Programmable：此 exact ICPN 已完成軟體 Programming Qualification/);
   assert.match(selector, /尚未等同 L3 PLASMA Verified/);
