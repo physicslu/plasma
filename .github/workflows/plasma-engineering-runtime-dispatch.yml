@@ -425,6 +425,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: read
+      actions: read  # F1-B only: trusted step fetches immutable prior artifact
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -457,6 +458,39 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
+      - name: Prefetch exact F1-B BIT/HWH with step-scoped GitHub token
+        if: needs.development-authorize.outputs.task_id == 'f1b-path3-z2-hil-once'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 0700 "$RUNNER_TEMP/plasma-f1b-pinned"
+          gh api repos/physicslu/plasma/actions/artifacts/12229639751/zip > "$RUNNER_TEMP/plasma-f1b-pinned/source.zip"
+          python3 - "$RUNNER_TEMP/plasma-f1b-pinned" <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import sys
+          import zipfile
+          root = pathlib.Path(sys.argv[1])
+          items = (
+              ('system_wrapper.bit', 4045769, 'fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075'),
+              ('system.hwh', 138977, 'bf3690d69fefc8da3fc62964209776466894cd4353aec0a475b373257899ca76'),
+          )
+          with zipfile.ZipFile(root / 'source.zip') as bundle:
+              for name, length, expected in items:
+                  archive_path = 'plasma/plasma/candidate/pl/build/f1b-deliverables/' + name
+                  data = bundle.read(archive_path)
+                  if len(data) != length or hashlib.sha256(data).hexdigest() != expected:
+                      raise SystemExit('F1B_ARTIFACT_IDENTITY_DENIED: ' + name)
+                  dest = root / name
+                  fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                  with os.fdopen(fd, 'wb') as stream:
+                      stream.write(data)
+          print('F1B_ARTIFACT_CUSTODY_PASS: exact BIT/HWH size and SHA256')
+          PY
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
@@ -464,6 +498,7 @@ jobs:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          PLASMA_F1B_TASK_ID: ${{ needs.development-authorize.outputs.task_id }}
           # Only the owner-authorized F1-B engineering task admits Vivado.
           PLASMA_FPGA_PATH3_APPROVED: ${{ needs.development-authorize.outputs.task_id == 'f1b-path3-codex-vivado-build' && '1' || '0' }}
           PLASMA_FPGA_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
@@ -473,6 +508,11 @@ jobs:
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
           test -z "$(git -C candidate status --porcelain --untracked-files=all)"
+          if [ "$PLASMA_F1B_TASK_ID" = 'f1b-path3-z2-hil-once' ]; then
+            install -d -m 0700 candidate/pl/build/f1b-deliverables
+            install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system_wrapper.bit" candidate/pl/build/f1b-deliverables/system_wrapper.bit
+            install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system.hwh" candidate/pl/build/f1b-deliverables/system.hwh
+          fi
           python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
             --event "$GITHUB_EVENT_PATH" \
             --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
