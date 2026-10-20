@@ -646,7 +646,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                     "Root cause and fix entries required in real execution.\n")
                 return Result()
             receipt=dev.run_codex_task(task,workspace=work,
-                                       executor=fake_codex)
+                                       executor=fake_codex,
+                                       task_id="f1b-path3-codex-vivado-build")
             self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertNotIn("source_path",receipt)
             self.assertIn("engineering_report_sha256",receipt)
@@ -656,6 +657,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("workspace-write",args)
             self.assertIn("sandbox_workspace_write.network_access=true",args)
             self.assertIn("Vivado 2026.1",kwargs["input"].decode())
+            self.assertIn("--path3-engineering-host-only",kwargs["input"].decode())
+            self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
             self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())
             self.assertIn("Do not program or access physical FPGA",
                           kwargs["input"].decode())
