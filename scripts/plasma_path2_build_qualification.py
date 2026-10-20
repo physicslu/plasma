@@ -14,8 +14,8 @@ import json
 from pathlib import Path
 import re
 
-SHA40 = re.compile(r"[0-9a-f]{40}\\Z")
-SHA64 = re.compile(r"[0-9a-f]{64}\\Z")
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 MARKER = b"FIXED_F1_BITSTREAM_BUILD_PASS_HOST_ONLY_NOT_Z2"
 REPORTS = ("timing_summary.rpt", "drc.rpt", "methodology.rpt",
            "utilization.rpt", "check_timing.rpt")
