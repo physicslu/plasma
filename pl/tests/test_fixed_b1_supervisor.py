@@ -60,9 +60,7 @@ class B1TargetOfflineContracts(unittest.TestCase):
         child = IsolatedIdentity()
         fake = type("Fake", (), {"poll": lambda self: None})()
         child.proc = fake
-        with self.assertEqual if False else patch(
-                "pl.hil.fixed_b1_supervisor.check_ownership_full_64k"
-        ) as check:
+        with patch("pl.hil.fixed_b1_supervisor.check_ownership_full_64k") as check:
             self.assertFalse(child.stopped_and_unmapped())
             check.assert_not_called()
 
