@@ -32,10 +32,12 @@ SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 
 BRANCH_COMMAND = re.compile(
     r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) "
-    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40}) 981\Z"
+    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 LEGACY_COMMAND = re.compile(
-    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) 981\Z"
+    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 
 
@@ -99,6 +101,17 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 type(task["board_repo_sha"]) is str and
                 SHA40.fullmatch(task["board_repo_sha"]) is not None,
                 "HOST_BUILD_TOOLCHAIN_DENIED")
+        return task
+    if execution_path == "path2-cli" and task.get("capability") == "z2-development-cycle":
+        # Each stage is a separately owner-triggered command. No stage
+        # automatically invokes its successor or touches FPGA from CI.
+        expected = {"z2-path2-download": "DOWNLOAD",
+                    "z2-path2-testing": "TESTING"}
+        require(task_id in expected and set(task) == {
+            "execution_path", "capability", "stage", "project"
+        } and task.get("stage") == expected.get(task_id)
+                and task.get("project") == "pl/projects/z2-fixed-unified-site1",
+                "CYCLE_TASK_FIELDS_DENIED")
         return task
     if execution_path == "path2-cli":
         # Legacy CPU-only CLI fixtures keep their independent sandbox.
@@ -185,8 +198,21 @@ def request(event: object, context: dict) -> dict:
     require(branch_match is not None or legacy_match is not None,
             "EXACT_COMMAND_DENIED")
     match = branch_match or legacy_match
+    flags = match.group("flags") or ""
+    auto_download = " --auto-download" in flags
+    auto_testing = " --auto-testing" in flags
+    task_id = match.group("task")
+    # Options belong to their preceding stage, not arbitrary tasks.
+    require((not auto_download or task_id == "fixed-site1-vivado-host-build")
+            and (not auto_testing or task_id in (
+                "fixed-site1-vivado-host-build", "z2-path2-download"))
+            and (not (task_id == "fixed-site1-vivado-host-build" and auto_testing)
+                 or auto_download),
+            "AUTO_STAGE_SCOPE_DENIED")
     return {
-        "task_id": match.group("task"),
+        "task_id": task_id,
+        "auto_download": auto_download,
+        "auto_testing": auto_testing,
         "pr_number": int(branch_match.group("pr")) if branch_match else 0,
         "source_sha": branch_match.group("sha") if branch_match else sha,
         "trusted_sha": sha,
@@ -255,6 +281,15 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
+    if task.get("capability") == "z2-development-cycle":
+        # This is stage routing only, never implicit live-hardware approval.
+        require((req["pr_number"] == 0
+                 and req["source_sha"] == req["trusted_sha"]) or
+                (req["pr_number"] > 0
+                 and req["source_sha"] != req["trusted_sha"]),
+                "CYCLE_SOURCE_BINDING_DENIED")
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "CYCLE_RERUN_DENIED")
     if task.get("capability") == "vivado-host-build":
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
@@ -326,8 +361,27 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 "HOST_BUILD_APPROVAL_REQUIRED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
+        # Existing Vivado Engine remains sole BUILD implementation.
+        # An auto request without separately authorized live backends
+        # cannot initiate hardware and fails closed.
+        if approval.get("auto_download") is True:
+            import plasma_path2_cycle as cycle
+            return cycle.run_stage(
+                task_id=approval["task_id"], approval=approval,
+                evidence_dir=evidence_dir,
+                build=lambda: build.run(
+                    task, workspace=workspace, approval=approval,
+                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
+    if task.get("capability") == "z2-development-cycle":
+        require(type(approval) is dict, "CYCLE_APPROVAL_REQUIRED")
+        import plasma_path2_cycle as cycle
+        # The trusted route has no live DOWNLOAD/TESTING adapter in this
+        # change. It cannot synthesize approvals or operate the Z2.
+        return cycle.run_stage(
+            task_id=approval["task_id"], approval=approval,
+            evidence_dir=evidence_dir)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -588,7 +642,8 @@ def main() -> int:
                 ), "WRONG_EXECUTION_PATH")
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build")
+                                    ("z2-cpu-only", "vivado-host-build",
+                                     "z2-development-cycle")
                                  else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace,

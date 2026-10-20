@@ -24,6 +24,8 @@ on:
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
+      - "scripts/plasma_path2_cycle.py"
+      - "scripts/tests/test_plasma_path2_cycle.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
@@ -41,6 +43,8 @@ on:
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
+      - "scripts/plasma_path2_cycle.py"
+      - "scripts/tests/test_plasma_path2_cycle.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
@@ -75,6 +79,8 @@ jobs:
           python3 scripts/tests/test_plasma_development_dispatch.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
+          python3 -m py_compile scripts/plasma_path2_cycle.py scripts/tests/test_plasma_path2_cycle.py
+          python3 scripts/tests/test_plasma_path2_cycle.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -293,6 +299,11 @@ jobs:
          needs.development-authorize.outputs.task_id == 'fixed-site1-vivado-host-build' &&
          needs.development-claim.result == 'skipped' &&
          github.run_attempt == 1) ||
+        (needs.development-authorize.outputs.execution_capability == 'z2-development-cycle' &&
+         (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-testing') &&
+         needs.development-claim.result == 'skipped' &&
+         github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
          needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
          needs.development-claim.result == 'success' &&
@@ -407,6 +418,9 @@ jobs:
             ${{ runner.temp }}/plasma-fpga-build-diagnostics.json
             ${{ runner.temp }}/plasma-fpga-build-diagnostics.json.sha256
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
+            ${{ runner.temp }}/plasma-path2-build.json
+            ${{ runner.temp }}/plasma-path2-download.json
+            ${{ runner.temp }}/plasma-path2-testing.json
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
             candidate/pl/build/**/*.bit
