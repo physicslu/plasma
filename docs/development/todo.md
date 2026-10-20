@@ -6,6 +6,36 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+### Universal PS-PL Hardware ABI Driver / Protocol-Neutral Command Layer
+
+**Status:** TODO / high priority; architecture review candidate, not product hardware-ready. Tracked decision 2026-10-19.
+
+**Layer:** Zynq PS Linux MMIO/UIO transport / PPU Hardware Broker / fixed-image Hardware ABI / per-Site command execution.
+
+**Core invariant:** The shared hardware driver is **not an SWD driver**. Its contract is safe, exact 32-bit PS-to-PL register access, device-memory ordering, resource/lease ownership, and lifecycle management. A protocol-neutral ABI command layer manages Site identity, capabilities, request/response sequencing and error recovery. SWD and SPI are protocol-specific engines/controllers **above** these shared layers. SWD is the first vertical-slice acceptance protocol, not the definition of driver completeness. GPIO bit-bang is a separate optional adapter, not a replacement for this common MMIO boundary.
+
+Current evidence and boundaries:
+
+- `software/python/plasma_interfaces/linux_mmio.py` has native aligned u32 access, allowlists and cooperative Site leases; earlier LT02/SWD-03 real Z2 PS/PL HIL passed **for their distinct legacy test images** (including PR #957). Neither image implements the proposed fixed-image v1 ABI.
+- The merged PR #1031 adds `FixedABISite1WordPort`, `FixedABISWDController` integration tests and ARMv7 `plasma_mmio_dmb_sy` **candidate**; this is intentionally Site-1/SWD-oriented proof of integration, not a finished protocol-neutral hardware driver.
+- The merged PRs #1019/#1025 establish a unified 64-KiB PPU/Site-1 RTL and production SWD-controller **host simulation**, not a physical fixed-image Z2 implementation. The fixed-image ABI `pl/verification/fixed_image_abi_v1_gate1.json` is `review_candidate_not_implemented`; **M1 = NO-GO**.
+- Phase 2A `UIOBackend` and configuration-owner logic have host-only/synthetic safety evidence; a real `/dev/uio*` production transport, enforced exclusion of non-cooperating owners, real Fixed ABI ordering and board-level acceptance remain unqualified.
+- PR #1053 HIL-A2 proposes only a pinned CPU-only 1,000-call ARMv7 `DMB SY` smoke on a real Z2. It is **not** evidence of real MMIO ordering, AXI write completion or a fixed-ABI SWD transaction; its SWPC/Z2 execution remains separately gated and must not be silently treated as a prerequisite PASS.
+
+Required work and explicit completion criteria:
+
+1. **Review and freeze ABI v1 under its own M1 decision:** one verified Board-Descriptor-derived 64-KiB PPU window, 32-bit little-endian aligned accesses, Identity/Global and up to eight independent 4-KiB Site windows; exact RO/WO, reserved offsets, capability negotiation and version failure behavior. `SITE_PRESENT_BITMAP` must reflect **actual** instantiated Sites, never eight by declaration. Preserve SWD=1 and SPI=2 command contracts as the first minimum protocol set; JTAG/I2C/ICSP are reserved, not implemented. Do not imply M1 acceptance until its owner/RTL/PS sign-off and evidence are recorded.
+2. **Complete the reusable MMIO backend:** decouple transport and per-Site register access from SWD opcode assumptions; decide controlled `/dev/mem` development versus actual UIO production admission (and conditions for a custom Kernel driver). Verify real device identity, mapping attributes, valid 32-bit access width/alignment, read/write allowlists, close/quiesce, mapping generation, lease ownership, concurrency and fail-closed behavior; reject illegal physical offset probes and unqualified reload.
+3. **Qualify memory ordering at the common transport boundary:** one explicit `write_barrier()` primitive usable by any protocol before a doorbell/`COMMAND` register, with exact ARMv7 ELF/digest and real-board integration evidence. `DMB SY` is an ordering primitive **only**; independently verify Device MMIO mappings, write/command behavior and whether readback/stronger completion barriers are needed. Do not claim CPU-only HIL-A2 proves FPGA-observed ordering or AXI completion.
+4. **Implement protocol-neutral command/response management:** Site lease plus request validation, `SEQUENCE`, `PROTOCOL`, `COMMAND`-last, capability/bit count/clock/timeout constraints, bounded PIO FIFO where applicable, `BUSY/DONE/FAULT`, `DONE_SEQ`, result/metadata snapshot, `ACK_SEQ`, one outstanding command per Site, poison-on-uncertain write and no blind retry. Keep protocol encoding and target algorithms in pluggable SWD/SPI-specific controllers above the shared MMIO/ABI layer.
+5. **Prove neutrality in host tests:** negative/fault-injection and actual RTL+Cocotb contracts for the common backend and command state machine; maintain SWD Site-1 differential regression and add SPI ABI capability/unsupported-path tests without fabricating an SPI hardware PASS. Cover wrong ABI/image, stale owner, ordering failure, unsupported protocol/Site, bad sequence, replay, timeouts, and independent Site isolation.
+6. **Then establish one real fixed-ABI vertical slice:** supervised, explicitly authorized Z2 image build/load and provenance/Identity verification; invoke the production common MMIO + ABI command path against the actual FPGA SWD Site 1; capture ordering, readback, completion, fault handling and independent verified base-image restoration. Existing LT02 fixture results cannot qualify this image. External SWD pins/Blue Pill DPIDR and erase/program/verify are subsequent **separate** electrical/hardware gates.
+7. **Scale only after evidence:** validate two physical Site instances, actual isolation/concurrency and timing/resource cost before claiming four/eight Site execution or Zynq-7010 capacity. One logical Broker and eight reserved Site addresses do not mean eight functioning PL engines.
+
+**Closure rule:** Declare the **shared driver** complete only with a reviewed protocol-neutral API, backend and command safety tests, actual fixed-ABI PS/PL evidence at the stated Site scope and operator/recovery documentation. Declare **SWD/SPI protocol support** separately. Preserve owner Gate 1 for hardware action and Gate 2 for PR merge; this TODO does not authorize either.
+
+References: [Fixed-image ABI candidate](../architecture/fixed-fpga-hardware-abi-v1-gate1.md), [ABI JSON](../../pl/verification/fixed_image_abi_v1_gate1.json), [Fixed Site-1 port](p0-fixed-abi-site1-mmio-adapter-host.md), [ADR-0003](../adr/0003-runtime-fpga-driver-reconfiguration-boundary.md).
+
 ### IC Electrical Programming Profile / Voltage Capability Database
 
 **Status:** TODO / required before physical multi-IC programming qualification
@@ -210,6 +240,25 @@ Required work:
 Architectural invariant:
 
 > Device knowledge and programming orchestration remain high-level and replaceable; the Hardware API describes Plasma hardware capabilities rather than raw registers, and PL owns deterministic protocol execution.
+
+### PS GPIO / EMIO SWD Bit-bang Alternative (non-blocking)
+
+**Status:** TODO / optional follow-up and comparison baseline; **not** a prerequisite for the common Hardware ABI Driver, fixed-image SWD vertical slice, PR #1053, or M1 acceptance.
+
+**Layer:** Experimental Z2 PS GPIO/EMIO / OpenOCD adapter / physical SWD instrumentation.
+
+**Technical distinction:** This route is **software GPIO bit-banging**, not ARM bit-band alias-address hardware and not the native FPGA SWD protocol engine. The desired alternate path is Z2 PS GPIO -> EMIO -> PMODB -> SWDIO/SWCLK (optional open-drain nRESET), driven by OpenOCD `linuxgpiod`. This is an alternative for bring-up, diagnosis or measured fallback; it must not force the generic ABI MMIO driver to become SWD-specific.
+
+Retained foundation: merged PR #856 packages ARMv7 OpenOCD 0.12.0 with `linuxgpiod` support and QEMU/deployment tests. Merged PR #859 provides the Z2 EMIO-to-PMODB SWD GPIO bridge, pin constraints and host RTL/Vivado tooling. Neither a packaged adapter nor a build/RTL PASS establishes real `gpiochip` numbering, open-drain/electrical timing, SWDIO turnaround or physical target programming.
+
+Required follow-up (separately authorized for real Z2/DUT operations):
+
+- Verify the exact loaded bridge image, pinout, 3.3V electrical/safe-state design, shared ground, target voltage, SWDIO bidirectional ownership, SWCLK waveform and nRESET isolation. Resolve actual Linux GPIO chip/line identity dynamically; EMIO indices are **not** Linux line numbers.
+- Validate the installed OpenOCD binary, `linuxgpiod` runtime dependencies and explicit reviewed adapter configuration on actual Z2 without assuming that QEMU proves GPIO hardware.
+- Under an independent physical-DUT Gate 1, first read a real STM32F103/Blue Pill DPIDR, then separately qualify target-specific erase/program/readback verify with approved supply/reset protections, no blind retries.
+- Measure bit-bang throughput, Linux scheduling jitter, CPU load, SWD turnaround reliability and error behavior against FPGA SWD hardware. Keep this as a **non-blocking** experimental/diagnostic route unless evidence justifies a formal product fallback.
+
+References: [Z2 SWD EMIO proof-of-path](../../pl/projects/z2-swd-gpio/README.md), [Plasma Hardware API / OpenOCD adapter debt](#plasma-hardware-api--openocd-adapter-productization).
 
 ### Split Programming Image Data Plane
 
