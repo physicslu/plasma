@@ -15,9 +15,9 @@ test("the third of the original four IC status tags has exactly three display st
   assert.match(source, /device\.backend_candidate\.production_binding_authorized === false/);
   assert.match(source, /device\.backend_candidate\.hardware_runtime_ready === false/);
   assert.match(source, /device\.backend_candidate\.family === device\.family/);
-  assert.match(source, /OpenOCD 設定 · 已存在/);
-  assert.match(source, /OpenOCD 設定 · 候選/);
-  assert.match(source, /OpenOCD 設定 · 未建立/);
+  assert.match(source, /PLASMA CFG · 已綁定/);
+  assert.match(source, /PLASMA CFG · 研究候選/);
+  assert.match(source, /PLASMA CFG · 未綁定/);
   assert.match(source, /openOcdConfigLabel\(openOcdTagState\(device\), zh\)/);
   assert.doesNotMatch(source, /openOcdConfigLabel\(device\.backend\.mapping_status, zh\)/);
   assert.match(source, /icSelectorStatusPhysical/);
@@ -54,4 +54,15 @@ test("mapped is green, candidate amber and no mapping neutral without granting p
   assert.match(source, /build\.github_actions_run_id/);
   assert.match(source, /未開放（僅 Metadata）/);
   assert.match(source, /未實機測試/);
+  assert.match(source, /Upstream OpenOCD CFG（來源證據）/);
+  assert.match(source, /Upstream Flash Driver（來源證據）/);
+  assert.match(source, /Upstream Device ID／DEVID/);
+  assert.match(source, /PLASMA Production CFG Binding/);
+  assert.match(source, /selected\.upstream_openocd_evidence\.target_cfg\.path/);
+  assert.match(source, /selected\.upstream_openocd_evidence\.device_id\.value/);
+  assert.match(source, /selected\.backend\.mapping_status/);
+  assert.doesNotMatch(source, /Catalog Level 0 DISCOVERED/);
+  assert.doesNotMatch(source, /Catalog Level 0 Evidence/);
+  assert.doesNotMatch(source, /DS60001513G p\.14 \/ p\.16/);
+
 });
