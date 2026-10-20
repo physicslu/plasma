@@ -209,6 +209,54 @@ class DiagnosticContracts(unittest.TestCase):
 
 
 
+
+class HostBuildOutputPathContracts(unittest.TestCase):
+    """Offline contract: candidate-relative Runner checkout must not duplicate paths."""
+
+    def test_relative_candidate_workspace_uses_absolute_build_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            workspace = parent / "candidate"
+            build_root = workspace / "pl" / "build"
+            build_root.mkdir(parents=True)
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(parent)
+                result = build.prepare_host_build_dir(Path("candidate"))
+                self.assertTrue(result.is_absolute())
+                self.assertEqual(result.parent, build_root)
+                self.assertTrue((result / "reports").is_dir())
+                self.assertTrue(result.is_relative_to(workspace))
+                # Same path from Vivado's actual cwd=workspace, no candidate/candidate.
+                self.assertEqual(Path(str(result)).resolve(strict=True), result)
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_absolute_candidate_workspace_and_symlink_output_guard(self):
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            workspace = parent / "candidate"
+            build_root = workspace / "pl" / "build"
+            build_root.mkdir(parents=True)
+            result = build.prepare_host_build_dir(workspace)
+            self.assertTrue(result.is_absolute())
+            self.assertEqual(result.parent, build_root)
+            self.assertTrue((result / "reports").is_dir())
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td)
+            workspace = parent / "candidate"
+            (workspace / "pl").mkdir(parents=True)
+            external = parent / "external-build"
+            external.mkdir()
+            (workspace / "pl" / "build").symlink_to(external, target_is_directory=True)
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_OUTPUT_ROOT_MISSING"
+            ):
+                build.prepare_host_build_dir(workspace)
+
+
+
+
 class LicenseDiscoveryContracts(unittest.TestCase):
     """Host-only filesystem fixtures; never touch real Xilinx installs."""
 

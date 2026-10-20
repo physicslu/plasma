@@ -253,7 +253,7 @@ def resolve_board_repository(task: dict, *, workspace: Path,
 def prepare_host_build_dir(workspace: Path) -> Path:
     """Reuse Git-ignored candidate/pl/build; never mutate persistent SWPC root."""
     root = workspace.resolve(strict=True)
-    output = workspace / "pl/build"
+    output = root / "pl/build"
     require(output.is_dir() and not output.is_symlink() and
             output.resolve().is_relative_to(root), "BUILD_OUTPUT_ROOT_MISSING")
     try:
