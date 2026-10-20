@@ -208,6 +208,150 @@ class DiagnosticContracts(unittest.TestCase):
                 reviewed.diagnostics_type()
 
 
+
+class LicenseDiscoveryContracts(unittest.TestCase):
+    """Isolated filesystem fixtures; never touch real Xilinx installs."""
+
+    def fixture(self, root: Path):
+        installed = root / "installed"
+        tool = installed / "2026.1" / "Vivado"
+        tool.mkdir(parents=True)
+        settings = tool / "settings64.sh"
+        settings.write_text("# metadata-only fixture")
+        return installed, settings
+
+    def test_single_allowlisted_installed_license_discovered_without_environment(self):
+        with tempfile.TemporaryDirectory() as td:
+            installed, settings = self.fixture(Path(td))
+            parent = installed / "licenses" / "vivado"
+            parent.mkdir(parents=True)
+            license_file = parent / "Xilinx.lic"
+            license_file.write_text("FIXTURE ONLY, not a license\n")
+            before = license_file.read_bytes()
+            resolved = build.discover_vivado_license(env={}, settings=settings)
+            self.assertEqual(resolved,
+                             {"XILINXD_LICENSE_FILE": str(license_file)})
+            self.assertEqual(license_file.read_bytes(), before)
+
+    def test_valid_explicit_source_and_synonymous_keys(self):
+        with tempfile.TemporaryDirectory() as td:
+            installed, settings = self.fixture(Path(td))
+            file = installed / "Xilinx.lic"
+            file.write_text("fixture")
+            resolved = build.discover_vivado_license(
+                env={"XILINXD_LICENSE_FILE": str(file)}, settings=settings)
+            self.assertEqual(resolved["XILINXD_LICENSE_FILE"], str(file))
+            resolved = build.discover_vivado_license(
+                env={"XILINXD_LICENSE_FILE": str(file),
+                     "LM_LICENSE_FILE": str(file)}, settings=settings)
+            self.assertEqual(resolved, {"XILINXD_LICENSE_FILE": str(file)})
+
+    def test_missing_ambiguous_and_unreadable_license_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            installed, settings = self.fixture(Path(td))
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_LICENSE_NOT_FOUND"
+            ):
+                build.discover_vivado_license(env={}, settings=settings)
+            a = installed / "Xilinx.lic"
+            a.write_text("fixture")
+            b = installed / "nested" / "Xilinx.lic"
+            b.parent.mkdir()
+            b.write_text("fixture")
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_LICENSE_SOURCE_AMBIGUOUS"
+            ):
+                build.discover_vivado_license(env={}, settings=settings)
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_LICENSE_SOURCE_AMBIGUOUS"
+            ):
+                build.discover_vivado_license(
+                    env={"XILINXD_LICENSE_FILE": str(a),
+                         "LM_LICENSE_FILE": str(b)}, settings=settings)
+            with patch.object(build.os, "access", return_value=False):
+                with self.assertRaisesRegex(
+                    build.BuildDenied, "BUILD_LICENSE_FILE_UNREADABLE"
+                ):
+                    build.discover_vivado_license(
+                        env={"XILINXD_LICENSE_FILE": str(a)}, settings=settings)
+
+    def test_reject_symlinks_escape_server_value_and_oversized_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            installed, settings = self.fixture(root)
+            outside = root / "secrets" / "Xilinx.lic"
+            outside.parent.mkdir()
+            outside.write_text("credential should not be inspected")
+            symlink = installed / "Xilinx.lic"
+            symlink.symlink_to(outside)
+            for value in (str(outside), str(symlink), "27000@server",
+                          "Xilinx.lic", "/etc/passwd", "/dev/mem"):
+                with self.subTest(input="redacted"), self.assertRaisesRegex(
+                    build.BuildDenied, "BUILD_LICENSE_SOURCE_DENIED"
+                ):
+                    build.discover_vivado_license(
+                        env={"XILINXD_LICENSE_FILE": value}, settings=settings)
+            symlink.unlink()
+            symlink.write_bytes(b"x" * (1024 * 1024 + 1))
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_LICENSE_FILE_INVALID"
+            ):
+                build.discover_vivado_license(
+                    env={"XILINXD_LICENSE_FILE": str(symlink)}, settings=settings)
+
+    def test_reject_symlinked_tool_root_and_scanner_bounds(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            installed, settings = self.fixture(base)
+            fake = base / "linked"
+            fake.symlink_to(installed, target_is_directory=True)
+            with self.assertRaisesRegex(
+                build.BuildDenied, "BUILD_LICENSE_TOOL_ROOT_DENIED"
+            ):
+                build.discover_vivado_license(
+                    env={}, settings=fake / "2026.1/Vivado/settings64.sh")
+            def limitless_walk(*args, **kwargs):
+                for index in range(20001):
+                    yield (str(installed / str(index)), [], [])
+            with patch.object(build.os, "walk", side_effect=limitless_walk):
+                with self.assertRaisesRegex(
+                    build.BuildDenied, "BUILD_LICENSE_DISCOVERY_BOUNDS"
+                ):
+                    build.discover_vivado_license(env={}, settings=settings)
+
+    def test_license_missing_is_preflight_failure_without_vivado_or_board(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder = Path(td)
+            evidence = folder / "evidence"
+            evidence.mkdir()
+            settings = folder / "settings64.sh"
+            settings.write_text("mock settings")
+            with (patch.object(build, "preflight", return_value={}),
+                  patch.object(build, "SETTINGS64", settings),
+                  patch.object(build.os, "geteuid", return_value=1001),
+                  patch.object(build, "discover_vivado_license",
+                               side_effect=build.BuildDenied("BUILD_LICENSE_NOT_FOUND")),
+                  patch.object(build, "resolve_board_repository") as board,
+                  patch.object(build, "prepare_host_build_dir") as output):
+                with self.assertRaisesRegex(
+                    build.BuildDenied, "BUILD_LICENSE_NOT_FOUND"
+                ):
+                    build.run({}, workspace=folder,
+                              approval={"pinned_sha": "a" * 40},
+                              evidence_dir=evidence,
+                              executor=lambda *args, **kwargs: self.fail("process spawned"))
+                board.assert_not_called()
+                output.assert_not_called()
+            receipt = json.loads((evidence / "plasma-fpga-build-diagnostics.json").read_text())
+            self.assertEqual(receipt["status"], "FAIL")
+            self.assertEqual(receipt["failed_stage"], "PREFLIGHT")
+            self.assertEqual(receipt["error_code"], "BUILD_LICENSE_NOT_FOUND")
+            self.assertEqual(receipt["checks"]["license_environment_present"], False)
+            self.assertNotIn(str(folder), json.dumps(receipt))
+            self.assertEqual(receipt["physical_load"], "NOT_RUN")
+
+
+
 class PipelineFailureEvidence(unittest.TestCase):
     """All executors below are stubs, even for license and Vivado regression."""
 
@@ -233,6 +377,8 @@ class PipelineFailureEvidence(unittest.TestCase):
             patch.object(build, "preflight", return_value=plan),
             patch.object(build, "SETTINGS64", settings),
             patch.object(build, "resolve_board_repository", return_value=board),
+            patch.object(build, "discover_vivado_license",
+                         return_value={"XILINXD_LICENSE_FILE": "/private/license"}),
             patch.object(build, "_run_checked", side_effect=checked_command),
             patch.object(build.os, "geteuid", return_value=1001),
             patch.object(build, "prepare_host_build_dir", side_effect=(
