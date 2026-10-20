@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ from pl.hil.fixed_b1_contract import (
 )
 from pl.hil.fixed_b1_staging import CANDIDATE_BIN_SHA256, derive_candidate
 
+OWNER_LOCK = Path("/run/lock/plasma-f1b-owner.lock")
 MANAGER = Path("/sys/class/fpga_manager/fpga0")
 FIRMWARE = Path("/lib/firmware")
 RUN_DIR = Path("/run/plasma-z2-f1b")
@@ -121,6 +123,7 @@ def exact_pins(i: Inputs) -> None:
         protected_file(f)
     if (i.candidate_bin.parent != FIRMWARE or
             i.recovery_bin.parent != FIRMWARE or
+            i.recovery_bin.name != "base.bin" or
             i.candidate_bin.name == i.recovery_bin.name or
             not re.fullmatch(r"[A-Za-z0-9_.-]+", i.candidate_bin.name)):
         raise B1Blocked("B1_FIRMWARE_NOT_PINNED")
@@ -198,6 +201,33 @@ class IsolatedIdentity:
         return True
 
 
+def clock_and_original_image(i: Inputs) -> None:
+    """Relevant load-time facts, NOT a repeated HIL-B0 checklist."""
+    from pl.hil.swd04.collect import fclk0_from_summary
+    from pl.hil.swd04.development import last_load
+    summary = Path("/sys/kernel/debug/clk/clk_summary").read_text()
+    if fclk0_from_summary(summary) != 100000000:
+        raise B1Blocked("B1_LIVE_FCLK_NOT_100MHZ")
+    log = subprocess.run(
+        ["dmesg", "--color=never"], check=True, text=True,
+        capture_output=True, timeout=10).stdout
+    if (": writing " + i.recovery_bin.name + " to ") not in last_load(log):
+        raise B1Blocked("B1_ORIGINAL_IMAGE_PROVENANCE_UNKNOWN")
+
+
+def service_snapshot() -> dict[str, bool]:
+    """Only the same four known runtime services, no restart or quiesce."""
+    states = {}
+    for name in ("plasma-bootstrap", "plasma-server", "plasma-web",
+                 "plasma-runtime-activation"):
+        result = subprocess.run(
+            ["systemctl", "is-active", "--quiet", name],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, timeout=3, check=False)
+        states[name] = result.returncode == 0
+    return states
+
+
 def run_live(i: Inputs) -> dict[str, str]:
     """No CLI/dispatcher: integration cannot run without a later approved route.
 
@@ -207,28 +237,58 @@ def run_live(i: Inputs) -> dict[str, str]:
     from pl.hil.swd04.native_qualify import check_runtime
     check_runtime()
     exact_pins(i)
-    check_ownership_full_64k()
-    if (MANAGER / "state").read_text().strip() != "operating":
-        raise B1Blocked("B1_MANAGER_NOT_OPERATING")
-    isolated = IsolatedIdentity()
-    boot_before = Path("/proc/sys/kernel/random/boot_id").read_text()
-    original_state = (MANAGER / "state").read_text().strip()
-    def preflight() -> None:
+    if not OWNER_LOCK.parent.is_dir() or OWNER_LOCK.is_symlink():
+        raise B1Blocked("B1_OWNER_LOCK_UNAVAILABLE")
+    lock_fd = os.open(OWNER_LOCK, os.O_CREAT | os.O_RDWR |
+                      getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Exact preflight BEFORE creating evidence or writing FPGA Manager.
         check_ownership_full_64k()
-        if (MANAGER / "state").read_text().strip() != original_state:
-            raise B1Blocked("B1_MANAGER_STATE_CHANGED")
-    def restore() -> None:
-        manager_write_firmware(i.recovery_bin.name)
-    def verify() -> None:
-        if (Path("/proc/sys/kernel/random/boot_id").read_text() != boot_before
-                or (MANAGER / "state").read_text().strip() != original_state):
-            raise B1Blocked("B1_RESTORATION_MISMATCH")
-        check_ownership_full_64k()
-    return one_shot(
-        preflight=preflight,
-        load_candidate=lambda: manager_write_firmware(i.candidate_bin.name),
-        identity_child=isolated.read,
-        child_stopped_and_unmapped=isolated.stopped_and_unmapped,
-        restore_original=restore,
-        verify_restoration=verify,
-    )
+        clock_and_original_image(i)
+        if (MANAGER / "state").read_text().strip() != "operating":
+            raise B1Blocked("B1_MANAGER_NOT_OPERATING")
+        before_services = service_snapshot()
+        if not all(before_services.values()):
+            raise B1Blocked("B1_SERVICES_NOT_STABLE")
+        boot_before = Path("/proc/sys/kernel/random/boot_id").read_text()
+        original_state = (MANAGER / "state").read_text().strip()
+        i.output.mkdir(mode=0o700, parents=False, exist_ok=False)
+        (i.output / "started.json").write_text(json.dumps({
+            "schema": "plasma.f1b.b1.target.started.v1",
+            "candidate_bin_sha256": CANDIDATE_BIN_SHA256,
+            "result": "STARTED",
+            "recovery_required": True,
+        }) + "\n")
+        isolated = IsolatedIdentity()
+        def preflight() -> None:
+            check_ownership_full_64k()
+            if (MANAGER / "state").read_text().strip() != original_state:
+                raise B1Blocked("B1_MANAGER_STATE_CHANGED")
+        def restore() -> None:
+            manager_write_firmware(i.recovery_bin.name)
+        def verify() -> None:
+            if (Path("/proc/sys/kernel/random/boot_id").read_text() != boot_before
+                    or (MANAGER / "state").read_text().strip() != original_state
+                    or service_snapshot() != before_services):
+                raise B1Blocked("B1_RESTORATION_MISMATCH")
+            clock_and_original_image(i)
+            check_ownership_full_64k()
+        result = one_shot(
+            preflight=preflight,
+            load_candidate=lambda: manager_write_firmware(i.candidate_bin.name),
+            identity_child=isolated.read,
+            child_stopped_and_unmapped=isolated.stopped_and_unmapped,
+            restore_original=restore,
+            verify_restoration=verify,
+        )
+        (i.output / "result.json").write_text(json.dumps({
+            "schema": "plasma.f1b.b1.target.result.v1",
+            "stages": result,
+            "physical_swd": "NOT_RUN",
+            "external_dut": "NOT_RUN",
+        }, sort_keys=True) + "\n")
+        return result
+    finally:
+        os.close(lock_fd)
+
