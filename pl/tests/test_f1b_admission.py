@@ -234,3 +234,108 @@ class TrustedPrefetchOffline(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+def test_noop_is_not_test_pass():
+    events = []
+    state = f1b.offline_sequence(
+        preflight=lambda: None, load=lambda: None, identity=lambda: None,
+        restore_guard=lambda: None, restore=lambda: events.append('restore'),
+        verify_restore=lambda: None)
+    assert state['test'] == 'NOT_RUN'
+    assert state['hil02'] == 'NOT_APPLICABLE'
+    assert state['overall'] != 'PASS_SOFTWARE_OFFLINE'
+    assert events == ['restore']
+
+
+def test_three_matching_reads_are_offline_only():
+    seen = []
+    def read(address):
+        seen.append(address)
+        return f1b.IDENTITY[address - f1b.BASE]
+    state = f1b.offline_sequence(
+        preflight=lambda: None, load=lambda: None,
+        identity=lambda: f1b.read_identity(read), restore_guard=lambda: None,
+        restore=lambda: None, verify_restore=lambda: None)
+    assert seen == [0x40000000, 0x40000004, 0x40004000]
+    assert state['test'] == 'PASS'
+    assert state['hil02'] == 'NOT_APPLICABLE'
+    assert state['overall'] == 'PASS_SOFTWARE_OFFLINE'
+    assert state['execution'] == 'software-offline'
+
+
+def test_f1b_profile_pins_one_aperture_and_firmware():
+    assert f1b.PROFILE.apertures == (('identity', 0x40000000, 0x10000),)
+    assert f1b.PROFILE.bin_sha256 == f1b.BIN_SHA
+    assert f1b.PROFILE.recovery_sha256 == f1b.BASE_SHA
+    assert dict(f1b.PROFILE.identity_words) == f1b.IDENTITY
+
+
+def test_identity_child_uses_readonly_native_backend(tmp_path):
+    from unittest.mock import MagicMock
+    from types import SimpleNamespace
+    backend = MagicMock()
+    backend.__enter__.return_value = backend
+    backend.read32.side_effect = lambda address: f1b.IDENTITY[address - f1b.BASE]
+    backend.stats.return_value = SimpleNamespace(read32=3, write32=0)
+    with patch('plasma_interfaces.linux_mmio.LinuxMMIO', return_value=backend) as factory, \
+         patch('pl.hil.swd04.native_qualify.check_runtime'):
+        f1b.identity_child(tmp_path / 'identity.json')
+    assert factory.call_args.kwargs == {'readonly': True}
+    aperture = factory.call_args.args[0][0]
+    assert aperture.readable == frozenset((0, 4, 0x4000))
+    assert aperture.writable == frozenset()
+    assert backend.read32.call_count == 3
+    backend.write32.assert_not_called()
+
+
+def test_missing_child_evidence_never_passes(tmp_path):
+    state = {'test': 'NOT_RUN'}
+    with patch.object(f1b.one_shot, 'run_child'), \
+         __import__('pytest').raises(FileNotFoundError):
+        f1b.identity_callback(tmp_path / 'missing.json')(state)
+    assert state['test'] == 'NOT_RUN'
+
+
+def test_bounded_child_timeout_reaps_before_return():
+    import subprocess
+    from pl.hil.swd04 import one_shot
+    from unittest.mock import MagicMock
+    import pytest
+    proc = MagicMock(pid=123)
+    proc.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 35), 0]
+    with patch.object(one_shot.subprocess, 'Popen', return_value=proc), \
+         patch.object(one_shot.os, 'killpg') as kill, \
+         pytest.raises(one_shot.c.SafetyError, match='MMIO_CHILD_TIMEOUT'):
+        one_shot.run_child(['synthetic'])
+    assert proc.wait.call_count == 2
+    kill.assert_called_once_with(123, one_shot.signal.SIGTERM)
+
+
+def test_bounded_child_sigbus_and_unreaped_are_never_pass():
+    import subprocess
+    import pytest
+    from unittest.mock import MagicMock
+    from pl.hil.swd04 import one_shot
+    for returns, message in (([-7], 'SIGBUS'),
+                             ([subprocess.TimeoutExpired('synthetic', 35)] * 3,
+                              'UNREAPED_NO_RELOAD')):
+        proc = MagicMock(pid=123)
+        proc.wait.side_effect = returns
+        with patch.object(one_shot.subprocess, 'Popen', return_value=proc), \
+             patch.object(one_shot.os, 'killpg'), \
+             pytest.raises(one_shot.c.SafetyError, match=message):
+            one_shot.run_child(['synthetic'])
+
+
+def test_profile_ownership_checks_full_64k():
+    # Ordinary host fixtures cover a retained last-page mapping after fd close.
+    import pytest
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory() as root:
+        proc = Path(root)
+        (proc/'123/fd').mkdir(parents=True)
+        (proc/'123/maps').write_text(
+            '10000000-10001000 r--s 4000f000 00:01 1 /dev/mem\n')
+        with pytest.raises(f1b.one_shot.c.SafetyError, match='retained PL mapping'):
+            f1b.development.check_users({'/dev/mem'}, proc=proc, profile=f1b.PROFILE)
