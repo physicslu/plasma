@@ -259,3 +259,48 @@ def restore_guarded(*, store: lease.LeaseLedger, port: TargetPort) -> dict:
         return {"result": "RESTORED_VERIFIED", "lease_id": record["lease_id"],
                 "evidence_sha256": done["restore_evidence_sha256"],
                 "firmware_sha256": record["recovery_sha256"]}
+
+
+def bind_injected_stage_callbacks(*, store: lease.LeaseLedger,
+                                  port: TargetPort, intent: dict,
+                                  provenance: dict) -> dict:
+    """Reuse the existing F1-B Adapter's Download/Testing callback ABI.
+
+    Returns *inert until separately invoked* callables, never registers them
+    in the trusted Dispatcher. The caller must supply a reviewed TargetPort;
+    user-provided receipts cannot become authority to load hardware.
+    """
+    def held_download(ctx: dict) -> dict:
+        need(type(ctx) is dict and
+             ctx.get("stage") == "download" and
+             ctx.get("source_sha") == intent["source_sha"] and
+             ctx.get("profile_id") == intent["profile_id"] and
+             ctx.get("target_id") == intent["target_id"] and
+             type(ctx.get("build_receipt")) is dict and
+             ctx["build_receipt"].get("artifact_sha256") ==
+             provenance["bit_sha256"], "UNTRUSTED_BUILD_TO_DOWNLOAD")
+        return download_held(store=store, port=port, intent=intent,
+                             provenance=provenance)
+
+    def identity_test(ctx: dict) -> dict:
+        need(type(ctx) is dict and ctx.get("stage") == "test" and
+             ctx.get("source_sha") == intent["source_sha"] and
+             ctx.get("profile_id") == intent["profile_id"] and
+             ctx.get("target_id") == intent["target_id"] and
+             type(ctx.get("load_receipt")) is dict,
+             "UNTRUSTED_LOAD_TO_TEST")
+        raw = ctx["load_receipt"]
+        need(raw.get("artifact_sha256") == provenance["bit_sha256"],
+             "LOAD_BIT_IDENTITY_MISMATCH")
+        request = {
+            "lease_id": raw.get("lease_id"),
+            "source_sha": ctx["source_sha"],
+            "profile_id": ctx["profile_id"],
+            "target_id": ctx["target_id"],
+            "artifact_sha256": provenance["bin_sha256"],
+            "load_evidence_sha256": raw.get("load_evidence_sha256"),
+        }
+        return testing_held(store=store, port=port, request=request,
+                            bit_sha256=provenance["bit_sha256"])
+
+    return {"held_download": held_download, "identity_test": identity_test}
