@@ -113,7 +113,7 @@ def run_stage(*, task_id: str, approval: dict, evidence_dir: Path,
     This coordinator NEVER retries a failed FPGA write.
     """
     stage, auto_download, auto_testing = check_approval(task_id, approval)
-    require(type(evidence_dir) is Path and evidence_dir.is_dir()
+    require(isinstance(evidence_dir, Path) and evidence_dir.is_dir()
             and not evidence_dir.is_symlink(), "STAGE_EVIDENCE_DIR_DENIED")
     output = evidence_dir / ("plasma-path2-" + stage.lower() + ".json")
     require(not output.exists(), "STAGE_EVIDENCE_EXISTS")
