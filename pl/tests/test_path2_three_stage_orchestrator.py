@@ -178,6 +178,18 @@ def test_no_go_blocks_next_stage_and_no_automatic_retry():
                                      "decision":"EXPLICIT_OPTION_TRUE"}]
 
 
+def test_direct_test_uses_real_load_receipt_not_fabricated_build():
+    events=[]
+    _, load=prior()
+    def check(ctx):
+        assert "load_receipt" in ctx
+        assert "build_receipt" not in ctx
+        return fake_adapters(events)["test"](ctx)
+    result=stage.run(req("test",load_receipt=load),adapters={"test":check})
+    assert events==["test"]
+    assert result["completed"]==["test"]
+
+
 def test_bad_test_callback_cannot_synthesize_pass():
     events=[]
     b,l=prior()
