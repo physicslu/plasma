@@ -277,8 +277,13 @@ def bind_injected_stage_callbacks(*, store: lease.LeaseLedger,
              ctx.get("profile_id") == intent["profile_id"] and
              ctx.get("target_id") == intent["target_id"] and
              type(ctx.get("build_receipt")) is dict and
+             ctx["build_receipt"].get("status") == "PASS" and
+             ctx["build_receipt"].get("stage") == "build" and
              ctx["build_receipt"].get("artifact_sha256") ==
-             provenance["bit_sha256"], "UNTRUSTED_BUILD_TO_DOWNLOAD")
+             provenance["bit_sha256"] and
+             ctx["build_receipt"].get("evidence_sha256") ==
+             provenance["build_qualification_sha256"],
+             "UNTRUSTED_BUILD_TO_DOWNLOAD")
         return download_held(store=store, port=port, intent=intent,
                              provenance=provenance)
 
