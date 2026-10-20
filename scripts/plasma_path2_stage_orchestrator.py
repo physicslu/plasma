@@ -51,6 +51,9 @@ def _validate_receipt(stage: str, value: object, context: dict) -> dict:
             r["profile_id"] == context["profile_id"], "SOURCE_OR_PROFILE_MISMATCH")
     require(_sha(r["artifact_sha256"], 64) and
             _sha(r["evidence_sha256"], 64), "RECEIPT_HASH_DENIED")
+    if "artifact_sha256" in context:
+        require(r["artifact_sha256"] == context["artifact_sha256"],
+                "PINNED_ARTIFACT_MISMATCH")
     if stage != "build":
         require(r["artifact_sha256"] == context["build_receipt"]["artifact_sha256"],
                 "ARTIFACT_PROVENANCE_MISMATCH")
@@ -77,11 +80,11 @@ def validate_request(request: object) -> dict:
     required = {"stage", "source_sha", "profile_id", "target_id"}
     allowed = required | {"options"}
     if stage == "download":
-        required |= {"build_receipt"}
-        allowed |= {"build_receipt"}
+        required |= {"build_receipt", "artifact_sha256"}
+        allowed |= {"build_receipt", "artifact_sha256"}
     if stage == "test":
-        required |= {"load_receipt"}
-        allowed |= {"load_receipt"}
+        required |= {"load_receipt", "artifact_sha256"}
+        allowed |= {"load_receipt", "artifact_sha256"}
     require(required <= set(request) <= allowed, "REQUEST_FIELDS_DENIED")
     require(_sha(request["source_sha"], 40), "SOURCE_SHA_DENIED")
     for key in ("profile_id", "target_id"):
@@ -97,6 +100,9 @@ def validate_request(request: object) -> dict:
     require(stage != "test" or not opts[FLAGS[1]],
             "AUTO_TEST_NOT_VALID_FOR_TEST_TRIGGER")
     clean = {k: request[k] for k in ("stage", "source_sha", "profile_id", "target_id")}
+    if stage != "build":
+        require(_sha(request["artifact_sha256"], 64), "PINNED_ARTIFACT_SHA_DENIED")
+        clean["artifact_sha256"] = request["artifact_sha256"]
     clean["options"] = opts
     ctx = {**clean}
     if stage == "download":
