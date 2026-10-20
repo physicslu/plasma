@@ -62,6 +62,7 @@
 - **Current** — [CI/CD Validation Architecture](architecture/ci-cd-validation-architecture.md)：定義 risk-based validation topology、Fast／Browser／Runtime／Release gate、Device Catalog Historical／Current 邊界，以及 production Device Catalog → IC Support 的跨 domain dependency。
 - **Gate 1 / Draft / Archive not yet approved** — [ICPN Catalog Workflow Rationalization — 2026-10-19](engineering/ci/icpn-workflow-rationalization-2026-10-19.md)：262 筆 Workflow 快照與首批兩個 Microchip 歷史 One-shot 歸檔候選；未完成全部 Actions Run History／Classic Branch Protection 驗證，沒有 Gate 2 合併授權。
 - **Reference** — [Device Catalog CI Coverage Map](architecture/device-catalog-ci-coverage-map.md)：記錄 Device Catalog workflow authority、trigger、validator、overlap 與 lifecycle；coverage parity 證明前不授權 workflow retirement。
+- **Gate 1 / Draft / GitHub-hosted Shadow only** — [STM32 Historical Governance Shadow Dispatcher](engineering/ci/stm32-governance-shadow-gate1.md)：以原三份 Workflow 的固定 Git Blob、Trigger 聯集、Validator 命令、Runner、Timeout 與負向測試驗證同等性；原 Workflow 不變、不退役，不授權合併或實體硬體操作。
 - **Current** — [Batch Domain Model](architecture/batch-domain-model.md)
 - **Current** — [Server-side Batch Runtime](architecture/server-side-batch-runtime.md)
 - **Current** — [Batch Persistence and Gateway Restart Recovery](architecture/batch-persistence-recovery.md)
