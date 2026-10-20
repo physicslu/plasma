@@ -1,0 +1,49 @@
+name: IC Selector upstream evidence versus Production binding Gate A
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ic-selector-evidence-consistency-gate-a.yml'
+      - 'software/python/plasma_web/microchip_upstream_openocd_evidence.py'
+      - 'software/python/plasma_web/gateway.py'
+      - 'software/python/tests/test_ic_selector_evidence_consistency_gate_a.py'
+      - 'software/web/app/device-catalog-api.ts'
+      - 'software/web/app/devices/ic-selector.tsx'
+      - 'software/web/tests/ic-selector-openocd-three-state-contract.test.mjs'
+      - 'software/web/tests/ic-selector-evidence-consistency-gate-a.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-evidence-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify frozen Catalog exact ICPNs and source-only Microchip projections
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s software/python/tests -p 'test_ic_selector_evidence_consistency_gate_a.py' -v
+          python3 -m unittest discover -s software/python/tests -p 'test_device_catalog_web_gateway.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate IC Selector read-only UI contracts (no device access)
+        run: |
+          set -euo pipefail
+          node --test software/web/tests/ic-selector-openocd-three-state-contract.test.mjs
+          node --test software/web/tests/ic-selector-evidence-consistency-gate-a.test.mjs
+          node --test software/web/tests/ic-selector-contract.test.mjs
+      - name: Type-check browser API and per-device evidence projection
+        working-directory: software/web
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
