@@ -1,0 +1,98 @@
+name: STM32 historical governance shadow dispatcher (Gate 1)
+# Gate 1 shadow only: original three workflows stay live and unmodified.
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/stm32-post-u5-frontier-selection.json'
+      - 'data/device-catalog/research/stm32-post-u5-production-prestate.json'
+      - 'data/device-catalog/research/stm32_post_u5_frontier_selection.py'
+      - 'data/device-catalog/research/validate_stm32_post_u5_frontier_selection.py'
+      - 'data/device-catalog/research/stm32-cross-family-prioritization-baseline.json'
+      - '.github/workflows/device-catalog-post-u5-frontier-selection-validation.yml'
+      - 'data/device-catalog/research/stm32h7-partition-source.json'
+      - 'data/device-catalog/research/stm32h7_partitioned_scope_selection.py'
+      - 'data/device-catalog/research/stm32h7-partitioned-scope-selection.json'
+      - 'data/device-catalog/research/validate_stm32h7_partitioned_scope_selection.py'
+      - '.github/workflows/device-catalog-stm32h7-partitioned-scope-selection-validation.yml'
+      - 'data/device-catalog/research/stm32h7rs_evidence_accessibility_probe.py'
+      - 'data/device-catalog/research/validate_stm32h7rs_evidence_accessibility.py'
+      - 'data/device-catalog/research/evidence/stm32h7rs-accessibility-live-2026-09-16/**'
+      - '.github/workflows/device-catalog-stm32h7rs-evidence-accessibility-validation.yml'
+      - '.github/workflows/device-catalog-stm32-governance-shadow.yml'
+      - 'scripts/ci/icpn_stm32_governance_shadow.py'
+      - 'scripts/tests/test-icpn-stm32-governance-shadow.py'
+  push:
+    branches: [main]
+    paths:
+      - 'data/device-catalog/research/stm32-post-u5-frontier-selection.json'
+      - 'data/device-catalog/research/stm32-post-u5-production-prestate.json'
+      - 'data/device-catalog/research/stm32_post_u5_frontier_selection.py'
+      - 'data/device-catalog/research/validate_stm32_post_u5_frontier_selection.py'
+      - 'data/device-catalog/research/stm32-cross-family-prioritization-baseline.json'
+      - '.github/workflows/device-catalog-post-u5-frontier-selection-validation.yml'
+      - 'data/device-catalog/research/stm32h7-partition-source.json'
+      - 'data/device-catalog/research/stm32h7_partitioned_scope_selection.py'
+      - 'data/device-catalog/research/stm32h7-partitioned-scope-selection.json'
+      - 'data/device-catalog/research/validate_stm32h7_partitioned_scope_selection.py'
+      - '.github/workflows/device-catalog-stm32h7-partitioned-scope-selection-validation.yml'
+      - 'data/device-catalog/research/stm32h7rs_evidence_accessibility_probe.py'
+      - 'data/device-catalog/research/validate_stm32h7rs_evidence_accessibility.py'
+      - 'data/device-catalog/research/evidence/stm32h7rs-accessibility-live-2026-09-16/**'
+      - '.github/workflows/device-catalog-stm32h7rs-evidence-accessibility-validation.yml'
+      - '.github/workflows/device-catalog-stm32-governance-shadow.yml'
+      - 'scripts/ci/icpn_stm32_governance_shadow.py'
+      - 'scripts/tests/test-icpn-stm32-governance-shadow.py'
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      has-targets: ${{ steps.select.outputs.has-targets }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source, triggers, negative contracts
+        run: |
+          python scripts/ci/icpn_stm32_governance_shadow.py self-test
+          python scripts/tests/test-icpn-stm32-governance-shadow.py
+      - name: Detect exact impacted targets
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+          matrix="$(python scripts/ci/icpn_stm32_governance_shadow.py detect --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "$GITHUB_SHA" --event "$GITHUB_EVENT_NAME")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          count="$(python -c 'import json,sys; print(len(json.loads(sys.argv[1])["include"]))' "$matrix")"
+          if [ "$count" -gt 0 ]; then
+            echo "has-targets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-targets=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  shadow-validate:
+    needs: detect
+    if: needs.detect.outputs.has-targets == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay original immutable validator as read-only shadow
+        run: python scripts/ci/icpn_stm32_governance_shadow.py run --target "${{ matrix.target }}"
