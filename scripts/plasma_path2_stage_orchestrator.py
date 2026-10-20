@@ -54,16 +54,18 @@ def _validate_receipt(stage: str, value: object, context: dict) -> dict:
     if "artifact_sha256" in context:
         require(r["artifact_sha256"] == context["artifact_sha256"],
                 "PINNED_ARTIFACT_MISMATCH")
-    if stage != "build":
+    if stage == "download" and "build_receipt" in context:
         require(r["artifact_sha256"] == context["build_receipt"]["artifact_sha256"],
                 "ARTIFACT_PROVENANCE_MISMATCH")
+    if stage != "build":
         require(r["target_id"] == context["target_id"] and
                 type(r["lease_id"]) is str and
                 IDENT.fullmatch(r["lease_id"]) is not None,
                 "TARGET_OR_LEASE_MISMATCH")
     if stage == "test":
         load = context["load_receipt"]
-        require(r["lease_id"] == load["lease_id"] and
+        require(r["artifact_sha256"] == load["artifact_sha256"] and
+                r["lease_id"] == load["lease_id"] and
                 r["load_evidence_sha256"] == load["load_evidence_sha256"] and
                 _sha(r["test_evidence_sha256"], 64),
                 "TEST_LOAD_PROVENANCE_MISMATCH")
@@ -109,17 +111,10 @@ def validate_request(request: object) -> dict:
         ctx["build_receipt"] = _validate_receipt(
             "build", request["build_receipt"], ctx)
     if stage == "test":
-        # A direct test can begin from a verified prior load receipt;
-        # the build receipt is derived rather than requiring another Build.
-        load = request["load_receipt"]
-        require(type(load) is dict, "LOAD_RECEIPT_REQUIRED")
-        synthetic_build = {
-            "stage": "build", "status": "PASS",
-            "source_sha": request["source_sha"], "profile_id": request["profile_id"],
-            "artifact_sha256": load.get("artifact_sha256"),
-            "evidence_sha256": load.get("artifact_sha256")}
-        ctx["build_receipt"] = _validate_receipt("build", synthetic_build, ctx)
-        ctx["load_receipt"] = _validate_receipt("download", load, ctx)
+        # A direct test starts only from the supplied loaded-image evidence.
+        # Never fabricate a synthetic Build PASS receipt.
+        ctx["load_receipt"] = _validate_receipt(
+            "download", request["load_receipt"], ctx)
     return ctx
 
 
@@ -154,7 +149,7 @@ def run(request: dict, *, adapters: Mapping[str, Callable[[dict], dict]]) -> dic
         call = {k: deepcopy(ctx[k]) for k in
                 ("source_sha", "profile_id", "target_id")}
         call["stage"] = stage
-        if stage != "build":
+        if stage == "download":
             require("build_receipt" in ctx, "MISSING_APPROVED_BUILD_RECEIPT")
             call["build_receipt"] = deepcopy(ctx["build_receipt"])
         if stage == "test":
