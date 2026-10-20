@@ -153,6 +153,35 @@ class DiagnosticContracts(unittest.TestCase):
                 self.assertEqual(result, 2)
 
 
+    def test_receipt_io_failure_cannot_silently_turn_into_build_pass(self):
+        class Unwritable:
+            def __init__(self, **kwargs):
+                self.failed = None
+            def fail(self, error):
+                self.failed = error
+            def persist(self):
+                raise PermissionError(13, "mock evidence FS denied")
+        with tempfile.TemporaryDirectory() as td:
+            with (patch.object(build, "diagnostics_type",
+                               return_value=Unwritable),
+                  patch.object(build, "_run_pipeline",
+                               return_value={"status": "PASS"})):
+                with self.assertRaises(PermissionError):
+                    build.run({}, workspace=Path(td),
+                              approval={"pinned_sha": "a" * 40},
+                              evidence_dir=Path(td))
+            with (patch.object(build, "diagnostics_type",
+                               return_value=Unwritable),
+                  patch.object(build, "_run_pipeline",
+                               side_effect=build.BuildDenied(
+                                   "BUILD_OUTPUT_PERMISSION_DENIED"))):
+                with self.assertRaisesRegex(
+                    build.BuildDenied, "BUILD_OUTPUT_PERMISSION_DENIED"
+                ):
+                    build.run({}, workspace=Path(td),
+                              approval={"pinned_sha": "a" * 40},
+                              evidence_dir=Path(td))
+
     def test_reviewed_pr_driver_loads_sibling_diagnostic_library(self):
         """A pinned candidate PR must not borrow a different main version."""
         import shutil
