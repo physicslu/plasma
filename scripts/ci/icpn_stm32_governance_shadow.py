@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -144,7 +145,7 @@ def self_test() -> None:
         raise ValueError("H7RS recursive evidence pattern lost")
     if affected(["data/device-catalog/production/icpn-v1-manifest.json"]):
         raise ValueError("unexpected Production routing")
-    print("Shadow source blobs, PR/push triggers, 3 overlap paths, Production negative routing: PASS")
+    print("Shadow source blobs, PR/push triggers, 3 overlap paths, Production negative routing: PASS", file=sys.stderr)
 
 
 def execute(target: str) -> None:
