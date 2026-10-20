@@ -8,16 +8,16 @@ Vivado build, physical FPGA test, or M1 qualification.
 
 This v1 reuses the already qualified F1-B Vivado 2026.1 Project Tcl, pinned
 PYNQ-Z2 board helper, HWH verifier and **one** Python host build driver,
-\`scripts/plasma_vivado_host_build.py\`. It does **not** create a second
+`scripts/plasma_vivado_host_build.py`. It does **not** create a second
 Vivado execution pipeline, alternate Workflow, runner, hardware access route,
 or deploy operation. Both approved Development Mode routes call the same
-\`run()\` implementation:
+`run()` implementation:
 
 - **Path 2**: trusted dispatcher validates Issue #981 authorization, exact
   source SHA, reviewed F1-B capability and worker identity; invokes the fixed
-  driver through the existing \`development-execute\` job.
+  driver through the existing `development-execute` job.
 - **Path 3**: only the exact authorized
-  \`f1b-path3-codex-vivado-build\` task receives the trusted workflow's
+  `f1b-path3-codex-vivado-build` task receives the trusted workflow's
   scoped host-build admission variables. Codex must use the shared driver
   CLI for Host-only Vivado work rather than bypassing it with independent
   ad-hoc shell/Tcl execution. The authorized candidate checkout is an
@@ -27,11 +27,11 @@ or deploy operation. Both approved Development Mode routes call the same
 Canonical Path 3 host-only invocation **during a separately authorized
 owner-initiated Path 3 job**, never from GitHub-hosted CI:
 
-\`\`\`bash
+```bash
 python3 scripts/plasma_vivado_host_build.py \
   --path3-engineering-host-only \
   --evidence-dir .plasma-path3-evidence
-\`\`\`
+```
 
 This command fails closed without the trusted workflow admission and pinned
 SHA/PR identity. A GitHub-hosted pull_request does not pass the admission.
@@ -39,41 +39,41 @@ Operator-invented environment variables are **not** an authorization method.
 
 ## Shared stage contract
 
-1. \`PREFLIGHT\`: validate source project and reviewed Tcl, worker, exact Git
+1. `PREFLIGHT`: validate source project and reviewed Tcl, worker, exact Git
    SHA, Vivado settings, License-discovery environment presence.
-2. \`BOARD_PREPARE\`: invoke existing SHA-pinned Board Repository helper,
+2. `BOARD_PREPARE`: invoke existing SHA-pinned Board Repository helper,
    verify clean board revision and original source commit.
-3. \`OUTPUT_PREPARE\`: create a unique writable directory inside the
-   candidate worktree's ignored \`pl/build\`. No assumed global SWPC cache.
-4. \`VIVADO_IMPLEMENTATION\`: source installed Vivado 2026.1 settings,
-   execute the existing \`build_bitstream.tcl\` with a bounded timeout,
+3. `OUTPUT_PREPARE`: create a unique writable directory inside the
+   candidate worktree's ignored `pl/build`. No assumed global SWPC cache.
+4. `VIVADO_IMPLEMENTATION`: source installed Vivado 2026.1 settings,
+   execute the existing `build_bitstream.tcl` with a bounded timeout,
    capture stdout/stderr and SHA256.
-5. \`ARTIFACT_VERIFY\`: existing \`verify_hwh.py\` qualification and SHA256
+5. `ARTIFACT_VERIFY`: existing `verify_hwh.py` qualification and SHA256
    over BIT, HWH, Timing, DRC, Methodology and check_timing evidence.
-6. \`EVIDENCE_WRITE\`: complete the existing Host Build receipt and the
+6. `EVIDENCE_WRITE`: complete the existing Host Build receipt and the
    unified diagnostic receipt.
 
-License environment variables \`XILINXD_LICENSE_FILE\` and
-\`LM_LICENSE_FILE\` are propagated **only if provided**. The diagnostic
-contains a boolean \`license_environment_present\`, never their values.
+License environment variables `XILINXD_LICENSE_FILE` and
+`LM_LICENSE_FILE` are propagated **only if provided**. The diagnostic
+contains a boolean `license_environment_present`, never their values.
 This boolean is **not** a license checkout or entitlement test; actual
 Vivado execution remains the authoritative License/Toolchain test.
 
 ## Evidence and first-failure semantics
 
-Both paths use \`plasma.fpga.build_diagnostics.v1\`:
+Both paths use `plasma.fpga.build_diagnostics.v1`:
 
-- \`plasma-fpga-build-diagnostics.json\`: ordered stage states, first failed
+- `plasma-fpga-build-diagnostics.json`: ordered stage states, first failed
   stage, bounded error code, whitelisted Python exception/cause types,
   limited boolean preflight checks, artifact sizes and SHA256.
-- \`plasma-fpga-build-diagnostics.json.sha256\`: digest of that JSON receipt.
+- `plasma-fpga-build-diagnostics.json.sha256`: digest of that JSON receipt.
 - Existing Vivado logs, reports, BIT/HWH and Host Build receipt: only
   preserved if actually produced, never inferred from a PASS message.
 
-\`root_cause_status=CONFIRMED\` is reserved for directly observed conditions
+`root_cause_status=CONFIRMED` is reserved for directly observed conditions
 such as an output-directory permission error, read-only filesystem,
 out-of-space error or missing Vivado settings. A generic command failure is
-\`UNKNOWN\`, even if a later run happens to pass.
+`UNKNOWN`, even if a later run happens to pass.
 
 The diagnostic schema never includes raw exception messages, full paths,
 license locations, tokens or host environment. A failure exit code remains
