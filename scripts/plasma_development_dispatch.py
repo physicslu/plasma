@@ -32,10 +32,12 @@ SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 
 BRANCH_COMMAND = re.compile(
     r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) "
-    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40}) 981\Z"
+    r"--pr (?P<pr>[1-9][0-9]{0,7}) --sha (?P<sha>[a-f0-9]{40})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 LEGACY_COMMAND = re.compile(
-    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63}) 981\Z"
+    r"/plasma-dispatch run (?P<task>[a-z][a-z0-9-]{2,63})"
+    r"(?P<flags>(?: --auto-download)?(?: --auto-testing)?) 981\Z"
 )
 
 
@@ -196,8 +198,21 @@ def request(event: object, context: dict) -> dict:
     require(branch_match is not None or legacy_match is not None,
             "EXACT_COMMAND_DENIED")
     match = branch_match or legacy_match
+    flags = match.group("flags") or ""
+    auto_download = " --auto-download" in flags
+    auto_testing = " --auto-testing" in flags
+    task_id = match.group("task")
+    # Options belong to their preceding stage, not arbitrary tasks.
+    require((not auto_download or task_id == "fixed-site1-vivado-host-build")
+            and (not auto_testing or task_id in (
+                "fixed-site1-vivado-host-build", "z2-path2-download"))
+            and (not (task_id == "fixed-site1-vivado-host-build" and auto_testing)
+                 or auto_download),
+            "AUTO_STAGE_SCOPE_DENIED")
     return {
-        "task_id": match.group("task"),
+        "task_id": task_id,
+        "auto_download": auto_download,
+        "auto_testing": auto_testing,
         "pr_number": int(branch_match.group("pr")) if branch_match else 0,
         "source_sha": branch_match.group("sha") if branch_match else sha,
         "trusted_sha": sha,
@@ -346,6 +361,17 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 "HOST_BUILD_APPROVAL_REQUIRED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
+        # Existing Vivado Engine remains sole BUILD implementation.
+        # An auto request without separately authorized live backends
+        # cannot initiate hardware and fails closed.
+        if approval.get("auto_download") is True:
+            import plasma_path2_cycle as cycle
+            return cycle.run_stage(
+                task_id=approval["task_id"], approval=approval,
+                evidence_dir=evidence_dir,
+                build=lambda: build.run(
+                    task, workspace=workspace, approval=approval,
+                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-development-cycle":
