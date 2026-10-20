@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 import signal
-from typing import Callable
+from typing import Callable, Protocol
 
 from pl.hil.swd04 import contract as c, development, staging
 
@@ -56,7 +56,7 @@ class Inputs:
     output: Path
 
 
-def verify_inputs(i: Inputs) -> None:
+def verify_inputs(i: Inputs, profile=development.SWD04_PROFILE) -> None:
     from pl.hil.swd04 import native_qualify
     native_qualify.check_runtime()
     require(os.geteuid() == 0, "Authorized Z2 root required")
@@ -68,10 +68,17 @@ def verify_inputs(i: Inputs) -> None:
     require(i.candidate_bin.parent.resolve() == FIRMWARE_ROOT and
             i.recovery_bin.parent.resolve() == FIRMWARE_ROOT,
             "FPGA Manager firmware must be directly under /lib/firmware")
-    c.verify_artifacts(c.Candidate(i.candidate_bit, i.candidate_hwh,
-                                   i.manifest, i.recovery_bin,
-                                   i.recovery_hwh))
-    staging.verify_bin(i.candidate_bit, i.candidate_bin)
+    if profile == development.SWD04_PROFILE:
+        c.verify_artifacts(c.Candidate(i.candidate_bit, i.candidate_hwh,
+                                       i.manifest, i.recovery_bin, i.recovery_hwh))
+        staging.verify_bin(i.candidate_bit, i.candidate_bin)
+    else:
+        for path, digest in ((i.candidate_bit, profile.bit_sha256),
+                             (i.candidate_hwh, profile.hwh_sha256),
+                             (i.candidate_bin, profile.bin_sha256),
+                             (i.recovery_bin, profile.recovery_sha256),
+                             (i.recovery_hwh, profile.recovery_hwh_sha256)):
+            require(c.sha256_file(path) == digest, 'Hardware profile hash mismatch')
     require(i.candidate_bin.name != i.recovery_bin.name,
             "Candidate and recovery names must be distinct")
     require(bool(re.fullmatch(r"[A-Za-z0-9_.-]+", i.candidate_bin.name))
@@ -79,7 +86,7 @@ def verify_inputs(i: Inputs) -> None:
             "Invalid firmware basename")
 
 
-def clock_and_owner() -> None:
+def clock_and_owner(profile=development.SWD04_PROFILE) -> None:
     require(MANAGER.joinpath("state").read_text().strip() == "operating",
             "FPGA Manager is not operating")
     require(Path("/dev/mem").is_char_device(), "Missing char /dev/mem")
@@ -90,7 +97,7 @@ def clock_and_owner() -> None:
               if line.split() and line.split()[0].lower() in
               ("fclk0", "fclk_clk0", "fclk0_clk")]
     require(len(active) == 1 and int(active[0][2]) > 0, "FCLK0 not enabled")
-    development.check_ownership()
+    development.check_ownership(profile=profile)
 
 
 def service_snapshot() -> dict[str, str]:
@@ -137,20 +144,31 @@ def record_json(path: Path, data: dict) -> None:
     with path.open("x", encoding="utf-8") as stream:
         json.dump(data, stream, sort_keys=True, indent=2)
         stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
-def run_protected(
+class TestCallback(Protocol):
+    def __call__(self, state: dict[str, str]) -> None: ...
+
+
+def run_sequence(
     *,
     preflight: Callable[[], None],
     load_candidate: Callable[[], None],
-    hil01: Callable[[], None],
-    hil02: Callable[[], None],
+    test_callback: TestCallback,
+    test_stages: tuple[str, ...] = ("test",),
     restore: Callable[[], None],
     verify_restoration: Callable[[], None],
 ) -> dict[str, str]:
     """Injection-friendly core. Set restore-required BEFORE attempting any load."""
     state = {"preflight": "NOT_RUN", "candidate_load": "NOT_RUN",
-             "hil01": "NOT_RUN", "hil02": "NOT_RUN",
+             **{name: "NOT_RUN" for name in test_stages},
              "restore": "NOT_RUN", "restoration_verified": "NOT_RUN",
              "overall": "NO_GO"}
     touched = False
@@ -160,10 +178,7 @@ def run_protected(
         touched = True
         load_candidate()
         state["candidate_load"] = "PASS"
-        hil01()
-        state["hil01"] = "PASS"
-        hil02()
-        state["hil02"] = "PASS"
+        test_callback(state)
     except Exception:
         state["overall"] = "FAIL_OR_BLOCKED"
     finally:
@@ -177,11 +192,64 @@ def run_protected(
                 state["restore"] = "FAIL_OR_UNKNOWN"
                 state["restoration_verified"] = "FAIL_OR_UNKNOWN"
     if all(state[key] == "PASS" for key in (
-        "preflight", "candidate_load", "hil01", "hil02",
+        "preflight", "candidate_load", *test_stages,
         "restore", "restoration_verified",
     )):
-        state["overall"] = "PASS_DEVELOPMENT_INTERNAL_FIXTURE"
+        state["overall"] = "PASS_SEQUENCE"
     return state
+
+
+def run_protected(*, preflight, load_candidate, hil01, hil02, restore,
+                  verify_restoration) -> dict[str, str]:
+    """Legacy SWD04 contract: both real HIL stages remain mandatory."""
+    def test(state):
+        hil01()
+        state["hil01"] = "PASS"
+        hil02()
+        state["hil02"] = "PASS"
+    result = run_sequence(preflight=preflight, load_candidate=load_candidate,
+                          test_callback=test, test_stages=("hil01", "hil02"),
+                          restore=restore, verify_restoration=verify_restoration)
+    if result["overall"] == "PASS_SEQUENCE":
+        result["overall"] = "PASS_DEVELOPMENT_INTERNAL_FIXTURE"
+    return result
+
+
+def run_child(args: list[str]) -> None:
+    proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True)
+    try:
+        status = proc.wait(timeout=35)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                # The mapping may still be owned by a kernel-stalled
+                # process. Recovery by FPGA load is now unsafe.
+                raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD") from exc
+        raise c.SafetyError("MMIO_CHILD_TIMEOUT") from exc
+    except BaseException:
+        # SSH disconnect / supervisor interruption: do not leave
+        # a live MMIO child holding an aperture when finally restores.
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD")
+        raise
+    require(status == 0, "MMIO child failed or SIGBUS")
 
 
 def run_live(i: Inputs) -> dict[str, str]:
