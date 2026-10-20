@@ -174,6 +174,21 @@ def test_test_evidence_never_fabricates_pass(tmp_path,bad):
     assert store.snapshot()["status"] == "TEST_IN_FLIGHT"
 
 
+@pytest.mark.parametrize("field,wrong,reason", [
+    ("load_attempts", 0, "LOAD_ATTEMPT_PROVENANCE_DENIED"),
+    ("load_evidence_sha256", None, "LOADED_PROVENANCE_DENIED"),
+    ("load_evidence_sha256", "NOT_RUN", "LEDGER_EVIDENCE_DENIED"),
+])
+def test_forged_held_record_is_not_accepted(tmp_path, field, wrong, reason):
+    store = loaded(tmp_path)
+    forged = store.snapshot()
+    forged[field] = wrong
+    # Deliberate test fixture mutation is not a valid hardware receipt.
+    store.path.write_text(json.dumps(forged))
+    with pytest.raises(lease.LeaseDenied, match=reason):
+        lease.LeaseLedger(store.path).snapshot()
+
+
 def test_timeout_expiration_never_auto_restores_or_retries(tmp_path):
     store=loaded(tmp_path)
     with pytest.raises(lease.LeaseDenied,match="LEASE_EXPIRED_NO_AUTOMATIC_RESTORE"):
