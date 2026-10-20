@@ -58,13 +58,15 @@ def existing_host_build(*, task: dict, workspace: Path, approval: dict,
     require(type(approval) is dict and
             approval.get("execution_path") == "path2-cli" and
             approval.get("execution_capability") == "vivado-host-build" and
-            approval.get("pinned_sha") == approval.get("trusted_sha")
-            if approval.get("pr_number") == 0 else
-            type(approval) is dict and
-            approval.get("execution_path") == "path2-cli" and
-            approval.get("execution_capability") == "vivado-host-build" and
-            approval.get("pr_number", 0) > 0 and
-            approval.get("pinned_sha") != approval.get("trusted_sha"),
+            type(approval.get("pr_number")) is int and
+            type(approval.get("pinned_sha")) is str and
+            stages._sha(approval["pinned_sha"], 40) and
+            type(approval.get("trusted_sha")) is str and
+            stages._sha(approval["trusted_sha"], 40) and
+            ((approval["pr_number"] == 0 and
+              approval["pinned_sha"] == approval["trusted_sha"]) or
+             (approval["pr_number"] > 0 and
+              approval["pinned_sha"] != approval["trusted_sha"])),
             "HOST_BUILD_TRUSTED_APPROVAL_REQUIRED")
     arguments = dict(task=task, workspace=workspace, approval=approval,
                      evidence_dir=evidence_dir)
