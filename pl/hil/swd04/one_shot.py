@@ -19,7 +19,7 @@ import sys
 import signal
 from typing import Callable
 
-from pl.hil.swd04 import contract as c, development, native_qualify, staging
+from pl.hil.swd04 import contract as c, development, staging
 
 FIRMWARE_ROOT = Path("/lib/firmware")
 MANAGER = Path("/sys/class/fpga_manager/fpga0")
@@ -57,6 +57,7 @@ class Inputs:
 
 
 def verify_inputs(i: Inputs) -> None:
+    from pl.hil.swd04 import native_qualify
     native_qualify.check_runtime()
     require(os.geteuid() == 0, "Authorized Z2 root required")
     require(not i.output.exists(), "Evidence directory cannot be reused")
