@@ -297,6 +297,23 @@ class LifecycleTests(unittest.TestCase):
 
 
 class ExistingF1BAdapterIntegrationTests(unittest.TestCase):
+    def test_download_rejects_forged_build_qualification_before_hardware(self):
+        tmp, store, port = setup()
+        with tmp:
+            callbacks = provider.bind_injected_stage_callbacks(
+                store=store, port=port,
+                intent=lease_intent(), provenance=provenance_data())
+            tampered = {"stage": "build", "status": "PASS",
+                        "artifact_sha256": BIT, "evidence_sha256": "0" * 64}
+            with self.assertRaisesRegex(
+                    provider.ProviderDenied, "UNTRUSTED_BUILD_TO_DOWNLOAD"):
+                callbacks["held_download"]({
+                    "stage": "download", "source_sha": SRC,
+                    "profile_id": "f1b-site1-v1", "target_id": "z2-bench",
+                    "build_receipt": tampered})
+            self.assertEqual(port.actions, [])
+            self.assertFalse(store.path.exists())
+
     def test_exact_adapter_abi_with_two_separate_triggers_and_restore(self):
         import plasma_path2_f1b_adapters as f1b_adapter
         import plasma_path2_stage_orchestrator as stages
