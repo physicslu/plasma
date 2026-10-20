@@ -47,10 +47,12 @@ QUALIFICATION_FIELDS = {
     "kernel_driver_excluded", "hardware_owner_excluded",
     "axi_idle_isolated", "worker_reaped", "restore_route_verified",
     "trusted_target_clock", "target_id", "boot_id", "owner_id",
-    "restore_intent_sha256",
+    "restore_intent_sha256", "bit_sha256", "bin_sha256",
+    "bootgen_evidence_sha256",
 }
 REQUIRED_BOOLEANS = QUALIFICATION_FIELDS - {
-    "target_id", "boot_id", "owner_id", "restore_intent_sha256"}
+    "target_id", "boot_id", "owner_id", "restore_intent_sha256",
+    "bit_sha256", "bin_sha256", "bootgen_evidence_sha256"}
 
 
 def _admit(port: TargetPort, stage: str, record: dict) -> None:
@@ -66,6 +68,14 @@ def _admit(port: TargetPort, stage: str, record: dict) -> None:
          "TARGET_HARDWARE_ISOLATION_UNPROVEN")
     for k in ("target_id", "boot_id", "owner_id", "restore_intent_sha256"):
         need(p[k] == record[k], "TARGET_OWNER_OR_RECOVERY_CHANGED")
+    need(type(p["bit_sha256"]) is str and
+         HEX64.fullmatch(p["bit_sha256"]) is not None and
+         p["bit_sha256"] != record["artifact_sha256"] and
+         p["bin_sha256"] == record["artifact_sha256"] and
+         type(p["bootgen_evidence_sha256"]) is str and
+         HEX64.fullmatch(p["bootgen_evidence_sha256"]) is not None,
+         "TARGET_BIT_BIN_PROVENANCE_DENIED")
+    return p
 
 
 def _observe(port: TargetPort, record: dict, bin_hash: str) -> tuple[int, dict]:
@@ -91,20 +101,30 @@ def download_held(*, store: lease.LeaseLedger, port: TargetPort,
                   intent: dict, provenance: dict) -> dict:
     """One load only; the durable intent and claim precede FPGA writes."""
     need(type(provenance) is dict and
+         set(provenance) == {
+             "source_sha", "bit_sha256", "hwh_sha256", "bin_sha256",
+             "build_qualification_sha256", "bootgen_evidence_sha256",
+             "scope", "physical_load"} and
          provenance.get("scope") == "BYTE_EQUIVALENCE_ONLY" and
          provenance.get("physical_load") == "NOT_RUN" and
          provenance.get("source_sha") == intent.get("source_sha") and
          provenance.get("bin_sha256") == intent.get("artifact_sha256") and
          HEX64.fullmatch(provenance.get("bit_sha256", "")) is not None and
          HEX64.fullmatch(provenance.get("hwh_sha256", "")) is not None and
-         HEX64.fullmatch(provenance.get("bootgen_evidence_sha256", "")) is not None,
+         HEX64.fullmatch(provenance.get("build_qualification_sha256", "")) is not None and
+         HEX64.fullmatch(provenance.get("bootgen_evidence_sha256", "")) is not None and
+         provenance["bit_sha256"] != provenance["bin_sha256"],
          "BIT_BIN_SOURCE_BINDING_DENIED")
     with port.exclusive():
         # No other record can be overwritten. A previous unknown/expired
         # session always requires separately reviewed manual reconciliation.
         need(not store.path.exists(), "PRIOR_HARDWARE_LEASE_REQUIRES_REVIEW")
         template = lease.create_record(intent, port.now())
-        _admit(port, "download", template)
+        target_claim = _admit(port, "download", template)
+        need(target_claim["bit_sha256"] == provenance["bit_sha256"] and
+             target_claim["bootgen_evidence_sha256"] ==
+             provenance["bootgen_evidence_sha256"],
+             "BOOTGEN_OR_BIT_TARGET_BINDING_DENIED")
         need(port.image_sha256("recovery") == intent["recovery_sha256"] and
              port.image_sha256("candidate") == intent["artifact_sha256"],
              "CANDIDATE_OR_RECOVERY_BYTES_CHANGED")
@@ -149,7 +169,11 @@ def testing_held(*, store: lease.LeaseLedger, port: TargetPort,
     """Independent Trigger: *fresh* actual target facts are mandatory."""
     with port.exclusive():
         record = store.snapshot()
-        _admit(port, "test", record)
+        trusted_claim = _admit(port, "test", record)
+        need(type(bit_sha256) is str and
+             HEX64.fullmatch(bit_sha256) is not None and
+             bit_sha256 == trusted_claim["bit_sha256"],
+             "TEST_BIT_BIN_IDENTITY_DENIED")
         at, facts = _observe(port, record, record["artifact_sha256"])
         lease.require_testing(record, request, facts, at)
         claim = store.advance("claim_test", at, facts=facts,
@@ -186,8 +210,6 @@ def testing_held(*, store: lease.LeaseLedger, port: TargetPort,
             _incident(store, "TEST_UNCERTAIN_REQUIRES_MANUAL_RECOVERY", at)
             raise
         need(complete["status"] == "LOADED_AND_HELD", "TEST_LEASE_NOT_HELD")
-        need(type(bit_sha256) is str and HEX64.fullmatch(bit_sha256) is not None,
-             "BIT_IDENTITY_DENIED")
         # Existing F1-B adapter's live callback returns integer offsets.
         return {
             "result": "IDENTITY_PASS", "source_sha": record["source_sha"],
