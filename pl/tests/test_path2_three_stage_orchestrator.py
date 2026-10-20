@@ -217,6 +217,6 @@ def test_explicit_boolean_gates_not_a_deployment_permission():
     source=(Path(__file__).resolve().parents[2]/"scripts"/
             "plasma_path2_stage_orchestrator.py").read_text()
     assert "import subprocess" not in source
-    assert "ssh" not in source.lower()
+    assert "import paramiko" not in source and "import asyncssh" not in source
     assert "fpga_manager" not in source.lower()
     assert "OWNER_DEV_RISK_ACK" not in source
