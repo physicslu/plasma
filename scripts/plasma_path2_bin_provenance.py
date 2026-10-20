@@ -8,7 +8,11 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import re
+import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from pl.hil.swd04 import staging
 
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
