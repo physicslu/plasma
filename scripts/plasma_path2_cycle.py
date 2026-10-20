@@ -1,138 +1,162 @@
 #!/usr/bin/env python3
-"""Minimal Path 2 development cycle: Build -> FPGA Download -> Testing -> Restore.
+"""Path 2 staged Development Mode: three separate triggers, never a chain.
 
-This is an orchestration contract, NOT a hardware backend. It never opens
-/dev/mem, contacts Z2, loads FPGA Manager or escalates privileges. The trusted
-dispatcher must supply a separately reviewed, explicitly approved live
-transaction adapter; the default is deliberately NOT_RUN. The transaction
-must own atomic intent-before-load, current-boot admission and safe restore.
+Existing Vivado Engine is the BUILD implementation. DOWNLOAD and TESTING
+are independent commands which MUST NOT touch hardware until separately
+reviewed live adapters and durable safety/restore ownership exist. All tests
+here inject offline callbacks: this module opens no devices or network.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import re
 from typing import Callable
 
-from pl.hil import f1b
-
-TASK_ID = "z2-path2-development-cycle"
-SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+STAGE_TASKS = {
+    "fixed-site1-vivado-host-build": "BUILD",
+    "z2-path2-download": "DOWNLOAD",
+    "z2-path2-testing": "TESTING",
+}
+CAPABILITIES = {"BUILD": "vivado-host-build",
+                "DOWNLOAD": "z2-development-cycle",
+                "TESTING": "z2-development-cycle"}
 BUILD_PASS = "HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED"
-HIL_PASS = "PASS_DEVELOPMENT_INTERNAL_FIXTURE"
-STAGES = ("BUILD", "DOWNLOAD", "TESTING", "RESTORE")
+SHA40 = re.compile(r"[a-f0-9]{40}\Z")
+SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+
+
+class StageDenied(ValueError):
+    pass
 
 
 def require(ok: bool, reason: str) -> None:
     if not ok:
-        raise ValueError(reason)
+        raise StageDenied(reason)
 
 
-def validate_authorization(approval: dict) -> None:
-    """Keep existing owner/PR/SHA/runner checks in trusted dispatcher."""
-    require(type(approval) is dict
-            and approval.get("task_id") == TASK_ID
+def check_approval(task_id: str, approval: dict) -> str:
+    """Existing trusted Dispatcher authenticates owner, SHA, PR and runner."""
+    stage = STAGE_TASKS.get(task_id)
+    require(stage is not None and type(approval) is dict
+            and approval.get("task_id") == task_id
             and approval.get("execution_path") == "path2-cli"
-            and approval.get("execution_capability") == "z2-development-cycle",
-            "CYCLE_APPROVAL_DENIED")
-    sha = approval.get("pinned_sha")
-    trusted = approval.get("trusted_sha")
-    pr = approval.get("pr_number")
-    require(type(sha) is str and SHA40.fullmatch(sha) is not None
+            and approval.get("execution_capability") == CAPABILITIES[stage],
+            "STAGE_APPROVAL_DENIED")
+    source, trusted, pr = (approval.get("pinned_sha"),
+                           approval.get("trusted_sha"),
+                           approval.get("pr_number"))
+    require(type(source) is str and SHA40.fullmatch(source) is not None
             and type(trusted) is str and SHA40.fullmatch(trusted) is not None
-            and type(pr) is int
-            and ((pr == 0 and sha == trusted)
-                 or (pr > 0 and sha != trusted)),
-            "CYCLE_SOURCE_DENIED")
+            and type(pr) is int and
+            ((pr == 0 and source == trusted)
+             or (pr > 0 and source != trusted)),
+            "STAGE_SOURCE_IDENTITY_DENIED")
+    return stage
 
 
-def f1b_transaction(*, lock_path: Path, observe: Callable,
-                    record_intent: Callable, load: Callable,
-                    identity: Callable, restore: Callable,
-                    verify_restore: Callable) -> dict:
-    """Reuse the existing F1-B safety guards, not SWD04's four-aperture test.
+def check_build_evidence(receipt: dict, source: str) -> dict:
+    """A hosted CI PASS alone is not real Vivado artifact evidence."""
+    require(type(receipt) is dict
+            and receipt.get("status") == BUILD_PASS
+            and receipt.get("source_sha") == source
+            and receipt.get("physical_load") == "NOT_RUN"
+            and receipt.get("z2_hil") == "NOT_RUN"
+            and type(receipt.get("bit_sha256")) is str
+            and SHA256.fullmatch(receipt["bit_sha256"]) is not None
+            and type(receipt.get("hwh_sha256")) is str
+            and SHA256.fullmatch(receipt["hwh_sha256"]) is not None,
+            "STAGE_BUILD_EVIDENCE_DENIED")
+    return receipt
 
-    observe MUST collect fresh process/VMA/fd, kernel-owner/AXI-idle, root,
-    recovery and current-boot evidence. identity MUST execute in a supervised,
-    bounded and reaped child and use f1b.read_identity's native aligned u32
-    whitelist. Callers must not implement speculative driver unbind/reloads.
+
+def check_download_evidence(receipt: dict, source: str) -> dict:
+    """Only actual runtime collector can create a trusted session receipt.
+
+    This validates structural continuity for OFFLINE testing; it does not
+    authenticate a caller-provided JSON or grant physical FPGA access.
     """
-    return f1b.supervised_sequence(
-        lock_path=lock_path, observe=observe, record_intent=record_intent,
-        load=load, identity=identity, restore=restore,
-        verify_restore=verify_restore)
+    require(type(receipt) is dict
+            and receipt.get("stage") == "DOWNLOAD"
+            and receipt.get("source_sha") == source
+            and receipt.get("outcome") == "PASS"
+            and type(receipt.get("session_id")) is str
+            and bool(receipt["session_id"])
+            and type(receipt.get("boot_id")) is str
+            and bool(receipt["boot_id"])
+            and receipt.get("restore_lease_active") is True
+            and receipt.get("candidate_image_verified") is True,
+            "STAGE_DOWNLOAD_EVIDENCE_DENIED")
+    return receipt
 
 
-def run_cycle(*, approval: dict, build: Callable[[], dict],
-              evidence_dir: Path, transaction: Callable[[], dict] | None = None,
-              live_hardware_approved: bool = False) -> dict:
-    """One call for all three stages, with no per-stage human gate.
+def run_stage(*, task_id: str, approval: dict, evidence_dir: Path,
+              build: Callable[[], dict] | None = None,
+              download: Callable[[], dict] | None = None,
+              testing: Callable[[], dict] | None = None,
+              previous: dict | None = None,
+              hardware_authorized: bool = False) -> dict:
+    """Execute exactly ONE requested stage; never trigger a successor.
 
-    Trusted dispatcher passes the reviewed Vivado Build Engine as build().
-    Without BOTH explicit trusted live admission and a real safe adapter,
-    only Build runs. Offline tests inject synthetic functions, not devices.
+    Injected DOWNLOAD/TESTING callbacks are for offline contract tests only.
+    A real adapter requires independent trusted runtime approval, root route,
+    source/hash/current-boot checks, AXI isolation, exclusive hardware owner,
+    durable recovery intent and a working restore lease/watchdog. None is
+    provided by this library or the GitHub Dispatcher in this PR.
     """
-    validate_authorization(approval)
+    stage = check_approval(task_id, approval)
     require(type(evidence_dir) is Path and evidence_dir.is_dir()
-            and not evidence_dir.is_symlink(), "CYCLE_EVIDENCE_DIR_DENIED")
-    require(not (evidence_dir / "plasma-path2-cycle.json").exists(),
-            "CYCLE_REPORT_ALREADY_EXISTS")
-    stages = {name: "NOT_RUN" for name in STAGES}
-    result = {"schema": "plasma.path2.development_cycle.v1",
-              "source_sha": approval["pinned_sha"],
-              "stages": stages, "overall": "NO_GO",
-              "physical_execution": "NOT_RUN",
-              "failure": None}
-    try:
-        receipt = build()
-        require(type(receipt) is dict and receipt.get("status") == BUILD_PASS
-                and receipt.get("physical_load") == "NOT_RUN"
-                and receipt.get("z2_hil") == "NOT_RUN",
-                "CYCLE_BUILD_NOT_QUALIFIED")
-        stages["BUILD"] = "PASS"
-    except Exception:
-        stages["BUILD"] = "FAIL"
-        result["failure"] = "BUILD_FAILED"
+            and not evidence_dir.is_symlink(), "STAGE_EVIDENCE_DIR_DENIED")
+    output = evidence_dir / ("plasma-path2-" + stage.lower() + ".json")
+    require(not output.exists(), "STAGE_EVIDENCE_EXISTS")
+    source = approval["pinned_sha"]
+    report = {"schema": "plasma.path2.staged.v1", "stage": stage,
+              "source_sha": source, "outcome": "NOT_RUN",
+              "next_stage_triggered": False, "physical_execution": "NOT_RUN"}
+    # All prerequisites must be established before attempting a hardware step.
+    if stage == "BUILD":
+        require(build is not None, "STAGE_BUILD_ENGINE_MISSING")
+        actual = check_build_evidence(build(), source)
+        report["outcome"] = "PASS"
+        report["bit_sha256"] = actual["bit_sha256"]
+        report["hwh_sha256"] = actual["hwh_sha256"]
+    elif stage == "DOWNLOAD":
+        require(previous is not None, "STAGE_BUILD_EVIDENCE_REQUIRED")
+        check_build_evidence(previous, source)
+        require(hardware_authorized is True and download is not None,
+                "STAGE_LIVE_DOWNLOAD_BACKEND_UNAVAILABLE")
+        # Hardware adapter must persist a bounded recovery lease BEFORE load.
+        result = download()
+        require(type(result) is dict and result.get("outcome") == "PASS"
+                and result.get("restore_lease_active") is True
+                and result.get("candidate_image_verified") is True
+                and type(result.get("session_id")) is str
+                and bool(result["session_id"])
+                and type(result.get("boot_id")) is str
+                and bool(result["boot_id"]),
+                "STAGE_DOWNLOAD_RESULT_UNKNOWN")
+        report.update({k: result[k] for k in
+                       ("outcome", "restore_lease_active",
+                        "candidate_image_verified", "session_id", "boot_id")})
+        report["physical_execution"] = "ATTEMPTED"
     else:
-        if live_hardware_approved is not True or transaction is None:
-            result["failure"] = "HARDWARE_BACKEND_NOT_AUTHORIZED"
-        else:
-            # No automatic retry and no second bitstream load on error.
-            result["physical_execution"] = "ATTEMPTED"
-            try:
-                outcome = transaction()
-                require(type(outcome) is dict
-                        and set(("preflight", "candidate_load", "hil01",
-                                 "hil02", "restore", "restoration_verified",
-                                 "overall")) <= set(outcome),
-                        "CYCLE_HIL_RECEIPT_INVALID")
-                stages["DOWNLOAD"] = (
-                    "PASS" if outcome["candidate_load"] == "PASS"
-                    else "FAIL" if outcome["preflight"] == "PASS"
-                    else "NOT_RUN")
-                stages["TESTING"] = (
-                    "PASS" if outcome["hil01"] == "PASS"
-                    and outcome["hil02"] == "PASS"
-                    else "FAIL" if stages["DOWNLOAD"] == "PASS"
-                    else "NOT_RUN")
-                stages["RESTORE"] = (
-                    "PASS" if outcome["restore"] == "PASS"
-                    and outcome["restoration_verified"] == "PASS"
-                    else "NOT_RUN" if outcome["restore"] == "NOT_RUN"
-                    else "UNKNOWN")
-                if (outcome["overall"] == HIL_PASS
-                        and all(stages[key] == "PASS"
-                                for key in STAGES)):
-                    result["overall"] = "PASS"
-                else:
-                    result["failure"] = "HIL_FAIL_OR_UNKNOWN"
-            except Exception:
-                # A crashed / unreaped worker or unverified restore is UNKNOWN.
-                # Never invoke a second FPGA write from this coordinator.
-                stages["RESTORE"] = "UNKNOWN"
-                result["failure"] = "HIL_RESULT_UNKNOWN"
-    report = evidence_dir / "plasma-path2-cycle.json"
-    with report.open("x", encoding="utf-8") as out:
-        json.dump(result, out, sort_keys=True, indent=2)
-        out.write("\n")
-    return result
+        require(previous is not None, "STAGE_DOWNLOAD_EVIDENCE_REQUIRED")
+        check_download_evidence(previous, source)
+        require(hardware_authorized is True and testing is not None,
+                "STAGE_LIVE_TEST_BACKEND_UNAVAILABLE")
+        # Test adapter must reverify current boot/FPGA/ownership before MMIO;
+        # restore original base.bin and independently verify it before PASS.
+        result = testing()
+        require(type(result) is dict and result.get("identity") == "PASS"
+                and result.get("restore") == "PASS"
+                and result.get("restoration_verified") == "PASS",
+                "STAGE_TEST_OR_RESTORE_UNKNOWN")
+        report["outcome"] = "PASS"
+        report["physical_execution"] = "ATTEMPTED"
+        report["restoration_verified"] = True
+    # Each invocation writes only its own stage report. Never call another.
+    with output.open("x", encoding="utf-8") as stream:
+        json.dump(report, stream, sort_keys=True, indent=2)
+        stream.write("\n")
+    return report
