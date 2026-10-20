@@ -252,8 +252,14 @@ def run_child(args: list[str]) -> None:
     require(status == 0, "MMIO child failed or SIGBUS")
 
 
-def run_live(i: Inputs) -> dict[str, str]:
-    verify_inputs(i)  # All hashes and paths before any physical action.
+def run_live(i: Inputs, *, profile=development.SWD04_PROFILE,
+             test_callback: TestCallback | None = None,
+             admission_check: Callable[[], None] | None = None) -> dict[str, str]:
+    require(test_callback is not None or profile == development.SWD04_PROFILE,
+            "Nonlegacy profile requires explicit test callback")
+    require(profile == development.SWD04_PROFILE or admission_check is not None,
+            "Nonlegacy profile requires current ownership/AXI admission")
+    verify_inputs(i, profile)  # All hashes and paths before any physical action.
     OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
     protected(OWNER_DIR, file=False)
     if OWNER_LOCK.exists():
@@ -270,20 +276,31 @@ def run_live(i: Inputs) -> dict[str, str]:
         b = i.output / "hil02"
         outcome = {}
         def preflight() -> None:
+            if admission_check is not None:
+                admission_check()
             require(Path("/proc/device-tree/compatible").read_bytes().split(b"\0").count(b"xlnx,zynq-7000") == 1,
                     "Zynq Device Tree family not verified")
-            clock_and_owner()
+            clock_and_owner(profile)
             snapshot["services"] = service_snapshot()
             snapshot["uio"] = uio_snapshot()
             snapshot["boot_id"] = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
             require(f": writing {i.recovery_bin.name} to " in manager_last_load(),
                     "Current original base image provenance unknown")
             # Recheck actual artifacts just before any hardware action.
-            c.verify_artifacts(c.Candidate(i.candidate_bit, i.candidate_hwh,
-                                           i.manifest, i.recovery_bin, i.recovery_hwh))
+            if profile == development.SWD04_PROFILE:
+                c.verify_artifacts(c.Candidate(i.candidate_bit, i.candidate_hwh,
+                                               i.manifest, i.recovery_bin, i.recovery_hwh))
+            else:
+                for path, digest in ((i.candidate_bin, profile.bin_sha256),
+                                     (i.recovery_bin, profile.recovery_sha256)):
+                    require(c.sha256_file(path) == digest, 'Firmware changed')
+            record_json(i.output / 'load-intent.json', {
+                'restore_required': True, 'candidate': profile.bin_sha256,
+                'recovery': profile.recovery_sha256})
+        reload_safe = True
         def load() -> None:
             manager_write(i.candidate_bin.name)
-            development.record_loaded_image(i.candidate_bin, receipt)
+            development.record_loaded_image(i.candidate_bin, receipt, profile=profile)
         def stage(name: str, previous: Path | None) -> None:
             args = [sys.executable, "-m", "pl.hil.swd04.native_qualify",
                     "--profile", "development", "--stage", name,
@@ -294,49 +311,19 @@ def run_live(i: Inputs) -> dict[str, str]:
                 args.extend(("--previous", str(previous)))
             # Process isolation is mandatory: a SIGBUS must not kill the
             # supervisor, leaving FPGA Manager unrecovered.
-            proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL,
-                                    start_new_session=True)
-            try:
-                status = proc.wait(timeout=35)
-            except subprocess.TimeoutExpired as exc:
-                os.killpg(proc.pid, signal.SIGTERM)
-                try:
-                    proc.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    try:
-                        proc.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        # The mapping may still be owned by a kernel-stalled
-                        # process. Recovery by FPGA load is now unsafe.
-                        raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD") from exc
-                raise c.SafetyError("MMIO_CHILD_TIMEOUT") from exc
-            except BaseException:
-                # SSH disconnect / supervisor interruption: do not leave
-                # a live MMIO child holding an aperture when finally restores.
-                if proc.poll() is None:
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    try:
-                        proc.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        try:
-                            proc.wait(timeout=2)
-                        except subprocess.TimeoutExpired:
-                            raise c.SafetyError("MMIO_CHILD_UNREAPED_NO_RELOAD")
-                raise
-            require(status == 0, name + " child failed or SIGBUS")
+            run_child(args)
             data = json.loads((a if name == "HIL01" else b).joinpath("result.json").read_text())
             require(data["result"] == "PASS" and data["stage"] == name,
                     "Stage report invalid")
         def restore() -> None:
+            if admission_check is not None:
+                admission_check()
+            require(reload_safe, "MMIO_STATE_UNKNOWN_NO_RELOAD")
             # A retained /dev/mem or PL mapping is a hard NO-RELOAD even
             # after a child timeout, to avoid reconfiguring under a consumer.
-            development.check_ownership()
+            development.check_ownership(profile=profile)
             # Never trust candidate observations as evidence of original image.
-            require(c.sha256_file(i.recovery_bin) == c.RECOVERY_BIN_SHA256,
+            require(c.sha256_file(i.recovery_bin) == profile.recovery_sha256,
                     "Recovery bytes changed")
             manager_write(i.recovery_bin.name)
         def verify_restoration() -> None:
@@ -344,7 +331,7 @@ def run_live(i: Inputs) -> dict[str, str]:
                     "Z2 boot changed")
             require(service_snapshot() == snapshot["services"], "Service state changed")
             require(uio_snapshot() == snapshot["uio"], "UIO binding state differs")
-            clock_and_owner()
+            clock_and_owner(profile)
         # An SSH disconnect normally propagates SIGHUP or SIGTERM; route it
         # into the Python finally recovery path. SIGKILL, SIGBUS in the
         # supervisor and uninterruptible kernel stalls remain unrecoverable.
@@ -355,21 +342,43 @@ def run_live(i: Inputs) -> dict[str, str]:
         try:
             for sig in watched:
                 signal.signal(sig, interrupt)
-            outcome = run_protected(
-                preflight=preflight, load_candidate=load,
-                hil01=lambda: stage("HIL01", None),
-                hil02=lambda: stage("HIL02", a / "result.json"),
-                restore=restore, verify_restoration=verify_restoration)
+            if test_callback is None:
+                outcome = run_protected(
+                    preflight=preflight, load_candidate=load,
+                    hil01=lambda: stage("HIL01", None),
+                    hil02=lambda: stage("HIL02", a / "result.json"),
+                    restore=restore, verify_restoration=verify_restoration)
+            else:
+                def checked_test(state):
+                    nonlocal reload_safe
+                    try:
+                        test_callback(state)
+                    except BaseException:
+                        reload_safe = False
+                        raise
+                outcome = run_sequence(
+                    preflight=preflight, load_candidate=load,
+                    test_callback=checked_test, restore=restore,
+                    verify_restoration=verify_restoration)
+                outcome['hil02'] = 'NOT_APPLICABLE'
+                outcome['execution'] = 'hardware-real'
+                if not reload_safe:
+                    outcome['hardware_state'] = 'UNKNOWN_MANUAL_RECOVERY_REQUIRED'
+                    outcome['overall'] = 'UNKNOWN_MANUAL_RECOVERY_REQUIRED'
+                if outcome['overall'] == 'PASS_SEQUENCE':
+                    outcome['overall'] = 'PASS_DEVELOPMENT_IDENTITY'
+
         finally:
             for sig, handler in old_handlers.items():
                 signal.signal(sig, handler)
         # A report never leaks kernel process, paths, addresses or credentials.
         record_json(i.output / "summary.json", {
-            "schema": "plasma.z2.swd05.oneshot.v1",
+            "schema": ("plasma.z2.swd05.oneshot.v1" if profile == development.SWD04_PROFILE
+                       else "plasma.z2.identity.oneshot.v1"),
             "stages": outcome,
-            "candidate_source": c.SOURCE_SHA,
-            "candidate_bin_sha256": c.CANDIDATE_BIN_SHA256,
-            "recovery_bin_sha256": c.RECOVERY_BIN_SHA256,
+            "candidate_source": profile.source,
+            "candidate_bin_sha256": profile.bin_sha256,
+            "recovery_bin_sha256": profile.recovery_sha256,
             "site": 1,
             "external_dut": "NOT_RUN",
             "physical_swd": "NOT_RUN",
