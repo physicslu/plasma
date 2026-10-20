@@ -16,6 +16,7 @@ import subprocess
 from pl.hil.swd04 import contract as c
 from pl.hil.swd04.collect import fclk0_from_summary
 
+
 @dataclass(frozen=True)
 class HardwareProfile:
     """Immutable image pins and physical apertures supplied by the caller."""
