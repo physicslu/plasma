@@ -448,6 +448,24 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "your complete tracked-source Git diff, newly created files and "
         "this report for review; do not commit, push or change Git refs.\n"
     )
+    if task.get("execution_path") == "path3-codex" and (
+        "F1-B PYNQ-Z2 fixed" in task.get("objective", "")
+    ):
+        prompt += (
+            "For this F1-B task, run every Vivado build through the SAME "
+            "reviewed host-only Python Build Engine as Path 2: "
+            "python3 scripts/plasma_vivado_host_build.py "
+            "--path3-engineering-host-only "
+            "--evidence-dir .plasma-path3-evidence. "
+            "Use the authorized task-specific environment supplied by the "
+            "trusted dispatcher, never synthesize fake admission variables. "
+            "The engine owns board preparation, license propagation, "
+            "worktree build directories, stage receipts, BIT/HWH and SHA256. "
+            "On failure inspect plasma-fpga-build-diagnostics.json first; "
+            "retain the first observed error and never assert an unproven "
+            "root cause. Do not bypass the engine with a separate Vivado "
+            "invocation or fabricate successful evidence.\n"
+        )
     if output_path:
         prompt += (
             "For this legacy task, also update " + output_path +
