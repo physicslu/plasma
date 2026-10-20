@@ -1,0 +1,13 @@
+{
+  "candidate_write_attempts": 1,
+  "identity": {
+    "observed": {
+      "0": 1297304656,
+      "16384": 1,
+      "4": 65536
+    }
+  },
+  "overall": "PASS_DEVELOPMENT_IDENTITY_LOAD_RESTORE",
+  "restore": "PASS",
+  "restore_write_attempts": 1
+}

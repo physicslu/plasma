@@ -1,7 +1,7 @@
-"""F1-B offline admission/Identity adapter. No live entrypoint or device access.
+"""F1-B three-read profile and adapter for the existing one-shot lifecycle.
 
-The privileged staging route is not established. This deliberately cannot call
-SWD04 run_live: that entrypoint's four apertures and write stages remain intact.
+Backend-free tests are explicitly software-offline. Live use requires separately
+reviewed protected root code and current observed ownership/AXI admission.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from contextlib import contextmanager
 import fcntl
 import os
 from pathlib import Path
-from pl.hil.swd04 import one_shot, staging
+from pl.hil.swd04 import one_shot, staging, development
 
 SOURCE = '00336106ad89eaa9fa0603dbe9e65024a27a6fe6'
 BIT_SHA = 'fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075'
@@ -21,16 +21,43 @@ BASE_HWH_SHA = '222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a
 BASE, LENGTH = 0x40000000, 0x10000
 # Historical built-source defaults, not unique provenance/authenticity IDs.
 # Dynamic health/status and reserved addresses are deliberately excluded.
-IDENTITY = {
-    0x0000: 0x4D534C50, 0x0004: 0x00010000,
-    0x0008: 0x11112222, 0x000C: 0x33334444,
-    0x0010: 0x55556666, 0x0014: 0x77778888,
-    0x0018: 0xABCDE001, 0x001C: 0xABCDE002,
-    0x0020: 0xABCDE003, 0x0024: 0xABCDE004,
-    0x0028: 1, 0x002C: 0, 0x0030: 1, 0x003C: 1,
-    0x0044: 1, 0x0048: 4096, 0x004C: 64,
-    0x4000: 1, 0x4004: 0x00010000, 0x4008: 1,
-}
+BIN_SHA = 'c351f668094a2b841426c64681d44c76cb8c14b61766d90a0e10adcf3a22a3c3'
+IDENTITY = {0x0000: 0x4D534C50, 0x0004: 0x00010000, 0x4000: 1}
+
+PROFILE = development.HardwareProfile(
+    SOURCE, BIT_SHA, HWH_SHA, BIN_SHA, BASE_SHA,
+    (('identity', BASE, LENGTH),), (('identity', 1),),
+    identity_words=tuple(IDENTITY.items()))
+
+
+def identity_child(output: Path) -> None:
+    """Target-only native aligned read backend; exactly three read-only words."""
+    from plasma_interfaces.linux_mmio import LinuxMMIO, MMIOAperture
+    from pl.hil.swd04 import native_qualify
+    native_qualify.check_runtime()
+    aperture = MMIOAperture(BASE, frozenset(IDENTITY), frozenset(), LENGTH)
+    with LinuxMMIO((aperture,), readonly=True) as mmio:
+        observed = read_identity(mmio.read32)
+        require(mmio.stats().read32 == 3 and mmio.stats().write32 == 0,
+                'unexpected MMIO access count')
+    one_shot.record_json(output, {'observed': observed})
+
+
+def identity_callback(output: Path) -> one_shot.TestCallback:
+    """Reuse existing bounded child/reap logic; child evidence is mandatory."""
+    import json
+    import sys
+    def test(state):
+        one_shot.run_child([sys.executable, '-m', 'pl.hil.f1b', str(output),
+                             '--execute-live', '--ack-unrecoverable-axi-stall-risk'])
+        data = json.loads(output.read_text())
+        require(all(type(v) is int for v in data.get('observed', {}).values()),
+                'non-u32 child evidence')
+        require(data == {'observed': {str(k): v for k, v in IDENTITY.items()}},
+                'matching three-read evidence required')
+        state['test'] = 'PASS'
+    return test
+
 
 
 def require(ok: bool, reason: str) -> None:
@@ -117,10 +144,18 @@ def offline_sequence(*, preflight, load, identity, restore_guard, restore,
     def guarded_restore():
         restore_guard()
         restore()
-    return one_shot.run_protected(
-        preflight=preflight, load_candidate=load, hil01=identity,
-        hil02=lambda: None, restore=guarded_restore,
-        verify_restoration=verify_restore)
+    def test(state):
+        observed = identity()
+        require(observed == IDENTITY, 'matching three-read evidence required')
+        state['test'] = 'PASS'
+    result = one_shot.run_sequence(
+        preflight=preflight, load_candidate=load, test_callback=test,
+        restore=guarded_restore, verify_restoration=verify_restore)
+    result['hil02'] = 'NOT_APPLICABLE'
+    result['execution'] = 'software-offline'
+    if result['overall'] == 'PASS_SEQUENCE':
+        result['overall'] = 'PASS_SOFTWARE_OFFLINE'
+    return result
 
 
 
@@ -216,3 +251,29 @@ def supervised_sequence(*, lock_path: Path, observe, record_intent, load,
         return offline_sequence(preflight=preflight, load=load, identity=identity,
                                 restore_guard=guard, restore=restore,
                                 verify_restore=verify_restore)
+
+
+def run_live(inputs: one_shot.Inputs, *, observe) -> dict:
+    """No new loader: use only with separately reviewed protected authority.
+
+    observe must collect fresh privileged facts, including AXI idle/isolation;
+    neither a callback result nor absence of open mappings establishes these.
+    """
+    def admission():
+        evidence, maps, fds = observe()
+        admit(evidence, maps=maps, fds=fds)
+    return one_shot.run_live(
+        inputs, profile=PROFILE, admission_check=admission,
+        test_callback=identity_callback(inputs.output / 'identity.json'))
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--execute-live', action='store_true')
+    parser.add_argument('--ack-unrecoverable-axi-stall-risk', action='store_true')
+    args = parser.parse_args()
+    if not (args.execute_live and args.ack_unrecoverable_axi_stall_risk):
+        parser.exit(2, 'F1B_IDENTITY_NO_GO: inert without explicit live flags\n')
+    identity_child(args.output)

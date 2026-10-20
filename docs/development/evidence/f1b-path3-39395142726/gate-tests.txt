@@ -1,0 +1,14 @@
+PASS exact passive UIO with explicit ack
+PASS rejects changed uio
+PASS rejects changed driver
+PASS rejects changed maps
+PASS rejects changed runtime
+PASS rejects changed irq_counts
+PASS rejects missing ack
+PASS rejects FD /dev/mem
+PASS rejects FD /dev/uio1
+PASS rejects FD /dev/uio0
+PASS rejects FD /dev/fpga0
+PASS rejects FD /dev/xdevcfg
+PASS rejects stale mapping
+exit=0
