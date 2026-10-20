@@ -153,6 +153,32 @@ class DiagnosticContracts(unittest.TestCase):
                 self.assertEqual(result, 2)
 
 
+    def test_reviewed_pr_driver_loads_sibling_diagnostic_library(self):
+        """A pinned candidate PR must not borrow a different main version."""
+        import shutil
+        import plasma_development_dispatch as dev
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            scripts = workspace / "scripts"
+            scripts.mkdir()
+            driver = scripts / "plasma_vivado_host_build.py"
+            library = scripts / "plasma_fpga_build_diagnostics.py"
+            shutil.copyfile(ROOT / "scripts/plasma_vivado_host_build.py", driver)
+            shutil.copyfile(ROOT / "scripts/plasma_fpga_build_diagnostics.py", library)
+            reviewed = dev.reviewed_host_build_driver(
+                workspace=workspace, approval={"pr_number": 1200})
+            self.assertTrue(callable(reviewed.run))
+            self.assertEqual(reviewed.diagnostics_type().SCHEMA if hasattr(
+                reviewed.diagnostics_type(), "SCHEMA") else
+                reviewed.diagnostics_type().__module__,
+                "plasma_reviewed_fpga_diagnostics")
+            library.unlink()
+            with self.assertRaisesRegex(
+                reviewed.BuildDenied, "BUILD_DIAGNOSTICS_LIBRARY_DENIED"
+            ):
+                reviewed.diagnostics_type()
+
+
 class PipelineFailureEvidence(unittest.TestCase):
     """All executors below are stubs, even for license and Vivado regression."""
 
