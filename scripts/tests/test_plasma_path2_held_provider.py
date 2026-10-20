@@ -46,6 +46,7 @@ def lease_intent(**changes):
 def provenance_data(**changes):
     result = {"source_sha": SRC, "bit_sha256": BIT, "hwh_sha256": HWH,
               "bin_sha256": BIN, "bootgen_evidence_sha256": "6" * 64,
+              "build_qualification_sha256": "8" * 64,
               "scope": "BYTE_EQUIVALENCE_ONLY", "physical_load": "NOT_RUN"}
     result.update(changes)
     return result
@@ -88,6 +89,8 @@ class SimulatedTarget:
             "trusted_target_clock": self.safe,
             "target_id": "z2-bench", "boot_id": self.boot,
             "owner_id": "trusted-owner", "restore_intent_sha256": INTENT,
+            "bit_sha256": BIT, "bin_sha256": BIN,
+            "bootgen_evidence_sha256": "6" * 64,
         }
 
     def observation(self, at):
@@ -260,6 +263,16 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaises(lease.LeaseDenied):
                 provider.restore_guarded(store=store, port=port)
             self.assertEqual(port.actions.count("restore"), 1)
+
+    def test_independent_testing_needs_original_bit_identity(self):
+        tmp, store, port = setup()
+        with tmp:
+            download(store, port)
+            with self.assertRaisesRegex(
+                    provider.ProviderDenied, "TEST_BIT_BIN_IDENTITY_DENIED"):
+                provider.testing_held(store=store, port=port,
+                    request=test_request(), bit_sha256="9" * 64)
+            self.assertEqual(port.actions.count("test"), 0)
 
     def test_test_provenance_changed_denied_without_child(self):
         tmp, store, port = setup()
