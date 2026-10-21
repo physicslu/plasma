@@ -461,6 +461,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     and invoke host-only Vivado. The fixed PR SHA remains the INPUT identity;
     the candidate Git diff and evidence are captured before review/commit.
     """
+    # This trusted-main entry launches its own dispatcher implementation.
+    # Never label it as candidate-dispatcher E2E or silently fall back to it.
+    require(task_id != "candidate-dispatcher-e2e-1083",
+            "CANDIDATE_DISPATCHER_REAL_CODEX_ROUTE_NOT_AVAILABLE")
     root = workspace.resolve(strict=True)
     evidence = root / ".plasma-path3-evidence"
     require(not evidence.exists() and not evidence.is_symlink(),
