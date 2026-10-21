@@ -1639,8 +1639,85 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertIn("GUARDED-HARDWARE", captured[0][1])
             self.assertIn("test, restore", captured[0][1])
             self.assertIn("Do not run Download unless", captured[0][1])
-            self.assertIn("SWPC Bridge deployment authorized: True",
+            self.assertIn("Requested Bridge deployment: True",
                           captured[0][1])
+            self.assertIn("DELEGATED", captured[0][1])
+            self.assertIn("Do not call the Bridge, sudo, SSH", captured[0][1])
+
+    def test_path3_reuses_existing_path2_trusted_bridge_in_one_job(self):
+        import plasma_path2_runtime_integration as integration
+        order = self._order(scope="guarded-hardware",
+                            hardware_stages=["test", "restore"])
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        executed = []
+        boot = "hardware-boot-validated"
+        def fake_bridge(command, **kwargs):
+            self.assertEqual(command[0],
+                             str(integration.ROOT_STAGE_BRIDGE))
+            stage = command[1]
+            executed.append(stage)
+            result = ("IDENTITY_PASS" if stage == "test"
+                      else "RESTORED_VERIFIED")
+            return subprocess.CompletedProcess(command, 0, json.dumps({
+                "stage": stage, "source_sha": approval["pinned_sha"],
+                "real_z2": True, "boot_id": boot, "result": result
+            }).encode(), b"")
+        with patch.object(integration, "_trusted_root_bridge"):
+            receipt = integration.path3_shared_hardware_stages(
+                task, approval, executor=fake_bridge)
+        self.assertEqual(executed, ["test", "restore"])
+        self.assertEqual(receipt["real_z2"], True)
+        self.assertEqual(receipt["boot_id"], boot)
+        self.assertEqual([x["result"] for x in receipt["completed"]],
+                         ["IDENTITY_PASS", "RESTORED_VERIFIED"])
+        self.assertEqual(receipt["delegate"],
+                         "existing-path2-trusted-bridge")
+        self.assertNotIn("download", executed)
+        with self.assertRaisesRegex(
+                integration.RuntimeDenied, "APPROVAL_DENIED"):
+            integration.path3_shared_hardware_stages(
+                task | {"work_order_sha256": "0" * 64}, approval,
+                executor=fake_bridge)
+        with self.assertRaisesRegex(
+                integration.RuntimeDenied, "DEPLOYMENT_NOT_INSTALLED"):
+            integration.path3_shared_hardware_stages(
+                task | {"swpc_bridge_deployment": True}, approval,
+                executor=fake_bridge)
+
+    def test_path3_shared_bridge_fail_closed_without_restore(self):
+        import plasma_path2_runtime_integration as integration
+        order = self._order(scope="guarded-hardware",
+                            hardware_stages=["test", "restore"])
+        event = self._event(order)
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        executed = []
+        def deny_test(command, **kwargs):
+            executed.append(command[1])
+            return subprocess.CompletedProcess(
+                command, 2, b"", b"remote not verified")
+        with patch.object(integration, "_trusted_root_bridge"):
+            with self.assertRaisesRegex(
+                    integration.RuntimeDenied, "BRIDGE_STAGE_FAILED"):
+                integration.path3_shared_hardware_stages(
+                    task, approval, executor=deny_test)
+        self.assertEqual(executed, ["test"])
+
+    def test_path3_shared_workflow_uses_one_existing_runner(self):
+        wf = WORKFLOW.read_text()
+        execute = wf.split("  development-execute:", 1)[1].split(
+            "  development-codex:", 1)[0]
+        self.assertIn("development-claim, development-codex]", execute)
+        self.assertIn("outputs.execution_capability == 'codex-guarded-hardware'",
+                      execute)
+        self.assertIn("needs.development-codex.result == 'success'", execute)
+        self.assertIn("outputs.task_id == 'path3-work-order'", execute)
+        self.assertEqual(wf.count(
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()

@@ -375,15 +375,16 @@ jobs:
           retention-days: 14
 
   development-execute:
-    # Dispatch by trusted, validated capability, NOT by task-specific test
-    # names. Hardware-capable A2 retains its separate one-shot claim gate.
-    needs: [development-authorize, development-claim]
+    # Both Paths reuse this ONE trusted provider; hardware never runs in Codex.
+    # Hardware-capable A2 retains its existing one-shot claim gate.
+    needs: [development-authorize, development-claim, development-codex]
     if: >-
       always() &&
       github.event_name == 'issue_comment' &&
       needs.development-authorize.result == 'success' &&
-      needs.development-authorize.outputs.execution_path == 'path2-cli' &&
       (
+        (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
+         (
         (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
          needs.development-claim.result == 'skipped') ||
         (needs.development-authorize.outputs.execution_capability == 'vivado-host-build' &&
@@ -405,10 +406,17 @@ jobs:
          needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
          needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
          github.run_attempt == 1)
+         ) ) ||
+        (needs.development-authorize.outputs.execution_path == 'path3-codex' &&
+         needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' &&
+         needs.development-authorize.outputs.task_id == 'path3-work-order' &&
+         needs.development-codex.result == 'success' &&
+         needs.development-claim.result == 'skipped' &&
+         github.run_attempt == 1)
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' && 10 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
     permissions:
       contents: read
       actions: read
