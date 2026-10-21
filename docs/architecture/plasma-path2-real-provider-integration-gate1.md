@@ -77,7 +77,7 @@ Local-only stage entrypoints, usable **only after separately reviewed
 installation of the exact source by the trusted Z2 root operator**:
 
 ```text
-PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UIO
+export PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UIO
 python3 -m pl.hil.path2_f1b_minimal_stage download
 python3 -m pl.hil.path2_f1b_minimal_stage test
 python3 -m pl.hil.path2_f1b_minimal_stage restore
