@@ -108,6 +108,38 @@ isolation or Restore feasibility. The executed script was pinned trusted
 been executed on Z2. None of these current live results, nor the historical
 one-shot AXI risk waiver, may promote `hardware_go` to true.
 
+## Owner's amended Gate 1 — precisely bounded Site 1 development risk
+
+**Approved owner instruction:** one PYNQ-Z2 Site 1 F1-B Development HIL
+may accept the already observed `uio1/uio_pdrv_genirq` bound-passive
+state while AXI isolation is `UNPROVEN`. This explicitly accepts the
+chance of external abort, SIGBUS or unrecoverable AXI stall **for this
+one development experiment only**. It does not provide AXI proof or
+authorize Production, unattended execution, retries, further Sites,
+DUT/LA/power changes, deployment or merge.
+
+`pl/hil/path2_f1b_dev_risk.py` implements a **read-only** exact-state
+policy and root-target observation: original `base.bin` active-load
+dmesg provenance, the pinned candidate/recovery SHA256, same-boot root
+facts, exactly `uio1/uio_pdrv_genirq` at the fixed 64-KiB aperture,
+runtime PM suspended, zero observed fabric IRQ counts, one corresponding
+bound platform device, no other overlapping driver, complete /proc FD/VMA
+scan without relevant retained mappings, and active baseline services.
+Any deviation is `NO_GO`. A checked policy result is **not** a
+hardware-writing capability or independent AXI isolation proof.
+
+Before executing even this amended development-risk HIL, a separately
+reviewed and physically installed **root-owned Z2 command** must still
+supply target-side privileged ownership across independently triggered
+stages, immutable trusted source SHA, verified Bootgen execution provenance,
+durable one-time recovery intent, original-image validation, bounded/reaped
+native MMIO child, trustworthy actual loaded-image attribution, terminal
+unknown/manual-recovery handling, and checked successful Restore route.
+Those capabilities are **not yet installed/registered**. The existing
+Dispatcher still calls `PATH2_LIVE_PROVIDER_NOT_REGISTERED`; the
+Host-only implementation must not misrepresent a policy check as actual
+FPGA Manager Download or HIL PASS.
+
 ## Stage contracts and durable state
 
 **Download** (separate Owner stage, future trusted target implementation):
