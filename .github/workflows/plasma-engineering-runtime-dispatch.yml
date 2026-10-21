@@ -28,6 +28,7 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
+      - "scripts/tests/test_plasma_licensed_f1b.py"
       - "scripts/plasma_path2_build_qualification.py"
       - "scripts/plasma_path2_runtime_integration.py"
       - "scripts/tests/test_plasma_path2_runtime_integration.py"
@@ -67,6 +68,7 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
+      - "scripts/tests/test_plasma_licensed_f1b.py"
       - "scripts/plasma_path2_build_qualification.py"
       - "scripts/plasma_path2_runtime_integration.py"
       - "scripts/tests/test_plasma_path2_runtime_integration.py"
@@ -119,8 +121,9 @@ jobs:
           python3 scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
-          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
+          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
+          python3 scripts/tests/test_plasma_licensed_f1b.py
           python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
           python3 scripts/tests/test_plasma_path2_runtime_integration.py
           python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
