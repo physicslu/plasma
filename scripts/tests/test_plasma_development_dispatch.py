@@ -1551,7 +1551,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
             self.assertIn("HOST-ONLY", calls[0])
-            self.assertIn("network_access=false", captured_commands[0])
+            self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
             self.assertIn("Acceptance criteria", calls[0])
             self.assertIn("Owner Work Order SHA256", calls[0])
 
