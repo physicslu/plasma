@@ -157,6 +157,21 @@ Metadata／Codex Stub：
 證明隔離，不能直接以 GitHub-hosted 假身分或 Prompt 取代。
 未建立這一條安全邊界前，SWPC Candidate E2E = `NOT_RUN`。
 
+**合併前 SWPC 純軟體沙箱測試（候選實作）：**
+不用授權候選 Dispatcher 作為控制平面。用已存在的可信 main Path 2
+`cpu-only` 派工，限定新登錄的
+`candidate-dispatcher-premerge-sandbox` 任務，從精確 PR SHA Checkout
+候選工作樹，交由可信 `run_task(...,sandbox=True)` 啟動已存在的
+`bubblewrap` 隔離：唯讀 `/work`、合成 `/dev`、隔離全部 namespaces
+（含 network）、`--clearenv`、`-I -S` Python、40 秒時限。
+沙箱內只執行 Candidate Dispatcher 的模擬 Owner/Runner CLI 與
+Stub Codex，輸出固定 `CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS`
+並由可信 Dispatcher 驗證 SHA256。若 bwrap 缺少、不支援 userns
+或隔離條件不成立則 Fail Closed，不得降級為裸執行。這條路徑
+實際執行 Candidate Dispatcher 程式碼，但**不啟動真 Codex、不核可
+SWPC 硬體權限，也不代表完整 Path 3 Agent E2E**。
+
+
 ## 五、Gate 1 — 推薦與選擇矩陣
 
 | 問題 | Path 1 | Path 2 | Path 3 |
