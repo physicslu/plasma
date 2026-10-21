@@ -122,10 +122,14 @@ The GitHub-hosted offline tests use an injected fake FPGA Manager and
 cover multiple Download/Test/Restore actions in one session, exact
 three-word readback, no auto-chaining, changed boot or image, failures,
 and safe idempotent restore. **Host-only tests are not real HIL**.
-The separately authenticated root-side execution route is still the
-single remaining physical integration blocker; the existing trusted
-Dispatcher correctly rejects hardware calls as
-`PATH2_LIVE_PROVIDER_NOT_REGISTERED`.
+The three Task identities are now **registered** in the candidate
+Dispatcher (`z2-path2-download`, `z2-path2-testing`,
+`z2-path2-restore`) and map to the fixed SWPC Bridge executable path
+`/usr/local/libexec/plasma/z2-path2-f1b-bridge`. An absent root-owned
+Bridge fails with `PATH2_TRUSTED_BRIDGE_NOT_INSTALLED`; it does **not**
+execute the candidate PR as root. This is the single remaining physical
+activation blocker. The GitHub-hosted CI only tests a fake installed
+Bridge and cannot claim an actual authenticated Z2 execution.
 
 ## Evidence reuse / target admission (as of 2026-10-21)
 
