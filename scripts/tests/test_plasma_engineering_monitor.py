@@ -381,6 +381,21 @@ class EngineeringMonitorTests(unittest.TestCase):
                     "split-window" in cmd or "kill-" in cmd
                     for cmd in result["commands"]))
 
+    def test_launcher_retains_window_on_immediate_viewer_exit(self):
+        """An sg/view failure must remain visible, never race the tmux layout check."""
+        for failing in ("path2", "path3"):
+            with self.subTest(failing=failing):
+                result = self._run_mock_launcher([], fail_viewer=failing)
+                self.assertEqual(result["rc"], 0, result["stderr"])
+                self.assertIn(
+                    f"MONITOR_VIEWER_EXIT path={failing} exit=7",
+                    result["stderr"])
+                self.assertEqual(
+                    [(w["index"], w["name"]) for w in result["windows"]],
+                    [(1, "path2"), (2, "path3")])
+                self.assertFalse(any(
+                    "kill-" in cmd for cmd in result["commands"]))
+
     def test_two_window_launcher_fails_closed(self):
         cases = [
             ([], False, True),
@@ -400,7 +415,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                     for cmd in result["commands"]))
 
     def _run_mock_launcher(self, windows, *, base=1, repeat=1,
-                           group_exists=True, member=True):
+                           group_exists=True, member=True, fail_viewer=""):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             bin_dir = root / "bin"
@@ -433,6 +448,11 @@ else exit 2; fi
 echo "$1 $2 $3" >> "$TEST_SG_LOG"
 [[ "$1" == plasma-monitor && "$2" == -c &&
    "$3" == *"exec python3 -u"* ]] || exit 2
+if [[ -n "$TEST_FAIL_VIEWER" &&
+      "$3" == *"view $TEST_FAIL_VIEWER"* ]]; then
+  echo "MOCK_SG_FAILURE" >&2
+  exit 7
+fi
 ''')
             write_stub("tmux", r'''
 import json, os, subprocess, sys
@@ -503,6 +523,7 @@ if op in ("new-session", "new-window"):
                 "TEST_SG_LOG": str(sg_file),
                 "TEST_MEMBER": "1" if member else "0",
                 "TEST_GROUP": "1" if group_exists else "0",
+                "TEST_FAIL_VIEWER": fail_viewer,
             })
             proc = None
             for _ in range(repeat):
@@ -536,6 +557,8 @@ if op in ("new-session", "new-window"):
         self.assertIn('tmux select-window -t "$session:1"', script)
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
+        self.assertIn("MONITOR_VIEWER_EXIT", script)
+        self.assertIn("exec bash", script)
 
 
 

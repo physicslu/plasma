@@ -28,6 +28,22 @@ running on that path. When a task runs the pane shows its Run ID, task ID,
 elapsed time, and recent output. When it finishes, the pane returns to IDLE
 and retains LAST: PASS or LAST: FAIL and process exit code.
 
+### Viewer startup failure and recovery
+
+The launcher preserves a Path 2/3 tmux window if its `sg` or Python viewer
+terminates immediately. The pane shows `MONITOR_VIEWER_EXIT path=... exit=...`
+along with the original error, and falls back to an operator-owned shell
+instead of disappearing and misleadingly reporting `can't find window: 2`.
+The launcher does not automatically retry or restart the Codex worker.
+
+If the viewer exited, inspect the error in that window first. After resolving
+the cause, close **only that diagnostic pane's shell** (for example with
+`exit`), then run `bash scripts/plasma-engineering-monitor.sh` from a
+separate operator shell to recreate the missing viewer. An already-running
+Path 2 or Path 3 window is never replaced by the launcher; do not use
+`tmux kill-server`, do not kill other sessions, and do not mutate the
+underlying monitor logs or job evidence.
+
 PASS here means only the monitored command exited 0; it does not supersede
 independent ChatGPT evidence review or approve a merge. If a process is
 killed before writing its final state, the pane shows
