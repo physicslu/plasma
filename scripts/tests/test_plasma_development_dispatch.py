@@ -609,12 +609,72 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 returncode=5
                 stdout=b"attempt failed"
                 stderr=b"problem detail"
-            with self.assertRaisesRegex(dev.Denied,"CODEX_CLI_NONZERO"):
-                dev.run_codex_task(self.task,workspace=work,
-                                   executor=lambda *args,**kwargs:Failure())
+            receipt=dev.run_codex_task(self.task,workspace=work,
+                                       executor=lambda *args,**kwargs:Failure())
+            self.assertEqual(receipt["status"],"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED")
+            self.assertEqual(receipt["failure_reason"],"CODEX_CLI_NONZERO")
+            self.assertEqual(receipt["codex_exit_code"],5)
+            self.assertFalse(receipt["evidence_complete"])
+            self.assertNotIn("PASS",receipt["status"])
             log=(work/".plasma-path3-evidence/codex.log").read_text()
             self.assertIn("attempt failed",log)
             self.assertIn("problem detail",log)
+            self.assertEqual(receipt["codex_log_sha256"],
+                             hashlib.sha256(log.encode()).hexdigest())
+
+    def test_codex_zero_exit_without_evidence_is_fail_not_success(self):
+        with tempfile.TemporaryDirectory() as td:
+            class Incomplete:
+                returncode=0
+                stdout=b"output without reviewed evidence"
+                stderr=b""
+            receipt=dev.run_codex_task(
+                self.task,workspace=Path(td),
+                executor=lambda *args,**kwargs:Incomplete())
+            self.assertEqual(receipt["status"],
+                             "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED")
+            self.assertEqual(receipt["failure_reason"],"CODEX_EVIDENCE_INCOMPLETE")
+            self.assertEqual(receipt["codex_exit_code"],0)
+            self.assertFalse(receipt["evidence_complete"])
+            self.assertTrue((Path(td)/".plasma-path3-evidence/codex.log").exists())
+
+    def test_codex_failure_retains_partial_report_and_never_auto_retries(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            calls=[]
+            class Failed:
+                returncode=7
+                stdout=b"compile FAIL, retry within Codex failed"
+                stderr=b""
+            def executor(command,**kwargs):
+                calls.append(command)
+                (root/".plasma-path3-evidence/engineering-report.md").write_text(
+                    "Attempt 1 FAIL, fixed; attempt 2 FAIL. Real execution NOT_RUN.\n")
+                self.assertIn("without another user approval",
+                              kwargs["input"].decode())
+                self.assertIn("unsafe hardware writes",kwargs["input"].decode())
+                return Failed()
+            receipt=dev.run_codex_task(self.task,workspace=root,
+                                       executor=executor)
+            self.assertEqual(len(calls),1)  # One Codex job, NO supervisor retries.
+            self.assertEqual(receipt["codex_exit_code"],7)
+            self.assertTrue(receipt["evidence_complete"])
+            self.assertEqual(receipt["status"],"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED")
+            self.assertIn("engineering_report_sha256",receipt)
+
+    def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
+        wf=WORKFLOW.read_text()
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        self.assertIn("Collect Path 3 evidence even when Codex",job)
+        self.assertIn("if: always()",job)
+        self.assertIn("git -C candidate diff --binary HEAD",job)
+        self.assertIn("git -C candidate ls-files --others --exclude-standard -z",job)
+        self.assertIn("plasma-path3-source.patch.sha256",job)
+        self.assertLess(job.index("Collect Path 3 evidence even when"),
+                        job.index("actions/upload-artifact@"))
+        self.assertEqual(job.count("scripts/plasma_development_dispatch.py execute-codex"),1)
+        self.assertNotIn("continue-on-error: true",job)
+        self.assertNotIn("|| true",job)
 
     def test_development_path3_supports_vivado_and_full_source_edits(self):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
