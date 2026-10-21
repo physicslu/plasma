@@ -386,7 +386,9 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
                 return type("Child", (), {
                     "returncode": 0, "stdout": expected, "stderr": b"",
                 })()
-            with patch.object(dev.shutil, "which", return_value="/usr/bin/bwrap"), \
+            # The synthetic executor never launches the wrapper; use a file
+            # present on hosted CI as its path for this argv contract test.
+            with patch.object(dev.shutil, "which", return_value="/usr/bin/python3"), \
                     patch.object(dev.sys, "executable", "/usr/bin/python3"):
                 receipt = dev.run_task(
                     task, workspace=workspace,

@@ -528,6 +528,7 @@ jobs:
     permissions:
       contents: read
       actions: read  # F1-B only: trusted step fetches immutable prior artifact
+      pull-requests: read  # trusted worker verifies the live exact PR HEAD
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -589,6 +590,7 @@ jobs:
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}

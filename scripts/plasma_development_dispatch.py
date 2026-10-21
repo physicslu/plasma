@@ -1020,6 +1020,10 @@ def live_pr_metadata(req: dict) -> dict | None:
         return pr
     except (OSError, ValueError, subprocess.SubprocessError):
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
+    finally:
+        # The workflow grants a step-scoped token for this trusted query.
+        # Codex and the subsequent build must not inherit it.
+        os.environ.pop("GH_TOKEN", None)
 
 
 def main() -> int:
