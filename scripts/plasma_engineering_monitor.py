@@ -15,12 +15,15 @@ import os
 from pathlib import Path
 import pwd
 import re
+import select
 import shutil
 import socket
 import stat
 import subprocess
 import sys
+import termios
 import time
+import tty
 import unicodedata
 
 BASE = Path("/run/plasma-codex")
@@ -208,27 +211,79 @@ def _clip_columns(line: str, width: int) -> str:
     return "".join(chars)
 
 
+def _read_state(directory: Path, path: str) -> dict:
+    state_file = directory / (path + ".json")
+    try:
+        if not state_file.is_symlink() and state_file.stat().st_size < 8192:
+            data = json.loads(state_file.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except (OSError, UnicodeError, ValueError, TypeError):
+        pass
+    return {}
+
+
+def _clear_point(directory: Path, path: str) -> tuple[int, int, int, str | None] | None:
+    """Remember the end of the current log without mutating it or job evidence."""
+    log_file = directory / (path + ".log")
+    try:
+        if log_file.is_symlink():
+            return None
+        st = log_file.stat()
+        if not stat.S_ISREG(st.st_mode):
+            return None
+        return (st.st_dev, st.st_ino, st.st_size,
+                _read_state(directory, path).get("started"))
+    except OSError:
+        return None
+
+
+def _tmux_prefix_hint() -> str:
+    """Display the real tmux prefix; never change any session bindings."""
+    if not os.environ.get("TMUX"):
+        return "Ctrl+B"  # tmux default; also used in non-tmux unit tests.
+    try:
+        proc = subprocess.run(
+            ["tmux", "show-options", "-gv", "prefix"],
+            capture_output=True, text=True, timeout=1, check=False)
+        if proc.returncode == 0:
+            match = re.fullmatch(r"C-([a-zA-Z])", proc.stdout.strip())
+            if match:
+                return "Ctrl+" + match.group(1).upper()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return "Prefix"  # Avoid claiming the wrong shortcut on custom setups.
+
+
+def _poll_key(fd: int) -> str | None:
+    """Read at most one key without blocking the monitor refresh loop."""
+    try:
+        if select.select([fd], [], [], 0)[0]:
+            return os.read(fd, 1).decode("ascii", errors="ignore")
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def render_snapshot(directory: Path, path: str, *,
                     width: int | None = None,
                     height: int | None = None,
-                    now: dt.datetime | None = None) -> str:
+                    now: dt.datetime | None = None,
+                    clear_from: tuple[int, int, int, str | None] | None = None,
+                    prefix: str = "Ctrl+B") -> str:
     if path not in PATHS:
         raise ValueError("unknown path")
     name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
-    state_file = directory / (path + ".json")
     log_file = directory / (path + ".log")
-    state = {}
-    try:
-        if not state_file.is_symlink() and state_file.stat().st_size < 8192:
-            state = json.loads(state_file.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, ValueError, TypeError):
-        pass
+    state = _read_state(directory, path)
     status = state.get("status", "IDLE")
     if status == "RUNNING" and not _alive(state):
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    lines = [name, "=" * 35, "STATUS: " + status,
+    lines = [name,
+             "KEYS: C Clear | %s 1/2 Switch" % prefix,
+             "      %s D Detach" % prefix,
+             "=" * 35, "STATUS: " + status,
              "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
     if status == "RUNNING":
         started = state.get("started", "")
@@ -252,8 +307,15 @@ def render_snapshot(directory: Path, path: str, *,
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
             raise OSError("invalid log")
         with log_file.open("rb") as f:
-            f.seek(0, 2)
-            f.seek(max(0, f.tell() - 32768))
+            st = os.fstat(f.fileno())
+            start = max(0, st.st_size - 32768)
+            if clear_from is not None:
+                dev, ino, offset, run_start = clear_from
+                if ((st.st_dev, st.st_ino, state.get("started")) ==
+                        (dev, ino, run_start) and st.st_size >= offset):
+                    start = max(start, offset)
+                # A new job/log or truncated log is new content, not old history.
+            f.seek(start)
             log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
     except OSError:
         log_lines = ["(no local output yet)"]
@@ -270,8 +332,8 @@ def render_snapshot(directory: Path, path: str, *,
 
 
 def view_loop(path: str, *, directory: Path = MONITOR, output=None,
-              get_size=None, sleep=None, get_now=None) -> None:
-    """Update only changed frames; never clear the whole screen first."""
+              get_size=None, sleep=None, get_now=None, get_key=None) -> None:
+    """Repaint changed frames and allow operator-only, display-only C clear."""
     if output is None:
         output = sys.stdout
     if get_size is None:
@@ -280,21 +342,45 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
         sleep = time.sleep
     if get_now is None:
         get_now = lambda: dt.datetime.now().astimezone()
+
+    saved_tty = None
+    fd = None
+    if get_key is None:
+        get_key = lambda: None
+        if sys.stdin.isatty():
+            try:
+                fd = sys.stdin.fileno()
+                saved_tty = termios.tcgetattr(fd)
+                tty.setcbreak(fd)
+                get_key = lambda: _poll_key(fd)
+            except OSError:
+                saved_tty = None
+
+    prefix = _tmux_prefix_hint()
     previous = None
     previous_size = None
-    while True:
-        width, height = get_size()
-        size = (width, height)
-        frame = render_snapshot(directory, path, width=width, height=height,
-                                now=get_now() if path == "path3" else None)
-        if frame != previous or size != previous_size:
-            # Home + overwrite + clear *remainder*. Avoid the blank frame
-            # caused by the old ESC[2J full-screen clear every second.
-            output.write("\033[H" + frame + "\033[J")
-            output.flush()
-            previous = frame
-            previous_size = size
-        sleep(1)
+    clear_from = None
+    try:
+        while True:
+            if get_key() in ("c", "C"):
+                clear_from = _clear_point(directory, path)
+                previous = None  # Force repaint, even if status is unchanged.
+            width, height = get_size()
+            size = (width, height)
+            frame = render_snapshot(
+                directory, path, width=width, height=height,
+                now=get_now() if path == "path3" else None,
+                clear_from=clear_from, prefix=prefix)
+            if frame != previous or size != previous_size:
+                # Only repaint this tmux pane, not global terminal scrollback.
+                output.write("\033[H" + frame + "\033[J")
+                output.flush()
+                previous = frame
+                previous_size = size
+            sleep(1)
+    finally:
+        if saved_tty is not None:
+            termios.tcsetattr(fd, termios.TCSADRAIN, saved_tty)
 
 
 def main() -> int:
