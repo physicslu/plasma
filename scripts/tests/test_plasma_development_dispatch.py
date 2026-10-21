@@ -704,6 +704,54 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                     with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
                         dev.worker_admission(req,args,self.registry)
 
+    def test_main_failure_receipt_exits_nonzero_after_worker_admission(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)/"candidate"
+            work.mkdir()
+            event_file=Path(td)/"event.json"
+            event_file.write_text(json.dumps(self.event()))
+            registry=Path(td)/"tasks.json"
+            registry.write_text(json.dumps(self.registry))
+            digest=hashlib.sha256(registry.read_bytes()).hexdigest()
+            argv=["execute-codex","--event",str(event_file),
+                  "--registry",str(registry),"--workspace",str(work),
+                  "--trusted-sha","a"*40,"--pinned-sha","a"*40,
+                  "--pr-number","0","--registry-sha256",digest]
+            env={**self.context(),
+                 "RUNNER_ENVIRONMENT":"self-hosted",
+                 "RUNNER_NAME":"SWPC-plasma-codex"}
+            failures=[
+                ({"status":"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+                  "codex_exit_code":7},2),
+                ({"status":"CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED",
+                  "codex_exit_code":0},2),
+                ({"status":"EVIDENCE_READY_REVIEW_REQUIRED",
+                  "codex_exit_code":0},0),
+            ]
+            with patch.dict(os.environ,env),patch.object(os,"geteuid",return_value=1000):
+                for receipt,expected_exit in failures:
+                    with self.subTest(receipt=receipt),patch.object(
+                            dev,"run_codex_task",return_value=receipt) as agent:
+                        with redirect_stdout(StringIO()) as output:
+                            rc=self._call_main(argv)
+                        self.assertEqual(rc,expected_exit)
+                        result=json.loads(output.getvalue())
+                        self.assertEqual(result["status"],receipt["status"])
+                        self.assertEqual(result["worker_admission"]["status"],
+                                         "WORKER_SOURCE_ADMITTED")
+                        agent.assert_called_once()
+                bad=list(argv)
+                bad[bad.index("--registry-sha256")+1]="0"*64
+                with patch.object(dev,"run_codex_task") as agent:
+                    with redirect_stdout(StringIO()) as output:
+                        rc=self._call_main(bad)
+                    self.assertEqual(rc,2)
+                    self.assertEqual(json.loads(output.getvalue())["reason"],
+                                     "AUTHORIZED_REGISTRY_MISMATCH")
+                    agent.assert_not_called()
+
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
         job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
