@@ -1,7 +1,7 @@
 # PLASMA — SSH tmux Engineering Monitor (Path 2 / Path 3)
 
-**Scope:** Development Mode, owner-only operator view. One tmux session, one window,
-two simultaneously visible panes. This is not another dispatcher,
+**Scope:** Development Mode, owner-only operator view. One tmux session,
+two switchable windows (Path 2 and Path 3). This is not another dispatcher,
 workflow, runner, approval gate, HIL test or production service.
 
 ## Operator workflow (SWPC)
@@ -11,17 +11,38 @@ checkout is updated, log in as the trusted operator:
 
     ssh "${SWPC_OPERATOR}@${SWPC_HOST}"
     cd "${PLASMA_REPO:?set trusted checkout path}"
-    # First use creates and attaches the operator-owned two-pane session.
+    # First use creates and attaches the operator-owned two-window session.
     bash scripts/plasma-engineering-monitor.sh
     # Subsequent uses (no window switching):
     tmux attach -t plasma-monitor
 
-Press Ctrl+B, then D to detach without stopping a GitHub Actions job.
-The left pane always displays Path 2 (fixed CLI), and the right pane always
-displays Path 3 (Codex). IDLE means no observed worker wrapper is currently
+The status header shows the configured tmux prefix and shortcuts:
+press **C** (no prefix) to clear only the current window's displayed output,
+while continuing to show new messages. Press **tmux prefix, then 1** to
+switch to Path 2 (fixed CLI), **prefix, then 2** for Path 3 (Codex),
+or **prefix, then D** to detach without stopping a GitHub Actions job.
+The default prefix is Ctrl+B; custom configurations such as Ctrl+A are
+detected and displayed in the header. Clearing never truncates a monitor
+log, removes Codex evidence, changes job state or affects the other window. IDLE means no observed worker wrapper is currently
 running on that path. When a task runs the pane shows its Run ID, task ID,
 elapsed time, and recent output. When it finishes, the pane returns to IDLE
 and retains LAST: PASS or LAST: FAIL and process exit code.
+
+### Viewer startup failure and recovery
+
+The launcher preserves a Path 2/3 tmux window if its `sg` or Python viewer
+terminates immediately. The pane shows `MONITOR_VIEWER_EXIT path=... exit=...`
+along with the original error, and falls back to an operator-owned shell
+instead of disappearing and misleadingly reporting `can't find window: 2`.
+The launcher does not automatically retry or restart the Codex worker.
+
+If the viewer exited, inspect the error in that window first. After resolving
+the cause, close **only that diagnostic pane's shell** (for example with
+`exit`), then run `bash scripts/plasma-engineering-monitor.sh` from a
+separate operator shell to recreate the missing viewer. An already-running
+Path 2 or Path 3 window is never replaced by the launcher; do not use
+`tmux kill-server`, do not kill other sessions, and do not mutate the
+underlying monitor logs or job evidence.
 
 PASS here means only the monitored command exited 0; it does not supersede
 independent ChatGPT evidence review or approve a merge. If a process is
@@ -69,12 +90,13 @@ merely to enable a monitor.
 
 ## Real SWPC acceptance checklist (after authorized activation)
 
-1. SSH to SWPC, start or attach the single two-pane tmux session.
-2. With no observed Path task, confirm both panes show IDLE.
+1. SSH to SWPC, start or attach the two-window tmux session.
+2. With no observed Path task, confirm both windows show IDLE.
 3. Run an already authorized Path 2 CPU-only task; confirm Run ID,
    RUNNING, IDLE, exit/result and independent GitHub evidence.
 4. Repeat for an authorized Path 3 CPU-only job and verify Codex
    output appears while running (not only after it exits).
-5. Verify detach/reattach, stale-run handling and existing Artifact,
+5. Verify switch (prefix+1 / prefix+2), C clear (new messages still appear,
+   monitor/evidence logs preserved), detach/reattach, stale-run handling and existing Artifact,
    and confirm no unauthorized resources were touched. Report
    FAIL or NOT_RUN wherever real evidence is missing.

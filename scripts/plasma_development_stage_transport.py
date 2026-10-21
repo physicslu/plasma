@@ -40,6 +40,106 @@ class Blocked(ValueError):
     pass
 
 
+# Only these exact local exception codes may cross the dispatcher boundary.
+# Never serialize exception text, SSH configuration or PTY output.
+SAFE_FAILURE_CODES = frozenset({
+    "LOCAL_ENROLLMENT_DENIED", "SSH_CONNECT_TIMEOUT_OR_UNREACHABLE",
+    "HOST_KEY_REJECTED", "REMOTE_AUTH_OR_SUDO_FAILED",
+    "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED", "REMOTE_TIMEOUT_MANUAL_STATE_REVIEW",
+    "REMOTE_RECEIPT_INVALID", "CHILD_OWNERSHIP_UNCERTAIN", "UNKNOWN",
+    "PRIVATE_CREDENTIAL_NOT_ENROLLED", "SWPC_RUNNER_IDENTITY_DENIED",
+    "SSH_OR_SUDO_ROUTE_NOT_ENROLLED", "HOST_KEY_FILE_DENIED",
+    "HOST_KEY_NOT_PINNED", "STAGE_NOT_ALLOWLISTED", "SOURCE_SHA_INVALID",
+    "REMOTE_EXIT_OR_PRIVILEGE_FAILED", "REMOTE_PTY_NOT_DRAINED",
+    "REMOTE_OUTPUT_TOO_LARGE", "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED",
+    "REMOTE_RESULT_NOT_VERIFIED", "F1B_IMAGE_NOT_LOADED",
+})
+
+
+def failure_code(exc: BaseException) -> str:
+    """Preserve exact allowlisted Blocked reasons; fail closed on unknown text."""
+    if type(exc) is Blocked and len(exc.args) == 1:
+        code = exc.args[0]
+        if type(code) is str and code in SAFE_FAILURE_CODES:
+            return code
+    return "UNKNOWN"
+
+
+# Exact diagnostics supported by the protected root entry/source. These only
+# categorize a failed command; they do not authenticate image/restore state.
+ROOT_MANIFEST_DIAGNOSTICS = frozenset({
+    "PATH2_APPROVED_ROOT_SOURCE_NOT_INSTALLED",
+    "PATH2_PINNED_PYTHON_NOT_INSTALLED", "PATH2_SOURCE_NOT_ROOT_OWNED",
+    "PATH2_SOURCE_WRITABLE_BY_OTHERS", "PATH2_REQUIRED_SOURCE_NOT_PINNED",
+    "PATH2_APPROVED_SOURCE_HASH_MISMATCH",
+})
+
+
+def remote_failure(returncode: int, output: bytes) -> str:
+    """Classify failed SSH, never interpret diagnostic text as a root receipt.
+
+    These are transport diagnostics, not authenticated root state assertions.
+    No remote diagnostic alone proves image or recovery state.
+    """
+    if returncode < 0:
+        return "CHILD_OWNERSHIP_UNCERTAIN"
+    text = output.decode("utf-8", "replace")
+    if returncode in (1, 2) and any(line in {
+            "pl.hil.swd04.contract.SafetyError: MMIO_CHILD_UNREAPED_NO_RELOAD",
+            "pl.hil.swd04.contract.SafetyError: MMIO_CHILD_TIMEOUT",
+            "pl.hil.swd04.contract.SafetyError: MMIO child failed or SIGBUS",
+            } for line in text.splitlines()):
+        return "CHILD_OWNERSHIP_UNCERTAIN"
+    if returncode == 255:
+        if re.search(r"(?m)^ssh: (?:connect to host [^\r\n]+ port [0-9]+: "
+                     r"(?:Connection timed out|No route to host|Network is unreachable|Connection refused)"
+                     r"|Could not resolve hostname [^\r\n]+)\r?$", text):
+            return "SSH_CONNECT_TIMEOUT_OR_UNREACHABLE"
+        if re.search(r"(?m)^(?:Host key verification failed\.|"
+                     r"WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!)\r?$", text):
+            return "HOST_KEY_REJECTED"
+        if re.search(r"(?m)^[^\r\n]+: Permission denied "
+                     r"\([a-z,-]+\)\.\r?$", text):
+            return "REMOTE_AUTH_OR_SUDO_FAILED"
+    if re.search(r"(?m)^sudo: (?:a password is required|"
+                 r"[0-9]+ incorrect password attempts?)\r?$", text):
+        return "REMOTE_AUTH_OR_SUDO_FAILED"
+    # Reject mixed/duplicate root diagnostic claims and all arbitrary stderr.
+    # Do not interpret diagnostics on SSH's own failure exit (255).
+    lines = text.splitlines()
+    root_codes = [line for line in lines if line in ROOT_MANIFEST_DIAGNOSTICS
+                  or line == "LiveStageDenied: F1B_IMAGE_NOT_LOADED"]
+    if returncode == 2 and len(root_codes) == 1:
+        if root_codes[0] in ROOT_MANIFEST_DIAGNOSTICS:
+            return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
+    if returncode == 1 and root_codes == ["LiveStageDenied: F1B_IMAGE_NOT_LOADED"]:
+        return "F1B_IMAGE_NOT_LOADED"
+    return "REMOTE_EXIT_OR_PRIVILEGE_FAILED"
+
+
+def parse_receipt(stage: str, source_sha: str, output: bytes) -> dict:
+    text = output.decode("utf-8", "replace")
+    matched = re.findall(
+        re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
+    need(text.count(MARK) == 1 and len(matched) == 1,
+         "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
+    try:
+        data = json.loads(matched[0])
+    except (ValueError, RecursionError):
+        raise Blocked("REMOTE_RECEIPT_INVALID") from None
+    need(type(data) is dict and data.get("stage") == stage
+         and type(data.get("boot_id")) is str
+         and re.fullmatch(r"[a-zA-Z0-9-]{8,64}", data["boot_id"]) is not None
+         and data.get("result") in {
+             "download": ("LOADED_AND_HELD",),
+             "test": ("IDENTITY_PASS",),
+             "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
+         }[stage], "REMOTE_RESULT_NOT_VERIFIED")
+    return {"stage": stage, "source_sha": source_sha,
+            "real_z2": True, "boot_id": data["boot_id"],
+            "result": data["result"]}
+
+
 def need(ok: bool, reason: str) -> None:
     if not ok:
         raise Blocked(reason)
@@ -86,7 +186,12 @@ def enrollment() -> tuple[str, str, str]:
 def execute(stage: str, source_sha: str) -> dict:
     need(stage in STAGES, "STAGE_NOT_ALLOWLISTED")
     need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
-    host, password, sudo_password = enrollment()
+    try:
+        host, password, sudo_password = enrollment()
+    except Blocked:
+        raise
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        raise Blocked("LOCAL_ENROLLMENT_DENIED") from None
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
     remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage)
@@ -153,41 +258,34 @@ def execute(stage: str, source_sha: str) -> dict:
         # sudo -S may be cached or configured to omit a password prompt.
         # Require a successful remote exit and exact root-entry receipt
         # instead of requiring a prompt that may legitimately be absent.
-        need(proc.wait(timeout=3) == 0,
-             "REMOTE_EXIT_OR_PRIVILEGE_FAILED")
-        # SSH and sudo prompts do not require line breaks. A legitimate
-        # root-entry marker may follow both prompts on the *same* PTY line.
-        # Never trust prompt text: require precisely one complete framed
-        # marker with a strict stage-specific JSON payload and exit code 0.
-        text = response.decode("utf-8", "replace")
-        matched = re.findall(
-            re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
-        need(text.count(MARK) == 1 and len(matched) == 1,
-             "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
-        data = json.loads(matched[0])
-        need(type(data) is dict and data.get("stage") == stage
-             and type(data.get("boot_id")) is str
-             and len(data["boot_id"]) >= 8
-             and data.get("result") in {
-                 "download": ("LOADED_AND_HELD",),
-                 "test": ("IDENTITY_PASS",),
-                 "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
-             }[stage], "REMOTE_RESULT_NOT_VERIFIED")
-        return {"stage": stage, "source_sha": source_sha,
-                "real_z2": True, "boot_id": data["boot_id"],
-                "result": data["result"]}
-    finally:
-        if proc is not None and proc.poll() is None:
-            try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                proc.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
-                proc.wait(timeout=2)
-        if slave != -1:
-            os.close(slave)
-        os.close(master)
+        try:
+            returncode = proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            raise Blocked("CHILD_OWNERSHIP_UNCERTAIN") from None
+        need(returncode == 0, remote_failure(returncode, bytes(response)))
+        return parse_receipt(stage, source_sha, bytes(response))
 
+    finally:
+        try:
+            if proc is not None and proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        raise Blocked("CHILD_OWNERSHIP_UNCERTAIN") from None
+        except (OSError, subprocess.SubprocessError):
+            raise Blocked("CHILD_OWNERSHIP_UNCERTAIN") from None
+        finally:
+            if slave != -1:
+                os.close(slave)
+            os.close(master)
