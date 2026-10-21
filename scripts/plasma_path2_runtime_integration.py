@@ -121,6 +121,7 @@ def stage_contract(task: dict, approval: dict) -> str:
         # transition or arbitrary shell. Continue using the installed Bridge.
         stage = task.get("stage") if type(task) is dict else None
         require(stage in ("download", "test", "restore") and
+                approval.get("authorized_stage") == stage and
                 type(approval.get("work_order_sha256")) is str and
                 approval["work_order_sha256"] == task.get("work_order_sha256"),
                 "PATH2_STAGE_WORK_ORDER_DENIED")
