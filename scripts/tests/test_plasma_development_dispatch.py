@@ -304,6 +304,26 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             "mode": "development", "tasks": {"legacy-cpu": legacy},
         }, "legacy-cpu"), legacy)
 
+    def test_candidate_live_codex_e2e_is_explicit_and_fail_closed(self):
+        task=dev.task_by_id(self.registry,"candidate-dispatcher-live-e2e")
+        self.assertEqual(task["execution_path"],"path3-codex")
+        self.assertIn("Do not use hardware",task["objective"])
+        self.assertIn("EXACTLY ONCE",task["objective"])
+        script=ROOT/"scripts/experiments/plasma_candidate_dispatcher_live_e2e.py"
+        self.assertTrue(script.is_file())
+        content=script.read_text()
+        self.assertIn("NESTED_CODEX_TIMEOUT_FAIL_CLOSED",content)
+        self.assertIn("TRUSTED_PARENT_CONTEXT_MISSING",content)
+        self.assertIn("CANDIDATE_DISPATCHER_REAL_CODEX_E2E_PASS",content)
+        # Without a real approved SWPC parent, fail BEFORE launching Codex.
+        result=subprocess.run(
+            [sys.executable,str(script)],cwd=ROOT,
+            env={"PATH":os.environ.get("PATH","/usr/bin:/bin")},
+            capture_output=True,check=False,timeout=5)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn(b"TRUSTED_PARENT_CONTEXT_MISSING",result.stderr)
+        self.assertNotIn(b"CANDIDATE_DISPATCHER_REAL_CODEX_E2E_PASS",result.stdout)
+
     def test_candidate_dispatcher_premerge_task_is_exact_cpu_only_sandbox(self):
         task=dev.task_by_id(self.registry,"candidate-dispatcher-premerge-sandbox")
         self.assertEqual(task["execution_path"],"path2-cli")
