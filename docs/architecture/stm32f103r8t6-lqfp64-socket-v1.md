@@ -41,8 +41,10 @@ Status: **exact-ICPN design-input contract only**. No physical qualification is 
 
 - `design_input_ready` means only sufficient pin/electrical/geometry
   information for socket schematic and contact assignment.
-- This is exactly `STM32F103R8T6`, **not** `STM32F103RBT6`, any T7/TR
-  variant, or all LQFP64 devices.
+- This Socket Profile applies exactly to `STM32F103R8T6`. A **separate**, explicitly
+  reviewed `STM32F103RBT6` exact Socket Profile consumes the same manufacturer-backed
+  LQFP64 pin map but has independent 128-KiB Flash geometry. Neither profile
+  applies implicitly to T7/TR variants or all LQFP64 devices.
 - Same OpenOCD target / same family does not authorize pin inheritance.
 - No FPGA, PPU, Site, DUT, runtime, HIL, PCB, socket-vendor approval,
   power-switch qualification, current-limit or signal-integrity validation.
