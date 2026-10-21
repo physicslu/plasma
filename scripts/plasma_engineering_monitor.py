@@ -15,11 +15,13 @@ import os
 from pathlib import Path
 import pwd
 import re
+import shutil
 import socket
 import stat
 import subprocess
 import sys
 import time
+import unicodedata
 
 BASE = Path("/run/plasma-codex")
 MONITOR = BASE / "engineering-monitor"
@@ -170,7 +172,26 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
                 print("MONITOR_WRITE_FAILED: %s" % type(exc).__name__, file=sys.stderr)
 
 
-def render_snapshot(directory: Path, path: str) -> str:
+def _clip_columns(line: str, width: int) -> str:
+    """Keep one log line inside one terminal row (including CJK wide glyphs)."""
+    if width <= 0:
+        return ""
+    used = 0
+    chars = []
+    for char in CONTROL.sub("", line).replace("\t", "    "):
+        cell_width = (0 if unicodedata.combining(char) else
+                      2 if unicodedata.east_asian_width(char) in ("W", "F")
+                      else 1)
+        if used + cell_width > width:
+            break
+        chars.append(char)
+        used += cell_width
+    return "".join(chars)
+
+
+def render_snapshot(directory: Path, path: str, *,
+                    width: int | None = None,
+                    height: int | None = None) -> str:
     if path not in PATHS:
         raise ValueError("unknown path")
     name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
@@ -207,10 +228,44 @@ def render_snapshot(directory: Path, path: str) -> str:
         with log_file.open("rb") as f:
             f.seek(0, 2)
             f.seek(max(0, f.tell() - 32768))
-            lines.extend(f.read().decode("utf-8", errors="replace").splitlines()[-30:])
+            log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
     except OSError:
-        lines.append("(no local output yet)")
+        log_lines = ["(no local output yet)"]
+    if height is not None:
+        # Reserve the bottom row to prevent tmux scrolling on a repaint.
+        visible_log_rows = max(0, height - 1 - len(lines))
+        log_lines = log_lines[-visible_log_rows:] if visible_log_rows else []
+    lines.extend(log_lines)
+    if height is not None:
+        lines = lines[:max(0, height - 1)]
+    if width is not None:
+        lines = [_clip_columns(str(line), width) for line in lines]
     return CONTROL.sub("", "\n".join(str(x) for x in lines))
+
+
+def view_loop(path: str, *, directory: Path = MONITOR, output=None,
+              get_size=None, sleep=None) -> None:
+    """Update only changed frames; never clear the whole screen first."""
+    if output is None:
+        output = sys.stdout
+    if get_size is None:
+        get_size = shutil.get_terminal_size
+    if sleep is None:
+        sleep = time.sleep
+    previous = None
+    previous_size = None
+    while True:
+        width, height = get_size()
+        size = (width, height)
+        frame = render_snapshot(directory, path, width=width, height=height)
+        if frame != previous or size != previous_size:
+            # Home + overwrite + clear *remainder*. Avoid the blank frame
+            # caused by the old ESC[2J full-screen clear every second.
+            output.write("\033[H" + frame + "\033[J")
+            output.flush()
+            previous = frame
+            previous_size = size
+        sleep(1)
 
 
 def main() -> int:
@@ -226,9 +281,7 @@ def main() -> int:
         command = args.command[1:] if args.command[:1] == ["--"] else args.command
         return run_job(args.path, command)
     try:
-        while True:
-            print("\033[2J\033[H" + render_snapshot(MONITOR, args.path), flush=True)
-            time.sleep(1)
+        view_loop(args.path)
     except KeyboardInterrupt:
         return 0
 
