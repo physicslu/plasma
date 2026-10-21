@@ -122,7 +122,9 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PLASMA_TRUSTED_SHA: ${{ github.event.pull_request.base.sha }}
           PLASMA_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+          PLASMA_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           test "$RUNNER_ENVIRONMENT" = github-hosted
