@@ -18,8 +18,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 DISPATCHER = ROOT / "scripts/plasma_development_dispatch.py"
 REGISTRY = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
-TRUSTED = "a" * 40
-CANDIDATE = "b" * 40
+TRUSTED = os.environ.get("PLASMA_TRUSTED_SHA", "")
+CANDIDATE = os.environ.get("PLASMA_CANDIDATE_SHA", "")
+PR_NUMBER = os.environ.get("PLASMA_PR_NUMBER", "")
 TASK = "auto4-premerge-path3"
 
 # Stub only. No Codex installation, network, sudo, USB, FPGA or devices.
@@ -76,9 +77,12 @@ def smoke() -> None:
           "ONLY_PULL_REQUEST_ALLOWED")
     check(os.environ.get("GITHUB_REPOSITORY") == "physicslu/plasma",
           "REPOSITORY_DENIED")
-    expected = os.environ.get("PLASMA_CANDIDATE_SHA", "")
     actual = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
-    check(len(expected) == 40 and actual == expected, "CANDIDATE_HEAD_MISMATCH")
+    check(len(CANDIDATE) == 40 and actual == CANDIDATE, "CANDIDATE_HEAD_MISMATCH")
+    check(len(TRUSTED) == 40 and TRUSTED != CANDIDATE,
+          "TRUSTED_BASE_IDENTITY_DENIED")
+    check(PR_NUMBER.isdecimal() and int(PR_NUMBER) > 0,
+          "PR_IDENTITY_DENIED")
     task = json.loads(REGISTRY.read_text())["tasks"][TASK]
     check(task["execution_path"] == "path3-codex"
           and "Do not use hardware" in task["objective"], "CPU_ONLY_TASK_REQUIRED")
@@ -88,7 +92,7 @@ def smoke() -> None:
             "action": "created",
             "issue": {"number": 981},
             "comment": {"id": 1001, "user": {"login": "physicslu"},
-                        "body": f"/plasma-dispatch run {TASK} --pr 1083 --sha {CANDIDATE} 981"},
+                        "body": f"/plasma-dispatch run {TASK} --pr {PR_NUMBER} --sha {CANDIDATE} 981"},
             "sender": {"login": "physicslu"},
             "repository": {"full_name": "physicslu/plasma"},
         }
@@ -96,7 +100,7 @@ def smoke() -> None:
         event_file.write_text(json.dumps(event))
         pr_file = temp / "pr.json"
         pr_file.write_text(json.dumps({
-            "number": 1083, "state": "open", "merged_at": None,
+            "number": int(PR_NUMBER), "state": "open", "merged_at": None,
             "user": {"login": "physicslu"},
             "head": {"ref": "candidate", "sha": CANDIDATE,
                      "repo": {"full_name": "physicslu/plasma"}},
@@ -140,7 +144,7 @@ def smoke() -> None:
                 "execute-codex", "--event", str(event_file),
                 "--registry", str(REGISTRY), "--workspace", str(workspace),
                 "--trusted-sha", TRUSTED, "--pinned-sha", pinned,
-                "--pr-number", "1083", "--registry-sha256",
+                "--pr-number", PR_NUMBER, "--registry-sha256",
                 digest if digest is not None else auth["registry_sha256"],
             ]
             return invoke(args, env)
