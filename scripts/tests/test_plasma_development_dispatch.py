@@ -1360,5 +1360,198 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
 
 
 
+
+
+class GenericWorkOrderContracts(unittest.TestCase):
+    """Offline: one Work Order format, both Paths; no device/Runner access."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.registry = json.loads(REGISTRY.read_text())
+
+    def _order(self, path="path3-codex", **kwargs):
+        order = {
+            "schema": dev.WORK_ORDER_SCHEMA,
+            "execution_path": path,
+            "capability": "codex-workspace" if path == "path3-codex"
+                          else "cpu-only",
+            "scope": "host-only",
+            "objective": "Perform the owner approved bounded engineering task.",
+            "acceptance": "Record actual test commands and observed results.",
+        }
+        if path == "path2-cli":
+            baseline = dev.task_by_id(self.registry, "nine-nine-path2")
+            order.update({key: baseline[key] for key in (
+                "script", "argv", "expected_stdout_sha256")})
+        order.update(kwargs)
+        return order
+
+    def _event(self, order):
+        return {
+            "action": "created", "issue": {"number": 981},
+            "comment": {"id": 246801, "user": {"login": "physicslu"},
+                        "body": dev.WORK_ORDER_PREFIX +
+                        json.dumps(order, ensure_ascii=False)},
+            "sender": {"login": "physicslu"},
+            "repository": {"full_name": "physicslu/plasma"},
+        }
+
+    def _context(self):
+        return {
+            "GITHUB_EVENT_NAME": "issue_comment",
+            "GITHUB_ACTOR": "physicslu",
+            "GITHUB_REPOSITORY": "physicslu/plasma",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_SHA": "a" * 40,
+            "GITHUB_RUN_ATTEMPT": "1",
+        }
+
+    def test_both_paths_share_one_dynamic_protocol_no_registry_entry(self):
+        self.assertNotIn("path2-work-order", self.registry["tasks"])
+        self.assertNotIn("path3-work-order", self.registry["tasks"])
+        for path, expected in (("path2-cli", "path2-work-order"),
+                               ("path3-codex", "path3-work-order")):
+            order = self._order(path)
+            event = self._event(order)
+            req = dev.request(event, self._context())
+            self.assertEqual(req["task_id"], expected)
+            self.assertEqual(req["work_order_sha256"],
+                             dev.work_order_digest(order))
+            approval = dev.authorize(event, self._context(), self.registry)
+            self.assertEqual(approval["task_id"], expected)
+            self.assertEqual(approval["execution_path"], path)
+            self.assertEqual(approval["pinned_sha"], "a" * 40)
+            self.assertEqual(approval["work_order_sha256"],
+                             req["work_order_sha256"])
+            task = dev.task_for_request(self.registry, req, event)
+            self.assertEqual(task["objective"], order["objective"])
+            self.assertEqual(task["acceptance"], order["acceptance"])
+
+    def test_path2_cpu_only_uses_existing_checked_script(self):
+        event = self._event(self._order("path2-cli"))
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["capability"], "cpu-only")
+        result = dev.run_task(task)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["rows"], 81)
+        with patch.object(dev.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
+                dev.run_task(task, sandbox=True)
+
+    def test_exact_stage_guard_accepts_only_digest_pinned_stage(self):
+        import plasma_path2_runtime_integration as runtime
+        stage_order = self._order(
+            "path2-cli", capability="path2-stage-contract",
+            scope="guarded-hardware",
+            project="pl/projects/z2-fixed-unified-site1",
+            stage="test")
+        for field in ("script", "argv", "expected_stdout_sha256"):
+            stage_order.pop(field, None)
+        event = self._event(stage_order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(runtime.stage_contract(task, approval), "test")
+        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
+            runtime.stage_contract(task, approval |
+                                   {"work_order_sha256": "0" * 64})
+        with self.assertRaisesRegex(runtime.RuntimeDenied, "TASK_DENIED"):
+            runtime.stage_contract(task | {"stage": "download"}, approval)
+
+    def test_work_order_tamper_and_replay_denied_before_execution(self):
+        order = self._order()
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        changed = copy.deepcopy(event)
+        changed["comment"]["body"] = dev.WORK_ORDER_PREFIX + json.dumps(
+            order | {"objective": "Changed objective after authorization."})
+        with self.assertRaisesRegex(dev.Denied, "DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, changed)
+        with self.assertRaisesRegex(dev.Denied, "RERUN_DENIED"):
+            dev.authorize(event, self._context() |
+                          {"GITHUB_RUN_ATTEMPT": "2"}, self.registry)
+        class Args:
+            action = "execute-codex"
+            trusted_sha = "a" * 40
+            pinned_sha = "a" * 40
+            pr_number = 0
+            execution_capability = "codex-workspace"
+            work_order_sha256 = "0" * 64
+        with tempfile.TemporaryDirectory() as td:
+            args = Args()
+            args.workspace = Path(td)
+            args.registry = Path(td) / "tasks.json"
+            args.registry.write_text(json.dumps(self.registry))
+            args.registry_sha256 = hashlib.sha256(
+                args.registry.read_bytes()).hexdigest()
+            with patch.dict(os.environ, {
+                "RUNNER_ENVIRONMENT": "self-hosted",
+                "RUNNER_NAME": "SWPC-plasma-codex",
+                "GITHUB_RUN_ATTEMPT": "1",
+            }), patch.object(dev.os, "geteuid", return_value=1000):
+                with self.assertRaisesRegex(dev.Denied, "WORKER_BINDING_DENIED"):
+                    dev.worker_admission(req, args, self.registry, event)
+
+    def test_reject_arbitrary_shell_and_path3_unbounded_hardware(self):
+        bad_orders = [
+            self._order("path2-cli", script="/bin/sh"),
+            self._order("path2-cli", argv=["-c", "rm"]),
+            self._order("path2-cli", capability="vivado-host-build"),
+            self._order("path3-codex", scope="guarded-hardware"),
+            self._order("path3-codex", capability="path2-stage-contract"),
+            self._order("path3-codex", hardware_stages=["download"]),
+            self._order("path2-cli", stage="restore"),
+        ]
+        for order in bad_orders:
+            with self.subTest(order=order), self.assertRaises(dev.Denied):
+                dev.request(self._event(order), self._context())
+        duplicate = self._event(self._order())
+        duplicate["comment"]["body"] = dev.WORK_ORDER_PREFIX + (
+            '{"schema":"a","schema":"b"}')
+        with self.assertRaises(dev.Denied):
+            dev.request(duplicate, self._context())
+        forged = self._event(self._order())
+        forged["sender"]["login"] = "attacker"
+        with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
+            dev.request(forged, self._context())
+
+    def test_existing_workflow_and_two_runner_routes(self):
+        content = WORKFLOW.read_text()
+        self.assertIn("'/plasma-dispatch work-order 981'", content)
+        self.assertIn("task_id == 'path2-work-order'", content)
+        self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
+        self.assertEqual(content.count(
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+        self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
+                      content)
+
+    def test_path3_prompt_preserves_host_only_and_one_attempt(self):
+        order = self._order()
+        event = self._event(order)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            calls = []
+            class Fake:
+                returncode = 0
+                stdout = b"offline agent output"
+                stderr = b""
+            def run(command, **kw):
+                calls.append(kw["input"].decode())
+                (root / ".plasma-path3-evidence" /
+                 "engineering-report.md").write_text("Host-only test evidence.\n")
+                return Fake()
+            result = dev.run_codex_task(
+                task, workspace=root, executor=run,
+                task_id="path3-work-order")
+            self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertEqual(len(calls), 1)
+            self.assertIn("HOST-ONLY", calls[0])
+            self.assertIn("Acceptance criteria", calls[0])
+            self.assertIn("Owner Work Order SHA256", calls[0])
+
+
 if __name__ == "__main__":
     unittest.main()
