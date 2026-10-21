@@ -24,10 +24,16 @@ fi
 
 # Each viewer switches group INSIDE its tmux pane, even if the tmux server was
 # created before the operator joined plasma-monitor.
+# Do not make sg/Python the pane's final process. If either exits during
+# startup, tmux otherwise removes the window before the layout check and
+# reports "can't find window: 2", hiding the actual failure. Keep an
+# operator-owned shell with a visible exit code instead. No automatic retries.
 viewer_command() {
-  local inner
+  local inner grouped_command launcher
   printf -v inner 'exec python3 -u %q view %s' "$viewer" "$1"
-  printf 'sg %q -c %q' "$group" "$inner"
+  printf -v grouped_command 'sg %q -c %q' "$group" "$inner"
+  printf -v launcher '%s; rc=$?; printf "MONITOR_VIEWER_EXIT path=%s exit=%%s\\n" "$rc" >&2; exec bash' "$grouped_command" "$1"
+  printf 'bash -c %q' "$launcher"
 }
 
 # Owned by the logged-in operator. Never change global tmux settings or

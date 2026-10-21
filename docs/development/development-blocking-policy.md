@@ -62,3 +62,16 @@ SIGBUS/timeout/reaping handling and unique real stage receipts remain
 subordinate B1/B2/B3 requirements. Historical one-shot/qualification modules
 are not silently activated by this Development change. Host regressions do
 not prove deployment, Vivado execution or HIL acceptance.
+
+Transport failures now cross the shared Path 2/3 adapter as exact codes from
+`SAFE_FAILURE_CODES`, including local enrollment, SSH reachability/host key/
+authentication, invalid receipts, timeout and uncertain child ownership.
+Existing explicit lower-level `Blocked` codes remain distinct; unknown exception
+text becomes `UNKNOWN`. No exception text, PTY output or connection identity is
+exported. Exact protected-source failure diagnostics may categorize manifest
+blocks or `F1B_IMAGE_NOT_LOADED`; these are failed-command diagnostic classes,
+not verified current image or recovery state. Arbitrary remote stderr is never
+a successful root receipt. Nonzero exit, malformed/duplicate markers, SIGBUS or
+unreaped children cannot authorize a following stage. Root guards and the
+exit-zero, stage-specific receipt requirement remain mandatory. A timeout needs
+manual state review; a failure code never authorizes an automatic retry.

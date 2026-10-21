@@ -113,6 +113,68 @@ class EngineeringMonitorTests(unittest.TestCase):
                     str(directory / "missing-live-log"))
             self.assertFalse((directory / "evidence").exists())
 
+    def test_shortcuts_are_visible_at_top_with_configured_prefix(self):
+        with tempfile.TemporaryDirectory() as td:
+            frame = mon.render_snapshot(
+                Path(td), "path3", prefix="Ctrl+A", width=50, height=20)
+            self.assertEqual(frame.splitlines()[0], "PATH 3 | SWPC Codex")
+            self.assertIn("KEYS: C Clear | Ctrl+A 1/2 Switch", frame)
+            self.assertIn("Ctrl+A D Detach", frame)
+            self.assertIn("STATUS: IDLE", frame)
+
+    def test_clear_is_display_only_and_new_lines_keep_streaming(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            log = directory / "path3.log"
+            original = "old Codex message\n"
+            log.write_text(original)
+            output = io.StringIO()
+            keys = iter([None, "C", None])
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] == 2:
+                    with log.open("a") as f:
+                        f.write("new Codex message\n")
+                if polls[0] >= 3:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop(
+                    "path3", directory=directory, output=output,
+                    get_size=lambda: os.terminal_size((80, 24)),
+                    sleep=fake_sleep, get_now=lambda: FIXED_NOW,
+                    get_key=lambda: next(keys))
+            frames = output.getvalue().split("\x1b[H")[1:]
+            self.assertEqual(len(frames), 3)
+            self.assertIn("old Codex message", frames[0])
+            self.assertNotIn("old Codex message", frames[1])
+            self.assertNotIn("old Codex message", frames[2])
+            self.assertIn("new Codex message", frames[2])
+            self.assertEqual(log.read_text(),
+                             original + "new Codex message\n")
+            self.assertFalse((directory / "path3.json").exists())
+            self.assertNotIn("\x1b[2J", output.getvalue())
+
+    def test_clear_does_not_hide_next_jobs_first_message(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            log = directory / "path2.log"
+            state = directory / "path2.json"
+            state.write_text(json.dumps({
+                "status": "IDLE", "run_id": "100", "started": "before"}))
+            log.write_text("old first line\n")
+            clear_from = mon._clear_point(directory, "path2")
+            self.assertNotIn("old first line", mon.render_snapshot(
+                directory, "path2", clear_from=clear_from))
+            # The same log inode is truncated when run_job starts anew.
+            log.write_text("new job first line\n")
+            state.write_text(json.dumps({
+                "status": "IDLE", "run_id": "200", "started": "after"}))
+            self.assertIn("new job first line", mon.render_snapshot(
+                directory, "path2", clear_from=clear_from))
+
     def test_view_does_not_redraw_when_idle_is_unchanged(self):
         with tempfile.TemporaryDirectory() as td:
             out = io.StringIO()
@@ -319,6 +381,21 @@ class EngineeringMonitorTests(unittest.TestCase):
                     "split-window" in cmd or "kill-" in cmd
                     for cmd in result["commands"]))
 
+    def test_launcher_retains_window_on_immediate_viewer_exit(self):
+        """An sg/view failure must remain visible, never race the tmux layout check."""
+        for failing in ("path2", "path3"):
+            with self.subTest(failing=failing):
+                result = self._run_mock_launcher([], fail_viewer=failing)
+                self.assertEqual(result["rc"], 0, result["stderr"])
+                self.assertIn(
+                    f"MONITOR_VIEWER_EXIT path={failing} exit=7",
+                    result["stderr"])
+                self.assertEqual(
+                    [(w["index"], w["name"]) for w in result["windows"]],
+                    [(1, "path2"), (2, "path3")])
+                self.assertFalse(any(
+                    "kill-" in cmd for cmd in result["commands"]))
+
     def test_two_window_launcher_fails_closed(self):
         cases = [
             ([], False, True),
@@ -338,7 +415,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                     for cmd in result["commands"]))
 
     def _run_mock_launcher(self, windows, *, base=1, repeat=1,
-                           group_exists=True, member=True):
+                           group_exists=True, member=True, fail_viewer=""):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             bin_dir = root / "bin"
@@ -371,6 +448,11 @@ else exit 2; fi
 echo "$1 $2 $3" >> "$TEST_SG_LOG"
 [[ "$1" == plasma-monitor && "$2" == -c &&
    "$3" == *"exec python3 -u"* ]] || exit 2
+if [[ -n "$TEST_FAIL_VIEWER" &&
+      "$3" == *"view $TEST_FAIL_VIEWER"* ]]; then
+  echo "MOCK_SG_FAILURE" >&2
+  exit 7
+fi
 ''')
             write_stub("tmux", r'''
 import json, os, subprocess, sys
@@ -441,6 +523,7 @@ if op in ("new-session", "new-window"):
                 "TEST_SG_LOG": str(sg_file),
                 "TEST_MEMBER": "1" if member else "0",
                 "TEST_GROUP": "1" if group_exists else "0",
+                "TEST_FAIL_VIEWER": fail_viewer,
             })
             proc = None
             for _ in range(repeat):
@@ -474,6 +557,8 @@ if op in ("new-session", "new-window"):
         self.assertIn('tmux select-window -t "$session:1"', script)
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
+        self.assertIn("MONITOR_VIEWER_EXIT", script)
+        self.assertIn("exec bash", script)
 
 
 
