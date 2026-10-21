@@ -65,6 +65,12 @@
       "project": "pl/projects/z2-fixed-unified-site1",
       "stage": "restore"
     },
+    "z2-path2-full-hil": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "full"
+    },
     "f1b-path3-codex-vivado-build": {
       "execution_path": "path3-codex",
       "objective": "Complete F1-B PYNQ-Z2 fixed unified Site 1 REAL Host-only FPGA build with Vivado 2026.1 using the existing pl/projects/z2-fixed-unified-site1 Tcl, the pinned board helper, and existing HWH verifier. This is Development Mode: run the actual Vivado synthesis, implementation, timing and DRC; generate BIT and HWH; diagnose failures, edit RTL/Tcl/Python/build scripts and documents as needed, rerun to qualified evidence. On failure, distinguish observed root causes from hypotheses and retain exact commands, logs, exit codes, minimal fixes and retest history. Save a chronological problem/solution engineering-report.md in .plasma-path3-evidence and preserve report/log/artifact SHA256. Do not falsely claim real Build PASS when NOT_RUN or failed. Host-only: do not connect to, program, reset or change power on physical Z2/FPGA/DUT/LA or use MMIO/USB/hardware deployment. Do not merge, push, or reconfigure GitHub CI. Prefer reuse of existing checked-in Vivado project and board helper, not a new build framework. MANDATORY delivery follow-up: rebuild the current newly pinned candidate HEAD from scratch after the fixed create_block_design.tcl change, not merely restate the prior successful run; independently verify final reports. The previous run 39342622512 produced valid BIT/HWH locally but raw binaries were absent from GitHub's uploaded artifact because hidden/ignored evidence paths were not captured. To correct custody with the EXISTING trusted workflow, copy the real final BIT and HWH plus raw Vivado logs/reports into candidate/pl/build/f1b-deliverables/ (create if necessary). In particular the files MUST be under pl/build/ with extensions .bit and .hwh, so existing artifact globs candidate/pl/build/**/*.bit and **/*.hwh upload both. Preserve original hashes and evidence report, and record commands, actual paths, sizes, SHA256 and all stage results. Do not embed license secrets. Do not alter Workflow or Git refs. If they cannot be included, explicitly report delivery FAIL."
