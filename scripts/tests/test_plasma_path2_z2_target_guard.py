@@ -202,6 +202,60 @@ class RootTargetPortContracts(unittest.TestCase):
                                     "FPGA_OWNER_LOCK_REQUIRED"):
             port.now()
 
+    def test_cross_trigger_checkpoint_rechecks_lease_boot_and_last_load(self):
+        from scripts import plasma_path2_persistent_lease as lease
+        import time
+        now = int(time.time())
+        port = target.RootZ2TargetPort(
+            candidate=Path("/lib/firmware/plasma-f1b-owner-20261020-once.bin"),
+            recovery=Path("/lib/firmware/base.bin"),
+            ledger=Path("/run/plasma-z2-swd05/f1b-site1-lease.json"))
+        # The local fixture models an acquired root owner, not a real lock.
+        port._locked = True
+        port._lock_owner_pid = os.getpid()
+        port._lock_owner_thread = threading.get_ident()
+        record = dict(
+            status="LOADED_AND_HELD", load_attempts=1,
+            restore_attempts=0, artifact_sha256=target.f1b.BIN_SHA,
+            recovery_sha256=target.f1b.BASE_SHA, boot_id="boot-current",
+            last_seen=now-2, lease_deadline=now+120, lease_id="lease-123")
+        live = fixture(boot_id="boot-current")
+        name = port.candidate.name
+        manager_log = f"fpga_manager fpga0: writing {name} to fpga0"
+        with patch.object(lease.LeaseLedger, "snapshot", return_value=record), \
+             patch.object(target, "read_live_z2_facts", return_value=live), \
+             patch.object(one_shot, "manager_last_load",
+                          return_value=manager_log):
+            result = port.inspect_cross_trigger("testing")
+            self.assertEqual(result["status"],
+                             "PASSIVE_CHECKPOINT_REVIEW_REQUIRED")
+            self.assertFalse(result["hardware_write_authorized"])
+            self.assertEqual(result["axi_isolation"], "UNPROVEN")
+            self.assertIn("UNATTESTED", result["loaded_image_identity"])
+            self.assertEqual(port.inspect_cross_trigger("restore")["stage"],
+                             "restore")
+            with patch.object(target, "read_live_z2_facts",
+                              return_value=fixture(boot_id="different-boot")):
+                with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                            "CROSS_TRIGGER_BOOT_OR_MMIO"):
+                    port.inspect_cross_trigger("testing")
+            with patch.object(one_shot, "manager_last_load",
+                              return_value="fpga_manager fpga0: writing base.bin to fpga0"):
+                with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                            "HELD_IMAGE_MANAGER"):
+                    port.inspect_cross_trigger("testing")
+            with patch.object(lease.LeaseLedger, "snapshot",
+                              return_value={**record,
+                                            "status": "UNKNOWN_MANUAL_RECOVERY"}):
+                with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                            "CROSS_TRIGGER_LEASE_NOT_ACTIVE"):
+                    port.inspect_cross_trigger("testing")
+            with patch.object(lease.LeaseLedger, "snapshot",
+                              return_value={**record, "lease_deadline": now-1}):
+                with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                            "HELD_IMAGE_LEASE_EXPIRED"):
+                    port.inspect_cross_trigger("restore")
+
     def test_no_auto_activation_or_arbitrary_shell(self):
         content = (ROOT / "pl/hil/path2_z2_target_guard.py").read_text()
         self.assertNotIn("subprocess", content)
