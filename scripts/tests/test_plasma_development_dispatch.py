@@ -304,6 +304,25 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             "mode": "development", "tasks": {"legacy-cpu": legacy},
         }, "legacy-cpu"), legacy)
 
+    def test_candidate_dispatcher_premerge_task_is_exact_cpu_only_sandbox(self):
+        task=dev.task_by_id(self.registry,"candidate-dispatcher-premerge-sandbox")
+        self.assertEqual(task["execution_path"],"path2-cli")
+        self.assertEqual(task["capability"],"cpu-only")
+        self.assertEqual(task["argv"],[])
+        self.assertEqual(
+            task["script"],
+            "scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py")
+        source=(ROOT/task["script"]).read_text()
+        self.assertIn('ROOT = Path("/work")',source)
+        self.assertIn("WORKTREE_MUST_BE_READ_ONLY",source)
+        self.assertIn("HOST_SYSFS_MOUNT_DENIED",source)
+        self.assertIn("HOST_UDEV_MOUNT_DENIED",source)
+        self.assertEqual(
+            task["expected_stdout_sha256"],
+            hashlib.sha256(
+                b"CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS\\n"
+            ).hexdigest())
+
     def test_cpu_only_sandbox_fails_closed_without_bwrap(self):
         task = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
         with tempfile.TemporaryDirectory() as td:
