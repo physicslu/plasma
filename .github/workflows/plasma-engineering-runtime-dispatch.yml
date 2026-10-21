@@ -603,6 +603,7 @@ jobs:
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
           PLASMA_F1B_TASK_ID: ${{ needs.development-authorize.outputs.task_id }}
           # Only the owner-authorized F1-B engineering task admits Vivado.
           PLASMA_FPGA_PATH3_APPROVED: ${{ needs.development-authorize.outputs.task_id == 'f1b-path3-codex-vivado-build' && '1' || '0' }}
@@ -625,6 +626,7 @@ jobs:
             --workspace candidate \
             --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+            --work-order-sha256 "$WORK_ORDER_SHA256" \
             > "$RUNNER_TEMP/plasma-path3-receipt.json"
           # Runner exits nonzero when Codex failed/incomplete. Do not put
           # evidence extraction here: 'set -e' would skip it on failure.
