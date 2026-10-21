@@ -139,8 +139,10 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
     stage = stage_contract(task, approval)
     try:
         payload = transport.execute(stage, approval["pinned_sha"])
-    except (transport.Blocked, OSError, ValueError, subprocess.SubprocessError):
-        raise RuntimeDenied("PATH2_STAGE_TRANSPORT_FAILED_OR_UNKNOWN") from None
+    except transport.Blocked as exc:
+        raise RuntimeDenied(transport.failure_code(exc)) from None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise RuntimeDenied("UNKNOWN") from None
     require(type(payload) is dict and
             payload.get("stage") == stage and
             payload.get("source_sha") == approval["pinned_sha"] and

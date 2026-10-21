@@ -1701,7 +1701,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             executed.append(stage)
             raise integration.transport.Blocked("REMOTE_EXIT_OR_PRIVILEGE_FAILED")
         with patch.object(integration.transport, "execute", side_effect=deny_test):
-            with self.assertRaisesRegex(integration.RuntimeDenied, "TRANSPORT_FAILED"):
+            with self.assertRaisesRegex(integration.RuntimeDenied, "REMOTE_EXIT_OR_PRIVILEGE_FAILED"):
                 integration.path3_shared_hardware_stages(task, approval)
         self.assertEqual(executed, ["test"])
 
