@@ -2,6 +2,7 @@
 """Host-only tests for the non-authorizing Path 2/3 SSH tmux monitor."""
 from __future__ import annotations
 
+import datetime as dt
 import io
 import json
 import os
@@ -18,6 +19,8 @@ import plasma_engineering_monitor as mon
 import plasma_development_dispatch as dev
 
 WORKFLOW = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
+TAIPEI = dt.timezone(dt.timedelta(hours=8))
+FIXED_NOW = dt.datetime(2026, 10, 21, 16, 10, 0, tzinfo=TAIPEI)
 
 
 class EngineeringMonitorTests(unittest.TestCase):
@@ -94,6 +97,10 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn(b"stderr marker", live.read_bytes())
             self.assertIn(b"stdout marker", evidence.read_bytes())
             self.assertIn(b"stderr marker", evidence.read_bytes())
+            # Synthetic timing goes only to the transient monitor sink.
+            mon._append(live, "\n" + mon._monitor_time_mark(FIXED_NOW))
+            self.assertIn(b"[MONITOR TIME MARK]", live.read_bytes())
+            self.assertNotIn(b"[MONITOR TIME MARK]", evidence.read_bytes())
 
     def test_monitor_setup_failure_is_only_pre_execution(self):
         with tempfile.TemporaryDirectory() as td:
@@ -119,7 +126,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             with self.assertRaises(StopIteration):
                 mon.view_loop("path3", directory=Path(td), output=out,
                               get_size=lambda: os.terminal_size((80, 24)),
-                              sleep=fake_sleep)
+                              sleep=fake_sleep, get_now=lambda: FIXED_NOW)
             self.assertEqual(polls[0], 3)
             self.assertEqual(out.getvalue().count("\x1b[H"), 1)
             self.assertNotIn("\x1b[2J", out.getvalue())
@@ -163,7 +170,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             with self.assertRaises(StopIteration):
                 mon.view_loop("path3", directory=directory, output=out,
                               get_size=lambda: os.terminal_size((80, 24)),
-                              sleep=fake_sleep)
+                              sleep=fake_sleep, get_now=lambda: FIXED_NOW)
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
             self.assertIn("RUN: 12345  TASK: test-task", out.getvalue())
             self.assertIn("LAST: PASS  EXIT: 0", out.getvalue())
@@ -184,6 +191,104 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("RECENT OUTPUT", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
+
+    def test_path3_clock_is_pinned_to_minute_and_has_timezone(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            before = mon.render_snapshot(directory, "path3", now=FIXED_NOW)
+            same_minute = mon.render_snapshot(
+                directory, "path3", now=FIXED_NOW.replace(second=59))
+            next_minute = mon.render_snapshot(
+                directory, "path3", now=FIXED_NOW + dt.timedelta(minutes=1))
+            self.assertEqual(before, same_minute)
+            self.assertNotEqual(before, next_minute)
+            self.assertIn("NOW: 2026-10-21T16:10+08:00", before)
+            self.assertIn("NOW: 2026-10-21T16:11+08:00", next_minute)
+            self.assertNotIn("NOW:", mon.render_snapshot(
+                directory, "path2", now=FIXED_NOW))
+
+    def test_path3_view_redraws_once_at_minute_boundary(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = io.StringIO()
+            readings = iter([FIXED_NOW.replace(second=1),
+                             FIXED_NOW.replace(second=59),
+                             FIXED_NOW + dt.timedelta(minutes=1)])
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] >= 3:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path3", directory=Path(td), output=output,
+                              get_size=lambda: os.terminal_size((80, 24)),
+                              sleep=fake_sleep, get_now=lambda: next(readings))
+            self.assertEqual(output.getvalue().count("\x1b[H"), 2)
+            self.assertNotIn("\x1b[2J", output.getvalue())
+            self.assertIn("NOW: 2026-10-21T16:10+08:00", output.getvalue())
+            self.assertIn("NOW: 2026-10-21T16:11+08:00", output.getvalue())
+
+    def test_path3_time_marks_only_after_60_elapsed_seconds(self):
+        class FakeProcess:
+            def __init__(self):
+                self.poll_count = 0
+
+            def poll(self):
+                self.poll_count += 1
+                return None if self.poll_count <= 5 else 0
+
+            def wait(self):
+                return 0
+
+        with tempfile.TemporaryDirectory() as td:
+            seconds = [0]
+            steps = iter([15, 15, 29, 1, 60])
+
+            def fake_sleep(_duration):
+                seconds[0] += next(steps)
+
+            with patch.object(mon.subprocess, "Popen", return_value=FakeProcess()), \
+                 patch.object(mon.time, "monotonic",
+                              side_effect=lambda: seconds[0]), \
+                 patch.object(mon.time, "sleep", side_effect=fake_sleep), \
+                 patch.object(mon, "_monitor_time_mark",
+                              return_value=mon._monitor_time_mark(FIXED_NOW)):
+                rc = mon.run_job("path3", ["fake-codex"], directory=Path(td))
+            self.assertEqual(rc, 0)
+            log = (Path(td) / "path3.log").read_text()
+            self.assertEqual(log.count("[MONITOR TIME MARK]"), 2)
+            self.assertIn("[MONITOR TIME MARK] 2026-10-21T16:10:00+08:00", log)
+            self.assertIn("PASS | exit=0", log)
+            state = json.loads((Path(td) / "path3.json").read_text())
+            self.assertEqual(state["last_result"], "PASS")
+
+    def test_path2_does_not_emit_codex_time_mark(self):
+        class FakeProcess:
+            def __init__(self):
+                self.poll_count = 0
+
+            def poll(self):
+                self.poll_count += 1
+                return None if self.poll_count <= 1 else 0
+
+            def wait(self):
+                return 0
+
+        with tempfile.TemporaryDirectory() as td:
+            seconds = [0]
+
+            def fake_sleep(_duration):
+                seconds[0] += 120
+
+            with patch.object(mon.subprocess, "Popen", return_value=FakeProcess()), \
+                 patch.object(mon.time, "monotonic",
+                              side_effect=lambda: seconds[0]), \
+                 patch.object(mon.time, "sleep", side_effect=fake_sleep):
+                rc = mon.run_job("path2", ["fake-cli"], directory=Path(td))
+            self.assertEqual(rc, 0)
+            self.assertNotIn("MONITOR TIME MARK",
+                             (Path(td) / "path2.log").read_text())
 
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
