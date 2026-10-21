@@ -99,6 +99,36 @@ flowchart TD
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
 5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
 
+### Path 3 Admission 與失敗證據最小化（Gate 1 Draft）
+
+**安全檢查數量不等於人工 Gate 數量。** 使用者 Gate 1 一次授權
+Codex 在既定工作樹／Objective 內自主進行 Code → Test → Fix → Retest，
+不需要因可恢復的軟體編譯失敗再向使用者取得批准；超出工作範圍、
+權限不足、實體 FPGA／AXI 安全不明及失敗恢復 UNKNOWN，仍必須立即停止。
+
+- **GitHub-hosted Admission**：確認 Owner、Issue #981、PR 與可信 main SHA、
+  Candidate 精確 Commit SHA、Task Registry SHA256 及合法 Path。
+- **SWPC Worker Admission**：重用同一個 Python `worker_admission()` 函式
+  進行第二信任邊界的獨立 SHA/Registry/Runner/Path 檢查，統一回報
+  `WORKER_SOURCE_ADMITTED`；不得省略第二次校驗或將它當成另一道人工 Gate。
+- **Codex 自主工程迴圈**：單一 Codex CLI 程序在同一 Job 內自行診斷、
+  修改及重跑允許的測試；Dispatcher 不新增 Agent Retry Supervisor，
+  不另起 SWPC Job，不因 Exit Code 自動重派硬體指令。
+- **失敗證據與退出碼**：`run_codex_task()` 即使 Codex 非零退出，也產生
+  `CODEX_EXECUTION_FAILED_REVIEW_REQUIRED` Receipt，保留實際 Exit Code
+  與 Codex Session Log；若 Exit Code 0 但沒有可用的工程報告或完整舊版
+  Source/Output/Test Log，則為 `CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED`。
+  兩者 Workflow 仍 **FAIL（非零退出）**，不能視為工程 PASS。
+- **失敗後收集**：共用 Workflow 以 `if: always()` 執行獨立的證據收集步驟，
+  保存含已暫存／未暫存變更的 `git diff HEAD --binary`、未追蹤檔清單／
+  壓縮檔、工程報告、Codex 日誌、Artifact Hash；不因 `set -e`
+  造成初始工作失敗時跳過所有證據。Runner 異常中斷、磁碟／網路故障、
+  Job 硬超時仍可能讓資料採集不完整，不能宣稱絕對保證。
+
+本 Draft PR 僅執行 GitHub-hosted 離線負向與回歸測試，**不發出 Issue #981 指令**，
+不啟動 SWPC self-hosted、Codex CLI、Vivado 或 Z2；沒有實機權限、
+部署或 PR Merge 授權。離線 CI PASS 不等於真正 SWPC Path 3 E2E PASS。
+
 ## 五、Gate 1 — 推薦與選擇矩陣
 
 | 問題 | Path 1 | Path 2 | Path 3 |
