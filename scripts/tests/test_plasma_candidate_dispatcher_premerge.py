@@ -31,22 +31,22 @@ root = Path.cwd()
 evidence = root / ".plasma-path3-evidence"
 evidence.mkdir(exist_ok=True)
 (evidence / "engineering-report.md").write_text(
-    "HOSTED_SIMULATION_ONLY: stub Codex; NOT a SWPC E2E test.\\n"
-    "12 rows independently checked by the outer integration harness.\\n"
+    "HOSTED_SIMULATION_ONLY: stub Codex; NOT a SWPC E2E test.\n"
+    "12 rows independently checked by the outer integration harness.\n"
 )
 dest = root / "scripts/experiments/plasma_auto4_branch_codex_generated.py"
 dest.parent.mkdir(parents=True, exist_ok=True)
 dest.write_text(
-    "print('n,triangular')\\n"
-    "for n in range(1, 13):\\n"
-    "    print(f'{n},{n*(n+1)//2}')\\n"
+    "print('n,triangular')\n"
+    "for n in range(1, 13):\n"
+    "    print(f'{n},{n*(n+1)//2}')\n"
 )
 out = dest.with_suffix(".csv")
-out.write_text("n,triangular\\n" + "".join(
-    f"{n},{n*(n+1)//2}\\n" for n in range(1, 13)
+out.write_text("n,triangular\n" + "".join(
+    f"{n},{n*(n+1)//2}\n" for n in range(1, 13)
 ))
 dest.with_suffix(".test.log").write_text(
-    "HOSTED_STUB_ONLY: 12 generated rows, outer harness verifies.\\n"
+    "HOSTED_STUB_ONLY: 12 generated rows, outer harness verifies.\n"
 )
 print("HOSTED_CODEX_STUB_ONLY")
 raise SystemExit(int(os.environ.get("SIMULATED_CODEX_EXIT", "0")))
