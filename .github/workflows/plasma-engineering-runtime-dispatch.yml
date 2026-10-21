@@ -31,6 +31,18 @@ on:
       - "scripts/plasma_path2_stage_orchestrator.py"
       - "scripts/plasma_path2_f1b_adapters.py"
       - "scripts/plasma_path2_persistent_lease.py"
+      - "scripts/plasma_path2_bin_provenance.py"
+      - "scripts/plasma_path2_held_provider.py"
+      - "scripts/tests/test_plasma_path2_held_provider.py"
+      - "pl/hil/path2_z2_target_guard.py"
+      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
+      - "pl/hil/path2_f1b_dev_risk.py"
+      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
+      - "pl/hil/path2_f1b_minimal_stage.py"
+      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/swpc/z2-path2-f1b-bridge"
+      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -54,6 +66,18 @@ on:
       - "scripts/plasma_path2_stage_orchestrator.py"
       - "scripts/plasma_path2_f1b_adapters.py"
       - "scripts/plasma_path2_persistent_lease.py"
+      - "scripts/plasma_path2_bin_provenance.py"
+      - "scripts/plasma_path2_held_provider.py"
+      - "scripts/tests/test_plasma_path2_held_provider.py"
+      - "pl/hil/path2_z2_target_guard.py"
+      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
+      - "pl/hil/path2_f1b_dev_risk.py"
+      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
+      - "pl/hil/path2_f1b_minimal_stage.py"
+      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/swpc/z2-path2-f1b-bridge"
+      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -89,6 +113,16 @@ jobs:
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
           python3 scripts/tests/test_plasma_path2_runtime_integration.py
+          python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
+          python3 scripts/tests/test_plasma_path2_held_provider.py
+          python3 -m py_compile pl/hil/path2_z2_target_guard.py scripts/tests/test_plasma_path2_z2_target_guard.py
+          python3 scripts/tests/test_plasma_path2_z2_target_guard.py
+          python3 -m py_compile pl/hil/path2_f1b_dev_risk.py scripts/tests/test_plasma_path2_f1b_dev_risk.py
+          python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
+          python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 -m py_compile scripts/swpc/z2-path2-f1b-bridge scripts/tests/test_plasma_path2_swpc_bridge.py
+          python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -310,7 +344,9 @@ jobs:
          github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'path2-stage-contract' &&
          (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-testing') &&
+          needs.development-authorize.outputs.task_id == 'z2-path2-testing' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-restore' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-full-hil') &&
          needs.development-claim.result == 'skipped' &&
          github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
@@ -322,7 +358,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
     permissions:
       contents: read
       actions: read

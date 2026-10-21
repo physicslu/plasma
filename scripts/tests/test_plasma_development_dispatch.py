@@ -787,7 +787,8 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("execution_capability == 'z2-cpu-only'",guard)
         self.assertIn("needs.development-claim.result == 'success'",guard)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
-        self.assertIn("== 'vivado-host-build' && 50 || 5",wf)
+        self.assertIn("== 'vivado-host-build' && 50 ||",wf)
+        self.assertIn("== 'z2-path2-full-hil' && 10 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
     def test_host_build_source_preflight_is_pure_and_strict(self):

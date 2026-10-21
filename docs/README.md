@@ -24,6 +24,8 @@
 
 ## Engineering governance and execution paths
 
+- **Gate 1 Draft / Host-only; real hardware NO_GO** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：加入 BIT/BIN 映像來源分離、跨 Trigger Download／Testing／Restore 的 Lease 交易與 Host-only 故障注入，未註冊任何可操作 Z2 的實機 Provider；需通過獨立 AXI、權限、映像與 Recovery 驗證後才能實測。\n
+
 - **Gate 1 / Host-only candidate** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：Build、Download、Testing 三階段獨立 Trigger 與兩個個別可選、預設關閉的自動銜接；只驗證受控 Adapter/Receipt 契約，不代表已啟用 SWPC 或實機執行能力。
 
 - **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
@@ -122,6 +124,7 @@
 
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
 - **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
+- **Gate 1 / Z2 live handoff / NOT RUN** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：固定 F1-B／base.bin SHA、既有 SWPC→Z2 受信任 Root 執行交接與獨立 Download／Testing／Restore 實機證據要求；PR 本身不安裝、派工或宣稱硬體通過。
 
 - **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)
