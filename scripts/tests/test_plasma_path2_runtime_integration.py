@@ -257,8 +257,8 @@ class RouteContracts(unittest.TestCase):
             return Mock(returncode=0, stderr=b"",
                         stdout=json.dumps({
                             "stage": command[1], "source_sha": SHA,
-                            "boot_id": "boot1" if command[1] == "download"
-                            else "boot2",
+                            "boot_id": "first-boot-id" if command[1] == "download"
+                            else "second-boot-id",
                             "real_z2": True,
                             "result": ("LOADED_AND_HELD" if
                                        command[1] == "download" else
