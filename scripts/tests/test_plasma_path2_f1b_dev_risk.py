@@ -148,7 +148,7 @@ class ScopeTests(unittest.TestCase):
             (m / "size").write_text("0x10000")
             (procroot / "sys/kernel/random").mkdir(parents=True)
             (procroot / "sys/kernel/random/boot_id").write_text("z2-current-boot-123")
-            (procroot / "interrupts").write_text("44: 0 0 fabric\\n")
+            (procroot / "interrupts").write_text("44: 0 0 fabric\n")
             fake_port = SimpleNamespace(
                 candidate=Path("/lib/firmware/plasma-f1b-owner-20261020-once.bin"),
                 recovery=Path("/lib/firmware/base.bin"),
