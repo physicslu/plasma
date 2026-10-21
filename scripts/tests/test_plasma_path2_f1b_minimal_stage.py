@@ -209,6 +209,40 @@ class MinimalStageTests(unittest.TestCase):
                 stage.run(name)
         self.assertEqual(self.hw.writes, [])
 
+    def test_native_runtime_is_qualified_before_hardware_load(self):
+        # The *same* ABI that passed the earlier real F1-B one-shot run.
+        stage.native_runtime_preflight(
+            version=(3, 12, 13), machine="armv7l", endian="little",
+            executable="/opt/plasma/python/3.12.13/bin/python3")
+        for changes in (
+            {"version": (3, 11, 0)},
+            {"machine": "x86_64"},
+            {"endian": "big"},
+            {"executable": "/usr/bin/python3"},
+        ):
+            with self.subTest(changed=changes):
+                baseline = dict(version=(3, 12, 13), machine="armv7l",
+                                endian="little",
+                                executable="/opt/plasma/python/3.12.13/bin/python3")
+                with self.assertRaisesRegex(stage.LiveStageDenied,
+                                            "NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED"):
+                    stage.native_runtime_preflight(**(baseline | changes))
+        self.assertEqual(self.hw.writes, [])
+        self.assertFalse(stage.LEDGER.exists())
+
+    def test_wrong_interpreter_blocks_download_before_lease_and_write(self):
+        # Root/ack/trusted-code checks are represented by the actual ABI
+        # guard; all hardware calls are still fake and have zero side effects.
+        with patch.object(stage, "trusted_local",
+                          side_effect=lambda: stage.native_runtime_preflight(
+                              version=(3, 11, 0), machine="armv7l",
+                              endian="little", executable="/usr/bin/python3")):
+            with self.assertRaisesRegex(stage.LiveStageDenied,
+                                        "NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED"):
+                stage.run("download")
+        self.assertFalse(stage.LEDGER.exists())
+        self.assertEqual(self.hw.writes, [])
+
     def test_root_risk_ack_is_explicit_and_not_a_secret(self):
         with patch.object(stage, "trusted_local", self.real_trusted_local), \
              patch.object(stage.os, "geteuid", return_value=0), \
