@@ -163,12 +163,21 @@ qualification/production behavior. Risk controls must be proportional to
 the actual command and physical effect, not the technology label `SW` or
 `HW`. Do not invent SW/HW-separated administrative lanes.
 
-- **Execute the experiment before designing a platform around it.** For a
-  trivial smoke test (for example, printing and checking the 9x9
-  multiplication table), first obtain the real CLI/Codex process result,
-  exit code and essential output. Do not precondition that test on a
-  factory-grade dispatcher, a new identity/enrollment program, expansive
-  audits, a task-specific workflow, or a production-readiness milestone.
+- **No overengineering in Development Mode (mandatory).** Start with the
+  shortest existing Path 2 CLI or Path 3 Codex route that can produce the
+  approved experiment's real result. Do not first design a platform, add a
+  per-task Registry ID, Workflow, Runner, approval Gate, review checklist,
+  evidence subsystem, or infrastructure solely because the work is new.
+  Reuse the existing Dispatcher, tools, environment and valid evidence;
+  describe new work as a scoped Work Order rather than introducing another
+  task-specific mechanism. A missing generic capability is a concrete
+  implementation gap: fix the smallest necessary component and test it,
+  instead of building another framework. Within an already approved Gate 1,
+  continue Build -> Run -> Observe -> Fix without asking for permission at
+  every stage; Gate 2 is only for merging a PR. Keep actual hardware/OS
+  privilege, ownership, rollback and electrical guards; these are runtime
+  checks, not new human approval Gates. Report PASS, FAIL or NOT_RUN from
+  execution evidence, never from documentation or hosted mocks alone.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions
