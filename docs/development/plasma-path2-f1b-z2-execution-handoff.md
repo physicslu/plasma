@@ -85,6 +85,37 @@ blindly retry after uncertainty; preserve the root checkpoint for an
 informed physical recovery decision. A verified `base.bin` allows an
 idempotent `ALREADY_RESTORED` no-op.
 
+## Minimal activation handoff (not yet performed on SWPC or Z2)
+
+- SWPC protected code **source**:
+  `scripts/swpc/z2-path2-f1b-bridge`, installed by the trusted SWPC
+  administrator at `/usr/local/libexec/plasma/z2-path2-f1b-bridge`
+  with owner `root`, mode `0755`, and root-controlled parent directory.
+  The exact authorized commit SHA is installed separately as root-owned
+  mode-`0600` `/usr/local/libexec/plasma/z2-path2-f1b.approved-sha`.
+  The bridge is **executed as the existing unprivileged `plasma-codex` worker**.
+  It reads only the existing privately enrolled login route
+  `/home/plasma-codex/.config/plasma/z2-login-smoke.json`,
+  pinned host key `z2-login-known_hosts`, and sudo password
+  `z2-swd05-oneshot.json`; no new credential is committed or assumed.
+- Z2 protected code **source**:
+  `scripts/z2/plasma-path2-f1b-root-entry`, installed by the trusted
+  target administrator at
+  `/usr/local/libexec/plasma/z2-path2-f1b-root-entry`, root-owned,
+  mode `0755`. Pin reviewed imports in the root-private
+  `/root/plasma-path2-f1b-site1-approved` tree with its
+  `.plasma-path2-source-sha256` manifest. The root entry checks the
+  manifest and exact 3-word read-only native stage command.
+- Do not trigger **either** hardware test unless the trusted main
+  Dispatcher includes this registration. The GitHub Workflow **runs
+  `trusted/scripts/plasma_development_dispatch.py` from current main**;
+  code present only in a Draft PR checkout cannot activate it.
+  A reviewed integration/merge and root installation are physical
+  prerequisites, not evidence of any HIL execution.
+- Verify that the Bridge installed version, approved SHA file, Z2
+  root-owned installed tree and existing SSH/sudo enrollment all match.
+  No need to rerun FPGA Build or repeat historical Path 3 HIL.
+
 ## Two required physical HIL modes (owner request 2026-10-21)
 
 Both modes use the **same** installed SWPC Bridge and Z2 root-owned
