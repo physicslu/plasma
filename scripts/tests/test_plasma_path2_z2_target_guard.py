@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -112,6 +113,15 @@ class PassiveSafety(unittest.TestCase):
             self.assertTrue(clean)
             self.assertEqual(conflicts, ["1000"])
 
+    def test_disappearing_process_does_not_claim_complete_snapshot(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            # Process listed, but fd and maps disappear before inspection.
+            (root / "1000").mkdir()
+            complete, conflicts = target.scan_proc_consumers(procroot=root)
+            self.assertFalse(complete)
+            self.assertEqual(conflicts, ["1000"])
+
     def test_retained_vma_never_passes(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -162,7 +172,9 @@ class RootTargetPortContracts(unittest.TestCase):
             candidate=Path("/lib/firmware/test.bin"),
             recovery=Path("/lib/firmware/base.bin"),
             ledger=Path("/run/plasma-z2-swd05/target.json"))
-        port._locked = True
+        port._locked = True  # Explicit Host-only fixture, never live.
+        port._lock_owner_pid = os.getpid()
+        port._lock_owner_thread = threading.get_ident()
         with patch.object(target, "read_live_z2_facts",
                           return_value=fixture(uio_overlaps=["uio1"])):
             report = port.passive_report()
@@ -170,6 +182,25 @@ class RootTargetPortContracts(unittest.TestCase):
             with self.assertRaisesRegex(
                     target.TargetSafetyDenied, "TARGET_AXI_OR_IMAGE_ISOLATION_NO_GO"):
                 port.qualification("download")
+
+    def test_lock_claim_cannot_cross_thread_or_process(self):
+        port = target.RootZ2TargetPort(
+            candidate=Path("/lib/firmware/test.bin"),
+            recovery=Path("/lib/firmware/base.bin"),
+            ledger=Path("/run/plasma-z2-swd05/target.json"))
+        port._locked = True  # Host-only fixture, without OS lock.
+        port._lock_owner_pid = os.getpid()
+        port._lock_owner_thread = threading.get_ident()
+        self.assertIsInstance(port.now(), int)
+        port._lock_owner_thread = -1
+        with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                    "FPGA_OWNER_LOCK_REQUIRED"):
+            port.now()
+        port._lock_owner_thread = threading.get_ident()
+        port._lock_owner_pid = -1
+        with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                    "FPGA_OWNER_LOCK_REQUIRED"):
+            port.now()
 
     def test_no_auto_activation_or_arbitrary_shell(self):
         content = (ROOT / "pl/hil/path2_z2_target_guard.py").read_text()
