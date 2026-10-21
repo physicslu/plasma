@@ -448,6 +448,10 @@ def authorize(event: object, context: dict, registry: object,
                 "HOST_BUILD_RERUN_DENIED")
     return {
         "status": "AUTHORIZED_DEV_TASK",
+        "authorized_stage": (task["stage"] if
+                             req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+                             task.get("capability") == "path2-stage-contract"
+                             else None),
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
