@@ -92,7 +92,11 @@ idempotent `ALREADY_RESTORED` no-op.
   administrator at `/usr/local/libexec/plasma/z2-path2-f1b-bridge`
   with owner `root`, mode `0755`, and root-controlled parent directory.
   The exact authorized commit SHA is installed separately as root-owned
-  mode-`0600` `/usr/local/libexec/plasma/z2-path2-f1b.approved-sha`.
+  mode-`0644` `/usr/local/libexec/plasma/z2-path2-f1b.approved-sha`.
+  The SHA is a public commit identifier: root retains exclusive write access,
+  while the unprivileged `plasma-codex` worker must be able to read it.
+  Existing SSH and sudo **credential** files remain private (`0600`); do not
+  relax their permissions. The installation directory stays root-controlled.
   The bridge is **executed as the existing unprivileged `plasma-codex` worker**.
   It reads only the existing privately enrolled login route
   the enrolled worker-private `~/.config/plasma/z2-login-smoke.json`,
