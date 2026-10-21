@@ -110,6 +110,8 @@ def collect_live(*, root_port, approval: str, scope: str) -> dict:
     uio = dict(uio=uio_root.name, driver=driver, maps=maps,
                runtime=(device / "power/runtime_status").read_text().strip(),
                irq_counts=counters)
+    require(passive["platform_overlaps"] == [device.name],
+            "UIO_PLATFORM_OWNER_MISMATCH")
     original = one_shot.manager_last_load()
     services = one_shot.service_snapshot()
     before = check_exact(passive=passive, uio=uio,
