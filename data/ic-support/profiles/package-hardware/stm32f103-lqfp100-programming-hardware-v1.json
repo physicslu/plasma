@@ -1,0 +1,691 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "stm32f103-lqfp100-programming-hardware-v1",
+  "kind": "package_hardware",
+  "status": "pilot_reviewed",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "series": "STM32F103",
+    "package": "LQFP",
+    "pin_count": 100,
+    "applicable_base_devices": [
+      "STM32F103V8"
+    ]
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "sections": [
+        "2.3.9 Power supply schemes",
+        "2.3.24 Serial wire JTAG debug port (SWJ-DP)",
+        "Figure 4. STM32F103xx performance line LQFP100 pinout",
+        "Table 5. Medium-density STM32F103xx pin definitions",
+        "5.1.6 Power supply scheme",
+        "5.3.14 NRST pin characteristics",
+        "6.5 LQFP100 package information (1L)",
+        "Table 56. LQFP100 - Mechanical data",
+        "Figure 48. LQFP100 - Footprint example",
+        "Figures 39-40. Power supply and reference decoupling"
+      ]
+    }
+  ],
+  "data": {
+    "package": "LQFP",
+    "physical_pin_map": [
+      {
+        "pin": 1,
+        "name": "PE2"
+      },
+      {
+        "pin": 2,
+        "name": "PE3"
+      },
+      {
+        "pin": 3,
+        "name": "PE4"
+      },
+      {
+        "pin": 4,
+        "name": "PE5"
+      },
+      {
+        "pin": 5,
+        "name": "PE6"
+      },
+      {
+        "pin": 6,
+        "name": "VBAT"
+      },
+      {
+        "pin": 7,
+        "name": "PC13-TAMPER-RTC"
+      },
+      {
+        "pin": 8,
+        "name": "PC14-OSC32_IN"
+      },
+      {
+        "pin": 9,
+        "name": "PC15-OSC32_OUT"
+      },
+      {
+        "pin": 10,
+        "name": "VSS_5"
+      },
+      {
+        "pin": 11,
+        "name": "VDD_5"
+      },
+      {
+        "pin": 12,
+        "name": "OSC_IN"
+      },
+      {
+        "pin": 13,
+        "name": "OSC_OUT"
+      },
+      {
+        "pin": 14,
+        "name": "NRST"
+      },
+      {
+        "pin": 15,
+        "name": "PC0"
+      },
+      {
+        "pin": 16,
+        "name": "PC1"
+      },
+      {
+        "pin": 17,
+        "name": "PC2"
+      },
+      {
+        "pin": 18,
+        "name": "PC3"
+      },
+      {
+        "pin": 19,
+        "name": "VSSA"
+      },
+      {
+        "pin": 20,
+        "name": "VREF-"
+      },
+      {
+        "pin": 21,
+        "name": "VREF+"
+      },
+      {
+        "pin": 22,
+        "name": "VDDA"
+      },
+      {
+        "pin": 23,
+        "name": "PA0-WKUP"
+      },
+      {
+        "pin": 24,
+        "name": "PA1"
+      },
+      {
+        "pin": 25,
+        "name": "PA2"
+      },
+      {
+        "pin": 26,
+        "name": "PA3"
+      },
+      {
+        "pin": 27,
+        "name": "VSS_4"
+      },
+      {
+        "pin": 28,
+        "name": "VDD_4"
+      },
+      {
+        "pin": 29,
+        "name": "PA4"
+      },
+      {
+        "pin": 30,
+        "name": "PA5"
+      },
+      {
+        "pin": 31,
+        "name": "PA6"
+      },
+      {
+        "pin": 32,
+        "name": "PA7"
+      },
+      {
+        "pin": 33,
+        "name": "PC4"
+      },
+      {
+        "pin": 34,
+        "name": "PC5"
+      },
+      {
+        "pin": 35,
+        "name": "PB0"
+      },
+      {
+        "pin": 36,
+        "name": "PB1"
+      },
+      {
+        "pin": 37,
+        "name": "PB2"
+      },
+      {
+        "pin": 38,
+        "name": "PE7"
+      },
+      {
+        "pin": 39,
+        "name": "PE8"
+      },
+      {
+        "pin": 40,
+        "name": "PE9"
+      },
+      {
+        "pin": 41,
+        "name": "PE10"
+      },
+      {
+        "pin": 42,
+        "name": "PE11"
+      },
+      {
+        "pin": 43,
+        "name": "PE12"
+      },
+      {
+        "pin": 44,
+        "name": "PE13"
+      },
+      {
+        "pin": 45,
+        "name": "PE14"
+      },
+      {
+        "pin": 46,
+        "name": "PE15"
+      },
+      {
+        "pin": 47,
+        "name": "PB10"
+      },
+      {
+        "pin": 48,
+        "name": "PB11"
+      },
+      {
+        "pin": 49,
+        "name": "VSS_1"
+      },
+      {
+        "pin": 50,
+        "name": "VDD_1"
+      },
+      {
+        "pin": 51,
+        "name": "PB12"
+      },
+      {
+        "pin": 52,
+        "name": "PB13"
+      },
+      {
+        "pin": 53,
+        "name": "PB14"
+      },
+      {
+        "pin": 54,
+        "name": "PB15"
+      },
+      {
+        "pin": 55,
+        "name": "PD8"
+      },
+      {
+        "pin": 56,
+        "name": "PD9"
+      },
+      {
+        "pin": 57,
+        "name": "PD10"
+      },
+      {
+        "pin": 58,
+        "name": "PD11"
+      },
+      {
+        "pin": 59,
+        "name": "PD12"
+      },
+      {
+        "pin": 60,
+        "name": "PD13"
+      },
+      {
+        "pin": 61,
+        "name": "PD14"
+      },
+      {
+        "pin": 62,
+        "name": "PD15"
+      },
+      {
+        "pin": 63,
+        "name": "PC6"
+      },
+      {
+        "pin": 64,
+        "name": "PC7"
+      },
+      {
+        "pin": 65,
+        "name": "PC8"
+      },
+      {
+        "pin": 66,
+        "name": "PC9"
+      },
+      {
+        "pin": 67,
+        "name": "PA8"
+      },
+      {
+        "pin": 68,
+        "name": "PA9"
+      },
+      {
+        "pin": 69,
+        "name": "PA10"
+      },
+      {
+        "pin": 70,
+        "name": "PA11"
+      },
+      {
+        "pin": 71,
+        "name": "PA12"
+      },
+      {
+        "pin": 72,
+        "name": "PA13"
+      },
+      {
+        "pin": 73,
+        "name": "NC"
+      },
+      {
+        "pin": 74,
+        "name": "VSS_2"
+      },
+      {
+        "pin": 75,
+        "name": "VDD_2"
+      },
+      {
+        "pin": 76,
+        "name": "PA14"
+      },
+      {
+        "pin": 77,
+        "name": "PA15"
+      },
+      {
+        "pin": 78,
+        "name": "PC10"
+      },
+      {
+        "pin": 79,
+        "name": "PC11"
+      },
+      {
+        "pin": 80,
+        "name": "PC12"
+      },
+      {
+        "pin": 81,
+        "name": "PD0"
+      },
+      {
+        "pin": 82,
+        "name": "PD1"
+      },
+      {
+        "pin": 83,
+        "name": "PD2"
+      },
+      {
+        "pin": 84,
+        "name": "PD3"
+      },
+      {
+        "pin": 85,
+        "name": "PD4"
+      },
+      {
+        "pin": 86,
+        "name": "PD5"
+      },
+      {
+        "pin": 87,
+        "name": "PD6"
+      },
+      {
+        "pin": 88,
+        "name": "PD7"
+      },
+      {
+        "pin": 89,
+        "name": "PB3"
+      },
+      {
+        "pin": 90,
+        "name": "PB4"
+      },
+      {
+        "pin": 91,
+        "name": "PB5"
+      },
+      {
+        "pin": 92,
+        "name": "PB6"
+      },
+      {
+        "pin": 93,
+        "name": "PB7"
+      },
+      {
+        "pin": 94,
+        "name": "BOOT0"
+      },
+      {
+        "pin": 95,
+        "name": "PB8"
+      },
+      {
+        "pin": 96,
+        "name": "PB9"
+      },
+      {
+        "pin": 97,
+        "name": "PE0"
+      },
+      {
+        "pin": 98,
+        "name": "PE1"
+      },
+      {
+        "pin": 99,
+        "name": "VSS_3"
+      },
+      {
+        "pin": 100,
+        "name": "VDD_3"
+      }
+    ],
+    "programming_route": {
+      "primary_interface": "SWD",
+      "alternate_interface": "JTAG",
+      "signals": {
+        "SWDIO": {
+          "gpio": "PA13",
+          "pin": 72,
+          "direction": "bidirectional",
+          "voltage_domain": "VDD",
+          "shared_jtag_signal": "JTMS"
+        },
+        "SWCLK": {
+          "gpio": "PA14",
+          "pin": 76,
+          "direction": "programmer_to_target",
+          "voltage_domain": "VDD",
+          "shared_jtag_signal": "JTCK"
+        },
+        "NRST": {
+          "pin": 14,
+          "direction": "programmer_to_target_open_drain_or_release",
+          "voltage_domain": "VDD",
+          "internal_pullup_kohm": {
+            "min": 30,
+            "typ": 40,
+            "max": 50
+          },
+          "plasma_fixture_policy": "required_for_reset_and_recovery"
+        },
+        "BOOT0": {
+          "pin": 94,
+          "direction": "fixture_optional",
+          "voltage_domain": "VDD",
+          "plasma_fixture_policy": "optional_for_swd_route_not_required_for_normal_flash_programming"
+        }
+      }
+    },
+    "power": {
+      "programming_vdd_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false,
+      "mandatory_positive_contacts": [
+        {
+          "rail": "VDD",
+          "pin": 50,
+          "name": "VDD_1"
+        },
+        {
+          "rail": "VDD",
+          "pin": 75,
+          "name": "VDD_2"
+        },
+        {
+          "rail": "VDD",
+          "pin": 100,
+          "name": "VDD_3"
+        },
+        {
+          "rail": "VDD",
+          "pin": 28,
+          "name": "VDD_4"
+        },
+        {
+          "rail": "VDD",
+          "pin": 11,
+          "name": "VDD_5"
+        },
+        {
+          "rail": "VDDA",
+          "pin": 22,
+          "name": "VDDA",
+          "tie_to": "VDD"
+        }
+      ],
+      "mandatory_ground_contacts": [
+        {
+          "rail": "VSS",
+          "pin": 49,
+          "name": "VSS_1"
+        },
+        {
+          "rail": "VSS",
+          "pin": 74,
+          "name": "VSS_2"
+        },
+        {
+          "rail": "VSS",
+          "pin": 99,
+          "name": "VSS_3"
+        },
+        {
+          "rail": "VSS",
+          "pin": 27,
+          "name": "VSS_4"
+        },
+        {
+          "rail": "VSS",
+          "pin": 10,
+          "name": "VSS_5"
+        },
+        {
+          "rail": "VSSA",
+          "pin": 19,
+          "name": "VSSA",
+          "tie_to": "VSS"
+        }
+      ],
+      "vbat": {
+        "pin": 6,
+        "range_v": {
+          "min": 1.8,
+          "max": 3.6
+        },
+        "socket_policy": "not_a_mandatory_SWD_signal_contact; fixture_design_must_explicitly_define_VBAT_bias_before_physical_release"
+      },
+      "all_main_power_and_ground_pins_must_be_connected": true,
+      "decoupling": {
+        "authority": "ST DS5319 power-supply scheme",
+        "socket_carrier_must_not_omit_target_supply_decoupling": true,
+        "exact_fixture_capacitor_placement": "board_design_review_required"
+      },
+      "analog_reference": {
+        "manufacturer_reference": "DS5319 Rev20 Figures 39-40 reference decoupling",
+        "fixture_provisioning_policy": "use_figure_40_VREFplus_to_VDDA_and_VREFminus_to_VSSA_in_development_fixture; exact_implementation_subject_to_schematic_review",
+        "contacts": [
+          {
+            "name": "VREF+",
+            "pin": 21,
+            "tie_to": "VDDA",
+            "mandatory_for_this_fixture_profile": true
+          },
+          {
+            "name": "VREF-",
+            "pin": 20,
+            "tie_to": "VSSA",
+            "mandatory_for_this_fixture_profile": true
+          }
+        ]
+      }
+    },
+    "socket_contacts": {
+      "mandatory": [
+        {
+          "purpose": "SWDIO",
+          "pin": 72
+        },
+        {
+          "purpose": "SWCLK",
+          "pin": 76
+        },
+        {
+          "purpose": "NRST",
+          "pin": 14
+        },
+        {
+          "purpose": "VDD_1",
+          "pin": 50
+        },
+        {
+          "purpose": "VDD_2",
+          "pin": 75
+        },
+        {
+          "purpose": "VDD_3",
+          "pin": 100
+        },
+        {
+          "purpose": "VDD_4",
+          "pin": 28
+        },
+        {
+          "purpose": "VDD_5",
+          "pin": 11
+        },
+        {
+          "purpose": "VSS_1",
+          "pin": 49
+        },
+        {
+          "purpose": "VSS_2",
+          "pin": 74
+        },
+        {
+          "purpose": "VSS_3",
+          "pin": 99
+        },
+        {
+          "purpose": "VSS_4",
+          "pin": 27
+        },
+        {
+          "purpose": "VSS_5",
+          "pin": 10
+        },
+        {
+          "purpose": "VDDA",
+          "pin": 22
+        },
+        {
+          "purpose": "VSSA",
+          "pin": 19
+        },
+        {
+          "purpose": "VREF+",
+          "pin": 21
+        },
+        {
+          "purpose": "VREF-",
+          "pin": 20
+        }
+      ],
+      "optional": [
+        {
+          "purpose": "BOOT0",
+          "pin": 94
+        },
+        {
+          "purpose": "VBAT",
+          "pin": 6
+        }
+      ],
+      "not_connected": [
+        {
+          "purpose": "NC",
+          "pin": 73,
+          "policy": "do_not_connect"
+        }
+      ]
+    },
+    "hardware_readiness_boundary": {
+      "socket_design_input_complete": true,
+      "electrical_design_review_required": true,
+      "signal_integrity_validated": false,
+      "physical_socket_qualified": false,
+      "hardware_runtime_ready": false,
+      "execution_authorized": false
+    },
+    "pin_count": 100,
+    "mechanical": {
+      "body_mm": {
+        "x": 14,
+        "y": 14
+      },
+      "lead_span_mm": {
+        "x": 16,
+        "y": 16
+      },
+      "pitch_mm": 0.5,
+      "max_height_mm": 1.6,
+      "numbering_view": "top_view_counterclockwise",
+      "pin1_identifier_required_for_fixture_orientation": true
+    }
+  }
+}
