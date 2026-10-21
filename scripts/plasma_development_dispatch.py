@@ -203,7 +203,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "execution_path", "capability",
                                "pr_number", "source_sha", "script", "argv",
                                "expected_stdout_sha256", "project", "stage",
-                               "hardware_stages", "swpc_bridge_deployment"},
+                               "hardware_stages"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -233,16 +233,15 @@ def parse_dynamic_work_order(event: object) -> dict:
                     "WORK_ORDER_PATH3_HOST_ONLY_FIELDS_DENIED")
         else:
             require(set(order) <= base | optional_ref |
-                    {"hardware_stages", "swpc_bridge_deployment"},
+                    {"hardware_stages"},
                     "WORK_ORDER_PATH3_HARDWARE_FIELDS_DENIED")
             stages = order.get("hardware_stages", [])
-            deploy = order.get("swpc_bridge_deployment", False)
             require(type(stages) is list and len(stages) <= 3
                     and all(type(stage) is str and
                             stage in ("download", "test", "restore")
                             for stage in stages)
                     and len(set(stages)) == len(stages)
-                    and type(deploy) is bool and (stages or deploy),
+                    and bool(stages),
                     "WORK_ORDER_PATH3_ACTIONS_DENIED")
             # Branch Work Orders reuse verify_pr() to pin the exact
             # owner-authored PR HEAD; no second development-only gate.
@@ -313,8 +312,7 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "work_order_sha256": req["work_order_sha256"],
     }
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage", "hardware_stages",
-                "swpc_bridge_deployment"):
+                "project", "stage", "hardware_stages"):
         if key in order:
             task[key] = order[key]
     return task
@@ -800,14 +798,12 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             )
         else:
             stages = task.get("hardware_stages", [])
-            deploy = task.get("swpc_bridge_deployment", False)
             prompt += (
-                "GUARDED-HARDWARE Development Mode. Requested Bridge "
-                "deployment: " + str(deploy) + ". "
+                "GUARDED-HARDWARE Development Mode. "
                 "Authorized Z2 stages in order: " + (", ".join(stages)
                 if stages else "(none)") + ". Do not run Download unless "
                 "explicitly listed. Hardware execution is DELEGATED to "
-                "the EXISTING Path 2 Trusted Runner / root-owned Bridge "
+                "the shared trusted-main stage transport "
                 "outside your Codex sandbox, after this engineering job "
                 "succeeds. Do not call the Bridge, sudo, SSH, FPGA Manager, "
                 "/dev/mem or UIO yourself; no second hardware executor, "
@@ -815,10 +811,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
                 "document acceptance, known preconditions and risks; "
                 "do not claim any Z2 result yet. Report an unrecoverable "
                 "engineering blocker with a nonzero Codex exit code so "
-                "the delegated job is skipped. Existing installed "
-                "Bridge/PIN must be valid; deployment requires the "
-                "already-enrolled admin channel and is not performed "
-                "by this sandbox.\n"
+                "the delegated job is skipped. Existing enrolled credentials and "
+                "Z2 protected source manifest remain required.\n"
             )
     if task_id == "f1b-path3-codex-vivado-build":
         prompt += (
@@ -946,6 +940,23 @@ def safe_error_reason(exc: Exception) -> str:
     return "EXECUTION_ERROR"
 
 
+def live_pr_metadata(req: dict) -> dict | None:
+    """Worker independently queries GitHub; never trust a cached admission snapshot."""
+    if not req["pr_number"]:
+        return None
+    try:
+        result = subprocess.run(
+            ["gh", "api", f"repos/{REPO}/pulls/{req['pr_number']}"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            check=True, timeout=15)
+        require(len(result.stdout) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
+        pr = json.loads(result.stdout)
+        verify_pr(pr, req)
+        return pr
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=(
@@ -976,6 +987,7 @@ def main() -> int:
                 # independent SWPC checks of trusted main SHA, candidate SHA
                 # and registry SHA256 before any task executes.
                 admission = worker_admission(req, args, registry, event)
+                pr = live_pr_metadata(req)
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in

@@ -180,7 +180,7 @@ the actual command and physical effect, not the technology label `SW` or
   execution evidence, never from documentation or hosted mocks alone.
 - **Path 3 is not inherently Host-only.** A dynamically approved Path 3
   Work Order may request guarded SWPC/Z2 development operations as well as
-  host-only engineering. Reuse the existing root-owned Trusted Bridge and
+  host-only engineering. Reuse the shared trusted-main development stage adapter and
   live ownership/recovery checks; allow only the actions explicitly stated
   by the owner. A work-order prompt grants no additional sudo rights and
   must never bypass an executable hardware Runtime Guard. If an existing
@@ -1185,3 +1185,16 @@ Treat `$PLASMA_REPO` as the normal workspace boundary for AI-assisted developmen
 - If a task cannot be completed without leaving the workspace boundary, stop and explain the required external resource.
 
 This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.
+
+### Development F1-B transport boundary
+
+Path 2 and Path 3 share the trusted-main stage transport in
+`scripts/plasma_development_stage_transport.py`. The SWPC installed bridge
+and approved-sha PIN are no longer runtime dependencies; leave existing
+root-owned files untouched. No deployment flag or admin install is required.
+The trusted GitHub event SHA, live owner PR metadata, exact checkout and
+owner-approved stage/Work Order digest establish B1 authorization, not a
+user-supplied SHA alone. Z2 root-owned entry/source manifest, image identity,
+ownership/recovery and authentic root receipts continue to enforce B2/B3.
+This contract grants neither root access nor permission to run hardware in a
+host-only Work Order.

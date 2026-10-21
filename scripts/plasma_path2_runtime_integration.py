@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Trusted Path 2 integration: existing Build and installed root bridge stages.
-
-The *task registry* maps Download, Testing and Restore to a fixed, root-owned
-SWPC stage bridge. An uninstalled bridge fails closed, never substitutes a PR
-checkout as a privileged runner or issues an SSH command from this module.
-"""
+"""Trusted Path 2/3 integration with shared trusted-main stage transport."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,6 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+import plasma_development_stage_transport as transport
 import plasma_path2_stage_orchestrator as coordinator
 import plasma_path2_f1b_adapters as f1b
 import plasma_path2_build_qualification as qualifier
@@ -94,7 +90,6 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
     return result
 
 
-ROOT_STAGE_BRIDGE = Path("/usr/local/libexec/plasma/z2-path2-f1b-bridge")
 STAGE_TASKS = {
     "z2-path2-download": "download",
     "z2-path2-testing": "test",
@@ -118,7 +113,7 @@ def stage_contract(task: dict, approval: dict) -> str:
     stage = STAGE_TASKS.get(approval.get("task_id"))
     if approval.get("task_id") == "path2-work-order":
         # Only the owner-pinned, single-stage generic route; no full-HIL
-        # transition or arbitrary shell. Continue using the installed Bridge.
+        # transition or arbitrary shell. Use only the trusted-main adapter.
         stage = task.get("stage") if type(task) is dict else None
         require(stage in ("download", "test", "restore") and
                 approval.get("authorized_stage") == stage and
@@ -130,51 +125,22 @@ def stage_contract(task: dict, approval: dict) -> str:
             and task.get("stage") == stage
             and task.get("project") == "pl/projects/z2-fixed-unified-site1",
             "PATH2_STAGE_TASK_DENIED")
-    # A single-stage bridge never consumes automation options. Exact stage
+    # A single-stage adapter never consumes automation options. Exact stage
     # authorization above bounds the only physical call for both Paths.
     return stage
 
 
-def _trusted_root_bridge(path: Path) -> None:
-    """Fixed local bridge installed by SWPC admin, never from PR checkout."""
-    require(path == ROOT_STAGE_BRIDGE, "PATH2_BRIDGE_PATH_NOT_FIXED")
-    require(path.is_file() and not path.is_symlink(),
-            "PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")
-    metadata = path.stat()
-    require(stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and
-            metadata.st_nlink == 1 and metadata.st_mode & 0o022 == 0 and
-            metadata.st_mode & 0o111 != 0,
-            "PATH2_TRUSTED_BRIDGE_NOT_PROTECTED")
-    # A root-owned file under an untrusted parent is not a trust root.
-    for parent in (path.parent, path.parent.parent):
-        require(parent.is_dir() and not parent.is_symlink()
-                and parent.stat().st_uid == 0 and
-                parent.stat().st_mode & 0o022 == 0,
-                "PATH2_BRIDGE_PARENT_NOT_PROTECTED")
+def registered_hardware_stage(task: dict, approval: dict) -> dict:
+    """Register fixed Task -> trusted-main transport, not a generic shell/SSH API.
 
-
-def registered_hardware_stage(task: dict, approval: dict, *,
-                              executor=subprocess.run) -> dict:
-    """Register fixed Task -> SWPC root bridge, not a generic shell/SSH API.
-
-    Returns actual sanitized target evidence only after installed bridge
+    Returns actual sanitized target evidence only after trusted transport
     executes. No implicit Build->Download or Download->Test progression.
     """
     stage = stage_contract(task, approval)
-    _trusted_root_bridge(ROOT_STAGE_BRIDGE)
-    command = [str(ROOT_STAGE_BRIDGE), stage, approval["pinned_sha"]]
     try:
-        result = executor(command, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, timeout=120,
-                          check=False, env={"PATH": "/usr/bin:/bin"})
-    except (OSError, subprocess.TimeoutExpired):
-        raise RuntimeDenied("PATH2_BRIDGE_EXECUTION_UNCERTAIN") from None
-    require(result.returncode == 0 and len(result.stdout) <= 8192,
-            "PATH2_BRIDGE_STAGE_FAILED_OR_UNKNOWN")
-    try:
-        payload = json.loads(result.stdout.decode("utf-8"))
-    except (UnicodeError, ValueError, AttributeError):
-        raise RuntimeDenied("PATH2_BRIDGE_RECEIPT_INVALID") from None
+        payload = transport.execute(stage, approval["pinned_sha"])
+    except (transport.Blocked, OSError, ValueError, subprocess.SubprocessError):
+        raise RuntimeDenied("PATH2_STAGE_TRANSPORT_FAILED_OR_UNKNOWN") from None
     require(type(payload) is dict and
             payload.get("stage") == stage and
             payload.get("source_sha") == approval["pinned_sha"] and
@@ -199,9 +165,8 @@ def registered_hardware_stage(task: dict, approval: dict, *,
 
 
 
-def path3_shared_hardware_stages(task: dict, approval: dict, *,
-                                 executor=subprocess.run) -> dict:
-    """Path 3 delegates authorized physical stages to the SAME Path 2 Bridge.
+def path3_shared_hardware_stages(task: dict, approval: dict) -> dict:
+    """Path 3 delegates authorized physical stages to the SAME Path 2 adapter.
 
     Executed by the existing trusted SWPC development-execute job, never
     inside Codex. No new hardware driver, runner, privilege or service.
@@ -219,17 +184,8 @@ def path3_shared_hardware_stages(task: dict, approval: dict, *,
             coordinator._sha(approval.get("pinned_sha"), 40) and
             coordinator._sha(approval.get("trusted_sha"), 40),
             "PATH3_SHARED_BRIDGE_APPROVAL_DENIED")
-    # Enrollment supplies a stage transport, not a callable admin installer.
-    # Neither the owner request nor candidate checkout may rewrite the root
-    # PIN. Keep this denial until an existing authenticated admin entrypoint
-    # (including independently verified source/digests and atomic install)
-    # can actually be bound here. Never fall back to stage Bridge or sudo.
-    deployment = task.get("swpc_bridge_deployment", False)
-    require(type(deployment) is bool,
-            "PATH3_SHARED_BRIDGE_DEPLOYMENT_REQUEST_INVALID")
-    require(not deployment,
-            "PATH3_SHARED_BRIDGE_DEPLOYMENT_NOT_INSTALLED: "
-            "SWPC_ADMIN_DEPLOYMENT_ENTRYPOINT_NOT_REGISTERED")
+    require("swpc_bridge_deployment" not in task,
+            "PATH2_OBSOLETE_DEPLOYMENT_FLAG")
     stages = task.get("hardware_stages")
     require(type(stages) is list and 1 <= len(stages) <= 3 and
             all(type(stage) is str and
@@ -237,7 +193,7 @@ def path3_shared_hardware_stages(task: dict, approval: dict, *,
             and len(stages) == len(set(stages)),
             "PATH3_SHARED_STAGE_LIST_DENIED")
     # The common stage_contract enforces auto-transition scope before the
-    # first trusted Bridge invocation for both Paths.
+    # first trusted adapter invocation for both Paths.
     observed = []
     boot_id = None
     for stage in stages:
@@ -251,25 +207,23 @@ def path3_shared_hardware_stages(task: dict, approval: dict, *,
                           "execution_path": "path2-cli",
                           "execution_capability": "path2-stage-contract",
                           "authorized_stage": stage}
-        receipt = registered_hardware_stage(stage_task, stage_approval,
-                                            executor=executor)
+        receipt = registered_hardware_stage(stage_task, stage_approval)
         require(boot_id is None or receipt["boot_id"] == boot_id,
                 "PATH3_SHARED_BOOT_CHANGED")
         boot_id = receipt["boot_id"]
         observed.append({"stage": stage, "result": receipt["result"]})
     return {"status": "REAL_Z2_PATH3_SHARED_BRIDGE_EVIDENCE_REVIEW_REQUIRED",
             "execution_path": "path3-codex",
-            "delegate": "existing-path2-trusted-bridge",
+            "delegate": "shared-trusted-main-stage-transport",
             "source_sha": approval["pinned_sha"],
             "real_z2": True, "boot_id": boot_id,
             "completed": observed, "auto_next_stage": False}
 
 
-def full_hil_sequence(task: dict, approval: dict, *,
-                      executor=subprocess.run) -> dict:
+def full_hil_sequence(task: dict, approval: dict) -> dict:
     """Explicit opt-in: one SWPC trigger performs three real *separate* stages.
 
-    Reuses the same fixed installed Bridge used by individual tasks. A
+    Reuses the same fixed trusted adapter used by individual tasks. A
     failed or uncertain stage stops; never blindly launch the next stage.
     Neither Build nor any stage other than F1-B Download/Test/Restore is run.
     """
@@ -282,8 +236,8 @@ def full_hil_sequence(task: dict, approval: dict, *,
             and task.get("project") == "pl/projects/z2-fixed-unified-site1"
             and task.get("stage") == "full",
             "PATH2_FULL_TASK_DENIED")
-    # Each shared stage_contract enforces transition scope before Bridge.
-    # These are three normal calls to the installed provider, but the owner
+    # Each shared stage_contract enforces transition scope before transport.
+    # These are three normal calls to the trusted provider, but the owner
     # explicitly selected full-hil. Normal task triggers never auto-chain.
     stages = (("z2-path2-download", "download"),
               ("z2-path2-testing", "test"),
@@ -297,7 +251,7 @@ def full_hil_sequence(task: dict, approval: dict, *,
                       "stage": stage}
         stage_approval = {**approval, "task_id": task_id}
         observed = registered_hardware_stage(
-            stage_task, stage_approval, executor=executor)
+            stage_task, stage_approval)
         # The shared adapter already validates stage and real root receipt.
         require(boot_id is None or boot_id == observed["boot_id"],
                 "PATH2_FULL_BOOT_OR_STAGE_CHANGED")
@@ -314,6 +268,6 @@ def full_hil_sequence(task: dict, approval: dict, *,
 
 
 def disabled_hardware_stage(task: dict, approval: dict) -> dict:
-    """Compatibility negative test: never bypass installation via this API."""
+    """Compatibility negative test: never bypass authorization via this API."""
     stage_contract(task, approval)
     raise RuntimeDenied("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")

@@ -33,8 +33,8 @@ this is part of its action scope, not a general rerun policy.
 The shared workflow routes by the authorized Path/capability. It does not
 repeat the task catalogue or require an unrelated A2 claim job to be skipped.
 Guarded Path 3 still requires successful real Codex execution before its
-shared Bridge job. Report completeness is review metadata in either scope;
-it cannot replace the Bridge's actual root-sourced stage receipt.
+shared stage job. Report completeness is review metadata in either scope;
+it cannot replace the Z2 root entry's actual root-sourced stage receipt.
 
 A successful CPU-only command may write diagnostics to stderr. Its return
 code and expected stdout digest still determine the result, and stderr is
@@ -42,11 +42,19 @@ preserved. Inert automation options do not block a single-stage adapter or
 add stages. Build evidence no longer requires the decorative `m1=NO_GO`
 label; actual BIT/HWH/report/log checks remain.
 
-No enrolled host-admin bridge installer is defined by this repository's
-runtime integration. `swpc_bridge_deployment=true` therefore remains an
-unimplemented-action failure before dependent physical execution, not an
-owner approval request. The exact root-owned Bridge SHA PIN must still
-match. This source change neither installs a Bridge nor updates that PIN.
+Development Path 2/3 use `scripts/plasma_development_stage_transport.py` from
+trusted main dispatcher code. The installed SWPC bridge and approved-sha PIN
+are unused; existing files are left untouched. `swpc_bridge_deployment` is
+obsolete and rejected in Work Orders. No installer, PIN update, new credentials
+or service is required. Event `GITHUB_SHA` authenticates trusted checkout;
+worker admission verifies exact candidate checkout and Work Order digest.
+For branch work the worker independently fetches live GitHub PR metadata and
+checks exact HEAD, same repository, owner and base main before executing.
+A caller-supplied SHA is not authorization. Both Paths use the same fixed
+stage allowlist, enrolled private credentials and pinned host keys. Candidate
+Python is never imported by the stage executor; this does not claim OS
+isolation from other processes running as the same worker account.
+The Z2 root entry and protected on-device source manifest remain mandatory.
 
 Current Manager/driver/MMIO ownership, protected source and recovery,
 native aligned read-only register access, durable UNKNOWN/crash state,
