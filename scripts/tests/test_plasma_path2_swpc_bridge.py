@@ -258,6 +258,7 @@ class MonitorDispatcherBridgeIntegration(unittest.TestCase):
     """
 
     def test_synthetic_success_and_fail_closed_through_monitor(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
         import plasma_engineering_monitor as monitor
 
         child = r'''
