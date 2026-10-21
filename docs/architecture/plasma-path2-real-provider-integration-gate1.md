@@ -82,6 +82,32 @@ or SWPC/Z2 HIL may be reported as run until those conditions are solved,
 or the owner explicitly approves a revised, bounded development-risk
 experiment as a distinct Gate 1 change.
 
+### Fresh Z2 connection evidence — read-only, 2026-10-21
+
+Real [GitHub Actions Z2 SSH-only readiness run #39522633934](https://github.com/physicslu/plasma/actions/runs/39522633934)
+was dispatched via the already-reviewed owner-only
+`/plasma-codex z2-readiness 981` Issue command on **trusted main**.
+The sanitized, SHA256-included Action artifact reported exit `0`:
+
+- authenticated SSH from SWPC to Z2: **PASS**;
+- actual Linux, ARMv7, Zynq-7000 family: **PASS**;
+- FPGA Manager state: `OPERATING`;
+- Fabric and Audio UIO detected, both driver links visible (`count=2`);
+- four PLASMA services (`plasma-bootstrap`,
+  `plasma-runtime-activation`, `plasma-server`, `plasma-web`): `ACTIVE`;
+- `baseline_result=BASELINE_PASS_PARTIAL`;
+- `clock_fclk0=NOT_OBSERVED_UNPRIVILEGED`,
+  `bitstream_identity=NOT_QUALIFIED`,
+  `board_identity_exact=NOT_QUALIFIED`, `hardware_go=false`;
+- `mmio_access=NOT_RUN`, `fpga_reload=NOT_RUN`,
+  `uart=NON_BLOCKING_NOT_RUN`.
+
+This **confirms current reachability**, not root-level F1-B Driver/AXI
+isolation or Restore feasibility. The executed script was pinned trusted
+**main**; the candidate branch's new `RootZ2TargetPort` has **not**
+been executed on Z2. None of these current live results, nor the historical
+one-shot AXI risk waiver, may promote `hardware_go` to true.
+
 ## Stage contracts and durable state
 
 **Download** (separate Owner stage, future trusted target implementation):
