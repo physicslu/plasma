@@ -144,17 +144,19 @@ def scan_proc_consumers(*, procroot: Path) -> tuple[bool, list[str]]:
                     targets.append(os.readlink(fd))
                 except FileNotFoundError:
                     continue
-            f1b.reject_retained_fds(targets)
-            f1b.reject_retained_maps((item / "maps").read_text())
+            maps = (item / "maps").read_text()
             observed += 1
+            # Parse only after full per-process fd/maps collection. A
+            # genuine conflict is different from incomplete visibility.
+            try:
+                f1b.reject_retained_fds(targets)
+                f1b.reject_retained_maps(maps)
+            except ValueError:
+                conflicts.append(item.name)
         except FileNotFoundError:
             need(not item.exists(), "LIVE_PROCESS_SCAN_INCOMPLETE")
-        except (ValueError, PermissionError, OSError) as exc:
-            # A conflicting client is a concrete blocker, not permission to
-            # continue the probe on incomplete enumeration.
-            conflicts.append(item.name)
-            if isinstance(exc, (PermissionError, OSError)):
-                return False, conflicts
+        except (PermissionError, OSError):
+            return False, [*conflicts, item.name]
     return observed > 0, conflicts
 
 
