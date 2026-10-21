@@ -62,14 +62,18 @@ def license_snapshot(*, executor=subprocess.run) -> dict:
     result["lmdiag"] = {"exit_code": proc.returncode,
                          "invalid_host": b"invalid host" in raw,
                          "checkout_success": b"can be checked out" in raw}
-    # Batch startup tests actual Vivado launch, not merely `vivado -version`.
-    proc = executor(
-        ["/usr/bin/bash", "-c", 'source "$1"; exec vivado -mode batch '
-         '-nojournal -nolog -source /dev/stdin', "plasma-license-probe", str(SETTINGS64)],
-        input=b'puts "PLASMA_LICENSE_STARTUP_PASS"\nexit\n',
-        env={"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/nonexistent"),
-             **selectors}, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        timeout=60, check=False)
+    # Vivado does not reliably execute -source /dev/stdin; use a private,
+    # short-lived Tcl file so a zero exit alone cannot count as probe PASS.
+    with tempfile.TemporaryDirectory(prefix="plasma-vivado-license-") as td:
+        probe = Path(td) / "probe.tcl"
+        probe.write_text('puts "PLASMA_LICENSE_STARTUP_PASS"\nexit\n')
+        proc = executor(
+            ["/usr/bin/bash", "-c", 'source "$1"; exec vivado -mode batch '
+             '-nojournal -nolog -source "$2"', "plasma-license-probe",
+             str(SETTINGS64), str(probe)],
+            env={"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/nonexistent"),
+                 **selectors}, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=60, check=False)
     result["vivado_startup"] = {
         "exit_code": proc.returncode,
         "license_rejected": b"valid license was not found" in proc.stdout + proc.stderr,
