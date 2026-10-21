@@ -21,6 +21,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_candidate_dispatcher_bridge.py"
+      - "scripts/tests/test_plasma_candidate_dispatcher_bridge.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -56,6 +58,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_candidate_dispatcher_bridge.py"
+      - "scripts/tests/test_plasma_candidate_dispatcher_bridge.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -569,13 +573,26 @@ jobs:
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system_wrapper.bit" candidate/pl/build/f1b-deliverables/system_wrapper.bit
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system.hwh" candidate/pl/build/f1b-deliverables/system.hwh
           fi
-          python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
-            --event "$GITHUB_EVENT_PATH" \
-            --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
-            --workspace candidate \
-            --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
-            --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
-            > "$RUNNER_TEMP/plasma-path3-receipt.json"
+          if [ "$PLASMA_F1B_TASK_ID" = 'candidate-dispatcher-e2e-1083' ]; then
+            # Trusted main owns owner/SHA authorization and the one real Codex
+            # invocation. Candidate Python runs ONLY inside bwrap, without
+            # host HOME/auth/network/devices. No candidate-controlled workflow.
+            python3 trusted/scripts/plasma_candidate_dispatcher_bridge.py \
+              --event "$GITHUB_EVENT_PATH" \
+              --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
+              --workspace candidate \
+              --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
+              --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+              > "$RUNNER_TEMP/plasma-path3-receipt.json"
+          else
+            python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
+              --event "$GITHUB_EVENT_PATH" \
+              --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
+              --workspace candidate \
+              --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
+              --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+              > "$RUNNER_TEMP/plasma-path3-receipt.json"
+          fi
           cat "$RUNNER_TEMP/plasma-path3-receipt.json"
           git -C trusted diff --exit-code
           # Development Mode: capture *all* candidate engineering changes.
