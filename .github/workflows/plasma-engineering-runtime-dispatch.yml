@@ -34,6 +34,8 @@ on:
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
       - "scripts/tests/test_plasma_path2_held_provider.py"
+      - "pl/hil/path2_z2_target_guard.py"
+      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -60,6 +62,8 @@ on:
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
       - "scripts/tests/test_plasma_path2_held_provider.py"
+      - "pl/hil/path2_z2_target_guard.py"
+      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -97,6 +101,8 @@ jobs:
           python3 scripts/tests/test_plasma_path2_runtime_integration.py
           python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
           python3 scripts/tests/test_plasma_path2_held_provider.py
+          python3 -m py_compile pl/hil/path2_z2_target_guard.py scripts/tests/test_plasma_path2_z2_target_guard.py
+          python3 scripts/tests/test_plasma_path2_z2_target_guard.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
