@@ -211,6 +211,26 @@ Architectural invariant:
 
 > Device knowledge and programming orchestration remain high-level and replaceable; the Hardware API describes Plasma hardware capabilities rather than raw registers, and PL owns deterministic protocol execution.
 
+### Z2 AXI Control/Data Plane / DMA Architecture Assessment
+
+**Status:** TODO / deferred until Path 2 real F1-B Provider and independent cross-trigger HIL pass; no immediate RTL or driver change
+
+**Layer:** Zynq-7000 PS/PL Hardware API / FPGA PL / firmware transfer performance / eight-Site programming
+
+**Reason:** PYNQ-Z2 can implement AXI4-Lite register control, memory-mapped AXI4 data movement and AXI4-Stream transfers within PL, but availability is not evidence that DMA is necessary for PLASMA. Zynq-7000 PS GP/HP interfaces have AXI3-specific details; any PL AXI4/AXI4-Stream design must select a compatible Interconnect/Protocol Converter and DMA/FIFO data path rather than assuming PS directly exposes an AXI4-Stream port. Eight simultaneous Sites alone does not prove bulk-transfer bottlenecks.
+
+Required follow-up, **after current PR #1082 Gate 1**:
+
+- preserve the existing AXI4-Lite control/status/identity register ABI and shared Linux MMIO Hardware API rather than rebuilding the current F1-B Provider;
+- measure actual PS-to-PL transfer time, CPU consumption, buffer usage, throughput and Site fairness under representative firmware/image sizes and 1/2/8 concurrent Sites; distinguish SWD/JTAG protocol wait time and DUT Flash programming bottlenecks from PS/PL data-copy cost;
+- compare (A) bounded MMIO register/FIFO writes, (B) an AXI DMA memory-mapped path using Zynq HP/DDR access and (C) AXI4-Stream plus a PL-side FIFO/dispatcher; record coherency, cache maintenance, buffer ownership and IRQ/completion semantics;
+- separately assess AXI3 PS-side compatibility, AXI4/AXI4-Lite IP choices, AXI4-Stream's addressless data-flow model and Xilinx AXI Interconnect/Protocol Converter boundaries;
+- specify stop/quiesce/restore behavior for every DMA/Stream Master **before** FPGA Manager reconfiguration; a DMA engine and a generic UIO driver do not establish AXI idleness or isolation;
+- require an evidence-backed latency/throughput threshold and end-to-end eight-Site HIL before adopting DMA. Defer implementation if simple MMIO/FIFO meets the measured throughput goal;
+- reflect the selected design in the common Linux-to-PL Hardware API, Site safety/ownership contract, RTL tests and operator recovery procedure. No Production hardware readiness follows from Host-only benchmarks.
+
+**Current scope exclusion:** This is a backlog design/performance decision. Do not add AXI DMA, modify PL bitstream, or dispatch hardware work as part of PR #1082's current Real Provider Gate 1. Existing F1-B Build and one-shot HIL evidence may be reused if exact hashes and environment bindings still match.
+
 ### Split Programming Image Data Plane
 
 **Status:** TODO / future architecture optimization
