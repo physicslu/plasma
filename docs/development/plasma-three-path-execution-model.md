@@ -99,6 +99,32 @@ flowchart TD
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
 5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
 
+### PR #1085 simplification (2026-10-21)
+
+Use the existing Issue #981 trusted-main Path 3 entry and existing SWPC
+Runner. The task-specific PR #1083 bridge, CLI shim, two-phase sandbox
+replay and output validator have been removed. Path 2's existing CPU-only
+sandbox is unchanged. The normal Codex `workspace-write` sandbox remains
+binding; it is not proof of OS device isolation.
+
+The trusted dispatcher can develop and test a pinned candidate workspace,
+but that does not prove the candidate dispatcher launched real Codex.
+`candidate-dispatcher-e2e-1083` fails before invoking Codex with
+`CANDIDATE_DISPATCHER_REAL_CODEX_ROUTE_NOT_AVAILABLE`. This is an explicit
+execution limitation, not an additional owner approval gate. Candidate
+E2E remains `NOT_RUN`; do not merge untested code to manufacture acceptance.
+The minimum remaining trusted-entry change would admit the reviewed pinned
+candidate dispatcher as the one top-level Codex launcher, with the existing
+owner/SHA/registry/Runner checks and sandbox. That route is not implemented
+or activated here: unrestricted candidate host execution would violate the
+current boundary, and nested Codex is not an alternative.
+
+The existing artifact uploader now receives source changes and a narrowly
+scoped engineering-evidence archive from an `if: always()` collector. It
+captures `git diff --binary HEAD` (staged and unstaged edits), untracked
+source files, and hidden engineering logs even when execution fails. This
+reuses PR #1083's collector fix without adding workflows or dispatchers.
+
 ## 五、Gate 1 — 推薦與選擇矩陣
 
 | 問題 | Path 1 | Path 2 | Path 3 |
