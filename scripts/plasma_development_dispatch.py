@@ -964,10 +964,6 @@ def live_pr_metadata(req: dict) -> dict | None:
         return pr
     except (OSError, ValueError, subprocess.SubprocessError):
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
-    finally:
-        # The workflow grants a step-scoped token for this trusted query.
-        # Codex and the subsequent build must not inherit it.
-        os.environ.pop("GH_TOKEN", None)
 
 
 def main() -> int:
@@ -1001,6 +997,9 @@ def main() -> int:
                 # and registry SHA256 before any task executes.
                 admission = worker_admission(req, args, registry, event)
                 pr = live_pr_metadata(req)
+                if args.action == "execute-codex":
+                    # Keep the step-scoped live PR token out of Codex and Vivado.
+                    os.environ.pop("GH_TOKEN", None)
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
