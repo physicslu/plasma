@@ -1,0 +1,222 @@
+name: STM32C0 five-stage deterministic validation
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/device-catalog-stm32c0-c01-foundation-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c02-discovery-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c03-metadata-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c04-admission-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c05-publication-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-stage-dispatch.yml'
+      - 'data/device-catalog/research/device-catalog-stm32c0-phase-c0.4-admission-plan.md'
+      - 'data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11/**'
+      - 'data/device-catalog/research/evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11/**'
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/publish_stm32c0_phase_c0_5.py'
+      - 'data/device-catalog/research/run_stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/stm32-c0-l0-post-u0-ordering-authority-review.json'
+      - 'data/device-catalog/research/stm32-post-u0-next-family-selection.json'
+      - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32c0-phase-c0.1-foundation-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-discovery-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-discovery-manifest.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-ordering-authority.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.5-publication-*.json'
+      - 'data/device-catalog/research/stm32c0_admission_policy.py'
+      - 'data/device-catalog/research/stm32c0_metadata_policy.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_3_policy.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_4_admission.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c01-foundation-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c02-discovery-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c03-metadata-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c04-admission-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c05-publication-validation.yml'
+      - 'scripts/ci/icpn_stm32c0_stage_dispatch.py'
+      - 'scripts/tests/test-icpn-stm32c0-stage-dispatch.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/device-catalog-stm32c0-c01-foundation-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c02-discovery-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c03-metadata-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c04-admission-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-c05-publication-validation.yml'
+      - '.github/workflows/device-catalog-stm32c0-stage-dispatch.yml'
+      - 'data/device-catalog/research/device-catalog-stm32c0-phase-c0.4-admission-plan.md'
+      - 'data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11/**'
+      - 'data/device-catalog/research/evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11/**'
+      - 'data/device-catalog/research/openocd-parts-canonical.csv'
+      - 'data/device-catalog/research/publish_stm32c0_phase_c0_5.py'
+      - 'data/device-catalog/research/run_stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/stm32-c0-l0-post-u0-ordering-authority-review.json'
+      - 'data/device-catalog/research/stm32-post-u0-next-family-selection.json'
+      - 'data/device-catalog/research/stm32c0-commercial-icpn.csv'
+      - 'data/device-catalog/research/stm32c0-phase-c0.1-foundation-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-discovery-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-discovery-manifest.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.2-production-manifest-prestate.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-ordering-authority.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.4-admission-plan.json'
+      - 'data/device-catalog/research/stm32c0-phase-c0.5-publication-*.json'
+      - 'data/device-catalog/research/stm32c0_admission_policy.py'
+      - 'data/device-catalog/research/stm32c0_metadata_policy.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_3_policy.py'
+      - 'data/device-catalog/research/stm32c0_phase_c0_4_admission.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_2_discovery.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py'
+      - 'data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_1_foundation.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py'
+      - 'data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c01-foundation-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c02-discovery-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c03-metadata-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c04-admission-validation.yml'
+      - 'docs/archive/ci-workflows/stm32c0-stages/device-catalog-stm32c0-c05-publication-validation.yml'
+      - 'scripts/ci/icpn_stm32c0_stage_dispatch.py'
+      - 'scripts/tests/test-icpn-stm32c0-stage-dispatch.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32c0-stage-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      c01: ${{ steps.select.outputs.c01 }}
+      c02: ${{ steps.select.outputs.c02 }}
+      c03: ${{ steps.select.outputs.c03 }}
+      c04: ${{ steps.select.outputs.c04 }}
+      c05: ${{ steps.select.outputs.c05 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Frozen source and trigger self-check
+        run: |
+          python scripts/ci/icpn_stm32c0_stage_dispatch.py self-test
+          python scripts/tests/test-icpn-stm32c0-stage-dispatch.py
+      - name: Route affected stages
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+            if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="${GITHUB_SHA}^"; fi
+          fi
+          python scripts/ci/icpn_stm32c0_stage_dispatch.py select --event "${{ github.event_name }}" --base "$base" --head "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  c01:
+    needs: detect
+    if: needs.detect.outputs.c01 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run C0.1 negative controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_1_foundation.py
+      - name: Replay frozen C0.1 baseline
+        run: python data/device-catalog/research/stm32c0_phase_c0_1_foundation.py --check
+      - name: Run C0.1 hard-lock validator
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_1_foundation.py
+
+  c02:
+    needs: detect
+    if: needs.detect.outputs.c02 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run C0.2 deterministic boundary and negative controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_2_discovery.py
+      - name: Print deterministic C0.2 target manifest
+        run: python data/device-catalog/research/stm32c0_phase_c0_2_discovery.py
+      - name: Validate retained evidence when present
+        shell: bash
+        run: |
+          if test -f data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py; then
+            python data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py
+          fi
+
+  c03:
+    needs: detect
+    if: needs.detect.outputs.c03 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate retained C0.2 evidence prerequisite
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py
+      - name: Run C0.3 metadata policy negative and boundary controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py
+      - name: Replay frozen C0.3 metadata policy
+        run: python data/device-catalog/research/stm32c0_phase_c0_3_policy.py
+
+  c04:
+    needs: detect
+    if: needs.detect.outputs.c04 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate retained C0.2 evidence prerequisite
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py
+      - name: Replay frozen C0.3 metadata prerequisite
+        run: python data/device-catalog/research/stm32c0_phase_c0_3_policy.py
+      - name: Run C0.4 admission negative and boundary controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_4_admission.py
+      - name: Replay frozen C0.4 read-only admission plan
+        run: python data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py
+
+  c05:
+    needs: detect
+    if: needs.detect.outputs.c05 == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate historical admission replay and C0.5 publication
+        run: |
+          python data/device-catalog/research/validate_stm32c0_phase_c0_4_admission_plan.py
+          python data/device-catalog/research/test_stm32c0_phase_c0_5_publication.py
+          python data/device-catalog/research/publish_stm32c0_phase_c0_5.py --verify

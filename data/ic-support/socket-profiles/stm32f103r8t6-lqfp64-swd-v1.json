@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "socket_profile_id": "stm32f103r8t6-lqfp64-swd-socket-v1",
+  "status": "design_input_ready",
+  "target": {
+    "manufacturer": "STMicroelectronics",
+    "icpn": "STM32F103R8T6",
+    "base_device": "STM32F103R8",
+    "package": "LQFP64"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5319_rev20"
+    }
+  ],
+  "programming_hardware_profile_id": "stm32f103-lqfp64-programming-hardware-v1",
+  "route": {
+    "provider_qualification_level": "L2",
+    "interface": "SWD",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "required_contacts": [
+      "SWDIO",
+      "SWCLK",
+      "NRST",
+      "VDD_1",
+      "VDD_2",
+      "VDD_3",
+      "VDD_4",
+      "VSS_1",
+      "VSS_2",
+      "VSS_3",
+      "VSS_4",
+      "VDDA",
+      "VSSA"
+    ],
+    "optional_contacts": [
+      "BOOT0",
+      "VBAT"
+    ]
+  },
+  "fixture_contract": {
+    "orientation": {
+      "pin1_must_be_keyed": true,
+      "reverse_insertion_prevention_required": true
+    },
+    "power": {
+      "target_power_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "all_main_supply_and_ground_contacts_required": true,
+      "external_vpp_required": false,
+      "target_vdd_reference_required": true,
+      "vbat_bias_documented_before_fixture_release": true
+    },
+    "reset": {
+      "nrst_contact_required": true,
+      "connect_under_reset_capable": true
+    },
+    "unproven_items": [
+      "socket_vendor_and_part_number",
+      "contact_resistance_limit",
+      "fixture_current_limit_value",
+      "maximum_verified_swd_clock",
+      "signal_integrity_margin",
+      "mechanical_cycle_life",
+      "thermal_derating",
+      "production_hil_pass"
+    ]
+  },
+  "readiness": {
+    "sufficient_for_socket_schematic_and_pin_assignment_development": true,
+    "sufficient_for_socket_vendor_selection": false,
+    "sufficient_for_production_release": false,
+    "physical_programming_qualified": false,
+    "hil_verified": false,
+    "execution_authorized": false
+  }
+}

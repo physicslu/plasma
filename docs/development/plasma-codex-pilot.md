@@ -54,3 +54,62 @@ The first real owner-authorized Issue comment reached the new independent `SWPC-
 ## Follow-on (not implemented here)
 
 After this read-only pilot is observed on real SWPC: add owner-bound Gate 1 A/B/C task manifests, job deduplication, cancellation and controlled artifact publication, isolated software-write Codex worktrees with GH-mediated PR submission, audit retention/redaction, resource locks, and individually scoped HIL capabilities. Track as subsequent PRs under Issue #981 or scoped follow-up issues, always stopping at Gate 2.
+
+
+## Pilot source-backed acceptance remediation (Gate 1; NOT MERGED / NOT EXECUTED)
+
+The previous genuine owner-command pilot GitHub Actions #39116515782 returned
+exit code 0 and a green workflow, but its uploaded last message explicitly
+said Codex could not read the six listed source files. It therefore supplied
+no source-grounded assessment. A successful Codex exit is not an acceptance test.
+
+This Gate 1-only change introduces a runner-owned source input/acceptance
+contract; it is NOT evidence of a subsequent real SWPC/Codex run. The unchanged
+owner command remains exactly /plasma-codex pilot 981.
+
+### Source preparation
+
+- The runner snapshots ONLY the six fixed public checked-in files already
+  specified for the read-only pilot. Parent-directory symlinks, file symlinks,
+  nonregular or binary content, oversized files and aggregate input overflow
+  cause immediate rejection.
+- The snapshot bytes and SHA256 are recorded in input-manifest.json. Exact
+  source contents are embedded as quoted untrusted data in a private prompt
+  file. Codex need not discover local files or use a shell/read-file tool.
+- The workflow still checks out main with read-only token permissions; no
+  new issue-command routes, capability grants, hardware permissions or
+  self-hosted runner labels have been added.
+- The CLI remains in read-only sandbox with no user-command approval; the
+  prompt forbids any tool invocation. The acceptance verifier rejects observed
+  tool item types in the JSONL trace, but this is a POST-EXECUTION assertion,
+  not an OS-enforced prohibition on other readable host files.
+
+### Actual outcome verification
+
+- Exit status 0 alone is insufficient: require a completed structured model
+  trace, a JSON response containing a substantive summary and exactly three
+  findings (guard, tmux, evidence), and substantive analysis of each source
+  pair.
+- Each finding cites two specific allowed files with exact anchored excerpts
+  actually found in those files. Missing source access, hallucinated excerpts,
+  refusal, short generic analysis, unknown topics, extra keys, attempted tools,
+  stale input, changed prompt, incomplete trace or nonzero Codex exit all
+  produce DENIED and nonzero job status.
+- Only the structured assessment if validated, sanitized acceptance status,
+  input manifest, original metadata, exit code and SHA256SUMS are uploaded.
+  Raw private prompt, model event trace and unverified last message are NOT
+  uploaded. No hardware acceptance is claimed.
+
+### Limits and Gate 2 requirements
+
+The source-input allowlist is enforced in the RUNNER'S prompt preparation.
+It does NOT create a kernel-enforced Codex filesystem allowlist. The worker's
+existing non-root identity, no-hardware-group restrictions and Codex read-only
+sandbox remain necessary; file secrecy and physical device isolation have NOT
+been proven by these host-only tests. Do not use this acceptance contract as
+authorization for USB, LA2016, Z2, FPGA or DUT.
+
+Prior to merge recheck exact PR HEAD, latest main, changed file list, all CI
+and mergeability. Approval to merge is a distinct Gate 2 decision. Any real
+rerun of the pilot after merge requires another specific owner authorization
+and its own evidence audit.

@@ -1,0 +1,127 @@
+{
+  "schema_version": "plasma.engineering.capabilities.v1",
+  "status": "CONTRACT_ONLY_NO_RUNTIME_DISPATCH",
+  "capabilities": {
+    "software-readonly": {
+      "entrypoint": "offline-analysis",
+      "worker_class": "hosted-offline",
+      "permissions": [
+        "repo:read"
+      ],
+      "max_timeout_seconds": 300,
+      "hardware_authorization": false,
+      "must_deny": [
+        "usb",
+        "z2",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "network-instrument",
+        "repository-write",
+        "host-root"
+      ],
+      "runtime_enabled": false
+    },
+    "software-pr": {
+      "entrypoint": "software-pr",
+      "worker_class": "software-isolated",
+      "permissions": [
+        "repo:read",
+        "repo:write-branch"
+      ],
+      "max_timeout_seconds": 900,
+      "hardware_authorization": false,
+      "must_deny": [
+        "usb",
+        "z2",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "network-instrument",
+        "host-root"
+      ],
+      "runtime_enabled": false
+    },
+    "la2016-loopback": {
+      "entrypoint": "la2016-direct",
+      "worker_class": "la2016-isolated",
+      "permissions": [
+        "repo:read",
+        "usb:la2016"
+      ],
+      "max_timeout_seconds": 600,
+      "hardware_authorization": true,
+      "must_deny": [
+        "z2",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "network-instrument",
+        "repository-write",
+        "host-root"
+      ],
+      "runtime_enabled": false
+    },
+    "z2-readonly": {
+      "entrypoint": "z2-inventory",
+      "worker_class": "z2-readonly",
+      "permissions": [
+        "repo:read",
+        "ssh:z2-readonly"
+      ],
+      "max_timeout_seconds": 300,
+      "hardware_authorization": true,
+      "must_deny": [
+        "usb",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "repository-write",
+        "host-root"
+      ],
+      "runtime_enabled": false
+    },
+    "z2-privileged": {
+      "entrypoint": "z2-hil-protected",
+      "worker_class": "z2-hil-privileged",
+      "permissions": [
+        "repo:read",
+        "z2:hardware-owner"
+      ],
+      "max_timeout_seconds": 300,
+      "hardware_authorization": true,
+      "must_deny": [
+        "usb",
+        "dut",
+        "hub-power",
+        "repository-write"
+      ],
+      "runtime_enabled": false
+    },
+    "z2-cpu-only": {
+      "entrypoint": "z2-cpu-only",
+      "worker_class": "z2-cpu-only",
+      "permissions": [
+        "repo:read",
+        "ssh:z2-cpu-only"
+      ],
+      "max_timeout_seconds": 120,
+      "hardware_authorization": true,
+      "must_deny": [
+        "usb",
+        "fpga",
+        "mmio",
+        "dut",
+        "hub-power",
+        "network-instrument",
+        "repository-write",
+        "host-root"
+      ],
+      "runtime_enabled": false
+    }
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open4th.com/schemas/plasma-verification-result-v1.schema.json",
+  "title": "PLASMA Verification Platform v1 execution receipt",
+  "description": "Per-run observed evidence; a PASS must not imply unexecuted hardware or other SIM stages.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "commit_sha",
+    "stage",
+    "status",
+    "runner_class",
+    "runner_identity",
+    "tools",
+    "rtl_top",
+    "rtl_source_digest",
+    "rtl_sources",
+    "driver_module",
+    "suite",
+    "test_counts",
+    "seed",
+    "ci_run_url",
+    "artifacts",
+    "claims",
+    "not_tested",
+    "exit_code",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "plasma-verification-v1"
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "stage": {
+      "enum": [
+        "SIM-0",
+        "SIM-1",
+        "SIM-2",
+        "SIM-3",
+        "SIM-4"
+      ]
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NOT_RUN",
+        "BLOCKED"
+      ]
+    },
+    "runner_class": {
+      "enum": [
+        "github-hosted",
+        "trusted-swpc",
+        "authorized-hil",
+        "local-host-only"
+      ]
+    },
+    "runner_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "pytest",
+        "cocotb",
+        "cocotb_test",
+        "simulator"
+      ],
+      "properties": {
+        "python": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "pytest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "cocotb": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "cocotb_test": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "simulator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "rtl_top": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "rtl_source_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rtl_sources": {
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "driver_module": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "suite": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "failed",
+        "skipped",
+        "errors"
+      ],
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "seed": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "ci_run_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+$"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "not_tested": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

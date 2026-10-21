@@ -123,6 +123,22 @@ VERIFICATION: Final = ("exact_candidate_verified", "resources_verified",
                        "independent_health_verified", "recovery_receipt_verified")
 
 
+def validate_synthetic_stage(pin: ConfigurationPin, evidence: object) -> None:
+    """Host fixture stage-level validation; NEVER grants hardware authority."""
+    if type(pin) is not ConfigurationPin:
+        raise ContractRejected("Exact configuration pin required")
+    for cls, fields in (
+        (OwnershipEvidence, OWNERSHIP),
+        (IsolationEvidence, ISOLATION),
+        (RetirementEvidence, RETIREMENT),
+        (VerificationEvidence, VERIFICATION),
+    ):
+        if type(evidence) is cls:
+            _require(pin, evidence, cls, fields)
+            return
+    raise ContractRejected("Missing or unrecognized synthetic gate evidence")
+
+
 def validate_synthetic_transition(
     pin: ConfigurationPin,
     ownership: OwnershipEvidence,

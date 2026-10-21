@@ -21,8 +21,13 @@ from stm32u0_metadata_policy import (
 )
 from stm32u0_phase_u0_3_policy import (
     EXPECTED_METADATA_DISTRIBUTION,
+    DEFAULT_PRODUCTION_MANIFEST,
+    FROZEN_PRESTATE_SOURCE_ROOT,
+    STM32U0PolicyError,
     build_policy_plan,
+    historical_prestate_source_rows,
     policy_plan_is_clean,
+    production_snapshot,
 )
 from validate_stm32u0_phase_u0_2_retained_evidence import BASELINE, EVIDENCE, main as validate_retained
 
@@ -123,6 +128,36 @@ class STM32U0PhaseU03PolicyTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(AdmissionError):
                 load_ordering_authority(path)
+
+    def test_historical_prestates_are_original_source_blobs(self) -> None:
+        source_manifest = json.loads(DEFAULT_PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
+        self.assertEqual(len(source_manifest["sources"]), 8)
+        for source in source_manifest["sources"]:
+            rows = historical_prestate_source_rows(source)
+            self.assertEqual(len(rows), source["row_count"])
+            self.assertTrue(all(row["family"] == source["family"] for row in rows))
+        snapshot = production_snapshot()
+        self.assertEqual(snapshot["exact_icpn_count"], 635)
+        self.assertEqual(snapshot["base_device_count"], 217)
+        self.assertEqual(snapshot["stm32u0_exact_icpn_count"], 0)
+
+    def test_mutated_pinned_fixture_fails_closed(self) -> None:
+        source = json.loads(DEFAULT_PRODUCTION_MANIFEST.read_text(encoding="utf-8"))["sources"][0]
+        expected = FROZEN_PRESTATE_SOURCE_ROOT / "stm32f0-commercial-icpn.csv"
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / expected.name
+            bad.write_bytes(expected.read_bytes() + b"\n")
+            with self.assertRaisesRegex(STM32U0PolicyError, "SHA-256 mismatch"):
+                historical_prestate_source_rows(source, evidence_root=Path(tmp))
+
+    def test_prestates_reject_injected_or_current_source_paths(self) -> None:
+        source = json.loads(DEFAULT_PRODUCTION_MANIFEST.read_text(encoding="utf-8"))["sources"][0]
+        tampered = dict(source, path="../../production/icpn-v1-manifest.json")
+        with self.assertRaisesRegex(STM32U0PolicyError, "unexpected U0.3 prestate source path"):
+            historical_prestate_source_rows(tampered)
+        unknown = dict(source, family="STM32U0")
+        with self.assertRaisesRegex(STM32U0PolicyError, "unexpected historical source family"):
+            historical_prestate_source_rows(unknown)
 
     def test_policy_planner_is_clean_without_authorizing_production_or_support(self) -> None:
         plan = build_policy_plan()

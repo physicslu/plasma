@@ -1,0 +1,96 @@
+{
+  "schema_version": "plasma.engineering.development_tasks.v1",
+  "mode": "development",
+  "tasks": {
+    "nine-nine-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_three_path_nine_nine.py",
+      "argv": [],
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d",
+      "capability": "cpu-only"
+    },
+    "nine-nine-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_nine_nine_codex_generated.py",
+      "objective": "Build a Python 9x9 multiplication-table program for factors 1 through 9. Choose the implementation and CSV column labels yourself. Run your program, independently check all 81 mathematical results, fix any failures, and return real source code, program output, and a test report for reviewer analysis.",
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
+    },
+    "hil-a2-cpu-only": {
+      "execution_path": "path2-cli",
+      "capability": "z2-cpu-only",
+      "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
+    },
+    "auto4-premerge-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_auto4_branch_probe.py",
+      "argv": [],
+      "expected_stdout_sha256": "9727532e69a8f60b50dca893192de734bb15d1b92b2ebd4ec639a04ffb0ead0d",
+      "verification": "sha256-only"
+    },
+    "candidate-dispatcher-premerge-sandbox": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py",
+      "argv": [],
+      "expected_stdout_sha256": "36b4f02f4579ad3460f33292c6b87285d418259d14a6c7267b16d0daa92d45e6",
+      "capability": "cpu-only"
+    },
+    "auto4-premerge-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
+      "output_format": "csv",
+      "objective": "Implement a CPU-only Python program that prints CSV with exactly header n,triangular and 12 ordered rows for n=1 through 12, using the integer triangular-number result n*(n+1)//2. Run it on this runner, independently verify all twelve rows and edge cases n=1 and n=12, record actual commands, exit codes, and observed outcomes. Do not use hardware, network, SSH, sudo, or any non-Python package."
+    },
+    "fixed-site1-vivado-host-build": {
+      "execution_path": "path2-cli",
+      "capability": "vivado-host-build",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "toolchain": "2026.1",
+      "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+    },
+    "z2-path2-build": {
+      "execution_path": "path2-cli",
+      "capability": "vivado-host-build",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "toolchain": "2026.1",
+      "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+    },
+    "z2-path2-download": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "download"
+    },
+    "z2-path2-testing": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "test"
+    },
+    "z2-path2-restore": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "restore"
+    },
+    "z2-path2-full-hil": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "full"
+    },
+    "f1b-path3-codex-vivado-build": {
+      "execution_path": "path3-codex",
+      "objective": "Complete F1-B PYNQ-Z2 fixed unified Site 1 REAL Host-only FPGA build with Vivado 2026.1 using the existing pl/projects/z2-fixed-unified-site1 Tcl, the pinned board helper, and existing HWH verifier. This is Development Mode: run the actual Vivado synthesis, implementation, timing and DRC; generate BIT and HWH; diagnose failures, edit RTL/Tcl/Python/build scripts and documents as needed, rerun to qualified evidence. On failure, distinguish observed root causes from hypotheses and retain exact commands, logs, exit codes, minimal fixes and retest history. Save a chronological problem/solution engineering-report.md in .plasma-path3-evidence and preserve report/log/artifact SHA256. Do not falsely claim real Build PASS when NOT_RUN or failed. Host-only: do not connect to, program, reset or change power on physical Z2/FPGA/DUT/LA or use MMIO/USB/hardware deployment. Do not merge, push, or reconfigure GitHub CI. Prefer reuse of existing checked-in Vivado project and board helper, not a new build framework. MANDATORY delivery follow-up: rebuild the current newly pinned candidate HEAD from scratch after the fixed create_block_design.tcl change, not merely restate the prior successful run; independently verify final reports. The previous run 39342622512 produced valid BIT/HWH locally but raw binaries were absent from GitHub's uploaded artifact because hidden/ignored evidence paths were not captured. To correct custody with the EXISTING trusted workflow, copy the real final BIT and HWH plus raw Vivado logs/reports into candidate/pl/build/f1b-deliverables/ (create if necessary). In particular the files MUST be under pl/build/ with extensions .bit and .hwh, so existing artifact globs candidate/pl/build/**/*.bit and **/*.hwh upload both. Preserve original hashes and evidence report, and record commands, actual paths, sizes, SHA256 and all stage results. Do not embed license secrets. Do not alter Workflow or Git refs. If they cannot be included, explicitly report delivery FAIL."
+    },
+    "f1b-path3-z2-hil-once": {
+      "execution_path": "path3-codex",
+      "objective": "OWNER DIRECTIVE 2026-10-20: DIRECT F1-B DEVELOPMENT FPGA LOAD NOW on the owner's own PYNQ-Z2, not another AXI-certification investigation. The owner understands and accepts that PS->PL AXI isolation cannot presently be proven and a one-time full-PL FPGA Manager reconfiguration may hang the Z2, disrupt kernel fabric accesses, prevent an automatic base.bin restore, and require MANUAL recovery. This is a lab experiment, not a production qualification or assertion of safety. Owner specifically requested no further repeated fabric/AXI inventory. You are authorized to accept THIS SINGLE PREVIOUSLY OBSERVED, EXACT GENERIC UIO condition as a development-mode known risk: bound 'uio_pdrv_genirq' at uio1 0x40000000..0x4000FFFF, no known user-space clients, 85/85 proc observed, zero IRQ and runtime suspended. Do NOT equate driver binding with proof of AXI activity; do NOT pretend no AXI risk. Do NOT unbind drivers, modify sudoers, stop services, reboot, power cycle, or reconfigure unrelated hardware. Do NOT generally disable ownership admission: if necessary create a strictly scoped, explicit OWNER_DEV_RISK_ACK=F1B_ONE_SHOT_BOUND_PASSIVE_UIO exception only for the documented uio1 mapping under this one F1-B development run, with absence of active /dev/mem or UIO FD/VMA and process visibility freshly confirmed immediately before writing. All OTHER ownership issues fail closed. Avoid a separate broad audit. A new root path should reuse existing secure password-sudo via private enrolled credentials and existing FPGA Manager loader; ensure exact source review and minimize code; may use the candidate F1B run_live(profile) once carefully, do not execute SWD04 4-aperture HIL02 writes. Preserve positive/negative test evidence for any gate change. \nAlready VERIFIED previously: main's authenticated BIT/HWH prefetch SHA pins (BIT fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075, HWH bf3690d69fefc8da3fc62964209776466894cd4353aec0a475b373257899ca76), true Bootgen 2026.1 BIN size 4045568 SHA256 c351f668094a2b841426c64681d44c76cb8c14b61766d90a0e10adcf3a22a3c3, root sudo via private credential PASS, original /lib/firmware/base.bin SHA256 c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c. Preserve/run current minimal firmware/recovery checks only immediately before load. PR #1074 holds shared generic Supervisor Profile/TestCallback, F1B three-word read-only test, SWD04 compatibility and strict sudo report framing, GitHub CI 10/10 SUCCESS. DO NOT re-run Vivado, rebuild RTL, repeat historical HIL or ask again for passwords. \nNOW: (1) authenticate to Z2 via enrolled secure SSH+sudo, verify current boot FPGA Manager operating, trusted base.bin bytes, prepared exact F1-B BIN bytes, and absence of any active UIO/devmem clients or stale mapping; (2) record durable RESTORE_REQUIRED intent and original manager/boot/service snapshot BEFORE any FPGA write; (3) perform exactly ONE FPGA Manager full-bitstream load of SHA-verified F1B BIN, no retry; (4) if manager operating and native-aligned read-only MMIO child is safely reaped, read ONLY 0x40000000 expect 0x4D534C50, 0x40000004 expect 0x00010000, 0x40004000 expect 1; (5) immediately restore the already verified original base.bin if safe to do so, and verify restoration using manager trace/boot ID/original owners. Never claim overall PASS absent actual load/readback/restore evidence. On hung manager, SIGBUS, child stall, unreaped worker, SSH loss or uncertain restore safety, STOP and report actual hardware UNKNOWN/MANUAL_RECOVERY; do NOT retry, issue an unsafe blind second write or use other equipment. At most 1 F1B candidate FPGA Manager write + 1 guarded original restore. Do not operate DUT/IC/Blue Pill/LA/USB Power/SWD/JTAG or modify any other hardware. No code merge, no PR merge, no deploy/service reboot. \nProvide .plasma-path3-evidence/engineering-report.md and candidate/pl/build/f1b-hil/reports/summary.md with exact commands/exits, accepted owner development risk, real FPGA manager write count, actual identity values, base restore proof and UNKNOWN where evidence missing. If a genuinely necessary missing technical runtime capability still prevents the experiment, return one precise blocker, not a new architecture project; DO NOT forge LOAD success or claim GitHub workflow success equals HIL PASS."
+    },
+    "candidate-dispatcher-e2e-1083": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
+      "output_format": "csv",
+      "objective": "Implement a CPU-only Python program that prints CSV with exactly header n,triangular and 12 ordered rows for n=1 through 12, using the integer triangular-number result n*(n+1)//2. Run it on this runner, independently verify all twelve rows and edge cases n=1 and n=12, record actual commands, exit codes, and observed outcomes. Do not use hardware, network, SSH, sudo, or any non-Python package."
+    }
+  }
+}

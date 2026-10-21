@@ -1,0 +1,9 @@
+{
+  "schema_version": "plasma.engineering.runtime_activation.v1",
+  "status": "DISABLED_GATE1",
+  "paths": {
+    "path2-cli": false,
+    "path3-codex": false
+  },
+  "notes": "Gate 1 offline candidate only; a separate reviewed activation change and root-provisioned isolated runner are mandatory."
+}

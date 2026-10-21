@@ -1,0 +1,40 @@
+{
+  "schema": "plasma-fixed-ppu-board-host-v1",
+  "soc": "XC7Z020-1CLG400C",
+  "image_policy": "FIXED_PER_BOOT",
+  "board_id": "SYNTHETIC-Z2-DO-NOT-DEPLOY",
+  "boot_id": "SYNTHETIC-BOOT",
+  "owner_epoch": "SYNTHETIC-OWNER-EPOCH",
+  "generation": 1,
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "image_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "hardware_authority": false,
+  "uio_pin": {
+    "label": "fixed-ppu-synthetic",
+    "platform_device": "40000000.fixed-ppu.synthetic",
+    "driver": "uio_pdrv_genirq",
+    "map_index": 0,
+    "physical_base": 1073741824,
+    "size": 65536,
+    "byte_offset": 0
+  },
+  "expected_identity": {
+    "image_id_words": [
+      286335522,
+      858997828,
+      1431660134,
+      2004322440
+    ],
+    "build_id_words": [
+      2882396161,
+      2882396162,
+      2882396163,
+      2882396164
+    ],
+    "hw_revision": 1,
+    "site_present_bitmap": 1,
+    "capabilities": 1,
+    "max_transfer_bits": 64
+  }
+}

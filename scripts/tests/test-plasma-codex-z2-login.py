@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 HERE = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -39,6 +39,25 @@ class Z2LoginContracts(unittest.TestCase):
             (interface / "bInterfaceNumber").write_text("01")
             (usb / "idProduct").write_text("9999")
             self.assertEqual(subject.uart_candidates(tty_root), [])
+
+    def test_uart_wake_requires_two_separate_enter_keypresses(self) -> None:
+        # Owner's picocom evidence: two Enter presses produce the
+        # interactive 'xilinx@pynq:~$' prompt. CRLF is not two CR keys.
+        with patch.object(subject.os, "write") as sender:
+            with patch.object(subject.time, "sleep") as pause:
+                subject.wake_uart_console(17, pause_seconds=0.35)
+        self.assertEqual(sender.call_args_list, [
+            call(17, b"\r"), call(17, b"\r"),
+        ])
+        pause.assert_called_once_with(0.35)
+
+    def test_z2_interactive_shell_prompt_format(self) -> None:
+        # A preauthenticated UART shell must not be asked for a password.
+        prompt = "\r\nxilinx@pynq:~$ "
+        self.assertRegex(
+            prompt,
+            r"(?m)(?:^|[\r\n])[\w.-]+@[\w.-]+:[^\r\n]{0,70}\$\s*$",
+        )
 
     def test_missing_private_credentials_never_guess_host(self) -> None:
         with patch.object(subject, "private_file", side_effect=ValueError("no file")):

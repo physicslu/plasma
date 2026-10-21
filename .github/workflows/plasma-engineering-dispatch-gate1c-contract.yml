@@ -1,0 +1,68 @@
+name: PLASMA Engineering Dispatch Gate 1C Safety Contracts
+
+# Hosted PR/main-push only. Full workflow inventory uses static parsing.
+# NO runtime dispatcher, issue comments, workflow dispatch, Codex or hardware.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/plasma_engineering_dispatch_gate1c.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_gate1c.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "scripts/plasma_engineering_dispatch_gate1c.py"
+      - "scripts/tests/test_plasma_engineering_dispatch_gate1c.py"
+      - "specs/engineering-dispatch/**"
+      - "docs/architecture/plasma-engineering-dispatch-v1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-safety-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Gate 1C negative security contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/plasma_engineering_dispatch_gate1c.py \
+            scripts/tests/test_plasma_engineering_dispatch_gate1c.py
+          python3 scripts/tests/test_plasma_engineering_dispatch_gate1c.py
+      - name: Audit EVERY checked-in workflow and preserve honest NO-GO finding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma_engineering_dispatch_gate1c.py audit-workflows \
+            --directory .github/workflows > gate1c-workflow-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          with open("gate1c-workflow-audit.json",encoding="utf8") as f:
+              r=json.load(f)
+          archives=list(Path("docs/archive/ci-workflows/stm32c0-stages").glob("*.yml"))
+          assert len(archives) == 5
+          assert Path(".github/workflows/device-catalog-stm32c0-stage-dispatch.yml").is_file()
+          assert r["scanned"] == r["total"] and r["total"] + len(archives) - 1 >= 325
+          assert r["status"] == "NO_GO_WORKFLOW_TRIGGER_RISK"
+          assert r["runtime_enabled"] is False
+          assert r["potential_exposures"] > 0
+          print("Gate 1C whole-repository workflow scan PASS with truthful NO_GO")
+          print("workflows scanned:",r["scanned"],"potential risks:",r["potential_exposures"])
+          PY
+      - name: Archive sanitized static trigger inventory
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-engineering-dispatch-gate1c-audit-${{ github.run_id }}
+          path: gate1c-workflow-audit.json
+          if-no-files-found: error
+          retention-days: 14

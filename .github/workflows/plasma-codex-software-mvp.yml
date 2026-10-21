@@ -1,0 +1,209 @@
+name: PLASMA Unified HIL - owner-triggered fixed SW Codex (Issue 981)
+
+# Unified SW/Z2/LA Runner: owner-only fixed SW task; no generic dispatcher or hardware operation.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-software-mvp.yml"
+      - "scripts/plasma_codex_software_mvp.py"
+      - "scripts/tests/test_plasma_codex_software_mvp.py"
+      - "scripts/plasma_codex_postmerge_dispatch.py"
+      - "scripts/tests/test_plasma_codex_postmerge_dispatch.py"
+      - "docs/development/plasma-codex-software-mvp.md"
+      - "examples/hello-world/main.c"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-software-mvp.yml"
+      - "scripts/plasma_codex_software_mvp.py"
+      - "scripts/tests/test_plasma_codex_software_mvp.py"
+      - "scripts/plasma_codex_postmerge_dispatch.py"
+      - "scripts/tests/test_plasma_codex_postmerge_dispatch.py"
+permissions:
+  contents: read
+concurrency:
+  group: plasma-codex-software-mvp-981
+  cancel-in-progress: false
+jobs:
+  contract:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m py_compile scripts/plasma_codex_software_mvp.py scripts/tests/test_plasma_codex_software_mvp.py scripts/plasma_codex_postmerge_dispatch.py scripts/tests/test_plasma_codex_postmerge_dispatch.py
+          python3 scripts/tests/test_plasma_codex_software_mvp.py
+          python3 scripts/tests/test_plasma_codex_postmerge_dispatch.py
+
+  authorize:
+    # Exact same explicit owner/Issue admission used by Z2 and LA jobs.
+    # PR and main push never schedule SWPC. This job is hosted-only.
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex hello-c 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      approved_sha: ${{ steps.provenance.outputs.approved_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: provenance
+        name: Verify exact trusted owner SW task and pin reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+          echo "approved_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  codex:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' && needs.authorize.outputs.approved_sha == github.sha }}
+    # One existing hardware-capable dedicated Codex worker shared by SW, Z2 and LA.
+    # SW tasks require explicit owner Issue command; hardware tasks retain distinct gates.
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+      - name: Verify unified SWPC/HIL worker identity and exact owner-authorized SW task
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ needs.authorize.outputs.approved_sha }}
+        run: |
+          set -euo pipefail
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
+          python3 scripts/plasma_codex_software_mvp.py authorize --event "$GITHUB_EVENT_PATH"
+          test "$RUNNER_ENVIRONMENT" = self-hosted
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          test -z "$(git status --porcelain)"
+          test ! -e examples/hello-world/main.c
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "NO_GO: software Codex has a privileged hardware group" >&2
+            exit 2
+          fi
+          test -z "${SSH_AUTH_SOCK:-}" || { echo "NO_GO: SSH agent exposed"; exit 2; }
+          # The existing HIL account intentionally has device-specific USB DAC.
+          # Mere /dev readability is not a software-task authorization failure.
+          # Do NOT open USB/serial devices here; hardware actions remain in their
+          # separate owner-authorized Z2/LA workflows.
+          for group in plasma-codex-io plasma-monitor; do
+            id -nG | tr ' ' '\n' | grep -Fxq "$group" || {
+              echo "NO_GO: unified HIL worker is missing $group" >&2
+              exit 2
+            }
+          done
+          command -v codex
+          command -v timeout
+          # Negative host preflight, NOT proof of host-wide network isolation.
+      - name: Real SWPC Codex (existing ChatGPT CLI authentication; no API secret)
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          codex --version
+          cat > "$RUNNER_TEMP/codex-task.txt" <<'EOF
+          PLASMA Issue #981, approved first C11 Hello World development pilot.
+          You are the real SWPC Codex CLI author. Create EXACTLY ONE NEW
+          source file: examples/hello-world/main.c (directory if necessary).
+          It must be a C11 program using ONLY #include <stdio.h>, int main(void),
+          a single puts("Hello, World!") OR printf("Hello, World!\\n") call,
+          followed by return 0;. No other includes, declarations, functions,
+          macros, comments, calls or side effects. Output exactly the bytes
+          Hello, World! followed by newline. Do not copy an existing file.
+          Read AGENTS.md for project conventions but change no tracked files.
+          Do not use external programs, sudo, SSH, networks, Z2/FPGA/USB/LA,
+          hardware, deployment, git push, git commit or GitHub PR commands.
+          The trusted worker wrapper will separately compile, run and publish
+          your patch after validating this tiny grammar. Do not create tests
+          or documentation: ONLY examples/hello-world/main.c.
+          EOF
+          # Existing SWPC Codex CLI login; no API key is supplied.
+          # Spawned tools should not have network access to laboratory endpoints.
+          timeout --signal=TERM --kill-after=10s 480s \
+            codex --ask-for-approval never \
+              -c sandbox_workspace_write.network_access=false \
+              exec --sandbox workspace-write \
+              - < "$RUNNER_TEMP/codex-task.txt"
+      - name: GCC C11 Hello World runtime acceptance and scoped patch artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/tests/test_plasma_codex_software_mvp.py
+          mkdir -p "$RUNNER_TEMP/mvp-parent"
+          python3 scripts/plasma_codex_software_mvp.py bundle \
+            --event "$GITHUB_EVENT_PATH" --artifact-dir "$RUNNER_TEMP/mvp-parent/bundle"
+          (cd "$RUNNER_TEMP/mvp-parent/bundle" && sha256sum candidate.patch receipt.json)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: real-codex-mvp-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/mvp-parent/bundle/candidate.patch
+            ${{ runner.temp }}/mvp-parent/bundle/receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publisher:
+    needs: [authorize, codex]
+    if: ${{ needs.codex.result == 'success' && needs.authorize.outputs.approved_sha == github.sha }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: real-codex-mvp-${{ github.run_id }}
+          path: ${{ runner.temp }}/mvp-candidate
+      - name: Verify model patch in a separate trusted job
+        env:
+          APPROVED_SHA: ${{ needs.authorize.outputs.approved_sha }}
+        run: |
+          set -euo pipefail
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
+          python3 scripts/plasma_codex_software_mvp.py publish \
+            --event "$GITHUB_EVENT_PATH" --artifact-dir "$RUNNER_TEMP/mvp-candidate"
+          git diff --cached --check
+      - name: Open real GitHub PR, never merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="codex-mvp/issue981-$GITHUB_RUN_ID"
+          git switch -c "$branch"
+          git -c user.name="plasma-codex-mvp[bot]" \
+              -c user.email="plasma-codex-mvp@users.noreply.github.com" \
+              commit -m "feat(examples): SWPC Codex C11 Hello World (#981)"
+          git push -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "feat(examples): real SWPC Codex C11 Hello World (#981)" \
+            --body "Produced by REAL SWPC Codex for C11 Hello World. Independent worker compiled with gcc -std=c11 -Wall -Wextra -Werror -pedantic and verified exact stdout, then Publisher admitted SHA256 and one-file patch without running model-generated source. No auto merge, hardware or deployment authorized. Gate 2 required. GitHub Actions token-generated PR might need manual CI approval."
+          gh pr view "$branch" --json url,number,headRefOid

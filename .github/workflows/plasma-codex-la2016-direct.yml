@@ -1,0 +1,149 @@
+name: PLASMA LA2016 Codex Direct Execution (Issue 981)
+
+# PR/push: HOSTED/OFFLINE tests ONLY. No self-hosted hardware job from PRs.
+# Physical work requires an additional exact owner comment AFTER Gate 2 merge.
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    paths:
+      - ".github/workflows/plasma-codex-la2016-direct.yml"
+      - "scripts/plasma-codex-la2016-direct.py"
+      - "scripts/tests/test-plasma-codex-la2016-direct.py"
+      - "docs/development/plasma-codex-la2016-direct.md"
+      - "docs/README.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plasma-codex-la2016-direct.yml"
+      - "scripts/plasma-codex-la2016-direct.py"
+      - "scripts/tests/test-plasma-codex-la2016-direct.py"
+      - "docs/development/plasma-codex-la2016-direct.md"
+      - "docs/README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-codex-la2016-direct-981
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Offline authorization, archived real-waveform, isolation and safety tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/plasma-codex-la2016-direct.py
+          python3 scripts/plasma-codex-la2016-direct.py --self-test
+          python3 scripts/tests/test-plasma-codex-la2016-direct.py
+
+  authorize:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'physicslu/plasma' &&
+      github.actor == 'physicslu' &&
+      github.event.issue.number == 981 &&
+      !github.event.issue.pull_request &&
+      github.event.comment.body == '/plasma-codex la2016-direct 981'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reviewed_sha: ${{ steps.auth.outputs.reviewed_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify exact Issue command and pin reviewed main
+        id: auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-la2016-direct.py --event --input "$GITHUB_EVENT_PATH"
+          printf 'reviewed_sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  loopback:
+    needs: authorize
+    if: ${{ needs.authorize.result == 'success' }}
+    runs-on: [self-hosted, linux, x64, plasma-codex]
+    timeout-minutes: 95
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pinned reviewed main (never PR source)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.reviewed_sha }}
+          persist-credentials: false
+          clean: true
+      - name: Enforce dedicated non-root SWPC Runner and immutable checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = issue_comment
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(hostname)" = SWPC
+          test "$(id -un)" = plasma-codex
+          test "$(id -u)" -ne 0
+          test "$RUNNER_NAME" = SWPC-plasma-codex
+          test "$(git rev-parse HEAD)" = "${{ needs.authorize.outputs.reviewed_sha }}"
+          test -z "$(git status --porcelain)"
+          for group in plasma-codex-io plasma-monitor; do
+            id -nG | tr ' ' '\n' | grep -Fxq "$group"
+          done
+          if id -nG | tr ' ' '\n' | grep -Eq '^(sudo|docker|adm|dialout|gpio|i2c|video|plasma-hil)$'; then
+            echo "Unexpected privileged Linux group" >&2
+            exit 1
+          fi
+          test "$(stat -c '%U:%G:%a' /run/plasma-codex)" = plasma-codex:plasma-monitor:2770
+      - name: Run autonomous Codex CLI with LA-only USB namespace and OFF watchdog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plasma-codex-la2016-direct.py --run
+      - name: Summarize sanitized signal evidence (not agent private output)
+        if: always()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/plasma-la2016-direct-$GITHUB_RUN_ID"
+          if test -f "$out/report.json"; then
+            python3 - "$out/report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1],encoding="utf-8"))
+          for key in ("preparation_status","preparation_attempts","live_attempts",
+                      "agent_exec","agent_termination","codex_elapsed_seconds",
+                      "failure_stage","primary_failure","network_preflight","private_logs","result",
+                      "pwm_off_command","independent_off_watchdog",
+                      "watchdog_final_receipt","z2_fpga","usb_hub_power","external_dut"):
+              value = r.get(key,"NOT_RUN")
+              formatted = (json.dumps(value,sort_keys=True,ensure_ascii=True)
+                           if isinstance(value,(list,dict)) else str(value))
+              print(key + ": " + formatted)
+          PY
+          else
+            echo "Codex direct LA2016: NOT_RUN_OR_EARLY_STOP" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload sanitized acceptance receipts and original .sr archives
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-codex-la2016-direct-981-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/report.json
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/exit_code
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/SHA256SUMS
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/evidence/1000hz-on.sr
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/evidence/1000hz-off.sr
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/evidence/2000hz-on.sr
+            ${{ runner.temp }}/plasma-la2016-direct-${{ github.run_id }}/evidence/2000hz-off.sr
+          if-no-files-found: warn
+          retention-days: 14

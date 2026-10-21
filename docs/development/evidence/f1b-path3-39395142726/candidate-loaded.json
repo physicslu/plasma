@@ -1,0 +1,4 @@
+{
+  "manager": "operating",
+  "trace": "[82936.566766] fpga_manager fpga0: writing plasma-f1b-owner-20261020-once.bin to Xilinx Zynq FPGA Manager"
+}

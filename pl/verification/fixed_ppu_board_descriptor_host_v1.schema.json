@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open4th.com/plasma/schemas/fixed-ppu-board-host-v1",
+  "title": "PLASMA Fixed PPU Host-only Board Descriptor v1",
+  "description": "Synthetic reviewed identity/resource expectations. This schema does not grant MMIO or authenticate bitstream bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "soc",
+    "image_policy",
+    "board_id",
+    "boot_id",
+    "owner_epoch",
+    "generation",
+    "source_sha256",
+    "image_sha256",
+    "manifest_sha256",
+    "hardware_authority",
+    "uio_pin",
+    "expected_identity"
+  ],
+  "properties": {
+    "schema": {
+      "const": "plasma-fixed-ppu-board-host-v1"
+    },
+    "soc": {
+      "const": "XC7Z020-1CLG400C"
+    },
+    "image_policy": {
+      "const": "FIXED_PER_BOOT"
+    },
+    "board_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "boot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner_epoch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "image_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "hardware_authority": {
+      "const": false
+    },
+    "uio_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "platform_device",
+        "driver",
+        "map_index",
+        "physical_base",
+        "size",
+        "byte_offset"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform_device": {
+          "type": "string",
+          "minLength": 1
+        },
+        "driver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "map_index": {
+          "const": 0
+        },
+        "physical_base": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294901760,
+          "multipleOf": 65536
+        },
+        "size": {
+          "const": 65536
+        },
+        "byte_offset": {
+          "const": 0
+        }
+      }
+    },
+    "expected_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image_id_words",
+        "build_id_words",
+        "hw_revision",
+        "site_present_bitmap",
+        "capabilities",
+        "max_transfer_bits"
+      ],
+      "properties": {
+        "image_id_words": {
+          "$ref": "#/$defs/words4"
+        },
+        "build_id_words": {
+          "$ref": "#/$defs/words4"
+        },
+        "hw_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "site_present_bitmap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "capabilities": {
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "max_transfer_bits": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 8192,
+          "multipleOf": 8
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "words4": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      }
+    }
+  }
+}
