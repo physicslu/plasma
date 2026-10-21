@@ -5,6 +5,8 @@ from __future__ import annotations
 from importlib.machinery import SourceFileLoader
 from importlib.util import spec_from_loader, module_from_spec
 from pathlib import Path
+from types import SimpleNamespace
+import stat
 import sys
 import tempfile
 import unittest
@@ -39,15 +41,49 @@ class BridgeContracts(unittest.TestCase):
                     bridge.execute("download", "a" * 40)
                 creds.assert_not_called()
 
-    def test_root_owned_approval_file_required(self):
+    def test_root_owned_0644_approval_readable_by_unprivileged_worker(self):
+        # A hosted non-root test cannot chown(2). Simulate only st_uid=0,
+        # while reading a real 0644 file as the current unprivileged user.
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "approved"
             p.write_text("a" * 40 + "\n")
-            p.chmod(0o644)  # publicly-readable file not valid
-            with patch.object(bridge, "APPROVAL", p):
-                with self.assertRaisesRegex(bridge.Blocked,
-                                            "SWPC_APPROVED_SOURCE_NOT_INSTALLED"):
-                    bridge.approved_sha("a" * 40)
+            p.chmod(0o644)
+            actual_lstat = Path.lstat
+
+            def root_owned_lstat(path):
+                observed = actual_lstat(path)
+                if path == p:
+                    return SimpleNamespace(
+                        st_mode=observed.st_mode, st_uid=0,
+                        st_size=observed.st_size)
+                return observed
+
+            with patch.object(Path, "lstat", root_owned_lstat), patch.object(
+                    bridge, "APPROVAL", p):
+                bridge.approved_sha("a" * 40)
+                with self.assertRaisesRegex(
+                        bridge.Blocked, "SWPC_APPROVED_SOURCE_SHA_MISMATCH"):
+                    bridge.approved_sha("b" * 40)
+
+    def test_approval_denies_bad_ownership_type_mode_and_size(self):
+        rejected = (
+            ("root_only_unreadable", stat.S_IFREG | 0o600, 0, 41),
+            ("group_writable", stat.S_IFREG | 0o664, 0, 41),
+            ("world_writable", stat.S_IFREG | 0o666, 0, 41),
+            ("worker_owned", stat.S_IFREG | 0o644, 1000, 41),
+            ("symlink", stat.S_IFLNK | 0o644, 0, 41),
+            ("oversized", stat.S_IFREG | 0o644, 0, 65),
+        )
+        with patch.object(bridge, "APPROVAL") as approved:
+            for name, mode, uid, size in rejected:
+                with self.subTest(name=name):
+                    approved.lstat.return_value = SimpleNamespace(
+                        st_mode=mode, st_uid=uid, st_size=size)
+                    approved.read_text.reset_mock()
+                    with self.assertRaisesRegex(
+                            bridge.Blocked, "SWPC_APPROVED_SOURCE_NOT_INSTALLED"):
+                        bridge.approved_sha("a" * 40)
+                    approved.read_text.assert_not_called()
             with self.assertRaisesRegex(bridge.Blocked, "SOURCE_SHA_INVALID"):
                 bridge.approved_sha("not-a-sha")
 
