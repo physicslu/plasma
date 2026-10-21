@@ -337,7 +337,8 @@ jobs:
         (needs.development-authorize.outputs.execution_capability == 'path2-stage-contract' &&
          (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
           needs.development-authorize.outputs.task_id == 'z2-path2-testing' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-restore') &&
+          needs.development-authorize.outputs.task_id == 'z2-path2-restore' ||
+          needs.development-authorize.outputs.task_id == 'z2-path2-full-hil') &&
          needs.development-claim.result == 'skipped' &&
          github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
@@ -349,7 +350,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
     permissions:
       contents: read
       actions: read
