@@ -178,6 +178,14 @@ the actual command and physical effect, not the technology label `SW` or
   privilege, ownership, rollback and electrical guards; these are runtime
   checks, not new human approval Gates. Report PASS, FAIL or NOT_RUN from
   execution evidence, never from documentation or hosted mocks alone.
+- **Path 3 is not inherently Host-only.** A dynamically approved Path 3
+  Work Order may request guarded SWPC/Z2 development operations as well as
+  host-only engineering. Reuse the existing root-owned Trusted Bridge and
+  live ownership/recovery checks; allow only the actions explicitly stated
+  by the owner. A work-order prompt grants no additional sudo rights and
+  must never bypass an executable hardware Runtime Guard. If an existing
+  protected entrypoint cannot enforce the requested operation, report the
+  concrete blocker rather than creating new administrative Gates.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions

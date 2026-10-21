@@ -202,7 +202,8 @@ def parse_dynamic_work_order(event: object) -> dict:
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage"},
+                               "expected_stdout_sha256", "project", "stage",
+                               "hardware_stages", "swpc_bridge_deployment"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -222,10 +223,29 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        # Codex natural-language instructions are NOT a hardware guard.
-        require(capability == "codex-workspace" and scope == "host-only"
-                and set(order) <= base | optional_ref,
+        # The generic agent can perform bounded real lab work. Root-owned
+        # hardware Runtime Guards and existing OS permissions remain binding.
+        require(capability == "codex-workspace" and
+                scope in ("host-only", "guarded-hardware"),
                 "WORK_ORDER_PATH3_CAPABILITY_DENIED")
+        if scope == "host-only":
+            require(set(order) <= base | optional_ref,
+                    "WORK_ORDER_PATH3_HOST_ONLY_FIELDS_DENIED")
+        else:
+            require(set(order) <= base | optional_ref |
+                    {"hardware_stages", "swpc_bridge_deployment"},
+                    "WORK_ORDER_PATH3_HARDWARE_FIELDS_DENIED")
+            stages = order.get("hardware_stages", [])
+            deploy = order.get("swpc_bridge_deployment", False)
+            require(type(stages) is list and len(stages) <= 3
+                    and all(type(stage) is str and
+                            stage in ("download", "test", "restore")
+                            for stage in stages)
+                    and len(set(stages)) == len(stages)
+                    and type(deploy) is bool and (stages or deploy),
+                    "WORK_ORDER_PATH3_ACTIONS_DENIED")
+            # Branch Work Orders reuse verify_pr() to pin the exact
+            # owner-authored PR HEAD; no second development-only gate.
     elif capability == "cpu-only":
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
@@ -292,11 +312,11 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "work_order_scope": order["scope"],
         "work_order_sha256": req["work_order_sha256"],
     }
-    if order["execution_path"] == "path2-cli":
-        for key in ("script", "argv", "expected_stdout_sha256",
-                    "project", "stage"):
-            if key in order:
-                task[key] = order[key]
+    for key in ("script", "argv", "expected_stdout_sha256",
+                "project", "stage", "hardware_stages",
+                "swpc_bridge_deployment"):
+        if key in order:
+            task[key] = order[key]
     return task
 
 
@@ -459,7 +479,10 @@ def authorize(event: object, context: dict, registry: object,
             "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
             else task.get("capability", "cpu-only")
                  if task["execution_path"] == "path2-cli"
-            else "codex-workspace"
+            else ("codex-guarded-hardware"
+                  if req["task_id"] == DYNAMIC_TASKS["path3-codex"]
+                  and task.get("work_order_scope") == "guarded-hardware"
+                  else "codex-workspace")
         ),
         **a2_claim,
     }
@@ -639,7 +662,10 @@ def worker_admission(req: dict, args, registry: object,
         "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
         else task.get("capability", "cpu-only")
              if task["execution_path"] == "path2-cli"
-        else "codex-workspace"
+        else ("codex-guarded-hardware"
+              if req["task_id"] == DYNAMIC_TASKS["path3-codex"]
+              and task.get("work_order_scope") == "guarded-hardware"
+              else "codex-workspace")
     )
     require(args.execution_capability in (None, capability),
             "CAPABILITY_ROUTE_MISMATCH")
@@ -758,13 +784,36 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "this report for review; do not commit, push or change Git refs.\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
+        scope = task["work_order_scope"]
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
-            "HOST-ONLY: no Z2 SSH/sudo, FPGA programming, MMIO, DUT, "
-            "USB power, or system deployment. Do not treat natural-language "
-            "instructions as hardware authorization.\n"
+            "Authorized scope: " + scope + "\n"
         )
+        if scope == "host-only":
+            prompt += (
+                "HOST-ONLY: no Z2 SSH/sudo, FPGA programming, MMIO, DUT, "
+                "USB power, or system deployment.\n"
+            )
+        else:
+            stages = task.get("hardware_stages", [])
+            deploy = task.get("swpc_bridge_deployment", False)
+            prompt += (
+                "GUARDED-HARDWARE Development Mode. SWPC Bridge deployment "
+                "authorized: " + str(deploy) + ". "
+                "Authorized Z2 stages in order: " + (", ".join(stages)
+                if stages else "(none)") + ". Do not run Download unless "
+                "explicitly listed; do not invoke other stages or retry "
+                "hardware writes. Use the installed root-owned Trusted "
+                "Bridge and existing Runtime Guard only. Do not modify "
+                "sudoers, grant new OS permissions, use raw FPGA Manager "
+                "writes or bypass the approved stage entrypoint. Before "
+                "each action validate current checkpoint, Boot ID, SHA "
+                "PIN, ownership and safe recovery. Stop on unknown state, "
+                "failed receipt, lost access, SIGBUS or unreaped child. "
+                "If permissions are missing, report a blocker instead "
+                "of escalating. Record actual stage receipts and counts.\n"
+            )
     if task_id == "f1b-path3-codex-vivado-build":
         prompt += (
             "For this F1-B task, run every Vivado build through the SAME "
@@ -788,10 +837,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plus a short .test.log, but do not restrict other engineering "
             "edits merely to satisfy the old generated-file convention.\n"
         )
-    # Generic host-only Work Orders never need to reach Z2 over SSH.
-    # Do not change legacy reviewed Path 3 jobs (e.g. existing Vivado).
-    network = ("false" if task_id == DYNAMIC_TASKS["path3-codex"]
-               else "true")
+    # Host-only remains disconnected; an explicitly authorized guarded
+    # hardware Work Order uses existing Path 3 networking, not new privileges.
+    network = ("false" if task_id == DYNAMIC_TASKS["path3-codex"] and
+               task.get("work_order_scope") == "host-only" else "true")
     command = [
         "codex", "--ask-for-approval", "never",
         "-c", "sandbox_workspace_write.network_access=" + network,

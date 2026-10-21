@@ -1516,6 +1516,132 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
             dev.request(forged, self._context())
 
+    def test_path3_guarded_hardware_is_owner_scoped_and_sha_pinned(self):
+        order = self._order(
+            scope="guarded-hardware",
+            hardware_stages=["test", "restore"],
+            swpc_bridge_deployment=True)
+        event = self._event(order)
+        request = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, request, event)
+        self.assertEqual(approval["execution_capability"],
+                         "codex-guarded-hardware")
+        self.assertEqual(task["work_order_scope"], "guarded-hardware")
+        self.assertEqual(task["hardware_stages"], ["test", "restore"])
+        self.assertTrue(task["swpc_bridge_deployment"])
+        self.assertNotIn("download", task["hardware_stages"])
+        self.assertEqual(approval["work_order_sha256"],
+                         dev.work_order_digest(order))
+        tampered = copy.deepcopy(event)
+        tampered["comment"]["body"] = dev.WORK_ORDER_PREFIX + json.dumps(
+            order | {"hardware_stages": ["download", "test", "restore"]})
+        with self.assertRaisesRegex(dev.Denied, "DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, request, tampered)
+
+    def test_path3_guarded_hardware_does_not_expand_without_actions(self):
+        forbidden = [
+            self._order(scope="guarded-hardware"),
+            self._order(scope="guarded-hardware",
+                        hardware_stages=["erase"]),
+            self._order(scope="guarded-hardware",
+                        hardware_stages=["test", "test"]),
+            self._order(scope="guarded-hardware",
+                        hardware_stages="restore"),
+            self._order(scope="guarded-hardware",
+                        swpc_bridge_deployment="true"),
+            self._order(scope="guarded-hardware",
+                        hardware_stages=["test"],
+                        pr_number=1234, source_sha="invalid"),
+            self._order(scope="host-only", hardware_stages=["test"]),
+            self._order(scope="host-only", swpc_bridge_deployment=True),
+        ]
+        for order in forbidden:
+            with self.subTest(order=order), self.assertRaises(dev.Denied):
+                dev.request(self._event(order), self._context())
+
+    def test_guarded_hardware_premerge_uses_existing_pr_head_pinning(self):
+        order = self._order(scope="guarded-hardware",
+                            hardware_stages=["test"],
+                            pr_number=1234, source_sha="b" * 40)
+        event = self._event(order)
+        pr = {
+            "number": 1234, "state": "open", "merged_at": None,
+            "user": {"login": "physicslu"},
+            "head": {"ref": "agent/candidate", "sha": "b" * 40,
+                     "repo": {"full_name": "physicslu/plasma"}},
+            "base": {"ref": "main",
+                     "repo": {"full_name": "physicslu/plasma"}},
+        }
+        approved = dev.authorize(event, self._context(),
+                                  self.registry, pr_info=pr)
+        self.assertEqual(approved["pinned_sha"], "b" * 40)
+        self.assertEqual(approved["execution_capability"],
+                         "codex-guarded-hardware")
+        with self.assertRaisesRegex(dev.Denied, "PR_HEAD_SHA_MISMATCH"):
+            dev.authorize(event, self._context(), self.registry,
+                          pr_info=pr | {"head": pr["head"] |
+                                      {"sha": "c" * 40}})
+
+    def test_path3_guarded_hardware_worker_capability_and_network(self):
+        order = self._order(scope="guarded-hardware",
+                            hardware_stages=["test", "restore"],
+                            swpc_bridge_deployment=True)
+        event = self._event(order)
+        request = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, request, event)
+        class Args:
+            action = "execute-codex"
+            trusted_sha = "a" * 40
+            pinned_sha = "a" * 40
+            pr_number = 0
+            execution_capability = "codex-workspace"
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            args = Args()
+            args.workspace = root
+            args.registry = root / "tasks.json"
+            args.registry.write_text(json.dumps(self.registry))
+            args.registry_sha256 = hashlib.sha256(
+                args.registry.read_bytes()).hexdigest()
+            args.work_order_sha256 = request["work_order_sha256"]
+            with patch.dict(os.environ, {
+                    "RUNNER_ENVIRONMENT": "self-hosted",
+                    "RUNNER_NAME": "SWPC-plasma-codex",
+                    "GITHUB_RUN_ATTEMPT": "1",
+            }), patch.object(dev.os, "geteuid", return_value=1000):
+                with self.assertRaisesRegex(
+                        dev.Denied, "CAPABILITY_ROUTE_MISMATCH"):
+                    dev.worker_admission(request, args, self.registry, event)
+                args.execution_capability = "codex-guarded-hardware"
+                admitted = dev.worker_admission(
+                    request, args, self.registry, event)
+                self.assertEqual(admitted["execution_capability"],
+                                 "codex-guarded-hardware")
+            captured = []
+            class Fake:
+                returncode = 0
+                stdout = b"offline Codex only"
+                stderr = b""
+            def fake_codex(command, **kw):
+                captured.append((command, kw["input"].decode()))
+                (root / ".plasma-path3-evidence" /
+                 "engineering-report.md").write_text("Offline test evidence.\\n")
+                return Fake()
+            receipt = dev.run_codex_task(
+                task, workspace=root, executor=fake_codex,
+                task_id="path3-work-order")
+            self.assertEqual(receipt["status"],
+                             "EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertEqual(len(captured), 1)
+            self.assertIn("sandbox_workspace_write.network_access=true",
+                          captured[0][0])
+            self.assertIn("GUARDED-HARDWARE", captured[0][1])
+            self.assertIn("test, restore", captured[0][1])
+            self.assertIn("Do not run Download unless", captured[0][1])
+            self.assertIn("SWPC Bridge deployment authorized: True",
+                          captured[0][1])
+
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
@@ -1525,6 +1651,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
+        self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
 
     def test_path3_prompt_preserves_host_only_and_one_attempt(self):
         order = self._order()
