@@ -1,6 +1,6 @@
 # STM32F103R8T6 / LQFP64 — Programming Hardware & Socket Design Input
 
-Status: **Gate 1 implementation; Gate 2 merge approval required**. No physical qualification is claimed.
+Status: **exact-ICPN design-input contract only**. No physical qualification is claimed.
 
 ## Exact target and authority
 
