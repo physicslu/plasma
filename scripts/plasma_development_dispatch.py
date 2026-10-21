@@ -553,6 +553,10 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         if approval is not None and approval.get("task_id") == "z2-path2-full-hil":
             return integration.full_hil_sequence(task, approval)
         return integration.registered_hardware_stage(task, approval)
+    if (task.get("execution_path") == "path3-codex" and
+            task.get("work_order_scope") == "guarded-hardware"):
+        import plasma_path2_runtime_integration as integration
+        return integration.path3_shared_hardware_stages(task, approval)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -669,7 +673,13 @@ def worker_admission(req: dict, args, registry: object,
     )
     require(args.execution_capability in (None, capability),
             "CAPABILITY_ROUTE_MISMATCH")
-    require(task["execution_path"] == (
+    shared_path3_hardware = (
+        args.action == "execute"
+        and req["task_id"] == DYNAMIC_TASKS["path3-codex"]
+        and task.get("work_order_scope") == "guarded-hardware"
+        and capability == "codex-guarded-hardware"
+    )
+    require(shared_path3_hardware or task["execution_path"] == (
         "path3-codex" if args.action == "execute-codex" else "path2-cli"
     ), "WRONG_EXECUTION_PATH")
     return {
@@ -799,20 +809,23 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             stages = task.get("hardware_stages", [])
             deploy = task.get("swpc_bridge_deployment", False)
             prompt += (
-                "GUARDED-HARDWARE Development Mode. SWPC Bridge deployment "
-                "authorized: " + str(deploy) + ". "
+                "GUARDED-HARDWARE Development Mode. Requested Bridge "
+                "deployment: " + str(deploy) + ". "
                 "Authorized Z2 stages in order: " + (", ".join(stages)
                 if stages else "(none)") + ". Do not run Download unless "
-                "explicitly listed; do not invoke other stages or retry "
-                "hardware writes. Use the installed root-owned Trusted "
-                "Bridge and existing Runtime Guard only. Do not modify "
-                "sudoers, grant new OS permissions, use raw FPGA Manager "
-                "writes or bypass the approved stage entrypoint. Before "
-                "each action validate current checkpoint, Boot ID, SHA "
-                "PIN, ownership and safe recovery. Stop on unknown state, "
-                "failed receipt, lost access, SIGBUS or unreaped child. "
-                "If permissions are missing, report a blocker instead "
-                "of escalating. Record actual stage receipts and counts.\n"
+                "explicitly listed. Hardware execution is DELEGATED to "
+                "the EXISTING Path 2 Trusted Runner / root-owned Bridge "
+                "outside your Codex sandbox, after this engineering job "
+                "succeeds. Do not call the Bridge, sudo, SSH, FPGA Manager, "
+                "/dev/mem or UIO yourself; no second hardware executor, "
+                "new service or privilege workaround. Inspect code and "
+                "document acceptance, known preconditions and risks; "
+                "do not claim any Z2 result yet. Report an unrecoverable "
+                "engineering blocker with a nonzero Codex exit code so "
+                "the delegated job is skipped. Existing installed "
+                "Bridge/PIN must be valid; deployment requires the "
+                "already-enrolled admin channel and is not performed "
+                "by this sandbox.\n"
             )
     if task_id == "f1b-path3-codex-vivado-build":
         prompt += (
@@ -975,6 +988,8 @@ def main() -> int:
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
+                                 or (req["task_id"] == DYNAMIC_TASKS["path3-codex"]
+                                     and task.get("work_order_scope") == "guarded-hardware")
                                  else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace,
