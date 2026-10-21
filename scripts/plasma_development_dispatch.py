@@ -497,6 +497,10 @@ def worker_admission(req: dict, args, registry: object) -> dict:
     }
 
 
+class LiveMonitorUnavailable(OSError):
+    """Pre-execution monitor setup error; no Codex process has started."""
+
+
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                              evidence: Path, live_log: str) -> int:
     """Stream genuine Codex bytes into immutable evidence and the monitor.
@@ -504,12 +508,15 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
     Only a trusted main worker supplies the fixed monitor path. Loss of the
     secondary monitor sink must never discard local engineering evidence.
     """
-    live_fd = os.open(live_log, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+    try:
+        live_fd = os.open(live_log, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise LiveMonitorUnavailable("MONITOR_LOG_UNAVAILABLE") from exc
     try:
         info = os.fstat(live_fd)
-        require(info.st_uid == os.geteuid() and
-                (info.st_mode & 0o170000) == 0o100000,
-                "MONITOR_LOG_OWNERSHIP_DENIED")
+        if (info.st_uid != os.geteuid() or
+                (info.st_mode & 0o170000) != 0o100000):
+            raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex live stdout + stderr (combined) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
@@ -634,7 +641,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             returncode = _run_codex_with_live_log(
                 command, prompt.encode("utf-8"), root, codex_log, live_log)
             proc = subprocess.CompletedProcess(command, returncode, b"", b"")
-        except OSError:
+        except LiveMonitorUnavailable:
+            # Only pre-execution setup can fall back. Never re-run a Codex
+            # command after any part of its real execution has begun.
             # Monitor unavailable: preserve the original real execution path,
             # rather than blocking an authorized engineering task.
             proc = executor(
