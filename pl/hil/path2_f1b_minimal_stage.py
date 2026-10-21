@@ -23,6 +23,8 @@ from scripts import plasma_path2_persistent_lease as lease
 
 ROOT = Path(__file__).resolve().parents[2]
 LEDGER = one_shot.OWNER_DIR / "path2-f1b-site1.json"
+# Unlike /run, the root-owned staged source is persistent across reboots.
+CLAIM = ROOT / "path2-f1b-site1-once.claim"
 CANDIDATE = guard.FIRMWARE / "plasma-f1b-owner-20261020-once.bin"
 RECOVERY = guard.FIRMWARE / "base.bin"
 CHILD = one_shot.OWNER_DIR / "path2-f1b-identity.json"
@@ -124,6 +126,40 @@ def intent_for(report: dict, now: int) -> dict:
                 lease_seconds=900)
 
 
+def claim_once_persistent() -> None:
+    """Create a root-private one-experiment claim before any FPGA write.
+
+    The volatile /run Lease preserves cross-process phase data; this durable
+    claim closes the reboot loophole that could otherwise re-arm Download.
+    A crash after creating the claim is a manual recovery case, never an
+    automatic retry or stale-lock deletion.
+    """
+    need(not CLAIM.exists() and not CLAIM.is_symlink(),
+         "SINGLE_EXPERIMENT_ALREADY_CLAIMED")
+    payload = (json.dumps({"schema": "plasma.path2.f1b.once.v1",
+                           "site": 1, "source_sha": f1b.SOURCE,
+                           "candidate_sha256": f1b.BIN_SHA,
+                           "recovery_sha256": f1b.BASE_SHA},
+                          sort_keys=True) + "\n").encode()
+    fd = os.open(CLAIM, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                 os.O_NOFOLLOW, 0o600)
+    try:
+        written = 0
+        while written < len(payload):
+            n = os.write(fd, payload[written:])
+            need(n > 0, "PERSISTENT_CLAIM_WRITE_INCOMPLETE")
+            written += n
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    directory = os.open(CLAIM.parent, os.O_RDONLY | os.O_DIRECTORY |
+                        os.O_NOFOLLOW)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def mark_unknown(store: lease.LeaseLedger, *, reason: str) -> None:
     if not store.path.exists():
         return
@@ -149,6 +185,7 @@ def run(stage: str) -> dict:
             at = port.now()
             intent = intent_for(report, at)
             created = store.initialize(intent, at)  # fsync before hardware
+            claim_once_persistent()                # survives a reboot
             try:
                 claimed = store.advance(
                     "claim_load", at, expected_revision=created["revision"],
