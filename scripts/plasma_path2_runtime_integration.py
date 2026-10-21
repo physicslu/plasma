@@ -190,6 +190,63 @@ def registered_hardware_stage(task: dict, approval: dict, *,
     }
 
 
+
+def full_hil_sequence(task: dict, approval: dict, *,
+                      executor=subprocess.run) -> dict:
+    """Explicit opt-in: one SWPC trigger performs three real *separate* stages.
+
+    Reuses the same fixed installed Bridge used by individual tasks. A
+    failed or uncertain stage stops; never blindly launch the next stage.
+    Neither Build nor any stage other than F1-B Download/Test/Restore is run.
+    """
+    require(type(approval) is dict
+            and approval.get("task_id") == "z2-path2-full-hil"
+            and type(task) is dict
+            and set(task) == {"execution_path", "capability", "project", "stage"}
+            and task.get("execution_path") == "path2-cli"
+            and task.get("capability") == "path2-stage-contract"
+            and task.get("project") == "pl/projects/z2-fixed-unified-site1"
+            and task.get("stage") == "full",
+            "PATH2_FULL_TASK_DENIED")
+    require(approval.get("auto_download_after_build_success", False) is False
+            and approval.get("auto_test_after_download_success", False) is False,
+            "PATH2_FULL_AUTO_FLAGS_DENIED")
+    # These are three normal calls to the installed provider, but the owner
+    # explicitly selected full-hil. Normal task triggers never auto-chain.
+    stages = (("z2-path2-download", "download"),
+              ("z2-path2-testing", "test"),
+              ("z2-path2-restore", "restore"))
+    results = []
+    boot_id = None
+    for task_id, stage in stages:
+        stage_task = {"execution_path": "path2-cli",
+                      "capability": "path2-stage-contract",
+                      "project": "pl/projects/z2-fixed-unified-site1",
+                      "stage": stage}
+        stage_approval = {**approval, "task_id": task_id}
+        observed = registered_hardware_stage(
+            stage_task, stage_approval, executor=executor)
+        require(observed["real_z2"] is True and
+                observed["stage"] == stage and
+                (boot_id is None or boot_id == observed["boot_id"]),
+                "PATH2_FULL_BOOT_OR_STAGE_CHANGED")
+        boot_id = observed["boot_id"]
+        results.append({"stage": stage, "result": observed["result"]})
+    require([item["stage"] for item in results] ==
+            ["download", "test", "restore"] and
+            results[0]["result"] == "LOADED_AND_HELD" and
+            results[1]["result"] == "IDENTITY_PASS" and
+            results[2]["result"] in ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
+            "PATH2_FULL_INCOMPLETE")
+    return {"status": "REAL_Z2_FULL_HIL_EVIDENCE_REVIEW_REQUIRED",
+            "real_z2": True,
+            "mode": "full-hil",
+            "source_sha": approval["pinned_sha"],
+            "boot_id": boot_id, "completed": results,
+            "auto_next_stage": True,
+            "build_stage": "REUSED_PREVIOUS_PINNED_IMAGE_NOT_REBUILT"}
+
+
 def disabled_hardware_stage(task: dict, approval: dict) -> dict:
     """Compatibility negative test: never bypass installation via this API."""
     stage_contract(task, approval)
