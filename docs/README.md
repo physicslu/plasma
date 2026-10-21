@@ -30,6 +30,8 @@
 
 - **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
 
+- **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
+
 ## Architecture and contracts
 
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
