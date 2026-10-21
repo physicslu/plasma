@@ -125,6 +125,55 @@ class ScopeTests(unittest.TestCase):
             dev.collect_live(root_port=NoLock(), approval=dev.WAIVER,
                              scope=dev.ALLOWED[0])
 
+    def test_live_uio_platform_must_match_same_resolved_device(self):
+        from tempfile import TemporaryDirectory
+        from types import SimpleNamespace
+        with TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            sysroot = root / "sys"
+            procroot = root / "proc"
+            target = sysroot / "bus/platform/devices/40000000.axi_fabric"
+            target.mkdir(parents=True)
+            driver = sysroot / "bus/platform/drivers/uio_pdrv_genirq"
+            driver.mkdir(parents=True)
+            (target / "driver").symlink_to(driver, target_is_directory=True)
+            (target / "power").mkdir()
+            (target / "power/runtime_status").write_text("suspended")
+            u = sysroot / "class/uio/uio1"
+            u.mkdir(parents=True)
+            (u / "device").symlink_to(target, target_is_directory=True)
+            m = u / "maps/map0"
+            m.mkdir(parents=True)
+            (m / "addr").write_text("0x40000000")
+            (m / "size").write_text("0x10000")
+            (procroot / "sys/kernel/random").mkdir(parents=True)
+            (procroot / "sys/kernel/random/boot_id").write_text("z2-current-boot-123")
+            (procroot / "interrupts").write_text("44: 0 0 fabric\\n")
+            fake_port = SimpleNamespace(
+                candidate=Path("/lib/firmware/plasma-f1b-owner-20261020-once.bin"),
+                recovery=Path("/lib/firmware/base.bin"),
+                _require_locked=lambda: None)
+            with patch.object(dev.guard, "SYS", sysroot), \
+                 patch.object(dev.guard, "PROC", procroot), \
+                 patch.object(dev.guard, "read_live_z2_facts",
+                              return_value=facts()), \
+                 patch.object(dev.os, "geteuid", return_value=0), \
+                 patch("pl.hil.swd04.one_shot.manager_last_load",
+                       return_value="fpga_manager fpga0: writing base.bin to fpga0"), \
+                 patch("pl.hil.swd04.one_shot.service_snapshot",
+                       return_value={"plasma-server": "active"}):
+                result = dev.collect_live(root_port=fake_port,
+                                          approval=dev.WAIVER,
+                                          scope=dev.ALLOWED[0])
+                self.assertFalse(result["production_qualification"])
+                mismatched = facts(platform_overlaps=["40001000.other"])
+                with patch.object(dev.guard, "read_live_z2_facts",
+                                  return_value=mismatched):
+                    with self.assertRaisesRegex(
+                            dev.BoundedRiskDenied, "UIO_PLATFORM_OWNER_MISMATCH"):
+                        dev.collect_live(root_port=fake_port,
+                                         approval=dev.WAIVER, scope=dev.ALLOWED[0])
+
     def test_no_dispatcher_access_or_hardware_side_effect(self):
         code = (ROOT / "pl/hil/path2_f1b_dev_risk.py").read_text()
         self.assertNotIn("manager_write(", code)
