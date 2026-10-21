@@ -81,6 +81,7 @@ class MinimalStageTests(unittest.TestCase):
         self.addCleanup(self.work.cleanup)
         root = Path(self.work.name)
         self.hw = FakeHardware()
+        self.real_trusted_local = stage.trusted_local
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.object(stage, "LEDGER", root / "f1b.json"))
@@ -209,7 +210,8 @@ class MinimalStageTests(unittest.TestCase):
         self.assertEqual(self.hw.writes, [])
 
     def test_root_risk_ack_is_explicit_and_not_a_secret(self):
-        with patch.object(stage.os, "geteuid", return_value=0), \
+        with patch.object(stage, "trusted_local", self.real_trusted_local), \
+             patch.object(stage.os, "geteuid", return_value=0), \
              patch.dict(stage.os.environ, {}, clear=True):
             with self.assertRaisesRegex(stage.LiveStageDenied,
                                         "EXPLICIT_SINGLE_EXPERIMENT"):
