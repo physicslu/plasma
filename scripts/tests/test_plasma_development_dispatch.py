@@ -320,7 +320,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
         self.assertEqual(
             task["expected_stdout_sha256"],
             hashlib.sha256(
-                b"CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS\\n"
+                b"CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS\n"
             ).hexdigest())
 
     def test_cpu_only_sandbox_fails_closed_without_bwrap(self):
