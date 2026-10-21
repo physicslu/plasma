@@ -111,6 +111,19 @@ def smoke() -> None:
         codex = fake_bin / "codex"
         codex.write_text(CODEX_STUB)
         codex.chmod(0o700)
+        # The worker now rechecks live PR metadata; this test must stub
+        # only that precise GitHub API request, never contact real GitHub.
+        gh = fake_bin / "gh"
+        gh.write_text(
+            "#!/usr/bin/env python3\n"
+            "from pathlib import Path\n"
+            "import sys\n"
+            "if len(sys.argv) != 3 or sys.argv[1] != 'api' or "
+            f"sys.argv[2] != 'repos/physicslu/plasma/pulls/{PR_NUMBER}':\n"
+            "    raise SystemExit(2)\n"
+            "sys.stdout.write((Path(__file__).resolve().parent.parent / 'pr.json').read_text())\n"
+        )
+        gh.chmod(0o700)
         clean_env = {
             "PATH": str(fake_bin) + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": str(temp),
