@@ -40,6 +40,9 @@ on:
       - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/swpc/z2-path2-f1b-bridge"
+      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -72,6 +75,9 @@ on:
       - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/swpc/z2-path2-f1b-bridge"
+      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
       - "specs/engineering-dispatch/runtime-activation-v1.json"
       - "scripts/tests/test_plasma_engineering_runtime_v1.py"
@@ -115,6 +121,8 @@ jobs:
           python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
           python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
           python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 -m py_compile scripts/swpc/z2-path2-f1b-bridge scripts/tests/test_plasma_path2_swpc_bridge.py
+          python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
