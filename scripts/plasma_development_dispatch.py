@@ -497,6 +497,58 @@ def worker_admission(req: dict, args, registry: object) -> dict:
     }
 
 
+class LiveMonitorUnavailable(OSError):
+    """Pre-execution monitor setup error; no Codex process has started."""
+
+
+def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
+                             evidence: Path, live_log: str) -> int:
+    """Stream genuine Codex bytes into immutable evidence and the monitor.
+
+    Only a trusted main worker supplies the fixed monitor path. Loss of the
+    secondary monitor sink must never discard local engineering evidence.
+    """
+    try:
+        live_fd = os.open(live_log, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise LiveMonitorUnavailable("MONITOR_LOG_UNAVAILABLE") from exc
+    try:
+        info = os.fstat(live_fd)
+        if (info.st_uid != os.geteuid() or
+                (info.st_mode & 0o170000) != 0o100000):
+            raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
+        with evidence.open("wb") as trace:
+            trace.write(b"=== Codex live stdout + stderr (combined) ===\n")
+            with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT) as worker:
+                assert worker.stdin is not None and worker.stdout is not None
+                try:
+                    worker.stdin.write(prompt)
+                except BrokenPipeError:
+                    pass
+                finally:
+                    worker.stdin.close()
+                while True:
+                    chunk = worker.stdout.read1(16384)
+                    if not chunk:
+                        break
+                    trace.write(chunk)
+                    trace.flush()
+                    if live_fd >= 0:
+                        try:
+                            pending = memoryview(chunk)
+                            while pending:
+                                pending = pending[os.write(live_fd, pending):]
+                        except OSError:
+                            os.close(live_fd)
+                            live_fd = -1
+                return worker.wait()
+    finally:
+        if live_fd >= 0:
+            os.close(live_fd)
+
+
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run,
                    task_id: str | None = None) -> dict:
@@ -577,13 +629,38 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     # Python timer would terminate normal Vivado implementation.
     # One autonomous Codex invocation owns scoped FIX -> RETEST iterations.
     # Do not launch extra SWPC jobs or grant new hardware permissions to retry.
-    proc = executor(
-        command, input=prompt.encode("utf-8"), cwd=root,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        timeout=None, check=False,
+    live_log = os.environ.get("PLASMA_ENGINEERING_MONITOR_LIVE_LOG")
+    live_allowed = (
+        executor is subprocess.run and
+        live_log == "/run/plasma-codex/engineering-monitor/path3.log" and
+        os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
+        os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted"
     )
-    codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
-                          b"\n=== Codex stderr ===\n" + proc.stderr)
+    if live_allowed:
+        try:
+            returncode = _run_codex_with_live_log(
+                command, prompt.encode("utf-8"), root, codex_log, live_log)
+            proc = subprocess.CompletedProcess(command, returncode, b"", b"")
+        except LiveMonitorUnavailable:
+            # Only pre-execution setup can fall back. Never re-run a Codex
+            # command after any part of its real execution has begun.
+            # Monitor unavailable: preserve the original real execution path,
+            # rather than blocking an authorized engineering task.
+            proc = executor(
+                command, input=prompt.encode("utf-8"), cwd=root,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=None, check=False,
+            )
+            codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
+                                  b"\n=== Codex stderr ===\n" + proc.stderr)
+    else:
+        proc = executor(
+            command, input=prompt.encode("utf-8"), cwd=root,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=None, check=False,
+        )
+        codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
+                              b"\n=== Codex stderr ===\n" + proc.stderr)
     def digest(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
     receipt = {

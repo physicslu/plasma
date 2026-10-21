@@ -21,6 +21,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_engineering_monitor.py"
+      - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -56,6 +58,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_engineering_monitor.py"
+      - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -109,6 +113,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_engineering_monitor.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
@@ -480,7 +485,8 @@ jobs:
           else
             test -z "$PR_INFO_BASE64"
           fi
-          python3 trusted/scripts/plasma_development_dispatch.py execute \
+          python3 trusted/scripts/plasma_engineering_monitor.py run path2 -- \
+            python3 trusted/scripts/plasma_development_dispatch.py execute \
             --event "$GITHUB_EVENT_PATH" \
             --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
             "${pr_info_args[@]}" \
@@ -612,7 +618,8 @@ jobs:
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system_wrapper.bit" candidate/pl/build/f1b-deliverables/system_wrapper.bit
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system.hwh" candidate/pl/build/f1b-deliverables/system.hwh
           fi
-          python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
+          python3 trusted/scripts/plasma_engineering_monitor.py run path3 -- \
+            python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
             --event "$GITHUB_EVENT_PATH" \
             --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
             --workspace candidate \
