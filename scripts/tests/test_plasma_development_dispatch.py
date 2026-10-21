@@ -735,7 +735,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                     with self.subTest(receipt=receipt),patch.object(
                             dev,"run_codex_task",return_value=receipt) as agent:
                         with redirect_stdout(StringIO()) as output:
-                            rc=self._call_main(argv)
+                            with patch.object(sys,"argv",["dispatch.py",*argv]):
+                                rc=dev.main()
                         self.assertEqual(rc,expected_exit)
                         result=json.loads(output.getvalue())
                         self.assertEqual(result["status"],receipt["status"])
@@ -746,7 +747,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 bad[bad.index("--registry-sha256")+1]="0"*64
                 with patch.object(dev,"run_codex_task") as agent:
                     with redirect_stdout(StringIO()) as output:
-                        rc=self._call_main(bad)
+                        with patch.object(sys,"argv",["dispatch.py",*bad]):
+                            rc=dev.main()
                     self.assertEqual(rc,2)
                     self.assertEqual(json.loads(output.getvalue())["reason"],
                                      "AUTHORIZED_REGISTRY_MISMATCH")
