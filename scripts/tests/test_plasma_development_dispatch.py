@@ -324,6 +324,34 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
         self.assertIn(b"TRUSTED_PARENT_CONTEXT_MISSING",result.stderr)
         self.assertNotIn(b"CANDIDATE_DISPATCHER_REAL_CODEX_E2E_PASS",result.stdout)
 
+    def test_candidate_live_e2e_failure_evidence_survives_scratch_cleanup(self):
+        import importlib.util
+        file=ROOT/"scripts/experiments/plasma_candidate_dispatcher_live_e2e.py"
+        spec=importlib.util.spec_from_file_location("candidate_live_e2e",file)
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            workspace=root/"scratch"
+            hidden=workspace/".plasma-path3-evidence"
+            hidden.mkdir(parents=True)
+            (hidden/"codex.log").write_bytes(b"nested Codex sandbox denied\\n")
+            prefix=root/"plasma_candidate_dispatcher_live_generated"
+            proc=subprocess.CompletedProcess(
+                ["python","dispatcher"],2,
+                b'{"status":"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"}\\n',
+                b"nested command failed\\n")
+            module.preserve_nested_evidence(
+                proc,workspace,workspace/"missing.py",workspace/"missing.csv",prefix)
+            self.assertEqual(
+                Path(str(prefix)+".codex.log").read_bytes(),
+                b"nested Codex sandbox denied\\n")
+            trace=Path(str(prefix)+".test.log").read_bytes()
+            self.assertIn(proc.stdout,trace)
+            self.assertIn(proc.stderr,trace)
+            self.assertFalse(prefix.with_suffix(".py").exists())
+            self.assertFalse(prefix.with_suffix(".csv").exists())
+
     def test_candidate_dispatcher_premerge_task_is_exact_cpu_only_sandbox(self):
         task=dev.task_by_id(self.registry,"candidate-dispatcher-premerge-sandbox")
         self.assertEqual(task["execution_path"],"path2-cli")
