@@ -30,23 +30,59 @@ viewer_command() {
   printf 'sg %q -c %q' "$group" "$inner"
 }
 
-# Owned by the logged-in operator. No cross-user tmux control socket is needed.
-# Address the named window, not :0: the operator's base-index can be 1.
-window="$session:overview"
+# Owned by the logged-in operator. Never change global tmux settings or
+# touch another session. Force 1/2 even when the operator's base-index is 0.
+# Retain existing viewers and their monitor state when migrating overview.
 if ! tmux has-session -t "=$session" 2>/dev/null; then
   left="$(viewer_command path2)"
-  tmux new-session -d -s "$session" -n overview -c "$repo" "$left"
+  tmux new-session -d -s "$session" -n path2 -c "$repo" "$left"
 fi
 
-# Repair a preexisting one-pane session left behind by the old :0 bug.
-panes="$(tmux list-panes -t "$window" -F '#{pane_id}' | wc -l)"
-if [ "$panes" -eq 1 ]; then
-  right="$(viewer_command path3)"
-  tmux split-window -d -h -t "$window" -c "$repo" "$right"
-elif [ "$panes" -ne 2 ]; then
-  echo "MONITOR_UNEXPECTED_PANE_COUNT: $panes" >&2
+windows="$(tmux list-windows -t "=$session" -F '#{window_name}' | paste -sd ' ' -)"
+case "$windows" in
+  overview)
+    # Migrate legacy left/right layout without killing either viewer process.
+    panes="$(tmux list-panes -t "$session:overview" -F '#{pane_id}' | wc -l)"
+    if [ "$panes" -eq 2 ]; then
+      right_pane="$(tmux list-panes -t "$session:overview" -F '#{pane_id}' | tail -n 1)"
+      tmux break-pane -d -s "$right_pane" -t "$session:2" -n path3
+    elif [ "$panes" -ne 1 ]; then
+      echo "MONITOR_UNEXPECTED_PANE_COUNT: $panes" >&2
+      exit 1
+    fi
+    tmux rename-window -t "$session:overview" path2
+    ;;
+  path2|path2\ path3)
+    ;;
+  *)
+    echo "MONITOR_UNEXPECTED_WINDOWS: $windows" >&2
+    exit 1
+    ;;
+esac
+
+# Ensure Ctrl+A,1 and Ctrl+A,2 select the same logical paths regardless of
+# tmux base-index. Never renumber or modify other tmux sessions.
+path2_index="$(tmux display-message -p -t "$session:path2" '#{window_index}')"
+if [ "$path2_index" != 1 ]; then
+  tmux move-window -d -s "$session:path2" -t "$session:1"
+fi
+path2_panes="$(tmux list-panes -t "$session:1" -F '#{pane_id}' | wc -l)"
+if [ "$path2_panes" -ne 1 ]; then
+  echo "MONITOR_UNEXPECTED_PANE_COUNT: $path2_panes" >&2
   exit 1
 fi
 
-tmux select-layout -t "$window" even-horizontal
+if ! tmux display-message -p -t "$session:path3" '#{window_index}' >/dev/null 2>&1; then
+  right="$(viewer_command path3)"
+  tmux new-window -d -t "$session:2" -n path3 -c "$repo" "$right"
+fi
+
+path3_index="$(tmux display-message -p -t "$session:path3" '#{window_index}')"
+path3_panes="$(tmux list-panes -t "$session:2" -F '#{pane_id}' | wc -l)"
+if [ "$path3_index" != 2 ] || [ "$path3_panes" -ne 1 ]; then
+  echo "MONITOR_UNEXPECTED_PATH3_LAYOUT: index=$path3_index panes=$path3_panes" >&2
+  exit 1
+fi
+
+tmux select-window -t "$session:1"
 exec tmux attach-session -t "=$session"
