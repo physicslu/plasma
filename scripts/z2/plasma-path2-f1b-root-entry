@@ -39,7 +39,7 @@ for required in \
   pl/hil/swd04/development.py \
   pl/hil/swd04/contract.py \
   software/python/plasma_interfaces/linux_mmio.py; do
-  /usr/bin/awk -v path="$required" '$2 == path && $1 ~ /^[0-9a-f]{64}$/ {found = 1} END {exit !found}' "$manifest" ||
+  /usr/bin/awk -v path="$required" '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' "$manifest" ||
     { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
 done
 (cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
