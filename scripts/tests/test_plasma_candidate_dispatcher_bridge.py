@@ -243,7 +243,7 @@ class CandidateBridgeContracts(unittest.TestCase):
             output=StringIO()
             with patch.dict(os.environ,self.context(),clear=True),\\
                  patch.object(bridge.os,"geteuid",return_value=1001),\\
-                 patch.object(bridge.subprocess,"check_output",return_value=("b"*40+"\\n").encode()),\\
+                 patch.object(bridge.subprocess,"check_output",return_value="b"*40+"\\n"),\\
                  patch.object(bridge,"sandbox_command",side_effect=make_cmd),\\
                  patch.object(bridge,"run_process",side_effect=subprocess_fixture),\\
                  patch.object(sys,"argv",argv),redirect_stdout(output):
