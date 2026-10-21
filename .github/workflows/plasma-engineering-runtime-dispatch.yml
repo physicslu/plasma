@@ -573,6 +573,21 @@ jobs:
             sha256sum "$RUNNER_TEMP/plasma-path3-source.patch" \
               > "$RUNNER_TEMP/plasma-path3-source.patch.sha256"
           fi
+          # upload-artifact excludes hidden paths by default. The Codex
+          # session log and *.test.log under .plasma-path3-evidence were
+          # missing even when the task succeeded. Explicitly package only
+          # this evidence directory; do NOT enable include-hidden-files for
+          # unrelated build outputs or other workspace secrets.
+          if [ -L candidate/.plasma-path3-evidence ]; then
+            echo "PATH3_EVIDENCE_SYMLINK_DENIED" >&2
+            exit 1
+          fi
+          if [ -d candidate/.plasma-path3-evidence ]; then
+            tar -C candidate -czf "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
+              -- .plasma-path3-evidence
+            sha256sum "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
+              > "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz.sha256"
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -584,6 +599,8 @@ jobs:
             ${{ runner.temp }}/plasma-path3-source.patch.sha256
             ${{ runner.temp }}/plasma-path3-status.txt
             ${{ runner.temp }}/plasma-path3-new-files.tar.gz
+            ${{ runner.temp }}/plasma-path3-engineering-evidence.tar.gz
+            ${{ runner.temp }}/plasma-path3-engineering-evidence.tar.gz.sha256
             candidate/.plasma-path3-evidence/**
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
