@@ -21,8 +21,6 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
-      - "scripts/plasma_candidate_dispatcher_bridge.py"
-      - "scripts/tests/test_plasma_candidate_dispatcher_bridge.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -58,8 +56,6 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
-      - "scripts/plasma_candidate_dispatcher_bridge.py"
-      - "scripts/tests/test_plasma_candidate_dispatcher_bridge.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
@@ -113,8 +109,6 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
-          python3 -m py_compile scripts/plasma_candidate_dispatcher_bridge.py scripts/tests/test_plasma_candidate_dispatcher_bridge.py
-          python3 scripts/tests/test_plasma_candidate_dispatcher_bridge.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
@@ -575,43 +569,59 @@ jobs:
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system_wrapper.bit" candidate/pl/build/f1b-deliverables/system_wrapper.bit
             install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system.hwh" candidate/pl/build/f1b-deliverables/system.hwh
           fi
-          if [ "$PLASMA_F1B_TASK_ID" = 'candidate-dispatcher-e2e-1083' ]; then
-            # Trusted main owns owner/SHA authorization and the one real Codex
-            # invocation. Candidate Python runs ONLY inside bwrap, without
-            # host HOME/auth/network/devices. No candidate-controlled workflow.
-            python3 trusted/scripts/plasma_candidate_dispatcher_bridge.py \
-              --event "$GITHUB_EVENT_PATH" \
-              --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
-              --workspace candidate \
-              --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
-              --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
-              > "$RUNNER_TEMP/plasma-path3-receipt.json"
-          else
-            python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
-              --event "$GITHUB_EVENT_PATH" \
-              --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
-              --workspace candidate \
-              --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
-              --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
-              > "$RUNNER_TEMP/plasma-path3-receipt.json"
-          fi
+          python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
+            --event "$GITHUB_EVENT_PATH" \
+            --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
+            --workspace candidate \
+            --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
+            --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
+            > "$RUNNER_TEMP/plasma-path3-receipt.json"
           cat "$RUNNER_TEMP/plasma-path3-receipt.json"
           git -C trusted diff --exit-code
-          # Development Mode: capture *all* candidate engineering changes.
-          # Never reject RTL/Tcl/Python/doc edits because they are not one
-          # predeclared generated Python output.
-          git -C candidate diff --binary > "$RUNNER_TEMP/plasma-path3-source.patch"
-          git -C candidate status --porcelain=v1 --untracked-files=all \
-            > "$RUNNER_TEMP/plasma-path3-status.txt"
-          git -C candidate ls-files --others --exclude-standard -z \
-            > "$RUNNER_TEMP/plasma-path3-new-file-list.nul"
-          if [ -s "$RUNNER_TEMP/plasma-path3-new-file-list.nul" ]; then
-            tar -C candidate --null -T "$RUNNER_TEMP/plasma-path3-new-file-list.nul" \
-              -czf "$RUNNER_TEMP/plasma-path3-new-files.tar.gz"
+      - name: Collect Path 3 evidence even when Codex or preflight fails
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Admission failure may leave no candidate checkout. Never fetch
+          # additional source, rerun the agent, or access physical devices.
+          if [ -d candidate/.git ]; then
+            # HEAD includes BOTH staged and unstaged changes. Output is only
+            # for evidence; the candidate checkout must remain uncommitted.
+            git -C candidate diff --binary HEAD > "$RUNNER_TEMP/plasma-path3-source.patch"
+            git -C candidate status --porcelain=v1 --untracked-files=all \
+              > "$RUNNER_TEMP/plasma-path3-status.txt"
+            git -C candidate ls-files --others --exclude-standard -z \
+              > "$RUNNER_TEMP/plasma-path3-new-file-list.nul"
+            if [ -s "$RUNNER_TEMP/plasma-path3-new-file-list.nul" ]; then
+              tar -C candidate --null -T "$RUNNER_TEMP/plasma-path3-new-file-list.nul" \
+                -czf "$RUNNER_TEMP/plasma-path3-new-files.tar.gz"
+            fi
           fi
-          git -C candidate status --short
-          sha256sum "$RUNNER_TEMP/plasma-path3-receipt.json" \
-            > "$RUNNER_TEMP/plasma-path3-receipt.json.sha256"
+          if [ -f "$RUNNER_TEMP/plasma-path3-receipt.json" ]; then
+            cat "$RUNNER_TEMP/plasma-path3-receipt.json"
+            sha256sum "$RUNNER_TEMP/plasma-path3-receipt.json" \
+              > "$RUNNER_TEMP/plasma-path3-receipt.json.sha256"
+          fi
+          if [ -f "$RUNNER_TEMP/plasma-path3-source.patch" ]; then
+            sha256sum "$RUNNER_TEMP/plasma-path3-source.patch" \
+              > "$RUNNER_TEMP/plasma-path3-source.patch.sha256"
+          fi
+          # upload-artifact excludes hidden paths by default. The Codex
+          # session log and *.test.log under .plasma-path3-evidence were
+          # missing even when the task succeeded. Explicitly package only
+          # this evidence directory; do NOT enable include-hidden-files for
+          # unrelated build outputs or other workspace secrets.
+          if [ -L candidate/.plasma-path3-evidence ]; then
+            echo "PATH3_EVIDENCE_SYMLINK_DENIED" >&2
+            exit 1
+          fi
+          if [ -d candidate/.plasma-path3-evidence ]; then
+            tar -C candidate -czf "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
+              -- .plasma-path3-evidence
+            sha256sum "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
+              > "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz.sha256"
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -620,8 +630,11 @@ jobs:
             ${{ runner.temp }}/plasma-path3-receipt.json
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
             ${{ runner.temp }}/plasma-path3-source.patch
+            ${{ runner.temp }}/plasma-path3-source.patch.sha256
             ${{ runner.temp }}/plasma-path3-status.txt
             ${{ runner.temp }}/plasma-path3-new-files.tar.gz
+            ${{ runner.temp }}/plasma-path3-engineering-evidence.tar.gz
+            ${{ runner.temp }}/plasma-path3-engineering-evidence.tar.gz.sha256
             candidate/.plasma-path3-evidence/**
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
