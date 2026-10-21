@@ -85,6 +85,7 @@ class MinimalStageTests(unittest.TestCase):
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.object(stage, "LEDGER", root / "f1b.json"))
+        self.stack.enter_context(patch.object(stage, "CLAIM", root / "f1b-once.claim"))
         self.stack.enter_context(patch.object(stage, "CHILD", root / "identity.json"))
         self.stack.enter_context(patch.object(stage, "trusted_local",
                                               return_value=None))
@@ -208,6 +209,21 @@ class MinimalStageTests(unittest.TestCase):
                                         "STAGE_NOT_ALLOWLISTED"):
                 stage.run(name)
         self.assertEqual(self.hw.writes, [])
+
+    def test_download_claim_survives_volatile_ledger_loss_after_reboot(self):
+        loaded = stage.run("download")
+        self.assertEqual(loaded["result"], "LOADED_AND_HELD")
+        self.assertTrue(stage.CLAIM.is_file())
+        claim = json.loads(stage.CLAIM.read_text())
+        self.assertEqual(claim["candidate_sha256"], f1b.BIN_SHA)
+        # Simulate boot losing the volatile /run ledger while the trusted
+        # source-level once claim survives. No new FPGA write can occur.
+        stage.LEDGER.unlink()
+        self.hw.current = "base.bin"
+        with self.assertRaisesRegex(stage.LiveStageDenied,
+                                    "SINGLE_EXPERIMENT_ALREADY_CLAIMED"):
+            stage.run("download")
+        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
 
     def test_native_runtime_is_qualified_before_hardware_load(self):
         # The *same* ABI that passed the earlier real F1-B one-shot run.
