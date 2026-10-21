@@ -228,7 +228,7 @@ class RootZ2TargetPort:
     def qualification(self, stage: str) -> dict:
         need(stage in ("download", "test", "restore"), "STAGE_DENIED")
         report = self.passive_report()
-        raise TargetSafetyDenied("TARGET_AXΙ_OR_IMAGE_ISOLATION_NO_GO: " +
+        raise TargetSafetyDenied("TARGET_AXI_OR_IMAGE_ISOLATION_NO_GO: " +
                                  ",".join(report["blockers"]))
 
     def observation(self, observed_at: int) -> dict:
