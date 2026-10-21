@@ -284,8 +284,11 @@ def main() -> int:
                         and receipt.get("output_sha256") == digest(csv.read_bytes())
                         and receipt.get("test_log_sha256") == digest(test_log.read_bytes()),
                         "CANDIDATE_EVIDENCE_DIGEST_MISMATCH")
-                for file in (source, csv, test_log):
-                    dest = target.with_suffix(file.suffix)
+                for file, dest in (
+                    (source, target),
+                    (csv, target.with_suffix(".csv")),
+                    (test_log, target.with_suffix(".test.log")),
+                ):
                     require(not dest.exists() and not dest.is_symlink(),
                             "CANDIDATE_SOURCE_COLLISION")
                     shutil.copyfile(file, dest)
