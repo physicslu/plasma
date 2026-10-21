@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "audit_id": "nxp-kl25-current-openocd-source-review-v2",
+  "audit_date": "2026-10-17",
+  "review_boundary": "SOURCE_ONLY_NO_EXECUTION",
+  "exact": {
+    "manufacturer": "NXP",
+    "icpn": "MKL25Z128VLK4",
+    "other_kl25_variants_inherited": 0
+  },
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "source_repository": "https://github.com/openocd-org/openocd",
+    "target_config": "tcl/target/kl25.cfg",
+    "flash_driver": "kinetis"
+  },
+  "historical_non_authority": {
+    "commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+    "gate58_state": "REJECTED_REVIEW",
+    "operation_admission_transferable": false
+  },
+  "source_files": {
+    "tcl/target/kl25.cfg": {
+      "git_blob": "916edf6853c3f26a004d2ca5a2f0e08f43a24093",
+      "bytes": 130
+    },
+    "tcl/target/klx.cfg": {
+      "git_blob": "cd236b3395e42310f1475f3b64580758a7f3b9ea",
+      "bytes": 2492
+    },
+    "tcl/target/swj-dp.tcl": {
+      "git_blob": "f2b233fb78133fd5e45395fd307674c16a65ed70",
+      "bytes": 1148
+    },
+    "src/flash/nor/kinetis.c": {
+      "git_blob": "7137b4aa078719af31122f8276494f006589e8ab",
+      "bytes": 95822
+    }
+  },
+  "observations": [
+    {
+      "id": "TRANSPORT_DEPENDS_ON_SELECTED_SESSION",
+      "source": "tcl/target/klx.cfg",
+      "line_start": 8,
+      "line_end": 35,
+      "source_symbol": "swj_newdap",
+      "finding": "swj_newdap is selected through swj-dp.tcl; target CFG does not force SWD",
+      "implication": "SWD transport must be selected and proven independently"
+    },
+    {
+      "id": "SWJ_DISPATCHES_SWD_OR_JTAG",
+      "source": "tcl/target/swj-dp.tcl",
+      "line_start": 19,
+      "line_end": 38,
+      "source_symbol": "swj_newdap",
+      "finding": "dispatch is conditional on using_swd/using_jtag and selected session",
+      "implication": "SWD-only adapter setting is not qualified by Tcl alone"
+    },
+    {
+      "id": "TARGET_RESET_INIT_HAS_SIDE_EFFECT",
+      "source": "tcl/target/klx.cfg",
+      "line_start": 55,
+      "line_end": 78,
+      "source_symbol": "reset-init",
+      "finding": "reset-init can invoke kinetis disable_wdog",
+      "implication": "read-only user operation is not proof of no target state change"
+    },
+    {
+      "id": "EXACT_PROBE_READS_DEVICE_REGISTERS",
+      "source": "src/flash/nor/kinetis.c",
+      "line_start": 2051,
+      "line_end": 2090,
+      "source_symbol": "kinetis_probe_chip",
+      "finding": "SIM SDID read with alternative SIM base; probe can fail",
+      "implication": "exact silicon revision and SDID response remain unproven"
+    },
+    {
+      "id": "PROBE_DECODES_DYNAMIC_GEOMETRY",
+      "source": "src/flash/nor/kinetis.c",
+      "line_start": 2497,
+      "line_end": 2647,
+      "source_symbol": "kinetis_probe_chip",
+      "finding": "SIM FCFG1/FCFG2 determine detected P-Flash size, bank count and sector behavior",
+      "implication": "manufacturer size alone does not prove runtime geometry"
+    },
+    {
+      "id": "FCF_GENERATOR_HAS_ASSERT_PATH",
+      "source": "src/flash/nor/kinetis.c",
+      "line_start": 1422,
+      "line_end": 1478,
+      "source_symbol": "kinetis_fill_fcf",
+      "finding": "FCF generation can access assert(bank_iter->prot_blocks) without a verified exact bank configuration",
+      "implication": "FCF synthesizer must remain unreachable from qualified operations"
+    },
+    {
+      "id": "SECTOR_ERASE_CAN_WRITE_FCF",
+      "source": "src/flash/nor/kinetis.c",
+      "line_start": 1648,
+      "line_end": 1703,
+      "source_symbol": "kinetis_erase",
+      "finding": "erase containing FCF may synthesize and write FCF even without allow_fcf_writes",
+      "implication": "erase of FCF-containing sector must be forbidden"
+    },
+    {
+      "id": "ANY_FCF_SECTOR_WRITE_CAN_WRITE_FCF",
+      "source": "src/flash/nor/kinetis.c",
+      "line_start": 1934,
+      "line_end": 2046,
+      "source_symbol": "kinetis_write",
+      "finding": "write touching sector containing FCF sets set_fcf even if payload excludes [0x400,0x410)",
+      "implication": "all writes overlapping [0x400,0x800) must be rejected before execution"
+    }
+  ],
+  "protected_flash": {
+    "fcf_start": 1024,
+    "fcf_end_exclusive": 1040,
+    "sector_start": 1024,
+    "sector_end_exclusive": 2048,
+    "erase_sector_bytes": 1024,
+    "program_longword_bytes": 4,
+    "main_flash_bytes_manufacturer": 131072,
+    "geometry_runtime_verified": false,
+    "program_intersection_requires_rejection": true,
+    "erase_containing_sector_requires_rejection": true,
+    "fcf_rewrite_qualified": false
+  },
+  "operation_review": {
+    "READ": "NOT_QUALIFIED",
+    "VERIFY": "NOT_QUALIFIED",
+    "PROGRAM": "NOT_QUALIFIED",
+    "ERASE_SECTOR": "NOT_QUALIFIED"
+  },
+  "gates": {
+    "swd_session_and_debug_id_pass": false,
+    "exact_sdid_revision_and_sim_fcfg_pass": false,
+    "fcf_no_implicit_mutation_proven": false,
+    "pinned_binary_runtime_attested": false,
+    "read_verify_program_erase_qualified": false,
+    "hardware_hil_pass": false
+  },
+  "result": {
+    "programming_qualification_state": "CANDIDATE",
+    "catalog_level": 1,
+    "job_selectable": false,
+    "execution_authorized": false,
+    "installed_runtime_attested": false,
+    "physical_programming_qualified": false,
+    "supported_exact_icpn_count_new": 0
+  },
+  "source_blob_check": "Upstream blob SHA-1 references were read from GitHub git/trees at the provider source commit. This artifact is a source-inspection witness, not an offline recompile, executable qualification or silicon observation."
+}

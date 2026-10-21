@@ -13,6 +13,7 @@ on:
       - "software/python/plasma_web/device_catalog.py"
       - "software/python/tests/test_catalog_promotion_framework.py"
       - "software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py"
+      - "software/python/tests/test_nxp_kl25_source_review_v2.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
       - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
@@ -31,6 +32,7 @@ on:
       - "software/python/plasma_web/device_catalog.py"
       - "software/python/tests/test_catalog_promotion_framework.py"
       - "software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py"
+      - "software/python/tests/test_nxp_kl25_source_review_v2.py"
       - "software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py"
       - "software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py"
       - "data/device-catalog/production/**"
@@ -70,6 +72,7 @@ jobs:
             software/python/plasma_web/nxp_kl25_qualification.py
           python software/python/tests/test_catalog_promotion_framework.py
           python software/python/tests/test_nxp_kl25_current_provider_candidate_v1.py
+          python software/python/tests/test_nxp_kl25_source_review_v2.py
           python software/python/tests/test_nxp_lpc11u6x_l1_admission_v1.py
           python software/python/tests/test_nxp_lpc81x_lpc11u24_l1_admission_v1.py
       - name: Emit deterministic coverage and blocker report
