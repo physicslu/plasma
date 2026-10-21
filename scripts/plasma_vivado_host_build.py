@@ -20,6 +20,98 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import socket
+import fcntl
+import struct
+
+
+def license_snapshot(*, executor=subprocess.run) -> dict:
+    """Category-only comparison; raw FlexNet output and identifiers never persist.
+
+    sysfs may expose host devices inside a network namespace, so use the
+    network API for the matching-interface boolean. An EPERM stays UNKNOWN.
+    """
+    selectors = discover_vivado_license()
+    path = Path(selectors["XILINXD_LICENSE_FILE"])
+    binding = re.findall(r'HOSTID\s*=\s*"?([0-9a-fA-F]{12})(?![0-9a-fA-F])',
+                         path.read_text())
+    result = {
+        "euid": os.geteuid(), "run_id": os.environ.get("GITHUB_RUN_ID"),
+        "runner": os.environ.get("RUNNER_NAME"),
+        "namespace_ids": {k: os.readlink("/proc/self/ns/" + k)
+                          for k in ("user", "net", "mnt", "pid", "uts")},
+        "license_path": str(path), "license_readable": True,
+        "selector": "XILINXD_LICENSE_FILE", "ethernet_binding": bool(binding),
+        "matching_interface_visible": None,
+    }
+    try:
+        addresses = []
+        for _, name in socket.if_nameindex():
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                data = fcntl.ioctl(sock, 0x8927,
+                                   struct.pack("256s", name.encode()[:15]))
+                addresses.append(data[18:24].hex())
+        result["matching_interface_visible"] = bool(
+            {x.lower() for x in binding}.intersection(addresses))
+    except OSError:
+        result["interface_query"] = "UNAVAILABLE"
+    lmutil = SETTINGS64.parent / "bin/unwrapped/lnx64.o/lmutil"
+    proc = executor(
+        ["/lib64/ld-linux-x86-64.so.2", str(lmutil), "lmdiag", "-n", "-c", str(path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, check=False)
+    raw = (proc.stdout + proc.stderr).lower()
+    result["lmdiag"] = {"exit_code": proc.returncode,
+                         "invalid_host": b"invalid host" in raw,
+                         "checkout_success": b"can be checked out" in raw}
+    # Batch startup tests actual Vivado launch, not merely `vivado -version`.
+    proc = executor(
+        ["/usr/bin/bash", "-c", 'source "$1"; exec vivado -mode batch '
+         '-nojournal -nolog -source /dev/stdin', "plasma-license-probe", str(SETTINGS64)],
+        input=b'puts "PLASMA_LICENSE_STARTUP_PASS"\nexit\n',
+        env={"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/nonexistent"),
+             **selectors}, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        timeout=60, check=False)
+    result["vivado_startup"] = {
+        "exit_code": proc.returncode,
+        "license_rejected": b"valid license was not found" in proc.stdout + proc.stderr,
+        "pass": proc.returncode == 0 and b"PLASMA_LICENSE_STARTUP_PASS" in proc.stdout,
+    }
+    return result
+
+
+def authenticate_host_inputs(workspace: Path, pinned_sha: str) -> dict:
+    """Reject edits/symlinks before executing candidate Tcl/Python on the host.
+
+    Called only by the trusted dispatcher after live owner/PR admission and
+    after Codex has exited. Changed inputs need a newly reviewed pinned SHA.
+    Git's index/status alone is insufficient (assume-unchanged/skip-worktree).
+    """
+    require(BOARD_SHA40.fullmatch(pinned_sha) is not None, "BUILD_SOURCE_SHA_MISMATCH")
+    root = workspace.resolve(strict=True)
+    def git(*args):
+        return subprocess.run(["git", "--no-replace-objects", "-C", str(root), *args], check=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=30).stdout
+    require(git("rev-parse", "HEAD").strip().decode() == pinned_sha,
+            "BUILD_SOURCE_SHA_MISMATCH")
+    paths = git("ls-tree", "-r", "--name-only", "-z", pinned_sha, "--", "pl").split(b"\0")
+    hashes = {}
+    for item in filter(None, paths):
+        name = item.decode()
+        path = root / name
+        require(path.is_file() and not path.is_symlink() and
+                path.resolve() == path and path.resolve().is_relative_to(root),
+                "BUILD_SOURCE_DENIED")
+        expected = git("show", pinned_sha + ":" + name)
+        require(path.read_bytes() == expected, "BUILD_UNREVIEWED_INPUT_DENIED")
+        hashes[name] = hashlib.sha256(expected).hexdigest()
+    require(bool(hashes), "BUILD_SOURCE_DENIED")
+    # Helper is executable; it must match trusted engine's co-versioned copy.
+    helper = "pl/projects/z2-swd-gpio/prepare-board-repository.sh"
+    trusted = Path(__file__).resolve().parents[1] / helper
+    require((root / helper).read_bytes() == trusted.read_bytes(),
+            "BUILD_UNREVIEWED_HELPER_DENIED")
+    return {"pinned_sha": pinned_sha, "files_sha256": hashes}
 
 EXPECTED_RUNNER = "SWPC-plasma-codex"
 BOARD_SHA40 = re.compile(r"[a-f0-9]{40}\Z")
@@ -342,8 +434,16 @@ def _run_pipeline(task: dict, *, workspace: Path, approval: dict,
                 "BUILD_LOG_EXCESSIVE")
         (build / "vivado-stdout.log").write_bytes(proc.stdout)
         (build / "vivado-stderr.log").write_bytes(proc.stderr)
+        execution = json.dumps({
+            "argv": args, "exit_code": proc.returncode,
+            "toolchain": "2026.1", "source_sha": plan["source_sha"],
+        }, indent=2) + "\n"
+        (build / "execution.json").write_text(execution)
+        (evidence_dir / "vivado-execution.json").write_text(execution)
         diagnostics.artifact("vivado_stdout", build / "vivado-stdout.log")
         diagnostics.artifact("vivado_stderr", build / "vivado-stderr.log")
+        require(b"valid license was not found" not in proc.stdout + proc.stderr,
+                "BUILD_VIVADO_LICENSE_REJECTED")
         require(proc.returncode == 0 and
                 b"FIXED_F1_BITSTREAM_BUILD_PASS_HOST_ONLY_NOT_Z2" in proc.stdout,
                 "BUILD_VIVADO_IMPLEMENTATION_FAILED")
