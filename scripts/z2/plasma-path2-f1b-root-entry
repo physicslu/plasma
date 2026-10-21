@@ -28,6 +28,20 @@ for path in "$root" "$manifest" "$root/pl/hil/path2_f1b_minimal_stage.py"; do
     { echo 'PATH2_SOURCE_WRITABLE_BY_OTHERS' >&2; exit 2; }
 done
 
+# Reject an empty or partial self-generated manifest: enumerate the
+# fixed execution modules, not just an arbitrary file chosen by the caller.
+for required in \
+  pl/hil/path2_f1b_minimal_stage.py \
+  pl/hil/path2_f1b_dev_risk.py \
+  pl/hil/path2_z2_target_guard.py \
+  pl/hil/f1b.py \
+  pl/hil/swd04/one_shot.py \
+  pl/hil/swd04/development.py \
+  pl/hil/swd04/contract.py \
+  software/python/plasma_interfaces/linux_mmio.py; do
+  /usr/bin/awk -v path="$required" '$2 == path && $1 ~ /^[0-9a-f]{64}$/ {found = 1} END {exit !found}' "$manifest" ||
+    { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
+done
 (cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
   { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
 
