@@ -2,6 +2,7 @@
 """Host-only tests for the non-authorizing Path 2/3 SSH tmux monitor."""
 from __future__ import annotations
 
+import io
 import json
 import os
 from pathlib import Path
@@ -104,6 +105,85 @@ class EngineeringMonitorTests(unittest.TestCase):
                     b"input", directory, directory / "evidence",
                     str(directory / "missing-live-log"))
             self.assertFalse((directory / "evidence").exists())
+
+    def test_view_does_not_redraw_when_idle_is_unchanged(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = io.StringIO()
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] == 3:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path3", directory=Path(td), output=out,
+                              get_size=lambda: os.terminal_size((80, 24)),
+                              sleep=fake_sleep)
+            self.assertEqual(polls[0], 3)
+            self.assertEqual(out.getvalue().count("\x1b[H"), 1)
+            self.assertNotIn("\x1b[2J", out.getvalue())
+            self.assertIn("STATUS: IDLE", out.getvalue())
+
+    def test_view_repaints_on_terminal_resize(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = io.StringIO()
+            sizes = iter([os.terminal_size((80, 24)),
+                          os.terminal_size((80, 24)),
+                          os.terminal_size((44, 15))])
+
+            def fake_sleep(_seconds):
+                if fake_sleep.count == 2:
+                    raise StopIteration
+                fake_sleep.count += 1
+            fake_sleep.count = 0
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path2", directory=Path(td), output=out,
+                              get_size=lambda: next(sizes), sleep=fake_sleep)
+            self.assertEqual(out.getvalue().count("\x1b[H"), 2)
+            self.assertNotIn("\x1b[2J", out.getvalue())
+
+    def test_view_repaints_when_status_changes(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = io.StringIO()
+            directory = Path(td)
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] == 1:
+                    (directory / "path3.json").write_text(json.dumps({
+                        "status": "IDLE", "run_id": "12345", "task": "test-task",
+                        "last_result": "PASS", "exit_code": 0,
+                    }))
+                else:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path3", directory=directory, output=out,
+                              get_size=lambda: os.terminal_size((80, 24)),
+                              sleep=fake_sleep)
+            self.assertEqual(out.getvalue().count("\x1b[H"), 2)
+            self.assertIn("RUN: 12345  TASK: test-task", out.getvalue())
+            self.assertIn("LAST: PASS  EXIT: 0", out.getvalue())
+
+    def test_log_is_clipped_to_pane_without_scrolling_status_offscreen(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "path3.log").write_text(
+                "".join(f"line-{i:03d}: " + ("中" * 60) + "\n"
+                        for i in range(60)))
+            frame = mon.render_snapshot(directory, "path3", width=38, height=12)
+            lines = frame.splitlines()
+            # One spare row prevents scrolling even with a trailing clear.
+            self.assertLessEqual(len(lines), 11)
+            self.assertTrue(all(mon._clip_columns(line, 38) == line
+                                for line in lines))
+            self.assertIn("STATUS: IDLE", frame)
+            self.assertIn("RECENT OUTPUT", frame)
+            self.assertIn("line-059:", frame)
+            self.assertNotIn("line-001:", frame)
 
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
