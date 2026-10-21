@@ -9,6 +9,19 @@ the installed license readable and `lmdiag` free of Invalid host, and Vivado
 while the proposed same-run baseline is still needed to pin the difference
 to the Runner and sandbox execution contexts.
 
+Repeated on SWPC with the same sanitized `license_snapshot()` probe:
+
+| Context | Matching interface | FlexNet `Invalid host` | Vivado Tcl marker | Exit |
+| --- | --- | --- | --- | ---: |
+| Current restricted Codex shell | query unavailable | yes | no | 42 |
+| SWPC host execution | yes | no | yes | 0 |
+
+Command: `PYTHONPATH=scripts python3 -c 'import json, plasma_vivado_host_build as b; print(json.dumps(b.license_snapshot(), sort_keys=True))'`.
+The private license text and raw Host ID were neither printed nor changed.
+Network namespaces differed, so the evidence identifies interface visibility
+in the restricted environment as the immediate FlexNet failure. The same-run
+Runner diagnostic and full F1-B build remain pending.
+
 The candidate change uses the existing engineering dispatcher, existing
 `f1b-path3-codex-vivado-build` task and existing Python Build Engine. It adds
 no workflow, runner, service, IPC endpoint, arbitrary command transport or
