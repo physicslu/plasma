@@ -5,6 +5,8 @@ from __future__ import annotations
 from contextlib import ExitStack
 import errno
 import json
+import os
+import subprocess
 
 from importlib.machinery import SourceFileLoader
 from importlib.util import spec_from_loader, module_from_spec
@@ -245,6 +247,157 @@ class BridgeContracts(unittest.TestCase):
                         side_effect=OSError(errno.EPERM, "unexpected"))
                 bridge.execute("download", "a" * 40)
         self.assertEqual(raised.exception.errno, errno.EPERM)
+
+
+
+class MonitorDispatcherBridgeIntegration(unittest.TestCase):
+    """Real monitor subprocess -> Dispatcher -> runtime -> mocked Bridge SSH.
+
+    GitHub-hosted, synthetic data only. Never opens SSH, sudo or a device.
+    The fixed Bridge entry is mocked after the route is checked.
+    """
+
+    def test_synthetic_success_and_fail_closed_through_monitor(self):
+        import plasma_engineering_monitor as monitor
+
+        child = r'''
+import errno
+import json
+import os
+import subprocess
+import sys
+from contextlib import ExitStack
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
+from pathlib import Path
+from unittest.mock import patch
+
+root = Path(os.environ["PLASMA_INTEGRATION_ROOT"])
+sys.path.insert(0, str(root / "scripts"))
+import plasma_development_dispatch as dispatcher
+import plasma_path2_runtime_integration as runtime
+
+path = root / "scripts/swpc/z2-path2-f1b-bridge"
+loader = SourceFileLoader("offline_path2_integrated_bridge", str(path))
+spec = spec_from_loader(loader.name, loader)
+bridge = module_from_spec(spec)
+loader.exec_module(bridge)
+
+approval = {
+    "execution_path": "path2-cli",
+    "execution_capability": "path2-stage-contract",
+    "task_id": "z2-path2-download",
+    "pinned_sha": "a" * 40,
+    "trusted_sha": "a" * 40,
+    "pr_number": 0,
+    "auto_download_after_build_success": False,
+    "auto_test_after_download_success": False,
+}
+task = {
+    "execution_path": "path2-cli",
+    "capability": "path2-stage-contract",
+    "project": "pl/projects/z2-fixed-unified-site1",
+    "stage": "download",
+}
+case = os.environ["PLASMA_INTEGRATION_CASE"]
+output = Path(os.environ["PLASMA_INTEGRATION_OUTPUT"])
+state = {
+    "stage": "download",
+    "boot_id": "synthetic-boot-only",
+    "result": "LOADED_AND_HELD",
+}
+payload = (bridge.MARK + json.dumps(state) + "\n").encode()
+chunks = [
+    b"z2.example's password:",
+    bridge.PROMPT.encode(),
+    payload,
+]
+
+class OfflineSSH:
+    pid = 77777777
+    def poll(self):
+        return 1 if case == "failure" else 0
+    def wait(self, timeout=None):
+        return self.poll()
+
+def offline_read(_fd, _count):
+    if chunks:
+        return chunks.pop(0)
+    raise OSError(errno.EIO, "synthetic PTY EOF")
+
+def fake_bridge_executor(command, **kwargs):
+    assert command == [
+        str(runtime.ROOT_STAGE_BRIDGE), "download", "a" * 40,
+    ], "UNEXPECTED_BRIDGE_COMMAND"
+    assert kwargs["check"] is False
+    assert kwargs["env"] == {"PATH": "/usr/bin:/bin"}
+    with ExitStack() as stack:
+        def p(obj, attr, **patch_kw):
+            return stack.enter_context(patch.object(obj, attr, **patch_kw))
+        p(bridge, "approved_sha")
+        p(bridge, "enrollment",
+          return_value=("z2.example", "fake-ssh", "fake-sudo"))
+        ssh = p(bridge.subprocess, "Popen", return_value=OfflineSSH())
+        p(bridge.os, "openpty", return_value=(910, 911))
+        p(bridge.os, "read", side_effect=offline_read)
+        p(bridge.os, "write", side_effect=lambda _fd, data: len(data))
+        p(bridge.os, "close")
+        p(bridge.select, "select", return_value=([910], [], []))
+        p(bridge.tty, "setraw")
+        try:
+            result = bridge.execute("download", "a" * 40)
+            assert ssh.call_args.args[0][0] == "/usr/bin/ssh"
+            return subprocess.CompletedProcess(command, 0,
+                json.dumps(result).encode(), b"")
+        except bridge.Blocked:
+            return subprocess.CompletedProcess(command, 2, b"",
+                b"PATH2_SWPC_BRIDGE_BLOCKED_OR_UNKNOWN")
+
+original = runtime.registered_hardware_stage
+def execute_mocked(task_arg, approval_arg):
+    return original(task_arg, approval_arg, executor=fake_bridge_executor)
+
+with patch.object(runtime, "_trusted_root_bridge"), patch.object(
+        runtime, "registered_hardware_stage", side_effect=execute_mocked):
+    try:
+        receipt = dispatcher.run_task(task, approval=approval, workspace=root)
+        output.write_text(json.dumps(receipt), encoding="utf-8")
+        print(json.dumps(receipt), flush=True)
+    except Exception as exc:
+        reason = dispatcher.safe_error_reason(exc)
+        output.write_text(json.dumps({"reason": reason}), encoding="utf-8")
+        sys.exit(2)
+'''
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            monitor_dir = temp / "monitor"
+            monitor_dir.mkdir()
+            evidence = temp / "evidence.json"
+            for case, expected_rc in (("success", 0), ("failure", 2)):
+                with self.subTest(case=case), patch.dict(os.environ, {
+                    "PLASMA_INTEGRATION_ROOT": str(ROOT),
+                    "PLASMA_INTEGRATION_CASE": case,
+                    "PLASMA_INTEGRATION_OUTPUT": str(evidence),
+                    "GITHUB_RUN_ID": "99900001",
+                    "PLASMA_MONITOR_TASK": "z2-path2-download",
+                }):
+                    rc = monitor.run_job(
+                        "path2", [sys.executable, "-c", child],
+                        directory=monitor_dir)
+                self.assertEqual(rc, expected_rc)
+                record = json.loads(evidence.read_text())
+                state = json.loads((monitor_dir / "path2.json").read_text())
+                self.assertEqual(state["exit_code"], expected_rc)
+                self.assertEqual(state["status"], "IDLE")
+                if case == "success":
+                    self.assertEqual(record["result"], "LOADED_AND_HELD")
+                    self.assertTrue(record["real_z2"])  # synthetic fixture
+                    self.assertFalse(record["auto_next_stage"])
+                    self.assertEqual(state["last_result"], "PASS")
+                else:
+                    self.assertEqual(record["reason"],
+                                     "PATH2_BRIDGE_STAGE_FAILED_OR_UNKNOWN")
+                    self.assertEqual(state["last_result"], "FAIL")
 
 
 if __name__ == "__main__":
