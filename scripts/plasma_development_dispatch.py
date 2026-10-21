@@ -788,9 +788,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plus a short .test.log, but do not restrict other engineering "
             "edits merely to satisfy the old generated-file convention.\n"
         )
+    # Generic host-only Work Orders never need to reach Z2 over SSH.
+    # Do not change legacy reviewed Path 3 jobs (e.g. existing Vivado).
+    network = ("false" if task_id == DYNAMIC_TASKS["path3-codex"]
+               else "true")
     command = [
         "codex", "--ask-for-approval", "never",
-        "-c", "sandbox_workspace_write.network_access=true",
+        "-c", "sandbox_workspace_write.network_access=" + network,
         "exec", "--sandbox", "workspace-write", "-",
     ]
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
