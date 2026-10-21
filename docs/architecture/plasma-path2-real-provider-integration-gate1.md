@@ -45,6 +45,43 @@ execution is NOT qualified or registered.** Existing main base:
   **pull_request GitHub-hosted offline-contract job only**. It does not
   introduce any new self-hosted runner or workflow.
 
+## Evidence reuse / target admission (as of 2026-10-21)
+
+The owner confirms Z2 is physically connected as before. This confirms
+**physical availability**, not a current target session or OS-level AXI proof.
+Reuse the fixed F1-B candidate Build/BIT/HWH/BIN hashes and the existing
+one-shot Z2 Identity/Restore transcript. Do **not** rebuild Vivado or repeat
+the previous one-shot HIL solely to satisfy a new checklist.
+
+The new `RootZ2TargetPort` uses the same protected
+`/run/plasma-z2-swd05/supervisor.lock` as the historical one-shot loader.
+It checks current root, FPGA Manager state, candidate/recovery file hashes,
+bound UIO and platform resources and per-process MMIO FD/VMA facts,
+without touching any actual registers or writing a bitstream.
+The local lock claim is tied to its thread/process and cannot be reused
+across a fork. Vanishing/inaccessible processes make the scan incomplete,
+never implicitly safe. This is **passive**, nonprivileged-to-command
+diagnostics implemented as root-only code in a PR, not proof it has
+been deployed or run on the actual connected Z2.
+
+Only the following facts must be refreshed for any new physical trigger:
+current authorized root identity/target code, boot ID, firmware and protected
+recovery digests, FPGA Manager identity/load history, exclusive owner,
+kernel/driver/DMA and process access, AXI quiescence mechanism and bounded
+recovery operator route. Read-only refresh is not a repeat of Vivado or HIL.
+
+**Current hard blocker:** prior F1-B one-shot retained
+`uio1/uio_pdrv_genirq` at `0x40000000..0x4000FFFF` under an **explicit,
+one-run owner risk exception**. The documented result was
+`AXI isolation UNPROVEN_OWNER_ACCEPTED_RISK`. The Path 2 contract requires
+independent safety admission of a held image across triggers; neither this
+owner acknowledgment nor an idle IRQ counter provides that admission.
+This PR intentionally leaves hardware writer and self-hosted trusted
+Dispatcher activation **unregistered**. No FPGA Manager Download/Restore
+or SWPC/Z2 HIL may be reported as run until those conditions are solved,
+or the owner explicitly approves a revised, bounded development-risk
+experiment as a distinct Gate 1 change.
+
 ## Stage contracts and durable state
 
 **Download** (separate Owner stage, future trusted target implementation):
