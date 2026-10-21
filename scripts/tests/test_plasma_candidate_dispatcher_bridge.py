@@ -248,7 +248,7 @@ class CandidateBridgeContracts(unittest.TestCase):
                   patch.object(bridge,"run_process",side_effect=subprocess_fixture),
                   patch.object(sys,"argv",argv),redirect_stdout(output)):
                 rc=bridge.main()
-            self.assertEqual(rc,0)
+            self.assertEqual(rc,0,output.getvalue())
             result=json.loads(output.getvalue())
             self.assertEqual(result["candidate_sha"],"b"*40)
             self.assertEqual(result["codex_exit_code"],0)
