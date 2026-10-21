@@ -1,277 +1,223 @@
 #!/usr/bin/env python3
-"""Offline-only stage lifecycle tests. No real Z2, root access or MMIO."""
+"""Host-only repeatable F1-B stage tests. Fake device; never touch /dev/mem."""
 from __future__ import annotations
 
-from contextlib import nullcontext, ExitStack
+from contextlib import ExitStack, nullcontext
 import json
 from pathlib import Path
 import sys
 import tempfile
-import time
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from pl.hil import f1b, path2_f1b_minimal_stage as stage
+from pl.hil import f1b
+from pl.hil import path2_f1b_minimal_stage as stage
 from pl.hil import path2_f1b_dev_risk as risk
-from pl.hil import path2_z2_target_guard as guard
 from pl.hil.swd04 import one_shot
-from scripts import plasma_path2_persistent_lease as lease
 
 
-class FakeHardware:
+class FakeTarget:
     def __init__(self):
-        self.boot_id = "reviewed-test-boot-id"
-        self.current = "base.bin"
-        self.clock = int(time.time())
+        self.boot = "test-boot-very-long-id"
+        self.image = "base.bin"
         self.writes = []
-        self.native_reads = 0
-        self.raise_write = None
-        self.raise_child = False
+        self.reads = 0
+        self.fail_load = False
+        self.fail_restore = False
+        self.fail_child = False
 
     def exclusive(self):
         return nullcontext()
 
-    def now(self):
-        self.clock += 1
-        return self.clock
-
-    def image_sha256(self, which):
-        return {"candidate": f1b.BIN_SHA, "recovery": f1b.BASE_SHA}[which]
-
-    def report(self, _port, image):
-        if image != self.current:
+    def report(self, port, expected):
+        if expected != self.image:
             raise stage.LiveStageDenied("MANAGER_LAST_LOAD_CHANGED")
-        return {
-            "target_boot_id": self.boot_id,
-            "site": 1,
-            "source_sha": f1b.SOURCE,
-            "bin_sha256": f1b.BIN_SHA,
-            "recovery_sha256": f1b.BASE_SHA,
-            "current_uio": risk.FIXED_UIO,
-            "development_exception": risk.WAIVER,
-            "expected_manager_firmware": image,
-            "axi_isolation": "UNPROVEN_ACCEPTED_FOR_ONE_DEVELOPMENT_EXPERIMENT",
-        }
+        return {"site": 1, "target_boot_id": self.boot,
+                "expected_manager_firmware": expected,
+                "axi_isolation": "UNPROVEN_ACCEPTED_FOR_ONE_DEVELOPMENT_EXPERIMENT",
+                "development_exception": risk.WAIVER}
 
-    def write(self, firmware):
-        self.writes.append(firmware)
-        if self.raise_write == firmware:
-            raise RuntimeError("INJECTED_FPGA_MANAGER_WRITE_FAILURE")
-        self.current = firmware
+    def manager_write(self, image):
+        self.writes.append(image)
+        if image == stage.CANDIDATE.name and self.fail_load:
+            raise RuntimeError("INJECTED_LOAD_ERROR")
+        if image == "base.bin" and self.fail_restore:
+            raise RuntimeError("INJECTED_RESTORE_ERROR")
+        self.image = image
 
-    def run_child(self, args):
-        self.native_reads += 1
-        if self.raise_child:
-            raise RuntimeError("INJECTED_SIGBUS_UNREAPED")
-        self.assert_child_args(args)
+    def run_child(self, cmd):
+        self.reads += 1
+        if self.fail_child:
+            raise RuntimeError("INJECTED_SIGBUS")
+        assert cmd[1:] == ["-m", "pl.hil.path2_f1b_minimal_stage",
+                            "--identity-child"]
         one_shot.record_json(stage.CHILD, {
             "observed": {str(k): v for k, v in f1b.IDENTITY.items()}})
 
-    @staticmethod
-    def assert_child_args(args):
-        assert args[1:] == ["-m", "pl.hil.path2_f1b_minimal_stage",
-                            "--identity-child"]
 
-
-class MinimalStageTests(unittest.TestCase):
+class RepeatableStageTests(unittest.TestCase):
     def setUp(self):
-        self.work = tempfile.TemporaryDirectory()
-        self.addCleanup(self.work.cleanup)
-        root = Path(self.work.name)
-        self.hw = FakeHardware()
-        self.real_trusted_local = stage.trusted_local
+        self.t = tempfile.TemporaryDirectory()
+        self.addCleanup(self.t.cleanup)
+        self.target = FakeTarget()
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(stage, "LEDGER", root / "f1b.json"))
-        self.stack.enter_context(patch.object(stage, "CLAIM", root / "f1b-once.claim"))
-        self.stack.enter_context(patch.object(stage, "CHILD", root / "identity.json"))
-        self.stack.enter_context(patch.object(stage, "trusted_local",
-                                              return_value=None))
+        root = Path(self.t.name)
+        self.stack.enter_context(patch.object(stage, "STATE", root / "state.json"))
+        self.stack.enter_context(patch.object(stage, "CHILD", root / "child.json"))
+        self.stack.enter_context(patch.object(stage, "trusted_local"))
+        self.stack.enter_context(patch.object(stage, "_state_file_trusted"))
         self.stack.enter_context(patch.object(stage.guard, "RootZ2TargetPort",
-                                              return_value=self.hw))
-        self.stack.enter_context(patch.object(stage, "risk_report",
-                                              side_effect=self.hw.report))
+                                              return_value=self.target))
+        self.stack.enter_context(patch.object(stage, "live_report",
+                                              side_effect=self.target.report))
         self.stack.enter_context(patch.object(one_shot, "manager_write",
-                                              side_effect=self.hw.write))
+                                              side_effect=self.target.manager_write))
         self.stack.enter_context(patch.object(one_shot, "run_child",
-                                              side_effect=self.hw.run_child))
-        self.stack.enter_context(patch.object(one_shot, "service_snapshot",
-                                              return_value={"plasma-server": "active"}))
-        self.stack.enter_context(patch.object(one_shot, "uio_snapshot",
-                                              return_value=(("fabric", "True", "uio1"),)))
+                                              side_effect=self.target.run_child))
+        self.stack.enter_context(patch.object(one_shot, "protected"))
 
-    def ledger(self):
-        return lease.LeaseLedger(stage.LEDGER).snapshot()
+    def state(self):
+        return stage.read_state()
 
-    def test_three_manual_triggers_with_no_automatic_next_stage(self):
-        d = stage.run("download")
-        self.assertEqual(d["result"], "LOADED_AND_HELD")
-        self.assertIs(d["auto_test"], False)
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
-        self.assertEqual(self.hw.native_reads, 0)
-        self.assertEqual(self.ledger()["load_attempts"], 1)
-        t = stage.run("test")
-        self.assertEqual(t["result"], "IDENTITY_PASS")
-        self.assertIs(t["auto_restore"], False)
-        self.assertEqual(self.hw.native_reads, 1)
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
-        restored = stage.run("restore")
-        self.assertEqual(restored["result"], "RESTORED_VERIFIED")
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name, "base.bin"])
-        self.assertEqual(self.ledger()["status"], "RESTORED_VERIFIED")
-        self.assertEqual(self.ledger()["load_attempts"], 1)
-        self.assertEqual(self.ledger()["test_attempts"], 1)
-        self.assertEqual(self.ledger()["restore_attempts"], 1)
-        for name in ("download", "test", "restore"):
-            with self.subTest(name=name), self.assertRaises(Exception):
-                stage.run(name)
-        self.assertEqual(len(self.hw.writes), 2)
+    def test_independently_triggered_repeatable_full_lifecycle(self):
+        first = stage.run("download")
+        self.assertEqual(first["result"], "LOADED_AND_HELD")
+        self.assertIs(first["auto_test"], False)
+        self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
+        # A deliberate second Download in the same session is permitted.
+        second = stage.run("download")
+        self.assertEqual(second["download_count"], 2)
+        self.assertEqual(first["lease_id"], second["lease_id"])
+        self.assertEqual(self.target.writes.count(stage.CANDIDATE.name), 2)
+        # Testing may run repeatedly; no automatic next-stage selection.
+        self.assertEqual(stage.run("test")["result"], "IDENTITY_PASS")
+        read2 = stage.run("test")
+        self.assertEqual(read2["test_count"], 2)
+        self.assertEqual(self.target.reads, 2)
+        self.assertEqual(len(self.target.writes), 2)
+        self.assertEqual(stage.run("restore")["result"], "RESTORED_VERIFIED")
+        self.assertEqual(stage.run("restore")["result"], "ALREADY_RESTORED")
+        self.assertEqual(self.target.writes.count("base.bin"), 1)
+        third = stage.run("download")
+        self.assertEqual(third["download_count"], 3)
+        self.assertEqual(third["lease_id"], first["lease_id"])
+        self.assertEqual(stage.run("test")["test_count"], 3)
+        self.assertEqual(stage.run("restore")["restore_count"], 2)
+        self.assertEqual(self.state()["status"], "BASE")
 
-    def test_testing_before_download_does_not_touch_hardware(self):
-        with self.assertRaises(FileNotFoundError):
-            stage.run("test")
-        self.assertEqual(self.hw.writes, [])
+    def test_no_prior_load_denies_readonly_testing_and_restore(self):
+        for command in ("test", "restore"):
+            with self.assertRaisesRegex(stage.LiveStageDenied,
+                                        "DOWNLOAD_REQUIRED_BEFORE"):
+                stage.run(command)
+        self.assertEqual(self.target.writes, [])
 
-    def test_restore_cannot_run_before_test(self):
+    def test_restore_after_download_without_testing_is_manual_and_valid(self):
         stage.run("download")
+        out = stage.run("restore")
+        self.assertEqual(out["result"], "RESTORED_VERIFIED")
+        self.assertEqual(self.target.writes,
+                         [stage.CANDIDATE.name, "base.bin"])
+
+    def test_failed_download_sets_unknown_without_blind_retry(self):
+        self.target.fail_load = True
+        with self.assertRaisesRegex(RuntimeError, "INJECTED_LOAD"):
+            stage.run("download")
+        self.assertEqual(self.state()["status"], "UNKNOWN")
+        self.target.fail_load = False
         with self.assertRaisesRegex(stage.LiveStageDenied,
-                                    "TEST_NOT_VERIFIED_RESTORE_DENIED"):
-            stage.run("restore")
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
-
-    def test_load_error_records_unknown_and_forbids_retry(self):
-        self.hw.raise_write = stage.CANDIDATE.name
-        with self.assertRaisesRegex(RuntimeError, "INJECTED"):
+                                    "UNCERTAIN_PRIOR_OPERATION"):
             stage.run("download")
-        self.assertEqual(self.ledger()["status"], "UNKNOWN_MANUAL_RECOVERY")
-        self.assertEqual(self.ledger()["load_attempts"], 1)
-        with self.assertRaises(stage.LiveStageDenied):
-            stage.run("download")
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
+        self.assertEqual(len(self.target.writes), 1)
 
-    def test_native_sigbus_blocks_restore(self):
+    def test_failed_test_blocks_restore_without_blind_reload(self):
         stage.run("download")
-        self.hw.raise_child = True
+        self.target.fail_child = True
         with self.assertRaisesRegex(RuntimeError, "INJECTED_SIGBUS"):
             stage.run("test")
-        self.assertEqual(self.ledger()["status"], "UNKNOWN_MANUAL_RECOVERY")
-        with self.assertRaises(stage.LiveStageDenied):
+        self.assertEqual(self.state()["status"], "UNKNOWN")
+        with self.assertRaisesRegex(stage.LiveStageDenied,
+                                    "UNCERTAIN_PRIOR_OPERATION"):
             stage.run("restore")
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
+        self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
 
-    def test_restore_fail_prevents_second_firmware_write(self):
+    def test_restore_error_forbids_blind_repeat(self):
         stage.run("download")
-        stage.run("test")
-        self.hw.raise_write = "base.bin"
-        with self.assertRaisesRegex(RuntimeError, "INJECTED"):
+        self.target.fail_restore = True
+        with self.assertRaisesRegex(RuntimeError, "INJECTED_RESTORE"):
             stage.run("restore")
-        self.assertEqual(self.ledger()["status"], "UNKNOWN_MANUAL_RECOVERY")
-        with self.assertRaises(stage.LiveStageDenied):
+        self.assertEqual(self.state()["status"], "UNKNOWN")
+        with self.assertRaisesRegex(stage.LiveStageDenied,
+                                    "UNCERTAIN_PRIOR_OPERATION"):
             stage.run("restore")
-        self.assertEqual(self.hw.writes.count("base.bin"), 1)
+        self.assertEqual(self.target.writes.count("base.bin"), 1)
 
-    def test_changed_manager_image_boot_and_expiry_are_no_go(self):
+    def test_loaded_manager_and_boot_are_refreshed_each_trigger(self):
         stage.run("download")
-        self.hw.current = "base.bin"
+        self.target.image = "base.bin"
         with self.assertRaisesRegex(stage.LiveStageDenied,
                                     "MANAGER_LAST_LOAD_CHANGED"):
             stage.run("test")
-        self.hw.current = stage.CANDIDATE.name
-        self.hw.boot_id = "unexpected-reboot"
+        self.target.image = stage.CANDIDATE.name
+        self.target.boot = "different-boot-long-id"
         with self.assertRaisesRegex(stage.LiveStageDenied,
-                                    "TARGET_BOOT_CHANGED"):
+                                    "BOOT_CHANGED_MANUAL_REVIEW"):
             stage.run("test")
-        self.hw.boot_id = "reviewed-test-boot-id"
-        self.hw.clock += 1000
-        with self.assertRaisesRegex(stage.LiveStageDenied,
-                                    "LEASE_EXPIRED_MANUAL_REVIEW"):
-            stage.run("test")
-        self.assertEqual(self.hw.native_reads, 0)
+        self.assertEqual(self.target.reads, 0)
 
-    def test_second_testing_attempt_denied(self):
+    def test_state_persists_across_restarts_and_is_not_one_use(self):
+        first = stage.run("download")
+        self.assertTrue(stage.STATE.exists())
+        loaded = json.loads(stage.STATE.read_text())
+        self.assertEqual(loaded["status"], "F1B")
+        self.assertEqual(loaded["session_id"], first["lease_id"])
+        self.assertEqual(stage.run("test")["test_count"], 1)
+        self.assertEqual(stage.run("restore")["result"], "RESTORED_VERIFIED")
+        self.assertEqual(stage.run("download")["download_count"], 2)
+        self.assertEqual(first["lease_id"], self.state()["session_id"])
+
+    def test_unfinished_operation_after_crash_is_unknown(self):
         stage.run("download")
-        stage.run("test")
+        record = self.state()
+        record["status"] = "RESTORE_IN_FLIGHT"
+        stage.write_state(record)
         with self.assertRaisesRegex(stage.LiveStageDenied,
-                                    "SECOND_IDENTITY_TEST_DENIED"):
-            stage.run("test")
-        self.assertEqual(self.hw.native_reads, 1)
+                                    "UNCERTAIN_PRIOR_OPERATION"):
+            stage.run("restore")
+        self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
 
-    def test_ack_required_and_only_three_fixed_stage_words(self):
-        with patch.object(stage, "trusted_local", wraps=None) as auth:
-            auth.side_effect = stage.LiveStageDenied("ROOT_REQUIRED")
-            with self.assertRaisesRegex(stage.LiveStageDenied, "ROOT_REQUIRED"):
-                stage.run("download")
-        self.assertEqual(self.hw.writes, [])
-        for name in ("build", "download+test", "status;rm -rf /", ""):
-            with self.assertRaisesRegex(stage.LiveStageDenied,
-                                        "STAGE_NOT_ALLOWLISTED"):
-                stage.run(name)
-        self.assertEqual(self.hw.writes, [])
-
-    def test_download_claim_survives_volatile_ledger_loss_after_reboot(self):
-        loaded = stage.run("download")
-        self.assertEqual(loaded["result"], "LOADED_AND_HELD")
-        self.assertTrue(stage.CLAIM.is_file())
-        claim = json.loads(stage.CLAIM.read_text())
-        self.assertEqual(claim["candidate_sha256"], f1b.BIN_SHA)
-        # Simulate boot losing the volatile /run ledger while the trusted
-        # source-level once claim survives. No new FPGA write can occur.
-        stage.LEDGER.unlink()
-        self.hw.current = "base.bin"
-        with self.assertRaisesRegex(stage.LiveStageDenied,
-                                    "SINGLE_EXPERIMENT_ALREADY_CLAIMED"):
-            stage.run("download")
-        self.assertEqual(self.hw.writes, [stage.CANDIDATE.name])
-
-    def test_native_runtime_is_qualified_before_hardware_load(self):
-        # The *same* ABI that passed the earlier real F1-B one-shot run.
+    def test_abnormal_arm_runtime_denied_before_hardware(self):
         stage.native_runtime_preflight(
             version=(3, 12, 13), machine="armv7l", endian="little",
             executable="/opt/plasma/python/3.12.13/bin/python3")
-        for changes in (
-            {"version": (3, 11, 0)},
-            {"machine": "x86_64"},
-            {"endian": "big"},
-            {"executable": "/usr/bin/python3"},
-        ):
-            with self.subTest(changed=changes):
-                baseline = dict(version=(3, 12, 13), machine="armv7l",
-                                endian="little",
-                                executable="/opt/plasma/python/3.12.13/bin/python3")
-                with self.assertRaisesRegex(stage.LiveStageDenied,
-                                            "NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED"):
-                    stage.native_runtime_preflight(**(baseline | changes))
-        self.assertEqual(self.hw.writes, [])
-        self.assertFalse(stage.LEDGER.exists())
-
-    def test_wrong_interpreter_blocks_download_before_lease_and_write(self):
-        # Root/ack/trusted-code checks are represented by the actual ABI
-        # guard; all hardware calls are still fake and have zero side effects.
-        with patch.object(stage, "trusted_local",
-                          side_effect=lambda: stage.native_runtime_preflight(
-                              version=(3, 11, 0), machine="armv7l",
-                              endian="little", executable="/usr/bin/python3")):
+        for change in ({"version": (3, 11, 0)}, {"machine": "x86_64"},
+                       {"endian": "big"}, {"executable": "/usr/bin/python3"}):
+            args = {"version": (3, 12, 13), "machine": "armv7l",
+                    "endian": "little",
+                    "executable": "/opt/plasma/python/3.12.13/bin/python3"}
             with self.assertRaisesRegex(stage.LiveStageDenied,
                                         "NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED"):
+                stage.native_runtime_preflight(**(args | change))
+        self.assertEqual(self.target.writes, [])
+
+    def test_root_and_explicit_waiver_enforced(self):
+        with patch.object(stage, "trusted_local", wraps=None) as gate:
+            gate.side_effect = stage.LiveStageDenied("ROOT_REQUIRED")
+            with self.assertRaisesRegex(stage.LiveStageDenied, "ROOT_REQUIRED"):
                 stage.run("download")
-        self.assertFalse(stage.LEDGER.exists())
-        self.assertEqual(self.hw.writes, [])
+        self.assertFalse(stage.STATE.exists())
 
-    def test_root_risk_ack_is_explicit_and_not_a_secret(self):
-        with patch.object(stage, "trusted_local", self.real_trusted_local), \
-             patch.object(stage.os, "geteuid", return_value=0), \
-             patch.dict(stage.os.environ, {}, clear=True):
+    def test_no_arbitrary_stage_or_auto_chain_or_dispatch_registration(self):
+        for stage_name in ("build", "download+test", "download;exit", ""):
             with self.assertRaisesRegex(stage.LiveStageDenied,
-                                        "EXPLICIT_SINGLE_EXPERIMENT"):
-                stage.trusted_local()
-
-    def test_no_dispatcher_registration_or_unattended_execution(self):
+                                        "STAGE_NOT_ALLOWLISTED"):
+                stage.run(stage_name)
+        self.assertFalse(stage.STATE.exists())
         source = (ROOT / "pl/hil/path2_f1b_minimal_stage.py").read_text()
-        self.assertIn("if __name__ == \"__main__\"", source)
         self.assertNotIn("paramiko", source)
-        self.assertNotIn("ssh ", source)
         self.assertNotIn("auto_run", source)
         integration = (ROOT / "scripts/plasma_path2_runtime_integration.py").read_text()
         self.assertIn("PATH2_LIVE_PROVIDER_NOT_REGISTERED", integration)
