@@ -126,7 +126,7 @@ class EngineeringMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             log = directory / "path3.log"
-            original = "old Codex message\\n"
+            original = "old Codex message\n"
             log.write_text(original)
             output = io.StringIO()
             keys = iter([None, "C", None])
@@ -136,7 +136,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 polls[0] += 1
                 if polls[0] == 2:
                     with log.open("a") as f:
-                        f.write("new Codex message\\n")
+                        f.write("new Codex message\n")
                 if polls[0] >= 3:
                     raise StopIteration
 
@@ -146,16 +146,16 @@ class EngineeringMonitorTests(unittest.TestCase):
                     get_size=lambda: os.terminal_size((80, 24)),
                     sleep=fake_sleep, get_now=lambda: FIXED_NOW,
                     get_key=lambda: next(keys))
-            frames = output.getvalue().split("\\x1b[H")[1:]
+            frames = output.getvalue().split("\x1b[H")[1:]
             self.assertEqual(len(frames), 3)
             self.assertIn("old Codex message", frames[0])
             self.assertNotIn("old Codex message", frames[1])
             self.assertNotIn("old Codex message", frames[2])
             self.assertIn("new Codex message", frames[2])
             self.assertEqual(log.read_text(),
-                             original + "new Codex message\\n")
+                             original + "new Codex message\n")
             self.assertFalse((directory / "path3.json").exists())
-            self.assertNotIn("\\x1b[2J", output.getvalue())
+            self.assertNotIn("\x1b[2J", output.getvalue())
 
     def test_clear_does_not_hide_next_jobs_first_message(self):
         with tempfile.TemporaryDirectory() as td:
@@ -164,12 +164,12 @@ class EngineeringMonitorTests(unittest.TestCase):
             state = directory / "path2.json"
             state.write_text(json.dumps({
                 "status": "IDLE", "run_id": "100", "started": "before"}))
-            log.write_text("old first line\\n")
+            log.write_text("old first line\n")
             clear_from = mon._clear_point(directory, "path2")
             self.assertNotIn("old first line", mon.render_snapshot(
                 directory, "path2", clear_from=clear_from))
             # The same log inode is truncated when run_job starts anew.
-            log.write_text("new job first line\\n")
+            log.write_text("new job first line\n")
             state.write_text(json.dumps({
                 "status": "IDLE", "run_id": "200", "started": "after"}))
             self.assertIn("new job first line", mon.render_snapshot(
