@@ -41,6 +41,18 @@ execution is NOT qualified or registered.** Existing main base:
   simulation/negative tests for overlapping UIO, kernel resource overlap,
   retained `/dev/mem` FD/VMA, incomplete observation and denial of all
   unregistered write/test/restore methods.
+- The privileged read-only collector ties the single overlapping
+  Platform Driver to the **same resolved device** as `uio1`, not merely a
+  similarly shaped name. `RootZ2TargetPort.inspect_cross_trigger()`
+  reacquires the private persistent Lease and checks Boot ID, current manager
+  `operating`, fresh nonconflicting process mappings, exact candidate filename
+  in the current-boot Manager last-load trace, and unexpired held state before
+  separate Testing/Restore. `MANAGER_LOG_ONLY_UNATTESTED` deliberately does
+  **not** claim a loaded FPGA image has been cryptographically attested; its
+  result explicitly grants no FPGA write capability. Test fixtures cover
+  wrong Platform Owner, expired/unknown Lease, changed Boot ID and stale
+  image load logs. No privileged route is registered or installed by these
+  Host-only checks.
 - The existing common GitHub Actions Workflow runs those tests in its
   **pull_request GitHub-hosted offline-contract job only**. It does not
   introduce any new self-hosted runner or workflow.
@@ -78,9 +90,10 @@ independent safety admission of a held image across triggers; neither this
 owner acknowledgment nor an idle IRQ counter provides that admission.
 This PR intentionally leaves hardware writer and self-hosted trusted
 Dispatcher activation **unregistered**. No FPGA Manager Download/Restore
-or SWPC/Z2 HIL may be reported as run until those conditions are solved,
-or the owner explicitly approves a revised, bounded development-risk
-experiment as a distinct Gate 1 change.
+or SWPC/Z2 HIL may be reported as run until those conditions are solved.
+The owner has since approved the narrowly bounded development-risk
+exception documented below; it does **not** bypass remaining root execution,
+provenance, durable Recovery, or independent trigger gates.
 
 ### Fresh Z2 connection evidence — read-only, 2026-10-21
 
