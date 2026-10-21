@@ -90,8 +90,11 @@ def enrollment() -> tuple[str, str, str]:
 def approved_sha(requested: str) -> None:
     need(bool(re.fullmatch(r"[a-f0-9]{40}", requested)), "SOURCE_SHA_INVALID")
     p = APPROVAL.lstat()
+    # The SHA is a public commit identifier, not a credential. The bridge
+    # runs as unprivileged plasma-codex, so root-owned 0600 is unreadable.
+    # Exactly 0644 preserves root-only writes while allowing worker reads.
     need(stat.S_ISREG(p.st_mode) and p.st_uid == 0 and
-         stat.S_IMODE(p.st_mode) == 0o600 and p.st_size <= 64,
+         stat.S_IMODE(p.st_mode) == 0o644 and p.st_size <= 64,
          "SWPC_APPROVED_SOURCE_NOT_INSTALLED")
     need(APPROVAL.read_text().strip() == requested,
          "SWPC_APPROVED_SOURCE_SHA_MISMATCH")
