@@ -230,6 +230,47 @@ If these priorities and existing offline-only runtime policies conflict,
 make the minimum Gate-1-scoped fix and verify it; reserve Gate 2 for the
 resulting PR. Do not use safety terminology to invent another owner gate.
 
+### 1A.2 Development Mode — three-question execution rule (normative)
+
+For each already Gate-1-approved Development Mode task, use these **three
+execution decisions** to minimize time to an actual result. They are a
+decision rule for the agent, **not** another owner approval gate, mandatory
+document package, or new runtime/checking subsystem:
+
+1. **Is this operation within the approved Gate 1 scope?** If yes, proceed
+   autonomously with the selected Path and authorized resources; do not
+   request another `continue`, per-stage approval, or hardware-specific
+   sign-off for work already covered by Gate 1. If the operation materially
+   changes scope, resources, permissions or risk, stop for a *revised Gate 1*.
+   Gate 2 applies only to merging a specific PR.
+2. **Is there a demonstrable current hazard or real execution blocker?**
+   Check only changeable facts relevant to the proposed action, such as
+   effective access, actual PL/MMIO ownership, artifact/source identity,
+   electrical/DUT state and a known recovery path when applicable. Reuse
+   still-valid board enrollment, historical HIL and recovery evidence;
+   do not introduce production-level qualification or repeated preflights
+   without a concrete dependency. Stop on real safety hazards. Never
+   silently bypass an enforced guard: report its exact denial and make
+   the smallest authorized, reviewed change needed to unblock the test.
+3. **Did execution produce authentic, measurable evidence?** Record the
+   actual executor/Runner and run ID when applicable, command/task/source
+   ref, exit status, expected versus observed result, and
+   `PASS`/`FAIL`/`NOT_RUN`; include the recovery outcome for a hardware
+   operation when applicable. Never substitute hosted CI, mocks or a plan
+   for a requested real SWPC/Z2 execution. For an in-scope failure, fix
+   and retest under the same Gate 1; for an unexecuted step, report the
+   actionable blocker as `NOT_RUN`, not `PASS`.
+
+**Decision:** *approved scope + no actual blocker -> execute and observe*.
+Favor the shortest reproducible Build -> Run -> Observe -> Fix loop.
+Do not create extra gates, once-only constraints, scripts, workflows,
+leases, isolation layers or evidence ceremonies solely as a precaution;
+introduce or retain such controls only where an existing executable
+requirement, demonstrated hazard, or explicit owner-approved scope
+justifies them. This rule does **not** waive the source-of-truth order,
+actual runtime guards, hardware/electrical safety, rollback, or truthful
+reporting requirements.
+
 ## 1B. Canonical Codex task/SSH execution contract (normative)
 
 **A Codex instruction is an execution assignment, not an invitation to
