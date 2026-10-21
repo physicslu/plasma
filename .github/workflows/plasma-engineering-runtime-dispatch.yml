@@ -182,7 +182,8 @@ jobs:
       github.actor == 'physicslu' &&
       github.event.issue.number == 981 &&
       !github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/plasma-dispatch run ')
+      (startsWith(github.event.comment.body, '/plasma-dispatch run ') ||
+       startsWith(github.event.comment.body, '/plasma-dispatch work-order 981'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -394,7 +395,8 @@ jobs:
          (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
           needs.development-authorize.outputs.task_id == 'z2-path2-testing' ||
           needs.development-authorize.outputs.task_id == 'z2-path2-restore' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-full-hil') &&
+          (needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' ||
+           needs.development-authorize.outputs.task_id == 'path2-work-order')) &&
          needs.development-claim.result == 'skipped' &&
          github.run_attempt == 1) ||
         (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
@@ -459,6 +461,7 @@ jobs:
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
           PR_INFO_BASE64: ${{ needs.development-authorize.outputs.pr_info_base64 }}
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
+          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
@@ -494,6 +497,7 @@ jobs:
             --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
             --execution-capability "$EXECUTION_CAPABILITY" \
+            --work-order-sha256 "$WORK_ORDER_SHA256" \
             > "$RUNNER_TEMP/plasma-path2-receipt.json"
           cat "$RUNNER_TEMP/plasma-path2-receipt.json"
           git -C trusted diff --exit-code
