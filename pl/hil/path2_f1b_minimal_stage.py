@@ -192,6 +192,7 @@ def run(stage: str) -> dict:
             return {"stage": stage, "result": "LOADED_AND_HELD",
                     "download_count": record["download_count"],
                     "lease_id": record["session_id"],
+                    "boot_id": record["boot_id"],
                     "auto_test": False}
         if stage == "test":
             need(record["status"] == "F1B", "F1B_IMAGE_NOT_LOADED")
@@ -220,12 +221,13 @@ def run(stage: str) -> dict:
             return {"stage": stage, "result": "IDENTITY_PASS",
                     "test_count": record["test_count"],
                     "read32_count": 3, "write32_count": 0,
-                    "lease_id": record["session_id"], "auto_restore": False}
+                    "lease_id": record["session_id"],
+                    "boot_id": record["boot_id"], "auto_restore": False}
         if record["status"] == "BASE":
             # Verified no-op is a valid repeatable Restore.
             return {"stage": stage, "result": "ALREADY_RESTORED",
                     "restore_count": record["restore_count"],
-                    "lease_id": record["session_id"]}
+                    "lease_id": record["session_id"], "boot_id": record["boot_id"]}
         record.update(status="RESTORE_IN_FLIGHT", last_error="")
         write_state(record)
         try:
@@ -241,7 +243,7 @@ def run(stage: str) -> dict:
             raise
         return {"stage": stage, "result": "RESTORED_VERIFIED",
                 "restore_count": record["restore_count"],
-                "lease_id": record["session_id"]}
+                "lease_id": record["session_id"], "boot_id": record["boot_id"]}
 
 
 def child_main() -> int:
