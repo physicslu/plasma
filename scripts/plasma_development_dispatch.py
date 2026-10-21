@@ -244,10 +244,8 @@ def parse_dynamic_work_order(event: object) -> dict:
                     and len(set(stages)) == len(stages)
                     and type(deploy) is bool and (stages or deploy),
                     "WORK_ORDER_PATH3_ACTIONS_DENIED")
-            # The existing trusted main controls the hardware policy.
-            require(order.get("pr_number", 0) == 0 and
-                    "source_sha" not in order,
-                    "WORK_ORDER_PATH3_HARDWARE_MAIN_ONLY")
+            # Branch Work Orders reuse verify_pr() to pin the exact
+            # owner-authored PR HEAD; no second development-only gate.
     elif capability == "cpu-only":
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
