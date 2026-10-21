@@ -47,6 +47,10 @@
       "toolchain": "2026.1",
       "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
     },
+    "f1b-path3-codex-vivado-build": {
+      "execution_path": "path3-codex",
+      "objective": "Diagnose the SWPC Path 3 Vivado 2026.1 license failure for F1-B. Compare the sanitized trusted Runner license baseline with the Codex sandbox observation. Do not escape the sandbox or modify the license or Host ID. Record observed evidence and any necessary candidate source fixes. The trusted Dispatcher authenticates reviewed PL inputs and then executes the fixed host Build Engine twice on the licensed Runner. Report real synthesis, implementation, timing, DRC, BIT/HWH SHA256 and repeatability from those actual build results. No Z2, FPGA load, MMIO, USB, DUT or other physical operation."
+    },
     "z2-path2-build": {
       "execution_path": "path2-cli",
       "capability": "vivado-host-build",

@@ -386,7 +386,10 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
                 return type("Child", (), {
                     "returncode": 0, "stdout": expected, "stderr": b"",
                 })()
-            with patch.object(dev.shutil, "which", return_value=sys.executable):
+            # The synthetic executor never launches the wrapper; use a file
+            # present on hosted CI as its path for this argv contract test.
+            with patch.object(dev.shutil, "which", return_value="/usr/bin/python3"), \
+                    patch.object(dev.sys, "executable", "/usr/bin/python3"):
                 receipt = dev.run_task(
                     task, workspace=workspace,
                     executor=fake_executor, sandbox=True,
@@ -903,6 +906,9 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("workspace-write",args)
             self.assertIn("sandbox_workspace_write.network_access=false",args)
             self.assertIn("Vivado 2026.1",kwargs["input"].decode())
+            self.assertIn("trusted dispatcher will execute",kwargs["input"].decode())
+            self.assertIn("twice in fresh output directories",kwargs["input"].decode())
+            self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
             self.assertNotIn("--path3-engineering-host-only",kwargs["input"].decode())
             self.assertNotIn("run every Vivado build",kwargs["input"].decode())
             self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())

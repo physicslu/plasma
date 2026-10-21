@@ -703,7 +703,8 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
 
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run,
-                   task_id: str | None = None) -> dict:
+                   task_id: str | None = None,
+                   runner_license: dict | None = None) -> dict:
     """Run the owner-authorized Development Mode engineer with real evidence.
 
     Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
@@ -715,6 +716,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     require(not evidence.exists() and not evidence.is_symlink(),
             "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
     evidence.mkdir(mode=0o700)
+    if runner_license is not None:
+        (evidence / "runner-license-diagnostic.json").write_text(
+            json.dumps(runner_license, indent=2, sort_keys=True) + "\n")
     report = evidence / "engineering-report.md"
     codex_log = evidence / "codex.log"
     output_path = task.get("output_path")
@@ -753,6 +757,22 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
+        )
+    if task_id == "f1b-path3-codex-vivado-build":
+        prompt += (
+            "For this F1-B task the trusted dispatcher will execute the SAME "
+            "fixed Python Build Engine as Path 2 on the licensed runner AFTER "
+            "you exit, twice in fresh output directories. Inspect "
+            ".plasma-path3-evidence/runner-license-diagnostic.json and record "
+            "a category-only sandbox comparison. Do not escape the sandbox. "
+            "Host execution accepts only byte-authenticated PL inputs at the "
+            "owner-reviewed pinned SHA. Diagnose/edit/test candidate source "
+            "here, but changed PL inputs require a reviewed new source pin "
+            "before host execution; report that blocker honestly. No candidate "
+            "driver or arbitrary command is executed outside the sandbox. "
+            "Host results will be appended to your report; do not claim them "
+            "in advance. On host failure inspect each run's "
+            "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
         )
     prompt += (
         "Choose engineering tools and build commands as needed for the owner goal. "
@@ -854,6 +874,67 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     receipt["evidence_complete"] = evidence_complete
     return receipt
 
+
+def run_licensed_f1b_task(task: dict, *, workspace: Path, req: dict) -> dict:
+    """Trusted-main, fixed-task integration. Never a sandbox escape endpoint.
+
+    main() calls this only after worker_admission and live_pr_metadata. No
+    request file, socket, candidate command, candidate driver or workflow.
+    """
+    require(req["task_id"] == "f1b-path3-codex-vivado-build" and
+            req["pr_number"] > 0 and req["source_sha"] != req["trusted_sha"],
+            "HOST_BUILD_SOURCE_BINDING_DENIED")
+    import plasma_vivado_host_build as build  # trusted dispatcher sibling
+    baseline = build.license_snapshot()
+    receipt = run_codex_task(task, workspace=workspace, task_id=req["task_id"],
+                             runner_license=baseline)
+    evidence = workspace / ".plasma-path3-evidence"
+    report = evidence / "engineering-report.md"
+    require(evidence.is_dir() and not evidence.is_symlink() and
+            evidence.resolve() == workspace.resolve() / ".plasma-path3-evidence" and
+            report.is_file() and not report.is_symlink(), "HOST_REPORT_DENIED")
+    result = {"status": "NOT_RUN", "builds": [], "source_sha": req["source_sha"]}
+    try:
+        require(receipt["codex_exit_code"] == 0, "HOST_BUILD_CODEX_FAILED")
+        require(baseline["vivado_startup"]["pass"], "HOST_BUILD_LICENSE_REJECTED")
+        source = build.authenticate_host_inputs(workspace, req["source_sha"])
+        with (evidence / "host-input-authentication.json").open("x") as stream:
+            stream.write(json.dumps(source, indent=2, sort_keys=True) + "\n")
+        fixed = parse_json(ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
+                           )["tasks"]["fixed-site1-vivado-host-build"]
+        fixed = dict(fixed, execution_path="path3-codex")
+        approval = {"execution_path": "path3-codex",
+                    "execution_capability": "vivado-host-build",
+                    "task_id": req["task_id"], "pr_number": req["pr_number"],
+                    "trusted_sha": req["trusted_sha"], "pinned_sha": req["source_sha"]}
+        for index in (1, 2):
+            # Each engine invocation creates a new mkdtemp build directory.
+            target = evidence / f"host-build-{index}"
+            target.mkdir(mode=0o700)
+            build.authenticate_host_inputs(workspace, req["source_sha"])
+            actual = build.run(fixed, workspace=workspace, approval=approval,
+                               evidence_dir=target, execution_path="path3-codex")
+            result["builds"].append(actual)
+        require(result["builds"][0]["build_dir"] != result["builds"][1]["build_dir"],
+                "HOST_BUILD_OUTPUT_REUSED")
+        result["status"] = "PASS"
+    except (Denied, build.BuildDenied, OSError, ValueError,
+            subprocess.SubprocessError) as exc:
+        result["reason"] = safe_error_reason(exc)
+        result["status"] = "FAIL" if result["builds"] else "NOT_RUN_OR_FAIL"
+        receipt["status"] = "HOST_BUILD_FAILED_REVIEW_REQUIRED"
+    with (evidence / "licensed-host-builds.json").open("x") as stream:
+        stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    # Host output is appended after the sandbox engineer finishes; never infer
+    # Build PASS from Codex's exit or from a successful GitHub job.
+    require(report.is_file() and not report.is_symlink(), "HOST_REPORT_DENIED")
+    with report.open("a") as stream:
+        stream.write("\nTrusted runner F1-B execution: " + result["status"] +
+                     ". See licensed-host-builds.json and host-build-{1,2}/.\n")
+    receipt["engineering_report_sha256"] = hashlib.sha256(report.read_bytes()).hexdigest()
+    receipt["licensed_host_build_status"] = result["status"]
+    return receipt
+
 def safe_error_reason(exc: Exception) -> str:
     """Keep one trusted, constant build error code; never leak host paths."""
     if isinstance(exc, Denied):
@@ -916,14 +997,20 @@ def main() -> int:
                 # and registry SHA256 before any task executes.
                 admission = worker_admission(req, args, registry, event)
                 pr = live_pr_metadata(req)
+                if args.action == "execute-codex":
+                    # Keep the step-scoped live PR token out of Codex and Vivado.
+                    os.environ.pop("GH_TOKEN", None)
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
                 receipt = (
-                    run_codex_task(task, workspace=args.workspace,
+                    (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
+                     if req["task_id"] == "f1b-path3-codex-vivado-build"
+                     else run_codex_task(task, workspace=args.workspace,
                                    task_id=req["task_id"])
+                    )
                     if args.action == "execute-codex"
                     else run_task(task, workspace=args.workspace,
                                   evidence_dir=args.evidence_dir,
