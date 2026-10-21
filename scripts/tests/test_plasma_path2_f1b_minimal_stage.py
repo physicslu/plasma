@@ -117,6 +117,33 @@ class RepeatableStageTests(unittest.TestCase):
                 stage.run(command)
         self.assertEqual(self.target.writes, [])
 
+    def test_restored_base_is_not_f1b_readiness(self):
+        stage.run("download")
+        stage.run("restore")
+        before = stage.STATE.read_bytes()
+        self.target.writes.clear()
+        with patch.object(stage, "live_report") as inspect_live:
+            with self.assertRaisesRegex(stage.LiveStageDenied,
+                                        "F1B_IMAGE_NOT_LOADED"):
+                stage.run("test")
+            inspect_live.assert_not_called()
+        self.assertEqual(self.target.reads, 0)
+        self.assertEqual(self.target.writes, [])
+        self.assertEqual(stage.STATE.read_bytes(), before)
+        self.assertEqual(self.state()["test_count"], 0)
+
+    def test_inconsistent_f1b_image_denied_before_live_inspection(self):
+        record = stage.init_state(self.target.report(self.target, "base.bin"))
+        record["status"] = "F1B"
+        stage.write_state(record)
+        with patch.object(stage, "live_report") as inspect_live:
+            with self.assertRaisesRegex(stage.LiveStageDenied,
+                                        "F1B_IMAGE_NOT_LOADED"):
+                stage.run("test")
+            inspect_live.assert_not_called()
+        self.assertEqual(self.target.reads, 0)
+        self.assertEqual(self.target.writes, [])
+
     def test_restore_after_download_without_testing_is_manual_and_valid(self):
         stage.run("download")
         out = stage.run("restore")

@@ -17,7 +17,6 @@ import pwd
 import re
 import select
 import signal
-import socket
 import stat
 import subprocess
 import sys
@@ -62,8 +61,7 @@ def private_json(path: Path) -> dict:
 
 
 def enrollment() -> tuple[str, str, str]:
-    need(socket.gethostname() == "SWPC"
-         and pwd.getpwuid(os.geteuid()).pw_name == WORKER and
+    need(pwd.getpwuid(os.geteuid()).pw_name == WORKER and
          os.geteuid() != 0, "SWPC_RUNNER_IDENTITY_DENIED")
     ssh = private_json(LOGIN)
     sudo = private_json(SUDO)

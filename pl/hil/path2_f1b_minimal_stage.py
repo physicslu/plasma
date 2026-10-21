@@ -153,6 +153,12 @@ def confirm_current(port, record: dict | None, stage: str) -> tuple[dict, dict]:
     if record is not None:
         need(record["status"] in ("BASE", "F1B"),
              "UNCERTAIN_PRIOR_OPERATION_MANUAL_RECOVERY")
+        # Restoring base.bin proves recovery only. Reject a known missing
+        # F1-B before collecting live facts or starting the MMIO child; a
+        # test-only Work Order must never implicitly Download the candidate.
+        if stage == "test":
+            need(record["status"] == "F1B" and
+                 record["image"] == CANDIDATE.name, "F1B_IMAGE_NOT_LOADED")
         expected = record["image"]
     else:
         need(stage == "download", "DOWNLOAD_REQUIRED_BEFORE_TEST_OR_RESTORE")
@@ -195,7 +201,6 @@ def run(stage: str) -> dict:
                     "boot_id": record["boot_id"],
                     "auto_test": False}
         if stage == "test":
-            need(record["status"] == "F1B", "F1B_IMAGE_NOT_LOADED")
             if CHILD.exists():
                 one_shot.protected(CHILD)
                 CHILD.unlink()

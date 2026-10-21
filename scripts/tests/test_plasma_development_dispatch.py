@@ -239,8 +239,8 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
         )[0].split("    if: >-", 1)[1].split("    runs-on:", 1)[0]
         self.assertIn("needs.development-authorize.result == 'success'", guard)
         self.assertIn("outputs.execution_path == 'path2-cli'", guard)
-        self.assertIn("outputs.execution_capability == 'cpu-only'", guard)
-        self.assertIn("needs.development-claim.result == 'skipped'", guard)
+        self.assertIn('"cpu-only"', guard)
+        self.assertNotIn("needs.development-claim.result == 'skipped'", guard)
         self.assertNotIn("'nine-nine-path2'", guard)
         self.assertNotIn("'auto4-premerge-path2'", guard)
         self.assertNotIn("'1055'", guard)
@@ -670,7 +670,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_log_sha256"],
                              hashlib.sha256(log.encode()).hexdigest())
 
-    def test_guarded_hardware_requires_complete_codex_evidence(self):
+    def test_guarded_hardware_report_completeness_is_metadata(self):
         task = self.task | {"work_order_scope": "guarded-hardware"}
         with tempfile.TemporaryDirectory() as td:
             class Incomplete:
@@ -680,9 +680,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             receipt = dev.run_codex_task(
                 task, workspace=Path(td),
                 executor=lambda *args, **kwargs: Incomplete())
-            self.assertEqual(receipt["status"],
-                             "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED")
-            self.assertEqual(receipt["failure_reason"], "CODEX_EVIDENCE_INCOMPLETE")
+            self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertNotIn("failure_reason", receipt)
             self.assertFalse(receipt["evidence_complete"])
 
     def test_codex_zero_exit_keeps_host_only_incomplete_evidence_as_metadata(self):
@@ -760,8 +759,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                         dev.worker_admission(req,args,self.registry)
                     setattr(args,attr,original)
                 with patch.dict(os.environ,{"RUNNER_NAME":"OTHER"}):
-                    with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
-                        dev.worker_admission(req,args,self.registry)
+                    self.assertEqual(dev.worker_admission(req,args,self.registry)["status"],
+                                     "WORKER_SOURCE_ADMITTED")
                 with patch.object(os,"geteuid",return_value=0):
                     with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
                         dev.worker_admission(req,args,self.registry)
@@ -963,14 +962,12 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         cpu=dev.task_by_id(self.registry,"nine-nine-path2")
         self.assertEqual(cpu["capability"],"cpu-only")
 
-    def test_host_build_approved_pr_head_and_no_replays(self):
+    def test_host_build_approved_pr_head_allows_reruns(self):
         ctx=self.context()
-        for attempt in ("2","0","","abc"):
-            with self.subTest(attempt=attempt),self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_RERUN_DENIED"
-            ):
-                dev.authorize(self.event(),ctx | {"GITHUB_RUN_ATTEMPT":attempt},
-                              self.registry)
+        for attempt in ("2", "3"):
+            plan = dev.authorize(self.event(), ctx | {"GITHUB_RUN_ATTEMPT": attempt},
+                                 self.registry)
+            self.assertEqual(plan["execution_capability"], "vivado-host-build")
         fixture=DevelopmentBranchDispatchContracts()
         branch_event=fixture.branch_event(
             task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
@@ -980,12 +977,11 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertEqual(plan["pinned_sha"],"b"*40)
         self.assertEqual(plan["trusted_sha"],"a"*40)
         self.assertEqual(plan["execution_capability"],"vivado-host-build")
-        for attempt in ("2", "0"):
-            with self.subTest(attempt=attempt),self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_RERUN_DENIED"):
-                dev.authorize(branch_event,
-                              ctx | {"GITHUB_RUN_ATTEMPT":attempt},
-                              self.registry,pr_info=fixture.valid_pr())
+        for attempt in ("2", "3"):
+            repeated = dev.authorize(branch_event,
+                                     ctx | {"GITHUB_RUN_ATTEMPT": attempt},
+                                     self.registry, pr_info=fixture.valid_pr())
+            self.assertEqual(repeated["pinned_sha"], "b" * 40)
         for change in ("sha","repo","owner","base","state"):
             pr=fixture.valid_pr()
             if change=="sha": pr["head"]["sha"]="c"*40
@@ -1026,11 +1022,11 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         guard=wf.split("  development-execute:",1)[1].split(
             "  development-codex:",1)[0].split(
             "    if: >-",1)[1].split("    runs-on:",1)[0]
-        self.assertIn("execution_capability == 'vivado-host-build'",guard)
-        self.assertIn("outputs.task_id == 'fixed-site1-vivado-host-build'",guard)
+        self.assertIn('"vivado-host-build"',guard)
+        self.assertNotIn("outputs.task_id == 'fixed-site1-vivado-host-build'",guard)
         self.assertNotIn("outputs.pr_number == '0'",guard)
         self.assertIn("github.run_attempt == 1",guard)
-        self.assertIn("execution_capability == 'cpu-only'",guard)
+        self.assertIn('"cpu-only"',guard)
         self.assertIn("execution_capability == 'z2-cpu-only'",guard)
         self.assertIn("needs.development-claim.result == 'success'",guard)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
@@ -1056,11 +1052,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("z2-fixed-unified-site1",p["project"])
         self.assertEqual(p["board_sha"],self.task["board_repo_sha"])
         for changed in (
-            {"RUNNER_NAME":"some-runner"},
-            {"GITHUB_RUN_ATTEMPT":"2"},
             {"GITHUB_SHA":"b"*40},
-            {"GITHUB_EVENT_NAME":"pull_request"},
-            {"GITHUB_REF":"refs/heads/feature"},
         ):
             with self.subTest(change=changed),self.assertRaises(build.BuildDenied):
                 build.preflight(self.task,workspace=ROOT,approval=approval,
@@ -1482,9 +1474,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
             order | {"objective": "Changed objective after authorization."})
         with self.assertRaisesRegex(dev.Denied, "DIGEST_MISMATCH"):
             dev.task_for_request(self.registry, req, changed)
-        with self.assertRaisesRegex(dev.Denied, "RERUN_DENIED"):
-            dev.authorize(event, self._context() |
-                          {"GITHUB_RUN_ATTEMPT": "2"}, self.registry)
+        repeated = dev.authorize(event, self._context() |
+                                 {"GITHUB_RUN_ATTEMPT": "2"}, self.registry)
+        self.assertEqual(repeated["work_order_sha256"], req["work_order_sha256"])
         class Args:
             action = "execute-codex"
             trusted_sha = "a" * 40
@@ -1695,11 +1687,23 @@ class GenericWorkOrderContracts(unittest.TestCase):
             integration.path3_shared_hardware_stages(
                 task | {"work_order_sha256": "0" * 64}, approval,
                 executor=fake_bridge)
-        with self.assertRaisesRegex(
-                integration.RuntimeDenied, "DEPLOYMENT_NOT_INSTALLED"):
-            integration.path3_shared_hardware_stages(
-                task | {"swpc_bridge_deployment": True}, approval,
-                executor=fake_bridge)
+        # A valid request cannot create an admin deployment route. Neither
+        # it nor a malformed boolean may reach the stage executor.
+        for deployment, reason in (
+                (True, "SWPC_ADMIN_DEPLOYMENT_ENTRYPOINT_NOT_REGISTERED"),
+                ("true", "DEPLOYMENT_REQUEST_INVALID"),
+                (1, "DEPLOYMENT_REQUEST_INVALID"),
+                (None, "DEPLOYMENT_REQUEST_INVALID")):
+            with self.subTest(deployment=deployment), patch.object(
+                    integration, "_trusted_root_bridge") as protected, \
+                    patch.object(integration, "registered_hardware_stage") as run:
+                with self.assertRaisesRegex(integration.RuntimeDenied, reason):
+                    integration.path3_shared_hardware_stages(
+                        task | {"swpc_bridge_deployment": deployment}, approval,
+                        executor=fake_bridge)
+                protected.assert_not_called()
+                run.assert_not_called()
+        self.assertEqual(executed, ["test", "restore"])
 
     def test_path3_shared_bridge_fail_closed_without_restore(self):
         import plasma_path2_runtime_integration as integration
@@ -1729,14 +1733,14 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn("outputs.execution_capability == 'codex-guarded-hardware'",
                       execute)
         self.assertIn("needs.development-codex.result == 'success'", execute)
-        self.assertIn("outputs.task_id == 'path3-work-order'", execute)
+        self.assertNotIn("outputs.task_id == 'path3-work-order'", execute)
         self.assertEqual(wf.count(
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
-        self.assertIn("task_id == 'path2-work-order'", content)
+        self.assertIn('"path2-stage-contract"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)

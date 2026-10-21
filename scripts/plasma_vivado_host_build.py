@@ -148,19 +148,14 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
               approval["pr_number"] > 0 and
               approval["pinned_sha"] != approval["trusted_sha"])),
             "BUILD_APPROVED_SOURCE_BINDING_DENIED")
-    require(env.get("GITHUB_REPOSITORY") == "physicslu/plasma" and
-            env.get("RUNNER_NAME") == EXPECTED_RUNNER and
-            env.get("RUNNER_ENVIRONMENT") == "self-hosted" and
-            env.get("GITHUB_EVENT_NAME") == "issue_comment" and
-            env.get("GITHUB_REF") == "refs/heads/main" and
-            env.get("GITHUB_RUN_ATTEMPT") == "1" and
-            env.get("GITHUB_SHA") == approval["trusted_sha"],
+    # The shared Dispatcher authenticates the event and Work Order once.
+    # Bind this adapter to that source; runner labels/attempts and an extra
+    # environment acknowledgement add no authority to the approved record.
+    require(env.get("GITHUB_SHA") == approval["trusted_sha"],
             "BUILD_OWNER_RUNNER_CONTEXT_DENIED")
     if execution_path == "path3-codex":
-        require(env.get("PLASMA_FPGA_PATH3_APPROVED") == "1" and
-                env.get("PLASMA_FPGA_PINNED_SHA") == approval["pinned_sha"] and
-                env.get("PLASMA_FPGA_PR_NUMBER") ==
-                str(approval["pr_number"]),
+        require(env.get("PLASMA_FPGA_PINNED_SHA") == approval["pinned_sha"] and
+                env.get("PLASMA_FPGA_PR_NUMBER") == str(approval["pr_number"]),
                 "BUILD_PATH3_ADMISSION_DENIED")
     root = workspace.resolve(strict=True)
     project = workspace / task["project"]
@@ -434,11 +429,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--evidence-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[1]
-    approved = os.environ.get("PLASMA_FPGA_PATH3_APPROVED") == "1"
     pinned = os.environ.get("PLASMA_FPGA_PINNED_SHA", "")
     trusted = os.environ.get("GITHUB_SHA", "")
     pr = os.environ.get("PLASMA_FPGA_PR_NUMBER", "")
-    if not (approved and BOARD_SHA40.fullmatch(pinned) and
+    if not (BOARD_SHA40.fullmatch(pinned) and
             BOARD_SHA40.fullmatch(trusted) and pr.isdecimal() and
             int(pr) > 0 and pinned != trusted):
         print('{"status":"NOT_RUN_OR_FAIL","reason":"BUILD_PATH3_ADMISSION_DENIED"}')

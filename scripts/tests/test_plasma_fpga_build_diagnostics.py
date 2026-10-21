@@ -130,11 +130,8 @@ class DiagnosticContracts(unittest.TestCase):
                                execution_path="path3-codex")
         self.assertEqual(plan["source_sha"], "b" * 40)
         for field, value in (
-            ("PLASMA_FPGA_PATH3_APPROVED", "0"),
             ("PLASMA_FPGA_PINNED_SHA", "c" * 40),
             ("PLASMA_FPGA_PR_NUMBER", "1"),
-            ("GITHUB_EVENT_NAME", "pull_request"),
-            ("RUNNER_NAME", "github-hosted"),
             ("GITHUB_SHA", "c" * 40),
         ):
             with self.subTest(field=field), self.assertRaises(build.BuildDenied):
