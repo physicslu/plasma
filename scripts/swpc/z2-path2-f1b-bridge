@@ -8,6 +8,7 @@ private files; no remote shell or host comes from GitHub Issue text.
 """
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import os
@@ -135,12 +136,21 @@ def execute(stage: str, source_sha: str) -> dict:
         os.close(slave)
         slave = -1
         deadline = time.monotonic() + TIMEOUT
+        exited_at = None
         while time.monotonic() < deadline:
+            # A reaped SSH child does not imply its PTY output was consumed.
+            # Keep draining to EOF, but do not hang on inherited slave FDs.
+            if proc.poll() is not None and exited_at is None:
+                exited_at = time.monotonic()
+            if exited_at is not None and time.monotonic() - exited_at > 3:
+                raise Blocked("REMOTE_PTY_NOT_DRAINED")
             ready = select.select([master], [], [], 0.2)[0]
             if ready:
                 try:
                     part = os.read(master, 2048)
-                except OSError:
+                except OSError as exc:
+                    if exc.errno != errno.EIO:  # Linux PTY slave closed.
+                        raise
                     break
                 if not part:
                     break
@@ -155,17 +165,22 @@ def execute(stage: str, source_sha: str) -> dict:
                 elif not sudo_sent and tail.endswith(PROMPT):
                     os.write(master, sudo_password.encode() + b"\n")
                     sudo_sent = True
-            if proc.poll() is not None:
-                break
         else:
             raise Blocked("REMOTE_TIMEOUT_MANUAL_STATE_REVIEW")
-        need(proc.wait(timeout=3) == 0 and ssh_sent and sudo_sent,
+        # sudo -S may be cached or configured to omit a password prompt.
+        # Require a successful remote exit and exact root-entry receipt
+        # instead of requiring a prompt that may legitimately be absent.
+        need(proc.wait(timeout=3) == 0 and ssh_sent,
              "REMOTE_EXIT_OR_PRIVILEGE_FAILED")
-        # Never accept a terminal/prompt/earlier stale output as a receipt.
+        # SSH and sudo prompts do not require line breaks. A legitimate
+        # root-entry marker may follow both prompts on the *same* PTY line.
+        # Never trust prompt text: require precisely one complete framed
+        # marker with a strict stage-specific JSON payload and exit code 0.
         text = response.decode("utf-8", "replace")
-        matched = re.findall(r"(?m)^" + MARK + r"([^\r\n]{1,3000})\r?$",
-                             text)
-        need(len(matched) == 1, "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
+        matched = re.findall(
+            re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
+        need(text.count(MARK) == 1 and len(matched) == 1,
+             "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
         data = json.loads(matched[0])
         need(type(data) is dict and data.get("stage") == stage
              and type(data.get("boot_id")) is str
