@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tarfile
 from pathlib import Path
 import sys
 import tempfile
@@ -302,6 +303,53 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             "schema_version": dev.VERSION,
             "mode": "development", "tasks": {"legacy-cpu": legacy},
         }, "legacy-cpu"), legacy)
+
+    def test_candidate_dispatcher_premerge_task_is_exact_cpu_only_sandbox(self):
+        task=dev.task_by_id(self.registry,"candidate-dispatcher-premerge-sandbox")
+        self.assertEqual(task["execution_path"],"path2-cli")
+        self.assertEqual(task["capability"],"cpu-only")
+        self.assertEqual(task["argv"],[])
+        self.assertEqual(
+            task["script"],
+            "scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py")
+        source=(ROOT/task["script"]).read_text()
+        self.assertIn('ROOT = Path("/work")',source)
+        self.assertIn("WORKTREE_MUST_BE_READ_ONLY",source)
+        self.assertIn("HOST_SYSFS_MOUNT_DENIED",source)
+        self.assertIn("HOST_UDEV_MOUNT_DENIED",source)
+        self.assertEqual(
+            task["expected_stdout_sha256"],
+            hashlib.sha256(
+                b"CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS\n"
+            ).hexdigest())
+
+    def test_candidate_premerge_sandbox_rejects_host_credential_and_device_leaks(self):
+        import importlib.util
+        file=ROOT/"scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py"
+        spec=importlib.util.spec_from_file_location("plasma_cpu_sandbox_guard",file)
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        clean={"HOME":"/tmp", "PATH":"/usr/bin:/bin", "PYTHONNOUSERSITE":"1"}
+        module.check_isolation(environ=clean, exists=lambda path: False)
+        for leaked in ("GITHUB_TOKEN","OPENAI_API_KEY","SSH_AUTH_SOCK","CODEX_HOME",
+                       "AWS_SECRET_ACCESS_KEY","PLASMA_Z2_AUTH"):
+            with self.subTest(env=leaked), self.assertRaisesRegex(
+                AssertionError,"HOST_CREDENTIAL_ENV_EXPOSED"
+            ):
+                module.check_isolation(
+                    environ={**clean,leaked:"sensitive"},exists=lambda path:False)
+        for exposed in ("/home","/root","/dev/mem","/dev/uio0",
+                        "/dev/ttyUSB0","/dev/bus/usb","/dev/serial"):
+            with self.subTest(path=exposed), self.assertRaisesRegex(
+                AssertionError,"HOST_PATH_EXPOSED"
+            ):
+                module.check_isolation(
+                    environ=clean,exists=lambda path,p=exposed:path==p)
+        for p,reason in (("/sys","HOST_SYSFS_MOUNT_DENIED"),
+                         ("/run/udev","HOST_UDEV_MOUNT_DENIED")):
+            with self.subTest(path=p),self.assertRaisesRegex(AssertionError,reason):
+                module.check_isolation(
+                    environ=clean,exists=lambda path,expected=p:path==expected)
 
     def test_cpu_only_sandbox_fails_closed_without_bwrap(self):
         task = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
@@ -609,12 +657,197 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 returncode=5
                 stdout=b"attempt failed"
                 stderr=b"problem detail"
-            with self.assertRaisesRegex(dev.Denied,"CODEX_CLI_NONZERO"):
-                dev.run_codex_task(self.task,workspace=work,
-                                   executor=lambda *args,**kwargs:Failure())
+            receipt=dev.run_codex_task(self.task,workspace=work,
+                                       executor=lambda *args,**kwargs:Failure())
+            self.assertEqual(receipt["status"],"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED")
+            self.assertEqual(receipt["failure_reason"],"CODEX_CLI_NONZERO")
+            self.assertEqual(receipt["codex_exit_code"],5)
+            self.assertFalse(receipt["evidence_complete"])
+            self.assertNotIn("PASS",receipt["status"])
             log=(work/".plasma-path3-evidence/codex.log").read_text()
             self.assertIn("attempt failed",log)
             self.assertIn("problem detail",log)
+            self.assertEqual(receipt["codex_log_sha256"],
+                             hashlib.sha256(log.encode()).hexdigest())
+
+    def test_codex_zero_exit_without_evidence_is_fail_not_success(self):
+        with tempfile.TemporaryDirectory() as td:
+            class Incomplete:
+                returncode=0
+                stdout=b"output without reviewed evidence"
+                stderr=b""
+            receipt=dev.run_codex_task(
+                self.task,workspace=Path(td),
+                executor=lambda *args,**kwargs:Incomplete())
+            self.assertEqual(receipt["status"],
+                             "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED")
+            self.assertEqual(receipt["failure_reason"],"CODEX_EVIDENCE_INCOMPLETE")
+            self.assertEqual(receipt["codex_exit_code"],0)
+            self.assertFalse(receipt["evidence_complete"])
+            self.assertTrue((Path(td)/".plasma-path3-evidence/codex.log").exists())
+
+    def test_codex_failure_retains_partial_report_and_never_auto_retries(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            calls=[]
+            class Failed:
+                returncode=7
+                stdout=b"compile FAIL, retry within Codex failed"
+                stderr=b""
+            def executor(command,**kwargs):
+                calls.append(command)
+                (root/".plasma-path3-evidence/engineering-report.md").write_text(
+                    "Attempt 1 FAIL, fixed; attempt 2 FAIL. Real execution NOT_RUN.\n")
+                self.assertIn("without another user approval",
+                              kwargs["input"].decode())
+                self.assertIn("unsafe hardware writes",kwargs["input"].decode())
+                return Failed()
+            receipt=dev.run_codex_task(self.task,workspace=root,
+                                       executor=executor)
+            self.assertEqual(len(calls),1)  # One Codex job, NO supervisor retries.
+            self.assertEqual(receipt["codex_exit_code"],7)
+            self.assertTrue(receipt["evidence_complete"])
+            self.assertEqual(receipt["status"],"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED")
+            self.assertIn("engineering_report_sha256",receipt)
+
+    def test_worker_admission_rechecks_three_sha_boundaries(self):
+        class Args:
+            action="execute-codex"
+            trusted_sha="a"*40
+            pinned_sha="a"*40
+            pr_number=0
+            execution_capability=None
+
+        with tempfile.TemporaryDirectory() as td:
+            args=Args()
+            args.workspace=Path(td)
+            args.registry=Path(td)/"tasks.json"
+            args.registry.write_text(json.dumps(self.registry))
+            args.registry_sha256=hashlib.sha256(args.registry.read_bytes()).hexdigest()
+            req={"trusted_sha":"a"*40,"source_sha":"a"*40,
+                 "pr_number":0,"task_id":"nine-nine-path3"}
+            env={"RUNNER_ENVIRONMENT":"self-hosted",
+                 "RUNNER_NAME":"SWPC-plasma-codex"}
+            with patch.dict(os.environ,env), patch.object(os,"geteuid",return_value=1000):
+                result=dev.worker_admission(req,args,self.registry)
+                self.assertEqual(result["status"],"WORKER_SOURCE_ADMITTED")
+                self.assertEqual(result["trusted_sha"],"a"*40)
+                self.assertEqual(result["pinned_sha"],"a"*40)
+                self.assertEqual(result["registry_sha256"],args.registry_sha256)
+                for attr,bad,reason in (
+                    ("trusted_sha","f"*40,"AUTHORIZED_SOURCE_MISMATCH"),
+                    ("pinned_sha","f"*40,"AUTHORIZED_SOURCE_MISMATCH"),
+                    ("registry_sha256","0"*64,"AUTHORIZED_REGISTRY_MISMATCH"),
+                    ("execution_capability","cpu-only","CAPABILITY_ROUTE_MISMATCH"),
+                ):
+                    original=getattr(args,attr)
+                    setattr(args,attr,bad)
+                    with self.subTest(attr=attr),self.assertRaisesRegex(dev.Denied,reason):
+                        dev.worker_admission(req,args,self.registry)
+                    setattr(args,attr,original)
+                with patch.dict(os.environ,{"RUNNER_NAME":"OTHER"}):
+                    with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
+                        dev.worker_admission(req,args,self.registry)
+                with patch.object(os,"geteuid",return_value=0):
+                    with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
+                        dev.worker_admission(req,args,self.registry)
+
+    def test_main_failure_receipt_exits_nonzero_after_worker_admission(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with tempfile.TemporaryDirectory() as td:
+            work=Path(td)/"candidate"
+            work.mkdir()
+            event_file=Path(td)/"event.json"
+            event_file.write_text(json.dumps(self.event()))
+            registry=Path(td)/"tasks.json"
+            registry.write_text(json.dumps(self.registry))
+            digest=hashlib.sha256(registry.read_bytes()).hexdigest()
+            argv=["execute-codex","--event",str(event_file),
+                  "--registry",str(registry),"--workspace",str(work),
+                  "--trusted-sha","a"*40,"--pinned-sha","a"*40,
+                  "--pr-number","0","--registry-sha256",digest]
+            env={**self.context(),
+                 "RUNNER_ENVIRONMENT":"self-hosted",
+                 "RUNNER_NAME":"SWPC-plasma-codex"}
+            failures=[
+                ({"status":"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+                  "codex_exit_code":7},2),
+                ({"status":"CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED",
+                  "codex_exit_code":0},2),
+                ({"status":"EVIDENCE_READY_REVIEW_REQUIRED",
+                  "codex_exit_code":0},0),
+            ]
+            with patch.dict(os.environ,env),patch.object(os,"geteuid",return_value=1000):
+                for receipt,expected_exit in failures:
+                    with self.subTest(receipt=receipt),patch.object(
+                            dev,"run_codex_task",return_value=receipt) as agent:
+                        with redirect_stdout(StringIO()) as output:
+                            with patch.object(sys,"argv",["dispatch.py",*argv]):
+                                rc=dev.main()
+                        self.assertEqual(rc,expected_exit)
+                        result=json.loads(output.getvalue())
+                        self.assertEqual(result["status"],receipt["status"])
+                        self.assertEqual(result["worker_admission"]["status"],
+                                         "WORKER_SOURCE_ADMITTED")
+                        agent.assert_called_once()
+                bad=list(argv)
+                bad[bad.index("--registry-sha256")+1]="0"*64
+                with patch.object(dev,"run_codex_task") as agent:
+                    with redirect_stdout(StringIO()) as output:
+                        with patch.object(sys,"argv",["dispatch.py",*bad]):
+                            rc=dev.main()
+                    self.assertEqual(rc,2)
+                    self.assertEqual(json.loads(output.getvalue())["reason"],
+                                     "AUTHORIZED_REGISTRY_MISMATCH")
+                    agent.assert_not_called()
+
+    def test_hidden_codex_and_test_logs_are_archived_without_broad_hidden_upload(self):
+        workflow=WORKFLOW.read_text()
+        codex_job=workflow.split("  development-codex:",1)[1].split(
+            "\n  authorize:",1)[0]
+        self.assertIn("Collect Path 3 evidence even when Codex",codex_job)
+        self.assertIn("tar -C candidate -czf",codex_job)
+        self.assertIn("-- .plasma-path3-evidence",codex_job)
+        self.assertIn("plasma-path3-engineering-evidence.tar.gz.sha256",codex_job)
+        self.assertIn("PATH3_EVIDENCE_SYMLINK_DENIED",codex_job)
+        self.assertNotIn("include-hidden-files: true",codex_job)
+        # Simulate the exact GNU tar packaging command on temporary files,
+        # without dispatching an Action or executing a Codex/host process.
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            candidate=root/"candidate"
+            hidden=candidate/".plasma-path3-evidence"
+            hidden.mkdir(parents=True)
+            (hidden/"codex.log").write_text("Codex exit 0\n")
+            (hidden/"triangular.test.log").write_text("12 rows PASS\n")
+            archive=root/"evidence.tar.gz"
+            proc=subprocess.run(
+                ["tar","-C",str(candidate),"-czf",str(archive),
+                 "--",".plasma-path3-evidence"],
+                capture_output=True,check=False)
+            self.assertEqual(proc.returncode,0,proc.stderr)
+            with tarfile.open(archive,"r:gz") as t:
+                names=set(t.getnames())
+                self.assertIn(".plasma-path3-evidence/codex.log",names)
+                self.assertIn(".plasma-path3-evidence/triangular.test.log",names)
+                self.assertEqual(t.extractfile(
+                    ".plasma-path3-evidence/codex.log").read(),
+                    b"Codex exit 0\n")
+
+    def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
+        wf=WORKFLOW.read_text()
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        self.assertIn("Collect Path 3 evidence even when Codex",job)
+        self.assertIn("if: always()",job)
+        self.assertIn("git -C candidate diff --binary HEAD",job)
+        self.assertIn("git -C candidate ls-files --others --exclude-standard -z",job)
+        self.assertIn("plasma-path3-source.patch.sha256",job)
+        self.assertLess(job.index("Collect Path 3 evidence even when"),
+                        job.index("actions/upload-artifact@"))
+        self.assertEqual(job.count("scripts/plasma_development_dispatch.py execute-codex"),1)
+        self.assertNotIn("continue-on-error: true",job)
+        self.assertNotIn("|| true",job)
 
     def test_development_path3_supports_vivado_and_full_source_edits(self):
         # Stub-only contract: no Vivado or physical device is invoked by CI.

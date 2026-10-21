@@ -452,6 +452,51 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     }
 
 
+def worker_admission(req: dict, args, registry: object) -> dict:
+    """One worker-side admission receipt, independent of hosted authorization.
+
+    The GitHub-hosted job authorizes the owner and pins main/candidate SHA;
+    this function independently checks the event identity, runner account,
+    registry bytes, route and task capability on the SWPC boundary.
+    The receipt is NOT a hardware privilege or a third human approval.
+    """
+    require(os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted"
+            and os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER
+            and os.geteuid() != 0, "SWPC_RUNNER_DENIED")
+    require(args.trusted_sha == req["trusted_sha"]
+            and args.pinned_sha == req["source_sha"]
+            and args.pr_number == req["pr_number"],
+            "AUTHORIZED_SOURCE_MISMATCH")
+    require(type(args.registry_sha256) is str
+            and SHA256.fullmatch(args.registry_sha256) is not None
+            and hashlib.sha256(args.registry.read_bytes()).hexdigest()
+                == args.registry_sha256,
+            "AUTHORIZED_REGISTRY_MISMATCH")
+    require(args.workspace.is_dir()
+            and args.workspace.resolve() != ROOT.resolve(), "WORKSPACE_DENIED")
+    task = task_by_id(registry, req["task_id"])
+    capability = (
+        "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
+        else task.get("capability", "cpu-only")
+             if task["execution_path"] == "path2-cli"
+        else "codex-workspace"
+    )
+    require(args.execution_capability in (None, capability),
+            "CAPABILITY_ROUTE_MISMATCH")
+    require(task["execution_path"] == (
+        "path3-codex" if args.action == "execute-codex" else "path2-cli"
+    ), "WRONG_EXECUTION_PATH")
+    return {
+        "status": "WORKER_SOURCE_ADMITTED",
+        "trusted_sha": args.trusted_sha,
+        "pinned_sha": args.pinned_sha,
+        "registry_sha256": args.registry_sha256,
+        "execution_path": task["execution_path"],
+        "execution_capability": capability,
+        "task_id": req["task_id"],
+    }
+
+
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run,
                    task_id: str | None = None) -> dict:
@@ -478,7 +523,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "PLASMA Development Mode Path 3: you are the autonomous engineer. "
         "Prioritize completing the user-approved engineering goal quickly. "
         "Run tools, diagnose failures, edit RTL/Tcl/Python/build scripts/docs, "
-        "repeat tests and host builds as needed. Do not stop at an offline "
+        "repeat tests and host builds as needed within this SAME Codex job "
+        "and existing Gate 1 scope, without another user approval. "
+        "Retry recoverable software/test failures only after diagnosing them; "
+        "do not repeat unsafe hardware writes or bypass denied permissions. "
+        "Stop on missing authorization, physical ownership conflict, SIGBUS, "
+        "unreaped child or uncertain FPGA restoration. "
+        "Do not stop at an offline "
         "mock when a real Vivado Host-only build is needed.\n"
         "Goal:\n" + task["objective"] + "\n"
         "You may edit files inside this candidate workspace and run "
@@ -524,6 +575,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     ]
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
+    # One autonomous Codex invocation owns scoped FIX -> RETEST iterations.
+    # Do not launch extra SWPC jobs or grant new hardware permissions to retry.
     proc = executor(
         command, input=prompt.encode("utf-8"), cwd=root,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -531,7 +584,6 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     )
     codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
                           b"\n=== Codex stderr ===\n" + proc.stderr)
-    require(proc.returncode == 0, "CODEX_CLI_NONZERO")
     def digest(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
     receipt = {
@@ -562,10 +614,19 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "test_log_path": str(test_log.relative_to(root)),
             "test_log_sha256": digest(test_log),
         })
-    require("engineering_report_sha256" in receipt or
-            all(k in receipt for k in (
-                "source_sha256", "output_sha256", "test_log_sha256")),
-            "CODEX_EVIDENCE_INCOMPLETE")
+    evidence_complete = ("engineering_report_sha256" in receipt or
+                         all(k in receipt for k in (
+                             "source_sha256", "output_sha256", "test_log_sha256")))
+    # Preserve the real Codex exit code and evidence even when execution
+    # fails. A JSON receipt is NOT acceptance; main() returns nonzero for
+    # failure and Actions collects source changes in an always() step.
+    if proc.returncode != 0:
+        receipt["status"] = "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"
+        receipt["failure_reason"] = "CODEX_CLI_NONZERO"
+    elif not evidence_complete:
+        receipt["status"] = "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED"
+        receipt["failure_reason"] = "CODEX_EVIDENCE_INCOMPLETE"
+    receipt["evidence_complete"] = evidence_complete
     return receipt
 
 def safe_error_reason(exc: Exception) -> str:
@@ -607,35 +668,11 @@ def main() -> int:
             registry = parse_json(args.registry)
             pr = parse_json(args.pr_info) if args.pr_info else None
             if args.action in ("execute", "execute-codex"):
-                require(os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted"
-                        and os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER
-                        and os.geteuid() != 0, "SWPC_RUNNER_DENIED")
-                require(args.trusted_sha == req["trusted_sha"] and
-                        args.pinned_sha == req["source_sha"] and
-                        args.pr_number == req["pr_number"],
-                        "AUTHORIZED_SOURCE_MISMATCH")
-                require(type(args.registry_sha256) is str and
-                        SHA256.fullmatch(args.registry_sha256) is not None
-                        and hashlib.sha256(
-                            args.registry.read_bytes()
-                        ).hexdigest() == args.registry_sha256,
-                        "AUTHORIZED_REGISTRY_MISMATCH")
-                require(args.workspace.is_dir() and
-                        args.workspace.resolve() != ROOT.resolve(),
-                        "WORKSPACE_DENIED")
+                # Single worker admission path for Path 2/3; retains the
+                # independent SWPC checks of trusted main SHA, candidate SHA
+                # and registry SHA256 before any task executes.
+                admission = worker_admission(req, args, registry)
                 task = task_by_id(registry, req["task_id"])
-                expected_capability = (
-                    "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
-                    else task.get("capability", "cpu-only")
-                         if task["execution_path"] == "path2-cli"
-                    else "codex-workspace"
-                )
-                require(args.execution_capability in (None, expected_capability),
-                        "CAPABILITY_ROUTE_MISMATCH")
-                require(task["execution_path"] == (
-                    "path3-codex" if args.action == "execute-codex"
-                    else "path2-cli"
-                ), "WRONG_EXECUTION_PATH")
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
@@ -655,14 +692,19 @@ def main() -> int:
                     "pinned_sha": req["source_sha"],
                     "registry_sha256": args.registry_sha256,
                     "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+                    "worker_admission": admission,
                 }
+                task_failed = (
+                    args.action == "execute-codex"
+                    and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED"
+                )
             else:
                 plan = authorize(event, os.environ, registry, pr)
                 plan["registry_sha256"] = hashlib.sha256(
                     args.registry.read_bytes()
                 ).hexdigest()
         print(json.dumps(plan, sort_keys=True))
-        return 0
+        return 2 if args.action == "execute-codex" and task_failed else 0
     except (Denied, OSError, UnicodeError, json.JSONDecodeError,
             subprocess.SubprocessError, ValueError) as exc:
         print(json.dumps({

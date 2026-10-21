@@ -99,6 +99,79 @@ flowchart TD
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
 5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
 
+### Path 3 Admission 與失敗證據最小化（Gate 1 Draft）
+
+**安全檢查數量不等於人工 Gate 數量。** 使用者 Gate 1 一次授權
+Codex 在既定工作樹／Objective 內自主進行 Code → Test → Fix → Retest，
+不需要因可恢復的軟體編譯失敗再向使用者取得批准；超出工作範圍、
+權限不足、實體 FPGA／AXI 安全不明及失敗恢復 UNKNOWN，仍必須立即停止。
+
+- **GitHub-hosted Admission**：確認 Owner、Issue #981、PR 與可信 main SHA、
+  Candidate 精確 Commit SHA、Task Registry SHA256 及合法 Path。
+- **SWPC Worker Admission**：重用同一個 Python `worker_admission()` 函式
+  進行第二信任邊界的獨立 SHA/Registry/Runner/Path 檢查，統一回報
+  `WORKER_SOURCE_ADMITTED`；不得省略第二次校驗或將它當成另一道人工 Gate。
+- **Codex 自主工程迴圈**：單一 Codex CLI 程序在同一 Job 內自行診斷、
+  修改及重跑允許的測試；Dispatcher 不新增 Agent Retry Supervisor，
+  不另起 SWPC Job，不因 Exit Code 自動重派硬體指令。
+- **失敗證據與退出碼**：`run_codex_task()` 即使 Codex 非零退出，也產生
+  `CODEX_EXECUTION_FAILED_REVIEW_REQUIRED` Receipt，保留實際 Exit Code
+  與 Codex Session Log；若 Exit Code 0 但沒有可用的工程報告或完整舊版
+  Source/Output/Test Log，則為 `CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED`。
+  兩者 Workflow 仍 **FAIL（非零退出）**，不能視為工程 PASS。
+- **失敗後收集**：共用 Workflow 以 `if: always()` 執行獨立的證據收集步驟，
+  保存含已暫存／未暫存變更的 `git diff HEAD --binary`、未追蹤檔清單／
+  壓縮檔、工程報告、Codex 日誌、Artifact Hash；不因 `set -e`
+  造成初始工作失敗時跳過所有證據。Runner 異常中斷、磁碟／網路故障、
+  Job 硬超時仍可能讓資料採集不完整，不能宣稱絕對保證。
+
+本 Draft PR 僅執行 GitHub-hosted 離線負向與回歸測試，**不發出 Issue #981 指令**，
+不啟動 SWPC self-hosted、Codex CLI、Vivado 或 Z2；沒有實機權限、
+部署或 PR Merge 授權。離線 CI PASS 不等於真正 SWPC Path 3 E2E PASS。
+
+### Candidate Dispatcher 合併前測試入口（PR #1083）
+
+若 PR 修改的是 `scripts/plasma_development_dispatch.py` **本身**，Issue #981
+正式 `issue_comment` 入口仍必須執行可信 `main` Dispatcher，不得透過
+`--pr/--sha` 偷換授權程式。既有 `pull_request` 已提供 Branch 測試入口；
+在**同一份共用 Workflow** 內增加 `candidate-dispatcher-premerge` GitHub-hosted
+Job，分別 Checkout 精確 Base SHA 與 Candidate HEAD SHA，驗證 Git Tree
+後執行候選 Dispatcher 的**真實命令列程式**與完全模擬的 Owner Event／PR
+Metadata／Codex Stub：
+
+- 正例：`authorize` 與 `execute-codex` CLI 依序通過，檢查三種 SHA
+  傳遞、12 筆三角數、Exit Code 與 Receipt。
+- 負例：模擬 Codex 非零退出須令 Dispatcher 非零退出且保留失敗證據；
+  Registry SHA、Candidate SHA 或 Owner 不符須拒絕，且在啟動 Stub 前停止。
+- 無 SWPC/self-hosted Runner，無真 Codex、Vivado、硬體／USB／MMIO。
+  Stub 暫時設定的 Runner 環境變數**僅是 GH-hosted 內的測試資料**，
+  結果必須標示 `HOSTED_SIMULATION_ONLY`，不可宣稱 SWPC E2E PASS。
+- 測試 Job 使用 GitHub-hosted ephemeral Runner、唯讀 repo token、不
+  持久化 Git credentials；不新增第二份 Workflow／Runner／Dispatcher，
+  不呼叫 Issue #981，亦不影響其他 Path 的正式派工模式。
+
+這條入口能在 Merge 前驗證 **Candidate Dispatcher CLI 控制流程**，
+但無法驗證 SWPC 上的真實 OS 身分、實際權限隔離與 Codex 行為。
+若要在合併前於 **SWPC 真正執行 Candidate Dispatcher**，仍須有可信
+主控建立的 OS 級純軟體 Sandbox（不接觸實體設備）並能由獨立證據
+證明隔離，不能直接以 GitHub-hosted 假身分或 Prompt 取代。
+未建立這一條安全邊界前，SWPC Candidate E2E = `NOT_RUN`。
+
+**合併前 SWPC 純軟體沙箱測試（候選實作）：**
+不用授權候選 Dispatcher 作為控制平面。用已存在的可信 main Path 2
+`cpu-only` 派工，限定新登錄的
+`candidate-dispatcher-premerge-sandbox` 任務，從精確 PR SHA Checkout
+候選工作樹，交由可信 `run_task(...,sandbox=True)` 啟動已存在的
+`bubblewrap` 隔離：唯讀 `/work`、合成 `/dev`、隔離全部 namespaces
+（含 network）、`--clearenv`、`-I -S` Python、40 秒時限。
+沙箱內只執行 Candidate Dispatcher 的模擬 Owner/Runner CLI 與
+Stub Codex，輸出固定 `CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS`
+並由可信 Dispatcher 驗證 SHA256。若 bwrap 缺少、不支援 userns
+或隔離條件不成立則 Fail Closed，不得降級為裸執行。這條路徑
+實際執行 Candidate Dispatcher 程式碼，但**不啟動真 Codex、不核可
+SWPC 硬體權限，也不代表完整 Path 3 Agent E2E**。
+
+
 ## 五、Gate 1 — 推薦與選擇矩陣
 
 | 問題 | Path 1 | Path 2 | Path 3 |
