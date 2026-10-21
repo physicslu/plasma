@@ -288,8 +288,8 @@ class LifecycleTests(unittest.TestCase):
     def test_no_live_target_adapter_or_cli_registered(self):
         code = (ROOT / "scripts/plasma_path2_runtime_integration.py").read_text()
         dispatch = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
-        self.assertIn("PATH2_LIVE_PROVIDER_NOT_REGISTERED", code)
-        self.assertIn("return integration.disabled_hardware_stage", dispatch)
+        self.assertIn("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED", code)
+        self.assertIn("return integration.registered_hardware_stage", dispatch)
         prov = (ROOT / "scripts/plasma_path2_held_provider.py").read_text()
         self.assertNotIn("if __name__ == \"__main__\"", prov)
         self.assertNotIn("subprocess", prov)
