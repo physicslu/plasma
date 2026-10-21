@@ -662,6 +662,48 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["status"],"CODEX_EXECUTION_FAILED_REVIEW_REQUIRED")
             self.assertIn("engineering_report_sha256",receipt)
 
+    def test_worker_admission_rechecks_three_sha_boundaries(self):
+        class Args:
+            action="execute-codex"
+            trusted_sha="a"*40
+            pinned_sha="a"*40
+            pr_number=0
+            execution_capability=None
+
+        with tempfile.TemporaryDirectory() as td:
+            args=Args()
+            args.workspace=Path(td)
+            args.registry=Path(td)/"tasks.json"
+            args.registry.write_text(json.dumps(self.registry))
+            args.registry_sha256=hashlib.sha256(args.registry.read_bytes()).hexdigest()
+            req={"trusted_sha":"a"*40,"source_sha":"a"*40,
+                 "pr_number":0,"task_id":"nine-nine-path3"}
+            env={"RUNNER_ENVIRONMENT":"self-hosted",
+                 "RUNNER_NAME":"SWPC-plasma-codex"}
+            with patch.dict(os.environ,env), patch.object(os,"geteuid",return_value=1000):
+                result=dev.worker_admission(req,args,self.registry)
+                self.assertEqual(result["status"],"WORKER_SOURCE_ADMITTED")
+                self.assertEqual(result["trusted_sha"],"a"*40)
+                self.assertEqual(result["pinned_sha"],"a"*40)
+                self.assertEqual(result["registry_sha256"],args.registry_sha256)
+                for attr,bad,reason in (
+                    ("trusted_sha","f"*40,"AUTHORIZED_SOURCE_MISMATCH"),
+                    ("pinned_sha","f"*40,"AUTHORIZED_SOURCE_MISMATCH"),
+                    ("registry_sha256","0"*64,"AUTHORIZED_REGISTRY_MISMATCH"),
+                    ("execution_capability","cpu-only","CAPABILITY_ROUTE_MISMATCH"),
+                ):
+                    original=getattr(args,attr)
+                    setattr(args,attr,bad)
+                    with self.subTest(attr=attr),self.assertRaisesRegex(dev.Denied,reason):
+                        dev.worker_admission(req,args,self.registry)
+                    setattr(args,attr,original)
+                with patch.dict(os.environ,{"RUNNER_NAME":"OTHER"}):
+                    with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
+                        dev.worker_admission(req,args,self.registry)
+                with patch.object(os,"geteuid",return_value=0):
+                    with self.assertRaisesRegex(dev.Denied,"SWPC_RUNNER_DENIED"):
+                        dev.worker_admission(req,args,self.registry)
+
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
         job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
