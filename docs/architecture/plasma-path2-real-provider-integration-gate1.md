@@ -57,24 +57,20 @@ execution is NOT qualified or registered.** Existing main base:
   **pull_request GitHub-hosted offline-contract job only**. It does not
   introduce any new self-hosted runner or workflow.
 
-## Minimal local Site1 F1-B experiment — distinct manual triggers
+## Minimal repeatable Site1 F1-B Development Mode — current implementation
 
-**Owner scope reduction, 2026-10-21:** prove one **physical Path 2**
-Download → independently triggered Testing → separately triggered Restore.
-Reuse the previously verified F1-B candidate and original `base.bin`;
-no Vivado rebuild, DMA/AXI redesign, extra qualification workflows,
-Production attestation, DUT/LA/power operations, deployment or PR merge.
+**Decision, 2026-10-21:** normal Download, Testing, and Restore must be
+**repeatable under the same Site1 session**. The hardware lock serializes
+operations; the state file records current observed image, Boot ID, last
+operation, counts and error evidence. Neither a fixed Lease ID, an
+everlasting once-only claim, nor attempt-count limits may prohibit a
+normal operator-initiated repeat. The general Host-only `LeaseLedger`
+contract is left unchanged for other providers; the **minimal target
+runner** uses a simpler persistent checkpoint instead of reproducing
+that excessive one-shot state machine.
 
-`pl/hil/path2_f1b_minimal_stage.py` is a **new Z2-local candidate
-root-owned command** with exactly three explicit CLI stages. It reuses the
-original `one_shot.manager_write`, F1-B native three-word LinuxMMIO reader
-under the existing bounded child supervisor, and the existing fsync/flock
-`LeaseLedger`. It is **not** shipped or registered by this PR and has **not**
-been run on actual Z2. It intentionally avoids introducing a network daemon
-or a new Github Actions self-hosted privilege route.
-
-Local-only stage entrypoints, usable **only after separately reviewed
-installation of the exact source by the trusted Z2 root operator**:
+The root-local candidate `pl/hil/path2_f1b_minimal_stage.py` exposes
+exactly three **independently triggered** commands:
 
 ```text
 export PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UIO
@@ -83,46 +79,53 @@ export PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UI
 /opt/plasma/python/3.12.13/bin/python3 -m pl.hil.path2_f1b_minimal_stage restore
 ```
 
-Before any Download, the runner checks the **same exact ARMv7, little-endian,
-CPython 3.12.13 interpreter path** as the prior successful F1-B one-shot. This
-avoids loading a candidate FPGA image before discovering an incompatible
-MMIO runtime. A child independently rechecks this ABI before mapping /dev/mem.
+This is an interface specification **only after** a separately reviewed
+root-owned installation of the exact code and trusted SWPC→Z2 invocation.
+The literal waiver name is retained for traceability to the owner's
+initial one-physical-experiment authorization; it is **not a blanket
+approval** to run unattended future hardware experiments. The PR does not
+install or register this runner and does not itself execute Z2 HIL.
 
-The displayed environment assignment is an explicit risk acknowledgement,
-**not** an access token; on each separate invocation the root operator
-must provide the same approved `PLASMA_DEV_RISK_ACK` variable. Do not
-run a mutable PR checkout as root. This is an interface specification,
-**not** an instruction to execute it on Z2 before target deployment
-and root-route verification.
+The target-specific checkpoint `.plasma-f1b-site1-development-state.json`
+is fsynced and atomically replaced in a root-protected persistent directory
+before a firmware write or native MMIO child. It survives reboot but will
+**reject a changed Boot ID until reviewed**, rather than assuming the PL
+still contains the earlier image.
 
-- Download: root-controlled candidate/recovery hash and bound UIO facts,
-  one protected common FPGA lock, fixed trusted `base.bin` load trace,
-  persistent `RESTORE_REQUIRED` and `LOAD_IN_FLIGHT` records **before**
-  any hardware write; leave F1-B loaded, `LOADED_AND_HELD`.
-- Test: independent invocation under same lock, exact boot/loaded manager
-  trace and unexpired 900-second Lease, only first native child, exactly
-  three 32-bit read-only Identity words, no register writes; no implicit
-  Restore on success.
-- Restore: independent invocation, require successful native test/child
-  reap and unchanged services/UIO baseline, persistent
-  `RESTORE_IN_FLIGHT` before one `base.bin` write, then check original
-  manager state/trace and mark `RESTORED_VERIFIED`.
-- Any load, child, native read or restore uncertainty is persistently
-  marked `UNKNOWN_MANUAL_RECOVERY`; never auto-repeat a candidate load,
-  test child or restore. The ledger is durable across separate processes
-  but stored under `/run` and **does not survive a reboot**; current-boot
-  provenance must still be reverified.
-- Live Manager dmesg provenance is a bounded **development observation**,
-  not proof of the current FPGA bit cells or AXI isolation. The owner
-  expressly accepted only the exact bound-passive Site1 UIO risk.
+- **Download:** verify actual `base.bin` or F1-B currently loaded by
+  the bounded Manager trace, exact candidate/recovery SHA256, accepted
+  Site1 `uio1` exception and common FPGA lock. Persist
+  `DOWNLOAD_IN_FLIGHT`, then call the existing Manager writer.
+  On verified success record `F1B`; repeat requests are valid while
+  the device remains safely observable. Never trigger Test automatically.
+- **Testing:** require current F1-B and Boot ID, persist
+  `TEST_IN_FLIGHT`; supervise a bounded native ARMv7 read-only child,
+  read exactly three F1-B Identity words, zero writes; on success record
+  `F1B` and increment the test counter. Repeat is supported.
+- **Restore:** when F1-B is current, persist `RESTORE_IN_FLIGHT`,
+  load pinned `base.bin`, verify Manager state and trace, record
+  `BASE`. When `base.bin` is already verified, respond
+  `ALREADY_RESTORED` without another bitstream write. A new Download
+  remains possible afterward.
+- **Genuine exceptions:** failure/SIGBUS/timeout/unreaped child or
+  unresolved Manager image keeps `UNKNOWN` or in-flight state; do not
+  blindly reconfigure. Review/recover the actual board state before
+  admitting another write. AXI isolation remains
+  `UNPROVEN` under the explicitly approved Development-only risk.
 
-GitHub-hosted negative tests simulate the three stage calls, changed boot,
-expired Lease, duplicate triggers, child failure, load failure and restore
-failure. This **Host-only PASS is not hardware HIL**. An authenticated
-root-owned SWPC → Z2 reviewed route for this stage command is still missing
-and the existing Dispatcher explicitly returns
-`PATH2_LIVE_PROVIDER_NOT_REGISTERED` (correct fail-closed behavior).
-No HIL stage has been dispatched from PR code.
+The exact native ABI (little-endian Zynq ARMv7, CPython 3.12.13)
+is checked **before** any Load and again before native MMIO. Normal
+repeat operations have no 900-second arbitrary Lease expiry. Neither
+new firmware Build nor DUT/LA/power operation is included.
+
+The GitHub-hosted offline tests use an injected fake FPGA Manager and
+cover multiple Download/Test/Restore actions in one session, exact
+three-word readback, no auto-chaining, changed boot or image, failures,
+and safe idempotent restore. **Host-only tests are not real HIL**.
+The separately authenticated root-side execution route is still the
+single remaining physical integration blocker; the existing trusted
+Dispatcher correctly rejects hardware calls as
+`PATH2_LIVE_PROVIDER_NOT_REGISTERED`.
 
 ## Evidence reuse / target admission (as of 2026-10-21)
 
