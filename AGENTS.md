@@ -200,6 +200,19 @@ the actual command and physical effect, not the technology label `SW` or
   once-only operational controls; where existing live controls enforce
   stricter behavior, change them through a scoped reviewed PR rather than
   bypassing them.
+- **One full Gate Readiness Review per PR HEAD; delta-only revalidation.**
+  Perform one comprehensive readiness/evidence review for a PR at its
+  reviewed HEAD SHA, recording that SHA, the verdict, applicable CI run IDs,
+  and evidence references. Reuse valid results; an unchanged HEAD, another
+  `continue`, or CI polling must **not** trigger the same full review again.
+  If the PR HEAD or a relevant CI/review/evidence dependency changes, check
+  **only the affected delta and its dependencies**, and update the verdict;
+  repeat the full review only if the prior baseline is genuinely invalid.
+  Immediately before an authorized Gate 2 merge, perform a **minimal live
+  status check** of the exact HEAD, latest `main`, required CI, mergeability,
+  active rulesets, and unresolved review threads. Stop on a material change
+  or unmet requirement; investigate only what changed. Never reuse a cached
+  verdict to bypass an enforced guard, required real acceptance, or Gate 2.
 - **Keep one obvious result.** A development smoke-test report should
   normally include: actual executor and Runner, GitHub run/job ID if used,
   command or task/ref, exit status, expected versus observed output, and
