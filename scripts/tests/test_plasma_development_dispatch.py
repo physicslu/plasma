@@ -1534,11 +1534,13 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             calls = []
+            captured_commands = []
             class Fake:
                 returncode = 0
                 stdout = b"offline agent output"
                 stderr = b""
             def run(command, **kw):
+                captured_commands.append(command)
                 calls.append(kw["input"].decode())
                 (root / ".plasma-path3-evidence" /
                  "engineering-report.md").write_text("Host-only test evidence.\n")
@@ -1549,6 +1551,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
             self.assertIn("HOST-ONLY", calls[0])
+            self.assertIn("network_access=false", captured_commands[0])
             self.assertIn("Acceptance criteria", calls[0])
             self.assertIn("Owner Work Order SHA256", calls[0])
 
