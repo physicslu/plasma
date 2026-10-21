@@ -27,6 +27,13 @@
       "expected_stdout_sha256": "9727532e69a8f60b50dca893192de734bb15d1b92b2ebd4ec639a04ffb0ead0d",
       "verification": "sha256-only"
     },
+    "candidate-dispatcher-premerge-sandbox": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py",
+      "argv": [],
+      "expected_stdout_sha256": "36b4f02f4579ad3460f33292c6b87285d418259d14a6c7267b16d0daa92d45e6",
+      "capability": "cpu-only"
+    },
     "auto4-premerge-path3": {
       "execution_path": "path3-codex",
       "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
