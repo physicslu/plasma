@@ -139,16 +139,25 @@ def run() -> None:
             complete = (len(rows) == 13 and rows[0] == "n,triangular" and
                         all(rows[i] == f"{i},{i*(i+1)//2}" for i in range(1,13)))
         facts["acceptance"] = "PASS" if complete else "FAIL"
-        # Trusted-main artifact uploader includes only these well-defined
-        # generated-path globs; hidden working-directory evidence is omitted.
-        if complete:
-            prefix = REPO / "scripts/experiments/plasma_candidate_dispatcher_live_generated"
+        # The trusted-main uploader omits hidden directories. Retain actual
+        # failure and success evidence under its existing generated-file globs
+        # BEFORE TemporaryDirectory cleanup, even on nonzero nested exit.
+        prefix = REPO / "scripts/experiments/plasma_candidate_dispatcher_live_generated"
+        inner_log = workspace / ".plasma-path3-evidence/codex.log"
+        if inner_log.is_file() and not inner_log.is_symlink():
+            require(inner_log.stat().st_size <= 1048576, "CODEX_LOG_TOO_LARGE")
+            shutil.copyfile(inner_log, Path(str(prefix) + ".codex.log"))
+        # Record the unmodified dispatcher receipt and exact stderr.
+        # Never print these raw diagnostics to the GitHub Actions console.
+        trace = (
+            b"=== inner dispatcher receipt stdout ===\\n" + result.stdout +
+            b"\\n=== inner dispatcher stderr ===\\n" + result.stderr + b"\\n"
+        )
+        Path(str(prefix) + ".test.log").write_bytes(trace)
+        if code.is_file() and not code.is_symlink():
             shutil.copyfile(code, prefix.with_suffix(".py"))
+        if csv.is_file() and not csv.is_symlink():
             shutil.copyfile(csv, prefix.with_suffix(".csv"))
-            shutil.copyfile(test_log, Path(str(prefix) + ".test.log"))
-            inner_log = workspace / ".plasma-path3-evidence/codex.log"
-            if inner_log.is_file() and not inner_log.is_symlink():
-                shutil.copyfile(inner_log, Path(str(prefix) + ".codex.log"))
         RESULT_FILE.write_text(json.dumps(facts, sort_keys=True, indent=2) + "\n",
                                encoding="utf-8")
         require(complete, "CANDIDATE_LIVE_CODEX_E2E_FAILED")
