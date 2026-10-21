@@ -27,6 +27,20 @@ execution is NOT qualified or registered.** Existing main base:
   fsync/flock-backed ledger file. Negative cases include AXI/owner denial,
   image/Bootgen mismatch, competing persistent lease, expired lease, wrong
   boot, load failure, native-child SIGBUS and restore failure.
+- `pl/hil/path2_z2_target_guard.py`: root-only **passive** Z2 observer,
+  shared one-shot F1-B FPGA supervisor lock, protected fixed
+  `/lib/firmware/base.bin` and F1-B BIN digest check, exact Site1
+  AXI-window UIO/Platform-driver and process FD/VMA enumeration. Findings
+  are emitted as actionable blockers. It never writes Manager firmware,
+  authorizes a native MMIO child, installs a background daemon or registers a
+  privileged route. A process lock + durable lease coordinates cooperative
+  processes, not kernel DMA or unrelated privileged writers. Independent
+  AXI isolation and active image attestation remain unproven even if all
+  passive scans succeed; never substitute a one-shot owner risk waiver.
+- `scripts/tests/test_plasma_path2_z2_target_guard.py`: filesystem
+  simulation/negative tests for overlapping UIO, kernel resource overlap,
+  retained `/dev/mem` FD/VMA, incomplete observation and denial of all
+  unregistered write/test/restore methods.
 - The existing common GitHub Actions Workflow runs those tests in its
   **pull_request GitHub-hosted offline-contract job only**. It does not
   introduce any new self-hosted runner or workflow.
