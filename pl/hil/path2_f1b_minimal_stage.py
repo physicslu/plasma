@@ -248,7 +248,27 @@ def child_main() -> int:
          (guard.PROC / "sys/kernel/random/boot_id").read_text().strip() and
          ": writing " + CANDIDATE.name + " to " in
          one_shot.manager_last_load(), "IDENTITY_IMAGE_NOT_CURRENT")
-    f1b.identity_child(CHILD)   # strict 3 native aligned readonly accesses
+    # Match the earlier real Z2 one-shot backend: import the reviewed MMIO
+    # module by fixed path, without depending on a PYNQ/package installation.
+    import importlib.util
+    from pl.hil.swd04 import native_qualify
+    native_qualify.check_runtime()
+    reviewed = ROOT / "software/python/plasma_interfaces/linux_mmio.py"
+    one_shot.protected(reviewed)
+    spec = importlib.util.spec_from_file_location("f1b_path2_native_mmio",
+                                                  reviewed)
+    need(spec is not None and spec.loader is not None,
+         "NATIVE_MMIO_DRIVER_NOT_INSTALLED")
+    driver = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = driver
+    spec.loader.exec_module(driver)
+    aperture = driver.MMIOAperture(f1b.BASE, frozenset(f1b.IDENTITY),
+                                   frozenset(), f1b.LENGTH)
+    with driver.LinuxMMIO((aperture,), readonly=True) as mmio:
+        observed = f1b.read_identity(mmio.read32)
+        need(mmio.stats().read32 == 3 and mmio.stats().write32 == 0,
+             "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
+    one_shot.record_json(CHILD, {"observed": observed})
     return 0
 
 
