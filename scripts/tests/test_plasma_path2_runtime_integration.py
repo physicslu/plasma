@@ -62,7 +62,8 @@ class RouteContracts(unittest.TestCase):
         for name, cap in (("z2-path2-build", "vivado-host-build"),
                           ("z2-path2-download", "path2-stage-contract"),
                           ("z2-path2-testing", "path2-stage-contract"),
-                           ("z2-path2-restore", "path2-stage-contract")):
+                           ("z2-path2-restore", "path2-stage-contract"),
+                          ("z2-path2-full-hil", "path2-stage-contract")):
             self.assertEqual(dispatch.task_by_id(self.registry, name)["capability"], cap)
             result = dispatch.authorize(event(name), context(), self.registry)
             self.assertEqual(result["task_id"], name)
@@ -77,7 +78,8 @@ class RouteContracts(unittest.TestCase):
                  ("z2-path2-download", "", False, False),
                  ("z2-path2-download", " --auto-testing", False, True),
                  ("z2-path2-testing", "", False, False),
-                  ("z2-path2-restore", "", False, False))
+                  ("z2-path2-restore", "", False, False),
+                 ("z2-path2-full-hil", "", False, False))
         for name, flags, ad, at in cases:
             with self.subTest(name=name, flags=flags):
                 p = dispatch.authorize(event(name, flags), context(), self.registry)
@@ -92,6 +94,8 @@ class RouteContracts(unittest.TestCase):
             ("z2-path2-testing", " --auto-testing"),
             ("z2-path2-restore", " --auto-download"),
             ("z2-path2-restore", " --auto-testing"),
+            ("z2-path2-full-hil", " --auto-download"),
+            ("z2-path2-full-hil", " --auto-testing"),
             ("z2-path2-build", " --auto-testing --auto-download"),
             ("z2-path2-build", " --auto-download --auto-download"),
             ("z2-path2-build", " --help"),
@@ -196,6 +200,89 @@ class RouteContracts(unittest.TestCase):
                     runtime.registered_hardware_stage(
                         task, approval("z2-path2-download"),
                         executor=lambda *_args, **_kw: result)
+
+    def test_full_hil_explicit_one_trigger_runs_three_real_stage_receipts(self):
+        task = self.registry["tasks"]["z2-path2-full-hil"]
+        called = []
+        def fake_exec(command, **kwargs):
+            called.append(command[1])
+            stage = command[1]
+            result = {
+                "download": "LOADED_AND_HELD",
+                "test": "IDENTITY_PASS",
+                "restore": "RESTORED_VERIFIED",
+            }[stage]
+            return Mock(returncode=0, stderr=b"",
+                        stdout=json.dumps({
+                            "stage": stage, "source_sha": SHA,
+                            "boot_id": "test-same-z2-boot",
+                            "real_z2": True, "result": result,
+                        }).encode())
+        with patch.object(runtime, "_trusted_root_bridge"):
+            output = runtime.full_hil_sequence(
+                task, approval("z2-path2-full-hil"), executor=fake_exec)
+        self.assertEqual(called, ["download", "test", "restore"])
+        self.assertEqual([r["result"] for r in output["completed"]],
+                         ["LOADED_AND_HELD", "IDENTITY_PASS",
+                          "RESTORED_VERIFIED"])
+        self.assertTrue(output["real_z2"])
+        self.assertEqual(output["mode"], "full-hil")
+        self.assertTrue(output["auto_next_stage"])
+        self.assertEqual(output["build_stage"],
+                         "REUSED_PREVIOUS_PINNED_IMAGE_NOT_REBUILT")
+
+    def test_full_hil_failure_does_not_blindly_restore_or_continue(self):
+        task = self.registry["tasks"]["z2-path2-full-hil"]
+        calls = []
+        def fake_exec(command, **_):
+            calls.append(command[1])
+            if command[1] == "test":
+                return Mock(returncode=1, stdout=b"", stderr=b"test fail")
+            return Mock(returncode=0, stderr=b"",
+                        stdout=json.dumps({
+                            "stage": command[1], "source_sha": SHA,
+                            "boot_id": "test-same-z2-boot",
+                            "real_z2": True, "result": "LOADED_AND_HELD",
+                        }).encode())
+        with patch.object(runtime, "_trusted_root_bridge"), \
+             self.assertRaisesRegex(runtime.RuntimeDenied,
+                                    "PATH2_BRIDGE_STAGE_FAILED_OR_UNKNOWN"):
+            runtime.full_hil_sequence(
+                task, approval("z2-path2-full-hil"), executor=fake_exec)
+        self.assertEqual(calls, ["download", "test"])
+        # Do not attempt an unsafe automatic Restore after failed MMIO.
+        calls.clear()
+        def rebooted_exec(command, **_):
+            calls.append(command[1])
+            return Mock(returncode=0, stderr=b"",
+                        stdout=json.dumps({
+                            "stage": command[1], "source_sha": SHA,
+                            "boot_id": "boot1" if command[1] == "download"
+                            else "boot2",
+                            "real_z2": True,
+                            "result": ("LOADED_AND_HELD" if
+                                       command[1] == "download" else
+                                       "IDENTITY_PASS"),
+                        }).encode())
+        with patch.object(runtime, "_trusted_root_bridge"), \
+             self.assertRaisesRegex(runtime.RuntimeDenied,
+                                    "PATH2_FULL_BOOT_OR_STAGE_CHANGED"):
+            runtime.full_hil_sequence(
+                task, approval("z2-path2-full-hil"),
+                executor=rebooted_exec)
+        self.assertEqual(calls, ["download", "test"])
+
+    def test_full_hil_uninstalled_bridge_denies_first_stage(self):
+        task = self.registry["tasks"]["z2-path2-full-hil"]
+        with patch.object(runtime, "_trusted_root_bridge",
+                          side_effect=runtime.RuntimeDenied(
+                              "PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")):
+            with self.assertRaisesRegex(runtime.RuntimeDenied,
+                                        "PATH2_TRUSTED_BRIDGE_NOT_INSTALLED"):
+                runtime.full_hil_sequence(
+                    task, approval("z2-path2-full-hil"),
+                    executor=Mock(side_effect=AssertionError(
+                        "should not run if bridge missing")))
 
     def test_host_build_receipt_is_qualified_once(self):
         build = Mock(return_value={
