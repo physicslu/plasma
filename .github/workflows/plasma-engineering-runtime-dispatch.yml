@@ -92,6 +92,47 @@ jobs:
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
+  candidate-dispatcher-premerge:
+    # Existing PR event is the unprivileged branch-test entry. This runs the
+    # exact candidate Dispatcher CLI with synthetic fixtures on GitHub-hosted
+    # infrastructure. It MUST NOT use SWPC/self-hosted labels or real Codex.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.repository == 'physicslu/plasma' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == 'physicslu/plasma'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact trusted base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Checkout exact candidate HEAD SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Run candidate Dispatcher CLI integration in hosted simulation
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PLASMA_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_EVENT_NAME" = pull_request
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test -z "${SSH_AUTH_SOCK:-}"
+          test "$(git -C trusted rev-parse HEAD)" = "$BASE_SHA"
+          test "$(git -C candidate rev-parse HEAD)" = "$PLASMA_CANDIDATE_SHA"
+          python3 candidate/scripts/tests/test_plasma_candidate_dispatcher_premerge.py
+
   development-authorize:
     # Trusted main adapter; PR candidate fetched only after owner request.
     if: >-
