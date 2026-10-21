@@ -73,6 +73,9 @@ def trusted_local() -> None:
               ROOT / "pl/hil/path2_z2_target_guard.py",
               ROOT / "scripts/plasma_path2_persistent_lease.py"):
         one_shot.protected(p, file=p != ROOT)
+    # /run is tmpfs and may be empty after a Z2 reboot. Creating the
+    # protected lock/ledger directory does NOT authorize an FPGA write.
+    one_shot.OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
     one_shot.protected(one_shot.OWNER_DIR, file=False)
 
 
