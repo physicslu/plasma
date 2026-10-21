@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Path 2 root target passive safety contracts; never connect to real Z2."""
+from __future__ import annotations
+
+from pathlib import Path
+import os
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+from pl.hil import path2_z2_target_guard as target
+from pl.hil.swd04 import one_shot
+
+
+def fixture(**overrides):
+    record = {
+        "root": True, "boot_id": "example-current-boot",
+        "manager_state": "operating",
+        "recovery_sha256": target.f1b.BASE_SHA,
+        "candidate_sha256": target.f1b.BIN_SHA,
+        "uio_overlaps": [], "platform_overlaps": [],
+        "proc_complete": True, "proc_conflicts": [],
+        "observation_kind": "LIVE_ROOT_READ_ONLY",
+        "axi_isolation_evidence": "UNPROVEN",
+        "active_image_attestation": "UNPROVEN",
+    }
+    record.update(overrides)
+    return record
+
+
+class PassiveSafety(unittest.TestCase):
+    def test_even_root_and_no_consumers_cannot_claim_hardware_qualification(self):
+        report = target.classify_passive_facts(fixture())
+        self.assertEqual(report["decision"], "NO_GO")
+        self.assertFalse(report["hardware_write_authorized"])
+        self.assertEqual(report["scope"], "PASSIVE_OBSERVATION_ONLY")
+        self.assertIn("AXI_ISOLATION_UNPROVEN", report["blockers"])
+        self.assertIn("ACTIVE_FPGA_IMAGE_UNATTESTED", report["blockers"])
+
+    def test_bound_uio_fabric_and_process_conflicts_are_explicit_blockers(self):
+        r = target.classify_passive_facts(fixture(
+            uio_overlaps=["uio1"], platform_overlaps=["40000000.fabric"],
+            proc_conflicts=["123"]))
+        self.assertIn("BOUND_UIO_IN_F1B_APERTURE", r["blockers"])
+        self.assertIn("BOUND_PLATFORM_IN_F1B_APERTURE", r["blockers"])
+        self.assertIn("RETAINED_MMIO_PROCESS_MAPPING", r["blockers"])
+
+    def test_forged_claim_cannot_enable_hardware_operations(self):
+        r = target.classify_passive_facts(fixture(
+            axi_isolation_evidence="INDEPENDENT_HARDWARE_PROOF",
+            active_image_attestation="INDEPENDENT_TARGET_PROOF"))
+        self.assertEqual(r["decision"], "NO_GO")
+        self.assertFalse(r["hardware_write_authorized"])
+        self.assertEqual(r["blockers"], [
+            "LIVE_PROVIDER_AND_PROOF_AUTHORITY_NOT_REGISTERED"])
+
+    def test_untrusted_or_partial_observations_are_denied(self):
+        cases = [
+            dict(root=False), dict(boot_id=""),
+            dict(manager_state="unknown"),
+            dict(recovery_sha256="0"*64),
+            dict(candidate_sha256="0"*64),
+            dict(proc_complete=False),
+            dict(observation_kind="HISTORICAL_ONE_SHOT"),
+            dict(uio_overlaps="uio1"),
+            dict(platform_overlaps=None),
+            dict(proc_conflicts=[""]),
+        ]
+        for c in cases:
+            with self.subTest(c=c), self.assertRaises(target.TargetSafetyDenied):
+                target.classify_passive_facts(fixture(**c))
+        with self.assertRaises(target.TargetSafetyDenied):
+            target.classify_passive_facts({**fixture(), "i_say_safe": True})
+
+    def test_uio_and_platform_mapping_overlap_scanner(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            uio = root / "class/uio/uio1"
+            mapping = uio / "maps/map0"
+            mapping.mkdir(parents=True)
+            (mapping / "addr").write_text("0x40000000")
+            (mapping / "size").write_text("0x10000")
+            (uio / "device/driver").mkdir(parents=True)
+            platform = root / "bus/platform/devices/40000000.fabric"
+            platform.mkdir(parents=True)
+            (platform / "driver").mkdir()
+            (platform / "resource").write_text("40000000 4000ffff 00000200\n")
+            a, b = target.scan_kernel_owners(sysroot=root)
+            self.assertEqual(a, ["uio1"])
+            self.assertEqual(b, ["40000000.fabric"])
+            (uio / "device/driver").rmdir()
+            (platform / "driver").rmdir()
+            self.assertEqual(target.scan_kernel_owners(sysroot=root), ([], []))
+
+    def test_proc_fd_overlap_denied_and_clean_snapshot_not_axi_proof(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pid = root / "1000"
+            fd = pid / "fd"
+            fd.mkdir(parents=True)
+            (pid / "maps").write_text(
+                "00100000-00101000 r--p 00000000 00:00 0 [anon]\n")
+            clean, conflicts = target.scan_proc_consumers(procroot=root)
+            self.assertTrue(clean)
+            self.assertEqual(conflicts, [])
+            (fd / "3").symlink_to("/dev/mem")
+            clean, conflicts = target.scan_proc_consumers(procroot=root)
+            self.assertTrue(clean)
+            self.assertEqual(conflicts, ["1000"])
+
+    def test_retained_vma_never_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pid = root / "1000"
+            (pid / "fd").mkdir(parents=True)
+            (pid / "maps").write_text(
+                "00100000-00101000 rw-p 40000000 00:00 0 /dev/mem\n")
+            complete, conflicts = target.scan_proc_consumers(procroot=root)
+            self.assertTrue(complete)
+            self.assertEqual(conflicts, ["1000"])
+
+
+class RootTargetPortContracts(unittest.TestCase):
+    def test_default_live_methods_have_no_hardware_capability(self):
+        port = target.RootZ2TargetPort(
+            candidate=Path("/lib/firmware/test.bin"),
+            recovery=Path("/lib/firmware/base.bin"),
+            ledger=Path("/run/plasma-z2-swd05/target.json"))
+        with self.assertRaisesRegex(target.TargetSafetyDenied, "Z2_ROOT_REQUIRED"):
+            with patch.object(os, "geteuid", return_value=1000):
+                with port.exclusive():
+                    self.fail("not authorized")
+        with self.assertRaisesRegex(
+                target.TargetSafetyDenied, "AXI_ISOLATION_UNPROVEN_NO_FPGA_WRITE"):
+            port.load_candidate_once(target.f1b.BIN_SHA)
+        with self.assertRaisesRegex(
+                target.TargetSafetyDenied, "CURRENT_IMAGE_OR_CHILD_ADMISSION"):
+            port.read_f1b_identity_child()
+        with self.assertRaisesRegex(
+                target.TargetSafetyDenied, "SAFE_RECOVERY_CONTEXT"):
+            port.restore_original_once(target.f1b.BASE_SHA)
+        self.assertEqual(target.GLOBAL_LOCK, one_shot.OWNER_LOCK)
+
+    def test_missing_target_lock_rejects_passive_and_clock(self):
+        port = target.RootZ2TargetPort(
+            candidate=Path("/lib/firmware/test.bin"),
+            recovery=Path("/lib/firmware/base.bin"),
+            ledger=Path("/run/plasma-z2-swd05/target.json"))
+        with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                    "FPGA_OWNER_LOCK_REQUIRED"):
+            port.passive_report()
+        with self.assertRaisesRegex(target.TargetSafetyDenied,
+                                    "FPGA_OWNER_LOCK_REQUIRED"):
+            port.now()
+
+    def test_probe_never_promotes_previous_passive_uio_exception(self):
+        port = target.RootZ2TargetPort(
+            candidate=Path("/lib/firmware/test.bin"),
+            recovery=Path("/lib/firmware/base.bin"),
+            ledger=Path("/run/plasma-z2-swd05/target.json"))
+        port._locked = True
+        with patch.object(target, "read_live_z2_facts",
+                          return_value=fixture(uio_overlaps=["uio1"])):
+            report = port.passive_report()
+            self.assertIn("BOUND_UIO_IN_F1B_APERTURE", report["blockers"])
+            with self.assertRaisesRegex(
+                    target.TargetSafetyDenied, "TARGET_AXI_OR_IMAGE_ISOLATION_NO_GO"):
+                port.qualification("download")
+
+    def test_no_auto_activation_or_arbitrary_shell(self):
+        content = (ROOT / "pl/hil/path2_z2_target_guard.py").read_text()
+        self.assertNotIn("subprocess", content)
+        self.assertNotIn("manager_write(", content)
+        self.assertNotIn("ssh ", content)
+        self.assertNotIn("if __name__ ==", content)
+        main = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("return integration.disabled_hardware_stage", main)
+
+
+if __name__ == "__main__":
+    unittest.main()
