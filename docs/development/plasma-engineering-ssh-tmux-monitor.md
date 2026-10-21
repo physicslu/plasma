@@ -9,8 +9,8 @@ workflow, runner, approval gate, HIL test or production service.
 After this change is merged to trusted main and an already authorized SWPC
 checkout is updated, log in as the trusted operator:
 
-    ssh gordon@SWPC
-    cd /storage/projects/plasma
+    ssh "${SWPC_OPERATOR}@${SWPC_HOST}"
+    cd "${PLASMA_REPO:?set trusted checkout path}"
     # First use creates and attaches the operator-owned two-pane session.
     bash scripts/plasma-engineering-monitor.sh
     # Subsequent uses (no window switching):
