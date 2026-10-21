@@ -220,7 +220,7 @@ class RepeatableStageTests(unittest.TestCase):
         self.assertNotIn("paramiko", source)
         self.assertNotIn("auto_run", source)
         integration = (ROOT / "scripts/plasma_path2_runtime_integration.py").read_text()
-        self.assertIn("PATH2_LIVE_PROVIDER_NOT_REGISTERED", integration)
+        self.assertIn("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED", integration)
 
 
 if __name__ == "__main__":
