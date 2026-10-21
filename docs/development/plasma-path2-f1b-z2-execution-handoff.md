@@ -43,11 +43,17 @@ checks root identity, protected source, exact ARMv7 native interpreter,
 current process/driver ownership, firmware digests and shared FPGA lock.
 
 Do **not** reuse the old `f1b-path3-z2-hil-once` task/one-shot claim.
-Do **not** use the disabled Path 2 Dispatcher as a fake live callback.
-The existing `z2-path2-download` / `z2-path2-testing` still intentionally
-return `PATH2_LIVE_PROVIDER_NOT_REGISTERED`. A separately reviewed
-authorized SWPC root execution route remains necessary; this document
-does **not** create or grant that privilege.
+The candidate PR now **registers three fixed Task routes**:
+`z2-path2-download` → `download`, `z2-path2-testing` → `test`, and
+`z2-path2-restore` → `restore`. The trusted Dispatcher invokes only the
+fixed installed SWPC bridge at `/usr/local/libexec/plasma/z2-path2-f1b-bridge`
+with stage and authorized exact source SHA. If that bridge does not exist,
+execution fails with `PATH2_TRUSTED_BRIDGE_NOT_INSTALLED`. The bridge itself
+must be provisioned by the SWPC administrator, pin the SSH host and reviewed
+Z2 source, and return an actual sanitized remote receipt. No GitHub PR
+checkout may self-install or become a privileged endpoint. **Registration
+in this Draft PR is not live SWPC/Z2 activation** and this document does
+not create or grant root access.
 
 ## Three independent manual stage invocations
 
