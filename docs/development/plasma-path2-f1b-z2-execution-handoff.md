@@ -95,7 +95,7 @@ idempotent `ALREADY_RESTORED` no-op.
   mode-`0600` `/usr/local/libexec/plasma/z2-path2-f1b.approved-sha`.
   The bridge is **executed as the existing unprivileged `plasma-codex` worker**.
   It reads only the existing privately enrolled login route
-  `/home/plasma-codex/.config/plasma/z2-login-smoke.json`,
+  the enrolled worker-private `~/.config/plasma/z2-login-smoke.json`,
   pinned host key `z2-login-known_hosts`, and sudo password
   `z2-swd05-oneshot.json`; no new credential is committed or assumed.
 - Z2 protected code **source**:
