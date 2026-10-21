@@ -34,7 +34,7 @@ def require(ok: bool, reason: str) -> None:
 
 def check_exact(*, passive: dict, uio: dict, approval: str,
                 scope: str, original_manager_load: str,
-                service_snapshot: dict) -> dict:
+                service_snapshot: dict, expected_firmware: str = "base.bin") -> dict:
     """Pure constraints on fresh facts; result *never* grants hardware access.
 
     Scope is exactly one experiment; cannot waive unknown MMIO users, missing
@@ -63,8 +63,10 @@ def check_exact(*, passive: dict, uio: dict, approval: str,
             bool(re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
                               passive["platform_overlaps"][0])),
             "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED")
+    require(expected_firmware in ("base.bin", "plasma-f1b-owner-20261020-once.bin"),
+            "MANAGER_FIRMWARE_NOT_ALLOWLISTED")
     require(type(original_manager_load) is str and
-            ": writing base.bin to " in original_manager_load,
+            ": writing " + expected_firmware + " to " in original_manager_load,
             "ORIGINAL_BOOT_LOAD_PROVENANCE_UNPROVEN")
     require(type(service_snapshot) is dict and bool(service_snapshot) and
             all(v == "active" for v in service_snapshot.values()),
@@ -89,7 +91,8 @@ def check_exact(*, passive: dict, uio: dict, approval: str,
     }
 
 
-def collect_live(*, root_port, approval: str, scope: str) -> dict:
+def collect_live(*, root_port, approval: str, scope: str,
+                 expected_firmware: str = "base.bin") -> dict:
     """Only inside RootZ2TargetPort.exclusive(); no MMIO/FPGA writes."""
     root_port._require_locked()
     require(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
@@ -117,8 +120,9 @@ def collect_live(*, root_port, approval: str, scope: str) -> dict:
     before = check_exact(passive=passive, uio=uio,
                          approval=approval, scope=scope,
                          original_manager_load=original,
-                         service_snapshot=services)
+                         service_snapshot=services,
+                         expected_firmware=expected_firmware)
     # Refresh boot after all reads; a transient scan must not qualify.
     require((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
             == before["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
-    return before
+    return {**before, "expected_manager_firmware": expected_firmware}
