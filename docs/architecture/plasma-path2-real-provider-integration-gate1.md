@@ -78,10 +78,15 @@ installation of the exact source by the trusted Z2 root operator**:
 
 ```text
 export PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UIO
-python3 -m pl.hil.path2_f1b_minimal_stage download
-python3 -m pl.hil.path2_f1b_minimal_stage test
-python3 -m pl.hil.path2_f1b_minimal_stage restore
+/opt/plasma/python/3.12.13/bin/python3 -m pl.hil.path2_f1b_minimal_stage download
+/opt/plasma/python/3.12.13/bin/python3 -m pl.hil.path2_f1b_minimal_stage test
+/opt/plasma/python/3.12.13/bin/python3 -m pl.hil.path2_f1b_minimal_stage restore
 ```
+
+Before any Download, the runner checks the **same exact ARMv7, little-endian,
+CPython 3.12.13 interpreter path** as the prior successful F1-B one-shot. This
+avoids loading a candidate FPGA image before discovering an incompatible
+MMIO runtime. A child independently rechecks this ABI before mapping /dev/mem.
 
 The displayed environment assignment is an explicit risk acknowledgement,
 **not** an access token; on each separate invocation the root operator
