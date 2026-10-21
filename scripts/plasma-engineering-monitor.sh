@@ -72,7 +72,7 @@ if [ "$path2_panes" -ne 1 ]; then
   exit 1
 fi
 
-if ! tmux has-session -t "$session:path3" 2>/dev/null; then
+if ! tmux display-message -p -t "$session:path3" '#{window_index}' >/dev/null 2>&1; then
   right="$(viewer_command path3)"
   tmux new-window -d -t "$session:2" -n path3 -c "$repo" "$right"
 fi
