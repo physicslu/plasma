@@ -172,14 +172,15 @@ def execute(stage: str, source_sha: str) -> dict:
         # instead of requiring a prompt that may legitimately be absent.
         need(proc.wait(timeout=3) == 0 and ssh_sent,
              "REMOTE_EXIT_OR_PRIVILEGE_FAILED")
-        # Never accept a terminal/prompt/earlier stale output as a receipt.
+        # SSH and sudo prompts do not require line breaks. A legitimate
+        # root-entry marker may follow both prompts on the *same* PTY line.
+        # Never trust prompt text: require precisely one complete framed
+        # marker with a strict stage-specific JSON payload and exit code 0.
         text = response.decode("utf-8", "replace")
-        # sudo -p has no trailing newline: the root entry's marker may
-        # begin immediately after the exact known sudo prompt.
         matched = re.findall(
-            r"(?m)^(?:" + re.escape(PROMPT) + r")?" + re.escape(MARK)
-            + r"([^\r\n]{1,3000})\r?$", text)
-        need(len(matched) == 1, "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
+            re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
+        need(text.count(MARK) == 1 and len(matched) == 1,
+             "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED")
         data = json.loads(matched[0])
         need(type(data) is dict and data.get("stage") == stage
              and type(data.get("boot_id")) is str
