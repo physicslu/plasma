@@ -109,6 +109,14 @@ def _append(log: Path, message: str) -> None:
         os.close(fd)
 
 
+def _monitor_time_mark(now: dt.datetime | None = None) -> str:
+    """Timestamp for monitor-only Path 3 log; never part of Codex evidence."""
+    stamp = dt.datetime.now().astimezone() if now is None else now
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise ValueError("time marker requires a timezone-aware timestamp")
+    return "[MONITOR TIME MARK] " + stamp.isoformat(timespec="seconds")
+
+
 def run_job(path: str, command: list[str], directory: Path | None = None) -> int:
     if path not in PATHS or not command:
         raise ValueError("invalid path/command")
@@ -150,12 +158,23 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         # command, permission boundary, worktree, receipt and exit status.
         proc = subprocess.Popen(command, env=env)
         last_heartbeat = time.monotonic()
+        last_time_mark = last_heartbeat
         while proc.poll() is None:
             time.sleep(1)
-            if live and time.monotonic() - last_heartbeat >= 15:
+            now_monotonic = time.monotonic()
+            if live and now_monotonic - last_heartbeat >= 15:
                 _append(log, "RUNNING | elapsed %ds | Run %s" %
-                        (int(time.monotonic() - last_heartbeat), run_id))
-                last_heartbeat = time.monotonic()
+                        (int(now_monotonic - last_heartbeat), run_id))
+                last_heartbeat = now_monotonic
+            if live and path == "path3" and now_monotonic - last_time_mark >= 60:
+                # A synthetic marker goes ONLY to the disposable monitor log.
+                # This must not appear in Codex stdout/stderr or GitHub evidence.
+                try:
+                    _append(log, "\n" + _monitor_time_mark())
+                except OSError as exc:
+                    print("MONITOR_TIME_MARK_FAILED: %s" %
+                          type(exc).__name__, file=sys.stderr)
+                last_time_mark = now_monotonic
         rc = proc.wait()
         result = "PASS" if rc == 0 else "FAIL"
         return rc
@@ -191,7 +210,8 @@ def _clip_columns(line: str, width: int) -> str:
 
 def render_snapshot(directory: Path, path: str, *,
                     width: int | None = None,
-                    height: int | None = None) -> str:
+                    height: int | None = None,
+                    now: dt.datetime | None = None) -> str:
     if path not in PATHS:
         raise ValueError("unknown path")
     name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
@@ -221,6 +241,12 @@ def render_snapshot(directory: Path, path: str, *,
     else:
         lines.append("LAST: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
+    if path == "path3":
+        clock = dt.datetime.now().astimezone() if now is None else now
+        if clock.tzinfo is None or clock.utcoffset() is None:
+            raise ValueError("status clock requires a timezone-aware timestamp")
+        # Minute precision keeps the fixed clock legible without 1 Hz redraw.
+        lines.append("NOW: " + clock.isoformat(timespec="minutes"))
     lines.extend(["", "RECENT OUTPUT", "-" * 35])
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
@@ -244,7 +270,7 @@ def render_snapshot(directory: Path, path: str, *,
 
 
 def view_loop(path: str, *, directory: Path = MONITOR, output=None,
-              get_size=None, sleep=None) -> None:
+              get_size=None, sleep=None, get_now=None) -> None:
     """Update only changed frames; never clear the whole screen first."""
     if output is None:
         output = sys.stdout
@@ -252,12 +278,15 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
         get_size = shutil.get_terminal_size
     if sleep is None:
         sleep = time.sleep
+    if get_now is None:
+        get_now = lambda: dt.datetime.now().astimezone()
     previous = None
     previous_size = None
     while True:
         width, height = get_size()
         size = (width, height)
-        frame = render_snapshot(directory, path, width=width, height=height)
+        frame = render_snapshot(directory, path, width=width, height=height,
+                                now=get_now() if path == "path3" else None)
         if frame != previous or size != previous_size:
             # Home + overwrite + clear *remainder*. Avoid the blank frame
             # caused by the old ESC[2J full-screen clear every second.
