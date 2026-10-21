@@ -3,8 +3,11 @@
 Vivado startup on Path 3 Run 39620483855 failed with exit 42; category-only
 FlexNet diagnostics reported Invalid host. A matching interface in sysfs does
 not establish visibility to FlexNet in the sandbox's network namespace.
-Network-interface enumeration was denied. There is no same-run unsandboxed
-baseline, so namespace causality and host license usability remain unproven.
+Network-interface enumeration was denied. A separate host-side check found
+the installed license readable and `lmdiag` free of Invalid host, and Vivado
+2026.1 batch startup reached a Tcl marker. That establishes host usability,
+while the proposed same-run baseline is still needed to pin the difference
+to the Runner and sandbox execution contexts.
 
 The candidate change uses the existing engineering dispatcher, existing
 `f1b-path3-codex-vivado-build` task and existing Python Build Engine. It adds
@@ -36,6 +39,13 @@ Therefore the new Path 3 mechanism cannot be accepted live pre-merge with the
 currently installed dispatcher. This is an executable routing blocker, not a
 request for another Gate 1. Do not run candidate dispatcher code outside the
 sandbox to work around it, and do not merge on a claim of Build PASS.
+
+Run 39622813247 of PR #1106 stopped even earlier at the trusted worker's
+live PR verification (`LIVE_PR_VERIFICATION_FAILED`). The Path 3 job did not
+pass `GH_TOKEN` to the trusted execute step. This candidate gives that step a
+read-only token and removes it from the process environment immediately after
+the live PR query, before Codex or Vivado can run. The fix cannot affect a
+trusted-main job until it is activated.
 
 An existing pre-merge real-build route is available for a separately reviewed
 owner PR: Issue #981 owner command
