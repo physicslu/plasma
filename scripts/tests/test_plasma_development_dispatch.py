@@ -323,6 +323,34 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
                 b"CANDIDATE_DISPATCHER_PREMERGE_SWPC_BWRAP_STUB_PASS\n"
             ).hexdigest())
 
+    def test_candidate_premerge_sandbox_rejects_host_credential_and_device_leaks(self):
+        import importlib.util
+        file=ROOT/"scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py"
+        spec=importlib.util.spec_from_file_location("plasma_cpu_sandbox_guard",file)
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        clean={"HOME":"/tmp", "PATH":"/usr/bin:/bin", "PYTHONNOUSERSITE":"1"}
+        module.check_isolation(environ=clean, exists=lambda path: False)
+        for leaked in ("GITHUB_TOKEN","OPENAI_API_KEY","SSH_AUTH_SOCK","CODEX_HOME",
+                       "AWS_SECRET_ACCESS_KEY","PLASMA_Z2_AUTH"):
+            with self.subTest(env=leaked), self.assertRaisesRegex(
+                AssertionError,"HOST_CREDENTIAL_ENV_EXPOSED"
+            ):
+                module.check_isolation(
+                    environ={**clean,leaked:"sensitive"},exists=lambda path:False)
+        for exposed in ("/home","/root","/dev/mem","/dev/uio0",
+                        "/dev/ttyUSB0","/dev/bus/usb","/dev/serial"):
+            with self.subTest(path=exposed), self.assertRaisesRegex(
+                AssertionError,"HOST_PATH_EXPOSED"
+            ):
+                module.check_isolation(
+                    environ=clean,exists=lambda path,p=exposed:path==p)
+        for p,reason in (("/sys","HOST_SYSFS_MOUNT_DENIED"),
+                         ("/run/udev","HOST_UDEV_MOUNT_DENIED")):
+            with self.subTest(path=p),self.assertRaisesRegex(AssertionError,reason):
+                module.check_isolation(
+                    environ=clean,exists=lambda path,expected=p:path==expected)
+
     def test_cpu_only_sandbox_fails_closed_without_bwrap(self):
         task = copy.deepcopy(self.registry["tasks"]["nine-nine-path2"])
         with tempfile.TemporaryDirectory() as td:
