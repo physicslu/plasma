@@ -1552,13 +1552,36 @@ class GenericWorkOrderContracts(unittest.TestCase):
                         swpc_bridge_deployment="true"),
             self._order(scope="guarded-hardware",
                         hardware_stages=["test"],
-                        pr_number=1234, source_sha="b" * 40),
+                        pr_number=1234, source_sha="invalid"),
             self._order(scope="host-only", hardware_stages=["test"]),
             self._order(scope="host-only", swpc_bridge_deployment=True),
         ]
         for order in forbidden:
             with self.subTest(order=order), self.assertRaises(dev.Denied):
                 dev.request(self._event(order), self._context())
+
+    def test_guarded_hardware_premerge_uses_existing_pr_head_pinning(self):
+        order = self._order(scope="guarded-hardware",
+                            hardware_stages=["test"],
+                            pr_number=1234, source_sha="b" * 40)
+        event = self._event(order)
+        pr = {
+            "number": 1234, "state": "open", "merged_at": None,
+            "user": {"login": "physicslu"},
+            "head": {"ref": "agent/candidate", "sha": "b" * 40,
+                     "repo": {"full_name": "physicslu/plasma"}},
+            "base": {"ref": "main",
+                     "repo": {"full_name": "physicslu/plasma"}},
+        }
+        approved = dev.authorize(event, self._context(),
+                                  self.registry, pr_info=pr)
+        self.assertEqual(approved["pinned_sha"], "b" * 40)
+        self.assertEqual(approved["execution_capability"],
+                         "codex-guarded-hardware")
+        with self.assertRaisesRegex(dev.Denied, "PR_HEAD_SHA_MISMATCH"):
+            dev.authorize(event, self._context(), self.registry,
+                          pr_info=pr | {"head": pr["head"] |
+                                      {"sha": "c" * 40}})
 
     def test_path3_guarded_hardware_worker_capability_and_network(self):
         order = self._order(scope="guarded-hardware",
