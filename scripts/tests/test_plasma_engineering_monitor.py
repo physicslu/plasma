@@ -290,6 +290,113 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotIn("MONITOR TIME MARK",
                              (Path(td) / "path2.log").read_text())
 
+    def test_launcher_switches_group_inside_tmux_panes(self):
+        """Host-only fake tmux/sg: no SWPC or tmux server is touched."""
+        scenarios = (
+            (False, 1, ("path2", "path3")),  # fresh named session
+            (True, 1, ("path3",)),           # repair one existing pane
+            (True, 2, ()),                   # healthy pair: attach only
+        )
+        for has_session, pane_count, expected in scenarios:
+            with self.subTest(has_session=has_session, panes=pane_count):
+                self._assert_launcher_scenario(
+                    has_session, pane_count, expected, member=True)
+
+    def test_launcher_fails_closed_when_group_missing_or_not_a_member(self):
+        for exists, member in ((False, False), (True, False)):
+            with self.subTest(exists=exists, member=member):
+                self._assert_launcher_scenario(
+                    False, 1, (), member=member, exists=exists,
+                    expected_code=1)
+
+    def _assert_launcher_scenario(self, has_session, pane_count, expected,
+                                  *, member, exists=True, expected_code=0):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            bindir = base / "bin"
+            bindir.mkdir()
+            tmux_log = base / "tmux.log"
+            sg_log = base / "sg.log"
+            tmux_log.touch()
+            sg_log.touch()
+
+            def stub(name, source):
+                file = bindir / name
+                file.write_text("#!/usr/bin/env bash\n" + source)
+                file.chmod(0o755)
+
+            stub("id", r'''
+case "$1" in
+  -un) printf 'operator\n' ;;
+  -nG)
+    if [[ "$FAKE_GROUP_MEMBER" == "yes" ]]; then
+      printf 'operator plasma-monitor\n'
+    else
+      printf 'operator\n'
+    fi ;;
+  *) exit 2 ;;
+esac
+''')
+            stub("getent", r'''
+if [[ "$FAKE_GROUP_EXISTS" == "yes" &&
+      "$1" == "group" && "$2" == "plasma-monitor" ]]; then
+  printf 'plasma-monitor:x:998:operator\n'
+else
+  exit 2
+fi
+''')
+            stub("sg", r'''
+printf '%s|%s|%s\n' "$1" "$2" "$3" >> "$FAKE_SG_LOG"
+[[ "$1" == "plasma-monitor" && "$2" == "-c" &&
+   "$3" == *"exec python3 -u"* ]] || exit 2
+''')
+            stub("tmux", r'''
+printf '%s\n' "$*" >> "$FAKE_TMUX_LOG"
+case "$1" in
+  has-session)
+    [[ "$FAKE_HAS_SESSION" == "yes" ]] ;;
+  list-panes)
+    for ((i=0; i<FAKE_PANES; i++)); do
+      printf '%%%s\n' "$i"
+    done ;;
+  new-session|split-window)
+    cmd=""
+    for cmd in "$@"; do :; done
+    bash -c "$cmd" ;;
+  select-layout|attach-session) exit 0 ;;
+  *) exit 2 ;;
+esac
+''')
+            env = os.environ.copy()
+            env.update({
+                "PATH": str(bindir) + os.pathsep + env.get("PATH", ""),
+                "FAKE_HAS_SESSION": "yes" if has_session else "no",
+                "FAKE_PANES": str(pane_count),
+                "FAKE_GROUP_EXISTS": "yes" if exists else "no",
+                "FAKE_GROUP_MEMBER": "yes" if member else "no",
+                "FAKE_TMUX_LOG": str(tmux_log),
+                "FAKE_SG_LOG": str(sg_log),
+            })
+            proc = subprocess.run(
+                ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
+                env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(proc.returncode, expected_code, proc.stderr)
+            calls = sg_log.read_text().splitlines()
+            self.assertEqual(len(calls), len(expected))
+            for path, call in zip(expected, calls):
+                self.assertTrue(call.startswith("plasma-monitor|-c|"),
+                                call)
+                self.assertIn("view " + path, call)
+            tmux_calls = tmux_log.read_text().splitlines()
+            if expected_code:
+                self.assertEqual(tmux_calls, [])
+                self.assertIn("MONITOR_GROUP_UNAVAILABLE", proc.stderr)
+            else:
+                self.assertTrue(any(x.startswith("attach-session ")
+                                    for x in tmux_calls), tmux_calls)
+                self.assertTrue(all(":0" not in x for x in tmux_calls),
+                                tmux_calls)
+
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
