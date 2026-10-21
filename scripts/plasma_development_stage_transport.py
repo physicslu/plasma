@@ -1,10 +1,8 @@
-#!/usr/bin/python3
-"""Installed SWPC-only fixed bridge: owner-approved stage -> pinned Z2 root.
+#!/usr/bin/env python3
+"""Trusted-main-only development transport. Never import from a candidate tree.
 
-Copy with root ownership to /usr/local/libexec/plasma/z2-path2-f1b-bridge.
-Do not run from the PR tree. Two positional arguments only: stage and
-approved source commit. Auth credentials remain in existing enrolled worker
-private files; no remote shell or host comes from GitHub Issue text.
+Dispatcher authenticates event, live PR, checkout and stage scope before calling.
+No local privileged installation or source SHA PIN is consumed here.
 """
 from __future__ import annotations
 
@@ -30,7 +28,6 @@ PRIVATE = HOME / ".config/plasma"
 LOGIN = PRIVATE / "z2-login-smoke.json"
 KNOWN_HOSTS = PRIVATE / "z2-login-known_hosts"
 SUDO = PRIVATE / "z2-swd05-oneshot.json"
-APPROVAL = Path("/usr/local/libexec/plasma/z2-path2-f1b.approved-sha")
 ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-f1b-root-entry"
 MARK = "PLASMA_F1B_PATH2_DEV="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
@@ -86,28 +83,15 @@ def enrollment() -> tuple[str, str, str]:
     return ssh["ssh_host"], ssh["ssh_password"], sudo["sudo_password"]
 
 
-def approved_sha(requested: str) -> None:
-    need(bool(re.fullmatch(r"[a-f0-9]{40}", requested)), "SOURCE_SHA_INVALID")
-    p = APPROVAL.lstat()
-    # The SHA is a public commit identifier, not a credential. The bridge
-    # runs as unprivileged plasma-codex, so root-owned 0600 is unreadable.
-    # Exactly 0644 preserves root-only writes while allowing worker reads.
-    need(stat.S_ISREG(p.st_mode) and p.st_uid == 0 and
-         stat.S_IMODE(p.st_mode) == 0o644 and p.st_size <= 64,
-         "SWPC_APPROVED_SOURCE_NOT_INSTALLED")
-    need(APPROVAL.read_text().strip() == requested,
-         "SWPC_APPROVED_SOURCE_SHA_MISMATCH")
-
-
 def execute(stage: str, source_sha: str) -> dict:
     need(stage in STAGES, "STAGE_NOT_ALLOWLISTED")
-    approved_sha(source_sha)
+    need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
     host, password, sudo_password = enrollment()
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
     remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage)
     argv = [
-        "/usr/bin/ssh", "-T",
+        "/usr/bin/ssh", "-F", "/dev/null", "-T",
         "-o", "StrictHostKeyChecking=yes",
         "-o", "UserKnownHostsFile=" + str(KNOWN_HOSTS),
         "-o", "GlobalKnownHostsFile=/dev/null",
@@ -130,7 +114,8 @@ def execute(stage: str, source_sha: str) -> dict:
     try:
         proc = subprocess.Popen(argv, stdin=slave, stdout=slave,
                                 stderr=slave, close_fds=True,
-                                preexec_fn=controlling_tty)
+                                preexec_fn=controlling_tty,
+                                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
         os.close(slave)
         slave = -1
         deadline = time.monotonic() + TIMEOUT
@@ -206,19 +191,3 @@ def execute(stage: str, source_sha: str) -> dict:
             os.close(slave)
         os.close(master)
 
-
-def main() -> int:
-    try:
-        need(len(sys.argv) == 3, "TWO_FIXED_ARGUMENTS_REQUIRED")
-        outcome = execute(sys.argv[1], sys.argv[2])
-        print(json.dumps(outcome, sort_keys=True, separators=(",", ":")))
-        return 0
-    except (Blocked, OSError, ValueError, subprocess.SubprocessError,
-            json.JSONDecodeError):
-        # Neither ssh/sudo password nor host identity is ever printed.
-        print("PATH2_SWPC_BRIDGE_BLOCKED_OR_UNKNOWN", file=sys.stderr)
-        return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
