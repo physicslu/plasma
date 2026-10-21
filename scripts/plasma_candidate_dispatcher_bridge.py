@@ -234,6 +234,11 @@ def main() -> int:
             # A real Codex invocation occurs ONCE in trusted SWPC context.
             # Candidate cannot see this process's HOME, auth or host devices.
             shutil.rmtree(scratch / "workspace/.plasma-path3-evidence")
+            # Codex normally expects a Git worktree. This is an isolated,
+            # scratch-only repository, not the candidate's source tree.
+            subprocess.run(["git", "init", "-q", str(scratch / "workspace")],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           check=True, timeout=8)
             rc, stdout, stderr = run_process(
                 list(CODEX_CMD), cwd=scratch / "workspace", env=os.environ.copy(),
                 input_bytes=prompt, timeout=240)
@@ -251,6 +256,39 @@ def main() -> int:
                 registry_sha256=args.registry_sha256, phase="replay")
             rc2, out2, err2 = run_process(phase2, cwd=candidate, env=env)
             receipt = json.loads(out2)
+            # Copy real agent evidence for the already existing trusted
+            # Workflow uploader, including failure logs. Candidate source
+            # is not executed outside the sandbox at any point.
+            output_rel = Path(task["output_path"])
+            target = candidate / output_rel
+            source = scratch / "workspace" / output_rel
+            generated_log = target.with_suffix(".codex.log")
+            require(not generated_log.exists() and not generated_log.is_symlink(),
+                    "CANDIDATE_EVIDENCE_COLLISION")
+            generated_log.parent.mkdir(parents=True, exist_ok=True)
+            generated_log.write_bytes(
+                b"=== Real Codex stdout ===\\n" + stdout +
+                b"\\n=== Real Codex stderr ===\\n" + stderr)
+            if rc == 0 and rc2 == 0:
+                csv = source.with_suffix(".csv")
+                test_log = source.with_suffix(".test.log")
+                for file in (source, csv, test_log):
+                    require(file.is_file() and not file.is_symlink()
+                            and file.stat().st_size < MAX_LOG,
+                            "CANDIDATE_REAL_EVIDENCE_MISSING")
+                rows = csv.read_text(encoding="utf-8").splitlines()
+                require(len(rows) == 13 and rows[0] == "n,triangular" and
+                        all(rows[i] == f"{i},{i*(i+1)//2}"
+                            for i in range(1, 13)), "CANDIDATE_OUTPUT_INVALID")
+                require(receipt.get("source_sha256") == digest(source.read_bytes())
+                        and receipt.get("output_sha256") == digest(csv.read_bytes())
+                        and receipt.get("test_log_sha256") == digest(test_log.read_bytes()),
+                        "CANDIDATE_EVIDENCE_DIGEST_MISMATCH")
+                for file in (source, csv, test_log):
+                    dest = target.with_suffix(file.suffix)
+                    require(not dest.exists() and not dest.is_symlink(),
+                            "CANDIDATE_SOURCE_COLLISION")
+                    shutil.copyfile(file, dest)
             require(rc2 == (0 if rc == 0 else 2) and
                     receipt.get("codex_exit_code") == rc and
                     receipt.get("pinned_sha") == current and
