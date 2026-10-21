@@ -1456,7 +1456,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
             runtime.stage_contract(task, approval |
                                    {"work_order_sha256": "0" * 64})
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "TASK_DENIED"):
+        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
             runtime.stage_contract(task | {"stage": "download"}, approval)
 
     def test_work_order_tamper_and_replay_denied_before_execution(self):
