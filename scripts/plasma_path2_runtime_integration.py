@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Trusted Path 2 Stage Gate 1 wiring: existing Build only, no live device provider.
+"""Trusted Path 2 integration: existing Build and installed root bridge stages.
 
-No generic callbacks supplied by an Issue payload. Host-only Build may run only
-via the existing reviewed vivado-host-build capability and pinned SHA.
-Download and Testing remain independently addressable but NOT RUN.
+The *task registry* maps Download, Testing and Restore to a fixed, root-owned
+SWPC stage bridge. An uninstalled bridge fails closed, never substitutes a PR
+checkout as a privileged runner or issues an SSH command from this module.
 """
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import json
+import stat
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,28 +94,103 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
     return result
 
 
-def disabled_hardware_stage(task: dict, approval: dict) -> dict:
-    """Registered task identity is NOT a registered privileged provider."""
+ROOT_STAGE_BRIDGE = Path("/usr/local/libexec/plasma/z2-path2-f1b-bridge")
+STAGE_TASKS = {
+    "z2-path2-download": "download",
+    "z2-path2-testing": "test",
+    "z2-path2-restore": "restore",
+}
+
+
+def stage_contract(task: dict, approval: dict) -> str:
+    """Owner/pin identity is already authenticated by trusted Dispatcher."""
     require(type(approval) is dict
             and approval.get("execution_path") == "path2-cli"
             and approval.get("execution_capability") == "path2-stage-contract"
             and coordinator._sha(approval.get("pinned_sha"), 40)
             and coordinator._sha(approval.get("trusted_sha"), 40)
             and type(approval.get("pr_number")) is int
-            and ((approval["pr_number"] == 0 and approval["pinned_sha"] ==
-                  approval["trusted_sha"]) or
-                 (approval["pr_number"] > 0 and approval["pinned_sha"] !=
-                  approval["trusted_sha"])), "PATH2_STAGE_APPROVAL_DENIED")
-    names = {"z2-path2-download": "download", "z2-path2-testing": "test"}
-    stage = names.get(approval.get("task_id"))
+            and ((approval["pr_number"] == 0 and
+                  approval["pinned_sha"] == approval["trusted_sha"]) or
+                 (approval["pr_number"] > 0 and
+                  approval["pinned_sha"] != approval["trusted_sha"])),
+            "PATH2_STAGE_APPROVAL_DENIED")
+    stage = STAGE_TASKS.get(approval.get("task_id"))
     require(stage is not None and type(task) is dict
+            and task.get("capability") == "path2-stage-contract"
             and task.get("stage") == stage
             and task.get("project") == "pl/projects/z2-fixed-unified-site1",
             "PATH2_STAGE_TASK_DENIED")
-    require(approval.get("auto_download_after_build_success", False) is False,
-            "PATH2_STAGE_AUTO_DOWNLOAD_DENIED")
-    require(type(approval.get("auto_test_after_download_success", False)) is bool,
-            "PATH2_STAGE_AUTO_TEST_TYPE_DENIED")
-    # Zero side effects and no fake callback. Preserve absence of fresh
-    # target facts, current-boot AXI admission and real lease providers.
-    raise RuntimeDenied("PATH2_LIVE_PROVIDER_NOT_REGISTERED")
+    require(approval.get("auto_download_after_build_success", False) is False
+            and approval.get("auto_test_after_download_success", False) is False,
+            "PATH2_STAGE_AUTO_TRANSITION_DENIED")
+    return stage
+
+
+def _trusted_root_bridge(path: Path) -> None:
+    """Fixed local bridge installed by SWPC admin, never from PR checkout."""
+    require(path == ROOT_STAGE_BRIDGE, "PATH2_BRIDGE_PATH_NOT_FIXED")
+    require(path.is_file() and not path.is_symlink(),
+            "PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")
+    metadata = path.stat()
+    require(stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and
+            metadata.st_nlink == 1 and metadata.st_mode & 0o022 == 0 and
+            metadata.st_mode & 0o111 != 0,
+            "PATH2_TRUSTED_BRIDGE_NOT_PROTECTED")
+    # A root-owned file under an untrusted parent is not a trust root.
+    for parent in (path.parent, path.parent.parent):
+        require(parent.is_dir() and not parent.is_symlink()
+                and parent.stat().st_uid == 0 and
+                parent.stat().st_mode & 0o022 == 0,
+                "PATH2_BRIDGE_PARENT_NOT_PROTECTED")
+
+
+def registered_hardware_stage(task: dict, approval: dict, *,
+                              executor=subprocess.run) -> dict:
+    """Register fixed Task -> SWPC root bridge, not a generic shell/SSH API.
+
+    Returns actual sanitized target evidence only after installed bridge
+    executes. No implicit Build->Download or Download->Test progression.
+    """
+    stage = stage_contract(task, approval)
+    _trusted_root_bridge(ROOT_STAGE_BRIDGE)
+    command = [str(ROOT_STAGE_BRIDGE), stage, approval["pinned_sha"]]
+    try:
+        result = executor(command, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, timeout=120,
+                          check=False, env={"PATH": "/usr/bin:/bin"})
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeDenied("PATH2_BRIDGE_EXECUTION_UNCERTAIN") from None
+    require(result.returncode == 0 and len(result.stdout) <= 8192,
+            "PATH2_BRIDGE_STAGE_FAILED_OR_UNKNOWN")
+    try:
+        payload = json.loads(result.stdout.decode("utf-8"))
+    except (UnicodeError, ValueError, AttributeError):
+        raise RuntimeDenied("PATH2_BRIDGE_RECEIPT_INVALID") from None
+    require(type(payload) is dict and
+            payload.get("stage") == stage and
+            payload.get("source_sha") == approval["pinned_sha"] and
+            payload.get("real_z2") is True and
+            type(payload.get("boot_id")) is str and
+            len(payload["boot_id"]) >= 8 and
+            payload.get("result") in ({
+                "download": {"LOADED_AND_HELD"},
+                "test": {"IDENTITY_PASS"},
+                "restore": {"RESTORED_VERIFIED", "ALREADY_RESTORED"},
+            }[stage]),
+            "PATH2_BRIDGE_RECEIPT_NOT_REAL_Z2")
+    return {
+        "status": "REAL_Z2_STAGE_EVIDENCE_REVIEW_REQUIRED",
+        "stage": stage,
+        "source_sha": approval["pinned_sha"],
+        "boot_id": payload["boot_id"],
+        "result": payload["result"],
+        "real_z2": True,
+        "auto_next_stage": False,
+    }
+
+
+def disabled_hardware_stage(task: dict, approval: dict) -> dict:
+    """Compatibility negative test: never bypass installation via this API."""
+    stage_contract(task, approval)
+    raise RuntimeDenied("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")
