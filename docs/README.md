@@ -118,6 +118,8 @@
 
 ## Development and validation
 
+- **Gate 1 / SWPC real monitor NOT_RUN** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 左右並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。現階段需先完成 Host-only CI，並在受控 Gate 1 啟用後驗證真正 SWPC 的觀察結果；此文件不授權部署或硬體操作。
+
 - **Gate 1 / Host-only Integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：重用既有 Dispatcher、Workflow、Vivado Build、三階段 Orchestrator、F1-B Adapter 與 Persistent Lease；建立獨立 Build/Download/Testing 任務身分與實際檔案 Hash 的 Host-only Build Qualification，實機 Provider 未授權且必須 fail closed。\n\n- **Gate 1 / Host-only Draft** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：跨階段 Loaded State、Lease、映像來源、Restore Intent、Timeout、不可盲目重試及 Testing 重入之離線安全契約；不提供實機下載或恢復權限。
 
 - **Gate 1 / Host-only Draft** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：重用 Vivado Host Build、F1-B Hardware Profile、FPGA Supervisor 與三暫存器 Test Callback；維持 Build／Download／Testing 獨立 Trigger 與兩個預設關閉的自動銜接。僅 Mock/Schema Contract，不提供實機權限。
