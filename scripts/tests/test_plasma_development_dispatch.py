@@ -1127,5 +1127,23 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
 
 
 
+class CandidateRealCodexRouteContracts(unittest.TestCase):
+    def test_unavailable_route_never_launches_real_codex_or_creates_evidence(self):
+        from unittest.mock import Mock
+        executor = Mock()
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            with self.assertRaisesRegex(
+                dev.Denied, "CANDIDATE_DISPATCHER_REAL_CODEX_ROUTE_NOT_AVAILABLE"
+            ):
+                dev.run_codex_task(
+                    {"execution_path": "path3-codex", "objective": "CPU-only test"},
+                    workspace=workspace, executor=executor,
+                    task_id="candidate-dispatcher-e2e-1083",
+                )
+            executor.assert_not_called()
+            self.assertEqual(list(workspace.iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
