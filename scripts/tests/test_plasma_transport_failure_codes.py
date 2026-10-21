@@ -28,19 +28,12 @@ class FailureCodes(unittest.TestCase):
                     r.registered_hardware_stage(TASK, APPROVAL)
                 self.assertEqual(caught.exception.args, (code,))
 
-    def test_every_failure_stops_path3_before_restore(self):
-        task={'execution_path':'path3-codex','capability':'codex-workspace',
-              'work_order_scope':'guarded-hardware','work_order_sha256':'c'*64,
-              'hardware_stages':['test','restore']}
-        approval={'task_id':'path3-work-order','execution_path':'path3-codex',
-                  'execution_capability':'codex-guarded-hardware',
-                  'work_order_sha256':'c'*64,'pinned_sha':SHA,'trusted_sha':SHA,'pr_number':0}
+    def test_every_failure_stops_executor_without_retry(self):
         for code in t.SAFE_FAILURE_CODES:
-            with self.subTest(code=code), patch.object(t,'execute',side_effect=t.Blocked(code)) as call:
-                with self.assertRaises(r.RuntimeDenied) as caught:
-                    r.path3_shared_hardware_stages(task,approval)
-                self.assertEqual(caught.exception.args,(code,))
-                call.assert_called_once_with('test',SHA)
+            with self.subTest(code=code), patch.object(t, 'execute', side_effect=t.Blocked(code)) as call:
+                with self.assertRaises(r.RuntimeDenied):
+                    r.registered_hardware_stage(TASK, APPROVAL)
+                call.assert_called_once_with('test', SHA)
 
     def test_hostile_exception_text_is_never_exported(self):
         for exc in (t.Blocked('SOURCE_SHA_INVALID\nsecret'), t.Blocked('10.0.0.1 password'),

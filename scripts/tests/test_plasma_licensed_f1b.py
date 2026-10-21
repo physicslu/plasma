@@ -13,6 +13,12 @@ import plasma_vivado_host_build as build
 
 
 class LicensedF1B(unittest.TestCase):
+    def test_fixed_task_is_admitted_from_reviewed_registry(self):
+        registry = json.loads(dev.MANIFEST.read_text())
+        task = dev.task_by_id(registry, 'f1b-path3-codex-vivado-build')
+        self.assertEqual(task['execution_path'], 'path3-codex')
+        self.assertIn('licensed Runner', task['objective'])
+
     def test_source_authentication_compares_bytes_not_index(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

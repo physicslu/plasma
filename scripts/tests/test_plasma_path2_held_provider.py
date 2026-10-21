@@ -188,6 +188,15 @@ class LifecycleTests(unittest.TestCase):
                 self.assertEqual(port.actions, [])
                 self.assertFalse(store.path.exists())
 
+    def test_wrong_target_denied_before_candidate_load(self):
+        tmp, store, port = setup()
+        with tmp:
+            original = port.qualification
+            port.qualification = lambda stage: original(stage) | {"target_id": "other-board"}
+            with self.assertRaisesRegex(provider.ProviderDenied, "TARGET_OWNER_OR_RECOVERY_CHANGED"):
+                download(store, port)
+            self.assertNotIn("load", port.actions)
+
     def test_unproven_axi_does_not_write_image(self):
         tmp, store, port = setup()
         with tmp:
@@ -391,6 +400,14 @@ class BitBinProvenanceTests(unittest.TestCase):
                             bit=bit, hwh=hwh, firmware=bin_file,
                             build_receipt=build, hwh_sha256=hwh_sha,
                             bin_sha256=bin_sha, bootgen_receipt=bad)
+                original_bit = bit.read_bytes()
+                bit.write_bytes(original_bit + b"tampered")
+                with self.assertRaises(provenance.ProvenanceDenied):
+                    provenance.verify_f1b_conversion(
+                        bit=bit, hwh=hwh, firmware=bin_file,
+                        build_receipt=build, hwh_sha256=hwh_sha,
+                        bin_sha256=bin_sha, bootgen_receipt=bootgen)
+                bit.write_bytes(original_bit)
                 bin_file.write_bytes(b"tampered")
                 with self.assertRaises(provenance.ProvenanceDenied):
                     provenance.verify_f1b_conversion(
