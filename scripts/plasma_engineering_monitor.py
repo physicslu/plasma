@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""SWPC Development Mode Path 2/3 operator-only, non-authorizing tmux monitor.
+
+GitHub Actions remains the executor and evidence authority. This module only
+publishes short-lived progress in the existing plasma-monitor group directory.
+It never authorizes, dispatches, retries or cancels a task.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import grp
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import socket
+import stat
+import subprocess
+import sys
+import time
+
+BASE = Path("/run/plasma-codex")
+MONITOR = BASE / "engineering-monitor"
+RUNNER = "SWPC-plasma-codex"
+WORKER = "plasma-codex"
+GROUP = "plasma-monitor"
+PATHS = ("path2", "path3")
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+RUN_ID = re.compile(r"[0-9]{1,20}\Z")
+TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
+
+
+def _valid_dir(path: Path, uid: int, gid: int) -> bool:
+    try:
+        s = path.lstat()
+    except OSError:
+        return False
+    return (stat.S_ISDIR(s.st_mode) and s.st_uid == uid and
+            s.st_gid == gid and stat.S_IMODE(s.st_mode) == 0o2770)
+
+
+def runtime_directory() -> Path | None:
+    """Fail monitoring closed, NOT the engineering job, on missing access."""
+    try:
+        uid = pwd.getpwnam(WORKER).pw_uid
+        gid = grp.getgrnam(GROUP).gr_gid
+        if (socket.gethostname() != "SWPC" or
+            os.environ.get("RUNNER_NAME") != RUNNER or
+            os.environ.get("RUNNER_ENVIRONMENT") != "self-hosted" or
+            os.geteuid() != uid or os.geteuid() == 0 or
+            not _valid_dir(BASE, uid, gid)):
+            return None
+        if not MONITOR.exists():
+            MONITOR.mkdir(mode=0o2770)
+            MONITOR.chmod(0o2770)
+        if not _valid_dir(MONITOR, uid, gid):
+            return None
+        return MONITOR
+    except (OSError, KeyError):
+        return None
+
+
+def _write_state(directory: Path, path: str, data: dict) -> None:
+    """Atomic, group-readable snapshots; never follow a preexisting symlink."""
+    name = directory / (path + ".json")
+    tmp = directory / (".%s.%d.json" % (path, os.getpid()))
+    raw = (json.dumps(data, sort_keys=True) + "\n").encode()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o660)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            os.fchmod(f.fileno(), 0o660)
+            f.write(raw)
+        if name.is_symlink():
+            raise OSError("monitor snapshot symlink denied")
+        os.replace(tmp, name)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
+def _proc_start(pid: int) -> str:
+    try:
+        # /proc/[pid]/stat fields after the final ')': field 22 is index 19.
+        fields = Path("/proc/%d/stat" % pid).read_text().rsplit(")", 1)[1].split()
+        return fields[19]
+    except (OSError, IndexError):
+        return ""
+
+
+def _alive(state: dict) -> bool:
+    try:
+        pid = state["pid"]
+        return (type(pid) is int and pid > 0 and
+                bool(state.get("proc_start")) and
+                _proc_start(pid) == state["proc_start"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _append(log: Path, message: str) -> None:
+    fd = os.open(log, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+    try:
+        os.write(fd, (message + "\n").encode())
+    finally:
+        os.close(fd)
+
+
+def run_job(path: str, command: list[str], directory: Path | None = None) -> int:
+    if path not in PATHS or not command:
+        raise ValueError("invalid path/command")
+    # The caller must be the already-authorized trusted workflow. Monitoring
+    # unavailability must never silently mutate the work-order semantics.
+    directory = runtime_directory() if directory is None else directory
+    live = directory is not None
+    log = directory / (path + ".log") if live else None
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    task = os.environ.get("PLASMA_MONITOR_TASK", "")
+    if not RUN_ID.fullmatch(run_id):
+        run_id = "unknown"
+    if not TASK_ID.fullmatch(task):
+        task = "unknown"
+    state = {
+        "path": path, "status": "RUNNING", "run_id": run_id,
+        "task": task, "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
+        "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+    }
+    if live:
+        try:
+            fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o660)
+            with os.fdopen(fd, "wb") as f:
+                os.fchmod(f.fileno(), 0o660)
+                f.write(("Job %s %s RUNNING (Run %s)\n" % (path, task, run_id)).encode())
+            _write_state(directory, path, state)
+        except OSError as exc:
+            print("MONITOR_UNAVAILABLE: %s" % type(exc).__name__, file=sys.stderr)
+            live = False
+    env = os.environ.copy()
+    if live and path == "path3":
+        env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
+    else:
+        env.pop("PLASMA_ENGINEERING_MONITOR_LIVE_LOG", None)
+    result = "UNKNOWN"
+    rc = 1
+    try:
+        # No shell or task-specific workflow. Child keeps the exact trusted
+        # command, permission boundary, worktree, receipt and exit status.
+        proc = subprocess.Popen(command, env=env)
+        last_heartbeat = time.monotonic()
+        while proc.poll() is None:
+            time.sleep(1)
+            if live and time.monotonic() - last_heartbeat >= 15:
+                _append(log, "RUNNING | elapsed %ds | Run %s" %
+                        (int(time.monotonic() - last_heartbeat), run_id))
+                last_heartbeat = time.monotonic()
+        rc = proc.wait()
+        result = "PASS" if rc == 0 else "FAIL"
+        return rc
+    finally:
+        if live:
+            try:
+                _append(log, "%s | exit=%s | Run %s" % (result, rc, run_id))
+                _write_state(directory, path, {
+                    **state, "status": "IDLE", "last_result": result,
+                    "exit_code": rc,
+                    "finished": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                })
+            except OSError as exc:
+                print("MONITOR_WRITE_FAILED: %s" % type(exc).__name__, file=sys.stderr)
+
+
+def render_snapshot(directory: Path, path: str) -> str:
+    if path not in PATHS:
+        raise ValueError("unknown path")
+    name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
+    state_file = directory / (path + ".json")
+    log_file = directory / (path + ".log")
+    state = {}
+    try:
+        if not state_file.is_symlink() and state_file.stat().st_size < 8192:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError, TypeError):
+        pass
+    status = state.get("status", "IDLE")
+    if status == "RUNNING" and not _alive(state):
+        status = "IDLE (interrupted/unknown)"
+    if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
+        status = "UNKNOWN"
+    lines = [name, "=" * 35, "STATUS: " + status,
+             "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
+    if status == "RUNNING":
+        started = state.get("started", "")
+        try:
+            elapsed = max(0, int((dt.datetime.now(dt.timezone.utc) -
+                    dt.datetime.fromisoformat(started)).total_seconds()))
+            lines.append("ELAPSED: %ds" % elapsed)
+        except (TypeError, ValueError):
+            pass
+    else:
+        lines.append("LAST: %s  EXIT: %s" %
+                     (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
+    lines.extend(["", "RECENT OUTPUT", "-" * 35])
+    try:
+        if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
+            raise OSError("invalid log")
+        with log_file.open("rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 32768))
+            lines.extend(f.read().decode("utf-8", errors="replace").splitlines()[-30:])
+    except OSError:
+        lines.append("(no local output yet)")
+    return CONTROL.sub("", "\n".join(str(x) for x in lines))
+
+
+def main() -> int:
+    p = argparse.ArgumentParser()
+    sub = p.add_subparsers(dest="action", required=True)
+    for action in ("run", "view"):
+        q = sub.add_parser(action)
+        q.add_argument("path", choices=PATHS)
+        if action == "run":
+            q.add_argument("command", nargs=argparse.REMAINDER)
+    args = p.parse_args()
+    if args.action == "run":
+        command = args.command[1:] if args.command[:1] == ["--"] else args.command
+        return run_job(args.path, command)
+    try:
+        while True:
+            print("\033[2J\033[H" + render_snapshot(MONITOR, args.path), flush=True)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
