@@ -901,10 +901,10 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             args,kwargs=calls[0]
             self.assertEqual(kwargs["timeout"],None)
             self.assertIn("workspace-write",args)
-            self.assertIn("sandbox_workspace_write.network_access=true",args)
+            self.assertIn("sandbox_workspace_write.network_access=false",args)
             self.assertIn("Vivado 2026.1",kwargs["input"].decode())
-            self.assertIn("--path3-engineering-host-only",kwargs["input"].decode())
-            self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
+            self.assertNotIn("--path3-engineering-host-only",kwargs["input"].decode())
+            self.assertNotIn("run every Vivado build",kwargs["input"].decode())
             self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())
             self.assertNotIn("Do not program or access physical FPGA",
                           kwargs["input"].decode())
@@ -1381,11 +1381,11 @@ class GenericWorkOrderContracts(unittest.TestCase):
             "execution_path": path,
             "capability": "codex-workspace" if path == "path3-codex"
                           else "cpu-only",
-            "scope": "host-only",
             "objective": "Perform the owner approved bounded engineering task.",
             "acceptance": "Record actual test commands and observed results.",
         }
         if path == "path2-cli":
+            order["scope"] = "host-only"
             baseline = dev.task_by_id(self.registry, "nine-nine-path2")
             order.update({key: baseline[key] for key in (
                 "script", "argv", "expected_stdout_sha256")})
@@ -1522,200 +1522,36 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
             dev.request(forged, self._context())
 
-    def test_path3_guarded_hardware_is_owner_scoped_and_sha_pinned(self):
-        order = self._order(
-            scope="guarded-hardware",
-            hardware_stages=["test", "restore"])
-        event = self._event(order)
-        request = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, request, event)
-        self.assertEqual(approval["execution_capability"],
-                         "codex-guarded-hardware")
-        self.assertEqual(task["work_order_scope"], "guarded-hardware")
-        self.assertEqual(task["hardware_stages"], ["test", "restore"])
-        self.assertNotIn("swpc_bridge_deployment", task)
-        self.assertNotIn("download", task["hardware_stages"])
-        self.assertEqual(approval["work_order_sha256"],
-                         dev.work_order_digest(order))
-        tampered = copy.deepcopy(event)
-        tampered["comment"]["body"] = dev.WORK_ORDER_PREFIX + json.dumps(
-            order | {"hardware_stages": ["download", "test", "restore"]})
-        with self.assertRaisesRegex(dev.Denied, "DIGEST_MISMATCH"):
-            dev.task_for_request(self.registry, request, tampered)
-
-    def test_path3_guarded_hardware_does_not_expand_without_actions(self):
-        forbidden = [
-            self._order(scope="guarded-hardware"),
-            self._order(scope="guarded-hardware",
-                        hardware_stages=["erase"]),
-            self._order(scope="guarded-hardware",
-                        hardware_stages=["test", "test"]),
-            self._order(scope="guarded-hardware",
-                        hardware_stages="restore"),
-            self._order(scope="guarded-hardware",
-                        swpc_bridge_deployment="true"),
-            self._order(scope="guarded-hardware",
-                        hardware_stages=["test"],
-                        pr_number=1234, source_sha="invalid"),
-            self._order(scope="host-only", hardware_stages=["test"]),
-            self._order(scope="host-only", swpc_bridge_deployment=True),
-        ]
-        for order in forbidden:
-            with self.subTest(order=order), self.assertRaises(dev.Denied):
-                dev.request(self._event(order), self._context())
-
-    def test_guarded_hardware_premerge_uses_existing_pr_head_pinning(self):
-        order = self._order(scope="guarded-hardware",
-                            hardware_stages=["test"],
-                            pr_number=1234, source_sha="b" * 40)
+    def test_goal_order_has_no_mode_builder_or_stage_list(self):
+        order = self._order(pr_number=1234, source_sha="b" * 40)
         event = self._event(order)
         pr = {
             "number": 1234, "state": "open", "merged_at": None,
             "user": {"login": "physicslu"},
             "head": {"ref": "agent/candidate", "sha": "b" * 40,
                      "repo": {"full_name": "physicslu/plasma"}},
-            "base": {"ref": "main",
-                     "repo": {"full_name": "physicslu/plasma"}},
+            "base": {"ref": "main", "repo": {"full_name": "physicslu/plasma"}},
         }
-        approved = dev.authorize(event, self._context(),
-                                  self.registry, pr_info=pr)
-        self.assertEqual(approved["pinned_sha"], "b" * 40)
-        self.assertEqual(approved["execution_capability"],
-                         "codex-guarded-hardware")
+        approval = dev.authorize(event, self._context(), self.registry, pr_info=pr)
+        self.assertEqual(approval["execution_capability"], "codex-workspace")
+        task = dev.task_for_request(self.registry,
+                                   dev.request(event, self._context()), event)
+        self.assertNotIn("work_order_scope", task)
+        self.assertNotIn("hardware_stages", task)
         with self.assertRaisesRegex(dev.Denied, "PR_HEAD_SHA_MISMATCH"):
             dev.authorize(event, self._context(), self.registry,
-                          pr_info=pr | {"head": pr["head"] |
-                                      {"sha": "c" * 40}})
+                          pr_info=pr | {"head": pr["head"] | {"sha": "c" * 40}})
 
-    def test_path3_guarded_hardware_worker_capability_and_network(self):
-        order = self._order(scope="guarded-hardware",
-                            hardware_stages=["test", "restore"])
-        event = self._event(order)
-        request = dev.request(event, self._context())
-        task = dev.task_for_request(self.registry, request, event)
-        class Args:
-            action = "execute-codex"
-            trusted_sha = "a" * 40
-            pinned_sha = "a" * 40
-            pr_number = 0
-            execution_capability = "codex-workspace"
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            args = Args()
-            args.workspace = root
-            args.registry = root / "tasks.json"
-            args.registry.write_text(json.dumps(self.registry))
-            args.registry_sha256 = hashlib.sha256(
-                args.registry.read_bytes()).hexdigest()
-            args.work_order_sha256 = request["work_order_sha256"]
-            with patch.dict(os.environ, {
-                    "RUNNER_ENVIRONMENT": "self-hosted",
-                    "RUNNER_NAME": "SWPC-plasma-codex",
-                    "GITHUB_RUN_ATTEMPT": "1",
-            }), patch.object(dev.os, "geteuid", return_value=1000):
-                with self.assertRaisesRegex(
-                        dev.Denied, "CAPABILITY_ROUTE_MISMATCH"):
-                    dev.worker_admission(request, args, self.registry, event)
-                args.execution_capability = "codex-guarded-hardware"
-                admitted = dev.worker_admission(
-                    request, args, self.registry, event)
-                self.assertEqual(admitted["execution_capability"],
-                                 "codex-guarded-hardware")
-            captured = []
-            class Fake:
-                returncode = 0
-                stdout = b"offline Codex only"
-                stderr = b""
-            def fake_codex(command, **kw):
-                captured.append((command, kw["input"].decode()))
-                (root / ".plasma-path3-evidence" /
-                 "engineering-report.md").write_text("Offline test evidence.\\n")
-                return Fake()
-            receipt = dev.run_codex_task(
-                task, workspace=root, executor=fake_codex,
-                task_id="path3-work-order")
-            self.assertEqual(receipt["status"],
-                             "EVIDENCE_READY_REVIEW_REQUIRED")
-            self.assertEqual(len(captured), 1)
-            self.assertIn("sandbox_workspace_write.network_access=true",
-                          captured[0][0])
-            self.assertIn("GUARDED-HARDWARE", captured[0][1])
-            self.assertIn("test, restore", captured[0][1])
-            self.assertIn("Do not run Download unless", captured[0][1])
-            self.assertIn("shared trusted-main stage transport",
-                          captured[0][1])
-            self.assertIn("DELEGATED", captured[0][1])
-            self.assertIn("Do not call the Bridge, sudo, SSH", captured[0][1])
-
-    def test_path3_reuses_existing_path2_trusted_bridge_in_one_job(self):
+    def test_deleted_automatic_hardware_progression_is_absent(self):
         import plasma_path2_runtime_integration as integration
-        order = self._order(scope="guarded-hardware",
-                            hardware_stages=["test", "restore"])
-        event = self._event(order)
-        req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, req, event)
-        executed = []
-        boot = "hardware-boot-validated"
-        def fake_bridge(stage, source_sha):
-            executed.append(stage)
-            return {"stage": stage, "source_sha": source_sha,
-                    "real_z2": True, "boot_id": boot,
-                    "result": "IDENTITY_PASS" if stage == "test" else "RESTORED_VERIFIED"}
-        with patch.object(integration.transport, "execute", side_effect=fake_bridge):
-            receipt = integration.path3_shared_hardware_stages(task, approval)
-        self.assertEqual(executed, ["test", "restore"])
-        self.assertEqual(receipt["real_z2"], True)
-        self.assertEqual(receipt["boot_id"], boot)
-        self.assertEqual([x["result"] for x in receipt["completed"]],
-                         ["IDENTITY_PASS", "RESTORED_VERIFIED"])
-        self.assertEqual(receipt["delegate"],
-                         "shared-trusted-main-stage-transport")
-        self.assertNotIn("download", executed)
-        with self.assertRaisesRegex(
-                integration.RuntimeDenied, "APPROVAL_DENIED"):
-            integration.path3_shared_hardware_stages(
-                task | {"work_order_sha256": "0" * 64}, approval,
-                )
-        # A valid request cannot create an admin deployment route. Neither
-        # it nor a malformed boolean may reach the stage executor.
-        for deployment in (True, False, "true", 1, None):
-            with patch.object(integration.transport, "execute") as run:
-                with self.assertRaisesRegex(integration.RuntimeDenied, "OBSOLETE"):
-                    integration.path3_shared_hardware_stages(
-                        task | {"swpc_bridge_deployment": deployment}, approval)
-                run.assert_not_called()
-        self.assertEqual(executed, ["test", "restore"])
-
-    def test_path3_shared_bridge_fail_closed_without_restore(self):
-        import plasma_path2_runtime_integration as integration
-        order = self._order(scope="guarded-hardware",
-                            hardware_stages=["test", "restore"])
-        event = self._event(order)
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(
-            self.registry, dev.request(event, self._context()), event)
-        executed = []
-        def deny_test(stage, source_sha):
-            executed.append(stage)
-            raise integration.transport.Blocked("REMOTE_EXIT_OR_PRIVILEGE_FAILED")
-        with patch.object(integration.transport, "execute", side_effect=deny_test):
-            with self.assertRaisesRegex(integration.RuntimeDenied, "REMOTE_EXIT_OR_PRIVILEGE_FAILED"):
-                integration.path3_shared_hardware_stages(task, approval)
-        self.assertEqual(executed, ["test"])
-
-    def test_path3_shared_workflow_uses_one_existing_runner(self):
-        wf = WORKFLOW.read_text()
-        execute = wf.split("  development-execute:", 1)[1].split(
+        self.assertFalse(hasattr(integration, "path3_shared_hardware_stages"))
+        execute = WORKFLOW.read_text().split("  development-execute:", 1)[1].split(
             "  development-codex:", 1)[0]
-        self.assertIn("development-claim, development-codex]", execute)
-        self.assertIn("outputs.execution_capability == 'codex-guarded-hardware'",
-                      execute)
-        self.assertIn("needs.development-codex.result == 'success'", execute)
-        self.assertNotIn("outputs.task_id == 'path3-work-order'", execute)
-        self.assertEqual(wf.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+        self.assertNotIn("codex-guarded-hardware", execute)
+        job = WORKFLOW.read_text().split("  development-codex:", 1)[1].split(
+            "  authorize:", 1)[0]
+        self.assertNotIn("Prefetch exact F1-B", job)
+        self.assertNotIn("PLASMA_FPGA_PATH3_APPROVED", job)
 
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
@@ -1728,7 +1564,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
 
-    def test_path3_prompt_preserves_host_only_and_one_attempt(self):
+    def test_path3_prompt_preserves_privilege_boundary_and_one_invocation(self):
         order = self._order()
         event = self._event(order)
         task = dev.task_for_request(
@@ -1752,7 +1588,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 task_id="path3-work-order")
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
-            self.assertIn("HOST-ONLY", calls[0])
+            self.assertIn("existing trusted root executor", calls[0])
+            self.assertNotIn("Authorized Z2 stages in order", calls[0])
+            self.assertNotIn("Authorized scope:", calls[0])
             self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
             self.assertIn("Acceptance criteria", calls[0])
             self.assertIn("Owner Work Order SHA256", calls[0])

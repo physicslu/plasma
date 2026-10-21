@@ -97,22 +97,6 @@ class Contracts(unittest.TestCase):
             self.assertIsNone(d.live_pr_metadata({'pr_number':0}))
             call.assert_not_called()
 
-    def test_shared_stage_boot_change_stops_before_restore(self):
-        task = {'execution_path':'path3-codex','capability':'codex-workspace',
-                'work_order_scope':'guarded-hardware','work_order_sha256':'c'*64,
-                'hardware_stages':['download','test','restore']}
-        approval = {'task_id':'path3-work-order','execution_path':'path3-codex',
-                    'execution_capability':'codex-guarded-hardware',
-                    'work_order_sha256':'c'*64,'pinned_sha':SHA,'trusted_sha':SHA,'pr_number':0}
-        def receipt(stage, sha):
-            return {'stage':stage,'source_sha':sha,'real_z2':True,
-                    'boot_id':'original-boot' if stage == 'download' else 'changed-boot',
-                    'result':{'download':'LOADED_AND_HELD','test':'IDENTITY_PASS'}[stage]}
-        with patch.object(t, 'execute', side_effect=receipt) as call:
-            with self.assertRaisesRegex(r.RuntimeDenied,'BOOT_CHANGED'):
-                r.path3_shared_hardware_stages(task, approval)
-            self.assertEqual([x.args[0] for x in call.call_args_list],['download','test'])
-
     def test_single_path2_test_has_no_implicit_download_restore(self):
         approval = {'task_id':'z2-path2-testing','execution_path':'path2-cli',
                     'execution_capability':'path2-stage-contract','pinned_sha':SHA,
