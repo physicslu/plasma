@@ -670,7 +670,22 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_log_sha256"],
                              hashlib.sha256(log.encode()).hexdigest())
 
-    def test_codex_zero_exit_without_evidence_is_fail_not_success(self):
+    def test_guarded_hardware_requires_complete_codex_evidence(self):
+        task = self.task | {"work_order_scope": "guarded-hardware"}
+        with tempfile.TemporaryDirectory() as td:
+            class Incomplete:
+                returncode = 0
+                stdout = b""
+                stderr = b""
+            receipt = dev.run_codex_task(
+                task, workspace=Path(td),
+                executor=lambda *args, **kwargs: Incomplete())
+            self.assertEqual(receipt["status"],
+                             "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED")
+            self.assertEqual(receipt["failure_reason"], "CODEX_EVIDENCE_INCOMPLETE")
+            self.assertFalse(receipt["evidence_complete"])
+
+    def test_codex_zero_exit_keeps_host_only_incomplete_evidence_as_metadata(self):
         with tempfile.TemporaryDirectory() as td:
             class Incomplete:
                 returncode=0
@@ -679,9 +694,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             receipt=dev.run_codex_task(
                 self.task,workspace=Path(td),
                 executor=lambda *args,**kwargs:Incomplete())
-            self.assertEqual(receipt["status"],
-                             "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED")
-            self.assertEqual(receipt["failure_reason"],"CODEX_EVIDENCE_INCOMPLETE")
+            self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+            self.assertNotIn("failure_reason", receipt)
             self.assertEqual(receipt["codex_exit_code"],0)
             self.assertFalse(receipt["evidence_complete"])
             self.assertTrue((Path(td)/".plasma-path3-evidence/codex.log").exists())

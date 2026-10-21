@@ -291,6 +291,17 @@ document package, or new runtime/checking subsystem:
    and retest under the same Gate 1; for an unexecuted step, report the
    actionable blocker as `NOT_RUN`, not `PASS`.
 
+Paths 2 and 3 share three substantive Development Mode BLOCKING decisions:
+(1) Owner-approved scope and trusted executable/source;
+(2) current host/Z2 ownership, image safety and protected recovery;
+(3) authentic execution outcome, with no follow-on operations after failure or uncertainty.
+These are not three atomic predicates: root and source integrity, native aligned
+read-only MMIO, FPGA Manager exclusivity, persistent UNKNOWN/crash state, and
+unreaped child/SIGBUS prevention remain mandatory. Routine report labels or
+unrelated service availability must not create separate stop gates.
+See `docs/development/development-blocking-policy.md` for actual removals and
+the retained device safety constraints.
+
 **Decision:** *approved scope + no actual blocker -> execute and observe*.
 Favor the shortest reproducible Build -> Run -> Observe -> Fix loop.
 Do not create extra gates, once-only constraints, scripts, workflows,

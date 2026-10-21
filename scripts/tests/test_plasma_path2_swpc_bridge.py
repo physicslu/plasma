@@ -217,10 +217,11 @@ class BridgeContracts(unittest.TestCase):
                 b"\n" + self._receipt(),
             ], exit_code=1)
 
-    def test_reject_missing_ssh_password_prompt_even_with_receipt(self):
-        with self.assertRaisesRegex(
-                bridge.Blocked, "REMOTE_EXIT_OR_PRIVILEGE_FAILED"):
-            self._fake_ssh([b"\n" + self._receipt()])
+    def test_ssh_prompt_not_required_when_exact_root_receipt_is_valid(self):
+        receipt, _writes = self._fake_ssh([b"\n" + self._receipt()])
+        self.assertEqual(receipt["result"], "LOADED_AND_HELD")
+        with self.assertRaises(bridge.Blocked):
+            self._fake_ssh([b"\nno root receipt\n"])
 
     def test_reject_unexpected_pty_error(self):
         with self.assertRaises(OSError) as raised:

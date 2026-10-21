@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -16,6 +16,8 @@ from pl.hil import f1b
 from pl.hil import path2_f1b_minimal_stage as stage
 from pl.hil import path2_f1b_dev_risk as risk
 from pl.hil.swd04 import one_shot
+
+REAL_RUN_CHILD = one_shot.run_child
 
 
 class FakeTarget:
@@ -144,6 +146,30 @@ class RepeatableStageTests(unittest.TestCase):
             stage.run("restore")
         self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
 
+    def test_native_supervisor_sigbus_and_unreaped_persist_stop(self):
+        import subprocess
+        for exits, reason in (([-7], "SIGBUS"),
+                ([subprocess.TimeoutExpired("fake", 35)] * 3,
+                 "UNREAPED_NO_RELOAD")):
+            with self.subTest(reason=reason):
+                if stage.STATE.exists():
+                    stage.STATE.unlink()
+                self.target.image = "base.bin"
+                self.target.writes.clear()
+                stage.run("download")
+                proc = Mock(pid=123, wait=Mock(side_effect=exits))
+                with patch.object(one_shot, "run_child", REAL_RUN_CHILD), \
+                     patch.object(one_shot.subprocess, "Popen", return_value=proc), \
+                     patch.object(one_shot.os, "killpg"), \
+                     self.assertRaisesRegex(one_shot.c.SafetyError, reason):
+                    stage.run("test")
+                self.assertEqual(self.state()["status"], "UNKNOWN")
+                for follow in ("download", "test", "restore"):
+                    with self.assertRaisesRegex(stage.LiveStageDenied,
+                                                "UNCERTAIN_PRIOR_OPERATION"):
+                        stage.run(follow)
+                self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
+
     def test_restore_error_forbids_blind_repeat(self):
         stage.run("download")
         self.target.fail_restore = True
@@ -189,6 +215,7 @@ class RepeatableStageTests(unittest.TestCase):
             stage.run("restore")
         self.assertEqual(self.target.writes, [stage.CANDIDATE.name])
 
+    @patch.object(Path, "resolve", lambda path: path)
     def test_abnormal_arm_runtime_denied_before_hardware(self):
         stage.native_runtime_preflight(
             version=(3, 12, 13), machine="armv7l", endian="little",

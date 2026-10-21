@@ -934,9 +934,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     if proc.returncode != 0:
         receipt["status"] = "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"
         receipt["failure_reason"] = "CODEX_CLI_NONZERO"
-    elif not evidence_complete:
+    elif not evidence_complete and task.get("work_order_scope") == "guarded-hardware":
+        # This status blocks the shared hardware job: success of Codex alone
+        # cannot authorize a physical stage without reviewable engineering data.
         receipt["status"] = "CODEX_EVIDENCE_INCOMPLETE_REVIEW_REQUIRED"
         receipt["failure_reason"] = "CODEX_EVIDENCE_INCOMPLETE"
+    # For host-only work, incomplete reporting remains visible metadata, not
+    # a new operational BLOCKING.
     receipt["evidence_complete"] = evidence_complete
     return receipt
 

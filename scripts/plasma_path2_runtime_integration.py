@@ -230,9 +230,8 @@ def path3_shared_hardware_stages(task: dict, approval: dict, *,
                 stage in ("download", "test", "restore") for stage in stages)
             and len(stages) == len(set(stages)),
             "PATH3_SHARED_STAGE_LIST_DENIED")
-    require(approval.get("auto_download_after_build_success", False) is False
-            and approval.get("auto_test_after_download_success", False) is False,
-            "PATH3_SHARED_AUTO_TRANSITION_DENIED")
+    # The common stage_contract enforces auto-transition scope before the
+    # first trusted Bridge invocation for both Paths.
     observed = []
     boot_id = None
     for stage in stages:
@@ -277,9 +276,7 @@ def full_hil_sequence(task: dict, approval: dict, *,
             and task.get("project") == "pl/projects/z2-fixed-unified-site1"
             and task.get("stage") == "full",
             "PATH2_FULL_TASK_DENIED")
-    require(approval.get("auto_download_after_build_success", False) is False
-            and approval.get("auto_test_after_download_success", False) is False,
-            "PATH2_FULL_AUTO_FLAGS_DENIED")
+    # Each shared stage_contract enforces transition scope before Bridge.
     # These are three normal calls to the installed provider, but the owner
     # explicitly selected full-hil. Normal task triggers never auto-chain.
     stages = (("z2-path2-download", "download"),
@@ -301,12 +298,7 @@ def full_hil_sequence(task: dict, approval: dict, *,
                 "PATH2_FULL_BOOT_OR_STAGE_CHANGED")
         boot_id = observed["boot_id"]
         results.append({"stage": stage, "result": observed["result"]})
-    require([item["stage"] for item in results] ==
-            ["download", "test", "restore"] and
-            results[0]["result"] == "LOADED_AND_HELD" and
-            results[1]["result"] == "IDENTITY_PASS" and
-            results[2]["result"] in ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
-            "PATH2_FULL_INCOMPLETE")
+    # Each stage's result was already validated by registered_hardware_stage.
     return {"status": "REAL_Z2_FULL_HIL_EVIDENCE_REVIEW_REQUIRED",
             "real_z2": True,
             "mode": "full-hil",

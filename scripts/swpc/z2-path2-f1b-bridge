@@ -170,7 +170,7 @@ def execute(stage: str, source_sha: str) -> dict:
         # sudo -S may be cached or configured to omit a password prompt.
         # Require a successful remote exit and exact root-entry receipt
         # instead of requiring a prompt that may legitimately be absent.
-        need(proc.wait(timeout=3) == 0 and ssh_sent,
+        need(proc.wait(timeout=3) == 0,
              "REMOTE_EXIT_OR_PRIVILEGE_FAILED")
         # SSH and sudo prompts do not require line breaks. A legitimate
         # root-entry marker may follow both prompts on the *same* PTY line.
