@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import stat
 import time
+import threading
 
 from pl.hil import f1b
 from pl.hil.swd04 import one_shot
@@ -154,7 +155,9 @@ def scan_proc_consumers(*, procroot: Path) -> tuple[bool, list[str]]:
             except ValueError:
                 conflicts.append(item.name)
         except FileNotFoundError:
-            need(not item.exists(), "LIVE_PROCESS_SCAN_INCOMPLETE")
+            # A disappearing PID means this snapshot is incomplete, even
+            # when it is a normal transient Linux process.
+            return False, [*conflicts, item.name]
         except (PermissionError, OSError):
             return False, [*conflicts, item.name]
     return observed > 0, conflicts
@@ -197,10 +200,18 @@ class RootZ2TargetPort:
     def __init__(self, *, candidate: Path, recovery: Path, ledger: Path):
         self.candidate, self.recovery, self.ledger = candidate, recovery, ledger
         self._locked = False
+        self._lock_owner_pid: int | None = None
+        self._lock_owner_thread: int | None = None
+
+    def _require_locked(self) -> None:
+        need(self._locked and self._lock_owner_pid == os.getpid() and
+             self._lock_owner_thread == threading.get_ident(),
+             "FPGA_OWNER_LOCK_REQUIRED")
 
     @contextmanager
     def exclusive(self):
         need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
+        need(not self._locked, "REENTRANT_TARGET_LOCK_DENIED")
         one_shot.protected(GLOBAL_LOCK.parent, file=False)
         need(self.ledger.parent.is_dir() and
              self.ledger.parent.resolve() == GLOBAL_LOCK.parent.resolve(),
@@ -213,18 +224,24 @@ class RootZ2TargetPort:
                  "GLOBAL_FPGA_LOCK_UNTRUSTED")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._locked = True
+            self._lock_owner_pid = os.getpid()
+            self._lock_owner_thread = threading.get_ident()
             yield self
         finally:
+            # Guard ownership is bound to the calling process and thread,
+            # not to an ambient Boolean shared with other callers.
             self._locked = False
+            self._lock_owner_pid = None
+            self._lock_owner_thread = None
             os.close(fd)
 
     def passive_report(self) -> dict:
-        need(self._locked, "FPGA_OWNER_LOCK_REQUIRED")
+        self._require_locked()
         return classify_passive_facts(read_live_z2_facts(
             candidate=self.candidate, recovery=self.recovery))
 
     def now(self) -> int:
-        need(self._locked, "FPGA_OWNER_LOCK_REQUIRED")
+        self._require_locked()
         return int(time.time())
 
     def qualification(self, stage: str) -> dict:
@@ -237,7 +254,7 @@ class RootZ2TargetPort:
         raise TargetSafetyDenied("AUTHENTICATED_LOADED_IMAGE_OBSERVER_NOT_INSTALLED")
 
     def image_sha256(self, which: str) -> str:
-        need(self._locked, "FPGA_OWNER_LOCK_REQUIRED")
+        self._require_locked()
         need(which in ("candidate", "recovery"), "IMAGE_NAME_DENIED")
         return _sha_file(self.candidate if which == "candidate" else self.recovery,
                          f1b.BIN_SHA if which == "candidate" else f1b.BASE_SHA)
