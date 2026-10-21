@@ -88,8 +88,11 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
-    if task_id in ("z2-path2-download", "z2-path2-testing"):
-        expected = {"z2-path2-download": "download", "z2-path2-testing": "test"}
+    if task_id in ("z2-path2-download", "z2-path2-testing",
+                    "z2-path2-restore"):
+        expected = {"z2-path2-download": "download",
+                    "z2-path2-testing": "test",
+                    "z2-path2-restore": "restore"}
         require(execution_path == "path2-cli" and set(task) == {
             "execution_path", "capability", "project", "stage",
         } and task["capability"] == "path2-stage-contract"
@@ -368,7 +371,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "path2-stage-contract":
         import plasma_path2_runtime_integration as integration
-        return integration.disabled_hardware_stage(task, approval)
+        return integration.registered_hardware_stage(task, approval)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
