@@ -228,14 +228,14 @@ class CandidateBridgeContracts(unittest.TestCase):
                 scratch=Path(cwd)
                 out=scratch/"scripts/experiments/plasma_auto4_branch_codex_generated.py"
                 out.parent.mkdir(parents=True)
-                out.write_text("for n in range(1,13): print(n,n*(n+1)//2)\\n")
+                out.write_text("for n in range(1,13): print(n,n*(n+1)//2)\n")
                 out.with_suffix(".csv").write_text(
-                    "n,triangular\\n"+"".join(
-                        f"{n},{n*(n+1)//2}\\n" for n in range(1,13)))
-                out.with_suffix(".test.log").write_text("12 rows checked; exit 0\\n")
+                    "n,triangular\n"+"".join(
+                        f"{n},{n*(n+1)//2}\n" for n in range(1,13)))
+                out.with_suffix(".test.log").write_text("12 rows checked; exit 0\n")
                 evidence=scratch/".plasma-path3-evidence"
                 evidence.mkdir()
-                (evidence/"engineering-report.md").write_text("Synthetic fixture, not real Codex.\\n")
+                (evidence/"engineering-report.md").write_text("Synthetic fixture, not real Codex.\n")
                 self.assertIn(self.task()["objective"].encode(),input_bytes)
                 return 0,b"HOSTED_SYNTHETIC_AGENT_ONLY",b""
             from contextlib import redirect_stdout
