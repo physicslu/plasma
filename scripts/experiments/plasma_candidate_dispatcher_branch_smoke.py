@@ -32,12 +32,16 @@ def check_isolation(*, environ=None, exists=None) -> None:
     forbidden_env_fragments = ("TOKEN", "SECRET", "CREDENTIAL", "AUTH", "API_KEY")
     for key in env:
         upper = key.upper()
-        assert not (any(marker in upper for marker in forbidden_env_fragments)
-                    or upper.startswith(("SSH_", "AWS_", "AZURE_", "GOOGLE_"))
-                    or upper in ("CODEX_HOME", "GITHUB_TOKEN", "GH_TOKEN")),
-                    "HOST_CREDENTIAL_ENV_EXPOSED"
+        credential_key = (
+            any(marker in upper for marker in forbidden_env_fragments)
+            or upper.startswith(("SSH_", "AWS_", "AZURE_", "GOOGLE_"))
+            or upper in ("CODEX_HOME", "GITHUB_TOKEN", "GH_TOKEN")
+        )
+        assert not credential_key, "HOST_CREDENTIAL_ENV_EXPOSED"
+    assert not path_exists("/sys"), "HOST_SYSFS_MOUNT_DENIED"
+    assert not path_exists("/run/udev"), "HOST_UDEV_MOUNT_DENIED"
     forbidden_paths = (
-        "/home", "/root", "/sys", "/run/udev", "/dev/mem",
+        "/home", "/root", "/dev/mem",
         "/dev/gpiomem", "/dev/uio0", "/dev/uio1",
         "/dev/ttyUSB0", "/dev/ttyACM0", "/dev/serial",
         "/dev/bus/usb", "/dev/i2c-0", "/dev/spidev0.0",
