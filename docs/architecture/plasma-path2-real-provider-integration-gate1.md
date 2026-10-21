@@ -57,6 +57,68 @@ execution is NOT qualified or registered.** Existing main base:
   **pull_request GitHub-hosted offline-contract job only**. It does not
   introduce any new self-hosted runner or workflow.
 
+## Minimal local Site1 F1-B experiment — distinct manual triggers
+
+**Owner scope reduction, 2026-10-21:** prove one **physical Path 2**
+Download → independently triggered Testing → separately triggered Restore.
+Reuse the previously verified F1-B candidate and original `base.bin`;
+no Vivado rebuild, DMA/AXI redesign, extra qualification workflows,
+Production attestation, DUT/LA/power operations, deployment or PR merge.
+
+`pl/hil/path2_f1b_minimal_stage.py` is a **new Z2-local candidate
+root-owned command** with exactly three explicit CLI stages. It reuses the
+original `one_shot.manager_write`, F1-B native three-word LinuxMMIO reader
+under the existing bounded child supervisor, and the existing fsync/flock
+`LeaseLedger`. It is **not** shipped or registered by this PR and has **not**
+been run on actual Z2. It intentionally avoids introducing a network daemon
+or a new Github Actions self-hosted privilege route.
+
+Local-only stage entrypoints, usable **only after separately reviewed
+installation of the exact source by the trusted Z2 root operator**:
+
+```text
+PLASMA_DEV_RISK_ACK=PLASMA_PATH2_F1B_SITE1_20261021_ONCE_BOUND_PASSIVE_UIO
+python3 -m pl.hil.path2_f1b_minimal_stage download
+python3 -m pl.hil.path2_f1b_minimal_stage test
+python3 -m pl.hil.path2_f1b_minimal_stage restore
+```
+
+The displayed environment assignment is an explicit risk acknowledgement,
+**not** an access token; on each separate invocation the root operator
+must provide the same approved `PLASMA_DEV_RISK_ACK` variable. Do not
+run a mutable PR checkout as root. This is an interface specification,
+**not** an instruction to execute it on Z2 before target deployment
+and root-route verification.
+
+- Download: root-controlled candidate/recovery hash and bound UIO facts,
+  one protected common FPGA lock, fixed trusted `base.bin` load trace,
+  persistent `RESTORE_REQUIRED` and `LOAD_IN_FLIGHT` records **before**
+  any hardware write; leave F1-B loaded, `LOADED_AND_HELD`.
+- Test: independent invocation under same lock, exact boot/loaded manager
+  trace and unexpired 900-second Lease, only first native child, exactly
+  three 32-bit read-only Identity words, no register writes; no implicit
+  Restore on success.
+- Restore: independent invocation, require successful native test/child
+  reap and unchanged services/UIO baseline, persistent
+  `RESTORE_IN_FLIGHT` before one `base.bin` write, then check original
+  manager state/trace and mark `RESTORED_VERIFIED`.
+- Any load, child, native read or restore uncertainty is persistently
+  marked `UNKNOWN_MANUAL_RECOVERY`; never auto-repeat a candidate load,
+  test child or restore. The ledger is durable across separate processes
+  but stored under `/run` and **does not survive a reboot**; current-boot
+  provenance must still be reverified.
+- Live Manager dmesg provenance is a bounded **development observation**,
+  not proof of the current FPGA bit cells or AXI isolation. The owner
+  expressly accepted only the exact bound-passive Site1 UIO risk.
+
+GitHub-hosted negative tests simulate the three stage calls, changed boot,
+expired Lease, duplicate triggers, child failure, load failure and restore
+failure. This **Host-only PASS is not hardware HIL**. An authenticated
+root-owned SWPC → Z2 reviewed route for this stage command is still missing
+and the existing Dispatcher explicitly returns
+`PATH2_LIVE_PROVIDER_NOT_REGISTERED` (correct fail-closed behavior).
+No HIL stage has been dispatched from PR code.
+
 ## Evidence reuse / target admission (as of 2026-10-21)
 
 The owner confirms Z2 is physically connected as before. This confirms
