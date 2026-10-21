@@ -197,13 +197,12 @@ def parse_dynamic_work_order(event: object) -> dict:
     except (ValueError, TypeError):
         raise Denied("WORK_ORDER_JSON_DENIED") from None
     require(type(order) is dict and
-            set(order) >= {"schema", "objective", "acceptance", "scope",
+            set(order) >= {"schema", "objective", "acceptance",
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage",
-                               "hardware_stages"},
+                               "expected_stdout_sha256", "project", "stage"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -215,36 +214,17 @@ def parse_dynamic_work_order(event: object) -> dict:
     require(len(order["objective"]) + len(order["acceptance"]) <= 10000,
             "WORK_ORDER_TOO_LARGE")
     path, capability, scope = (order["execution_path"],
-                               order["capability"], order["scope"])
+                               order["capability"], order.get("scope"))
     require(type(path) is str and path in DYNAMIC_TASKS and
-            type(capability) is str and type(scope) is str,
+            type(capability) is str,
             "WORK_ORDER_PATH_DENIED")
     base = {"schema", "objective", "acceptance", "scope",
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        # The generic agent can perform bounded real lab work. Root-owned
-        # hardware Runtime Guards and existing OS permissions remain binding.
         require(capability == "codex-workspace" and
-                scope in ("host-only", "guarded-hardware"),
-                "WORK_ORDER_PATH3_CAPABILITY_DENIED")
-        if scope == "host-only":
-            require(set(order) <= base | optional_ref,
-                    "WORK_ORDER_PATH3_HOST_ONLY_FIELDS_DENIED")
-        else:
-            require(set(order) <= base | optional_ref |
-                    {"hardware_stages"},
-                    "WORK_ORDER_PATH3_HARDWARE_FIELDS_DENIED")
-            stages = order.get("hardware_stages", [])
-            require(type(stages) is list and len(stages) <= 3
-                    and all(type(stage) is str and
-                            stage in ("download", "test", "restore")
-                            for stage in stages)
-                    and len(set(stages)) == len(stages)
-                    and bool(stages),
-                    "WORK_ORDER_PATH3_ACTIONS_DENIED")
-            # Branch Work Orders reuse verify_pr() to pin the exact
-            # owner-authored PR HEAD; no second development-only gate.
+                set(order) <= (base - {"scope"}) | optional_ref,
+                "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only":
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
@@ -308,11 +288,12 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "capability": order["capability"],
         "objective": order["objective"],
         "acceptance": order["acceptance"],
-        "work_order_scope": order["scope"],
         "work_order_sha256": req["work_order_sha256"],
     }
+    if order["execution_path"] == "path2-cli":
+        task["work_order_scope"] = order["scope"]
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage", "hardware_stages"):
+                "project", "stage"):
         if key in order:
             task[key] = order[key]
     return task
@@ -472,10 +453,7 @@ def authorize(event: object, context: dict, registry: object,
             "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
             else task.get("capability", "cpu-only")
                  if task["execution_path"] == "path2-cli"
-            else ("codex-guarded-hardware"
-                  if req["task_id"] == DYNAMIC_TASKS["path3-codex"]
-                  and task.get("work_order_scope") == "guarded-hardware"
-                  else "codex-workspace")
+            else "codex-workspace"
         ),
         **a2_claim,
     }
@@ -546,10 +524,6 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         if approval is not None and approval.get("task_id") == "z2-path2-full-hil":
             return integration.full_hil_sequence(task, approval)
         return integration.registered_hardware_stage(task, approval)
-    if (task.get("execution_path") == "path3-codex" and
-            task.get("work_order_scope") == "guarded-hardware"):
-        import plasma_path2_runtime_integration as integration
-        return integration.path3_shared_hardware_stages(task, approval)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -657,20 +631,11 @@ def worker_admission(req: dict, args, registry: object,
         "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
         else task.get("capability", "cpu-only")
              if task["execution_path"] == "path2-cli"
-        else ("codex-guarded-hardware"
-              if req["task_id"] == DYNAMIC_TASKS["path3-codex"]
-              and task.get("work_order_scope") == "guarded-hardware"
-              else "codex-workspace")
+        else "codex-workspace"
     )
     require(args.execution_capability in (None, capability),
             "CAPABILITY_ROUTE_MISMATCH")
-    shared_path3_hardware = (
-        args.action == "execute"
-        and req["task_id"] == DYNAMIC_TASKS["path3-codex"]
-        and task.get("work_order_scope") == "guarded-hardware"
-        and capability == "codex-guarded-hardware"
-    )
-    require(shared_path3_hardware or task["execution_path"] == (
+    require(task["execution_path"] == (
         "path3-codex" if args.action == "execute-codex" else "path2-cli"
     ), "WRONG_EXECUTION_PATH")
     return {
@@ -785,51 +750,18 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "this report for review; do not commit, push or change Git refs.\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
-        scope = task["work_order_scope"]
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
-            "Authorized scope: " + scope + "\n"
         )
-        if scope == "host-only":
-            prompt += (
-                "HOST-ONLY: no Z2 SSH/sudo, FPGA programming, MMIO, DUT, "
-                "USB power, or system deployment.\n"
-            )
-        else:
-            stages = task.get("hardware_stages", [])
-            prompt += (
-                "GUARDED-HARDWARE Development Mode. "
-                "Authorized Z2 stages in order: " + (", ".join(stages)
-                if stages else "(none)") + ". Do not run Download unless "
-                "explicitly listed. Hardware execution is DELEGATED to "
-                "the shared trusted-main stage transport "
-                "outside your Codex sandbox, after this engineering job "
-                "succeeds. Do not call the Bridge, sudo, SSH, FPGA Manager, "
-                "/dev/mem or UIO yourself; no second hardware executor, "
-                "new service or privilege workaround. Inspect code and "
-                "document acceptance, known preconditions and risks; "
-                "do not claim any Z2 result yet. Report an unrecoverable "
-                "engineering blocker with a nonzero Codex exit code so "
-                "the delegated job is skipped. Existing enrolled credentials and "
-                "Z2 protected source manifest remain required.\n"
-            )
-    if task_id == "f1b-path3-codex-vivado-build":
-        prompt += (
-            "For this F1-B task, run every Vivado build through the SAME "
-            "reviewed host-only Python Build Engine as Path 2: "
-            "python3 scripts/plasma_vivado_host_build.py "
-            "--path3-engineering-host-only "
-            "--evidence-dir .plasma-path3-evidence. "
-            "Use the authorized task-specific environment supplied by the "
-            "trusted dispatcher, never synthesize fake admission variables. "
-            "The engine owns board preparation, license propagation, "
-            "worktree build directories, stage receipts, BIT/HWH and SHA256. "
-            "On failure inspect plasma-fpga-build-diagnostics.json first; "
-            "retain the first observed error and never assert an unproven "
-            "root cause. Do not bypass the engine with a separate Vivado "
-            "invocation or fabricate successful evidence.\n"
-        )
+    prompt += (
+        "Choose engineering tools and build commands as needed for the owner goal. "
+        "Physical effects require owner authorization and the existing trusted "
+        "root executor. Do not call sudo, SSH, FPGA Manager, /dev/mem or UIO "
+        "from this sandbox. Never claim delegated hardware acceptance without "
+        "an authentic real Z2 receipt. Report an unavailable protected execution "
+        "route as NOT_RUN.\n"
+    )
     if output_path:
         prompt += (
             "For this legacy task, also update " + output_path +
@@ -837,13 +769,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plus a short .test.log, but do not restrict other engineering "
             "edits merely to satisfy the old generated-file convention.\n"
         )
-    # Host-only remains disconnected; an explicitly authorized guarded
-    # hardware Work Order uses existing Path 3 networking, not new privileges.
-    network = ("false" if task_id == DYNAMIC_TASKS["path3-codex"] and
-               task.get("work_order_scope") == "host-only" else "true")
     command = [
         "codex", "--ask-for-approval", "never",
-        "-c", "sandbox_workspace_write.network_access=" + network,
+        "-c", "sandbox_workspace_write.network_access=false",
         "exec", "--sandbox", "workspace-write", "-",
     ]
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
@@ -992,8 +920,6 @@ def main() -> int:
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
-                                 or (req["task_id"] == DYNAMIC_TASKS["path3-codex"]
-                                     and task.get("work_order_scope") == "guarded-hardware")
                                  else None)
                 receipt = (
                     run_codex_task(task, workspace=args.workspace,

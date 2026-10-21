@@ -100,55 +100,15 @@ class DiagnosticContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ses.persist()
 
-    def test_path3_requires_pinned_owner_runner_before_any_build(self):
+    def test_deleted_path3_build_admission_is_not_a_backdoor(self):
         fixed = json.loads(
             (ROOT / "specs/engineering-dispatch/development-tasks-v1.json").read_text()
         )["tasks"]["fixed-site1-vivado-host-build"]
-        task = dict(fixed, execution_path="path3-codex")
-        approval = {
-            "execution_capability": "vivado-host-build",
-            "execution_path": "path3-codex",
-            "task_id": "f1b-path3-codex-vivado-build",
-            "pr_number": 1111,
-            "pinned_sha": "b" * 40,
-            "trusted_sha": "a" * 40,
-        }
-        env = {
-            "GITHUB_REPOSITORY": "physicslu/plasma",
-            "RUNNER_NAME": build.EXPECTED_RUNNER,
-            "RUNNER_ENVIRONMENT": "self-hosted",
-            "GITHUB_EVENT_NAME": "issue_comment",
-            "GITHUB_REF": "refs/heads/main",
-            "GITHUB_RUN_ATTEMPT": "1",
-            "GITHUB_SHA": "a" * 40,
-            "PLASMA_FPGA_PATH3_APPROVED": "1",
-            "PLASMA_FPGA_PINNED_SHA": "b" * 40,
-            "PLASMA_FPGA_PR_NUMBER": "1111",
-        }
-        plan = build.preflight(task, workspace=ROOT,
-                               approval=approval, env=env,
-                               execution_path="path3-codex")
-        self.assertEqual(plan["source_sha"], "b" * 40)
-        for field, value in (
-            ("PLASMA_FPGA_PINNED_SHA", "c" * 40),
-            ("PLASMA_FPGA_PR_NUMBER", "1"),
-            ("GITHUB_SHA", "c" * 40),
-        ):
-            with self.subTest(field=field), self.assertRaises(build.BuildDenied):
-                build.preflight(task, workspace=ROOT, approval=approval,
-                                env=env | {field: value},
-                                execution_path="path3-codex")
+        self.assertFalse(hasattr(build, "main"))
         with self.assertRaises(build.BuildDenied):
-            build.preflight(task, workspace=ROOT, approval=approval,
-                            env=env, execution_path="path2-cli")
-        with tempfile.TemporaryDirectory() as td:
-            with patch.dict(os.environ, {"PLASMA_FPGA_PATH3_APPROVED": "0",
-                                         "PLASMA_FPGA_PINNED_SHA": "",
-                                         "PLASMA_FPGA_PR_NUMBER": ""}):
-                result = build.main(["--path3-engineering-host-only",
-                                     "--evidence-dir", td])
-                self.assertEqual(result, 2)
-
+            build.preflight(dict(fixed, execution_path="path3-codex"),
+                            workspace=ROOT, approval={},
+                            execution_path="path3-codex")
 
     def test_receipt_io_failure_cannot_silently_turn_into_build_pass(self):
         class Unwritable:

@@ -106,7 +106,7 @@ class BlockingPolicy(unittest.TestCase):
             self.assertFalse(admitted('path2-cli', capability, **{
                 'needs.development-authorize.result': 'failure'}))
         self.assertFalse(admitted('path3-codex', 'codex-guarded-hardware'))
-        self.assertTrue(admitted('path3-codex', 'codex-guarded-hardware', **{
+        self.assertFalse(admitted('path3-codex', 'codex-guarded-hardware', **{
             'needs.development-codex.result': 'success'}))
         self.assertFalse(admitted('path2-cli', 'z2-cpu-only'))
         self.assertFalse(admitted('path2-cli', 'arbitrary-shell'))

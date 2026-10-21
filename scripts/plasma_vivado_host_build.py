@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import errno
 import hashlib
-import argparse
 import sys
 import importlib.util
 import json
@@ -119,7 +118,7 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
         "execution_path", "capability", "project", "toolchain",
         "board_repo_sha"
     }, "BUILD_TASK_FIELDS_DENIED")
-    require(execution_path in ("path2-cli", "path3-codex") and
+    require(execution_path == "path2-cli" and
             task["execution_path"] == execution_path and
             task["capability"] == "vivado-host-build" and
             type(task["project"]) is str and
@@ -133,10 +132,7 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == execution_path and
             approval.get("task_id") in (
-                ("fixed-site1-vivado-host-build", "z2-path2-build")
-                if execution_path == "path2-cli"
-                else ("f1b-path3-codex-vivado-build",)
-            ) and
+                "fixed-site1-vivado-host-build", "z2-path2-build") and
             type(approval.get("pinned_sha")) is str and
             BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None and
             type(approval.get("trusted_sha")) is str and
@@ -153,10 +149,6 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
     # environment acknowledgement add no authority to the approved record.
     require(env.get("GITHUB_SHA") == approval["trusted_sha"],
             "BUILD_OWNER_RUNNER_CONTEXT_DENIED")
-    if execution_path == "path3-codex":
-        require(env.get("PLASMA_FPGA_PINNED_SHA") == approval["pinned_sha"] and
-                env.get("PLASMA_FPGA_PR_NUMBER") == str(approval["pr_number"]),
-                "BUILD_PATH3_ADMISSION_DENIED")
     root = workspace.resolve(strict=True)
     project = workspace / task["project"]
     require(project.is_dir() and not project.is_symlink() and
@@ -419,48 +411,3 @@ def run(task: dict, *, workspace: Path, approval: dict,
             # On build failure, preserve the earlier first exception.
             if not pipeline_failed:
                 raise
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Dedicated Path 3 host-only entry; NO generic command or Tcl injection."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--path3-engineering-host-only", action="store_true",
-                        required=True)
-    parser.add_argument("--evidence-dir", type=Path, required=True)
-    args = parser.parse_args(argv)
-    root = Path(__file__).resolve().parents[1]
-    pinned = os.environ.get("PLASMA_FPGA_PINNED_SHA", "")
-    trusted = os.environ.get("GITHUB_SHA", "")
-    pr = os.environ.get("PLASMA_FPGA_PR_NUMBER", "")
-    if not (BOARD_SHA40.fullmatch(pinned) and
-            BOARD_SHA40.fullmatch(trusted) and pr.isdecimal() and
-            int(pr) > 0 and pinned != trusted):
-        print('{"status":"NOT_RUN_OR_FAIL","reason":"BUILD_PATH3_ADMISSION_DENIED"}')
-        return 2
-    registry = root / "specs/engineering-dispatch/development-tasks-v1.json"
-    tasks = json.loads(_read_safe_file(registry))["tasks"]
-    fixed = tasks["fixed-site1-vivado-host-build"]
-    task = dict(fixed, execution_path="path3-codex")
-    approval = {
-        "execution_path": "path3-codex",
-        "execution_capability": "vivado-host-build",
-        "task_id": "f1b-path3-codex-vivado-build",
-        "pinned_sha": pinned, "trusted_sha": trusted, "pr_number": int(pr),
-    }
-    try:
-        receipt = run(task, workspace=root, approval=approval,
-                      evidence_dir=args.evidence_dir,
-                      execution_path="path3-codex")
-        print(json.dumps(receipt, sort_keys=True))
-        return 0
-    except (BuildDenied, OSError, ValueError, subprocess.SubprocessError) as exc:
-        # The diagnostic file is the detailed source of truth, not stderr.
-        reason = str(exc)
-        if not re.fullmatch(r"BUILD_[A-Z0-9_]{3,80}", reason):
-            reason = "BUILD_UNCLASSIFIED_EXCEPTION"
-        print(json.dumps({"status": "NOT_RUN_OR_FAIL", "reason": reason}))
-        return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

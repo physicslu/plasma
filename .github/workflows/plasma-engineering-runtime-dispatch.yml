@@ -381,9 +381,9 @@ jobs:
           retention-days: 14
 
   development-execute:
-    # Both Paths reuse this ONE trusted provider; hardware never runs in Codex.
+    # Path 2 retains its trusted provider; no automatic post-Codex stages.
     # Hardware-capable A2 retains its existing one-shot claim gate.
-    needs: [development-authorize, development-claim, development-codex]
+    needs: [development-authorize, development-claim]
     if: >-
       always() &&
       needs.development-authorize.result == 'success' &&
@@ -398,14 +398,11 @@ jobs:
            needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
            needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
            github.run_attempt == 1)
-         )) ||
-        (needs.development-authorize.outputs.execution_path == 'path3-codex' &&
-         needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' &&
-         needs.development-codex.result == 'success')
+         ))
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' && 10 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
     permissions:
       contents: read
       actions: read
@@ -524,7 +521,6 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: read
-      actions: read  # F1-B only: trusted step fetches immutable prior artifact
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -550,39 +546,6 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
-      - name: Prefetch exact F1-B BIT/HWH with step-scoped GitHub token
-        if: needs.development-authorize.outputs.task_id == 'f1b-path3-z2-hil-once'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          umask 077
-          install -d -m 0700 "$RUNNER_TEMP/plasma-f1b-pinned"
-          gh api repos/physicslu/plasma/actions/artifacts/12229639751/zip > "$RUNNER_TEMP/plasma-f1b-pinned/source.zip"
-          python3 - "$RUNNER_TEMP/plasma-f1b-pinned" <<'PY'
-          import hashlib
-          import os
-          import pathlib
-          import sys
-          import zipfile
-          root = pathlib.Path(sys.argv[1])
-          items = (
-              ('system_wrapper.bit', 4045769, 'fdbde5c66999a9dab37339587d304b9c16e71a06f1890b24893c8391859cf075'),
-              ('system.hwh', 138977, 'bf3690d69fefc8da3fc62964209776466894cd4353aec0a475b373257899ca76'),
-          )
-          with zipfile.ZipFile(root / 'source.zip') as bundle:
-              for name, length, expected in items:
-                  archive_path = 'plasma/plasma/candidate/pl/build/f1b-deliverables/' + name
-                  data = bundle.read(archive_path)
-                  if len(data) != length or hashlib.sha256(data).hexdigest() != expected:
-                      raise SystemExit('F1B_ARTIFACT_IDENTITY_DENIED: ' + name)
-                  dest = root / name
-                  fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-                  with os.fdopen(fd, 'wb') as stream:
-                      stream.write(data)
-          print('F1B_ARTIFACT_CUSTODY_PASS: exact BIT/HWH size and SHA256')
-          PY
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
@@ -592,21 +555,11 @@ jobs:
           REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
           WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
-          PLASMA_F1B_TASK_ID: ${{ needs.development-authorize.outputs.task_id }}
-          # Only the owner-authorized F1-B engineering task admits Vivado.
-          PLASMA_FPGA_PATH3_APPROVED: ${{ needs.development-authorize.outputs.task_id == 'f1b-path3-codex-vivado-build' && '1' || '0' }}
-          PLASMA_FPGA_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
-          PLASMA_FPGA_PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
           test -z "$(git -C candidate status --porcelain --untracked-files=all)"
-          if [ "$PLASMA_F1B_TASK_ID" = 'f1b-path3-z2-hil-once' ]; then
-            install -d -m 0700 candidate/pl/build/f1b-deliverables
-            install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system_wrapper.bit" candidate/pl/build/f1b-deliverables/system_wrapper.bit
-            install -m 0600 "$RUNNER_TEMP/plasma-f1b-pinned/system.hwh" candidate/pl/build/f1b-deliverables/system.hwh
-          fi
           python3 trusted/scripts/plasma_engineering_monitor.py run path3 -- \
             python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
             --event "$GITHUB_EVENT_PATH" \

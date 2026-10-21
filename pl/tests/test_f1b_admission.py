@@ -191,45 +191,27 @@ class SupervisorAdapter(unittest.TestCase):
         self.assertEqual(state['preflight'], 'NOT_RUN')
 
 
-class TrustedPrefetchOffline(unittest.TestCase):
-    def test_embedded_validator_synthetic_receipt_and_rejections(self):
-        """Execute exact embedded validator with synthetic pins, never a network call."""
-        import ast
+class RetiredPath3PrefetchOffline(unittest.TestCase):
+    def test_legacy_prefetch_is_absent_but_content_integrity_remains(self):
+        """Delete the Path 3 prefetch without weakening protected Path 2 checks."""
         import hashlib
-        import subprocess
-        import sys
-        import zipfile
         workflow = Path('.github/workflows/plasma-engineering-runtime-dispatch.yml').read_text()
-        block = workflow.split("          python3 - \"$RUNNER_TEMP/plasma-f1b-pinned\" <<'PY'\n", 1)[1].split('\n          PY', 1)[0]
-        source = '\n'.join(line[10:] for line in block.splitlines())
-        tree = ast.parse(source)
-        payloads = {'system_wrapper.bit': b'synthetic-bit', 'system.hwh': b'synthetic-hwh'}
-        # Positive exercise uses explicit synthetic fixtures, not real custody evidence.
-        for node in tree.body:
-            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'items' for t in node.targets):
-                node.value = ast.parse(repr(tuple((n, len(b), hashlib.sha256(b).hexdigest())
-                                                  for n, b in payloads.items())), mode='eval').body
-        synthetic = ast.unparse(ast.fix_missing_locations(tree))
-        for scenario in ('valid', 'corrupt', 'partial', 'missing'):
-            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as d:
-                root = Path(d)
-                with zipfile.ZipFile(root/'source.zip', 'w') as archive:
-                    for name, data in payloads.items():
-                        if scenario == 'missing' and name == 'system.hwh':
-                            continue
-                        if name == 'system_wrapper.bit':
-                            if scenario == 'corrupt':
-                                data = b'X' * len(data)
-                            if scenario == 'partial':
-                                data = data[:-1]
-                        archive.writestr('plasma/plasma/candidate/pl/build/f1b-deliverables/'+name, data)
-                result = subprocess.run([sys.executable, '-c', synthetic, d], capture_output=True, text=True)
-                self.assertEqual(result.returncode == 0, scenario == 'valid', result.stderr)
-                if scenario == 'valid':
-                    for name, data in payloads.items():
-                        self.assertEqual((root/name).read_bytes(), data)
-        self.assertIn('GH_TOKEN: ${{ github.token }}', workflow)
-        self.assertIn('F1B_ARTIFACT_IDENTITY_DENIED', source)
+        self.assertNotIn('plasma-f1b-pinned', workflow)
+        self.assertNotIn('Prefetch exact F1-B BIT/HWH', workflow)
+        self.assertNotIn('PLASMA_FPGA_PATH3_APPROVED', workflow)
+
+        with tempfile.TemporaryDirectory() as d:
+            payload = b'synthetic-bit-content'
+            bit = Path(d) / 'candidate.bit'
+            bit.write_bytes(payload)
+            digest = hashlib.sha256(payload).hexdigest()
+            self.assertEqual(f1b.verify_file(bit, digest, size=len(payload)), payload)
+            with self.assertRaisesRegex(ValueError, 'artifact hash rejected'):
+                f1b.verify_file(bit, '0' * 64)
+            with self.assertRaisesRegex(ValueError, 'artifact size rejected'):
+                f1b.verify_file(bit, digest, size=len(payload) + 1)
+            with self.assertRaises(FileNotFoundError):
+                f1b.verify_file(Path(d) / 'missing.bit', digest)
 
 
 if __name__ == '__main__':

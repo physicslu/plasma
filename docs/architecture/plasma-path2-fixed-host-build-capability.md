@@ -138,3 +138,21 @@ This is a **fresh** Vivado 2026.1 Host-only synthesis, implementation, routing a
 The second run removes the **initial Artifact's missing BIT/HWH** deficiency; its prior caveat is historical only, not the current status. Persistent provenance includes the real Vivado logs/reports, original and copied hashes, two HWH verifier receipts, and problem/solution engineering reports. GitHub Artifact retention is limited (14 days by current workflow setting), so preserve a reviewed external copy when planning release.
 
 **Gate 1 Host-only qualification = PASS**, pending only new latest-HEAD CI after this documentation change. **Gate 2 merge of PR #1064 remains owner-reserved; do not auto-merge**. This image has **not** been loaded onto FPGA; actual Z2/DUT/LA, power, USB/MMIO, hardware HIL and deployment remain NOT_RUN, and M1 is NO_GO.
+
+## Path 3 legacy mechanism deletion (candidate)
+
+The two historical F1-B Path 3 registry tasks and their special workflow
+prefetch/admission instructions are removed. Historical results above remain
+unchanged. New Path 3 Work Orders contain the schema, execution_path
+`path3-codex`, capability `codex-workspace`, objective and acceptance; an
+owner-pinned PR additionally supplies pr_number and source_sha. They do not
+contain scope or hardware_stages. These routing fields authenticate the existing
+dispatch protocol; they do not select an engineering mode or builder.
+
+The existing candidate workspace supports autonomous software/build iterations.
+Physical calls still require the existing protected executor; automatic
+post-Codex list progression has been deleted. General future-image physical
+delegation remains blocked by that executor's fixed reviewed F1-B image
+contract. Removing those root image pins would also change Path 2 and remove
+its artifact authorization boundary; this cleanup preserves them. No physical
+execution or deployed-main behavior is proved by the candidate patch.
