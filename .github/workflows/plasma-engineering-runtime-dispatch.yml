@@ -416,7 +416,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' && 10 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' && 10 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
     permissions:
       contents: read
       actions: read
