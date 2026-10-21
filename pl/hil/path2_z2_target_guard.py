@@ -259,6 +259,51 @@ class RootZ2TargetPort:
         return _sha_file(self.candidate if which == "candidate" else self.recovery,
                          f1b.BIN_SHA if which == "candidate" else f1b.BASE_SHA)
 
+    def inspect_cross_trigger(self, stage: str) -> dict:
+        """Current-boot checkpoint; never infer attestation from manager logs.
+
+        This accepts only an existing durable target ledger for the held
+        Testing/Restore triggers. It is read-only and cannot authorize
+        reconfiguration, erase a stale lease, or reactivate unknown hardware.
+        """
+        self._require_locked()
+        need(stage in ("testing", "restore"), "STAGE_DENIED")
+        from scripts import plasma_path2_persistent_lease as lease
+        record = lease.LeaseLedger(self.ledger).snapshot()
+        need(record["status"] == "LOADED_AND_HELD" and
+             record["load_attempts"] == 1 and
+             record["restore_attempts"] == 0 and
+             record["artifact_sha256"] == f1b.BIN_SHA and
+             record["recovery_sha256"] == f1b.BASE_SHA,
+             "CROSS_TRIGGER_LEASE_NOT_ACTIVE")
+        now = self.now()
+        need(now >= record["last_seen"] and now < record["lease_deadline"],
+             "HELD_IMAGE_LEASE_EXPIRED")
+        live = read_live_z2_facts(candidate=self.candidate,
+                                  recovery=self.recovery)
+        need(live["boot_id"] == record["boot_id"] and
+             live["manager_state"] == "operating" and
+             live["proc_complete"] is True and
+             live["proc_conflicts"] == [],
+             "CROSS_TRIGGER_BOOT_OR_MMIO_OWNER_CHANGED")
+        last_load = one_shot.manager_last_load()
+        need(": writing " + self.candidate.name + " to " in last_load,
+             "HELD_IMAGE_MANAGER_PROVENANCE_UNPROVEN")
+        # Metadata alone cannot attest loaded FPGA configuration bits.
+        return {
+            "stage": stage,
+            "lease_id": record["lease_id"],
+            "boot_id": record["boot_id"],
+            "manager_state": live["manager_state"],
+            "manager_last_load": last_load,
+            "loaded_image_identity": "MANAGER_LOG_ONLY_UNATTESTED",
+            "axi_isolation": "UNPROVEN",
+            "live_uio_overlaps": live["uio_overlaps"],
+            "live_platform_overlaps": live["platform_overlaps"],
+            "status": "PASSIVE_CHECKPOINT_REVIEW_REQUIRED",
+            "hardware_write_authorized": False,
+        }
+
     def load_candidate_once(self, bin_sha256: str) -> dict:
         raise TargetSafetyDenied("AXI_ISOLATION_UNPROVEN_NO_FPGA_WRITE")
 
