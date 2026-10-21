@@ -85,6 +85,69 @@ blindly retry after uncertainty; preserve the root checkpoint for an
 informed physical recovery decision. A verified `base.bin` allows an
 idempotent `ALREADY_RESTORED` no-op.
 
+## Two required physical HIL modes (owner request 2026-10-21)
+
+Both modes use the **same** installed SWPC Bridge and Z2 root-owned
+stage executable. They are independent experiment executions using the
+previously pinned candidate firmware; no FPGA Build and no DUT/LA/power.
+After Mode A's Restore verifies `base.bin`, Mode B can begin. Run the
+two modes separately and retain independent receipts; a single old
+Path 3 one-shot result **does not** satisfy either mode.
+
+**Mode A: individually dispatched stages (three user commands on Issue
+#981, each pinned to the same reviewed PR HEAD).**
+
+```text
+/plasma-dispatch run z2-path2-download --pr 1082 --sha <REVIEWED_40_CHAR_SHA> 981
+/plasma-dispatch run z2-path2-testing --pr 1082 --sha <REVIEWED_40_CHAR_SHA> 981
+/plasma-dispatch run z2-path2-restore --pr 1082 --sha <REVIEWED_40_CHAR_SHA> 981
+```
+
+Each command is an independent Owner issue comment/Action run.
+Check each actual `real_z2` bridge receipt before sending the next.
+Expected: `LOADED_AND_HELD`, `IDENTITY_PASS` (three read32, zero
+write32), then `RESTORED_VERIFIED` and current `base.bin`.
+No automatic transition from Download to Testing.
+
+**Mode B: one explicitly selected Full HIL command** (not a build
+request; not the default for ordinary stage tasks).
+
+```text
+/plasma-dispatch run z2-path2-full-hil --pr 1082 --sha <REVIEWED_40_CHAR_SHA> 981
+```
+
+Its single Workflow run invokes the same pinned trusted Bridge in
+`download → test → restore` order. Require actual stage receipts and
+consistent live Z2 Boot ID. If a stage exits uncertain, stop the
+sequence; no blind reload or automatic next stage. The result
+`REAL_Z2_FULL_HIL_EVIDENCE_REVIEW_REQUIRED` is a receipt for human
+review, **not** Production Qualification. The one explicit Full HIL
+task has a bounded 10-minute existing SWPC Workflow budget.
+
+**Physical preparation:** the trusted main-based Dispatcher and Workflow
+must contain the reviewed registration; the SWPC administrator must
+install `/usr/local/libexec/plasma/z2-path2-f1b-bridge` as a protected
+fixed command, and the Z2 administrator must install exactly the
+approved root-owned immutable Python source/manifest and fixed root
+entry. Check the enrolled private SSH host key and sudo route without
+printing credentials. A Draft PR branch by itself does **not** activate
+the trusted `main` Dispatcher; no GitHub-hosted fake receipt is real HIL.
+Do not post the owner dispatch commands until the installed Bridge
+reports ready without reconfiguring FPGA.
+
+**Outcome matrix**:
+
+| Requirement | Mode A | Mode B |
+| --- | --- | --- |
+| Same approved F1-B BIN/base.bin SHA | Required | Required |
+| Physical Z2 Boot ID consistent | Across three Actions | Across internal stages |
+| Download F1-B Manager operating | Actual stage receipt | Actual stage receipt |
+| Three Identity reads / zero MMIO writes | Actual native child evidence | Actual native child evidence |
+| Restore base.bin confirmed | Actual stage receipt | Actual stage receipt |
+| No additional Build/DUT/LA/power | Required | Required |
+| SHA/exit-code/FPGA state evidence | Three separate runs | One combined run |
+| Production qualification claim | Never | Never |
+
 ## As-run evidence and acceptance
 
 For each separately invoked stage, capture actual invocation timestamp,
@@ -93,7 +156,7 @@ installed Git SHA, remote root UID, boot ID, stage exit code, sanitized
 (`.plasma-f1b-site1-development-state.json`), bounded native child
 result and Manager load/restore log evidence.
 
-Accept **one real Path 2 HIL** only if:
+Accept a **single successful round in each of the two modes** only if:
 - Download observed `LOADED_AND_HELD` on actual Z2.
 - An **independent** Testing trigger produced exact three Identity
   words (offsets 0, 4, 0x4000; 3 native 32-bit reads, zero writes).
