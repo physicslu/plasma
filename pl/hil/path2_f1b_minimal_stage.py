@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import sys
 import time
 
@@ -46,10 +47,25 @@ def digest(data: object) -> str:
                           separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
+def native_runtime_preflight(*, version=None, machine=None,
+                             endian=None, executable=None) -> None:
+    """Fast first-principles ABI check before *any* FPGA Manager write."""
+    actual_version = tuple(sys.version_info[:3]) if version is None else tuple(version)
+    actual_machine = platform.machine() if machine is None else machine
+    actual_endian = sys.byteorder if endian is None else endian
+    actual_exe = sys.executable if executable is None else executable
+    need(actual_version == (3, 12, 13) and actual_machine == "armv7l"
+         and actual_endian == "little"
+         and Path(actual_exe).resolve().is_relative_to(
+             "/opt/plasma/python/3.12.13"),
+         "NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED")
+
+
 def trusted_local() -> None:
     need(os.geteuid() == 0, "ROOT_REQUIRED")
     need(os.environ.get("PLASMA_DEV_RISK_ACK") == risk.WAIVER,
          "EXPLICIT_SINGLE_EXPERIMENT_RISK_ACK_REQUIRED")
+    native_runtime_preflight()
     # Never run an unreviewed PR checkout as root: code deployment and route
     # ownership are independent obligations of the hardware operator.
     for p in (ROOT, Path(__file__).resolve(),
@@ -251,8 +267,8 @@ def child_main() -> int:
     # Match the earlier real Z2 one-shot backend: import the reviewed MMIO
     # module by fixed path, without depending on a PYNQ/package installation.
     import importlib.util
-    from pl.hil.swd04 import native_qualify
-    native_qualify.check_runtime()
+    # Reuse the already checked root runtime; no alternate package import.
+    native_runtime_preflight()
     reviewed = ROOT / "software/python/plasma_interfaces/linux_mmio.py"
     one_shot.protected(reviewed)
     spec = importlib.util.spec_from_file_location("f1b_path2_native_mmio",
