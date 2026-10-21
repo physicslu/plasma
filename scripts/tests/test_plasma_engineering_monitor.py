@@ -290,112 +290,173 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotIn("MONITOR TIME MARK",
                              (Path(td) / "path2.log").read_text())
 
-    def test_launcher_switches_group_inside_tmux_panes(self):
-        """Host-only fake tmux/sg: no SWPC or tmux server is touched."""
-        scenarios = (
-            (False, 1, ("path2", "path3")),  # fresh named session
-            (True, 1, ("path3",)),           # repair one existing pane
-            (True, 2, ()),                   # healthy pair: attach only
-        )
-        for has_session, pane_count, expected in scenarios:
-            with self.subTest(has_session=has_session, panes=pane_count):
-                self._assert_launcher_scenario(
-                    has_session, pane_count, expected, member=True)
+    def test_two_window_launcher_scenarios(self):
+        """Stateful fake tmux/sg; never connects to a real host/socket."""
+        cases = [
+            ([], ("path2", "path3"), 0),
+            ([], ("path2", "path3"), 1),
+            ([{"index": 0, "name": "overview", "panes": ["%1", "%2"]}], (), 0),
+            ([{"index": 1, "name": "overview", "panes": ["%1", "%2"]}], (), 1),
+            ([{"index": 1, "name": "overview", "panes": ["%1"]}], ("path3",), 1),
+            ([{"index": 0, "name": "path2", "panes": ["%1"]}], ("path3",), 0),
+            ([{"index": 1, "name": "path2", "panes": ["%1"]},
+              {"index": 2, "name": "path3", "panes": ["%2"]}], (), 1),
+        ]
+        for windows, new_viewers, base in cases:
+            with self.subTest(windows=windows, base=base):
+                result = self._run_mock_launcher(windows, base=base, repeat=2)
+                self.assertEqual(result["rc"], 0, result["stderr"])
+                self.assertEqual(result["viewers"], new_viewers)
+                self.assertEqual(
+                    [(w["index"], w["name"], len(w["panes"]))
+                     for w in result["windows"]],
+                    [(1, "path2", 1), (2, "path3", 1)])
+                if windows and windows[0]["name"] == "overview":
+                    self.assertIn("%1", result["windows"][0]["panes"])
+                    if len(windows[0]["panes"]) == 2:
+                        self.assertIn("%2", result["windows"][1]["panes"])
+                self.assertFalse(any(
+                    "split-window" in cmd or "kill-" in cmd
+                    for cmd in result["commands"]))
 
-    def test_launcher_fails_closed_when_group_missing_or_not_a_member(self):
-        for exists, member in ((False, False), (True, False)):
-            with self.subTest(exists=exists, member=member):
-                self._assert_launcher_scenario(
-                    False, 1, (), member=member, exists=exists,
-                    expected_code=1)
+    def test_two_window_launcher_fails_closed(self):
+        cases = [
+            ([], False, True),
+            ([], True, False),
+            ([{"index": 1, "name": "stranger", "panes": ["%1"]}], True, True),
+            ([{"index": 1, "name": "overview",
+               "panes": ["%1", "%2", "%3"]}], True, True),
+        ]
+        for windows, exists, member in cases:
+            with self.subTest(windows=windows, exists=exists, member=member):
+                result = self._run_mock_launcher(
+                    windows, group_exists=exists, member=member)
+                self.assertNotEqual(result["rc"], 0)
+                self.assertFalse(result["viewers"])
+                self.assertFalse(any(
+                    cmd.startswith(("new-session", "new-window", "break-pane"))
+                    for cmd in result["commands"]))
 
-    def _assert_launcher_scenario(self, has_session, pane_count, expected,
-                                  *, member, exists=True, expected_code=0):
+    def _run_mock_launcher(self, windows, *, base=1, repeat=1,
+                           group_exists=True, member=True):
         with tempfile.TemporaryDirectory() as td:
-            base = Path(td)
-            bindir = base / "bin"
-            bindir.mkdir()
-            tmux_log = base / "tmux.log"
-            sg_log = base / "sg.log"
-            tmux_log.touch()
-            sg_log.touch()
+            root = Path(td)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            state_file, call_file, sg_file = (
+                root / "state.json", root / "commands.log", root / "sg.log")
+            state_file.write_text(json.dumps({"windows": windows, "base": base}))
+            call_file.touch()
+            sg_file.touch()
 
-            def stub(name, source):
-                file = bindir / name
-                file.write_text("#!/usr/bin/env bash\n" + source)
-                file.chmod(0o755)
+            def write_stub(name, code, python=False):
+                f = bin_dir / name
+                f.write_text(("#!/usr/bin/env python3\n" if python
+                              else "#!/usr/bin/env bash\n") + code)
+                f.chmod(0o755)
 
-            stub("id", r'''
-case "$1" in
-  -un) printf 'operator\n' ;;
-  -nG)
-    if [[ "$FAKE_GROUP_MEMBER" == "yes" ]]; then
-      printf 'operator plasma-monitor\n'
-    else
-      printf 'operator\n'
-    fi ;;
-  *) exit 2 ;;
-esac
+            write_stub("id", r'''
+if [[ "$1" == "-un" ]]; then echo operator
+elif [[ "$1" == "-nG" ]]; then
+  if [[ "$TEST_MEMBER" == 1 ]]; then echo "operator plasma-monitor"
+  else echo operator; fi
+else exit 2; fi
 ''')
-            stub("getent", r'''
-if [[ "$FAKE_GROUP_EXISTS" == "yes" &&
-      "$1" == "group" && "$2" == "plasma-monitor" ]]; then
-  printf 'plasma-monitor:x:998:operator\n'
-else
-  exit 2
-fi
+            write_stub("getent", r'''
+if [[ "$TEST_GROUP" == 1 && "$1" == group &&
+      "$2" == plasma-monitor ]]; then echo "plasma-monitor:x:998:operator"
+else exit 2; fi
 ''')
-            stub("sg", r'''
-printf '%s|%s|%s\n' "$1" "$2" "$3" >> "$FAKE_SG_LOG"
-[[ "$1" == "plasma-monitor" && "$2" == "-c" &&
+            write_stub("sg", r'''
+echo "$1 $2 $3" >> "$TEST_SG_LOG"
+[[ "$1" == plasma-monitor && "$2" == -c &&
    "$3" == *"exec python3 -u"* ]] || exit 2
 ''')
-            stub("tmux", r'''
-printf '%s\n' "$*" >> "$FAKE_TMUX_LOG"
-case "$1" in
-  has-session)
-    [[ "$FAKE_HAS_SESSION" == "yes" ]] ;;
-  list-panes)
-    for ((i=0; i<FAKE_PANES; i++)); do
-      printf '%%%s\n' "$i"
-    done ;;
-  new-session|split-window)
-    cmd=""
-    for cmd in "$@"; do :; done
-    bash -c "$cmd" ;;
-  select-layout|attach-session) exit 0 ;;
-  *) exit 2 ;;
-esac
-''')
-            env = os.environ.copy()
+            write_stub("tmux", r'''
+import json, os, subprocess, sys
+args = sys.argv[1:]
+p = os.environ["TEST_TMUX_STATE"]
+with open(p) as f: state = json.load(f)
+wins = state["windows"]
+with open(os.environ["TEST_TMUX_LOG"], "a") as f:
+    f.write(" ".join(args) + "\n")
+def get(target):
+    target = target.split(":")[-1]
+    return next((w for w in wins if w["name"] == target or
+                 str(w["index"]) == target), None)
+def require(condition):
+    if not condition: sys.exit(2)
+op = args[0]
+if op == "has-session":
+    target = args[args.index("-t")+1]
+    sys.exit(0 if wins else 1)
+if op == "list-windows":
+    for w in sorted(wins, key=lambda w:w["index"]): print(w["name"])
+elif op == "list-panes":
+    w = get(args[args.index("-t")+1])
+    require(w is not None)
+    for pane in w["panes"]: print(pane)
+elif op == "display-message":
+    w = get(args[args.index("-t")+1])
+    require(w is not None)
+    print(w["index"])
+elif op == "new-session":
+    require(not wins)
+    wins.append({"index": state["base"],
+                 "name": args[args.index("-n")+1], "panes":["%101"]})
+elif op == "rename-window":
+    w = get(args[args.index("-t")+1]); require(w is not None)
+    w["name"] = args[-1]
+elif op == "move-window":
+    w = get(args[args.index("-s")+1])
+    idx = int(args[args.index("-t")+1].split(":")[-1])
+    require(w is not None and all(x["index"] != idx for x in wins))
+    w["index"] = idx
+elif op == "break-pane":
+    pane = args[args.index("-s")+1]
+    idx = int(args[args.index("-t")+1].split(":")[-1])
+    origins = [w for w in wins if pane in w["panes"]]
+    require(len(origins)==1 and all(w["index"] != idx for w in wins))
+    origins[0]["panes"].remove(pane)
+    wins.append({"index":idx,"name":args[args.index("-n")+1],
+                 "panes":[pane]})
+elif op == "new-window":
+    idx = int(args[args.index("-t")+1].split(":")[-1])
+    require(all(w["index"] != idx for w in wins))
+    wins.append({"index":idx,"name":args[args.index("-n")+1],
+                 "panes":["%102"]})
+elif op in ("select-window", "attach-session"):
+    pass
+else:
+    sys.exit(2)
+with open(p, "w") as f: json.dump(state, f)
+if op in ("new-session", "new-window"):
+    subprocess.run(["bash", "-c", args[-1]], check=True)
+''', python=True)
+            env = dict(os.environ)
             env.update({
-                "PATH": str(bindir) + os.pathsep + env.get("PATH", ""),
-                "FAKE_HAS_SESSION": "yes" if has_session else "no",
-                "FAKE_PANES": str(pane_count),
-                "FAKE_GROUP_EXISTS": "yes" if exists else "no",
-                "FAKE_GROUP_MEMBER": "yes" if member else "no",
-                "FAKE_TMUX_LOG": str(tmux_log),
-                "FAKE_SG_LOG": str(sg_log),
+                "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
+                "TEST_TMUX_STATE": str(state_file),
+                "TEST_TMUX_LOG": str(call_file),
+                "TEST_SG_LOG": str(sg_file),
+                "TEST_MEMBER": "1" if member else "0",
+                "TEST_GROUP": "1" if group_exists else "0",
             })
-            proc = subprocess.run(
-                ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
-                env=env, capture_output=True, text=True, timeout=10)
-            self.assertEqual(proc.returncode, expected_code, proc.stderr)
-            calls = sg_log.read_text().splitlines()
-            self.assertEqual(len(calls), len(expected))
-            for path, call in zip(expected, calls):
-                self.assertTrue(call.startswith("plasma-monitor|-c|"),
-                                call)
-                self.assertIn("view " + path, call)
-            tmux_calls = tmux_log.read_text().splitlines()
-            if expected_code:
-                self.assertEqual(tmux_calls, [])
-                self.assertIn("MONITOR_GROUP_UNAVAILABLE", proc.stderr)
-            else:
-                self.assertTrue(any(x.startswith("attach-session ")
-                                    for x in tmux_calls), tmux_calls)
-                self.assertTrue(all(":0" not in x for x in tmux_calls),
-                                tmux_calls)
+            proc = None
+            for _ in range(repeat):
+                proc = subprocess.run(
+                    ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
+                    env=env, capture_output=True, text=True, timeout=15)
+                if proc.returncode: break
+            return {
+                "rc": proc.returncode, "stderr": proc.stderr,
+                "windows": sorted(json.loads(state_file.read_text())["windows"],
+                                  key=lambda w:w["index"]),
+                "commands": call_file.read_text().splitlines(),
+                "viewers": tuple(
+                    "path2" if "view path2" in x else "path3"
+                    for x in sg_file.read_text().splitlines()),
+            }
 
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
@@ -405,17 +466,15 @@ esac
         shell = ROOT / "scripts/plasma-engineering-monitor.sh"
         self.assertEqual(subprocess.run(["bash", "-n", str(shell)],
                                         check=False).returncode, 0)
-        self.assertIn("split-window -d -h", shell.read_text())
-        self.assertIn("plasma-monitor", shell.read_text())
-        # Regression: operator tmux base-index may be 1 (SWPC uses :1),
-        # so addressing :0 silently leaves a single Path 2 pane.
         script = shell.read_text()
-        self.assertIn('window="$session:overview"', script)
-        self.assertIn('tmux list-panes -t "$window"', script)
-        self.assertIn('tmux split-window -d -h -t "$window"', script)
-        self.assertNotIn('"=$session:0"', script)
-        self.assertIn('if [ "$panes" -eq 1 ]; then', script)
-        self.assertIn('elif [ "$panes" -ne 2 ]; then', script)
+        self.assertIn("plasma-monitor", script)
+        self.assertIn("tmux break-pane -d", script)
+        self.assertIn('tmux new-window -d -t "$session:2"', script)
+        self.assertIn("tmux move-window -d", script)
+        self.assertIn('tmux select-window -t "$session:1"', script)
+        self.assertNotIn("tmux split-window", script)
+        self.assertNotIn("tmux kill-server", script)
+
 
 
 if __name__ == "__main__":
