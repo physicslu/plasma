@@ -115,6 +115,15 @@ class EngineeringMonitorTests(unittest.TestCase):
                                         check=False).returncode, 0)
         self.assertIn("split-window -d -h", shell.read_text())
         self.assertIn("plasma-monitor", shell.read_text())
+        # Regression: operator tmux base-index may be 1 (SWPC uses :1),
+        # so addressing :0 silently leaves a single Path 2 pane.
+        script = shell.read_text()
+        self.assertIn('window="$session:overview"', script)
+        self.assertIn('tmux list-panes -t "$window"', script)
+        self.assertIn('tmux split-window -d -h -t "$window"', script)
+        self.assertNotIn('"=$session:0"', script)
+        self.assertIn('if [ "$panes" -eq 1 ]; then', script)
+        self.assertIn('elif [ "$panes" -ne 2 ]; then', script)
 
 
 if __name__ == "__main__":
