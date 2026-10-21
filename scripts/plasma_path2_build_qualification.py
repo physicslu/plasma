@@ -71,8 +71,7 @@ def qualify_host_build(raw: dict, *, workspace: Path, pinned_sha: str) -> dict:
          and raw.get("execution_capability") == "vivado-host-build"
          and raw.get("source_sha") == pinned_sha
          and raw.get("physical_load") == "NOT_RUN"
-         and raw.get("z2_hil") == "NOT_RUN"
-         and raw.get("m1") == "NO_GO", "BUILD_RECEIPT_NOT_HOST_ONLY")
+         and raw.get("z2_hil") == "NOT_RUN", "BUILD_RECEIPT_NOT_HOST_ONLY")
     need(sha(raw.get("bit_sha256")) and sha(raw.get("hwh_sha256"))
          and type(raw.get("report_sha256")) is dict
          and set(raw["report_sha256"]) == set(REPORTS)

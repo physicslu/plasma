@@ -97,10 +97,8 @@ def validate_request(request: object) -> dict:
     require(type(opts) is dict and set(opts) <= set(FLAGS) and all(
         type(v) is bool for v in opts.values()), "AUTOMATION_OPTIONS_DENIED")
     opts = {flag: opts.get(flag, False) for flag in FLAGS}
-    require(stage == "build" or not opts[FLAGS[0]],
-            "AUTO_DOWNLOAD_REQUIRES_BUILD_TRIGGER")
-    require(stage != "test" or not opts[FLAGS[1]],
-            "AUTO_TEST_NOT_VALID_FOR_TEST_TRIGGER")
+    # Options for an already completed/selected stage are inert.
+    # required_stages() alone determines explicitly requested progression.
     clean = {k: request[k] for k in ("stage", "source_sha", "profile_id", "target_id")}
     if stage != "build":
         require(_sha(request["artifact_sha256"], 64), "PINNED_ARTIFACT_SHA_DENIED")

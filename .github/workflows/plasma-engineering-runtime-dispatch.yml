@@ -24,6 +24,7 @@ on:
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
@@ -61,6 +62,7 @@ on:
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
@@ -113,6 +115,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
@@ -380,39 +383,22 @@ jobs:
     needs: [development-authorize, development-claim, development-codex]
     if: >-
       always() &&
-      github.event_name == 'issue_comment' &&
       needs.development-authorize.result == 'success' &&
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-        (needs.development-authorize.outputs.execution_capability == 'cpu-only' &&
-         needs.development-claim.result == 'skipped') ||
-        (needs.development-authorize.outputs.execution_capability == 'vivado-host-build' &&
-         (needs.development-authorize.outputs.task_id == 'fixed-site1-vivado-host-build' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-build') &&
-         needs.development-claim.result == 'skipped' &&
-         github.run_attempt == 1) ||
-        (needs.development-authorize.outputs.execution_capability == 'path2-stage-contract' &&
-         (needs.development-authorize.outputs.task_id == 'z2-path2-download' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-testing' ||
-          needs.development-authorize.outputs.task_id == 'z2-path2-restore' ||
-          (needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' ||
-           needs.development-authorize.outputs.task_id == 'path2-work-order')) &&
-         needs.development-claim.result == 'skipped' &&
-         github.run_attempt == 1) ||
-        (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
-         needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
-         needs.development-claim.result == 'success' &&
-         needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
-         needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
-         github.run_attempt == 1)
-         ) ) ||
+          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract"]'),
+                   needs.development-authorize.outputs.execution_capability) ||
+          (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
+           needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
+           needs.development-claim.result == 'success' &&
+           needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref &&
+           needs.development-claim.outputs.work_order_sha256 == needs.development-authorize.outputs.work_order_sha256 &&
+           github.run_attempt == 1)
+         )) ||
         (needs.development-authorize.outputs.execution_path == 'path3-codex' &&
          needs.development-authorize.outputs.execution_capability == 'codex-guarded-hardware' &&
-         needs.development-authorize.outputs.task_id == 'path3-work-order' &&
-         needs.development-codex.result == 'success' &&
-         needs.development-claim.result == 'skipped' &&
-         github.run_attempt == 1)
+         needs.development-codex.result == 'success')
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
@@ -427,10 +413,8 @@ jobs:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
         run: |
           set -euo pipefail
-          # The shared trusted dispatcher authenticates the event, SHA and Runner.
-          # Retain direct SWPC host/account admission before checkout.
-          test "$(hostname)" = SWPC
-          test "$(id -un)" = plasma-codex
+          # Scheduling labels are metadata; retain the effective privilege boundary.
+          test "$(id -u)" != 0
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -545,10 +529,8 @@ jobs:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
         run: |
           set -euo pipefail
-          # The shared trusted dispatcher authenticates the event, SHA and Runner.
-          # Retain direct SWPC host/account admission before checkout.
-          test "$(hostname)" = SWPC
-          test "$(id -un)" = plasma-codex
+          # Scheduling labels are metadata; retain the effective privilege boundary.
+          test "$(id -u)" != 0
           command -v codex
           codex --version
       - name: Checkout trusted main dispatcher

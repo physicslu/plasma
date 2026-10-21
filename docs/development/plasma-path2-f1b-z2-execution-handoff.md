@@ -202,3 +202,33 @@ Host-only fake-device results are **not** equivalent to these results.
 If there is no separately authorized installed root route, final result
 remains `REAL_HIL_NOT_RUN` with the concrete missing execution boundary;
 do not declare success or invoke an untrusted PR as root.
+
+### HIL-13: Path 3 deployment request is not an admin entrypoint
+
+The source tree currently contains no callable enrolled SWPC admin deployment
+entrypoint for the Bridge/PIN pair. The enrolled Path 2 Bridge accepts only
+`download`, `test`, and `restore`; its SSH/sudo enrollment is a Z2 stage route,
+not an SWPC installation API. Administrator provisioning described above is
+not an implemented Dispatcher deployment capability.
+
+A boolean `swpc_bridge_deployment=true` therefore fails closed with
+`PATH3_SHARED_BRIDGE_DEPLOYMENT_NOT_INSTALLED:
+SWPC_ADMIN_DEPLOYMENT_ENTRYPOINT_NOT_REGISTERED` before any stage. Malformed
+(non-boolean) values are rejected separately. A stale exact SHA PIN still
+fails `SWPC_APPROVED_SOURCE_SHA_MISMATCH`; neither a candidate checkout nor
+an owner-supplied requested SHA can rewrite it. Do not replace this with a
+candidate-run installer, a new sudo grant, or a new Runner/service.
+
+To complete integration, identify the existing administrator-controlled
+callable deployment command and its authentication/receipt contract. That
+route must independently verify the authorized immutable source and artifact
+digests, retain root ownership and protected parents, and atomically install
+consistent Bridge/PIN updates with failure recovery. No such route is
+established by these source changes; deployment remains NOT_RUN.
+
+Testing requires a same-boot F1-B loaded state and current image/ownership
+checks. A restored `base.bin` is recovery evidence only. Testing rejects that
+state before live inspection or the MMIO child, produces no Identity PASS,
+and does not automatically Download. When Download is absent from the
+approved stage list, stop and report F1-B not loaded; do not invent a Restore
+PASS after the failed test or continue to later stages.

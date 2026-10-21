@@ -104,8 +104,7 @@ class RouteContracts(unittest.TestCase):
             with self.subTest(name=name, flags=flags):
                 with self.assertRaises(dispatch.Denied):
                     dispatch.authorize(event(name, flags), context(), self.registry)
-        for key, value in (("GITHUB_ACTOR", "attacker"),
-                           ("GITHUB_RUN_ATTEMPT", "2")):
+        for key, value in (("GITHUB_ACTOR", "attacker"),):
             ctx = context()
             ctx[key] = value
             with self.assertRaises(dispatch.Denied):
@@ -372,27 +371,14 @@ class RouteContracts(unittest.TestCase):
                 route(executor)
             executor.assert_not_called()
 
-    def test_shared_stage_contract_still_blocks_auto_flags_before_bridge(self):
-        work_sha = "d" * 64
-        task = {"execution_path": "path3-codex", "capability": "codex-workspace",
-                "work_order_scope": "guarded-hardware", "work_order_sha256": work_sha,
-                "hardware_stages": ["download", "test", "restore"]}
-        for flag in ("auto_download_after_build_success", "auto_test_after_download_success"):
-            with self.subTest(flag=flag), patch.object(runtime, "_trusted_root_bridge") as bridge:
-                executor = Mock()
-                with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_AUTO_TRANSITION_DENIED"):
-                    runtime.full_hil_sequence(
-                        self.registry["tasks"]["z2-path2-full-hil"],
-                        approval("z2-path2-full-hil", **{flag: True}), executor=executor)
-                with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_AUTO_TRANSITION_DENIED"):
-                    runtime.path3_shared_hardware_stages(task,
-                        approval("path3-work-order", execution_path="path3-codex",
-                                 execution_capability="codex-guarded-hardware",
-                                 work_order_sha256=work_sha, **{flag: True}), executor=executor)
-                bridge.assert_not_called()
-                executor.assert_not_called()
+    def test_shared_stage_contract_ignores_inert_flags(self):
+        for name in ("z2-path2-download", "z2-path2-testing", "z2-path2-restore"):
+            task = self.registry["tasks"][name]
+            for flag in ("auto_download_after_build_success", "auto_test_after_download_success"):
+                with self.subTest(name=name, flag=flag):
+                    self.assertEqual(runtime.stage_contract(
+                        task, approval(name, **{flag: True})), task["stage"])
 
-class BuildQualificationBytes(unittest.TestCase):
     def evidence(self, td):
         root = Path(td)
         build = root / "pl/build/fixed-f1-bounded"

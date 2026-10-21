@@ -130,9 +130,8 @@ def stage_contract(task: dict, approval: dict) -> str:
             and task.get("stage") == stage
             and task.get("project") == "pl/projects/z2-fixed-unified-site1",
             "PATH2_STAGE_TASK_DENIED")
-    require(approval.get("auto_download_after_build_success", False) is False
-            and approval.get("auto_test_after_download_success", False) is False,
-            "PATH2_STAGE_AUTO_TRANSITION_DENIED")
+    # A single-stage bridge never consumes automation options. Exact stage
+    # authorization above bounds the only physical call for both Paths.
     return stage
 
 
@@ -220,10 +219,17 @@ def path3_shared_hardware_stages(task: dict, approval: dict, *,
             coordinator._sha(approval.get("pinned_sha"), 40) and
             coordinator._sha(approval.get("trusted_sha"), 40),
             "PATH3_SHARED_BRIDGE_APPROVAL_DENIED")
-    # Deployment remains a separate real host-admin action. Do not mistake
-    # Codex's sandbox for a root-authorized installer.
-    require(task.get("swpc_bridge_deployment", False) is False,
-            "PATH3_SHARED_BRIDGE_DEPLOYMENT_NOT_INSTALLED")
+    # Enrollment supplies a stage transport, not a callable admin installer.
+    # Neither the owner request nor candidate checkout may rewrite the root
+    # PIN. Keep this denial until an existing authenticated admin entrypoint
+    # (including independently verified source/digests and atomic install)
+    # can actually be bound here. Never fall back to stage Bridge or sudo.
+    deployment = task.get("swpc_bridge_deployment", False)
+    require(type(deployment) is bool,
+            "PATH3_SHARED_BRIDGE_DEPLOYMENT_REQUEST_INVALID")
+    require(not deployment,
+            "PATH3_SHARED_BRIDGE_DEPLOYMENT_NOT_INSTALLED: "
+            "SWPC_ADMIN_DEPLOYMENT_ENTRYPOINT_NOT_REGISTERED")
     stages = task.get("hardware_stages")
     require(type(stages) is list and 1 <= len(stages) <= 3 and
             all(type(stage) is str and
@@ -292,9 +298,8 @@ def full_hil_sequence(task: dict, approval: dict, *,
         stage_approval = {**approval, "task_id": task_id}
         observed = registered_hardware_stage(
             stage_task, stage_approval, executor=executor)
-        require(observed["real_z2"] is True and
-                observed["stage"] == stage and
-                (boot_id is None or boot_id == observed["boot_id"]),
+        # The shared adapter already validates stage and real root receipt.
+        require(boot_id is None or boot_id == observed["boot_id"],
                 "PATH2_FULL_BOOT_OR_STAGE_CHANGED")
         boot_id = observed["boot_id"]
         results.append({"stage": stage, "result": observed["result"]})

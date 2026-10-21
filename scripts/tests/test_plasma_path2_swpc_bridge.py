@@ -28,7 +28,8 @@ loader.exec_module(bridge)
 
 class BridgeContracts(unittest.TestCase):
     def test_stage_allowlist_blocks_any_remote_call(self):
-        for stage in ("full", "build", "reset", "download;id", "", "--help"):
+        for stage in ("full", "build", "reset", "deploy", "install",
+                      "update-pin", "download;id", "", "--help"):
             with self.subTest(stage=stage), patch.object(
                     bridge, "approved_sha") as approve, patch.object(
                     bridge, "enrollment") as creds:
@@ -70,6 +71,19 @@ class BridgeContracts(unittest.TestCase):
                 with self.assertRaisesRegex(
                         bridge.Blocked, "SWPC_APPROVED_SOURCE_SHA_MISMATCH"):
                     bridge.approved_sha("b" * 40)
+                # Run 39583893901's stale PIN must not self-heal from a
+                # requested SHA, even when the requested source is main.
+                stale = "430c8e2bc1ac6699616e952ebcb9eed01ad1dc01"
+                requested = "f229c3abd6e697db11cb39f34a6b7fd4666b01f4"
+                p.write_text(stale + "\n")
+                with patch.object(bridge, "enrollment") as credentials:
+                    with self.assertRaisesRegex(
+                            bridge.Blocked, "SWPC_APPROVED_SOURCE_SHA_MISMATCH"):
+                        bridge.execute("test", requested)
+                    credentials.assert_not_called()
+                self.assertEqual(p.read_text(), stale + "\n")
+                p.write_text(requested + "\n")  # offline admin fixture only
+                bridge.approved_sha(requested)
 
     def test_approval_denies_bad_ownership_type_mode_and_size(self):
         rejected = (
@@ -111,7 +125,7 @@ class BridgeContracts(unittest.TestCase):
             "boot_id": "fe723a58-621e-444a-9171-0c81d35a3b0a",
         }) + "\n").encode()
 
-    def _fake_ssh(self, chunks, *, exit_code=0, eio=False):
+    def _fake_ssh(self, chunks, *, exit_code=0, eio=False, stage="download"):
         """Drive actual Bridge parsing without sockets, SSH, sudo or hardware.
 
         poll() reports that SSH has exited *before* its buffered PTY data is
@@ -155,7 +169,7 @@ class BridgeContracts(unittest.TestCase):
                     return_value=([910], [], []))
             replace(bridge.tty, "setraw")
             try:
-                outcome = bridge.execute("download", "a" * 40)
+                outcome = bridge.execute(stage, "a" * 40)
             finally:
                 args = popen.call_args.args[0]
                 self.assertEqual(args[0], "/usr/bin/ssh")
@@ -216,6 +230,19 @@ class BridgeContracts(unittest.TestCase):
                 b"xilinx@z2.example's password:",
                 b"\n" + self._receipt(),
             ], exit_code=1)
+
+    def test_no_identity_or_restore_pass_without_successful_root_receipt(self):
+        for stage, result in (("test", "IDENTITY_PASS"),
+                              ("restore", "RESTORED_VERIFIED"),
+                              ("restore", "ALREADY_RESTORED")):
+            with self.subTest(stage=stage, result=result):
+                with self.assertRaisesRegex(bridge.Blocked,
+                                            "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED"):
+                    self._fake_ssh([b"no receipt\n"], stage=stage)
+                with self.assertRaisesRegex(bridge.Blocked,
+                                            "REMOTE_EXIT_OR_PRIVILEGE_FAILED"):
+                    self._fake_ssh([self._receipt(result=result, stage=stage)],
+                                   stage=stage, exit_code=1)
 
     def test_ssh_prompt_not_required_when_exact_root_receipt_is_valid(self):
         receipt, _writes = self._fake_ssh([b"\n" + self._receipt()])
