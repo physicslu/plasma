@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tarfile
 from pathlib import Path
 import sys
 import tempfile
@@ -753,6 +754,39 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                     self.assertEqual(json.loads(output.getvalue())["reason"],
                                      "AUTHORIZED_REGISTRY_MISMATCH")
                     agent.assert_not_called()
+
+    def test_hidden_codex_and_test_logs_are_archived_without_broad_hidden_upload(self):
+        workflow=WORKFLOW.read_text()
+        codex_job=workflow.split("  development-codex:",1)[1].split(
+            "\n  authorize:",1)[0]
+        self.assertIn("Collect Path 3 evidence even when Codex",codex_job)
+        self.assertIn("tar -C candidate -czf",codex_job)
+        self.assertIn("-- .plasma-path3-evidence",codex_job)
+        self.assertIn("plasma-path3-engineering-evidence.tar.gz.sha256",codex_job)
+        self.assertIn("PATH3_EVIDENCE_SYMLINK_DENIED",codex_job)
+        self.assertNotIn("include-hidden-files: true",codex_job)
+        # Simulate the exact GNU tar packaging command on temporary files,
+        # without dispatching an Action or executing a Codex/host process.
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            candidate=root/"candidate"
+            hidden=candidate/".plasma-path3-evidence"
+            hidden.mkdir(parents=True)
+            (hidden/"codex.log").write_text("Codex exit 0\n")
+            (hidden/"triangular.test.log").write_text("12 rows PASS\n")
+            archive=root/"evidence.tar.gz"
+            proc=subprocess.run(
+                ["tar","-C",str(candidate),"-czf",str(archive),
+                 "--",".plasma-path3-evidence"],
+                capture_output=True,check=False)
+            self.assertEqual(proc.returncode,0,proc.stderr)
+            with tarfile.open(archive,"r:gz") as t:
+                names=set(t.getnames())
+                self.assertIn(".plasma-path3-evidence/codex.log",names)
+                self.assertIn(".plasma-path3-evidence/triangular.test.log",names)
+                self.assertEqual(t.extractfile(
+                    ".plasma-path3-evidence/codex.log").read(),
+                    b"Codex exit 0\n")
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
