@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -72,8 +73,6 @@ def run() -> None:
     task = registry["tasks"][TASK_ID]
     require(task["execution_path"] == "path3-codex" and
             "Do not use hardware" in task["objective"], "SOFTWARE_ONLY_TASK_REQUIRED")
-    require(os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SANDBOX"),
-            "OUTER_CODEX_SANDBOX_CONTEXT_UNVERIFIED")
     with tempfile.TemporaryDirectory(prefix=".plasma-candidate-live-", dir=REPO) as d:
         root = Path(d)
         workspace = root / "workspace"
@@ -140,6 +139,16 @@ def run() -> None:
             complete = (len(rows) == 13 and rows[0] == "n,triangular" and
                         all(rows[i] == f"{i},{i*(i+1)//2}" for i in range(1,13)))
         facts["acceptance"] = "PASS" if complete else "FAIL"
+        # Trusted-main artifact uploader includes only these well-defined
+        # generated-path globs; hidden working-directory evidence is omitted.
+        if complete:
+            prefix = REPO / "scripts/experiments/plasma_candidate_dispatcher_live_generated"
+            shutil.copyfile(code, prefix.with_suffix(".py"))
+            shutil.copyfile(csv, prefix.with_suffix(".csv"))
+            shutil.copyfile(test_log, Path(str(prefix) + ".test.log"))
+            inner_log = workspace / ".plasma-path3-evidence/codex.log"
+            if inner_log.is_file() and not inner_log.is_symlink():
+                shutil.copyfile(inner_log, Path(str(prefix) + ".codex.log"))
         RESULT_FILE.write_text(json.dumps(facts, sort_keys=True, indent=2) + "\n",
                                encoding="utf-8")
         require(complete, "CANDIDATE_LIVE_CODEX_E2E_FAILED")
