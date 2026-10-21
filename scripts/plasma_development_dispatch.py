@@ -25,6 +25,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 VERSION = "plasma.engineering.development_tasks.v1"
 COMMAND_PREFIX = "/plasma-dispatch run "
+DYNAMIC_TASK = "path3-work-order"  # one generic route; never per-work Task ID
+WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
+WORK_ORDER_SCHEMA = "plasma.path3.work_order.v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
@@ -166,6 +169,108 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "OUTPUT_DIGEST_INVALID")
     return task
 
+
+def parse_dynamic_work_order(event: object) -> dict:
+    """Owner's single Issue comment is the Work Order; no registry edit.
+
+    The JSON must be exact and immutable within this created event. Stage
+    names bound physical effects; they do not override the installed hardware
+    Runtime Guard or grant OS privileges to the Codex worker.
+    """
+    require(type(event) is dict and type(event.get("comment")) is dict,
+            "WORK_ORDER_EVENT_DENIED")
+    body = event["comment"].get("body")
+    require(type(body) is str and body.startswith(WORK_ORDER_PREFIX)
+            and len(body.encode("utf-8")) <= 12288,
+            "WORK_ORDER_FORMAT_DENIED")
+
+    def unique(pairs):
+        data = {}
+        for key, val in pairs:
+            require(key not in data, "WORK_ORDER_DUPLICATE_FIELD")
+            data[key] = val
+        return data
+
+    try:
+        order = json.loads(body[len(WORK_ORDER_PREFIX):],
+                           object_pairs_hook=unique)
+    except (ValueError, TypeError):
+        raise Denied("WORK_ORDER_JSON_DENIED") from None
+    require(type(order) is dict and
+            set(order) >= {"schema", "objective", "acceptance", "scope"}
+            and set(order) <= {"schema", "objective", "acceptance", "scope",
+                               "pr_number", "source_sha", "hardware_stages"},
+            "WORK_ORDER_FIELDS_DENIED")
+    require(order["schema"] == WORK_ORDER_SCHEMA,
+            "WORK_ORDER_SCHEMA_DENIED")
+    for key in ("objective", "acceptance"):
+        val = order[key]
+        require(type(val) is str and 20 <= len(val) <= 8192
+                and not any(ord(ch) < 32 and ch not in "\n\r\t"
+                            for ch in val), "WORK_ORDER_TEXT_DENIED")
+    require(len(order["objective"]) + len(order["acceptance"]) <= 10000,
+            "WORK_ORDER_TOO_LARGE")
+    scope = order["scope"]
+    require(type(scope) is str and scope in (
+            "host-only", "guarded-hardware"),
+            "WORK_ORDER_SCOPE_DENIED")
+    stages = order.get("hardware_stages", [])
+    require(type(stages) is list and len(stages) <= 3
+            and all(type(stage) is str and
+                    stage in ("download", "test", "restore") for stage in stages)
+            and len(set(stages)) == len(stages),
+            "WORK_ORDER_HARDWARE_STAGES_DENIED")
+    require((scope == "host-only" and not stages
+             and "hardware_stages" not in order) or
+            (scope == "guarded-hardware" and len(stages) > 0),
+            "WORK_ORDER_CAPABILITY_MISMATCH")
+    if scope == "guarded-hardware":
+        # Exact stage sequence is operator approved. Never silently replay
+        # Download or change the original root-owned runtime safety guard.
+        require(stages.count("download") <= 1,
+                "WORK_ORDER_DOWNLOAD_REPLAY_DENIED")
+    number = order.get("pr_number", 0)
+    require(type(number) is int and 0 <= number <= 99999999,
+            "WORK_ORDER_PR_DENIED")
+    if number:
+        require(type(order.get("source_sha")) is str and
+                SHA40.fullmatch(order["source_sha"]) is not None,
+                "WORK_ORDER_SOURCE_DENIED")
+    else:
+        require("source_sha" not in order,
+                "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
+    return order
+
+
+def work_order_digest(order: dict) -> str:
+    data = json.dumps(order, sort_keys=True,
+                      separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def task_for_request(registry: object, req: dict, event: object) -> dict:
+    if req["task_id"] != DYNAMIC_TASK:
+        return task_by_id(registry, req["task_id"])
+    # Keep the existing registry identity check, but the generic Work Order
+    # is never listed in its per-task catalogue.
+    require(type(registry) is dict and
+            set(registry) == {"schema_version", "mode", "tasks"} and
+            registry["schema_version"] == VERSION and
+            registry["mode"] == "development" and
+            type(registry["tasks"]) is dict,
+            "REGISTRY_FIELDS_DENIED")
+    order = parse_dynamic_work_order(event)
+    require(req.get("work_order_sha256") == work_order_digest(order),
+            "WORK_ORDER_DIGEST_MISMATCH")
+    return {
+        "execution_path": "path3-codex",
+        "objective": order["objective"],
+        "acceptance": order["acceptance"],
+        "work_order_scope": order["scope"],
+        "hardware_stages": order.get("hardware_stages", []),
+        "work_order_sha256": req["work_order_sha256"],
+    }
+
 def request(event: object, context: dict) -> dict:
     """Verify owner, issue and exact command before any candidate checkout."""
     require(type(event) is dict and event.get("action") == "created",
@@ -195,8 +300,22 @@ def request(event: object, context: dict) -> dict:
     require(type(comment.get("id")) is int and comment["id"] > 0,
             "EVENT_COMMENT_ID_DENIED")
     body = comment.get("body")
-    require(type(body) is str and 0 < len(body) <= 200,
+    require(type(body) is str and 0 < len(body) <= 12288,
             "COMMAND_DENIED")
+    if body.startswith(WORK_ORDER_PREFIX):
+        order = parse_dynamic_work_order(event)
+        return {
+            "task_id": DYNAMIC_TASK,
+            "auto_download_after_build_success": False,
+            "auto_test_after_download_success": False,
+            "pr_number": order.get("pr_number", 0),
+            "source_sha": order.get("source_sha", sha),
+            "trusted_sha": sha,
+            "comment_id": comment["id"],
+            "issue_number": ISSUE,
+            "work_order_sha256": work_order_digest(order),
+        }
+    require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
     legacy_match = LEGACY_COMMAND.fullmatch(body)
     require(branch_match is not None or legacy_match is not None,
@@ -254,7 +373,10 @@ def authorize(event: object, context: dict, registry: object,
         verify_pr(pr_info, req)
     else:
         require(pr_info is None, "UNEXPECTED_PR_METADATA")
-    task = task_by_id(registry, req["task_id"])
+    task = task_for_request(registry, req, event)
+    if req["task_id"] == DYNAMIC_TASK:
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "WORK_ORDER_RERUN_DENIED")
     a2_claim = {}
     if req["task_id"] == "hil-a2-cpu-only":
         # A hardware-capable task cannot use untrusted PR-candidate code.
@@ -452,7 +574,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     }
 
 
-def worker_admission(req: dict, args, registry: object) -> dict:
+def worker_admission(req: dict, args, registry: object,
+                     event: object = None) -> dict:
     """One worker-side admission receipt, independent of hosted authorization.
 
     The GitHub-hosted job authorizes the owner and pins main/candidate SHA;
@@ -474,7 +597,11 @@ def worker_admission(req: dict, args, registry: object) -> dict:
             "AUTHORIZED_REGISTRY_MISMATCH")
     require(args.workspace.is_dir()
             and args.workspace.resolve() != ROOT.resolve(), "WORKSPACE_DENIED")
-    task = task_by_id(registry, req["task_id"])
+    task = task_for_request(registry, req, event)
+    if req["task_id"] == DYNAMIC_TASK:
+        require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1" and
+                args.work_order_sha256 == req["work_order_sha256"],
+                "WORK_ORDER_WORKER_BINDING_DENIED")
     capability = (
         "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
         else task.get("capability", "cpu-only")
@@ -597,6 +724,34 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "your complete tracked-source Git diff, newly created files and "
         "this report for review; do not commit, push or change Git refs.\n"
     )
+    if task_id == DYNAMIC_TASK:
+        scope = task["work_order_scope"]
+        stages = task["hardware_stages"]
+        prompt += (
+            "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
+            "Acceptance criteria:\n" + task["acceptance"] + "\n"
+            "Authorized execution scope: " + scope + "\n"
+            "Do not execute outside this Work Order; no automatic retries "
+            "of FPGA Manager writes, deployment, or destructive actions. "
+            "No additional human Gate within the approved scope. "
+        )
+        if scope == "host-only":
+            prompt += (
+                "HOST-ONLY: No SSH/sudo to Z2, no FPGA Manager, MMIO, "
+                "JTAG/SWD, DUT, power, or SWPC deployment. \n"
+            )
+        else:
+            prompt += (
+                "Only the following owner-authorized hardware stages "
+                "may be requested, in this exact order: " +
+                ", ".join(stages) + ". Always use the existing installed "
+                "Trusted Bridge and the Z2 Runtime Guard; never bypass the "
+                "root-owned guard, invoke direct FPGA writes, or replay a "
+                "stage. Check live checkpoint/boot/identity before each "
+                "stage; fail closed on any unknown state. Do not use a "
+                "different stage even if the natural-language objective "
+                "suggests it. \n"
+            )
     if task_id == "f1b-path3-codex-vivado-build":
         prompt += (
             "For this F1-B task, run every Vivado build through the SAME "
@@ -732,6 +887,7 @@ def main() -> int:
     parser.add_argument("--trusted-sha")
     parser.add_argument("--pr-number", type=int)
     parser.add_argument("--registry-sha256")
+    parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
@@ -748,8 +904,8 @@ def main() -> int:
                 # Single worker admission path for Path 2/3; retains the
                 # independent SWPC checks of trusted main SHA, candidate SHA
                 # and registry SHA256 before any task executes.
-                admission = worker_admission(req, args, registry)
-                task = task_by_id(registry, req["task_id"])
+                admission = worker_admission(req, args, registry, event)
+                task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
