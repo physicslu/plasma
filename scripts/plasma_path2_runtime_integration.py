@@ -116,6 +116,14 @@ def stage_contract(task: dict, approval: dict) -> str:
                   approval["pinned_sha"] != approval["trusted_sha"])),
             "PATH2_STAGE_APPROVAL_DENIED")
     stage = STAGE_TASKS.get(approval.get("task_id"))
+    if approval.get("task_id") == "path2-work-order":
+        # Only the owner-pinned, single-stage generic route; no full-HIL
+        # transition or arbitrary shell. Continue using the installed Bridge.
+        stage = task.get("stage") if type(task) is dict else None
+        require(stage in ("download", "test", "restore") and
+                type(approval.get("work_order_sha256")) is str and
+                approval["work_order_sha256"] == task.get("work_order_sha256"),
+                "PATH2_STAGE_WORK_ORDER_DENIED")
     require(stage is not None and type(task) is dict
             and task.get("capability") == "path2-stage-contract"
             and task.get("stage") == stage
