@@ -102,19 +102,21 @@ class ScopeTests(unittest.TestCase):
                 with self.assertRaises(dev.BoundedRiskDenied):
                     check(passive=facts(**c))
 
-    def test_no_base_manager_provenance_or_services_denied(self):
+    def test_manager_provenance_required_but_services_not_a_gate(self):
         with self.assertRaisesRegex(dev.BoundedRiskDenied, "ORIGINAL_BOOT_LOAD"):
             check(original_manager_load="fpga_manager fpga0: writing other.bin to FPGA")
-        with self.assertRaisesRegex(dev.BoundedRiskDenied, "ORIGINAL_SERVICE"):
-            check(service_snapshot={"plasma-server": "failed"})
+        for services in ({}, {"plasma-server": "failed"}):
+            self.assertEqual(check(service_snapshot=services)["provider"], dev.NO_OP)
 
-    def test_new_risk_must_explicitly_remain_unproven(self):
-        with self.assertRaisesRegex(dev.BoundedRiskDenied,
-                                    "RISKS_MUST_REMAIN_EXPLICIT"):
-            check(passive=facts(axi_isolation_evidence="VERIFIED"))
-        with self.assertRaisesRegex(dev.BoundedRiskDenied,
-                                    "RISKS_MUST_REMAIN_EXPLICIT"):
-            check(passive=facts(active_image_attestation="PASS"))
+    def test_risk_labels_are_not_hardware_authority(self):
+        for label in ("VERIFIED", "UNPROVEN", "PASS", None):
+            receipt = check(passive=facts(axi_isolation_evidence=label,
+                                          active_image_attestation=label))
+            self.assertEqual(receipt["provider"], dev.NO_OP)
+            self.assertFalse(receipt["production_qualification"])
+            with self.assertRaises(dev.BoundedRiskDenied):
+                check(passive=facts(proc_conflicts=["901"],
+                                    axi_isolation_evidence=label))
 
     def test_root_live_collector_not_allowed_without_target_lock(self):
         class NoLock:

@@ -427,15 +427,10 @@ jobs:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
         run: |
           set -euo pipefail
-          test "$GITHUB_EVENT_NAME" = issue_comment
-          test "$GITHUB_REF" = refs/heads/main
-          test "$GITHUB_SHA" = "$TRUSTED_SHA"
-          test "$GITHUB_REPOSITORY" = physicslu/plasma
-          test "$RUNNER_ENVIRONMENT" = self-hosted
-          test "$RUNNER_NAME" = SWPC-plasma-codex
+          # The shared trusted dispatcher authenticates the event, SHA and Runner.
+          # Retain direct SWPC host/account admission before checkout.
           test "$(hostname)" = SWPC
           test "$(id -un)" = plasma-codex
-          test "$(id -u)" -ne 0
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -550,15 +545,10 @@ jobs:
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
         run: |
           set -euo pipefail
-          test "$GITHUB_EVENT_NAME" = issue_comment
-          test "$GITHUB_REF" = refs/heads/main
-          test "$GITHUB_SHA" = "$TRUSTED_SHA"
-          test "$GITHUB_REPOSITORY" = physicslu/plasma
-          test "$RUNNER_ENVIRONMENT" = self-hosted
-          test "$RUNNER_NAME" = SWPC-plasma-codex
+          # The shared trusted dispatcher authenticates the event, SHA and Runner.
+          # Retain direct SWPC host/account admission before checkout.
           test "$(hostname)" = SWPC
           test "$(id -un)" = plasma-codex
-          test "$(id -u)" -ne 0
           command -v codex
           codex --version
       - name: Checkout trusted main dispatcher

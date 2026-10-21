@@ -330,6 +330,68 @@ class RouteContracts(unittest.TestCase):
         self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
 
+    def test_both_paths_share_failure_boundary_and_never_continue(self):
+        import subprocess
+        work_sha = "d" * 64
+        path3_task = {"execution_path": "path3-codex",
+                      "capability": "codex-workspace",
+                      "work_order_scope": "guarded-hardware",
+                      "work_order_sha256": work_sha,
+                      "hardware_stages": ["download", "test", "restore"]}
+        path3_approval = approval("path3-work-order",
+            execution_path="path3-codex",
+            execution_capability="codex-guarded-hardware",
+            work_order_sha256=work_sha)
+        routes = [
+            lambda executor: runtime.full_hil_sequence(
+                self.registry["tasks"]["z2-path2-full-hil"],
+                approval("z2-path2-full-hil"), executor=executor),
+            lambda executor: runtime.path3_shared_hardware_stages(
+                path3_task, path3_approval, executor=executor)]
+        for route in routes:
+            for failure in ("sigbus", "timeout", "receipt", "denied"):
+                calls = []
+                def executor(command, **kwargs):
+                    calls.append(command[1])
+                    if failure == "timeout":
+                        raise subprocess.TimeoutExpired(command, 1)
+                    if failure in ("sigbus", "denied"):
+                        return Mock(returncode=-7 if failure == "sigbus" else 2,
+                                    stdout=b"", stderr=b"")
+                    return Mock(returncode=0, stdout=b'{"result":"PASS"}',
+                                stderr=b"")
+                with self.subTest(route=route, failure=failure), \
+                     patch.object(runtime, "_trusted_root_bridge"), \
+                     self.assertRaises(runtime.RuntimeDenied):
+                    route(executor)
+                self.assertEqual(calls, ["download"])
+            executor = Mock()
+            with patch.object(runtime, "_trusted_root_bridge",
+                              side_effect=runtime.RuntimeDenied("ROOT_INTEGRITY_DENIED")), \
+                 self.assertRaises(runtime.RuntimeDenied):
+                route(executor)
+            executor.assert_not_called()
+
+    def test_shared_stage_contract_still_blocks_auto_flags_before_bridge(self):
+        work_sha = "d" * 64
+        task = {"execution_path": "path3-codex", "capability": "codex-workspace",
+                "work_order_scope": "guarded-hardware", "work_order_sha256": work_sha,
+                "hardware_stages": ["download", "test", "restore"]}
+        for flag in ("auto_download_after_build_success", "auto_test_after_download_success"):
+            with self.subTest(flag=flag), patch.object(runtime, "_trusted_root_bridge") as bridge:
+                executor = Mock()
+                with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_AUTO_TRANSITION_DENIED"):
+                    runtime.full_hil_sequence(
+                        self.registry["tasks"]["z2-path2-full-hil"],
+                        approval("z2-path2-full-hil", **{flag: True}), executor=executor)
+                with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_AUTO_TRANSITION_DENIED"):
+                    runtime.path3_shared_hardware_stages(task,
+                        approval("path3-work-order", execution_path="path3-codex",
+                                 execution_capability="codex-guarded-hardware",
+                                 work_order_sha256=work_sha, **{flag: True}), executor=executor)
+                bridge.assert_not_called()
+                executor.assert_not_called()
+
 class BuildQualificationBytes(unittest.TestCase):
     def evidence(self, td):
         root = Path(td)
