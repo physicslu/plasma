@@ -129,6 +129,34 @@ Codex 在既定工作樹／Objective 內自主進行 Code → Test → Fix → R
 不啟動 SWPC self-hosted、Codex CLI、Vivado 或 Z2；沒有實機權限、
 部署或 PR Merge 授權。離線 CI PASS 不等於真正 SWPC Path 3 E2E PASS。
 
+### Candidate Dispatcher 合併前測試入口（PR #1083）
+
+若 PR 修改的是 `scripts/plasma_development_dispatch.py` **本身**，Issue #981
+正式 `issue_comment` 入口仍必須執行可信 `main` Dispatcher，不得透過
+`--pr/--sha` 偷換授權程式。既有 `pull_request` 已提供 Branch 測試入口；
+在**同一份共用 Workflow** 內增加 `candidate-dispatcher-premerge` GitHub-hosted
+Job，分別 Checkout 精確 Base SHA 與 Candidate HEAD SHA，驗證 Git Tree
+後執行候選 Dispatcher 的**真實命令列程式**與完全模擬的 Owner Event／PR
+Metadata／Codex Stub：
+
+- 正例：`authorize` 與 `execute-codex` CLI 依序通過，檢查三種 SHA
+  傳遞、12 筆三角數、Exit Code 與 Receipt。
+- 負例：模擬 Codex 非零退出須令 Dispatcher 非零退出且保留失敗證據；
+  Registry SHA、Candidate SHA 或 Owner 不符須拒絕，且在啟動 Stub 前停止。
+- 無 SWPC/self-hosted Runner，無真 Codex、Vivado、硬體／USB／MMIO。
+  Stub 暫時設定的 Runner 環境變數**僅是 GH-hosted 內的測試資料**，
+  結果必須標示 `HOSTED_SIMULATION_ONLY`，不可宣稱 SWPC E2E PASS。
+- 測試 Job 使用 GitHub-hosted ephemeral Runner、唯讀 repo token、不
+  持久化 Git credentials；不新增第二份 Workflow／Runner／Dispatcher，
+  不呼叫 Issue #981，亦不影響其他 Path 的正式派工模式。
+
+這條入口能在 Merge 前驗證 **Candidate Dispatcher CLI 控制流程**，
+但無法驗證 SWPC 上的真實 OS 身分、實際權限隔離與 Codex 行為。
+若要在合併前於 **SWPC 真正執行 Candidate Dispatcher**，仍須有可信
+主控建立的 OS 級純軟體 Sandbox（不接觸實體設備）並能由獨立證據
+證明隔離，不能直接以 GitHub-hosted 假身分或 Prompt 取代。
+未建立這一條安全邊界前，SWPC Candidate E2E = `NOT_RUN`。
+
 ## 五、Gate 1 — 推薦與選擇矩陣
 
 | 問題 | Path 1 | Path 2 | Path 3 |
