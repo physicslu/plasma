@@ -11,6 +11,8 @@ on:
       - 'software/python/tests/test_bluepill_web_ps_admission.py'
       - 'software/python/tests/test_bluepill_web_ps_job.py'
       - 'software/python/plasma_interfaces/bluepill_openocd_job.py'
+      - 'software/python/plasma_interfaces/bluepill_openocd_session.py'
+      - 'software/python/tests/test_bluepill_web_ps_real_openocd.py'
       - 'software/python/plasma_server/execution_router.py'
       - 'pl/rtl/bus/plasma_poc_swd_gpio_axi_lite.sv'
       - 'pl/verification/test_bluepill_remote_bitbang_rtl.py'
@@ -50,6 +52,10 @@ jobs:
         env:
           PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
         run: python -m pytest -q software/python/tests/test_bluepill_openocd_virtual_target.py
+      - name: Real OpenOCD via WEB/PS/SiteWorker must fail on IDR-only target
+        env:
+          PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
+        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_real_openocd.py
       - name: Publish source and SWD adapter admission evidence
         if: always()
         uses: actions/upload-artifact@v4
