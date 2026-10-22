@@ -208,23 +208,23 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(report["discovered_exact_icpns"], 5885)
         self.assertEqual(
             report["catalog_level_counts"],
-            {"0": 315, "1": 5505, "2": 65, "3": 0},
+            {"0": 315, "1": 5493, "2": 77, "3": 0},
         )
         self.assertEqual(
             report["promotion_evidence_counts"],
             {
                 EVIDENCE_BACKEND_CANDIDATE_ROUTE: 1377,
-                EVIDENCE_CATALOG_MAPPED_ROUTE: 4127,
+                EVIDENCE_CATALOG_MAPPED_ROUTE: 4115,
                 EVIDENCE_IDENTITY_ONLY: 315,
-                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 66,
+                EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 78,
             },
         )
         self.assertEqual(report["selector_visible_exact_icpns"], 5570)
-        self.assertEqual(report["job_selectable_exact_icpns"], 65)
+        self.assertEqual(report["job_selectable_exact_icpns"], 77)
 
         self.assertEqual(
             by_manufacturer["STMicroelectronics"]["catalog_level_counts"],
-            {"0": 103, "1": 4461, "2": 65, "3": 0},
+            {"0": 103, "1": 4449, "2": 77, "3": 0},
         )
         self.assertEqual(
             by_manufacturer["NXP"]["catalog_level_counts"],
@@ -239,7 +239,7 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
             by_manufacturer["STMicroelectronics"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
             {
                 BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED: 362,
-                MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 4099,
+                MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 4087,
             },
         )
         self.assertEqual(
@@ -253,7 +253,7 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             report["promotion_blocker_counts"][EDGE_L2_TO_L3],
-            {PLASMA_VERIFIED_CONFIGURATION_MISSING: 65},
+            {PLASMA_VERIFIED_CONFIGURATION_MISSING: 77},
         )
 
 
