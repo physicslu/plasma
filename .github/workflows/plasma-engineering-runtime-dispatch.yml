@@ -573,6 +573,8 @@ jobs:
           test -z "$(git -C candidate status --porcelain --untracked-files=all)"
           resume_args=()
           if [ "$RESUME_PROBE" = "page-boundary-v1" ]; then
+            test "$(codex --version)" = "codex-cli 0.163.0"
+            command -v bwrap
             resume_args=(--resume-phase new)
           elif [ -n "$RESUME_PROBE" ]; then
             echo "RESUME_PROBE_DENIED" >&2
