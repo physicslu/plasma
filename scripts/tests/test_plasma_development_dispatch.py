@@ -653,6 +653,82 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
+            self.assertEqual(receipt["codex_model_selection"]["model"]["source"], "NOT_AVAILABLE")
+            self.assertEqual(receipt["codex_model_selection"]["reasoning_effort"]["source"], "NOT_AVAILABLE")
+
+    def test_codex_requested_model_effort_source_and_conflicts(self):
+        run = ["codex", "--model", "gpt-6-sol", "-c",
+               'model_reasoning_effort="medium"', "exec", "--json", "-"]
+        result = dev.codex_requested_model_settings(run)
+        self.assertEqual(result, {
+            "schema_version": 1,
+            "model": {"value": "gpt-6-sol", "source": "cli_requested"},
+            "reasoning_effort": {"value": "medium", "source": "cli_requested"},
+        })
+        equivalent = ["codex", "--model=gpt-6-sol",
+                      "--config=model_reasoning_effort=medium", "exec"]
+        self.assertEqual(dev.codex_requested_model_settings(equivalent), result)
+        for argv in (
+            ["codex", "--model", "gpt-6-sol", "-c", "model=gpt-5", "exec"],
+            ["codex", "-c", "model_reasoning_effort=medium",
+             "-c", "model_reasoning_effort=high", "exec"],
+        ):
+            with self.subTest(argv=argv):
+                result = dev.codex_requested_model_settings(argv)
+                self.assertTrue(any(v["source"] == "NOT_AVAILABLE"
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertNotIn("runtime_observed", json.dumps(result))
+
+    def test_codex_model_settings_fail_closed_on_untrusted_values(self):
+        cases = [
+            ["codex", "exec", "--json", "-"],
+            ["codex", "--model", "gpt-6-sol\nINJECT", "exec"],
+            ["codex", "--model", "-c", "exec"],
+            ["codex", "-c", "model_reasoning_effort=ultra", "exec"],
+            ["codex", "-c", "model_reasoning_effort=high\nSECRET", "exec"],
+            ["codex", "-c", "api_key=DO_NOT_RECORD", "exec"],
+            ["codex", "--", "--model", "gpt-6-sol", "exec"],
+        ]
+        for argv in cases:
+            with self.subTest(argv=argv):
+                result = dev.codex_requested_model_settings(argv)
+                self.assertTrue(all(v["source"] == "NOT_AVAILABLE"
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertTrue(all(v["value"] is None
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertNotIn("SECRET", json.dumps(result))
+                self.assertNotIn("DO_NOT_RECORD", json.dumps(result))
+
+    def test_codex_runtime_fields_without_verified_schema_are_not_evidence(self):
+        # Upstream codex exec JSONL lacks effective model/effort in its
+        # documented event contract; arbitrary extra keys are not proof.
+        stream = [
+            {"type": "thread.started",
+             "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53",
+             "model": "gpt-6-sol", "reasoning_effort": "high"},
+            {"type": "turn.started", "model": "gpt-6-sol",
+             "reasoning_effort": "high"},
+            {"type": "turn.completed",
+             "usage": {"input_tokens": 1, "cached_input_tokens": 0,
+                       "output_tokens": 1},
+             "model": "gpt-6-sol", "reasoning_effort": "high"},
+        ]
+        class Result:
+            returncode = 0
+            stderr = b""
+            stdout = ("\n".join(json.dumps(event) for event in stream)
+                      + "\n").encode()
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                self.task, workspace=Path(td),
+                executor=lambda *args, **kwargs: Result())
+            model = receipt["codex_model_selection"]
+            self.assertEqual(model["model"],
+                             {"value": None, "source": "NOT_AVAILABLE"})
+            self.assertEqual(model["reasoning_effort"],
+                             {"value": None, "source": "NOT_AVAILABLE"})
+            self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
+            self.assertNotIn("gpt-6-sol", json.dumps(receipt))
 
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"

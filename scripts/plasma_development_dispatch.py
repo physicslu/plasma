@@ -654,6 +654,64 @@ class LiveMonitorUnavailable(OSError):
     """Pre-execution monitor setup error; no Codex process has started."""
 
 
+def codex_requested_model_settings(command: list[str]) -> dict:
+    """Report only explicit CLI requests; do not guess Codex's effective model.
+
+    The documented codex exec --json thread/turn events do not include
+    effective Model/Reasoning Effort. In particular, extra JSONL keys,
+    host config files and current SWPC defaults are NOT runtime evidence.
+    'runtime_observed' is reserved for a future verified upstream contract.
+    Do not store argv, environment or other -c values in the receipt.
+    """
+    candidates = {"model": [], "reasoning_effort": []}
+    index = 0
+    while index < len(command):
+        arg = command[index]
+        if arg == "--":
+            break
+        if arg in ("--model", "-m", "-c", "--config"):
+            item = command[index + 1] if index + 1 < len(command) else ""
+            index += 2
+            if arg in ("--model", "-m"):
+                candidates["model"].append(item)
+                continue
+        elif type(arg) is str and arg.startswith("--model="):
+            candidates["model"].append(arg.partition("=")[2])
+            index += 1
+            continue
+        elif type(arg) is str and arg.startswith("--config="):
+            item = arg.partition("=")[2]
+            index += 1
+        else:
+            index += 1
+            continue
+        if type(item) is not str or "=" not in item:
+            continue
+        name, value = item.split("=", 1)
+        name = name.strip()
+        if name not in ("model", "model_reasoning_effort"):
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        candidates["model" if name == "model" else "reasoning_effort"].append(value)
+
+    def evidence(key: str) -> dict:
+        vals = candidates[key]
+        valid = (bool(vals) and all(type(v) is str and
+                 re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", v) for v in vals)
+                 and len(set(vals)) == 1)
+        if key == "reasoning_effort":
+            valid = valid and vals[0] in (
+                "minimal", "low", "medium", "high", "xhigh", "none")
+        return {"value": vals[0] if valid else None,
+                "source": "cli_requested" if valid else "NOT_AVAILABLE"}
+
+    return {"schema_version": 1,
+            "model": evidence("model"),
+            "reasoning_effort": evidence("reasoning_effort")}
+
+
 class CodexUsageCollector:
     """Read Codex JSONL, retaining only audited usage and event names.
 
@@ -971,6 +1029,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
         "codex_usage": usage_snapshot,
+        "codex_model_selection": codex_requested_model_settings(command),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
