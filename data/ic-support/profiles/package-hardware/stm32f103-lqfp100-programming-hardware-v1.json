@@ -9,8 +9,13 @@
     "package": "LQFP",
     "pin_count": 100,
     "applicable_base_devices": [
-      "STM32F103V8"
-    ]
+      "STM32F103V8",
+      "STM32F103VB"
+    ],
+    "applicability_basis": {
+      "STM32F103V8": "ST DS5319 Rev 20 Table 1 x8 device summary + Figure 4 common medium-density LQFP100 pinout",
+      "STM32F103VB": "ST DS5319 Rev 20 Table 1 xB device summary + Figure 4 common medium-density LQFP100 pinout"
+    }
   },
   "evidence": [
     {
@@ -25,7 +30,8 @@
         "6.5 LQFP100 package information (1L)",
         "Table 56. LQFP100 - Mechanical data",
         "Figure 48. LQFP100 - Footprint example",
-        "Figures 39-40. Power supply and reference decoupling"
+        "Figures 39-40. Power supply and reference decoupling",
+        "Table 1. Device summary: x8/xB compatible package applicability"
       ]
     }
   ],
