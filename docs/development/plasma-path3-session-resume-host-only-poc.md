@@ -9,7 +9,7 @@ There are two distinct kinds of debug continuity:
 1. **Within one Path 3 Job (already supported):** Codex independently iterates Code → Test → Fix → Retest within the same `exec` process. Its context is continuous for that process; no extra Dispatcher retry job is created.
 2. **Across two independent Codex processes / Jobs (not yet production-supported):** `codex exec resume <thread-id>` may restore the same dialogue. Simply recording the first `thread.started.thread_id` does not prove resume succeeded. Git source pin, task/owner binding, sandbox policy and working files must remain valid.
 
-**This Gate 1 only demonstrates the host-side probe contract**, using deterministic offline fake-CLI tests and an opt-in real local CLI entrypoint. Real Codex CLI resume on the owner's machine, and real cross-Job SWPC Path 3 qualification, are **NOT_RUN** until separately observed and authorized. Synthetic tests are not proof that upstream Codex restored memory.
+**This Gate 1 demonstrates the host-side probe contract** using deterministic offline fake-CLI tests and, after the Owner's explicit SWPC-specific Gate 1 scope revision, **one real SWPC interactive-user Codex CLI NEW → FAIL → RESUME → PASS execution** (Owner-provided output; see evidence below). This real test verifies two consecutive Codex processes inside one manual wrapper, **not** resumption across GitHub Actions Jobs. Production Path 3 cross-Job Session Resume remains **NOT_IMPLEMENTED / NOT_RUN**; CI fake-CLI tests alone are not evidence of actual context restoration.
 
 ## Continuous debugging example: Page-boundary off-by-one
 
@@ -38,7 +38,7 @@ A second **fresh** agent could simply inspect the file and repair a trivial bug.
 
 The existing GitHub-hosted `plasma-engineering-runtime-dispatch.yml` PR contract job runs `scripts/tests/test_plasma_development_dispatch.py`; its new `Path3SessionResumeHostOnlyProbe` suite injects a **fake Codex subprocess**. It asserts NEW → FAIL → RESUME → PASS, UUID mismatch, challenge missing, premature success, first-turn failure, dirty source and missing telemetry. **No model is called during CI**. Host-only CI success must be labeled `SIMULATED_PASS`, not `SWPC_RESUME_PASS`.
 
-A future owner who wants a *real* local CPU-only CLI test can use an **independent clean isolated checkout** with exact SHA, never the production SWPC workspace. This executes Codex twice and consumes model Tokens; it is **not run as part of this PR**:
+**Manual standalone invocation contract:** The Owner executed this once on SWPC as an unprivileged interactive user inside a restricted Bubblewrap mount namespace with an isolated clean Git Worktree, rather than as the SWPC GitHub Actions Runner. Do **not** run the raw CLI example below on a privileged or unisolated SWPC host; the actual Owner-approved SWPC run used a separate outer Bubblewrap launcher and a dedicated Codex session store. This command is only the underlying inner probe:
 
 ~~~bash
 # Only in an explicitly authorized disposable local checkout, after reviewing the CLI version:
@@ -50,7 +50,39 @@ python3 scripts/plasma_path3_session_resume_probe.py \
 
 Running it creates a fresh untracked `.plasma-path3-resume-probe/` directory and owner-only `receipt.json`, does not commit or push, and refuses to overwrite an existing probe. The caller must review the local source, stdout hashes and receipt; never commit raw Codex rollout data. A failed attempt remains auditable rather than triggering a hidden retry. A nonzero exit or missing real `thread.started` is FAIL, not automatically recovered with `--last`.
 
-**Sandbox caution:** Some Codex releases do not accept `--sandbox` on `exec resume` and may not preserve the original explicit policy when resuming. The probe sets `sandbox_mode="workspace-write"` **again for both processes**, keeps `sandbox_workspace_write.network_access=false`, and never requests full access. This CLI sandbox is not an OS-level guarantee for physical device/host access. Do not place the experiment on a privileged SWPC/HIL worker.
+**Sandbox caution:** Some Codex releases do not accept `--sandbox` on `exec resume` and may not preserve the original explicit policy when resuming. The probe sets `sandbox_mode="workspace-write"` **again for both processes**, keeps `sandbox_workspace_write.network_access=false`, and never requests full access. The Owner additionally checked Bubblewrap OS-level mount isolation on SWPC (`bubblewrap 0.6.1`), with no real device nodes or primary project tree visible in the probe namespace. These checks do **not** prove a complete host or network security boundary: model connections remain possible and a read-only model authentication file was available to the isolated process. No privileged SWPC GitHub Runner/HIL worker was invoked.
+
+## Real SWPC Codex Direct evidence — Owner-reported 2026-10-23 (Asia/Taipei)
+
+**Evidence status: OWNER_REPORTED / NOT_INDEPENDENTLY_VERIFIED.** After reviewing the SWPC preflight (interactive UID 1000, `codex-cli 0.163.0`, Bubblewrap 0.6.1 available, inspected isolation namespace) and a Git-HTTPS fetch of the exact candidate commit, the Owner ran **one** manual CPU-only probe in an isolated detached Worktree. This was **not** a GitHub Actions Path 3 job or an automatic SWPC dispatch. The reviewer has the complete sanitized console receipt supplied in conversation but **has not independently read the host files, private Codex sessions, model API telemetry or raw source output**. This changes real CLI status from `NOT_RUN` to **OWNER_REPORTED_PASS**; it does not certify all actual hardware/network isolation properties or cross-Job functionality.
+
+| Evidence field | Owner-reported value |
+| --- | --- |
+| PR candidate Git HEAD | `e63d44efe6d56ed4a6edd0fdf5c2fc2ce660c6d9` |
+| Codex CLI / Bubblewrap | `codex-cli 0.163.0` / `bubblewrap 0.6.1` |
+| Execution scope | SWPC unprivileged interactive shell + detached Worktree + restricted Bubblewrap; **not** self-hosted Runner |
+| Preflight host check | `FILESYSTEM_AND_DEVICE_ISOLATION=PASS` (Owner console) |
+| Case | `page-boundary-off-by-one`; single NEW / one RESUME |
+| Before / after NEW / after RESUME unittest exits | `1 / 1 / 0` (first two **expected FAIL**, final **PASS**) |
+| Codex phases | `COMPLETE / COMPLETE` (both subprocess calls returned exit 0 as checked by probe) |
+| Thread continuity | `same_thread=true` |
+| First-turn-only challenge | `context_continuity=VERIFIED` |
+| Thread identity SHA-256 (not raw UUID) | `66b8a1fa03529098eed44f05909b6c85e1238a43c262b08ebe0d7b78adfb2e72` |
+| Probe result / program exit | `PASS` / `PROBE_EXIT_CODE=0` and `TEST_EXIT_CODE=0` |
+| Failure reason | `null` |
+
+**Token usage**, from two genuine `turn.completed` event receipts as reported by Owner; Input **already includes** Cached:
+
+| Counter | NEW | RESUME | Total |
+| --- | ---: | ---: | ---: |
+| Input Tokens | 57,554 | 119,646 | **177,200** |
+| Cached Input | 49,536 | 110,080 | **159,616** |
+| Non-cached Input (Input − Cached) | 8,018 | 9,566 | **17,584** |
+| Output | 319 | 763 | **1,082** |
+
+**Acceptance rationale:** The probe's own checks require the same `thread.started` UUID in both processes, no premature repair, an unchanged test file, no out-of-probe Git edits, a failing test before and after the diagnosis-only turn, a repaired test after Resume, and byte-for-byte recovery of a 128-bit challenge that appears only in the first prompt. A **fresh second Session that merely fixes the obvious bug would not satisfy the challenge**. It is concrete evidence of reported cross-process conversation continuity, but not a controlled measure of context/cache causality and not evidence of resumption across separate GitHub Jobs. Second-turn cumulative input exceeded first-turn input; the 177,200 total is a two-turn cost, not a claim of savings versus an independent fresh-session repair.
+
+**Source and evidence boundaries:** The local sanitized file was reported at `/storage/projects/plasma-resume-pr1131-e63d44ef/.plasma-path3-resume-probe/receipt.json` and the outer log at `/storage/projects/plasma-resume-pr1131-e63d44ef-result.log`; neither is uploaded or independently verified. Do not archive actual UUID, secret challenge, `auth.json`, rollout JSONL, raw prompt or token. **SWPC Path 3 across-Jobs integration remains NOT_IMPLEMENTED / NOT_RUN; the trusted production Dispatcher was not modified.** The documentation-only evidence addendum does not authorize more model runs or automatic retries.
 
 ## Future production-admission prerequisites (not implemented here)
 
