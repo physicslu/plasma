@@ -48,7 +48,7 @@ Failure codes are category-only (for example `RESUME_BINDING_MISMATCH`, `RESUME_
 
 | Job / Test | Evidence required | Result |
 | --- | --- | --- |
-| GitHub-hosted candidate CI | Contract, negative tests, module compilation, Workflow conditions and hosted simulator | Pending |
+| GitHub-hosted candidate CI | Contract, negative tests, module compilation, Workflow conditions and hosted simulator | **SIMULATED_PASS** — 94/94 dispatcher/resume unit tests on reviewed candidate; check latest PR HEAD before Gate 2 |
 | GitHub Actions Job #1 `development-codex` | `NEW`, deliberate unittest exit 1 before and after diagnosis, valid UUID, `READY_FOR_RESUME`, real Run/Job ID and counters | **NOT_RUN** |
 | GitHub Actions Job #2 `development-codex-resume` | `RESUME` same UUID, correct first-turn challenge, unchanged test, fixed source, unittest exit 0 and real Job ID | **NOT_RUN** |
 | State / source negatives | Wrong original Work Order or Registry SHA, PR HEAD movement, Runner mismatch, dirty candidate, state missing, corrupted fixture, duplicate Resume | Pending |
