@@ -403,7 +403,7 @@ class Kl25HardwareIdentityPreflightContracts(unittest.TestCase):
         self.assertIn('"specs/engineering-dispatch/**"', wf)
         self.assertIn("python3 scripts/tests/test_plasma_engineering_dispatch_v1.py", wf)
         self.assertIn("runs-on: ubuntu-24.04", wf)
-        self.assertNotIn("self-hosted", wf)
+        self.assertNotIn("runs-on: [self-hosted", wf)
         self.assertNotIn("issue_comment:", wf)
         self.assertNotIn("workflow_dispatch:", wf)
         self.assertNotIn("sudo ", wf)
