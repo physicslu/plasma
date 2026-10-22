@@ -947,7 +947,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
         )
     prompt += (
-        "Physical actions require the approved trusted root executor; "
+        "Physical actions require the existing trusted root executor; "
         "no sudo, SSH, FPGA Manager, /dev/mem or UIO from this sandbox. "
         "Never claim Z2 acceptance without an authentic receipt.\n"
     )
