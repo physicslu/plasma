@@ -9,6 +9,9 @@ on:
       - 'software/python/tests/test_bluepill_remote_bitbang.py'
       - 'software/python/tests/test_bluepill_openocd_virtual_target.py'
       - 'software/python/tests/test_bluepill_web_ps_admission.py'
+      - 'software/python/tests/test_bluepill_web_ps_job.py'
+      - 'software/python/plasma_interfaces/bluepill_openocd_job.py'
+      - 'software/python/plasma_server/execution_router.py'
       - 'pl/rtl/bus/plasma_poc_swd_gpio_axi_lite.sv'
       - 'pl/verification/test_bluepill_remote_bitbang_rtl.py'
       - 'pl/verification/cocotb/test_bluepill_remote_bitbang_axi.py'
@@ -37,6 +40,8 @@ jobs:
         run: python -m pytest -q software/python/tests/test_bluepill_remote_bitbang.py
       - name: WEB REST to real PS route pre-admission (no hardware)
         run: python -m pytest -q software/python/tests/test_bluepill_web_ps_admission.py
+      - name: WEB REST to SiteWorker opt-in PoC executor integration (synthetic host only)
+        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_job.py
       - name: Real AXI-Lite RTL Cocotb simulation
         run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
       - name: Build exact upstream OpenOCD candidate and verify SWD adapter admission
