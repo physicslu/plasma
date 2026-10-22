@@ -36,6 +36,9 @@ EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-medium-density-tr-ord
 HIGH_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-high-rvz-package-v4.json"
 HIGH_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-high-density-rvz-package-t6-t7-applicability-v4.json"
 HIGH_EQUIVALENCE_REL = "release/openocd-qualification/stm32f103-high-density-rvz-lqfp-tr-ordering-equivalence-v3.json"
+MEDIUM_NONLQFP_APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-nonlqfp-exact-12-applicability-v1.json"
+MEDIUM_NONLQFP_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-nonlqfp-12-v1.json"
+QUALIFICATION_V9_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json"
 RELEASE_REL = "release/openocd.json"
 SOFTWARE_STATES = frozenset({"UNKNOWN", "CANDIDATE", "SUPPORTED", "UNSUPPORTED"})
 REQUIRED_OPERATIONS = ("probe", "erase", "program", "read", "verify")
@@ -79,6 +82,9 @@ class OpenOCDSoftwareQualificationRegistry:
         high_qualification = _read_json(root / HIGH_QUALIFICATION_REL)
         high_applicability = _read_json(root / HIGH_APPLICABILITY_REL)
         high_equivalence = _read_json(root / HIGH_EQUIVALENCE_REL)
+        package_applicability = _read_json(root / MEDIUM_NONLQFP_APPLICABILITY_REL)
+        package_qualification = _read_json(root / MEDIUM_NONLQFP_QUALIFICATION_REL)
+        qualification_v9 = _read_json(root / QUALIFICATION_V9_REL)
 
         provider = source_lock.get("provider", {})
         _require(
@@ -1126,6 +1132,290 @@ class OpenOCDSoftwareQualificationRegistry:
             "combined Programming Qualification scope expanded without review",
         )
 
+        # v9 adds a bounded medium-density C/R/V non-LQFP cohort without
+        # mutating or weakening the previously qualified 65 exact ST ICPNs.
+        old_ledger = qualification_v9.get("predecessor_qualification", {})
+        added_ledger = qualification_v9.get("added_cohort", {})
+        _require(
+            qualification_v9.get("qualification_id") == "adr0002-phase2-openocd-012-stm32f103-v9"
+            and qualification_v9.get("provider_source_lock_id") == source_lock["source_lock_id"]
+            and qualification_v9.get("provider") == q_provider
+            and qualification_v9.get("default_unreviewed_software_state") == "UNKNOWN"
+            and old_ledger.get("path") == QUALIFICATION_REL
+            and old_ledger.get("qualification_id") == qualification_manifest["qualification_id"]
+            and old_ledger.get("supported_exact_icpn_count") == 65
+            and _git_blob_sha1((root / QUALIFICATION_REL).read_bytes()) == old_ledger.get("git_blob_sha1")
+            and added_ledger.get("path") == MEDIUM_NONLQFP_QUALIFICATION_REL
+            and added_ledger.get("qualification_id") == package_qualification.get("qualification_id")
+            and added_ledger.get("supported_exact_icpn_count") == 12
+            and _git_blob_sha1((root / MEDIUM_NONLQFP_QUALIFICATION_REL).read_bytes()) == added_ledger.get("git_blob_sha1")
+            and qualification_v9.get("supported_exact_icpn_count") == 77,
+            "ST medium non-LQFP v9 admission manifest drift",
+        )
+        _require(
+            package_qualification.get("qualification_id")
+            == "adr0002-phase2-openocd-012-stm32f103-medium-nonlqfp-12-v1"
+            and package_qualification.get("status") == "reviewed_source_only"
+            and package_qualification.get("provider_source_lock_id") == source_lock["source_lock_id"]
+            and package_qualification.get("provider") == q_provider
+            and package_qualification.get("reference_programming_group_id") == group["group_id"]
+            and package_qualification.get("supported_exact_icpn_count") == 12,
+            "ST non-LQFP medium cohort/provider drift",
+        )
+        package_reference = package_qualification.get("reference_medium_qualification", {})
+        package_app_binding = package_qualification.get("applicability_authority", {})
+        _require(
+            package_reference.get("path") == MEDIUM_QUALIFICATION_REL
+            and _git_blob_sha1((root / MEDIUM_QUALIFICATION_REL).read_bytes()) == package_reference.get("git_blob_sha1")
+            and package_app_binding.get("path") == MEDIUM_NONLQFP_APPLICABILITY_REL
+            and _git_blob_sha1((root / MEDIUM_NONLQFP_APPLICABILITY_REL).read_bytes())
+            == package_app_binding.get("git_blob_sha1")
+            and package_app_binding.get("applicability_id") == package_applicability.get("applicability_id"),
+            "ST non-LQFP source/applicability blob drift",
+        )
+        _require(
+            package_applicability.get("applicability_id")
+            == "st-stm32f103-medium-nonlqfp-exact-12-v1"
+            and package_applicability.get("phase") == "02_PROGRAMMING"
+            and package_applicability.get("manufacturer") == "STMicroelectronics"
+            and package_applicability.get("family") == "STM32F1"
+            and package_applicability.get("series") == "STM32F103"
+            and package_applicability.get("density_class") == "medium"
+            and package_applicability.get("shared_programming_semantics")
+            == {
+                "openocd_device_id": "0x410",
+                "programming_profile_id": "stm32f1-medium-density-flash-v0",
+                "main_flash_start": "0x08000000",
+                "erase_unit_bytes": 1024,
+                "program_unit_bytes": 2,
+                "operations": list(REQUIRED_OPERATIONS),
+            },
+            "ST non-LQFP shared programming semantics drift",
+        )
+        package_authority = package_applicability.get("manufacturer_authority", {})
+        for source_name, expected_rel in (
+            ("ordering", "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json"),
+            ("production_exact_identity", "data/device-catalog/research/stm32f1-commercial-icpn.csv"),
+            ("programming_review", "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json"),
+            ("programming_profile", "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json"),
+        ):
+            source = package_authority.get(source_name, {})
+            _require(
+                source.get("path") == expected_rel
+                and _git_blob_sha1((root / expected_rel).read_bytes()) == source.get("git_blob_sha1"),
+                f"non-LQFP manufacturer authority lock drift: {source_name}",
+            )
+        source_spec = package_authority.get("manufacturer_source_lock", {})
+        _require(
+            source_spec.get("path") == "data/ic-support/benchmarks/stm32f103c/source-lock.json"
+            and source_spec.get("source_id") == "st_ds5319_rev20"
+            and source_spec.get("sha256")
+            == group["manufacturer_evidence"]["source_lock"]["st_ds5319_rev20"],
+            "non-LQFP manufacturer DS5319 source lock drift",
+        )
+        sources_payload = _read_json(root / source_spec["path"])
+        source_records = [
+            x for x in sources_payload.get("sources", [])
+            if x.get("source_id") == source_spec["source_id"]
+        ]
+        _require(
+            len(source_records) == 1
+            and source_records[0].get("integrity", {}).get("digest") == source_spec["sha256"],
+            "non-LQFP manufacturer PDF byte custody drift",
+        )
+        medium_band = next(
+            (x for x in app_stm32f103.get("bands", []) if x.get("name") == "medium"),
+            None,
+        )
+        _require(
+            isinstance(medium_band, dict)
+            and medium_band.get("document") == "DS5319 Rev 20"
+            and medium_band.get("package", {}).get("H") == "BGA"
+            and medium_band.get("package", {}).get("U") == "UFQFPN"
+            and medium_band.get("package_pin_overrides", {}).get("H/R") == "TFBGA"
+            and medium_band.get("package_pin_overrides", {}).get("H/V") == "LFBGA"
+            and medium_band.get("pin_count", {}).get("T") == 36
+            and medium_band.get("flash_kib") == {"8": 64, "B": 128}
+            and medium_band.get("allowed_tails") == ["", "TR"],
+            "ST DS5319 medium-density package evidence drift",
+        )
+
+        direct_exact = {
+            "STM32F103CBU6", "STM32F103R8H6", "STM32F103R8H7",
+            "STM32F103RBH6", "STM32F103RBH7",
+            "STM32F103V8H6", "STM32F103VBH6", "STM32F103VBH7",
+        }
+        variant_pairs = {
+            "STM32F103CBU6TR": "STM32F103CBU6",
+            "STM32F103R8H6TR": "STM32F103R8H6",
+            "STM32F103RBH6TR": "STM32F103RBH6",
+            "STM32F103V8H6TR": "STM32F103V8H6",
+        }
+        excluded_exact = {
+            "STM32F103RBH6R", "STM32F103RBH6RTR",
+            "STM32F103T8U6", "STM32F103T8U6TR",
+            "STM32F103T8U7", "STM32F103T8U7TR",
+            "STM32F103TBU6", "STM32F103TBU6TR", "STM32F103TBU7",
+        }
+        direct_targets = {
+            x["icpn"]: x for x in package_applicability.get("targets", [])
+            if isinstance(x, dict) and isinstance(x.get("icpn"), str)
+        }
+        variants = {
+            x["icpn"]: x for x in package_applicability.get("packing_variants", [])
+            if isinstance(x, dict) and isinstance(x.get("icpn"), str)
+        }
+        _require(
+            len(package_applicability.get("targets", [])) == 8
+            and set(direct_targets) == direct_exact
+            and len(package_applicability.get("packing_variants", [])) == 4
+            and {k: v.get("equivalent_to_icpn") for k, v in variants.items()} == variant_pairs
+            and set(package_applicability.get("explicit_non_targets", [])) == excluded_exact
+            and set(package_qualification.get("non_targets", [])) == excluded_exact
+            and set(qualification_v9.get("excluded_exact_icpns", [])) == excluded_exact,
+            "ST non-LQFP 12 exact admitted / 9 excluded scope drift",
+        )
+
+        def validate_medium_package_target(target: dict[str, Any]) -> None:
+            icpn = target["icpn"]
+            row = catalog_by_key.get(("STMicroelectronics", icpn))
+            _require(row is not None and row.identity_state == "IDENTIFIED", "missing Production exact " + icpn)
+            _require(row.mapping_status == "mapped" and row.target_config == q_provider["target_config"],
+                     "missing pinned OpenOCD mapping " + icpn)
+            base = target["base_device"]
+            _require(icpn.startswith(base) and base.startswith("STM32F103"), "base mismatch " + icpn)
+            pin_letter = base[9]
+            flash_letter = base[10]
+            order_tail = icpn[len(base):]
+            _require(
+                (pin_letter, order_tail[0]) in {("C", "U"), ("R", "H"), ("V", "H")}
+                and flash_letter in {"8", "B"}
+                and order_tail[1] in {"6", "7"}
+                and order_tail[2:] == "",
+                "ST non-LQFP direct order-code out of scope " + icpn,
+            )
+            expected_package = {
+                ("C", "U"): "UFQFPN", ("R", "H"): "TFBGA", ("V", "H"): "LFBGA",
+            }[(pin_letter, order_tail[0])]
+            for field, expected in (
+                ("base_device", base),
+                ("package", expected_package),
+                ("pin_count", str(medium_band["pin_count"][pin_letter])),
+                ("flash_size", str(medium_band["flash_kib"][flash_letter]) + " KiB"),
+                ("temperature_grade", medium_band["temperature_c"][order_tail[1]]),
+                ("option_suffix", ""),
+                ("target_config", q_provider["target_config"]),
+            ):
+                _require(
+                    (getattr(row, field) or "") == expected
+                    and target.get(field) == expected,
+                    f"non-LQFP canonical/manufacturer identity drift: {icpn}/{field}",
+                )
+            _require(row.source_authority == "STMicroelectronics official", "source authority drift " + icpn)
+            rel = target.get("memory_geometry_path")
+            _require(isinstance(rel, str) and rel.startswith("data/ic-support/profiles/memory-geometry/"),
+                     "missing exact geometry " + icpn)
+            raw = (root / rel).read_bytes()
+            geometry = json.loads(raw.decode("utf-8"))
+            mem = medium_band["flash_kib"][flash_letter] * 1024
+            g = geometry.get("data", {})
+            _require(
+                _git_blob_sha1(raw) == target.get("memory_geometry_git_blob_sha1")
+                and geometry.get("profile_id") == target.get("memory_geometry_profile_id")
+                and geometry.get("scope", {}).get("manufacturer") == "STMicroelectronics"
+                and geometry.get("scope", {}).get("base_device") == base
+                and g.get("main_flash_start") == "0x08000000"
+                and g.get("main_flash_size_bytes") == mem
+                and g.get("main_flash_end") == f"0x{(0x08000000 + mem - 1):08X}"
+                and g.get("page_size_bytes") == 1024
+                and g.get("erase_granularity_bytes") == 1024
+                and g.get("program_granularity_bytes") == 2
+                and g.get("page_count") == mem // 1024
+                and target.get("main_flash_size_bytes") == mem
+                and target.get("page_count") == mem // 1024,
+                "non-LQFP Flash geometry evidence drift " + icpn,
+            )
+
+        for target in direct_targets.values():
+            validate_medium_package_target(target)
+        additions = package_qualification.get("records", [])
+        _require(len(additions) == 12 and len({x.get("icpn") for x in additions}) == 12,
+                 "non-LQFP qualification record cardinality drift")
+        for raw in additions:
+            icpn = raw.get("icpn")
+            key = ("STMicroelectronics", icpn)
+            _require(key not in self._records, "non-LQFP provider duplicate claim " + str(icpn))
+            _require(
+                raw.get("manufacturer") == "STMicroelectronics"
+                and raw.get("software_state") == "SUPPORTED"
+                and raw.get("programming_profile_id") == "stm32f1-medium-density-flash-v0"
+                and raw.get("operations") == list(REQUIRED_OPERATIONS),
+                "non-LQFP reviewed operation mismatch " + str(icpn),
+            )
+            basis = raw.get("qualification_basis", {})
+            if icpn in direct_exact:
+                target = direct_targets[icpn]
+                _require(
+                    basis == {
+                        "kind": "manufacturer_applicability",
+                        "applicability_id": package_applicability["applicability_id"],
+                    },
+                    "direct package applicability missing " + icpn,
+                )
+            elif icpn in variant_pairs:
+                variant = variants[icpn]
+                source_icpn = variant_pairs[icpn]
+                source = self._records.get(("STMicroelectronics", source_icpn))
+                source_row = catalog_by_key.get(("STMicroelectronics", source_icpn))
+                row = catalog_by_key.get(key)
+                _require(
+                    basis == {
+                        "kind": "ordering_equivalence",
+                        "equivalent_to_icpn": source_icpn,
+                        "applicability_id": package_applicability["applicability_id"],
+                    }
+                    and variant.get("base_device") == raw.get("base_device")
+                    and variant.get("packing_suffix") == "TR"
+                    and source is not None
+                    and source.get("software_state") == "SUPPORTED"
+                    and source_row is not None and row is not None
+                    and row.option_suffix == "TR"
+                    and (source_row.option_suffix or "") == "",
+                    "TR equivalence source/order missing " + icpn,
+                )
+                for field in (
+                    "base_device", "package", "pin_count", "flash_size",
+                    "temperature_grade", "target_config",
+                ):
+                    _require(getattr(source_row, field) == getattr(row, field),
+                             f"TR package/catalog mismatch {icpn}/{field}")
+                for field in (
+                    "base_device", "programming_profile_id",
+                    "memory_geometry_profile_id", "main_flash_size_bytes",
+                    "page_count", "operations",
+                ):
+                    _require(raw.get(field) == source.get(field),
+                             f"TR programming mismatch {icpn}/{field}")
+                target = direct_targets[source_icpn]
+            else:
+                raise DeviceCatalogIntegrityError("unexpected non-LQFP qualified exact: " + str(icpn))
+            for field in (
+                "base_device", "memory_geometry_profile_id",
+                "main_flash_size_bytes", "page_count",
+            ):
+                _require(raw.get(field) == target.get(field),
+                         f"non-LQFP qualified geometry mismatch {icpn}/{field}")
+            self._records[key] = deepcopy(raw)
+        _require(
+            len(self._records) == 77
+            and all(("STMicroelectronics", icpn) not in self._records for icpn in excluded_exact),
+            "ST v9 non-LQFP combined exact scope exceeded",
+        )
+        for item in (package_applicability, package_qualification, qualification_v9):
+            boundary = item.get("non_claims", item.get("acceptance_boundary", {}))
+            for k in ("hardware_runtime_ready", "physical_programming_qualified", "execution_authorized"):
+                _require(boundary.get(k) is False, "non-LQFP physical/run execution boundary drift: " + k)
+
         for qualification_name, boundary in (
             ("medium-density", qualification.get("acceptance_boundary", {})),
             ("high-density", high_qualification.get("acceptance_boundary", {})),
@@ -1154,7 +1444,7 @@ class OpenOCDSoftwareQualificationRegistry:
             _require(boundary.get(key) is False, f"unsafe Programming Qualification boundary: {key}")
 
         self.source_lock_id = source_lock["source_lock_id"]
-        self.qualification_id = qualification_manifest["qualification_id"]
+        self.qualification_id = qualification_v9["qualification_id"]
         self.provider = deepcopy(q_provider)
         self.programming_group = deepcopy(group)
         self.operation_qualification = deepcopy(opq)
@@ -1296,6 +1586,9 @@ def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQual
         HIGH_QUALIFICATION_REL,
         HIGH_APPLICABILITY_REL,
         HIGH_EQUIVALENCE_REL,
+        MEDIUM_NONLQFP_APPLICABILITY_REL,
+        MEDIUM_NONLQFP_QUALIFICATION_REL,
+        QUALIFICATION_V9_REL,
     )
     if not source_files_available(ROOT, required):
         return None
