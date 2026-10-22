@@ -5,7 +5,7 @@ MEMORY {
 }
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 _Min_Heap_Size = 0;
-_Min_Stack_Size = 0x400;
+_Min_Stack_Size = 0x800;
 SECTIONS {
   .isr_vector : { . = ALIGN(4); KEEP(*(.isr_vector)); . = ALIGN(4); } >FLASH
   .text : { . = ALIGN(4); *(.text*) *(.rodata*) KEEP(*(.init)) KEEP(*(.fini)) . = ALIGN(4); } >FLASH

@@ -223,13 +223,19 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
   pdev->pData = &hpcd;
 
   /* Initialize LL Driver */
-  HAL_PCD_Init((PCD_HandleTypeDef *) pdev->pData);
+  if (HAL_PCD_Init((PCD_HandleTypeDef *) pdev->pData) != HAL_OK)
+  {
+    return USBD_FAIL;
+  }
 
-  HAL_PCDEx_PMAConfig(pdev->pData, 0x00, PCD_SNG_BUF, 0x40);
-  HAL_PCDEx_PMAConfig(pdev->pData, 0x80, PCD_SNG_BUF, 0x80);
-  HAL_PCDEx_PMAConfig(pdev->pData, CDC_IN_EP, PCD_SNG_BUF, 0xC0);
-  HAL_PCDEx_PMAConfig(pdev->pData, CDC_OUT_EP, PCD_SNG_BUF, 0x110);
-  HAL_PCDEx_PMAConfig(pdev->pData, CDC_CMD_EP, PCD_SNG_BUF, 0x100);
+  if (HAL_PCDEx_PMAConfig(pdev->pData, 0x00, PCD_SNG_BUF, 0x40) != HAL_OK ||
+      HAL_PCDEx_PMAConfig(pdev->pData, 0x80, PCD_SNG_BUF, 0x80) != HAL_OK ||
+      HAL_PCDEx_PMAConfig(pdev->pData, CDC_IN_EP, PCD_SNG_BUF, 0xC0) != HAL_OK ||
+      HAL_PCDEx_PMAConfig(pdev->pData, CDC_OUT_EP, PCD_SNG_BUF, 0x110) != HAL_OK ||
+      HAL_PCDEx_PMAConfig(pdev->pData, CDC_CMD_EP, PCD_SNG_BUF, 0x100) != HAL_OK)
+  {
+    return USBD_FAIL;
+  }
 
   return USBD_OK;
 }
@@ -252,8 +258,7 @@ USBD_StatusTypeDef USBD_LL_DeInit(USBD_HandleTypeDef * pdev)
   */
 USBD_StatusTypeDef USBD_LL_Start(USBD_HandleTypeDef * pdev)
 {
-  HAL_PCD_Start((PCD_HandleTypeDef *) pdev->pData);
-  return USBD_OK;
+  return HAL_PCD_Start((PCD_HandleTypeDef *) pdev->pData) == HAL_OK ? USBD_OK : USBD_FAIL;
 }
 
 /**
