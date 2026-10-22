@@ -35,6 +35,7 @@ class VirtualWordPort:
         self.target_value = 1
         self.writes = 0
         self.barriers = 0
+        self.dpidr_reads = 0
 
     def read32(self, address):
         if address == BASE:
@@ -56,9 +57,13 @@ class VirtualWordPort:
         if address != BASE + 8 or type(value) is not int or not 0 <= value <= 7:
             raise OSError("Non-Site AXI write")
         if not self.drive & 1 and value & 1:
-            # Rising edge: the independent target consumes the current bit
-            # and transitions its SWD request/response state machine.
+            # Rising edge: the independent target consumes the current bit.
+            # Count DPIDR acceptance as an event: OpenOCD may issue SWD
+            # line reset on shutdown, clearing target.connected afterward.
+            was_connected = self.target.connected
             self.target.rising(bool(value & 4), bool(value & 2))
+            if self.target.connected and not was_connected:
+                self.dpidr_reads += 1
         elif self.drive & 1 and not value & 1:
             # OpenOCD's bitbang_swd_exchange() clocks LOW, samples SWDIO,
             # then clocks HIGH. A target must have its *next* response bit
@@ -127,9 +132,12 @@ def test_real_upstream_openocd_remote_bitbang_reads_virtual_dpidr():
             f"bridge_errors={errors!r}\\n"
         )
         assert result.returncode == 0, diagnostics + stdout[-6000:]
-        assert port.target.connected, (
-            "The virtual target never received a valid DPIDR SWD transfer\n"
+        assert "SWD DPIDR 0x2ba01477" in stdout, (
+            "Real OpenOCD did not decode the correct SWD DPIDR\n"
             + stdout[-4000:]
+        )
+        assert port.dpidr_reads >= 1, (
+            "Independent virtual target never accepted a valid DP IDR request"
         )
         assert port.writes > 0 and port.barriers >= port.writes
         assert not location.exists()
