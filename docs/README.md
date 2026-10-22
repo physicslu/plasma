@@ -126,6 +126,7 @@
 ## Development and validation
 
 - **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
+- **Gate 1 / Local-only Tool; Desktop Telemetry NOT_RUN** — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 
 - **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 Host-side Build Qualification、離線 F1-B Adapter／Lease 測試；目前有獨立的受控 Stage Transport。每次 Build／Download／Testing 仍須通過固定 Work Order SHA、映像 Hash、Sandbox 及硬體授權檢查。\n\n- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
 
