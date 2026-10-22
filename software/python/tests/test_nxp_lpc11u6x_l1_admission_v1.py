@@ -151,8 +151,8 @@ class NxpLpc11U6xL1AdmissionTests(unittest.TestCase):
             self.assertFalse(q["job_selectable"])
         report = framework.report
         nxp = next(x for x in report["manufacturers"] if x["manufacturer"] == "NXP")
-        self.assertEqual(nxp["catalog_level_counts"], {"0": 212, "1": 29, "2": 0, "3": 0})
-        self.assertEqual(nxp["selector_visible_exact_icpns"], 29)
+        self.assertEqual(nxp["catalog_level_counts"], {"0": 101, "1": 140, "2": 0, "3": 0})
+        self.assertEqual(nxp["selector_visible_exact_icpns"], 140)
         self.assertEqual(nxp["job_selectable_exact_icpns"], 0)
 
     def test_no_fuzzy_material_admission_and_tamper_evidence_detection(self) -> None:
