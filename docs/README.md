@@ -125,7 +125,7 @@
 
 ## Development and validation
 
-- **Gate 1 / SWPC real monitor NOT_RUN** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 左右並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。現階段需先完成 Host-only CI，並在受控 Gate 1 啟用後驗證真正 SWPC 的觀察結果；此文件不授權部署或硬體操作。
+- **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
 
 - **Gate 1 / Host-only Integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：重用既有 Dispatcher、Workflow、Vivado Build、三階段 Orchestrator、F1-B Adapter 與 Persistent Lease；建立獨立 Build/Download/Testing 任務身分與實際檔案 Hash 的 Host-only Build Qualification，實機 Provider 未授權且必須 fail closed。\n\n- **Gate 1 / Host-only Draft** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：跨階段 Loaded State、Lease、映像來源、Restore Intent、Timeout、不可盲目重試及 Testing 重入之離線安全契約；不提供實機下載或恢復權限。
 

@@ -869,7 +869,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
             "execution_path":"path3-codex",
-            "objective":"Complete actual Vivado 2026.1 F1-B Host-only implementation, "
+            "objective":"Complete actual Vivado 2026.1 F1-B implementation, "
                         "record all errors/fixes and real BIT HWH timing DRC evidence.",
         }
         dev.task_by_id({
@@ -891,7 +891,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 rtl.write_text("module host_fixture; endmodule\n")
                 evidence=work/".plasma-path3-evidence"
                 (evidence/"engineering-report.md").write_text(
-                    "Actual host-only build log (stub fixture; NOT_RUN).\n"
+                    "Actual Vivado build log (stub fixture; NOT_RUN).\n"
                     "Root cause and fix entries required in real execution.\n")
                 return Result()
             receipt=dev.run_codex_task(task,workspace=work,
@@ -906,6 +906,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("workspace-write",args)
             self.assertIn("sandbox_workspace_write.network_access=false",args)
             self.assertIn("Vivado 2026.1",kwargs["input"].decode())
+            self.assertNotIn("Vivado Host-only",kwargs["input"].decode())
+            self.assertNotIn("host-only Vivado",kwargs["input"].decode())
             self.assertIn("trusted dispatcher will execute",kwargs["input"].decode())
             self.assertIn("twice in fresh output directories",kwargs["input"].decode())
             self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
