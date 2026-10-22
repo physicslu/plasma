@@ -178,6 +178,12 @@ def qualification_boundary_claim(payload: dict[str, Any]) -> dict[str, Any]:
             and payload.get("installed_runtime_attested") is False
             and payload.get("hardware_runtime_ready") is False,
             "offline evidence must not authorize programming")
+    require(payload.get("host_parser") == "PASS"
+            and payload.get("parser_adapter") == "dummy"
+            and payload.get("parser_transport") == "jtag"
+            and payload.get("swd_session_qualified") is False
+            and payload.get("real_silicon_observed") is False,
+            "host-only parser may not claim real SWD or silicon observation")
     require(payload.get("operations") == {op: "UNKNOWN" for op in OPERATIONS},
             "host-only evidence cannot qualify operations")
     require(payload.get("missing_gates") == list(MISSING), "qualification blockers missing")
