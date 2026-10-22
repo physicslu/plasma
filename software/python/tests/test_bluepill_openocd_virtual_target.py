@@ -56,9 +56,19 @@ class VirtualWordPort:
         if address != BASE + 8 or type(value) is not int or not 0 <= value <= 7:
             raise OSError("Non-Site AXI write")
         if not self.drive & 1 and value & 1:
-            self.target_drive, self.target_value = self.target.rising(
-                bool(value & 4), bool(value & 2)
-            )
+            # Rising edge: the independent target consumes the current bit
+            # and transitions its SWD request/response state machine.
+            self.target.rising(bool(value & 4), bool(value & 2))
+        elif self.drive & 1 and not value & 1:
+            # OpenOCD's bitbang_swd_exchange() clocks LOW, samples SWDIO,
+            # then clocks HIGH. A target must have its *next* response bit
+            # available at LOW (after the falling edge), not after HIGH.
+            # The independent model owns the response sequence; peeking
+            # does not consume it, only the subsequent rising edge does.
+            if self.target.state == "response" and self.target.pending:
+                self.target_drive, self.target_value, _ = self.target.pending[0]
+            else:
+                self.target_drive, self.target_value = False, 1
         self.drive = value
         self.writes += 1
 
