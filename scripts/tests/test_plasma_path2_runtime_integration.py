@@ -191,7 +191,8 @@ class RouteContracts(unittest.TestCase):
         self.assertIn("path2-stage-contract", wf)
         self.assertIn("github.run_attempt == 1", wf)
         self.assertIn("scripts/tests/test_plasma_path2_runtime_integration.py", wf)
-        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertIn("  development-codex-resume:", wf)
 
 
     def test_shared_stage_contract_ignores_inert_flags(self):
