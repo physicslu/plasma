@@ -1,6 +1,6 @@
 # PLASMA Path 3 — Repo-first Token Optimization RCA Closure
 
-**狀態：Engineering DONE / 階段性結案。** 此文件為 Gate 1 的證據歸檔變更，必須經獨立 Gate 2 合併才能成為正式 main 文件。**Token 完整因果歸因沒有結案**，另以低優先級技術債追蹤。
+**狀態：Engineering DONE / 階段性結案。** 原始歸檔已於 [PR #1129](https://github.com/physicslu/plasma/pull/1129) 經 Gate 2 合併至 main；本節新增的 Linux Direct 證據補充另需經本次文件 PR 的 Gate 2。**Token 完整因果歸因沒有結案**，仍以低優先級技術債追蹤。
 
 **範圍：** 原有 PLASMA Development Mode Path 3、CPU-only `nine-nine-path3` 任務、GitHub Actions + `SWPC-plasma-codex` Runner。此報告歸檔既有執行證據；**沒有新增執行、重跑 Codex、部署或操作 Z2、DUT、FPGA、電源、USB。**
 
@@ -65,6 +65,49 @@
 | Generated source | `93d3aed9688c6c435f028996eb2fbd30e6b2f62ac1d026da36d817ec6585dd4d` | `fde9caf82113c7666652207c36a74e9c5ea0e9cf9268d0f54cfaf280f3477184` |
 
 校驗方法：以 GitHub Artifact ID 下載 ZIP，先對 ZIP 計算 SHA-256，比對表內 digest；再在壓縮包內查驗 `_temp/plasma-path3-receipt.json` 的欄位、收據 Hash 與 `_temp/plasma-path3-engineering-evidence.tar.gz` 的實際 CSV。已於本次 Gate 1 歸檔前對兩個 ZIP **獨立計算 SHA-256 並逐筆驗算兩份 9×9 CSV**，吻合表格與預期值。
+
+## Linux Codex Direct 9×9 補充樣本（2026-10-23；Owner-reported）
+
+**證據等級：USER_REPORTED / NOT_INDEPENDENTLY_VERIFIED。** 下列兩次新版 Linux Direct 測試的 JSON 數值、Codex CLI 版本、輸出檔 SHA-256 與驗收結果由 Owner 在對話中直接提供。Repo 審查者沒有連線讀取 Linux 工作區中的 JSON、Python 程式、stdout、原始 Codex Session 或模型伺服端計量；因此僅能**獨立重算報告中的算術、核對 Git 上既有 Work Order 與 SHA 格式**，不能把這兩份本機結果提升為已獨立實測的 PASS。保留首次失敗樣本以避免倖存者偏差。
+
+相同的 **`nine-nine-path3` 工作目標** 源自 `specs/engineering-dispatch/development-tasks-v1.json`：`Build a Python 9x9 multiplication-table program for factors 1 through 9`，輸出路徑 `scripts/experiments/plasma_nine_nine_codex_generated.py`。兩次 Direct 都固定 Git HEAD `8239fdf4746fdb9dbc6388a77a399bc055004988`，根目錄 `AGENTS.md` 為 **17,285 bytes**，CLI `codex-cli 0.163.0`；以單次全新 `codex exec --json` 程序執行。**提示不是與 Path 3 逐位元組相同**：Direct 包含額外的隔離工作樹、輸出檔、CPU-only、驗收與安全指示；Attempt #2 另外明確聲明 Owner Gate 1 允許建立單一測試檔案。故「相同案例」不等於「相同 Prompt／Session」。
+
+| Owner 回報 | Attempt #1（失敗樣本） | Attempt #2（成功樣本） |
+| --- | --- | --- |
+| UTC 執行起訖 | 2026-10-22 17:01:17.088974–17:01:45.863209 | 2026-10-22 17:09:01.140073–17:09:33.250952 |
+| Wall Time | 28.774 秒 | 32.111 秒 |
+| Codex CLI exit | 0 | 0 |
+| Source created | **false**（Git 工作樹後續唯讀檢查為乾淨、預期路徑不存在） | **true** |
+| Python program exit | null（未執行） | 0 |
+| 9×9 驗收 | **FAIL — 未交付程式；不是乘法運算錯誤的證據** | **81/81 PASS（Owner 本機腳本回報）** |
+| Input Tokens（含 Cached） | 95,960 | 138,815 |
+| Cached Input Tokens | 79,616 | 123,776 |
+| Non-cached Input | 16,344 | 15,039 |
+| Output Tokens | 1,493 | 2,239 |
+| Usage status | REPORTED | REPORTED |
+| Model requested / Effort requested | `gpt-6-sol` / `medium` | `gpt-6-sol` / `medium` |
+| Effective Model / Effort | **NOT_VERIFIED** | **NOT_VERIFIED** |
+| Per-model request count | **NOT_AVAILABLE** | **NOT_AVAILABLE** |
+| Source SHA-256 | null | `00408ded47a40b955e8757b9deba0607398ba4de1547085dfae78087a4480804` |
+| Stdout SHA-256 | null | `29889cb9189d5756064bd05eebfc0d46ea0bbbfc6dc0a5cf115825b7d456fe` |
+
+Attempt #2 `stdout_matches_path3_expected = false`：**不等於算術失敗**。原始工作目標允許自行選擇 CSV 欄名與程式實作，因此逐位元組 stdout SHA-256 不必與 Path 3 相同；本機驗證腳本聲稱以 81 個唯一的 `(a,b,a*b)` 驗收。兩個 SHA 僅為 Owner 回報的識別資料，**尚未獨立比對對應原始位元組**。Attempt #1 在失敗時即使 `codex_exit_code=0`，也不能視為 Task PASS。
+
+### 跨執行型態對照：描述性數值，不是受控 A/B
+
+| 測試樣本／證據來源 | Input | Cached Input | Non-cached Input | Output | 功能／計量狀態 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 舊版 Linux Direct，歷史既有 Session（Owner 本機 Telemetry） | 1,951,915 | 1,927,680 | 24,235 | 6,339 | 81/81 PASS（Owner-reported；16 unique Response records） |
+| **新版 Linux Direct Attempt #1**（Owner JSON） | 95,960 | 79,616 | 16,344 | 1,493 | **FAIL — source not created** |
+| **新版 Linux Direct Attempt #2**（Owner JSON） | 138,815 | 123,776 | 15,039 | 2,239 | **81/81 PASS（Owner-reported）** |
+| 舊版 SWPC Path 3（GitHub artifact verified） | 251,614 | 192,896 | 58,718 | 2,664 | 81/81 PASS |
+| 新版 SWPC Path 3（GitHub artifact verified） | 148,319 | 118,272 | 30,047 | 2,649 | 81/81 PASS |
+
+從舊版 Direct 成功樣本到新版 Direct Attempt #2，**總 Input 觀察到 −92.89%、Cached −93.58%、Non-cached −37.95%、Output −64.68%**；舊版既有 Session 的完整 Turn 邊界約 **126.427 秒**，新版 Attempt #2 的 Codex CLI 單次程序約 **32.111 秒**（量測範圍也不同，不能直接當成等價效能提升）。舊版 Direct 16 次 Response、平均每次約 121,995 Input，而新版 **逐次模型請求數 NOT_AVAILABLE**。新品樣本含 123,776 Cached，比例約 89.17%。Input 已包含 Cached，不可重複加總。
+
+**不得將 −92.89% 歸因於 PR #1128 的 `AGENTS.md` 精簡，也不得宣稱 Fresh Session 必然貢獻了特定百分比。** Fresh Session 減少歷史上下文是重要候選解釋，但仍與 Response 次數、工具／迭代路徑、提示差異、Prompt Cache、有效 Model/Effort、CLI 差異及執行上下文混雜。Path 3 使用 `codex-cli 0.162.1`；新版 Linux Direct 使用 `0.163.0`；舊版 Linux Direct 的精確 CLI 版本沒有獨立證據。新版 Direct 的 `gpt-6-sol`／`medium` 是**要求設定**而不是可證實的**生效設定**。只有配對控制條件、來源可驗的 Fresh Session A/B，才能估算各因素貢獻。
+
+**證據保留界線：**Owner 本機數值摘要（Attempt #1 與 #2）應由 Owner 留存；不要把私有 rollout JSONL、原始 Session、Prompt、憑證或任意本機工作目錄上傳 Repository。本節是提供的脫敏計量及驗收結果歸檔，無新的 SWPC／Codex Run／硬體操作。此補充不重新開啟先前已合併的 Path 3 優化結案；Per-response Token Attribution 保留原低優先級 TODO。
 
 ## RCA / 結案決策
 
