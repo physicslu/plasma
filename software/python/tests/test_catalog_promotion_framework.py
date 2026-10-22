@@ -257,5 +257,62 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
 
 
+
+class NxpReverseCanonicalGapV2Tests(unittest.TestCase):
+    """Reconcile frozen NXP research with exact canonical qualification only."""
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        from pathlib import Path
+
+        script = (Path(__file__).resolve().parents[3]
+                  / "data/device-catalog/research/nxp_openocd_canonical_gap_v2.py")
+        spec = importlib.util.spec_from_file_location("nxp_openocd_canonical_gap_v2", script)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_source_locked_501_to_241_reconciliation_and_no_promotion(self):
+        audit = self._module()
+        result = audit.build()
+        self.assertEqual(result["historical_501"],
+                         {"total": 501, "priority": {"P0": 27, "P1": 38, "P2": 436}})
+        self.assertEqual(result["identity_join"],
+                         {"in_both": 224, "historic_only": 277,
+                          "newer_canonical_lpc": 17})
+        self.assertEqual(result["historic_only_priority"],
+                         {"P0": 15, "P1": 22, "P2": 240})
+        self.assertEqual(result["historic_only_priority_detail"],
+                         {"P0_LPC844_LPC845": 15,
+                          "P1_K32L2_not_admitted": 4,
+                          "P1_LPC802_LPC804_not_admitted": 18,
+                          "P2_other": 240})
+        self.assertEqual(result["canonical"]["catalog_levels"],
+                         {"0": 212, "1": 29, "2": 0, "3": 0})
+        self.assertEqual(result["current_l1_families"],
+                         {"KL25": 12, "LPC11U6X": 8, "LPC81X": 8, "LPC11U2X": 1})
+        self.assertEqual(result["current_l0_families"], {"MCX": 196, "K32L2": 16})
+        self.assertIs(result["promotion_authorized"], False)
+        self.assertIs(result["hardware_executed"], False)
+        self.assertIsNone(result["unbounded_nxp_portfolio_coverage"])
+
+    def test_source_tampering_fails_closed_without_catalog_side_effects(self):
+        import unittest.mock
+
+        audit = self._module()
+        with unittest.mock.patch.dict(
+            audit.PINNED,
+            {"nxp-501-adr0002-core-transport-qualification-v10.csv": "0" * 40},
+        ):
+            with self.assertRaisesRegex(ValueError, "pinned source drift"):
+                audit.build()
+        original = audit.PINNED[
+            "nxp-501-adr0002-core-transport-qualification-v10.csv"
+        ]
+        self.assertEqual(original, "9f0397fe6062356fd04cd5eb73133969e75d9bfb")
+        self.assertIs(audit.build()["promotion_authorized"], False)
+
 if __name__ == "__main__":
     unittest.main()
