@@ -8,7 +8,7 @@ This is PLASMA's **primary operating contract** and the **compact Codex instruct
 
 ## 1. Project purpose and canonical domain
 
-PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility -> PPU -> Site (one-based 1..N); Socket is a fixture, not Site identity. PPU exposes Plasma Gateway REST. **Plasma Gateway** is not the Linux default network gateway. The canonical protocol is PLASMA33 v3.3 with site_id 1..N, and Web REST contract v3. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity into production paths.
+PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility -> PPU -> SITE 1..N (one-based site_id = 1..N); Socket is a fixture, not Site identity. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. The canonical Protocol v3.3 uses PLASMA33 and site_id 1..N; Web REST contract v3 is canonical. **Plasma Manager** implements bounded managed PPU command routing, not a central universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity into production paths.
 
 Repository: pl/ FPGA and verification; software/python/ embedded/control/REST; software/web/ Console; scripts/ integration and orchestration; docs/ design and operation.
 
