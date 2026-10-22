@@ -40,7 +40,7 @@ git -C "$source" submodule update --init --depth 1 jimtcl src/jtag/drivers/libja
   cd "$source"
   ./bootstrap
   ./configure --prefix="$prefix" --disable-werror --disable-doxygen-html \
-    --enable-dummy --enable-remote-bitbang --disable-jlink
+    --enable-internal-jimtcl --enable-dummy --enable-remote-bitbang --disable-jlink
   make -j2
   make install
 )
