@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 import subprocess
 import sys
@@ -162,6 +163,21 @@ class TestDesktopUsage(unittest.TestCase):
                              check=True, capture_output=True, text=True)
         self.assertEqual(json.loads(run.stdout)["input_tokens"], 250)
         self.assertNotIn("PRIVATE PROMPT", run.stdout)
+
+    def test_cli_private_file_and_no_overwrite(self):
+        self.write(self.base())
+        path = Path(self.temp.name) / "private-usage-summary.json"
+        argv = [sys.executable, str(ROOT / "scripts/plasma_codex_benchmark_usage.py"),
+                "--session", str(self.rollout), "--start", START,
+                "--end", END, "--output", str(path)]
+        first = subprocess.run(argv, capture_output=True, text=True)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        old = path.read_bytes()
+        again = subprocess.run(argv, capture_output=True, text=True)
+        self.assertEqual(again.returncode, 2)
+        self.assertEqual(path.read_bytes(), old)
+        self.assertNotIn("PRIVATE PROMPT", path.read_text())
 
     def test_explicit_timezone(self):
         with self.assertRaisesRegex(ValueError, "UTC offset"):
