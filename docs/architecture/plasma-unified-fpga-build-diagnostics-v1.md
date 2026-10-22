@@ -10,32 +10,23 @@ This v1 reuses the already qualified F1-B Vivado 2026.1 Project Tcl, pinned
 PYNQ-Z2 board helper, HWH verifier and **one** Python host build driver,
 `scripts/plasma_vivado_host_build.py`. It does **not** create a second
 Vivado execution pipeline, alternate Workflow, runner, hardware access route,
-or deploy operation. Both approved Development Mode routes call the same
-`run()` implementation:
+or deploy operation. Path 2 retains the fixed driver and its admission checks.
 
-- **Path 2**: trusted dispatcher validates Issue #981 authorization, exact
-  source SHA, reviewed F1-B capability and worker identity; invokes the fixed
-  driver through the existing `development-execute` job.
-- **Path 3**: only the exact authorized
-  `f1b-path3-codex-vivado-build` task receives the trusted workflow's
-  scoped host-build admission variables. Codex must use the shared driver
-  CLI for Host-only Vivado work rather than bypassing it with independent
-  ad-hoc shell/Tcl execution. The authorized candidate checkout is an
-  engineering worktree: its original HEAD remains pinned, while any source
-  changes require a diff and independent evidence review.
+Path 3 accepts an owner-authenticated goal and acceptance criteria without a
+scope enum, fixed builder or owner-authored hardware stage list. Codex chooses
+its development tools and build commands. The former mandatory shared-driver
+instruction, task-specific admission environment and historical artifact
+prefetch are deleted. The reusable Path 2 driver is unchanged; it is not a
+prerequisite for Path 3 builds.
 
-Canonical Path 3 host-only invocation **during a separately authorized
-owner-initiated Path 3 job**, never from GitHub-hosted CI:
-
-```bash
-python3 scripts/plasma_vivado_host_build.py \
-  --path3-engineering-host-only \
-  --evidence-dir .plasma-path3-evidence
-```
-
-This command fails closed without the trusted workflow admission and pinned
-SHA/PR identity. A GitHub-hosted pull_request does not pass the admission.
-Operator-invented environment variables are **not** an authorization method.
+The candidate workflow no longer automatically runs a hardware stage list
+following Codex success. The sandbox cannot call root, SSH or MMIO. Existing
+protected physical execution remains bounded by the trusted executor's actual
+allowlist, image verification, ownership/recovery state and receipts. That
+executor currently supports the fixed F1-B contract, so arbitrary future-image
+Path 3 physical acceptance is **BLOCKED**, not proven by these source changes.
+No replacement task framework or physical authorization inference is added.
+These candidate changes are **NOT_ACTIVE_IN_MAIN** until reviewed and merged.
 
 ## Shared stage contract
 

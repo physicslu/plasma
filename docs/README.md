@@ -170,6 +170,7 @@
 - **Current** — [Runtime Acceptance](testing/runtime-acceptance.md)
 - **Current / Prototype Execution Contract** — [PYNQ-Z2 Codex Autonomous HIL Command](development/codex-z2-hil-development-command.md)：可重複使用的 Codex 任務指令、私有 SSH／sudo 認證介面與 PSPL-02／SWD-00 實機測試／復原驗收標準；文件不代表實機測試已完成。
 - **Current** — [FPGA Development Guide](development/fpga-development-guide.md)
+- **Gate 1 / Host-only candidate** — [F1-B Licensed SWPC Runner Build](development/f1b-licensed-host-build.md)：Path 3 Sandbox 授權失敗的證據、受信任 Runner 修復候選與真實 Build 驗收路徑；候選尚未啟用，Build 未因此宣告 PASS。
 - **Current** — [FPGA Verification Guide](development/fpga-verification-guide.md)
 - **Gate 1 / Host-only / M1 NO-GO** — [V2 PS Driver → AXI BFM → Fixed ABI Site-1 RTL Verification](development/fixed-abi-v2-ps-pl-host-verification-gate1.md)：固定 ABI v1 單 Site RTL 的真實 AXI 模擬失敗案例、可重現工具版本與未涵蓋的實體 PS／PL 邊界。
 - **Current** — [PLASMA FPGA SystemVerilog Coding Standard](development/fpga-systemverilog-style.md)：規範新 RTL 的可移植語法、FSM／Type／Width、AXI/Response 與 SWD／Programming Site 驗證標準。

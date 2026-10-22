@@ -167,61 +167,6 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
 
 
 
-def path3_shared_hardware_stages(task: dict, approval: dict) -> dict:
-    """Path 3 delegates authorized physical stages to the SAME Path 2 adapter.
-
-    Executed by the existing trusted SWPC development-execute job, never
-    inside Codex. No new hardware driver, runner, privilege or service.
-    """
-    require(type(task) is dict and type(approval) is dict and
-            approval.get("task_id") == "path3-work-order" and
-            approval.get("execution_path") == "path3-codex" and
-            approval.get("execution_capability") == "codex-guarded-hardware" and
-            task.get("execution_path") == "path3-codex" and
-            task.get("capability") == "codex-workspace" and
-            task.get("work_order_scope") == "guarded-hardware" and
-            approval.get("work_order_sha256") == task.get("work_order_sha256") and
-            type(task.get("work_order_sha256")) is str and
-            len(task["work_order_sha256"]) == 64 and
-            coordinator._sha(approval.get("pinned_sha"), 40) and
-            coordinator._sha(approval.get("trusted_sha"), 40),
-            "PATH3_SHARED_BRIDGE_APPROVAL_DENIED")
-    require("swpc_bridge_deployment" not in task,
-            "PATH2_OBSOLETE_DEPLOYMENT_FLAG")
-    stages = task.get("hardware_stages")
-    require(type(stages) is list and 1 <= len(stages) <= 3 and
-            all(type(stage) is str and
-                stage in ("download", "test", "restore") for stage in stages)
-            and len(stages) == len(set(stages)),
-            "PATH3_SHARED_STAGE_LIST_DENIED")
-    # The common stage_contract enforces auto-transition scope before the
-    # first trusted adapter invocation for both Paths.
-    observed = []
-    boot_id = None
-    for stage in stages:
-        stage_task = {"execution_path": "path2-cli",
-                      "capability": "path2-stage-contract",
-                      "project": "pl/projects/z2-fixed-unified-site1",
-                      "stage": stage,
-                      "work_order_sha256": task["work_order_sha256"]}
-        stage_approval = {**approval,
-                          "task_id": "path2-work-order",
-                          "execution_path": "path2-cli",
-                          "execution_capability": "path2-stage-contract",
-                          "authorized_stage": stage}
-        receipt = registered_hardware_stage(stage_task, stage_approval)
-        require(boot_id is None or receipt["boot_id"] == boot_id,
-                "PATH3_SHARED_BOOT_CHANGED")
-        boot_id = receipt["boot_id"]
-        observed.append({"stage": stage, "result": receipt["result"]})
-    return {"status": "REAL_Z2_PATH3_SHARED_BRIDGE_EVIDENCE_REVIEW_REQUIRED",
-            "execution_path": "path3-codex",
-            "delegate": "shared-trusted-main-stage-transport",
-            "source_sha": approval["pinned_sha"],
-            "real_z2": True, "boot_id": boot_id,
-            "completed": observed, "auto_next_stage": False}
-
-
 def full_hil_sequence(task: dict, approval: dict) -> dict:
     """Explicit opt-in: one SWPC trigger performs three real *separate* stages.
 
