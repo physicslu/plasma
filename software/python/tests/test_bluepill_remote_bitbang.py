@@ -1,11 +1,12 @@
 """Fail-closed SWD remote_bitbang wire/PL-port contract: no real hardware."""
 import socket
 import threading
+import time
 
 import pytest
 
 from plasma_interfaces.bluepill_remote_bitbang import (
-    RemoteBitbangSWD, SWDBitbangError, serve_connection,
+    RemoteBitbangSWD, SWDBitbangError, serve_connection, serve_local_unix_once,
 )
 
 
@@ -166,3 +167,48 @@ def test_connection_budget_and_eof_fails_closed():
         serve_connection(server, b)
     assert p.drive == 2
     server.close()
+
+
+def test_one_shot_owner_private_socket_and_cleanup(tmp_path):
+    directory = tmp_path / "private"
+    directory.mkdir(mode=0o700)
+    path = directory / "swd.sock"
+    b, port = bridge()
+    outcomes = []
+
+    def worker():
+        try:
+            outcomes.append(serve_local_unix_once(path, b, idle_timeout_s=3))
+        except Exception as exc:
+            outcomes.append(exc)
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 3
+    while not path.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert path.is_socket()
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as cli:
+        cli.connect(str(path))
+        cli.settimeout(2)
+        cli.sendall(b"Odc")
+        assert cli.recv(1) == b"1"
+        cli.sendall(b"oQ")
+    thread.join(timeout=3)
+    assert outcomes == [5]
+    assert not path.exists()
+    assert port.drive == 2
+    b, _ = bridge()
+    with pytest.raises(ValueError):
+        serve_local_unix_once(tmp_path / "insecure.sock", b)
+
+
+def test_absolute_user_owned_socket_required(tmp_path):
+    b, _ = bridge()
+    with pytest.raises(ValueError):
+        serve_local_unix_once("relative.sock", b)
+    parent = tmp_path / "shared"
+    parent.mkdir(mode=0o777)
+    parent.chmod(0o777)
+    with pytest.raises(ValueError):
+        serve_local_unix_once(parent / "swd.sock", b)
