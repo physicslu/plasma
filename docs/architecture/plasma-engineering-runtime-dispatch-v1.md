@@ -1,6 +1,9 @@
 # PLASMA Engineering Runtime Dispatcher v1 — current state and Development Mode gate
 
 **Status:** Qualification `workflow_dispatch` Runtime remains **DISABLED**.
+Its separate `software-pr` Path 3 mapping is a dormant Qualification isolation
+contract, not the active Development Mode Path 3 capability or a general
+Host-only restriction. No Qualification access is enabled by this document.
 The shared Workflow's owner-only Development Mode `issue_comment` entry is
 implemented and has successfully executed real Path 2 CLI and Path 3 Codex
 smoke tests on existing `SWPC-plasma-codex` (PRs #1047–#1049). This is not
