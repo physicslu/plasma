@@ -9,8 +9,13 @@
     "package": "LQFP",
     "pin_count": 64,
     "applicable_base_devices": [
-      "STM32F103R8"
-    ]
+      "STM32F103R8",
+      "STM32F103RB"
+    ],
+    "applicability_basis": {
+      "STM32F103R8": "DS5319 Rev 20 medium-density x8 ordering and common LQFP64 pinout",
+      "STM32F103RB": "DS5319 Rev 20 medium-density xB ordering and common LQFP64 pinout"
+    }
   },
   "evidence": [
     {
@@ -24,7 +29,8 @@
         "5.3.14 NRST pin characteristics",
         "Table 59. LQFP64 - Mechanical data",
         "Figure 51. LQFP64 - Outline",
-        "Figure 52. LQFP64 - Footprint example"
+        "Figure 52. LQFP64 - Footprint example",
+        "DS5319 Rev 20 medium-density x8/xB ordering identity and package applicability"
       ]
     }
   ],

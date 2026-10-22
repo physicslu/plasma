@@ -39,8 +39,9 @@ def verify(hw: dict, socket: dict, qualification: dict) -> None:
     assert len(PIN_NAMES) == 64
     assert hw["profile_id"] == "stm32f103-lqfp64-programming-hardware-v1"
     assert hw["kind"] == "package_hardware" and hw["status"] == "pilot_reviewed"
-    assert hw["scope"]["applicable_base_devices"] == ["STM32F103R8"]
+    assert hw["scope"]["applicable_base_devices"] == ["STM32F103R8", "STM32F103RB"]
     assert hw["scope"]["pin_count"] == 64
+    assert set(hw["scope"]["applicability_basis"]) == {"STM32F103R8", "STM32F103RB"}
     assert {e["source_id"] for e in hw["evidence"]} == {"st_ds5319_rev20"}
     data = hw["data"]
     assert data["package"] == "LQFP" and data["pin_count"] == 64
@@ -123,7 +124,7 @@ def main() -> int:
     bad_hw["data"]["socket_contacts"]["mandatory"].pop()
     must_reject(bad_hw, socket, qualification)
     bad_hw = deepcopy(hw)
-    bad_hw["scope"]["applicable_base_devices"].append("STM32F103RB")
+    bad_hw["scope"]["applicable_base_devices"].append("STM32F103V8")
     must_reject(bad_hw, socket, qualification)
     bad_socket = deepcopy(socket)
     bad_socket["route"]["required_contacts"].remove("VDD_4")
