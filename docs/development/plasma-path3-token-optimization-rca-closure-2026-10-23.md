@@ -89,7 +89,7 @@
 | Effective Model / Effort | **NOT_VERIFIED** | **NOT_VERIFIED** |
 | Per-model request count | **NOT_AVAILABLE** | **NOT_AVAILABLE** |
 | Source SHA-256 | null | `00408ded47a40b955e8757b9deba0607398ba4de1547085dfae78087a4480804` |
-| Stdout SHA-256 | null | `29889cb9189d5756064bd05eebfc0d46ea0bbbfc6dc0a5cf115825b7d456fe` |
+| Stdout SHA-256 | null | `29889cb9189d5756064bd05eebfc0d46ea0bbbfcfc6dc0a5cf115825b7d456fe` |
 
 Attempt #2 `stdout_matches_path3_expected = false`：**不等於算術失敗**。原始工作目標允許自行選擇 CSV 欄名與程式實作，因此逐位元組 stdout SHA-256 不必與 Path 3 相同；本機驗證腳本聲稱以 81 個唯一的 `(a,b,a*b)` 驗收。兩個 SHA 僅為 Owner 回報的識別資料，**尚未獨立比對對應原始位元組**。Attempt #1 在失敗時即使 `codex_exit_code=0`，也不能視為 Task PASS。
 
