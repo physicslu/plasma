@@ -208,7 +208,7 @@ def run_acceptance(
         raise Kl25ReadinessError("failed binary version probe") from exc
     banner = (version.stdout or "") + (version.stderr or "")
     require(version.returncode == 0
-            and re.search(r"Open On-Chip Debugger\s+0\.12\.0(?:\s|$)", banner) is not None,
+            and re.search(r"Open On-Chip Debugger\s+0\.12\.0(?:-g[0-9a-f]+)?(?:\s|$)", banner) is not None,
             "installed binary version differs from pinned release")
     argv = build_safe_argv(binary, scripts_root)
     validate_argv(argv, binary, scripts_root)
