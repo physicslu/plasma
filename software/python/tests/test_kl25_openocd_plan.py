@@ -97,5 +97,47 @@ class KL25PlanTests(unittest.TestCase):
         with self.assertRaisesRegex(PlasmaError, "one exact aligned sector"):
             self.compile(request(Operation.ERASE, map_data={"address": 0, "length": 131072}))
 
+    def test_complete_128k_firmware_image_cannot_be_programmed_atomically(self):
+        # FCF sector overlaps every single contiguous [0x0,0x20000) image.
+        with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
+            self.compile(request(Operation.PROGRAM, image=b"\xff" * 0x20000))
+        with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
+            self.compile(request(Operation.PROGRAM, image=b"\xff" * 0x800))
+        # Boundary: a one-sector image before FCF is individually admissible.
+        before = self.compile(request(Operation.PROGRAM, image=b"z" * 0x400))
+        self.assertIn("flash write_image ${PLASMA_IMAGE_BIN} 0x00000000 bin", before.commands)
+
+    def test_explicit_segments_must_leave_entire_fcf_sector_unwritten(self):
+        # Two independent PROGRAM commands never constitute an attested full-image write.
+        segments = ((0, 0x400), (0x800, 0x20000 - 0x800))
+        for address, size in segments:
+            with self.subTest(address=hex(address), size=size):
+                plan = self.compile(request(Operation.PROGRAM, image=b"z" * size,
+                                            map_data={"address": address}))
+                commands = " ".join(plan.commands)
+                self.assertIn("flash write_image", commands)
+                self.assertNotIn("flash erase_address", commands)
+                self.assertNotIn("erase ", commands)
+        missing = 0x20000 - sum(length for _, length in segments)
+        self.assertEqual(missing, 0x400)
+        for address, size in ((0x3FC, 8), (0x7FC, 8), (0x410, 4)):
+            with self.subTest(forbidden=address):
+                with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
+                    self.compile(request(Operation.PROGRAM, image=b"x" * size,
+                                         map_data={"address": address}))
+
+    def test_fcfsafe_sector_erases_do_not_expand_to_mass_or_fcf(self):
+        for address in (0, 0x800, 0x1FC00):
+            with self.subTest(address=hex(address)):
+                plan = self.compile(request(Operation.ERASE,
+                                            map_data={"address": address, "length": 0x400}))
+                self.assertIn("flash erase_address", " ".join(plan.commands))
+                self.assertNotIn(" pad", " ".join(plan.commands))
+        for address, length in ((0x400, 0x400), (0x0, 0x20000)):
+            with self.subTest(address=hex(address), length=length):
+                with self.assertRaises(PlasmaError):
+                    self.compile(request(Operation.ERASE,
+                                         map_data={"address": address, "length": length}))
+
 if __name__ == "__main__":
     unittest.main()
