@@ -1,5 +1,15 @@
 # PLASMA — Runtime FPGA Architecture v1.0
 
+> **2026-10-22 ARCHITECTURE STATUS — SUPERSEDED / HISTORICAL FOR vNext:**
+>
+> 本文件是 2026-10-16 的歷史規劃快照。新的產品目標架構請見
+> [PLASMA 通用燒錄器 vNext（2026-10-22）](plasma-vnext-architecture-20261022.md)。
+> 本文件第 1 節的「全 PPU 單一 Full Bitstream 作為唯一方式」、「同批次各 Site 必須使用相同 exact IC」、
+> 「配置時必須先停止全部 Site」等**舊架構假設**，不再作為 vNext 目標的強制設計決策。
+> vNext 的按 Site 載入 Protocol IP／DFX、異種 IC 能否並行及不中斷其他 Site 仍屬 **Open Decision／未驗證**。
+> **現行保護仍不可放寬：** 在完成 Partition 隔離、電源／OE Fail-safe、配置 Ownership 與真實 HIL 之前，執行中 Site 不得進行實際 FPGA 重配置；需要新 Gate 1 明確授權。
+> 這個標記**只更新設計文件的定位**，不宣告現有程式、固定 ABI、Bitstream 或硬體已遷移；歷史 CI／HIL 證據仍保持原時間與範圍有效。
+>
 > **狀態：Plan / Proposed Roadmap（非 Current Implementation，也不是 HIL PASS）**
 >
 > **記錄日期：2026-10-16**
