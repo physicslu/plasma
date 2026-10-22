@@ -285,9 +285,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                     self.assertEqual(variant[field], source[field])
 
     def test_same_base_or_cfg_without_exact_review_does_not_grant_supported(self):
-        # Same medium-density Base Device is not enough when the package was not reviewed.
+        # Unreviewed VFQFPN36 exact ICPN remains L1 despite a shared medium-density driver.
         self.assertEqual(
-            self.registry.state_for("STMicroelectronics", "STM32F103V8H6"),
+            self.registry.state_for("STMicroelectronics", "STM32F103T8U6"),
             "UNKNOWN",
         )
         # A syntactically plausible but non-admitted exact order code is never synthesized.
