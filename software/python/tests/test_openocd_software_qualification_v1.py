@@ -322,7 +322,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.registry.state_for("STMicroelectronics", "STM32F407VGT6"),
             "UNKNOWN",
         )
-        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103V8H6"))
+        self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103T8U6"))
         self.assertIsNone(self.registry.lookup("STMicroelectronics", "STM32F103V8T7"))
 
     def test_projection_separates_supported_from_unreviewed_mapping(self):
