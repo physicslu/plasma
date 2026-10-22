@@ -1,17 +1,22 @@
-# Path 2 Build / Download / Testing — Gate 1 host-only adapter contract
+# Path 2 Build / Download / Testing — historical offline coordinator Gate 1
 
-**Status:** Draft PR, software/Host-only contract. No runner activation, SWPC usage, Vivado build, FPGA reconfiguration, DUT/LA operation, or production qualification.
+**Status of original Gate 1:** offline adapter/receipt validation only; it did
+not activate a Runner, launch Vivado, operate SWPC/Z2, or qualify production.
+**Current main:** Path 2 is not globally Host-only. The pure coordinator remains
+inert by itself; authorized fixed CLI Build or real Z2 stages are supplied
+only by the separately guarded Dispatcher/Stage Transport. Fake adapter
+receipts never prove real hardware execution.
 
 ## Existing components to reuse
 
 - Owner-authorized `scripts/plasma_development_dispatch.py` provides strict Issue #981 / PR / SHA approval, one-shot Work Order and capability routing.
 - `scripts/plasma_vivado_host_build.py` and `scripts/plasma_fpga_build_diagnostics.py` are the fixed, reviewed Vivado HOST **Build Code** engine; not reimplemented.
-- `pl/hil/swd04/one_shot.py`, `pl/hil/swd04/development.py`, and `pl/hil/f1b.py` provide reusable **FPGA Manager lifecycle**, Hardware Profile, and Test Callback. These are used by future independently approved trusted Download and Testing adapters. No direct hardware adapter is enabled in this Gate 1 change.
+- `pl/hil/swd04/one_shot.py`, `pl/hil/swd04/development.py`, and `pl/hil/f1b.py` provide reusable **FPGA Manager lifecycle**, Hardware Profile, and Test Callback. These are reused by separately reviewed, authorized Download and Testing adapters. No direct hardware adapter was enabled by this original offline Gate 1 change.
 - Historical [Run #39395142726 evidence](../development/plasma-f1b-path3-39395142726-evidence.md) / [Codex exact operation ledger](../development/plasma-f1b-path3-39395142726-codex-steps.md) provide the prior real Z2 F1-B one-shot and actual command/exception recovery sequence. Historical DEV PASS does **not** prove PS–PL AXI isolation or production readiness.
 
 ## New minimal coordinator
 
-`scripts/plasma_path2_stage_orchestrator.py` is a pure Python stage coordinator with **injected** adapter callbacks. It is not exposed as an issue-command task and does not import SSH/sudo, Vivado, FPGA Manager or MMIO. It performs strict request/receipt schema and provenance checks, derives the next stage from the **explicit per-run options** and stops after the selected stage(s). Only the trusted Path 2 execution boundary may later create verified adapters and authorize a real operation.
+`scripts/plasma_path2_stage_orchestrator.py` is a pure Python stage coordinator with **injected** adapter callbacks. It is not exposed as an issue-command task and does not import SSH/sudo, Vivado, FPGA Manager or MMIO. It performs strict request/receipt schema and provenance checks, derives the next stage from the **explicit per-run options** and stops after the selected stage(s). Only the trusted Path 2 execution boundary may supply verified adapters and authorize a real operation.
 
 | Explicit initial trigger | Input prerequisite | Default effect | Independent option |
 |---|---|---|---|
@@ -29,4 +34,8 @@ A standalone Download or Testing request **must pin the expected artifact SHA256
 
 GitHub-hosted test `pl/tests/test_path2_three_stage_orchestrator.py` uses inert Python callbacks for: three independent triggers, both opt-in transitions independently and together, default OFF, provenance mismatch rejection, missing prior receipts, fail/NO_GO, missing handler preflight, and no retry. Existing CI should run this under `Python and PL source tests`. No changes to trusted Dispatcher Registry or shared Workflow are permitted by this PR.
 
-**Next authorization boundary:** after review, a distinct owner-approved integration Gate must connect the coordinator to existing, appropriately authorized Build/Download/Test adapters. Do not infer real Trigger availability from this software-only contract.
+**Current authorization boundary:** the later trusted-main integration now supplies
+fixed Build/Download/Test routes, but this coordinator itself cannot authorize
+any of them. Each real stage must independently pass owner authorization,
+protected Z2 root source-manifest checks and runtime safety/receipt validation.
+The historical fake-callback PASS is not a physical HIL PASS.

@@ -1,7 +1,17 @@
-# Path 2 Runtime Integration Gate 1 — F1-B Host-only
+# Path 2 Runtime Integration — historical offline Gate 1 baseline
 
-Status: **Host-only integration candidate**, not authorization to use Z2 hardware.
-Base: main `8e909769601cd8cea82120c16b5c171b176c358d` (includes PRs #1076, #1077 and #1079).
+**Original PR status:** offline/fake-device integration candidate; the initial
+Gate 1 did not authorize Z2 hardware. Historical base: main
+`8e909769601cd8cea82120c16b5c171b176c358d` (#1076/#1077/#1079).
+
+**Current main:** Path 2 is a fixed CLI execution method, not a globally
+Host-only mode. Build remains host-side; owner-authorized fixed Download,
+Testing and Restore stage tasks route through the trusted-main Dispatcher,
+`plasma_development_stage_transport.py` and protected Z2 root entry.
+The old SWPC Bridge / separate approved-SHA PIN installer is obsolete.
+Actual Z2 execution still depends on installed root source integrity and
+fresh per-run authorization, observations and recovery evidence; the offline
+results on this page cannot establish hardware PASS.
 
 ## Existing building blocks; no duplicate Build or Supervisor
 
@@ -14,7 +24,8 @@ Base: main `8e909769601cd8cea82120c16b5c171b176c358d` (includes PRs #1076, #1077
   `build`, `download`, `test` requests, independent transitions and receipts.
 - Existing `scripts/plasma_path2_f1b_adapters.py` implements typed Build,
   held Download and Identity callback contracts; existing
-  `scripts/plasma_path2_persistent_lease.py` provides **Host-only ledger only**.
+  `scripts/plasma_path2_persistent_lease.py` provides an offline host-side
+  test ledger; it is **not** the protected Z2 root checkpoint.
 - NEW, narrow `plasma_path2_build_qualification.py` checks exact on-disk
   BIT/HWH, five Vivado reports, stdout/stderr hashes and build success marker,
   and **reuses** `pl/projects/z2-fixed-unified-site1/verify_hwh.py`.
@@ -22,15 +33,17 @@ Base: main `8e909769601cd8cea82120c16b5c171b176c358d` (includes PRs #1076, #1077
   pinned worktree agree; it is not an additional Vivado implementation.
 - NEW, narrow `plasma_path2_runtime_integration.py` attaches that decision
   to the existing F1-B Adapter and Stage Orchestrator. Real privileged
-  Download/Testing providers are NOT supplied, installed or authorized.
+  Download/Testing providers were NOT supplied or installed by this
+  **historical integration PR**; later trusted-main Stage Transport wiring is
+  separate from these original candidate tests.
 
 ## Three separately triggerable reviewed task identities
 
-| Existing owner Issue #981 command (future, NOT run by this PR) | Meaning |
+| Historical owner Issue #981 command examples (not executed by this document) | Meaning |
 | --- | --- |
 | `/plasma-dispatch run z2-path2-build 981` | Run existing fixed Vivado Build **once**, independently check host outputs, deliver Build stage receipt |
-| `/plasma-dispatch run z2-path2-download 981` | Independent Download route, **fail-closed** `PATH2_LIVE_PROVIDER_NOT_REGISTERED` |
-| `/plasma-dispatch run z2-path2-testing 981` | Independent Testing route, **fail-closed** `PATH2_LIVE_PROVIDER_NOT_REGISTERED` |
+| `/plasma-dispatch run z2-path2-download 981` | Historical candidate had no real Provider; current main routes an individually authorized Download through protected Stage Transport |
+| `/plasma-dispatch run z2-path2-testing 981` | Historical candidate had no real Provider; current main routes independently authorized Testing through protected Stage Transport |
 
 The historical `fixed-site1-vivado-host-build` command remains backwards
 compatible. `z2-path2-build` invokes the **same** fixed engine, never a new
@@ -40,8 +53,9 @@ For the new tasks only, `--auto-download` (Build) and `--auto-testing`
 (Build/Download) are separate owner-selected per-run options. Both default
 `false`. The existing Orchestrator treats `--auto-testing` on Build with
 `--auto-download` false as Build only. Any Build request that could continue
-to Download is rejected **before** launching Vivado because the live Provider
-is not registered. Download/Testing fail closed before any I/O.
+to Download is rejected **before** launching Vivado by the Build-only adapter boundary. Individually authorized real
+Download/Testing use the separate trusted-main Stage Transport, with root
+integrity and live target checks; unqualified requests still fail closed.
 Untrusted flags, wrong task, wrong SHA, PR metadata, replayed attempts,
 arbitrary scripts, and unsupported capabilities remain denied.
 
@@ -57,7 +71,8 @@ Download; it restores `base.bin`. Do **not** replay the dated temporary
 passive-UIO exception from Path 3. The new task names and opt-in flags do not
 grant SSH, sudo, MMIO, FPGA Manager or device-file capabilities.
 
-Real Download/Testing require an independently reviewed future Gate 1 covering:
+Actual Download/Testing continue to require owner-approved Gate 1 scope and
+verified trusted target safeguards covering:
 1. fresh authenticated Z2 boot/FPGA loaded-image/manager facts and trust in
    origin of image receipts and BIT→BIN conversion;
 2. exclusive *hardware-global* lock and Persistent Lease across separate
@@ -80,7 +95,7 @@ device observations. The Host-only tests intentionally use fake backends and
 file fixtures. **Neither the success of hosted CI nor the earlier Path 3
 F1-B one-shot implies Path 2 held Download / Testing readiness.**
 
-## Gate 1 qualification
+## Historical Gate 1 offline qualification (not hardware acceptance)
 
 - Single existing Workflow; the `offline-contract` job executes only on
   GitHub-hosted `pull_request` or `push`; this Draft triggers no Issue #981
