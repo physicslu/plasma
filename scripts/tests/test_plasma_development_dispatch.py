@@ -760,8 +760,16 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             seen.append((list(command), kwargs["input"]))
             return Result()
         with tempfile.TemporaryDirectory() as td:
-            dev.run_codex_task(self.task, workspace=Path(td), executor=fake)
+            receipt = dev.run_codex_task(
+                self.task, workspace=Path(td), executor=fake)
         self.assertEqual(len(seen), 1)
+        audit = receipt["codex_context_audit"]
+        self.assertEqual(audit["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertIsNone(audit["model_request_count"])
+        self.assertIsNone(audit["repo_root_agents_bytes"])
+        self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
+        self.assertEqual(audit["dispatched_prompt_bytes"], len(seen[0][1]))
+        self.assertNotIn(self.task["objective"], json.dumps(audit))
         argv, raw_prompt = seen[0]
         prompt = raw_prompt.decode("utf-8")
         self.assertLess(len(raw_prompt), 2200 + len(self.task["objective"].encode("utf-8")))
