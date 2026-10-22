@@ -100,9 +100,9 @@ class KL25PlanTests(unittest.TestCase):
     def test_complete_128k_firmware_image_cannot_be_programmed_atomically(self):
         # FCF sector overlaps every single contiguous [0x0,0x20000) image.
         with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
-            self.compile(request(Operation.PROGRAM, image=b"\\xff" * 0x20000))
+            self.compile(request(Operation.PROGRAM, image=b"\xff" * 0x20000))
         with self.assertRaisesRegex(PlasmaError, "Configuration Field sector"):
-            self.compile(request(Operation.PROGRAM, image=b"\\xff" * 0x800))
+            self.compile(request(Operation.PROGRAM, image=b"\xff" * 0x800))
         # Boundary: a one-sector image before FCF is individually admissible.
         before = self.compile(request(Operation.PROGRAM, image=b"z" * 0x400))
         self.assertIn("flash write_image ${PLASMA_IMAGE_BIN} 0x00000000 bin", before.commands)
