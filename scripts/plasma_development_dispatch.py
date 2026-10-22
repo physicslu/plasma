@@ -708,7 +708,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     """Run the owner-authorized Development Mode engineer with real evidence.
 
     Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
-    and invoke host-only Vivado. The fixed PR SHA remains the INPUT identity;
+    and invoke approved Vivado builds on the SWPC host. This function does not
+    grant physical device access. The fixed PR SHA remains the INPUT identity;
     the candidate Git diff and evidence are captured before review/commit.
     """
     root = workspace.resolve(strict=True)
@@ -738,12 +739,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "Stop on missing authorization, physical ownership conflict, SIGBUS, "
         "unreaped child or uncertain FPGA restoration. "
         "Do not stop at an offline "
-        "mock when a real Vivado Host-only build is needed.\n"
+        "mock when an actual Vivado build is needed.\n"
         "Goal:\n" + task["objective"] + "\n"
         "You may edit files inside this candidate workspace and run "
         "commands required for development, including Vivado 2026.1 "
         "synthesis/implementation/timing/DRC and BIT/HWH generation. "
-        "Host-only Vivado does not equal FPGA programming.\n"
+        "A successful Vivado build does not authorize FPGA loading or other "
+        "physical hardware operations.\n"
         "Record actual commands, exit codes, observed errors, proven versus "
         "hypothesized root causes, minimal fixes, retries, final build "
         "stage results and hashes in .plasma-path3-evidence/engineering-report.md. "
