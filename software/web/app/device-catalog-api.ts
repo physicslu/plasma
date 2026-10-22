@@ -305,18 +305,34 @@ export type ProgrammingQualification = {
   physical_programming_qualified: false;
 };
 
+/** Source-only upstream snapshot. Never use for Job eligibility or Production binding. */
+export type UpstreamOpenOCDEvidence = {
+  status: "PINNED_UPSTREAM_SOURCE";
+  scope: "source_only_non_executable";
+  distribution: "upstream-openocd";
+  source_version: string;
+  source_commit: string;
+  target_cfg: { path: string; git_blob: string };
+  flash_driver: { path: string; git_blob: string } | null;
+  device_id: { kind: "DEVID"; value: string; source: "pinned_flash_driver_table" } | null;
+  base_device: string;
+  production_binding_authorized: false;
+  executable: false;
+  physical_programming_qualified: false;
+};
+
 export type MicrochipICInformation = {
-  status: "manufacturer_exact_material_partial_information";
+  status: "manufacturer_exact_material_partial_information" | "manufacturer_exact_material_identity_route_candidate";
   manufacturer: "Microchip";
   icpn: string;
   identity_state: "IDENTIFIED";
   information_complete: false;
-  catalog_level: 0;
-  catalog_level_state: "DISCOVERED";
-  programming_state: "UNKNOWN";
+  catalog_level: 0 | 1 | 2;
+  catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE";
+  programming_state: "UNKNOWN" | "CANDIDATE" | "BLOCKED" | "SUPPORTED" | "UNSUPPORTED";
   compatibility_state: "NOT_TESTED";
-  ram_size: string;
-  core_model: string;
+  ram_size: string | null;
+  core_model: string | null;
   working_vdd_v: null;
   io_supply_v: null;
   vdda_v: null;
@@ -324,10 +340,11 @@ export type MicrochipICInformation = {
   source: {
     authority: "Microchip Technology official";
     exact_mcp_material_source: string;
-    pdf_revision: "DS60001513G";
-    pdf_original_sha256: string;
-    pdf_printed_pages: number[];
-    official_pdf_grammar_not_exact_material_list: true;
+    pdf_revision?: "DS60001513G";
+    pdf_original_sha256?: string;
+    pdf_printed_pages?: number[];
+    provider_route_evidence?: string;
+    official_pdf_grammar_not_exact_material_list: boolean;
   };
   software_supported: false;
   programming_provider: null;
@@ -385,6 +402,7 @@ export type DeviceSearchResult = {
   manufacturer_device_basic_profile?: ManufacturerDeviceBasicProfile | null;
   nxp_manufacturer_device_profile?: NXPManufacturerDeviceProfile | null;
   microchip_ic_information?: MicrochipICInformation | null;
+  upstream_openocd_evidence?: UpstreamOpenOCDEvidence | null;
   selected_profile?: SelectedICProfile | null;
   programming_qualification?: ProgrammingQualification | null;
   catalog_level: 1 | 2 | 3;
