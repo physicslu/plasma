@@ -14,6 +14,8 @@ on:
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
       - "data/ic-support/validate_stm32f103_openocd_real_binary.py"
+      - "data/ic-support/validate_nxp_kl25_runtime_readiness.py"
+      - "data/ic-support/test_nxp_kl25_runtime_readiness.py"
       - "data/ic-support/test_stm32f103_openocd_real_binary.py"
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json"
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.lock.json"
@@ -53,6 +55,8 @@ on:
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
       - "data/ic-support/validate_stm32f103_openocd_real_binary.py"
+      - "data/ic-support/validate_nxp_kl25_runtime_readiness.py"
+      - "data/ic-support/test_nxp_kl25_runtime_readiness.py"
       - "data/ic-support/test_stm32f103_openocd_real_binary.py"
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.json"
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.lock.json"
@@ -238,6 +242,7 @@ jobs:
           python -m pytest -q \
             software/python/tests/test_openocd_runtime_artifact.py \
             software/python/tests/test_openocd_release_cache_contract.py
+          python data/ic-support/test_nxp_kl25_runtime_readiness.py
 
       - name: Build pinned OpenOCD runtime on cache miss
         if: steps.openocd-cache.outputs.cache-hit != 'true'
@@ -351,15 +356,29 @@ jobs:
                 --openocd "$binary" \
                 --scripts-root "$scripts_root" \
                 --output "/acceptance/stm32f103-openocd-real-binary-$ARCH.json"
+              python3 /repo/data/ic-support/validate_nxp_kl25_runtime_readiness.py \\
+                --openocd "$binary" \\
+                --scripts-root "$scripts_root" \\
+                --install-receipt /opt/plasma/install/openocd-runtime.json \\
+                --output "/acceptance/nxp-kl25-openocd-readiness-$ARCH.json"
               python3 -c '"'"'import json; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["hardware_runtime_ready"] is False'"'"'
             '
           test -s "$evidence_dir/stm32f103-openocd-real-binary-$ARCH.json"
+          test -s "$evidence_dir/nxp-kl25-openocd-readiness-$ARCH.json"
 
       - name: Upload STM32F103 real OpenOCD software acceptance evidence
         uses: actions/upload-artifact@v4
         with:
           name: stm32f103-real-openocd-software-${{ matrix.architecture }}-${{ github.sha }}
           path: ${{ runner.temp }}/stm32f103-openocd-acceptance-${{ matrix.architecture }}/stm32f103-openocd-real-binary-${{ matrix.architecture }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload NXP KL25 Host-only Runtime Readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxp-kl25-runtime-readiness-${{ matrix.architecture }}-${{ github.sha }}
+          path: ${{ runner.temp }}/stm32f103-openocd-acceptance-${{ matrix.architecture }}/nxp-kl25-openocd-readiness-${{ matrix.architecture }}.json
           if-no-files-found: error
           retention-days: 14
 
