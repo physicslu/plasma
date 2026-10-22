@@ -85,6 +85,7 @@
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Plan / Accepted Policy** — [IC Information Catalog Level 0 Evidence Contract](architecture/ic-information-phase1.md)：歷史檔名保留 `phase1`，但正式語意為 Level 0 Exact ICPN identity/evidence；具 programming route 才升 L1，qualification `SUPPORTED` 才升 L2，HIL PASS 才升 L3；L0 僅供 Internal Research，Customer IC Selector 從 L1 開始。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
+- **Current** — [IC Selector Upstream Evidence / Binding Contract Gate A](architecture/ic-selector-upstream-evidence-consistency-gate-a.md)：區分 OpenOCD 上游 CFG／Driver／DEVID、Production CFG Binding 與 Programming Qualification。
 - **Implementation / Proposal** — [Installed OpenOCD Evidence Root v1](architecture/runtime-evidence-root-implementation-v1.md)：修正 source-only H5/C5/OpenOCD Provider 顯示資訊在非 editable Python 安裝下的路徑解析，區分 Render full 與 Slim PPU 必備／可省略來源；不授權燒錄。
 - **Implementation / Proposal** — [KL25 Installed Backend Lock Root v1](architecture/kl25-runtime-backend-lock-root-v1.md)：以既有 IC Support Root 契約載入固定的 KL25 implementation lock，non-editable 安裝與 fail-closed 測試通過才能合併；不新增 KL25 Operation Admission。
 - **CI / Architecture Contract** — [Runtime Data Root Contract v1](architecture/runtime-data-root-contract-v1.md)：所有可安裝 Python 模組使用明確 Data Root，AST CI 禁止新增 wheel `__file__` 相對路徑推算；只保留 2 個受控 Source-tree 開發例外，並守護 NXP、OpenOCD 與 KL25 Root Resolver。
