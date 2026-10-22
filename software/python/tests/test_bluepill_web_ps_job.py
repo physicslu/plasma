@@ -19,6 +19,7 @@ from pathlib import Path
 from plasma_client.client import PlasmaClient
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.ic_support import get_default_ic_support_resolver
+from plasma_core.errors import ErrorCode
 from plasma_interfaces.bluepill_openocd_job import BluepillPoCOpenOCDInterface
 from plasma_interfaces.openocd_executor import OpenOCDExecutionResult
 from plasma_server.server import PlasmaServer
@@ -149,7 +150,7 @@ class BluePillWebPsCandidateJobTests(unittest.IsolatedAsyncioTestCase):
             "site_id": 1, "operation": "erase",
         })
         self.assertEqual(status, 400)
-        self.assertEqual(data["error"]["error_code"], "INTERFACE_NOT_CONFIGURED")
+        self.assertEqual(data["error"]["error_code"], ErrorCode.INTERFACE_NOT_CONFIGURED.value)
         self.assertEqual(self.executor.calls, [])
         self.assertFalse(self.ps.manager.execution_lease_snapshot()["busy"])
         self.assertEqual(self.ps.manager.registry.all(), [])
