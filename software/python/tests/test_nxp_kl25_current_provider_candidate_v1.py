@@ -41,8 +41,8 @@ class NxpKl25CurrentProviderCandidateTests(unittest.TestCase):
 
     def test_canonical_level_and_job_execution_remain_fail_closed(self) -> None:
         registry = get_default_programming_qualification_registry()
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 66)
-        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 65)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 78)
+        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 77)
         row = registry.describe("NXP", ICPN)
         self.assertEqual(row["state"], "CANDIDATE")
         self.assertTrue(row["reviewed"])
