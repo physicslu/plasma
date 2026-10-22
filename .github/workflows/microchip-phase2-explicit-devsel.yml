@@ -5,7 +5,7 @@ on:
     paths:
       - 'data/device-catalog/research/microchip_phase2_explicit_devsel_audit_v1.py'
       - '.github/workflows/microchip-phase2-explicit-devsel.yml'
-      - 'software/python/plasma_web/microchip_sam_phase2_route_evidence.py'
+      - 'software/python/plasma_web/microchip_sam_explicit_devsel_route_evidence.py'
       - 'software/python/plasma_web/microchip_phase1_admission_guard.py'
       - 'software/python/plasma_web/programming_qualification.py'
       - 'software/python/tests/test_microchip_sam_phase2_892_l1.py'
@@ -96,7 +96,7 @@ jobs:
                   raise AssertionError('Modified upstream/original source accepted')
           catalog = get_default_device_catalog()
           microchip = [r for r in catalog.records if r.vendor == 'Microchip']
-          from plasma_web.microchip_sam_phase2_route_evidence import SAM_EXPLICIT_DEVSEL
+          from plasma_web.microchip_sam_explicit_devsel_route_evidence import SAM_EXPLICIT_DEVSEL
           assert len(microchip) == 1907
           assert len(SAM_EXPLICIT_DEVSEL) == 84
           registry = get_default_programming_qualification_registry()
