@@ -70,9 +70,29 @@ supplied runtime admission metadata. This is proof of the **existing WEB/PS
 request path and truthful refusal only**; it is not proof of a positive
 OpenOCD Programming Job, a browser UI interaction, or any connected PL.
 
+Phase 1 now also has an **inert opt-in candidate Job adapter**:
+`software/python/plasma_interfaces/bluepill_openocd_job.py` and the
+matching exact-ICPN branch in `plasma_server/execution_router.py`.
+The normal `OpenOCDInterface` created by the Production SiteManager
+remains non-executable. The candidate can be created only by an
+explicitly injected trusted Site `interface_factory` with a plan
+executor, *external* admission function and safe-shutdown hook.
+No YAML/REST boolean enables this route. Only Site 1 and
+`STM32F103C8T6`/STM32F1 medium-density are allowed.
+
+`software/python/tests/test_bluepill_web_ps_job.py` exercises a real
+WEB HTTP -> PS Protocol v3.3 -> SiteWorker programming Job using a
+**synthetic injected executor** and tests revocation. Synthetic PASS
+proves the canonical execution seam, staging and Job state transitions,
+NOT an OpenOCD flash command process, FPGA BIT/HWH identity, hardware
+admission or a programmed Blue Pill. Path 2 still needs the actual
+exclusive owner/electrical/rollback admission provider, reviewed native
+ARMv7 port and physically connected bridge before ANY positive
+real-hardware Job is permitted.
+
 Host-only admission can test this seam without claiming a connected IC.
-The current isolated lower-layer candidate and hosted OpenOCD build do
-not close that integration by themselves. No CI PASS may reclassify it.
+The current isolated candidate and hosted tests cannot supply an actual
+electrical / hardware-ownership proof. No CI PASS may reclassify it.
 
 ## Stage 2: Path 2 hardware acceptance (not executed in Stage 1)
 
