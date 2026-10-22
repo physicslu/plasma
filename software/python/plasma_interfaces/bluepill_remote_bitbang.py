@@ -131,6 +131,9 @@ class RemoteBitbangSWD:
                 self._clock = (pair >> 1) & 1
                 self._swdio = pair & 1
                 self._drive()
+                # This proof prioritizes physically ordered SWCLK edges over
+                # throughput; a posted write must not collapse two edges.
+                self._barrier()
             elif cmd == ord("c"):
                 self._barrier()
                 responses.append(ord("1") if self._read(self.REG_SAMPLE) & 1
