@@ -199,8 +199,11 @@ def test_one_shot_owner_private_socket_and_cleanup(tmp_path):
     assert not path.exists()
     assert port.drive == 2
     b, _ = bridge()
+    # An existing path must be rejected *before* creating a listener.
+    stale = directory / "occupied.sock"
+    stale.write_text("not a socket", encoding="utf-8")
     with pytest.raises(ValueError):
-        serve_local_unix_once(tmp_path / "insecure.sock", b)
+        serve_local_unix_once(stale, b)
 
 
 def test_absolute_user_owned_socket_required(tmp_path):
