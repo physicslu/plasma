@@ -62,10 +62,19 @@ in the existing restricted /run/plasma-codex/engineering-monitor/ location.
 
 The wrapper updates status to RUNNING and records an active process.
 Path 2 sends a periodic heartbeat; detailed subprocess output remains
-governed by task/build evidence policy. Path 3 streams combined real
-Codex stdout+stderr simultaneously to its original
-.plasma-path3-evidence/codex.log and observer log. Existing GitHub
-receipt, source diff, SHA256 evidence, failure semantics and artifact
+governed by task/build evidence policy. Path 3 uses `codex exec --json`
+and streams **event type names only** to both its
+`.plasma-path3-evidence/codex.log` and the observer log. JSON event bodies
+(including commands, prompt content, model text and potential credentials)
+and unstructured stderr are not copied into these logs. The dispatcher
+extracts only `thread.started.thread_id` as the Codex Session ID and the
+non-negative token counters from `turn.completed.usage` into
+`.plasma-path3-evidence/codex-token-usage.json` and the hashed JSON receipt:
+`input_tokens`, `cached_input_tokens` (already included in input), and
+`output_tokens`. Missing or invalid usage is `null`/`unavailable` or
+`invalid`, never a fabricated zero. This does not read Codex auth/session
+files or modify its session, sandbox, Runner, permissions, or task routing.
+Existing source diff, evidence hashes, failure semantics and artifact
 collection remain unchanged. Monitor failure must not replay Codex.
 
 The monitor checks existing SWPC-plasma-codex worker identity and
@@ -94,8 +103,8 @@ merely to enable a monitor.
 2. With no observed Path task, confirm both windows show IDLE.
 3. Run an already authorized Path 2 CPU-only task; confirm Run ID,
    RUNNING, IDLE, exit/result and independent GitHub evidence.
-4. Repeat for an authorized Path 3 CPU-only job and verify Codex
-   output appears while running (not only after it exits).
+4. Repeat for an authorized Path 3 CPU-only job and verify sanitized
+   Codex event types appear while running (not only after it exits).
 5. Verify switch (prefix+1 / prefix+2), C clear (new messages still appear,
    monitor/evidence logs preserved), detach/reattach, stale-run handling and existing Artifact,
    and confirm no unauthorized resources were touched. Report
