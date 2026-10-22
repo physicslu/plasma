@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -278,8 +279,10 @@ def main() -> int:
         if args.output:
             if args.output.is_symlink() or args.output.resolve() == args.session.resolve():
                 raise ValueError("OUTPUT_PATH_INVALID")
-            # Never overwrite existing files or the input rollout.
-            with args.output.open("x", encoding="utf-8") as out:
+            # Exclusive, symlink-resistant, owner-only local summary.
+            fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                         os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as out:
                 out.write(output)
         else:
             print(output, end="")
