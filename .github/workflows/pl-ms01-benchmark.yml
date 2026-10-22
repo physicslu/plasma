@@ -1,0 +1,52 @@
+name: PL MS01 multi-Site PS benchmark host gates
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/ms01/**"
+      - "pl/tests/test_ms01_*.py"
+      - "pl/hil/lt02/native.py"
+      - "pl/tests/test_lt02_native_hil.py"
+      - "software/python/plasma_interfaces/mmio_loop_test.py"
+      - "software/python/tests/test_mmio_loop_test.py"
+      - "pl/projects/z2-ms01-axi/**"
+      - "pl/tests/test_z2_ms01_axi_build.py"
+      - ".github/workflows/pl-ms01-benchmark.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/ms01/**"
+      - "pl/tests/test_ms01_*.py"
+      - "pl/hil/lt02/native.py"
+      - "pl/tests/test_lt02_native_hil.py"
+      - ".github/workflows/pl-ms01-benchmark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ps-benchmark-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python development dependencies
+        run: python3 -m pip install -e software/python pytest
+      - name: Compile and run Host-only concurrent benchmarking
+        run: |
+          python3 -m py_compile pl/hil/ms01/benchmark.py pl/hil/ms01/native.py pl/hil/ms01/supervisor.py pl/projects/z2-ms01-axi/artifact.py
+          python3 -m pytest -q pl/tests/test_ms01_benchmark.py \
+            software/python/tests/test_mmio_loop_test.py \
+            software/python/tests/test_linux_mmio.py \
+            pl/tests/test_z2_ms01_axi_build.py \
+            pl/tests/test_ms01_native_hil.py \
+            pl/tests/test_ms01_ownership.py \
+            pl/tests/test_ms01_supervisor.py \
+            pl/tests/test_lt02_native_hil.py
+      - name: Evidence limitation
+        run: |
+          echo "Host file-backed, synthetic WordPort and Process-IPC only." >> "$GITHUB_STEP_SUMMARY"
+          echo "No real Z2 multi-Site HIL, direct multi-process MMIO, Vivado bitstream, or IC operation is claimed." >> "$GITHUB_STEP_SUMMARY"

@@ -216,73 +216,103 @@ def check_fclk_enabled(clock_summary: str) -> bool:
 
 
 def check_ownership(*, sysroot: Path = Path("/sys"),
-                    procroot: Path = Path("/proc")) -> None:
-    """Five-aperture ownership check, including retained /dev/mem mmap.
+                    procroot: Path = Path("/proc"),
+                    aperture_end: int = LT02 + 4096,
+                    full_reconfiguration: bool = False,
+                    allowed_kernel_devices: frozenset[str] = frozenset()) -> None:
+    """Read-only, fail-closed ownership audit; default remains five apertures.
 
-    Cannot rule out rogue AXI bus masters; the approved development
-    orchestrator must also own FPGA configuration and all PL consumers.
+    MS01 supplies its sixth aperture end. Only a reload supervisor may admit
+    known original bindings during its *pre-unbind* audit; the final audit
+    admits none. UIO mmap offsets are map selectors, NOT physical addresses.
+    /dev/mem offsets are physical, even after its fd has been closed.
     """
-    start, end = IDENTITY, LT02 + 4096
+    require(aperture_end in (0x40005000, 0x40006000), "Unsupported aperture end")
+    start, end = IDENTITY, 0x80000000 if full_reconfiguration else aperture_end
+
     def overlaps(a: int, b: int) -> bool:
         return a < end and b > start
 
-    related_uio, unrelated_uio = set(), set()
-    for uio in (sysroot / "class/uio").glob("uio*"):
-        known, conflict = False, False
-        for mapping in (uio / "maps").glob("map*"):
-            known = True
-            lo = int((mapping / "addr").read_text(), 0)
-            hi = lo + int((mapping / "size").read_text(), 0)
-            if overlaps(lo, hi):
-                conflict = True
-                related_uio.add("/dev/" + uio.name)
-                require(not (uio / "device/driver").exists(),
+    def inspect() -> None:
+        uio_root = sysroot / "class/uio"
+        platform_root = sysroot / "bus/platform/devices"
+        require(uio_root.is_dir() and platform_root.is_dir() and procroot.is_dir(),
+                "Ownership inventory unavailable")
+        unrelated_uio: set[str] = set()
+        for uio in uio_root.iterdir():
+            if not uio.name.startswith("uio"):
+                continue
+            maps = list((uio / "maps").iterdir())
+            require(bool(maps), "Unknown UIO mapping: " + uio.name)
+            conflict = False
+            for mapping in maps:
+                lo = int((mapping / "addr").read_text(), 0)
+                size = int((mapping / "size").read_text(), 0)
+                require(lo >= 0 and size > 0, "Invalid UIO mapping")
+                conflict |= overlaps(lo, lo + size)
+            if conflict:
+                device = (uio / "device").resolve().name
+                driver = uio / "device/driver"
+                if driver.is_symlink():
+                    driver.resolve(strict=True)
+                require(not driver.exists() or device in allowed_kernel_devices,
                         "Conflicting kernel UIO owner: " + uio.name)
-        if known and not conflict:
-            unrelated_uio.add("/dev/" + uio.name)
-    for device in (sysroot / "bus/platform/devices").iterdir():
-        if not (device / "driver").exists():
-            continue
-        match = re.match(r"^([a-fA-F0-9]+)\.", device.name)
-        conflict = bool(match and overlaps(int(match[1], 16),
-                                           int(match[1], 16) + 1))
-        resource = device / "resource"
-        if resource.exists():
-            for line in resource.read_text().splitlines():
-                lo, hi, flags = (int(v, 16) for v in line.split())
-                if flags & 0x200 and overlaps(lo, hi + 1):
-                    conflict = True
-        require(not conflict, "Conflicting kernel PL resource: " + device.name)
+            else:
+                unrelated_uio.add("/dev/" + uio.name)
+        for device in platform_root.iterdir():
+            driver = device / "driver"
+            if driver.is_symlink():
+                driver.resolve(strict=True)
+            if not driver.exists():
+                continue
+            match = re.match(r"^([a-fA-F0-9]+)\.", device.name)
+            conflict = bool(match and overlaps(int(match[1], 16), int(match[1], 16) + 1))
+            resource = device / "resource"
+            if resource.exists():
+                for line in resource.read_text().splitlines():
+                    lo, hi, flags = (int(v, 16) for v in line.split())
+                    require(hi >= lo, "Malformed platform resource")
+                    conflict |= bool(flags & 0x200 and overlaps(lo, hi + 1))
+            require(not conflict or device.name in allowed_kernel_devices,
+                    "Conflicting kernel PL resource: " + device.name)
 
-    for pid in procroot.iterdir():
-        if not pid.name.isdigit():
-            continue
-        try:
-            for fd in (pid / "fd").iterdir():
-                try:
-                    path = os.readlink(fd)
-                except FileNotFoundError:
-                    continue
-                require(path not in {"/dev/mem", "/dev/xdevcfg", "/dev/fpga0"}
-                        and (not path.startswith("/dev/uio")
-                             or path in unrelated_uio),
-                        "Conflicting PL handle: PID " + pid.name)
-            for line in (pid / "maps").read_text().splitlines():
-                fields = line.split()
-                if len(fields) < 6:
-                    continue
-                device = fields[5]
-                if device not in {"/dev/mem", "/dev/xdevcfg", "/dev/fpga0"} \
-                        and (not device.startswith("/dev/uio")
-                             or device in unrelated_uio):
-                    continue
-                lo, hi = (int(v, 16) for v in fields[0].split("-"))
-                offset = int(fields[2], 16)
-                require(device == "/dev/mem" and
-                        not overlaps(offset, offset + hi - lo),
-                        "Conflicting retained PL mapping: PID " + pid.name)
-        except FileNotFoundError:
-            continue
+        def blocked_device(path: str) -> bool:
+            if path.startswith("/dev/uio") and path.endswith(" (deleted)"):
+                return True  # A reused UIO number cannot identify the old mapping.
+            path = path.removesuffix(" (deleted)")
+            if path.startswith("/dev/uio"):
+                return full_reconfiguration or path not in unrelated_uio
+            return path in {"/dev/mem", "/dev/xdevcfg", "/dev/fpga0"} or (
+                full_reconfiguration and path.startswith(("/dev/dri", "/dev/xlnk")))
+
+        for pid in procroot.iterdir():
+            if not pid.name.isdigit():
+                continue
+            try:
+                for fd in (pid / "fd").iterdir():
+                    try:
+                        path = os.readlink(fd)
+                    except FileNotFoundError:
+                        continue  # A closed fd does NOT skip the maps audit.
+                    require(not blocked_device(path), "Conflicting PL handle: PID " + pid.name)
+                for line in (pid / "maps").read_text().splitlines():
+                    fields = line.split(maxsplit=5)
+                    require(len(fields) >= 5, "Malformed process maps: PID " + pid.name)
+                    lo, hi = (int(v, 16) for v in fields[0].split("-"))
+                    offset = int(fields[2], 16)
+                    require(hi > lo and offset >= 0, "Invalid process mapping")
+                    device = fields[5] if len(fields) == 6 else ""
+                    if not blocked_device(device):
+                        continue
+                    require(device.removesuffix(" (deleted)") == "/dev/mem"
+                            and not overlaps(offset, offset + hi - lo),
+                            "Conflicting retained PL mapping: PID " + pid.name)
+            except (FileNotFoundError, ProcessLookupError):
+                require(not pid.exists(), "Ownership process disappeared incompletely: PID " + pid.name)
+    try:
+        inspect()
+    except (OSError, ValueError) as exc:
+        raise LT02SafetyError("Cannot establish ownership: " + str(exc)) from exc
 
 
 def expected_identity(source_git_sha: str) -> dict[int, int]:

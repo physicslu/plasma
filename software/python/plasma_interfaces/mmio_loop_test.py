@@ -65,14 +65,19 @@ class LoopTestResult:
 
 
 class LoopTestDriver:
-    """Synchronous single-Site transport; caller must hold exclusive MMIO lease."""
+    """Synchronous Site transport; caller must bind an approved independent aperture.
+
+    Site ID validation does NOT authorize a physical Site: the caller must
+    independently verify the loaded FPGA manifest and actual HWH.
+    """
 
     def __init__(self, port: WordPort, *, base: int, site_id: int = 1) -> None:
-        if site_id != 1 or type(site_id) is not int:
-            raise LoopTestError("LT02 reference image exposes Site 1 only")
+        if type(site_id) is not int or not 1 <= site_id <= 8:
+            raise LoopTestError("LT02 Site ID must be one-based 1..8")
         loopback_aperture(base)
         self._port = port
         self.base = base
+        self.site_id = site_id
         self._case_lock = Lock()
         self._poisoned = False
         for offset, expected in (
