@@ -21,6 +21,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_kl25_usb_cached_identity.py"
+      - "scripts/tests/test_plasma_kl25_usb_cached_identity.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
@@ -61,6 +63,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_kl25_usb_cached_identity.py"
+      - "scripts/tests/test_plasma_kl25_usb_cached_identity.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
@@ -119,6 +123,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_kl25_usb_cached_identity.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py
@@ -393,7 +398,7 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract","usb-passive-readonly"]'),
                    needs.development-authorize.outputs.execution_capability) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
