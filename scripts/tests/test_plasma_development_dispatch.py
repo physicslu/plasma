@@ -645,11 +645,72 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertNotIn("PASS",receipt["status"])
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
+            self.assertIn("--json",calls[0][0])
             self.assertIn("workspace-write",calls[0][0])
             self.assertNotIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
             self.assertIn("Record actual commands",calls[0][1]["input"].decode())
             self.assertNotIn("shell",calls[0][1])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
+            self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
+            self.assertIsNone(receipt["codex_usage"]["input_tokens"])
+
+    def test_jsonl_usage_receipt_and_secret_redaction(self):
+        secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
+        thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
+        events = [
+            {"type": "thread.started", "thread_id": thread},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"type": "agent_message",
+                "text": secret, "command": secret}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 24763, "cached_input_tokens": 24448,
+                "output_tokens": 122, "reasoning_output_tokens": 9}},
+        ]
+        class Result:
+            returncode = 0
+            stdout = ("\n".join(json.dumps(item) for item in events) + "\n").encode()
+            stderr = secret.encode()
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            receipt = dev.run_codex_task(
+                self.task, workspace=work, executor=lambda *a, **kw: Result())
+            self.assertEqual(receipt["codex_usage"], {
+                "schema_version": 1, "source": "codex_exec_jsonl",
+                "status": "reported", "session_id": thread,
+                "input_tokens": 24763, "cached_input_tokens": 24448,
+                "output_tokens": 122})
+            log = (work / receipt["codex_log_path"]).read_text()
+            usage = (work / receipt["codex_usage_path"]).read_text()
+            self.assertNotIn(secret, log + usage + json.dumps(receipt))
+            self.assertIn("[codex turn.completed]", log)
+            self.assertEqual(json.loads(usage), receipt["codex_usage"])
+            self.assertEqual(hashlib.sha256(usage.encode()).hexdigest(),
+                             receipt["codex_usage_sha256"])
+
+    def test_usage_missing_invalid_and_oversized_events_fail_closed(self):
+        cases = [
+            (b'{"type":"turn.completed","usage":{"input_tokens":10,'
+             b'"cached_input_tokens":11,"output_tokens":1}}\n', "invalid"),
+            (b'{"type":"turn.completed","usage":{"input_tokens":true,'
+             b'"cached_input_tokens":0,"output_tokens":1}}\n', "invalid"),
+            (b'{"type":"turn.started"}\n', "unavailable"),
+            (b'{"type": {}, "text":"bad kind"}\n', "unavailable"),
+        ]
+        for stream, status in cases:
+            with self.subTest(stream=stream):
+                collector = dev.CodexUsageCollector()
+                safe = collector.feed(stream[:7]) + collector.feed(stream[7:])
+                safe += collector.finish()
+                self.assertNotIn(b"bad kind", safe)
+                self.assertEqual(collector.snapshot()["status"], status)
+                self.assertIsNone(collector.snapshot()["input_tokens"])
+        collector = dev.CodexUsageCollector()
+        safe = collector.feed(b'{"type":"item.started","secret":"' +
+                              b'X' * (collector.MAX_LINE + 1))
+        safe += collector.feed(b'"}\n') + collector.finish()
+        self.assertIn(b"oversized event omitted", safe)
+        self.assertNotIn(b'X', safe)
+        self.assertIsNone(collector.snapshot()["input_tokens"])
 
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
@@ -668,8 +729,11 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertFalse(receipt["evidence_complete"])
             self.assertNotIn("PASS",receipt["status"])
             log=(work/".plasma-path3-evidence/codex.log").read_text()
-            self.assertIn("attempt failed",log)
-            self.assertIn("problem detail",log)
+            self.assertIn("unstructured output omitted",log)
+            self.assertIn("stderr omitted",log)
+            self.assertNotIn("attempt failed",log)
+            self.assertNotIn("problem detail",log)
+            self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertEqual(receipt["codex_log_sha256"],
                              hashlib.sha256(log.encode()).hexdigest())
 
