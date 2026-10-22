@@ -2306,8 +2306,9 @@ class CrossJobCodexResumeContracts(unittest.TestCase):
             self.assertIn(str(home / ".nvm"), cmd)
             self.assertIn("--ro-bind", cmd)
             self.assertTrue(any(str(nvm_bin) in x for x in cmd))
-            self.assertEqual(cmd[cmd.index("--setenv", cmd.index(
-                "--setenv", cmd.index("--setenv") + 1) + 1) + 1], "CODEX_HOME")
+            self.assertIn("CODEX_HOME", cmd)
+            self.assertIn("PATH", cmd)
+            self.assertIn(str(nvm_bin), cmd[cmd.index("PATH") + 1])
 
     def test_cli_explicitly_reasserts_network_policy_on_both_turns(self):
         c = self.probe()
