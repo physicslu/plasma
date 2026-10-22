@@ -136,16 +136,22 @@ class BluepillOpenOCDSessionExecutor:
                             asyncio.shield(serving),
                             timeout=self.socket_timeout_s + 1.0,
                         )
-                    except (Exception, asyncio.CancelledError):
+                    except asyncio.CancelledError:
+                        # Preserve Job cancellation; never turn it into a
+                        # success or an unrelated transport exception.
                         if not serving.done():
                             serving.cancel()
-                        # The caller will see the authentic OpenOCD exception,
-                        # or explicit SWD transport failure if this is the only
-                        # failed component. Never promote a bridge error to PASS.
-                        if not bridge.closed or bridge.poisoned:
-                            raise PlasmaError(
-                                ErrorCode.INTERFACE_FAILURE,
-                                "SWD bridge did not finish safely; recovery required",
-                            )
+                        raise
+                    except Exception as exc:
+                        if not serving.done():
+                            serving.cancel()
+                        # Even if bridge.close() ran after EOF/timeout, that
+                        # does not prove a valid OpenOCD 'Q' handshake.
+                        # A failed transport must never yield Job success.
+                        raise PlasmaError(
+                            ErrorCode.INTERFACE_FAILURE,
+                            "SWD bridge ended without a confirmed clean session; "
+                            "external recovery may be required",
+                        ) from exc
         finally:
             self._busy = False
