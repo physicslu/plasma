@@ -2,6 +2,8 @@
 import cocotb
 from cocotb.triggers import Timer
 
+from plasma_interfaces.bluepill_remote_bitbang import RemoteBitbangSWD
+
 
 BASE = 0x40008000
 OKAY, SLVERR = 0, 2
@@ -117,3 +119,50 @@ async def rejects_register_escape_partial_strobe_reserved_bits_and_reset(dut):
     await bench.tick(2)
     assert (int(dut.swclk.value), int(dut.swdio_out.value),
             int(dut.swdio_oe.value)) == (0, 1, 0)
+
+
+@cocotb.test()
+async def production_bridge_controls_actual_gpio_rtl(dut):
+    """Real Python PS word-port -> Cocotb AXI BFM -> real PL candidate."""
+    bench = Bench(dut)
+    await bench.reset()
+
+    @cocotb.function
+    async def read_word(address):
+        response, value = await bench.read(address)
+        if response != OKAY:
+            raise OSError("AXI read refused")
+        return value
+
+    @cocotb.function
+    async def write_word(address, value):
+        response = await bench.write(address, value)
+        if response != OKAY:
+            raise OSError("AXI write refused")
+
+    class Port:
+        def __init__(self):
+            self.barriers = 0
+
+        def read32(self, address):
+            return read_word(address)
+
+        def write32(self, address, value):
+            write_word(address, value)
+
+        def write_barrier(self):
+            # Only host BFM ordering, not a native ARMv7 DMB proof.
+            self.barriers += 1
+
+    port = Port()
+    bridge = RemoteBitbangSWD(port, base=BASE)
+    bridge.admit()
+    assert bridge.exchange(b"Odefgc") == b"1"
+    assert (int(dut.swclk.value), int(dut.swdio_out.value),
+            int(dut.swdio_oe.value)) == (1, 1, 1)
+    dut.swdio_in.value = 0
+    assert bridge.exchange(b"c") == b"0"
+    bridge.exchange(b"oQ")
+    assert (int(dut.swclk.value), int(dut.swdio_out.value),
+            int(dut.swdio_oe.value)) == (0, 1, 0)
+    assert port.barriers >= 7
