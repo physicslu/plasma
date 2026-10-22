@@ -2,7 +2,7 @@
 
 Executor: Codex Path 3 on `SWPC`, local isolated worktree from `origin/main`
 `b8ad41a35`. Reviewed build source commit:
-`5f63d550ce81bb6269d4962c7e2ccc0d91156247`.
+`ceda5b1894fda77effa280a39cf8557225685cd3`.
 
 ## Tool and dependency identity
 
@@ -29,15 +29,15 @@ reproduction commands and the pinned-source contract.
 | Check | Expected | Observed | Result |
 | --- | --- | --- | --- |
 | CMake + Ninja cross-build | ELF, HEX, BIN, MAP; exit 0 | Exit 0; all four emitted; [full log](build.log) | PASS |
-| `arm-none-eabi-size` | Image fits 64 KiB Flash / 20 KiB RAM | Flash 18,312 B (27.94%); RAM 4,912 B (23.98%) | PASS |
-| `readelf` / `objdump` static check | ARM ELF, Flash/RAM segments, valid vector pointers, firmware strings | SP `0x20005000`; Reset `0x0800093D`; SysTick `0x0800037D`; USB IRQ `0x08000381`; [inspection](inspection.log) | PASS |
+| `arm-none-eabi-size` | Image fits 64 KiB Flash / 20 KiB RAM | Flash 18,328 B (27.97%); RAM 5,936 B (28.98%), including 2 KiB reserved stack | PASS |
+| `readelf` / `objdump` static check | ARM ELF, Flash/RAM segments, valid vector pointers, firmware strings | SP `0x20005000`; Reset `0x0800094D`; SysTick `0x0800037D`; USB IRQ `0x08000381`; [inspection](inspection.log) | PASS |
 | Host C app tests with UBSan | Commands, 500 ms schedule, BUSY, reconnect, RX overflow, concurrent parser | Exit 0, `app host tests PASS` | PASS |
 | Host Python CDC monitor unit tests | Sequence, interval, ID, interruption parsing | 4 tests, exit 0; [host log](host-tests.log) | PASS |
 | Real USB enumeration, unsolicited output, timing, physical disconnect/reconnect, LED | Measured on Blue Pill | No hardware operation in Phase A | NOT_RUN |
 | ST-LINK, Flash, Reset, Z2/PL, other hardware | No operation in Phase A | No operation | NOT_RUN |
 
 The build and static checker used the commands in the firmware README, with
-`/tmp/plasma-blue-pill-phase-a-build` as the build directory. The C host
+`/tmp/plasma-blue-pill-phase-a-final` as the build directory. The C host
 test used `gcc -std=c11 -Wall -Wextra -Werror -fsanitize=undefined
 -fno-omit-frame-pointer` and returned 0. The Python command was
 `python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p

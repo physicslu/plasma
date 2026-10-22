@@ -484,7 +484,7 @@ LOAD /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libn
 END GROUP
                 0x0000000020005000                _estack = (ORIGIN (RAM) + LENGTH (RAM))
                 0x0000000000000000                _Min_Heap_Size = 0x0
-                0x0000000000000400                _Min_Stack_Size = 0x400
+                0x0000000000000800                _Min_Stack_Size = 0x800
 
 .isr_vector     0x0000000008000000      0x10c
                 0x0000000008000000                . = ALIGN (0x4)
@@ -493,7 +493,7 @@ END GROUP
                 0x0000000008000000                g_pfnVectors
                 0x000000000800010c                . = ALIGN (0x4)
 
-.text           0x000000000800010c     0x4494
+.text           0x000000000800010c     0x44a4
                 0x000000000800010c                . = ALIGN (0x4)
  *(.text*)
  .text.cdc_deinit
@@ -565,498 +565,498 @@ END GROUP
                 0x0000000008000718        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
                 0x0000000008000718                HAL_PCD_ResumeCallback
  .text.USBD_LL_Init
-                0x0000000008000720       0x7c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000720       0x88 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
                 0x0000000008000720                USBD_LL_Init
  .text.USBD_LL_Start
-                0x000000000800079c        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x000000000800079c                USBD_LL_Start
+                0x00000000080007a8       0x12 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007a8                USBD_LL_Start
  .text.USBD_LL_OpenEP
-                0x00000000080007aa       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x00000000080007aa                USBD_LL_OpenEP
+                0x00000000080007ba       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007ba                USBD_LL_OpenEP
  .text.USBD_LL_CloseEP
-                0x00000000080007be        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x00000000080007be                USBD_LL_CloseEP
+                0x00000000080007ce        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007ce                USBD_LL_CloseEP
  .text.USBD_LL_StallEP
-                0x00000000080007cc        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x00000000080007cc                USBD_LL_StallEP
+                0x00000000080007dc        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007dc                USBD_LL_StallEP
  .text.USBD_LL_ClearStallEP
-                0x00000000080007da        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x00000000080007da                USBD_LL_ClearStallEP
+                0x00000000080007ea        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007ea                USBD_LL_ClearStallEP
  .text.USBD_LL_IsStallEP
-                0x00000000080007e8       0x22 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x00000000080007e8                USBD_LL_IsStallEP
+                0x00000000080007f8       0x22 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x00000000080007f8                USBD_LL_IsStallEP
  .text.USBD_LL_SetUSBAddress
-                0x000000000800080a        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x000000000800080a                USBD_LL_SetUSBAddress
+                0x000000000800081a        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x000000000800081a                USBD_LL_SetUSBAddress
  .text.USBD_LL_Transmit
-                0x0000000008000818        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x0000000008000818                USBD_LL_Transmit
+                0x0000000008000828        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000828                USBD_LL_Transmit
  .text.USBD_LL_PrepareReceive
-                0x0000000008000826        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x0000000008000826                USBD_LL_PrepareReceive
+                0x0000000008000836        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000836                USBD_LL_PrepareReceive
  .text.USBD_LL_GetRxDataSize
-                0x0000000008000834        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x0000000008000834                USBD_LL_GetRxDataSize
+                0x0000000008000844        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000844                USBD_LL_GetRxDataSize
  .text.USBD_static_malloc
-                0x000000000800083c        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x000000000800083c                USBD_static_malloc
+                0x000000000800084c        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x000000000800084c                USBD_static_malloc
  .text.USBD_static_free
-                0x0000000008000844        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x0000000008000844                USBD_static_free
+                0x0000000008000854        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000854                USBD_static_free
  .text.HAL_PCDEx_SetConnectionState
-                0x0000000008000846        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
-                0x0000000008000846                HAL_PCDEx_SetConnectionState
+                0x0000000008000856        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_conf.c.obj
+                0x0000000008000856                HAL_PCDEx_SetConnectionState
  .text.USBD_VCP_DeviceDescriptor
-                0x0000000008000848        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x0000000008000848                USBD_VCP_DeviceDescriptor
+                0x0000000008000858        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008000858                USBD_VCP_DeviceDescriptor
  .text.USBD_VCP_LangIDStrDescriptor
-                0x0000000008000854        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x0000000008000854                USBD_VCP_LangIDStrDescriptor
+                0x0000000008000864        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008000864                USBD_VCP_LangIDStrDescriptor
  .text.IntToUnicode
-                0x0000000008000860       0x2a CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
- *fill*         0x000000000800088a        0x2 
+                0x0000000008000870       0x2a CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+ *fill*         0x000000000800089a        0x2 
  .text.USBD_VCP_SerialStrDescriptor
-                0x000000000800088c       0x3c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x000000000800088c                USBD_VCP_SerialStrDescriptor
+                0x000000000800089c       0x3c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x000000000800089c                USBD_VCP_SerialStrDescriptor
  .text.USBD_VCP_ProductStrDescriptor
-                0x00000000080008c8       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x00000000080008c8                USBD_VCP_ProductStrDescriptor
+                0x00000000080008d8       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x00000000080008d8                USBD_VCP_ProductStrDescriptor
  .text.USBD_VCP_ManufacturerStrDescriptor
-                0x00000000080008e4       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x00000000080008e4                USBD_VCP_ManufacturerStrDescriptor
+                0x00000000080008f4       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x00000000080008f4                USBD_VCP_ManufacturerStrDescriptor
  .text.USBD_VCP_ConfigStrDescriptor
-                0x0000000008000900       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x0000000008000900                USBD_VCP_ConfigStrDescriptor
+                0x0000000008000910       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008000910                USBD_VCP_ConfigStrDescriptor
  .text.USBD_VCP_InterfaceStrDescriptor
-                0x000000000800091c       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
-                0x000000000800091c                USBD_VCP_InterfaceStrDescriptor
+                0x000000000800092c       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x000000000800092c                USBD_VCP_InterfaceStrDescriptor
  .text.SystemInit
-                0x0000000008000938        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c.obj
-                0x0000000008000938                SystemInit
- *fill*         0x000000000800093a        0x2 
+                0x0000000008000948        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c.obj
+                0x0000000008000948                SystemInit
+ *fill*         0x000000000800094a        0x2 
  .text.Reset_Handler
-                0x000000000800093c       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xb.s.obj
-                0x000000000800093c                Reset_Handler
+                0x000000000800094c       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xb.s.obj
+                0x000000000800094c                Reset_Handler
  .text.Default_Handler
-                0x0000000008000984        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xb.s.obj
-                0x0000000008000984                RTC_Alarm_IRQHandler
-                0x0000000008000984                EXTI2_IRQHandler
-                0x0000000008000984                DebugMon_Handler
-                0x0000000008000984                TIM1_CC_IRQHandler
-                0x0000000008000984                HardFault_Handler
-                0x0000000008000984                PVD_IRQHandler
-                0x0000000008000984                PendSV_Handler
-                0x0000000008000984                NMI_Handler
-                0x0000000008000984                EXTI3_IRQHandler
-                0x0000000008000984                EXTI0_IRQHandler
-                0x0000000008000984                I2C2_EV_IRQHandler
-                0x0000000008000984                UsageFault_Handler
-                0x0000000008000984                ADC1_2_IRQHandler
-                0x0000000008000984                SPI1_IRQHandler
-                0x0000000008000984                TAMPER_IRQHandler
-                0x0000000008000984                DMA1_Channel4_IRQHandler
-                0x0000000008000984                USART3_IRQHandler
-                0x0000000008000984                RTC_IRQHandler
-                0x0000000008000984                DMA1_Channel7_IRQHandler
-                0x0000000008000984                CAN1_RX1_IRQHandler
-                0x0000000008000984                TIM4_IRQHandler
-                0x0000000008000984                I2C1_EV_IRQHandler
-                0x0000000008000984                DMA1_Channel6_IRQHandler
-                0x0000000008000984                TIM3_IRQHandler
-                0x0000000008000984                RCC_IRQHandler
-                0x0000000008000984                TIM1_TRG_COM_IRQHandler
-                0x0000000008000984                DMA1_Channel1_IRQHandler
-                0x0000000008000984                Default_Handler
-                0x0000000008000984                EXTI15_10_IRQHandler
-                0x0000000008000984                EXTI9_5_IRQHandler
-                0x0000000008000984                SPI2_IRQHandler
-                0x0000000008000984                MemManage_Handler
-                0x0000000008000984                SVC_Handler
-                0x0000000008000984                DMA1_Channel5_IRQHandler
-                0x0000000008000984                EXTI4_IRQHandler
-                0x0000000008000984                USB_HP_CAN1_TX_IRQHandler
-                0x0000000008000984                DMA1_Channel3_IRQHandler
-                0x0000000008000984                TIM1_UP_IRQHandler
-                0x0000000008000984                WWDG_IRQHandler
-                0x0000000008000984                TIM2_IRQHandler
-                0x0000000008000984                TIM1_BRK_IRQHandler
-                0x0000000008000984                EXTI1_IRQHandler
-                0x0000000008000984                USART2_IRQHandler
-                0x0000000008000984                I2C2_ER_IRQHandler
-                0x0000000008000984                DMA1_Channel2_IRQHandler
-                0x0000000008000984                CAN1_SCE_IRQHandler
-                0x0000000008000984                FLASH_IRQHandler
-                0x0000000008000984                BusFault_Handler
-                0x0000000008000984                USART1_IRQHandler
-                0x0000000008000984                I2C1_ER_IRQHandler
-                0x0000000008000984                USBWakeUp_IRQHandler
+                0x0000000008000994        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xb.s.obj
+                0x0000000008000994                RTC_Alarm_IRQHandler
+                0x0000000008000994                EXTI2_IRQHandler
+                0x0000000008000994                DebugMon_Handler
+                0x0000000008000994                TIM1_CC_IRQHandler
+                0x0000000008000994                HardFault_Handler
+                0x0000000008000994                PVD_IRQHandler
+                0x0000000008000994                PendSV_Handler
+                0x0000000008000994                NMI_Handler
+                0x0000000008000994                EXTI3_IRQHandler
+                0x0000000008000994                EXTI0_IRQHandler
+                0x0000000008000994                I2C2_EV_IRQHandler
+                0x0000000008000994                UsageFault_Handler
+                0x0000000008000994                ADC1_2_IRQHandler
+                0x0000000008000994                SPI1_IRQHandler
+                0x0000000008000994                TAMPER_IRQHandler
+                0x0000000008000994                DMA1_Channel4_IRQHandler
+                0x0000000008000994                USART3_IRQHandler
+                0x0000000008000994                RTC_IRQHandler
+                0x0000000008000994                DMA1_Channel7_IRQHandler
+                0x0000000008000994                CAN1_RX1_IRQHandler
+                0x0000000008000994                TIM4_IRQHandler
+                0x0000000008000994                I2C1_EV_IRQHandler
+                0x0000000008000994                DMA1_Channel6_IRQHandler
+                0x0000000008000994                TIM3_IRQHandler
+                0x0000000008000994                RCC_IRQHandler
+                0x0000000008000994                TIM1_TRG_COM_IRQHandler
+                0x0000000008000994                DMA1_Channel1_IRQHandler
+                0x0000000008000994                Default_Handler
+                0x0000000008000994                EXTI15_10_IRQHandler
+                0x0000000008000994                EXTI9_5_IRQHandler
+                0x0000000008000994                SPI2_IRQHandler
+                0x0000000008000994                MemManage_Handler
+                0x0000000008000994                SVC_Handler
+                0x0000000008000994                DMA1_Channel5_IRQHandler
+                0x0000000008000994                EXTI4_IRQHandler
+                0x0000000008000994                USB_HP_CAN1_TX_IRQHandler
+                0x0000000008000994                DMA1_Channel3_IRQHandler
+                0x0000000008000994                TIM1_UP_IRQHandler
+                0x0000000008000994                WWDG_IRQHandler
+                0x0000000008000994                TIM2_IRQHandler
+                0x0000000008000994                TIM1_BRK_IRQHandler
+                0x0000000008000994                EXTI1_IRQHandler
+                0x0000000008000994                USART2_IRQHandler
+                0x0000000008000994                I2C2_ER_IRQHandler
+                0x0000000008000994                DMA1_Channel2_IRQHandler
+                0x0000000008000994                CAN1_SCE_IRQHandler
+                0x0000000008000994                FLASH_IRQHandler
+                0x0000000008000994                BusFault_Handler
+                0x0000000008000994                USART1_IRQHandler
+                0x0000000008000994                I2C1_ER_IRQHandler
+                0x0000000008000994                USBWakeUp_IRQHandler
  .text.HAL_MspInit
-                0x0000000008000986        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
-                0x0000000008000986                HAL_MspInit
+                0x0000000008000996        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
+                0x0000000008000996                HAL_MspInit
  .text.HAL_InitTick
-                0x0000000008000988       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
-                0x0000000008000988                HAL_InitTick
+                0x0000000008000998       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
+                0x0000000008000998                HAL_InitTick
  .text.HAL_Init
-                0x00000000080009d0       0x24 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
-                0x00000000080009d0                HAL_Init
+                0x00000000080009e0       0x24 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
+                0x00000000080009e0                HAL_Init
  .text.HAL_IncTick
-                0x00000000080009f4       0x18 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
-                0x00000000080009f4                HAL_IncTick
+                0x0000000008000a04       0x18 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
+                0x0000000008000a04                HAL_IncTick
  .text.HAL_GetTick
-                0x0000000008000a0c        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
-                0x0000000008000a0c                HAL_GetTick
+                0x0000000008000a1c        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c.obj
+                0x0000000008000a1c                HAL_GetTick
  .text.HAL_RCC_OscConfig
-                0x0000000008000a18      0x338 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
-                0x0000000008000a18                HAL_RCC_OscConfig
+                0x0000000008000a28      0x338 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
+                0x0000000008000a28                HAL_RCC_OscConfig
  .text.HAL_RCC_GetSysClockFreq
-                0x0000000008000d50       0x4c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
-                0x0000000008000d50                HAL_RCC_GetSysClockFreq
+                0x0000000008000d60       0x4c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
+                0x0000000008000d60                HAL_RCC_GetSysClockFreq
  .text.HAL_RCC_ClockConfig
-                0x0000000008000d9c      0x138 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
-                0x0000000008000d9c                HAL_RCC_ClockConfig
+                0x0000000008000dac      0x138 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
+                0x0000000008000dac                HAL_RCC_ClockConfig
  .text.HAL_RCCEx_PeriphCLKConfig
-                0x0000000008000ed4       0xf4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c.obj
-                0x0000000008000ed4                HAL_RCCEx_PeriphCLKConfig
+                0x0000000008000ee4       0xf4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c.obj
+                0x0000000008000ee4                HAL_RCCEx_PeriphCLKConfig
  .text.HAL_GPIO_Init
-                0x0000000008000fc8      0x1b4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c.obj
-                0x0000000008000fc8                HAL_GPIO_Init
+                0x0000000008000fd8      0x1b4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c.obj
+                0x0000000008000fd8                HAL_GPIO_Init
  .text.HAL_GPIO_WritePin
-                0x000000000800117c        0xa CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c.obj
-                0x000000000800117c                HAL_GPIO_WritePin
- *fill*         0x0000000008001186        0x2 
+                0x000000000800118c        0xa CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c.obj
+                0x000000000800118c                HAL_GPIO_WritePin
+ *fill*         0x0000000008001196        0x2 
  .text.HAL_NVIC_SetPriorityGrouping
-                0x0000000008001188       0x24 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
-                0x0000000008001188                HAL_NVIC_SetPriorityGrouping
+                0x0000000008001198       0x24 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
+                0x0000000008001198                HAL_NVIC_SetPriorityGrouping
  .text.HAL_NVIC_SetPriority
-                0x00000000080011ac       0x64 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
-                0x00000000080011ac                HAL_NVIC_SetPriority
+                0x00000000080011bc       0x64 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
+                0x00000000080011bc                HAL_NVIC_SetPriority
  .text.HAL_NVIC_EnableIRQ
-                0x0000000008001210       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
-                0x0000000008001210                HAL_NVIC_EnableIRQ
+                0x0000000008001220       0x1c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
+                0x0000000008001220                HAL_NVIC_EnableIRQ
  .text.HAL_SYSTICK_Config
-                0x000000000800122c       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
-                0x000000000800122c                HAL_SYSTICK_Config
+                0x000000000800123c       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c.obj
+                0x000000000800123c                HAL_SYSTICK_Config
  .text.HAL_PCD_Init
-                0x0000000008001254       0xcc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001254                HAL_PCD_Init
+                0x0000000008001264       0xcc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001264                HAL_PCD_Init
  .text.HAL_PCD_Start
-                0x0000000008001320       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001320                HAL_PCD_Start
+                0x0000000008001330       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001330                HAL_PCD_Start
  .text.HAL_PCD_SetAddress
-                0x0000000008001352       0x26 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001352                HAL_PCD_SetAddress
+                0x0000000008001362       0x26 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001362                HAL_PCD_SetAddress
  .text.HAL_PCD_IRQHandler
-                0x0000000008001378      0x9a0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001378                HAL_PCD_IRQHandler
+                0x0000000008001388      0x9a0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001388                HAL_PCD_IRQHandler
  .text.HAL_PCD_EP_Open
-                0x0000000008001d18       0x60 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001d18                HAL_PCD_EP_Open
+                0x0000000008001d28       0x60 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001d28                HAL_PCD_EP_Open
  .text.HAL_PCD_EP_Close
-                0x0000000008001d78       0x50 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001d78                HAL_PCD_EP_Close
+                0x0000000008001d88       0x50 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001d88                HAL_PCD_EP_Close
  .text.HAL_PCD_EP_Receive
-                0x0000000008001dc8       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001dc8                HAL_PCD_EP_Receive
+                0x0000000008001dd8       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001dd8                HAL_PCD_EP_Receive
  .text.HAL_PCD_EP_GetRxCount
-                0x0000000008001df6       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001df6                HAL_PCD_EP_GetRxCount
+                0x0000000008001e06       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001e06                HAL_PCD_EP_GetRxCount
  .text.HAL_PCD_EP_Transmit
-                0x0000000008001e06       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001e06                HAL_PCD_EP_Transmit
+                0x0000000008001e16       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001e16                HAL_PCD_EP_Transmit
  .text.HAL_PCD_EP_SetStall
-                0x0000000008001e34       0x6c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001e34                HAL_PCD_EP_SetStall
+                0x0000000008001e44       0x6c CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001e44                HAL_PCD_EP_SetStall
  .text.HAL_PCD_EP_ClrStall
-                0x0000000008001ea0       0x64 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
-                0x0000000008001ea0                HAL_PCD_EP_ClrStall
+                0x0000000008001eb0       0x64 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c.obj
+                0x0000000008001eb0                HAL_PCD_EP_ClrStall
  .text.HAL_PCDEx_PMAConfig
-                0x0000000008001f04       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd_ex.c.obj
-                0x0000000008001f04                HAL_PCDEx_PMAConfig
+                0x0000000008001f14       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd_ex.c.obj
+                0x0000000008001f14                HAL_PCDEx_PMAConfig
  .text.USB_CoreInit
-                0x0000000008001f36        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f36                USB_CoreInit
+                0x0000000008001f46        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001f46                USB_CoreInit
  .text.USB_EnableGlobalInt
-                0x0000000008001f44       0x12 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f44                USB_EnableGlobalInt
+                0x0000000008001f54       0x12 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001f54                USB_EnableGlobalInt
  .text.USB_DisableGlobalInt
-                0x0000000008001f56       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f56                USB_DisableGlobalInt
+                0x0000000008001f66       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001f66                USB_DisableGlobalInt
  .text.USB_SetCurrentMode
-                0x0000000008001f6a        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f6a                USB_SetCurrentMode
+                0x0000000008001f7a        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001f7a                USB_SetCurrentMode
  .text.USB_DevInit
-                0x0000000008001f6e       0x22 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f6e                USB_DevInit
+                0x0000000008001f7e       0x22 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001f7e                USB_DevInit
  .text.USB_ActivateEndpoint
-                0x0000000008001f90      0x2c4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008001f90                USB_ActivateEndpoint
+                0x0000000008001fa0      0x2c4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008001fa0                USB_ActivateEndpoint
  .text.USB_DeactivateEndpoint
-                0x0000000008002254      0x1a2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008002254                USB_DeactivateEndpoint
+                0x0000000008002264      0x1a2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008002264                USB_DeactivateEndpoint
  .text.USB_EPSetStall
-                0x00000000080023f6       0x40 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080023f6                USB_EPSetStall
+                0x0000000008002406       0x40 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008002406                USB_EPSetStall
  .text.USB_EPClearStall
-                0x0000000008002436       0x92 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008002436                USB_EPClearStall
+                0x0000000008002446       0x92 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008002446                USB_EPClearStall
  .text.USB_SetDevAddress
-                0x00000000080024c8        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024c8                USB_SetDevAddress
+                0x00000000080024d8        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x00000000080024d8                USB_SetDevAddress
  .text.USB_DevConnect
-                0x00000000080024d4        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024d4                USB_DevConnect
- .text.USB_DevDisconnect
-                0x00000000080024d8        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024d8                USB_DevDisconnect
- .text.USB_ReadInterrupts
-                0x00000000080024dc        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024dc                USB_ReadInterrupts
- .text.USB_EP0_OutStart
                 0x00000000080024e4        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024e4                USB_EP0_OutStart
+                0x00000000080024e4                USB_DevConnect
+ .text.USB_DevDisconnect
+                0x00000000080024e8        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x00000000080024e8                USB_DevDisconnect
+ .text.USB_ReadInterrupts
+                0x00000000080024ec        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x00000000080024ec                USB_ReadInterrupts
+ .text.USB_EP0_OutStart
+                0x00000000080024f4        0x4 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x00000000080024f4                USB_EP0_OutStart
  .text.USB_WritePMA
-                0x00000000080024e8       0x20 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x00000000080024e8                USB_WritePMA
+                0x00000000080024f8       0x20 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x00000000080024f8                USB_WritePMA
  .text.USB_EPStartXfer
-                0x0000000008002508      0x470 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008002508                USB_EPStartXfer
+                0x0000000008002518      0x470 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008002518                USB_EPStartXfer
  .text.USB_ReadPMA
-                0x0000000008002978       0x38 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
-                0x0000000008002978                USB_ReadPMA
+                0x0000000008002988       0x38 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c.obj
+                0x0000000008002988                USB_ReadPMA
  .text.USBD_Init
-                0x00000000080029b0       0x2a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x00000000080029b0                USBD_Init
+                0x00000000080029c0       0x2a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x00000000080029c0                USBD_Init
  .text.USBD_RegisterClass
-                0x00000000080029da        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x00000000080029da                USBD_RegisterClass
+                0x00000000080029ea        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x00000000080029ea                USBD_RegisterClass
  .text.USBD_Start
-                0x00000000080029e8        0xa CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x00000000080029e8                USBD_Start
+                0x00000000080029f8        0xa CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x00000000080029f8                USBD_Start
  .text.USBD_SetClassConfig
-                0x00000000080029f2       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x00000000080029f2                USBD_SetClassConfig
+                0x0000000008002a02       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002a02                USBD_SetClassConfig
  .text.USBD_ClrClassConfig
-                0x0000000008002a08        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002a08                USBD_ClrClassConfig
+                0x0000000008002a18        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002a18                USBD_ClrClassConfig
  .text.USBD_LL_SetupStage
-                0x0000000008002a16       0x5a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002a16                USBD_LL_SetupStage
+                0x0000000008002a26       0x5a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002a26                USBD_LL_SetupStage
  .text.USBD_LL_DataOutStage
-                0x0000000008002a70       0x74 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002a70                USBD_LL_DataOutStage
+                0x0000000008002a80       0x74 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002a80                USBD_LL_DataOutStage
  .text.USBD_LL_DataInStage
-                0x0000000008002ae4       0xb6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002ae4                USBD_LL_DataInStage
+                0x0000000008002af4       0xb6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002af4                USBD_LL_DataInStage
  .text.USBD_LL_Reset
-                0x0000000008002b9a       0x4e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002b9a                USBD_LL_Reset
+                0x0000000008002baa       0x4e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002baa                USBD_LL_Reset
  .text.USBD_LL_SetSpeed
-                0x0000000008002be8        0x6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002be8                USBD_LL_SetSpeed
+                0x0000000008002bf8        0x6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002bf8                USBD_LL_SetSpeed
  .text.USBD_LL_Suspend
-                0x0000000008002bee       0x12 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002bee                USBD_LL_Suspend
+                0x0000000008002bfe       0x12 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002bfe                USBD_LL_Suspend
  .text.USBD_LL_Resume
-                0x0000000008002c00       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002c00                USBD_LL_Resume
+                0x0000000008002c10       0x14 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002c10                USBD_LL_Resume
  .text.USBD_LL_SOF
-                0x0000000008002c14       0x18 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
-                0x0000000008002c14                USBD_LL_SOF
+                0x0000000008002c24       0x18 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c.obj
+                0x0000000008002c24                USBD_LL_SOF
  .text.USBD_CtlError.constprop.0
-                0x0000000008002c2c       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
- *fill*         0x0000000008002c42        0x2 
+                0x0000000008002c3c       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+ *fill*         0x0000000008002c52        0x2 
  .text.USBD_StdDevReq
-                0x0000000008002c44      0x250 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x0000000008002c44                USBD_StdDevReq
+                0x0000000008002c54      0x250 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x0000000008002c54                USBD_StdDevReq
  .text.USBD_StdItfReq
-                0x0000000008002e94       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x0000000008002e94                USBD_StdItfReq
+                0x0000000008002ea4       0x48 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x0000000008002ea4                USBD_StdItfReq
  .text.USBD_StdEPReq
-                0x0000000008002edc      0x114 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x0000000008002edc                USBD_StdEPReq
+                0x0000000008002eec      0x114 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x0000000008002eec                USBD_StdEPReq
  .text.USBD_ParseSetupRequest
-                0x0000000008002ff0       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x0000000008002ff0                USBD_ParseSetupRequest
+                0x0000000008003000       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x0000000008003000                USBD_ParseSetupRequest
  .text.USBD_CtlError
-                0x0000000008003018       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x0000000008003018                USBD_CtlError
+                0x0000000008003028       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x0000000008003028                USBD_CtlError
  .text.USBD_GetString
-                0x000000000800302e       0x38 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
-                0x000000000800302e                USBD_GetString
+                0x000000000800303e       0x38 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c.obj
+                0x000000000800303e                USBD_GetString
  .text.USBD_CtlSendData
-                0x0000000008003066       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x0000000008003066                USBD_CtlSendData
+                0x0000000008003076       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x0000000008003076                USBD_CtlSendData
  .text.USBD_CtlContinueSendData
-                0x0000000008003080       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x0000000008003080                USBD_CtlContinueSendData
+                0x0000000008003090       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x0000000008003090                USBD_CtlContinueSendData
  .text.USBD_CtlPrepareRx
-                0x0000000008003090       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x0000000008003090                USBD_CtlPrepareRx
+                0x00000000080030a0       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x00000000080030a0                USBD_CtlPrepareRx
  .text.USBD_CtlContinueRx
-                0x00000000080030aa       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x00000000080030aa                USBD_CtlContinueRx
+                0x00000000080030ba       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x00000000080030ba                USBD_CtlContinueRx
  .text.USBD_CtlSendStatus
-                0x00000000080030ba       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x00000000080030ba                USBD_CtlSendStatus
+                0x00000000080030ca       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x00000000080030ca                USBD_CtlSendStatus
  .text.USBD_CtlReceiveStatus
-                0x00000000080030d0       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
-                0x00000000080030d0                USBD_CtlReceiveStatus
+                0x00000000080030e0       0x16 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c.obj
+                0x00000000080030e0                USBD_CtlReceiveStatus
  .text.USBD_CDC_EP0_RxReady
-                0x00000000080030e6       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
- *fill*         0x000000000800310e        0x2 
+                0x00000000080030f6       0x28 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+ *fill*         0x000000000800311e        0x2 
  .text.USBD_CDC_GetFSCfgDesc
-                0x0000000008003110        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003120        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_GetHSCfgDesc
-                0x000000000800311c        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x000000000800312c        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_GetOtherSpeedCfgDesc
-                0x0000000008003128        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003138        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_GetDeviceQualifierDescriptor
-                0x0000000008003134        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x0000000008003134                USBD_CDC_GetDeviceQualifierDescriptor
+                0x0000000008003144        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003144                USBD_CDC_GetDeviceQualifierDescriptor
  .text.USBD_CDC_DataOut
-                0x0000000008003140       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003150       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_DataIn
-                0x000000000800316e       0x42 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x000000000800317e       0x42 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_Setup
-                0x00000000080031b0       0xb6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x00000000080031c0       0xb6 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_DeInit
-                0x0000000008003266       0x42 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003276       0x42 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_Init
-                0x00000000080032a8       0xa2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x00000000080032b8       0xa2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
  .text.USBD_CDC_RegisterInterface
-                0x000000000800334a        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x000000000800334a                USBD_CDC_RegisterInterface
+                0x000000000800335a        0xe CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x000000000800335a                USBD_CDC_RegisterInterface
  .text.USBD_CDC_SetTxBuffer
-                0x0000000008003358       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x0000000008003358                USBD_CDC_SetTxBuffer
+                0x0000000008003368       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003368                USBD_CDC_SetTxBuffer
  .text.USBD_CDC_SetRxBuffer
-                0x0000000008003368        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x0000000008003368                USBD_CDC_SetRxBuffer
+                0x0000000008003378        0xc CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003378                USBD_CDC_SetRxBuffer
  .text.USBD_CDC_TransmitPacket
-                0x0000000008003374       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x0000000008003374                USBD_CDC_TransmitPacket
+                0x0000000008003384       0x32 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x0000000008003384                USBD_CDC_TransmitPacket
  .text.USBD_CDC_ReceivePacket
-                0x00000000080033a6       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
-                0x00000000080033a6                USBD_CDC_ReceivePacket
- .text          0x00000000080033d4       0x48 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-init.o)
-                0x00000000080033d4                __libc_init_array
- .text          0x000000000800341c       0xec /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memcpy.o)
-                0x000000000800341c                memcpy
- .text          0x0000000008003508       0xa4 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memset.o)
-                0x0000000008003508                memset
- .text          0x00000000080035ac      0x100 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-snprintf.o)
-                0x00000000080035ac                _sniprintf_r
-                0x00000000080035ac                _snprintf_r
-                0x0000000008003628                snprintf
-                0x0000000008003628                sniprintf
- .text          0x00000000080036ac      0x1bc /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-strcmp.o)
-                0x00000000080036ac                strcmp
- .text          0x0000000008003868       0x5c /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-strlen-stub.o)
-                0x0000000008003868                strlen
- .text          0x00000000080038c4      0x3f4 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-svfprintf.o)
-                0x00000000080038c4                __ssputs_r
-                0x0000000008003988                __ssprint_r
-                0x0000000008003a84                _svfprintf_r
-                0x0000000008003a84                _svfiprintf_r
- .text          0x0000000008003cb8      0x3d8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-vfprintf_i.o)
-                0x0000000008003cb8                _printf_common
-                0x0000000008003de4                _printf_i
- .text          0x0000000008004090       0x90 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memchr-stub.o)
-                0x0000000008004090                memchr
- .text          0x0000000008004120       0xf8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memmove.o)
-                0x0000000008004120                memmove
- .text          0x0000000008004218       0xcc /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-freer.o)
-                0x0000000008004218                _free_r
- .text          0x00000000080042e4       0xb8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-mallocr.o)
-                0x00000000080042e4                _malloc_r
- .text          0x000000000800439c       0x50 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-reallocr.o)
-                0x000000000800439c                _realloc_r
- .text          0x00000000080043ec       0x24 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-sbrkr.o)
-                0x00000000080043ec                _sbrk_r
- .text          0x0000000008004410        0x8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-mlock.o)
-                0x0000000008004410                __malloc_lock
-                0x0000000008004414                __malloc_unlock
- .text          0x0000000008004418       0x14 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-msizer.o)
-                0x0000000008004418                _malloc_usable_size_r
- .text          0x000000000800442c       0x1c /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libnosys.a(sbrk.o)
-                0x000000000800442c                _sbrk
+                0x00000000080033b6       0x2e CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c.obj
+                0x00000000080033b6                USBD_CDC_ReceivePacket
+ .text          0x00000000080033e4       0x48 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-init.o)
+                0x00000000080033e4                __libc_init_array
+ .text          0x000000000800342c       0xec /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memcpy.o)
+                0x000000000800342c                memcpy
+ .text          0x0000000008003518       0xa4 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memset.o)
+                0x0000000008003518                memset
+ .text          0x00000000080035bc      0x100 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-snprintf.o)
+                0x00000000080035bc                _sniprintf_r
+                0x00000000080035bc                _snprintf_r
+                0x0000000008003638                snprintf
+                0x0000000008003638                sniprintf
+ .text          0x00000000080036bc      0x1bc /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-strcmp.o)
+                0x00000000080036bc                strcmp
+ .text          0x0000000008003878       0x5c /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-strlen-stub.o)
+                0x0000000008003878                strlen
+ .text          0x00000000080038d4      0x3f4 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-svfprintf.o)
+                0x00000000080038d4                __ssputs_r
+                0x0000000008003998                __ssprint_r
+                0x0000000008003a94                _svfprintf_r
+                0x0000000008003a94                _svfiprintf_r
+ .text          0x0000000008003cc8      0x3d8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-vfprintf_i.o)
+                0x0000000008003cc8                _printf_common
+                0x0000000008003df4                _printf_i
+ .text          0x00000000080040a0       0x90 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memchr-stub.o)
+                0x00000000080040a0                memchr
+ .text          0x0000000008004130       0xf8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-memmove.o)
+                0x0000000008004130                memmove
+ .text          0x0000000008004228       0xcc /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-freer.o)
+                0x0000000008004228                _free_r
+ .text          0x00000000080042f4       0xb8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-mallocr.o)
+                0x00000000080042f4                _malloc_r
+ .text          0x00000000080043ac       0x50 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-reallocr.o)
+                0x00000000080043ac                _realloc_r
+ .text          0x00000000080043fc       0x24 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-sbrkr.o)
+                0x00000000080043fc                _sbrk_r
+ .text          0x0000000008004420        0x8 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-mlock.o)
+                0x0000000008004420                __malloc_lock
+                0x0000000008004424                __malloc_unlock
+ .text          0x0000000008004428       0x14 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-msizer.o)
+                0x0000000008004428                _malloc_usable_size_r
+ .text          0x000000000800443c       0x1c /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libnosys.a(sbrk.o)
+                0x000000000800443c                _sbrk
  *(.rodata*)
  .rodata.queue_reply.str1.1
-                0x0000000008004448        0x5 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
+                0x0000000008004458        0x5 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
  .rodata.app_process.str1.1
-                0x000000000800444d       0x96 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
+                0x000000000800445d       0x96 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
  .rodata.app_next.str1.1
-                0x00000000080044e3       0x26 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
+                0x00000000080044f3       0x26 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/app.c.obj
                                          0x2a (size before relaxing)
  .rodata.USBD_VCP_ProductStrDescriptor.str1.1
-                0x0000000008004509       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008004519       0x1a CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
  .rodata.USBD_VCP_ManufacturerStrDescriptor.str1.1
-                0x0000000008004523        0xb CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008004533        0xb CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
  .rodata.USBD_VCP_ConfigStrDescriptor.str1.1
-                0x000000000800452e        0xb CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x000000000800453e        0xb CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
  .rodata.USBD_VCP_InterfaceStrDescriptor.str1.1
-                0x0000000008004539        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
+                0x0000000008004549        0x8 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/usbd_desc.c.obj
  .rodata.AHBPrescTable
-                0x0000000008004541       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c.obj
-                0x0000000008004541                AHBPrescTable
+                0x0000000008004551       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c.obj
+                0x0000000008004551                AHBPrescTable
  .rodata.aPLLMULFactorTable.1
-                0x0000000008004551       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
+                0x0000000008004561       0x10 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
  .rodata.aPredivFactorTable.0
-                0x0000000008004561        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
- *fill*         0x0000000008004563        0x1 
+                0x0000000008004571        0x2 CMakeFiles/plasma-blue-pill-cdc.elf.dir/tmp/plasma-stm32cubef1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c.obj
+ *fill*         0x0000000008004573        0x1 
  .rodata.str1.4
-                0x0000000008004564       0x13 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-svfprintf.o)
- *fill*         0x0000000008004577        0x1 
+                0x0000000008004574       0x13 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-svfprintf.o)
+ *fill*         0x0000000008004587        0x1 
  .rodata.str1.4
-                0x0000000008004578       0x25 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-vfprintf_i.o)
+                0x0000000008004588       0x25 /tmp/plasma-arm-toolchain/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp/libc_nano.a(lib_a-nano-vfprintf_i.o)
  *(.init)
  *(.fini)
-                0x00000000080045a0                . = ALIGN (0x4)
- *fill*         0x000000000800459d        0x3 
+                0x00000000080045b0                . = ALIGN (0x4)
+ *fill*         0x00000000080045ad        0x3 
 
-.glue_7         0x00000000080045a0        0x0
- .glue_7        0x00000000080045a0        0x0 linker stubs
+.glue_7         0x00000000080045b0        0x0
+ .glue_7        0x00000000080045b0        0x0 linker stubs
 
-.glue_7t        0x00000000080045a0        0x0
- .glue_7t       0x00000000080045a0        0x0 linker stubs
+.glue_7t        0x00000000080045b0        0x0
+ .glue_7t       0x00000000080045b0        0x0 linker stubs
 
-.vfp11_veneer   0x00000000080045a0        0x0
- .vfp11_veneer  0x00000000080045a0        0x0 linker stubs
+.vfp11_veneer   0x00000000080045b0        0x0
+ .vfp11_veneer  0x00000000080045b0        0x0 linker stubs
 
-.v4_bx          0x00000000080045a0        0x0
- .v4_bx         0x00000000080045a0        0x0 linker stubs
+.v4_bx          0x00000000080045b0        0x0
+ .v4_bx         0x00000000080045b0        0x0 linker stubs
 
-.iplt           0x00000000080045a0        0x0
- .iplt          0x00000000080045a0        0x0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/main.c.obj
+.iplt           0x00000000080045b0        0x0
+ .iplt          0x00000000080045b0        0x0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/main.c.obj
 
-.rel.dyn        0x00000000080045a0        0x0
- .rel.iplt      0x00000000080045a0        0x0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/main.c.obj
+.rel.dyn        0x00000000080045b0        0x0
+ .rel.iplt      0x00000000080045b0        0x0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/main.c.obj
 
 .ARM.extab
  *(.ARM.extab*)
 
-.ARM.exidx      0x00000000080045a0        0x0
-                0x00000000080045a0                __exidx_start = .
+.ARM.exidx      0x00000000080045b0        0x0
+                0x00000000080045b0                __exidx_start = .
  *(.ARM.exidx*)
-                0x00000000080045a0                __exidx_end = .
+                0x00000000080045b0                __exidx_end = .
 
-.preinit_array  0x00000000080045a0        0x0
-                0x00000000080045a0                PROVIDE (__preinit_array_start = .)
+.preinit_array  0x00000000080045b0        0x0
+                0x00000000080045b0                PROVIDE (__preinit_array_start = .)
  *(.preinit_array*)
-                0x00000000080045a0                PROVIDE (__preinit_array_end = .)
+                0x00000000080045b0                PROVIDE (__preinit_array_end = .)
 
-.init_array     0x00000000080045a0        0x0
-                0x00000000080045a0                PROVIDE (__init_array_start = .)
+.init_array     0x00000000080045b0        0x0
+                0x00000000080045b0                PROVIDE (__init_array_start = .)
  *(.init_array*)
-                0x00000000080045a0                PROVIDE (__init_array_end = .)
+                0x00000000080045b0                PROVIDE (__init_array_end = .)
 
-.fini_array     0x00000000080045a0        0x0
+.fini_array     0x00000000080045b0        0x0
                 [!provide]                        PROVIDE (__fini_array_start = .)
  *(.fini_array*)
                 [!provide]                        PROVIDE (__fini_array_end = .)
-                0x00000000080045a0                _sidata = LOADADDR (.data)
+                0x00000000080045b0                _sidata = LOADADDR (.data)
 
-.data           0x0000000020000000      0x1e8 load address 0x00000000080045a0
+.data           0x0000000020000000      0x1e8 load address 0x00000000080045b0
                 0x0000000020000000                . = ALIGN (0x4)
                 0x0000000020000000                _sdata = .
  *(.data*)
@@ -1111,10 +1111,10 @@ END GROUP
                 0x00000000200001e8                . = ALIGN (0x4)
                 0x00000000200001e8                _edata = .
 
-.igot.plt       0x00000000200001e8        0x0 load address 0x0000000008004788
+.igot.plt       0x00000000200001e8        0x0 load address 0x0000000008004798
  .igot.plt      0x00000000200001e8        0x0 CMakeFiles/plasma-blue-pill-cdc.elf.dir/src/main.c.obj
 
-.bss            0x00000000200001e8      0xd48 load address 0x0000000008004788
+.bss            0x00000000200001e8      0xd48 load address 0x0000000008004798
                 0x00000000200001e8                . = ALIGN (0x4)
                 0x00000000200001e8                _sbss = .
  *(.bss*)
@@ -1151,12 +1151,12 @@ END GROUP
                 0x0000000020000f30                _end = .
 
 ._user_heap_stack
-                0x0000000020000f30      0x400 load address 0x0000000008004788
+                0x0000000020000f30      0x800 load address 0x0000000008004798
                 0x0000000020000f30                . = ALIGN (0x8)
                 0x0000000020000f30                . = (. + _Min_Heap_Size)
-                0x0000000020001330                . = (. + _Min_Stack_Size)
- *fill*         0x0000000020000f30      0x400 
-                0x0000000020001330                . = ALIGN (0x8)
+                0x0000000020001730                . = (. + _Min_Stack_Size)
+ *fill*         0x0000000020000f30      0x800 
+                0x0000000020001730                . = ALIGN (0x8)
 
 /DISCARD/
  *(.note.GNU-stack)
