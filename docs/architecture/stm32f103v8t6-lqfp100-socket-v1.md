@@ -60,8 +60,10 @@ placement and current limitation. No power circuit has been built or measured.
 - `design_input_ready` means only that pin assignment and schematic work
   may begin; **not** fixture vendor/part, PCB, SI, thermal/current, production,
   physical socket qualification, HIL, runtime readiness or execution authority.
-- No inheritance to `STM32F103VBT6`, T7/TR, another density, or another
-  package without separate exact applicable evidence.
+- This exact Socket Profile applies **only** to `STM32F103V8T6`. The separately
+  reviewed `STM32F103VBT6` profile reuses the DS5319 LQFP100 physical map but
+  binds **independent 128-KiB Flash geometry** and its own exact L2 record.
+  Neither profile automatically covers T7/TR or another package/density.
 - No ADR-0002 level change. No SWPC/Z2/DUT operations or deployment.
 
 ## Host-only gate
