@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0.0",
+  "binding_set_id": "stm32f103c8t6-socket-design-v1",
+  "status": "design_input_only",
+  "bindings": [
+    {
+      "icpn": "STM32F103C8T6",
+      "profile_id": "stm32f103c8t6-lqfp48-programming-hardware-v1"
+    }
+  ]
+}

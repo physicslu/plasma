@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "stm32f103-socket-design-sources-v1",
+  "status": "engineering_design_input",
+  "sources": [
+    {
+      "source_id": "st_an2586_rev8",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "AN2586",
+      "revision": "8",
+      "title": "Getting started with STM32F10xxx hardware development",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/content/ccc/resource/technical/document/application_note/6c/a3/24/49/a5/d4/4a/db/CD00164185.pdf/files/CD00164185.pdf/jcr:content/translations/en.CD00164185.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "power_supply_connection",
+        "decoupling",
+        "vbat_connection",
+        "hardware_design_guidance"
+      ]
+    }
+  ]
+}

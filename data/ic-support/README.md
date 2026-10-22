@@ -125,6 +125,19 @@ The manufacturer-only Evidence Pack A/B experiment is deliberately separate from
 
 Actual manufacturer-content-derived pack outputs are generated outside Git. `.github/workflows/ic-evidence-live-validation.yml` separately verifies the exact DS5319 source and semantic policy against the real PDF while retaining only metadata/digests as an artifact; ordinary deterministic AI IC Support research CI remains independent of ST availability.
 
+## STM32F103C8T6 Socket design-input pilot
+
+The manufacturer-near `package_hardware` profile remains the shared LQFP48/debug-interface fact used by the source-locked C8/CB research benchmark. Socket engineering is composed separately through the independent `socket-design/` sidecar registry; frozen IC Support bindings and OpenOCD qualification inputs remain byte-identical.
+
+`socket-design/profiles/stm32f103c8t6-lqfp48-programming-hardware-v1.json` is the first design-ready overlay, bound through `socket-design/bindings/stm32f103c8t6-v1.json`. It records the source-backed LQFP48 mechanics, all mandatory VDD/VSS/VDDA/VSSA/VBAT contacts, SWDIO/SWCLK/NRST physical pins, deterministic BOOT0 main-Flash startup policy, decoupling/reset requirements and explicit unresolved HIL items. It can be exported with:
+
+```bash
+PYTHONPATH=software/python python -m plasma_core.ic_support \
+  --icpn STM32F103C8T6 --socket-design-input
+```
+
+The output is **design input only**. It never grants Socket compatibility, Site electrical compatibility, runtime hardware readiness, physical programming qualification or Catalog Level 3. A real Socket model/revision, schematic/netlist continuity checks and PPU/Site/DUT HIL remain separate gates.
+
 ## Manufacturer-only native-programmer pilot
 
 The STM32F103C8T6 pilot now has a separate manufacturer-only knowledge baseline under
@@ -208,6 +221,7 @@ Run the deterministic/offline checks from the repository root:
 
 ```bash
 python data/ic-support/validate.py
+python data/ic-support/socket-design/validate.py
 python data/ic-support/evidence-pack/validate_contract.py
 python data/ic-support/evidence-pack/validate_preprocessing.py
 python data/ic-support/evidence-pack/validate_semantic_pack.py
