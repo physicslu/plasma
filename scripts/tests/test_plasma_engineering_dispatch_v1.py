@@ -283,5 +283,130 @@ class DispatchGate1AContracts(unittest.TestCase):
         self.assertNotIn("sudo ", wf)
 
 
+
+KL25_PREFLIGHT_PATH = ROOT / "specs/engineering-dispatch/work-orders/kl25-hardware-identity-preflight-v1.json"
+DEV_TASKS_PATH = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
+
+
+class Kl25HardwareIdentityPreflightContracts(unittest.TestCase):
+    """Path 1 only: validate a future Path 2 plan without any live hardware."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = dispatch.load_json(KL25_PREFLIGHT_PATH)
+        cls.policy = dispatch.load_json(POLICY_PATH)
+
+    def test_kl25_scope_is_contract_only_not_hardware_inventory(self):
+        o = self.order
+        rule = dispatch.validate_work_order(o, self.policy)
+        self.assertEqual(o["work_order_id"], "kl25-hardware-identity-preflight")
+        self.assertEqual(o["authorization_kind"], "gate1-implementation")
+        self.assertEqual(o["capability"], "software-readonly")
+        self.assertEqual(o["entrypoint"], "offline-analysis")
+        self.assertFalse(rule["hardware_authorization"])
+        self.assertFalse(rule["runtime_enabled"])
+        self.assertEqual(rule["worker_class"], "hosted-offline")
+        self.assertEqual(o["scope"]["required_permissions"], ["repo:read"])
+        self.assertEqual(set(o["scope"]["deny_resources"]), set(rule["must_deny"]))
+        self.assertIn("MKL25Z128VLK4", o["objective"])
+        self.assertIn("9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c", o["objective"])
+        required = " ".join(o["acceptance"])
+        for term in ("SDID", "FCFG1", "FCFG2", "NOT_RUN",
+                     "L1 CANDIDATE", "NXP L2=0", "Execution Authorized=false",
+                     "Job Selectable=false", "mass-erase", "unprotect"):
+            with self.subTest(term=term):
+                self.assertIn(term, required)
+        # No executable Path 2 task is registered by this offline contract.
+        active = dispatch.load_json(DEV_TASKS_PATH)
+        self.assertNotIn(o["work_order_id"], active["tasks"])
+        self.assertEqual(self.policy["status"], dispatch.NO_RUNTIME)
+
+    def test_kl25_capability_and_resource_escalations_fail_closed(self):
+        for key, value in (
+            ("capability", "z2-readonly"),
+            ("capability", "z2-privileged"),
+            ("authorization_kind", "hardware-one-shot"),
+            ("entrypoint", "z2-inventory"),
+            ("reviewed_main_sha", "HEAD"),
+            ("requested_by", "not-owner"),
+        ):
+            o = copy.deepcopy(self.order)
+            o[key] = value
+            with self.subTest(field=key, value=value):
+                with self.assertRaises(dispatch.ContractDenied):
+                    dispatch.validate_work_order(o, self.policy)
+        for resource in self.order["scope"]["deny_resources"]:
+            o = copy.deepcopy(self.order)
+            o["scope"]["deny_resources"].remove(resource)
+            with self.subTest(missing=resource):
+                with self.assertRaisesRegex(dispatch.ContractDenied,
+                                            "CAPABILITY_NEGATIVE_SCOPE_MISSING"):
+                    dispatch.validate_work_order(o, self.policy)
+
+    def test_kl25_runtime_and_operation_fields_are_never_admitted(self):
+        for field, value in (
+            ("runtime_enabled", True),
+            ("allow_hardware", True),
+            ("execution_authorized", True),
+            ("job_selectable", True),
+            ("catalog_level", 2),
+            ("commands", ["openocd -c init", "flash erase", "reset"]),
+            ("privileged_device_paths", ["/dev/bus/usb"]),
+        ):
+            o = copy.deepcopy(self.order)
+            o[field] = value
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(dispatch.ContractDenied, "WORK_ORDER_FIELDS_INVALID"):
+                    dispatch.validate_work_order(o, self.policy)
+        o = copy.deepcopy(self.order)
+        o["scope"]["required_permissions"] = ["usb:la2016"]
+        with self.assertRaises(dispatch.ContractDenied):
+            dispatch.validate_work_order(o, self.policy)
+        p = copy.deepcopy(self.policy)
+        p["capabilities"]["software-readonly"]["runtime_enabled"] = True
+        with self.assertRaisesRegex(dispatch.ContractDenied,
+                                    "RUNTIME_DISPATCH_FORBIDDEN_GATE1A"):
+            dispatch.validate_work_order(self.order, p)
+
+    def test_kl25_approval_digest_is_offline_and_mutation_bound(self):
+        o = self.order
+        e = {
+            "action": "created",
+            "issue": {"number": 981},
+            "comment": {"id": 1234, "user": {"login": "physicslu"},
+                        "body": dispatch.approval_command(o)},
+            "sender": {"login": "physicslu"},
+            "repository": {"full_name": "physicslu/plasma"},
+        }
+        ctx = {"event_name": "issue_comment", "actor": "physicslu",
+               "repository": "physicslu/plasma", "ref": "refs/heads/main",
+               "checked_out_sha": o["reviewed_main_sha"],
+               "run_id": 1001, "run_attempt": 1}
+        # Synthetic offline owner-event fixture: not an actual issue comment.
+        receipt = dispatch.authorize(e, ctx, o, self.policy)
+        self.assertEqual(receipt["status"], "AUTH_CONTRACT_PASS_NO_DISPATCH")
+        self.assertIs(receipt["runtime_enabled"], False)
+        self.assertEqual(receipt["work_order_sha256"], dispatch.digest(o))
+        for changed in (
+            {"revision": 2},
+            {"objective": o["objective"] + " bypass source identity"},
+            {"capability": "z2-readonly"},
+        ):
+            mutant = copy.deepcopy(o)
+            mutant.update(changed)
+            with self.subTest(changed=changed):
+                with self.assertRaises(dispatch.ContractDenied):
+                    dispatch.authorize(e, ctx, mutant, self.policy)
+
+    def test_kl25_only_existing_offline_ci_acceptance_no_device_trigger(self):
+        wf = WORKFLOW_PATH.read_text()
+        self.assertIn('"specs/engineering-dispatch/**"', wf)
+        self.assertIn("python3 scripts/tests/test_plasma_engineering_dispatch_v1.py", wf)
+        self.assertIn("runs-on: ubuntu-24.04", wf)
+        self.assertNotIn("self-hosted", wf)
+        self.assertNotIn("issue_comment:", wf)
+        self.assertNotIn("workflow_dispatch:", wf)
+        self.assertNotIn("sudo ", wf)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
