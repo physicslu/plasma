@@ -240,6 +240,11 @@ def parse_dynamic_work_order(event: object) -> dict:
                         "expected_stdout_sha256":
                             order["expected_stdout_sha256"]}}},
                    "work-order-fixture")
+    elif capability == "usb-passive-readonly":
+        require(scope == "cached-usb-sysfs-only" and
+                set(order) == base and
+                order["execution_path"] == "path2-cli",
+                "WORK_ORDER_USB_SCOPE_DENIED")
     elif capability == "path2-stage-contract":
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
@@ -441,6 +446,11 @@ def authorize(event: object, context: dict, registry: object,
             (req["pr_number"] > 0 and
              req["source_sha"] != req["trusted_sha"]),
             "HOST_BUILD_SOURCE_BINDING_DENIED")
+    if task.get("capability") == "usb-passive-readonly":
+        require(req["pr_number"] == 0 and
+                req["source_sha"] == req["trusted_sha"] and
+                context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "USB_TRUSTED_MAIN_ONLY")
     return {
         "status": "AUTHORIZED_DEV_TASK",
         "authorized_stage": (task["stage"] if
@@ -487,6 +497,23 @@ def reviewed_host_build_driver(*, workspace: Path, approval: dict):
 def run_task(task: dict, *, workspace: Path = ROOT,
              executor=subprocess.run, evidence_dir: Path | None = None,
              approval: dict | None = None, sandbox: bool = False) -> dict:
+    if task.get("capability") == "usb-passive-readonly":
+        # Unlike CPU-only bwrap, this read-only capability must see sysfs.
+        # Never execute arbitrary candidate task scripts or argv here.
+        require(type(approval) is dict and
+                approval.get("execution_capability") == "usb-passive-readonly" and
+                approval.get("execution_path") == "path2-cli" and
+                approval.get("pr_number") == 0 and
+                approval.get("pinned_sha") == approval.get("trusted_sha") and
+                approval.get("task_id") == "path2-work-order",
+                "USB_TRUSTED_MAIN_ONLY")
+        # Import from trusted-main dispatcher directory, never candidate code.
+        from plasma_kl25_usb_cached_identity import observe
+        receipt = observe()
+        return {"status": "PASS" if receipt["status"] == "PASSIVE_CACHE_READ"
+                else "NOT_RUN", "execution_path": "path2-cli",
+                "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
+                "cached_usb": receipt}
     if task.get("capability") == "vivado-host-build":
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
@@ -1202,7 +1229,8 @@ def main() -> int:
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
+                                    ("z2-cpu-only", "vivado-host-build", "path2-stage-contract",
+                                     "usb-passive-readonly")
                                  else None)
                 receipt = (
                     (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
