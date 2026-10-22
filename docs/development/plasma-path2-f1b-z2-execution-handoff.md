@@ -1,9 +1,16 @@
 # PLASMA Path 2 — Z2 Site 1 F1-B minimal live HIL handoff
 
-**Scope:** one owner-authorized Development HIL using the existing exact F1-B
-candidate and `base.bin`; AXI isolation remains **UNPROVEN** under the
-owner-approved bound-passive UIO risk. No DUT, LA, power or unrelated
-hardware. No Vivado rebuild. No merge or production deployment.
+**Scope:** historical 2026-10-21 handoff for one owner-authorized Development
+HIL using the exact F1-B candidate and `base.bin`. AXI isolation was
+**UNPROVEN** under the original bound-passive UIO risk acceptance; no DUT,
+LA, power, unrelated hardware or Vivado rebuild was in that scope.
+
+**Current execution contract:** The earlier SWPC Bridge/approved-SHA PIN
+installation plan below has been superseded. Development Path 2/3 use the
+trusted-main `scripts/plasma_development_stage_transport.py` with the
+protected Z2 root entry and on-device source manifest. No Bridge/PIN
+installation or update is an execution prerequisite. Historical commands
+and risk acceptance do not authorize a fresh physical run.
 
 ## Confirmed facts — do not repeat old qualification
 
@@ -43,17 +50,14 @@ checks root identity, protected source, exact ARMv7 native interpreter,
 current process/driver ownership, firmware digests and shared FPGA lock.
 
 Do **not** reuse the old `f1b-path3-z2-hil-once` task/one-shot claim.
-The candidate PR now **registers three fixed Task routes**:
+The current development registry retains fixed Path 2 stage tasks:
 `z2-path2-download` → `download`, `z2-path2-testing` → `test`, and
-`z2-path2-restore` → `restore`. The trusted Dispatcher invokes only the
-fixed installed SWPC bridge at `/usr/local/libexec/plasma/z2-path2-f1b-bridge`
-with stage and authorized exact source SHA. If that bridge does not exist,
-execution fails with `PATH2_TRUSTED_BRIDGE_NOT_INSTALLED`. The bridge itself
-must be provisioned by the SWPC administrator, pin the SSH host and reviewed
-Z2 source, and return an actual sanitized remote receipt. No GitHub PR
-checkout may self-install or become a privileged endpoint. **Registration
-in this Draft PR is not live SWPC/Z2 activation** and this document does
-not create or grant root access.
+`z2-path2-restore` → `restore`. The trusted-main Dispatcher passes an
+authorized stage and exact source SHA through the shared Stage Transport;
+the protected Z2 root executor must verify the source manifest and return
+an authentic sanitized receipt. No GitHub PR checkout may self-install
+or become a privileged endpoint. Task registration alone grants no live
+SWPC/Z2 authorization or root access.
 
 ## Three independent manual stage invocations
 
@@ -85,23 +89,16 @@ blindly retry after uncertainty; preserve the root checkpoint for an
 informed physical recovery decision. A verified `base.bin` allows an
 idempotent `ALREADY_RESTORED` no-op.
 
-## Minimal activation handoff (not yet performed on SWPC or Z2)
+## Current protected execution prerequisites (historical run not replayed)
 
-- SWPC protected code **source**:
-  `scripts/swpc/z2-path2-f1b-bridge`, installed by the trusted SWPC
-  administrator at `/usr/local/libexec/plasma/z2-path2-f1b-bridge`
-  with owner `root`, mode `0755`, and root-controlled parent directory.
-  The exact authorized commit SHA is installed separately as root-owned
-  mode-`0644` `/usr/local/libexec/plasma/z2-path2-f1b.approved-sha`.
-  The SHA is a public commit identifier: root retains exclusive write access,
-  while the unprivileged `plasma-codex` worker must be able to read it.
-  Existing SSH and sudo **credential** files remain private (`0600`); do not
-  relax their permissions. The installation directory stays root-controlled.
-  The bridge is **executed as the existing unprivileged `plasma-codex` worker**.
-  It reads only the existing privately enrolled login route
-  the enrolled worker-private `~/.config/plasma/z2-login-smoke.json`,
-  pinned host key `z2-login-known_hosts`, and sudo password
-  `z2-swd05-oneshot.json`; no new credential is committed or assumed.
+- SWPC trusted-main **Stage Transport**:
+  `scripts/plasma_development_stage_transport.py` is called by the
+  trusted Dispatcher running as the existing unprivileged `plasma-codex`
+  worker. It uses already enrolled private SSH/sudo credentials and pinned
+  host keys; do not print them, relax permissions or provision new ones.
+  The old SWPC Bridge executable and separate approved-SHA PIN are no
+  longer runtime dependencies. Existing root-owned host files are left
+  untouched; this source-document update neither installs nor removes them.
 - Z2 protected code **source**:
   `scripts/z2/plasma-path2-f1b-root-entry`, installed by the trusted
   target administrator at
@@ -116,14 +113,15 @@ idempotent `ALREADY_RESTORED` no-op.
   code present only in a Draft PR checkout cannot activate it.
   A reviewed integration/merge and root installation are physical
   prerequisites, not evidence of any HIL execution.
-- Verify that the Bridge installed version, approved SHA file, Z2
-  root-owned installed tree and existing SSH/sudo enrollment all match.
-  No need to rerun FPGA Build or repeat historical Path 3 HIL.
+- Before any separately approved physical operation, independently verify
+  trusted Dispatcher/Stage Transport identity, the Z2 root-owned source
+  manifest, current device ownership/recovery and existing SSH/sudo enrollment.
+  Do not infer a fresh PASS from historical Path 3 HIL.
 
 ## Two required physical HIL modes (owner request 2026-10-21)
 
-Both modes use the **same** installed SWPC Bridge and Z2 root-owned
-stage executable. They are independent experiment executions using the
+Both historical modes use the trusted-main Stage Transport and protected
+Z2 root stage executable. They are independent experiment executions using the
 previously pinned candidate firmware; no FPGA Build and no DUT/LA/power.
 After Mode A's Restore verifies `base.bin`, Mode B can begin. Run the
 two modes separately and retain independent receipts; a single old
@@ -139,7 +137,7 @@ Path 3 one-shot result **does not** satisfy either mode.
 ```
 
 Each command is an independent Owner issue comment/Action run.
-Check each actual `real_z2` bridge receipt before sending the next.
+Check each authentic `real_z2` root-stage receipt before sending the next.
 Expected: `LOADED_AND_HELD`, `IDENTITY_PASS` (three read32, zero
 write32), then `RESTORED_VERIFIED` and current `base.bin`.
 No automatic transition from Download to Testing.
@@ -151,7 +149,7 @@ request; not the default for ordinary stage tasks).
 /plasma-dispatch run z2-path2-full-hil --pr 1082 --sha <REVIEWED_40_CHAR_SHA> 981
 ```
 
-Its single Workflow run invokes the same pinned trusted Bridge in
+Its single Workflow run invokes the trusted Stage Transport in
 `download → test → restore` order. Require actual stage receipts and
 consistent live Z2 Boot ID. If a stage exits uncertain, stop the
 sequence; no blind reload or automatic next stage. The result
@@ -159,16 +157,14 @@ sequence; no blind reload or automatic next stage. The result
 review, **not** Production Qualification. The one explicit Full HIL
 task has a bounded 10-minute existing SWPC Workflow budget.
 
-**Physical preparation:** the trusted main-based Dispatcher and Workflow
-must contain the reviewed registration; the SWPC administrator must
-install `/usr/local/libexec/plasma/z2-path2-f1b-bridge` as a protected
-fixed command, and the Z2 administrator must install exactly the
-approved root-owned immutable Python source/manifest and fixed root
-entry. Check the enrolled private SSH host key and sudo route without
-printing credentials. A Draft PR branch by itself does **not** activate
-the trusted `main` Dispatcher; no GitHub-hosted fake receipt is real HIL.
-Do not post the owner dispatch commands until the installed Bridge
-reports ready without reconfiguring FPGA.
+**Physical preparation:** the trusted main-based Dispatcher and Stage
+Transport must authorize the exact stage and source. Independently verify
+the protected Z2 root entry and root-owned immutable Python source/manifest,
+current device state, private SSH host key and sudo enrollment without
+printing credentials. A Draft PR alone does **not** activate root access;
+GitHub-hosted fake receipts are not real HIL. Do not dispatch these
+historical example commands without current owner authorization and
+verified protected transport/recovery readiness.
 
 **Outcome matrix**:
 
@@ -203,28 +199,16 @@ If there is no separately authorized installed root route, final result
 remains `REAL_HIL_NOT_RUN` with the concrete missing execution boundary;
 do not declare success or invoke an untrusted PR as root.
 
-### HIL-13: Path 3 deployment request is not an admin entrypoint
+### HIL-13 historical disposition: obsolete Bridge/PIN deployment request
 
-The source tree currently contains no callable enrolled SWPC admin deployment
-entrypoint for the Bridge/PIN pair. The enrolled Path 2 Bridge accepts only
-`download`, `test`, and `restore`; its SSH/sudo enrollment is a Z2 stage route,
-not an SWPC installation API. Administrator provisioning described above is
-not an implemented Dispatcher deployment capability.
-
-A boolean `swpc_bridge_deployment=true` therefore fails closed with
-`PATH3_SHARED_BRIDGE_DEPLOYMENT_NOT_INSTALLED:
-SWPC_ADMIN_DEPLOYMENT_ENTRYPOINT_NOT_REGISTERED` before any stage. Malformed
-(non-boolean) values are rejected separately. A stale exact SHA PIN still
-fails `SWPC_APPROVED_SOURCE_SHA_MISMATCH`; neither a candidate checkout nor
-an owner-supplied requested SHA can rewrite it. Do not replace this with a
-candidate-run installer, a new sudo grant, or a new Runner/service.
-
-To complete integration, identify the existing administrator-controlled
-callable deployment command and its authentication/receipt contract. That
-route must independently verify the authorized immutable source and artifact
-digests, retain root ownership and protected parents, and atomically install
-consistent Bridge/PIN updates with failure recovery. No such route is
-established by these source changes; deployment remains NOT_RUN.
+The former Path 3 `swpc_bridge_deployment` option and Bridge/PIN deployment
+prerequisite are obsolete. The active Development Work Order rejects that
+option; it does not require a Bridge installer, PIN update, new Runner or
+credential. Trusted-main Stage Transport and the protected Z2 root entry
+remain the hardware execution boundary. If current enrollment, manifest,
+root ownership or recovery checks fail, stop and report `NOT_RUN` with the
+actual blocker. This supersession neither proves a real run nor authorizes
+new hardware effects.
 
 Testing requires a same-boot F1-B loaded state and current image/ownership
 checks. A restored `base.bin` is recovery evidence only. Testing rejects that
