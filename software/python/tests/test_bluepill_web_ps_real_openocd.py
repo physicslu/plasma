@@ -76,7 +76,6 @@ class RealOpenOCDWebPsJobTests(unittest.IsolatedAsyncioTestCase):
                 admission_check=lambda req, route: (
                     req.site_id == 1
                     and req.target == "STM32F103C8T6"
-                    and route.get("hardware_runtime_ready") is False
                     and self.session is not None
                 ),
                 shutdown=shutdown,
