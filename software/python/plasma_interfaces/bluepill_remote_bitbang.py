@@ -8,7 +8,10 @@ admission. No register address is accepted from a socket client.
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
 import socket
+import stat
 from typing import Protocol
 
 
@@ -151,13 +154,13 @@ class RemoteBitbangSWD:
 
 
 def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
-                     *, command_limit: int = 2_000_000) -> int:
+                     *, command_limit: int = 20_000_000) -> int:
     """Serve one already accepted local connection; never create a listener.
 
     This does not authorize actual hardware. The owner is responsible for
     trusted, local-only endpoint ownership, timeout and Board/Power proof.
     """
-    if type(command_limit) is not int or not 1 <= command_limit <= 2_000_000:
+    if type(command_limit) is not int or not 1 <= command_limit <= 20_000_000:
         raise ValueError("Bounded command limit required")
     count = 0
     try:
@@ -175,3 +178,50 @@ def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
         return count
     finally:
         bridge.close()
+
+
+def serve_local_unix_once(path: str | Path, bridge: RemoteBitbangSWD,
+                          *, idle_timeout_s: float = 30.0) -> int:
+    """Bind exactly one user-owned local SWD session, only when called.
+
+    Does not construct a real MMIO port, perform FPGA reconfiguration, or
+    assert target power/reset. The invoking trusted supervisor must supply
+    an independently admitted Site and restore policy.
+    """
+    location = Path(path)
+    if not location.is_absolute() or location.is_symlink() or location.exists():
+        raise ValueError("Fresh absolute UNIX socket path required")
+    parent = location.parent
+    info = parent.stat()
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or
+            info.st_mode & 0o077):
+        raise ValueError("Socket directory must be private and owner-controlled")
+    if type(idle_timeout_s) not in (float, int) or not 0 < idle_timeout_s <= 120:
+        raise ValueError("Bounded socket idle timeout required")
+    if len(os.fsencode(location)) >= 100:
+        raise ValueError("UNIX socket path too long")
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    created_inode = None
+    try:
+        previous_umask = os.umask(0o177)
+        try:
+            server.bind(str(location))
+            os.chmod(location, 0o600)
+            created_inode = location.lstat().st_ino
+        finally:
+            os.umask(previous_umask)
+        server.listen(1)
+        server.settimeout(float(idle_timeout_s))
+        conn, _ = server.accept()
+        with conn:
+            conn.settimeout(float(idle_timeout_s))
+            return serve_connection(conn, bridge)
+    finally:
+        server.close()
+        if created_inode is not None:
+            try:
+                info = location.lstat()
+                if stat.S_ISSOCK(info.st_mode) and info.st_ino == created_inode:
+                    location.unlink()
+            except FileNotFoundError:
+                pass
