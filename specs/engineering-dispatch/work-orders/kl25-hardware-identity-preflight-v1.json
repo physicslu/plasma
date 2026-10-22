@@ -1,0 +1,49 @@
+{
+  "schema_version": "plasma.engineering.work_order.v1",
+  "work_order_id": "kl25-hardware-identity-preflight",
+  "revision": 1,
+  "repository": "physicslu/plasma",
+  "issue_number": 981,
+  "requested_by": "physicslu",
+  "reviewed_main_sha": "5f16024799c37463a21fcb34e8ece1d917cbfb3c",
+  "authorization_kind": "gate1-implementation",
+  "objective": "Path 1 offline-only KL25 hardware identity preflight contract for exact NXP MKL25Z128VLK4, pinned OpenOCD 0.12.0 source 9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c. Define the future Path 2 SWPC USB/adapter presence and passive identity observation requirements; DO NOT run SWPC/USB/SWD/JTAG/Reset/DUT or flash. This contract cannot enumerate hardware, assert physical identity, or authorize L2.",
+  "capability": "software-readonly",
+  "entrypoint": "offline-analysis",
+  "scope": {
+    "allow_repo_paths": [
+      "specs/engineering-dispatch/work-orders/kl25-hardware-identity-preflight-v1.json",
+      "specs/engineering-dispatch/capabilities-v1.json",
+      "release/openocd.json",
+      "data/device-catalog/research/nxp-kl25-current-source-review-v2.json",
+      "data/device-catalog/research/NXP_KL25_RUNTIME_READINESS_HOST_V3.md"
+    ],
+    "deny_resources": [
+      "usb",
+      "z2",
+      "fpga",
+      "mmio",
+      "dut",
+      "hub-power",
+      "network-instrument",
+      "repository-write",
+      "host-root"
+    ],
+    "required_permissions": [
+      "repo:read"
+    ]
+  },
+  "timeout_seconds": 120,
+  "acceptance": [
+    "Validate exact ICPN MKL25Z128VLK4 and pinned source SHA before any future identity experiment.",
+    "Future real-hardware inventory requires a separate approved Path 2 Work Order, current observed adapter details, target power and wiring checks, and device provenance.",
+    "Future observer may read kernel-cached USB ID attributes only after approved SWPC scope; no active SWD session, debugger attachment, reset or USB control transfer in this Gate.",
+    "Future SDID, FCFG1 and FCFG2 values must be measured on the real exact target; simulated IDs or static manufacturer geometry cannot establish a real DUT PASS.",
+    "Absent or ambiguous device, mismatched adapter identity, missing owner approval, or unavailable safe hardware route must be NOT_RUN or BLOCKED, never PASS.",
+    "No erase, program, write, mass-erase, unprotect, reset, power cycle, firmware deployment, Z2 operation or target-executing OpenOCD commands.",
+    "Keep NXP MKL25Z128VLK4 at L1 CANDIDATE, NXP L2=0, Job Selectable=false and Execution Authorized=false."
+  ],
+  "evidence": [
+    "offline-test-report"
+  ]
+}
