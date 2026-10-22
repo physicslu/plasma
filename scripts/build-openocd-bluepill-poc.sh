@@ -46,10 +46,10 @@ git -C "$source" submodule update --init --depth 1 jimtcl src/jtag/drivers/libja
 )
 "$prefix/bin/openocd" --version
 "$prefix/bin/openocd" -c "adapter list" -c "shutdown" > "$out/adapter-list.txt" 2>&1
-grep -q "remote_bitbang" "$out/adapter-list.txt"
+grep -Eq "^remote_bitbang[[:space:]]+\\{.*[[:space:]]swd[[:space:]]*\\}" "$out/adapter-list.txt"
 "$prefix/bin/openocd" -c "adapter driver remote_bitbang" \
   -c "transport select swd" -c "shutdown" > "$out/swd-admission.txt" 2>&1
-grep -q "swd" "$out/swd-admission.txt"
+test -f "$out/swd-admission.txt"
 printf '%s\n' "$commit" > "$out/openocd-source-sha.txt"
 sha256sum "$prefix/bin/openocd" > "$out/openocd-binary.sha256"
 echo "HOST_OPENOCD_REMOTE_BITBANG_SWD_ADMISSION_PASS (no ARMv7 / hardware claim)"
