@@ -1,0 +1,10 @@
+app host tests PASS
+test_firmware_identity (test_cdc_probe.MonitorTests) ... ok
+test_ignores_commands_and_other_versions (test_cdc_probe.MonitorTests) ... ok
+test_rejects_sequence_interval_and_uptime_failures (test_cdc_probe.MonitorTests) ... ok
+test_sequence_interval_uptime_and_interruption (test_cdc_probe.MonitorTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK
