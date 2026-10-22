@@ -356,10 +356,10 @@ jobs:
                 --openocd "$binary" \
                 --scripts-root "$scripts_root" \
                 --output "/acceptance/stm32f103-openocd-real-binary-$ARCH.json"
-              python3 /repo/data/ic-support/validate_nxp_kl25_runtime_readiness.py \\
-                --openocd "$binary" \\
-                --scripts-root "$scripts_root" \\
-                --install-receipt /opt/plasma/install/openocd-runtime.json \\
+              python3 /repo/data/ic-support/validate_nxp_kl25_runtime_readiness.py \
+                --openocd "$binary" \
+                --scripts-root "$scripts_root" \
+                --install-receipt /opt/plasma/install/openocd-runtime.json \
                 --output "/acceptance/nxp-kl25-openocd-readiness-$ARCH.json"
               python3 -c '"'"'import json; p=json.load(open("/opt/plasma/install/openocd-runtime.json")); assert p["hardware_runtime_ready"] is False'"'"'
             '
