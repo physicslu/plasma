@@ -1009,6 +1009,22 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         return hashlib.sha256(p.read_bytes()).hexdigest()
     usage_path = evidence / "codex-token-usage.json"
     usage_snapshot = usage.snapshot()
+    # Bounded numeric-only context diagnostics. The size of a repo file is
+    # NOT proof of actual Codex instruction loading or a model request count.
+    root_agents = root / "AGENTS.md"
+    agents_size = None
+    if root_agents.is_file() and not root_agents.is_symlink():
+        candidate_size = root_agents.stat().st_size
+        if 0 <= candidate_size <= 1024 * 1024:
+            agents_size = candidate_size
+    context_audit = {
+        "schema_version": 1,
+        "repo_root_agents_bytes": agents_size,
+        "dispatched_prompt_bytes": len(prompt.encode("utf-8")),
+        "model_request_count": None,
+        "model_request_count_status": "NOT_AVAILABLE",
+        "actual_instruction_load_status": "NOT_VERIFIED",
+    }
     usage_path.write_text(json.dumps(usage_snapshot, indent=2, sort_keys=True) + "\n")
     receipt = {
         "status": "EVIDENCE_READY_REVIEW_REQUIRED",
@@ -1018,6 +1034,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
         "codex_usage": usage_snapshot,
+        "codex_context_audit": context_audit,
         "codex_model_selection": codex_requested_model_settings(command),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
