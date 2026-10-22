@@ -104,7 +104,7 @@ SAM_EXPLICIT_DEVSEL = {
 }
 
 
-def admitted_sam_phase2_explicit_devsel_routes(
+def admitted_sam_explicit_devsel_routes(
     catalog: DeviceCatalog,
 ) -> AdmittedRouteCandidateRegistry:
     """Expose separately admitted exact manufacturer identities as L1 only."""
