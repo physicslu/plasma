@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Path 2 Runtime Integration Gate 1: GitHub-hosted Host-only contracts."""
+"""Path 2 GitHub-hosted offline tests and fail-closed hardware boundaries."""
 from __future__ import annotations
 
 import copy
@@ -135,6 +135,18 @@ class RouteContracts(unittest.TestCase):
                         auto_download_after_build_success=True),
                     evidence_dir=Path(td), build_driver=build)
             build.assert_not_called()
+
+    def test_bad_source_pin_blocks_stage_before_transport(self):
+        task = self.registry["tasks"]["z2-path2-download"]
+        remote = Mock()
+        for bad_pin in ("not-a-sha", "f" * 40):
+            bad = approval("z2-path2-download", pinned_sha=bad_pin)
+            with self.subTest(pin=bad_pin), patch.object(
+                    runtime.transport, "execute", remote):
+                with self.assertRaisesRegex(
+                        runtime.RuntimeDenied, "PATH2_STAGE_APPROVAL_DENIED"):
+                    runtime.registered_hardware_stage(task, bad)
+        remote.assert_not_called()
 
     def test_host_build_receipt_is_qualified_once(self):
         build = Mock(return_value={

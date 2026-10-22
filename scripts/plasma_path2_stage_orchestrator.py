@@ -1,8 +1,9 @@
 """Path 2 three-stage coordinator: injectable existing adapters, never hardware authority.
 
-Host-only Gate 1: no SSH, sudo, Vivado, FPGA Manager, network or subprocess.
-The trusted Development Dispatcher must authorize each execution *before*
-supplying adapter callables. This module cannot activate a hardware route.
+This pure coordinator performs no SSH, sudo, Vivado, FPGA Manager, network
+or subprocess itself. The trusted Development Dispatcher must authorize each
+execution before supplying adapters; only the reviewed adapters may perform
+host builds or guarded stages. This module grants no hardware authority.
 """
 from __future__ import annotations
 

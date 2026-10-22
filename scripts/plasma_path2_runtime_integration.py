@@ -30,8 +30,10 @@ def require(ok: bool, code: str) -> None:
 def host_build(task: dict, *, workspace: Path, approval: dict,
                evidence_dir: Path, executor=None,
                build_driver=None, qualify=None) -> dict:
-    """One reviewed Host-only Vivado invocation, then real file qualification.
+    """One reviewed host-side Vivado build, then real file qualification.
 
+    Host-side Build is not a global Path 2 Host-only restriction, and does
+    not itself confer FPGA programming or any target-device authority.
     The optional injected hooks exist solely for offline test coverage;
     the trusted Dispatcher calls with no hooks and no device backend.
     """
@@ -154,6 +156,9 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
                 "test": {"IDENTITY_PASS"},
                 "restore": {"RESTORED_VERIFIED", "ALREADY_RESTORED"},
             }[stage]),
+            # Historical failure code retained for callers; the required
+            # evidence now comes from the protected Z2 root Stage Transport,
+            # not an installed SWPC Bridge.
             "PATH2_BRIDGE_RECEIPT_NOT_REAL_Z2")
     return {
         "status": "REAL_Z2_STAGE_EVIDENCE_REVIEW_REQUIRED",
@@ -215,6 +220,9 @@ def full_hil_sequence(task: dict, approval: dict) -> dict:
 
 
 def disabled_hardware_stage(task: dict, approval: dict) -> dict:
-    """Compatibility negative test: never bypass authorization via this API."""
+    """Disabled compatibility API; cannot replace trusted Stage Transport.
+
+    Retain the historical Bridge-named failure code for negative-test callers.
+    """
     stage_contract(task, approval)
     raise RuntimeDenied("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")

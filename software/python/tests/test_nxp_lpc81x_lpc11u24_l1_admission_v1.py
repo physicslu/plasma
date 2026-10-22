@@ -148,8 +148,8 @@ class NxpLpc81xLpc11U24L1Tests(unittest.TestCase):
             self.assertEqual(observed["promotion_blocker"], MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED)
             self.assertTrue(observed["selector_visible"])
         nxp = next(r for r in framework.report["manufacturers"] if r["manufacturer"] == "NXP")
-        self.assertEqual(nxp["catalog_level_counts"], {"0": 212, "1": 29, "2": 0, "3": 0})
-        self.assertEqual(nxp["selector_visible_exact_icpns"], 29)
+        self.assertEqual(nxp["catalog_level_counts"], {"0": 101, "1": 140, "2": 0, "3": 0})
+        self.assertEqual(nxp["selector_visible_exact_icpns"], 140)
         self.assertEqual(nxp["job_selectable_exact_icpns"], 0)
 
     def test_slash_material_round_trip_and_negative_aliases(self) -> None:

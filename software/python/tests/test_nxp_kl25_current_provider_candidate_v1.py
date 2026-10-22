@@ -61,10 +61,11 @@ class NxpKl25CurrentProviderCandidateTests(unittest.TestCase):
         self.assertEqual(obs["promotion_evidence_class"], EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER)
         self.assertEqual(obs["promotion_blocker"], PROVIDER_QUALIFICATION_INCOMPLETE)
         nxp = next(x for x in framework.report["manufacturers"] if x["manufacturer"] == "NXP")
-        self.assertEqual(nxp["catalog_level_counts"], {"0": 212, "1": 29, "2": 0, "3": 0})
+        self.assertEqual(nxp["catalog_level_counts"], {"0": 101, "1": 140, "2": 0, "3": 0})
         self.assertEqual(nxp["job_selectable_exact_icpns"], 0)
         self.assertEqual(nxp["promotion_blocker_counts"]["L1_TO_L2"],
-                         {"MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED": 28,
+                         {"BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED": 111,
+                          "MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED": 28,
                           "PROVIDER_QUALIFICATION_INCOMPLETE": 1})
         other = registry.describe("NXP", "MKL25Z128VLH4")
         self.assertFalse(other["reviewed"])

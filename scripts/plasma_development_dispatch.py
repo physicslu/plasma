@@ -17,6 +17,7 @@ import re
 import shutil
 import subprocess
 import sys
+import uuid
 
 REPO = "physicslu/plasma"
 OWNER = "physicslu"
@@ -653,9 +654,174 @@ class LiveMonitorUnavailable(OSError):
     """Pre-execution monitor setup error; no Codex process has started."""
 
 
+def codex_requested_model_settings(command: list[str]) -> dict:
+    """Report only explicit CLI requests; do not guess Codex's effective model.
+
+    The documented codex exec --json thread/turn events do not include
+    effective Model/Reasoning Effort. In particular, extra JSONL keys,
+    host config files and current SWPC defaults are NOT runtime evidence.
+    'runtime_observed' is reserved for a future verified upstream contract.
+    Do not store argv, environment or other -c values in the receipt.
+    """
+    candidates = {"model": [], "reasoning_effort": []}
+    index = 0
+    while index < len(command):
+        arg = command[index]
+        if arg == "--":
+            break
+        if arg in ("--model", "-m", "-c", "--config"):
+            item = command[index + 1] if index + 1 < len(command) else ""
+            index += 2
+            if arg in ("--model", "-m"):
+                candidates["model"].append(item)
+                continue
+        elif type(arg) is str and arg.startswith("--model="):
+            candidates["model"].append(arg.partition("=")[2])
+            index += 1
+            continue
+        elif type(arg) is str and arg.startswith("--config="):
+            item = arg.partition("=")[2]
+            index += 1
+        else:
+            index += 1
+            continue
+        if type(item) is not str or "=" not in item:
+            continue
+        name, value = item.split("=", 1)
+        name = name.strip()
+        if name not in ("model", "model_reasoning_effort"):
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        candidates["model" if name == "model" else "reasoning_effort"].append(value)
+
+    def evidence(key: str) -> dict:
+        vals = candidates[key]
+        valid = (bool(vals) and all(type(v) is str and
+                 re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", v) for v in vals)
+                 and len(set(vals)) == 1)
+        if key == "reasoning_effort":
+            valid = valid and vals[0] in (
+                "minimal", "low", "medium", "high", "xhigh", "none")
+        return {"value": vals[0] if valid else None,
+                "source": "cli_requested" if valid else "NOT_AVAILABLE"}
+
+    return {"schema_version": 1,
+            "model": evidence("model"),
+            "reasoning_effort": evidence("reasoning_effort")}
+
+
+class CodexUsageCollector:
+    """Read Codex JSONL, retaining only audited usage and event names.
+
+    Other JSON events may contain commands, source code, prompts or secrets.
+    Neither raw JSONL nor unstructured stderr is persisted or monitored.
+    """
+
+    MAX_LINE = 262144
+    EVENTS = frozenset({
+        "thread.started", "turn.started", "turn.completed", "turn.failed",
+        "item.started", "item.updated", "item.completed", "error",
+    })
+    MAX_TOKENS = 2**63 - 1
+
+    def __init__(self):
+        self.pending = bytearray()
+        self.dropping = False
+        self.session_id = None
+        self.totals = {"input_tokens": 0, "cached_input_tokens": 0,
+                       "output_tokens": 0}
+        self.turns = 0
+        self.invalid = False
+
+    def _line(self, raw: bytes) -> bytes:
+        try:
+            event = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return b"[codex unstructured output omitted]\n"
+        if type(event) is not dict:
+            return b"[codex unrecognized event]\n"
+        kind = event.get("type")
+        if kind == "thread.started":
+            thread_id = event.get("thread_id")
+            try:
+                parsed = str(uuid.UUID(thread_id)) if type(thread_id) is str else None
+            except ValueError:
+                parsed = None
+            if parsed is None or (self.session_id and self.session_id != parsed):
+                self.invalid = True
+            else:
+                self.session_id = parsed
+        elif kind == "turn.completed":
+            usage = event.get("usage")
+            keys = tuple(self.totals)
+            if (type(usage) is not dict or any(
+                    type(usage.get(key)) is not int or
+                    not 0 <= usage[key] <= self.MAX_TOKENS for key in keys)
+                    or (type(usage) is dict and
+                        type(usage.get("cached_input_tokens")) is int and
+                        type(usage.get("input_tokens")) is int and
+                        usage["cached_input_tokens"] > usage["input_tokens"])):
+                self.invalid = True
+            else:
+                for key in keys:
+                    self.totals[key] += usage[key]
+                    if self.totals[key] > self.MAX_TOKENS:
+                        self.invalid = True
+                self.turns += 1
+        label = kind if type(kind) is str and kind in self.EVENTS else "unrecognized event"
+        return f"[codex {label}]\n".encode("ascii")
+
+    def feed(self, data: bytes) -> bytes:
+        safe = bytearray()
+        parts = data.split(b"\n")
+        for index, part in enumerate(parts):
+            if not self.dropping:
+                if len(self.pending) + len(part) > self.MAX_LINE:
+                    self.pending.clear()
+                    self.dropping = True
+                else:
+                    self.pending.extend(part)
+            if index < len(parts) - 1:
+                if self.dropping:
+                    safe.extend(b"[codex oversized event omitted]\n")
+                else:
+                    safe.extend(self._line(bytes(self.pending)))
+                self.pending.clear()
+                self.dropping = False
+        return bytes(safe)
+
+    def finish(self) -> bytes:
+        if self.dropping:
+            self.dropping = False
+            self.pending.clear()
+            return b"[codex oversized event omitted]\n"
+        if not self.pending:
+            return b""
+        result = self._line(bytes(self.pending))
+        self.pending.clear()
+        return result
+
+    def snapshot(self) -> dict:
+        complete = self.turns > 0 and not self.invalid
+        return {
+            "schema_version": 1,
+            "source": "codex_exec_jsonl",
+            "status": "invalid" if self.invalid else
+                      "reported" if complete else "unavailable",
+            "session_id": self.session_id,
+            "input_tokens": self.totals["input_tokens"] if complete else None,
+            "cached_input_tokens": (self.totals["cached_input_tokens"]
+                                    if complete else None),
+            "output_tokens": self.totals["output_tokens"] if complete else None,
+        }
+
+
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
-                             evidence: Path, live_log: str) -> int:
-    """Stream genuine Codex bytes into immutable evidence and the monitor.
+                             evidence: Path, live_log: str,
+                             usage: CodexUsageCollector | None = None) -> int:
+    """Stream sanitized Codex event names into evidence and the monitor.
 
     Only a trusted main worker supplies the fixed monitor path. Loss of the
     secondary monitor sink must never discard local engineering evidence.
@@ -669,11 +835,12 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
         if (info.st_uid != os.geteuid() or
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
+        usage = usage if usage is not None else CodexUsageCollector()
         with evidence.open("wb") as trace:
-            trace.write(b"=== Codex live stdout + stderr (combined) ===\n")
+            trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT) as worker:
+                                  stderr=subprocess.DEVNULL) as worker:
                 assert worker.stdin is not None and worker.stdout is not None
                 try:
                     worker.stdin.write(prompt)
@@ -685,16 +852,27 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     chunk = worker.stdout.read1(16384)
                     if not chunk:
                         break
-                    trace.write(chunk)
+                    safe = usage.feed(chunk)
+                    trace.write(safe)
                     trace.flush()
-                    if live_fd >= 0:
+                    if live_fd >= 0 and safe:
                         try:
-                            pending = memoryview(chunk)
+                            pending = memoryview(safe)
                             while pending:
                                 pending = pending[os.write(live_fd, pending):]
                         except OSError:
                             os.close(live_fd)
                             live_fd = -1
+                tail = usage.finish()
+                trace.write(tail)
+                if live_fd >= 0 and tail:
+                    try:
+                        pending = memoryview(tail)
+                        while pending:
+                            pending = pending[os.write(live_fd, pending):]
+                    except OSError:
+                        os.close(live_fd)
+                        live_fd = -1
                 return worker.wait()
     finally:
         if live_fd >= 0:
@@ -708,7 +886,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     """Run the owner-authorized Development Mode engineer with real evidence.
 
     Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
-    and invoke host-only Vivado. The fixed PR SHA remains the INPUT identity;
+    and invoke approved Vivado builds on the SWPC host. This function does not
+    grant physical device access. The fixed PR SHA remains the INPUT identity;
     the candidate Git diff and evidence are captured before review/commit.
     """
     root = workspace.resolve(strict=True)
@@ -738,12 +917,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "Stop on missing authorization, physical ownership conflict, SIGBUS, "
         "unreaped child or uncertain FPGA restoration. "
         "Do not stop at an offline "
-        "mock when a real Vivado Host-only build is needed.\n"
+        "mock when an actual Vivado build is needed.\n"
         "Goal:\n" + task["objective"] + "\n"
         "You may edit files inside this candidate workspace and run "
         "commands required for development, including Vivado 2026.1 "
         "synthesis/implementation/timing/DRC and BIT/HWH generation. "
-        "Host-only Vivado does not equal FPGA programming.\n"
+        "A successful Vivado build does not authorize FPGA loading or other "
+        "physical hardware operations.\n"
         "Record actual commands, exit codes, observed errors, proven versus "
         "hypothesized root causes, minimal fixes, retries, final build "
         "stage results and hashes in .plasma-path3-evidence/engineering-report.md. "
@@ -792,8 +972,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     command = [
         "codex", "--ask-for-approval", "never",
         "-c", "sandbox_workspace_write.network_access=false",
-        "exec", "--sandbox", "workspace-write", "-",
+        "exec", "--json", "--sandbox", "workspace-write", "-",
     ]
+    usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
     # One autonomous Codex invocation owns scoped FIX -> RETEST iterations.
@@ -808,7 +989,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     if live_allowed:
         try:
             returncode = _run_codex_with_live_log(
-                command, prompt.encode("utf-8"), root, codex_log, live_log)
+                command, prompt.encode("utf-8"), root, codex_log, live_log,
+                usage=usage)
             proc = subprocess.CompletedProcess(command, returncode, b"", b"")
         except LiveMonitorUnavailable:
             # Only pre-execution setup can fall back. Never re-run a Codex
@@ -820,18 +1002,25 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 timeout=None, check=False,
             )
-            codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
-                                  b"\n=== Codex stderr ===\n" + proc.stderr)
+            codex_log.write_bytes(
+                b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
+                usage.feed(proc.stdout) + usage.finish() +
+                (b"[codex stderr omitted]\n" if proc.stderr else b""))
     else:
         proc = executor(
             command, input=prompt.encode("utf-8"), cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=None, check=False,
         )
-        codex_log.write_bytes(b"=== Codex stdout ===\n" + proc.stdout +
-                              b"\n=== Codex stderr ===\n" + proc.stderr)
+        codex_log.write_bytes(
+            b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
+            usage.feed(proc.stdout) + usage.finish() +
+            (b"[codex stderr omitted]\n" if proc.stderr else b""))
     def digest(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
+    usage_path = evidence / "codex-token-usage.json"
+    usage_snapshot = usage.snapshot()
+    usage_path.write_text(json.dumps(usage_snapshot, indent=2, sort_keys=True) + "\n")
     receipt = {
         "status": "EVIDENCE_READY_REVIEW_REQUIRED",
         "execution_path": "path3-codex",
@@ -839,6 +1028,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_exit_code": proc.returncode,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
+        "codex_usage": usage_snapshot,
+        "codex_model_selection": codex_requested_model_settings(command),
+        "codex_usage_path": str(usage_path.relative_to(root)),
+        "codex_usage_sha256": digest(usage_path),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
     }
     if report.is_file() and not report.is_symlink():
