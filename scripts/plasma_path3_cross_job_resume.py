@@ -267,7 +267,7 @@ def default_execute(command: list[str], prompt: str, state: Path) -> tuple[str, 
     return parse_codex_events(r.stdout)
 
 
-def clean_fixture(project: Path, expected: str) -> None:
+def clean_fixture(project: Path, expected: str, *, proof_allowed: bool = False) -> None:
     source = project / "mock_page_chunks.py"
     test = project / "test_mock_page_chunks.py"
     require(source.is_file() and not source.is_symlink()
@@ -276,6 +276,8 @@ def clean_fixture(project: Path, expected: str) -> None:
             and test.read_text(encoding="utf-8") == TEST_SOURCE,
             "RESUME_WORKSPACE_HASH_MISMATCH")
     permitted = {"mock_page_chunks.py", "test_mock_page_chunks.py", "__pycache__"}
+    if proof_allowed:
+        permitted.add("resume-proof.txt")
     require({p.name for p in project.iterdir()} <= permitted,
             "RESUME_WORKSPACE_EXTRA_FILES")
 
@@ -354,7 +356,7 @@ def run_stage(phase: str, *, identity: dict, workspace: Path, state_base: Path,
     write_private_json(manifest, record, replace=True)  # prevents automatic retry
     resumed_thread, usage = execute(cmd, RESUME_PROMPT, state)
     require(resumed_thread == thread, "RESUME_THREAD_MISMATCH")
-    clean_fixture(project, FIXED_SOURCE)
+    clean_fixture(project, FIXED_SOURCE, proof_allowed=True)
     require(test_exit(project) == 0, "RESUME_FIX_NOT_PASS")
     proof = project / "resume-proof.txt"
     require(proof.is_file() and not proof.is_symlink()
