@@ -730,6 +730,54 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
             self.assertNotIn("gpt-6-sol", json.dumps(receipt))
 
+    def test_repo_first_codex_guidance_budget_and_safety_preservation(self):
+        root = (ROOT / "AGENTS.md").read_bytes()
+        detail = (ROOT / "docs/development/"
+                  "plasma-autonomous-development-contract-full.md").read_text()
+        # Avoid silent truncation at Codex's default 32 KiB project budget.
+        self.assertLess(len(root), 32768)
+        brief = root.decode("utf-8")
+        for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
+                         "trusted root executor", "Merge Approval",
+                         "electrical", "B1", "rollback",
+                         "Credential", "AGENTS.md"):
+            with self.subTest(required=required):
+                self.assertIn(required.casefold(), brief.casefold())
+        for required in ("## 1A. Prototype-first",
+                         "## 1B. Canonical Codex task/SSH",
+                         "## 11. Autonomous task execution contract",
+                         "## 20. Workspace and information boundary"):
+            self.assertIn(required, detail)
+        self.assertGreater(len(detail.encode("utf-8")), len(root))
+
+    def test_repo_first_path3_prompt_is_short_and_preserves_scope(self):
+        seen = []
+        class Result:
+            returncode = 0
+            stdout = b""
+            stderr = b""
+        def fake(command, **kwargs):
+            seen.append((list(command), kwargs["input"]))
+            return Result()
+        with tempfile.TemporaryDirectory() as td:
+            dev.run_codex_task(self.task, workspace=Path(td), executor=fake)
+        self.assertEqual(len(seen), 1)
+        argv, raw_prompt = seen[0]
+        prompt = raw_prompt.decode("utf-8")
+        self.assertLess(len(raw_prompt), 2200 + len(self.task["objective"].encode("utf-8")))
+        self.assertIn("AGENTS.md", prompt)
+        self.assertIn("pinned source SHA", prompt)
+        self.assertIn(self.task["objective"], prompt)
+        self.assertIn("NOT_RUN", prompt)
+        self.assertIn("unsafe hardware writes", prompt)
+        self.assertIn("without another user approval", prompt)
+        self.assertNotIn("Plasma Autonomous Development Contract", prompt)
+        self.assertEqual(argv, [
+            "codex", "--ask-for-approval", "never",
+            "-c", "sandbox_workspace_write.network_access=false",
+            "exec", "--json", "--sandbox", "workspace-write", "-",
+        ])
+
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
         thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
