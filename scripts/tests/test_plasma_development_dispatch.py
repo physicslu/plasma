@@ -645,11 +645,148 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertNotIn("PASS",receipt["status"])
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
+            self.assertIn("--json",calls[0][0])
             self.assertIn("workspace-write",calls[0][0])
             self.assertNotIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
             self.assertIn("Record actual commands",calls[0][1]["input"].decode())
             self.assertNotIn("shell",calls[0][1])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
+            self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
+            self.assertIsNone(receipt["codex_usage"]["input_tokens"])
+            self.assertEqual(receipt["codex_model_selection"]["model"]["source"], "NOT_AVAILABLE")
+            self.assertEqual(receipt["codex_model_selection"]["reasoning_effort"]["source"], "NOT_AVAILABLE")
+
+    def test_codex_requested_model_effort_source_and_conflicts(self):
+        run = ["codex", "--model", "gpt-6-sol", "-c",
+               'model_reasoning_effort="medium"', "exec", "--json", "-"]
+        result = dev.codex_requested_model_settings(run)
+        self.assertEqual(result, {
+            "schema_version": 1,
+            "model": {"value": "gpt-6-sol", "source": "cli_requested"},
+            "reasoning_effort": {"value": "medium", "source": "cli_requested"},
+        })
+        equivalent = ["codex", "--model=gpt-6-sol",
+                      "--config=model_reasoning_effort=medium", "exec"]
+        self.assertEqual(dev.codex_requested_model_settings(equivalent), result)
+        for argv in (
+            ["codex", "--model", "gpt-6-sol", "-c", "model=gpt-5", "exec"],
+            ["codex", "-c", "model_reasoning_effort=medium",
+             "-c", "model_reasoning_effort=high", "exec"],
+        ):
+            with self.subTest(argv=argv):
+                result = dev.codex_requested_model_settings(argv)
+                self.assertTrue(any(v["source"] == "NOT_AVAILABLE"
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertNotIn("runtime_observed", json.dumps(result))
+
+    def test_codex_model_settings_fail_closed_on_untrusted_values(self):
+        cases = [
+            ["codex", "exec", "--json", "-"],
+            ["codex", "--model", "gpt-6-sol\nINJECT", "exec"],
+            ["codex", "--model", "-c", "exec"],
+            ["codex", "-c", "model_reasoning_effort=ultra", "exec"],
+            ["codex", "-c", "model_reasoning_effort=high\nSECRET", "exec"],
+            ["codex", "-c", "api_key=DO_NOT_RECORD", "exec"],
+            ["codex", "--", "--model", "gpt-6-sol", "exec"],
+        ]
+        for argv in cases:
+            with self.subTest(argv=argv):
+                result = dev.codex_requested_model_settings(argv)
+                self.assertTrue(all(v["source"] == "NOT_AVAILABLE"
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertTrue(all(v["value"] is None
+                                    for k, v in result.items() if k != "schema_version"))
+                self.assertNotIn("SECRET", json.dumps(result))
+                self.assertNotIn("DO_NOT_RECORD", json.dumps(result))
+
+    def test_codex_runtime_fields_without_verified_schema_are_not_evidence(self):
+        # Upstream codex exec JSONL lacks effective model/effort in its
+        # documented event contract; arbitrary extra keys are not proof.
+        stream = [
+            {"type": "thread.started",
+             "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53",
+             "model": "gpt-6-sol", "reasoning_effort": "high"},
+            {"type": "turn.started", "model": "gpt-6-sol",
+             "reasoning_effort": "high"},
+            {"type": "turn.completed",
+             "usage": {"input_tokens": 1, "cached_input_tokens": 0,
+                       "output_tokens": 1},
+             "model": "gpt-6-sol", "reasoning_effort": "high"},
+        ]
+        class Result:
+            returncode = 0
+            stderr = b""
+            stdout = ("\n".join(json.dumps(event) for event in stream)
+                      + "\n").encode()
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                self.task, workspace=Path(td),
+                executor=lambda *args, **kwargs: Result())
+            model = receipt["codex_model_selection"]
+            self.assertEqual(model["model"],
+                             {"value": None, "source": "NOT_AVAILABLE"})
+            self.assertEqual(model["reasoning_effort"],
+                             {"value": None, "source": "NOT_AVAILABLE"})
+            self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
+            self.assertNotIn("gpt-6-sol", json.dumps(receipt))
+
+    def test_jsonl_usage_receipt_and_secret_redaction(self):
+        secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
+        thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
+        events = [
+            {"type": "thread.started", "thread_id": thread},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"type": "agent_message",
+                "text": secret, "command": secret}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 24763, "cached_input_tokens": 24448,
+                "output_tokens": 122, "reasoning_output_tokens": 9}},
+        ]
+        class Result:
+            returncode = 0
+            stdout = ("\n".join(json.dumps(item) for item in events) + "\n").encode()
+            stderr = secret.encode()
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            receipt = dev.run_codex_task(
+                self.task, workspace=work, executor=lambda *a, **kw: Result())
+            self.assertEqual(receipt["codex_usage"], {
+                "schema_version": 1, "source": "codex_exec_jsonl",
+                "status": "reported", "session_id": thread,
+                "input_tokens": 24763, "cached_input_tokens": 24448,
+                "output_tokens": 122})
+            log = (work / receipt["codex_log_path"]).read_text()
+            usage = (work / receipt["codex_usage_path"]).read_text()
+            self.assertNotIn(secret, log + usage + json.dumps(receipt))
+            self.assertIn("[codex turn.completed]", log)
+            self.assertEqual(json.loads(usage), receipt["codex_usage"])
+            self.assertEqual(hashlib.sha256(usage.encode()).hexdigest(),
+                             receipt["codex_usage_sha256"])
+
+    def test_usage_missing_invalid_and_oversized_events_fail_closed(self):
+        cases = [
+            (b'{"type":"turn.completed","usage":{"input_tokens":10,'
+             b'"cached_input_tokens":11,"output_tokens":1}}\n', "invalid"),
+            (b'{"type":"turn.completed","usage":{"input_tokens":true,'
+             b'"cached_input_tokens":0,"output_tokens":1}}\n', "invalid"),
+            (b'{"type":"turn.started"}\n', "unavailable"),
+            (b'{"type": {}, "text":"bad kind"}\n', "unavailable"),
+        ]
+        for stream, status in cases:
+            with self.subTest(stream=stream):
+                collector = dev.CodexUsageCollector()
+                safe = collector.feed(stream[:7]) + collector.feed(stream[7:])
+                safe += collector.finish()
+                self.assertNotIn(b"bad kind", safe)
+                self.assertEqual(collector.snapshot()["status"], status)
+                self.assertIsNone(collector.snapshot()["input_tokens"])
+        collector = dev.CodexUsageCollector()
+        safe = collector.feed(b'{"type":"item.started","secret":"' +
+                              b'X' * (collector.MAX_LINE + 1))
+        safe += collector.feed(b'"}\n') + collector.finish()
+        self.assertIn(b"oversized event omitted", safe)
+        self.assertNotIn(b'X', safe)
+        self.assertIsNone(collector.snapshot()["input_tokens"])
 
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
@@ -668,8 +805,11 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertFalse(receipt["evidence_complete"])
             self.assertNotIn("PASS",receipt["status"])
             log=(work/".plasma-path3-evidence/codex.log").read_text()
-            self.assertIn("attempt failed",log)
-            self.assertIn("problem detail",log)
+            self.assertIn("unstructured output omitted",log)
+            self.assertIn("stderr omitted",log)
+            self.assertNotIn("attempt failed",log)
+            self.assertNotIn("problem detail",log)
+            self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertEqual(receipt["codex_log_sha256"],
                              hashlib.sha256(log.encode()).hexdigest())
 
@@ -869,7 +1009,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
             "execution_path":"path3-codex",
-            "objective":"Complete actual Vivado 2026.1 F1-B Host-only implementation, "
+            "objective":"Complete actual Vivado 2026.1 F1-B implementation, "
                         "record all errors/fixes and real BIT HWH timing DRC evidence.",
         }
         dev.task_by_id({
@@ -891,7 +1031,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 rtl.write_text("module host_fixture; endmodule\n")
                 evidence=work/".plasma-path3-evidence"
                 (evidence/"engineering-report.md").write_text(
-                    "Actual host-only build log (stub fixture; NOT_RUN).\n"
+                    "Actual Vivado build log (stub fixture; NOT_RUN).\n"
                     "Root cause and fix entries required in real execution.\n")
                 return Result()
             receipt=dev.run_codex_task(task,workspace=work,
@@ -906,6 +1046,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("workspace-write",args)
             self.assertIn("sandbox_workspace_write.network_access=false",args)
             self.assertIn("Vivado 2026.1",kwargs["input"].decode())
+            self.assertNotIn("Vivado Host-only",kwargs["input"].decode())
+            self.assertNotIn("host-only Vivado",kwargs["input"].decode())
             self.assertIn("trusted dispatcher will execute",kwargs["input"].decode())
             self.assertIn("twice in fresh output directories",kwargs["input"].decode())
             self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())

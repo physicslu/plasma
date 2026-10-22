@@ -86,7 +86,7 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
                 self.assertEqual(row["physical_validation"]["socket_status"], "no_evidence")
         nxp = _device_search_payload("NXP", limit=1)
         self.assertEqual(nxp["levels"], [1, 2, 3])
-        self.assertEqual(nxp["total_count"], 29)
+        self.assertEqual(nxp["total_count"], 140)
 
     def test_explicit_empty_and_partially_missing_roots_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

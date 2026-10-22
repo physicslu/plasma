@@ -1,10 +1,19 @@
 # Path 2 Real Provider Integration — Development Gate 1
 
-**Status:** Candidate **Host-only implementation**, with bounded held Download /
-independent Testing / separate Restore transaction contracts. **Z2 hardware
-execution is NOT qualified or registered.** Existing main base:
-`bcf500685f749fb8eb056248c518ed4fc1f4c285` (includes #1076, #1077,
-#1079, #1081).
+**Historical Gate 1 status:** the original offline candidate provided fake-target
+Download / Testing / Restore contracts; it did **not** qualify live Z2 operation.
+Original main base: `bcf500685f749fb8eb056248c518ed4fc1f4c285`
+(includes #1076, #1077, #1079, #1081).
+
+**Current Path 2 boundary (supersedes the candidate-only routing below):**
+trusted-main Dispatcher and `scripts/plasma_path2_runtime_integration.py`
+route fixed stage tasks through `scripts/plasma_development_stage_transport.py`
+to the protected Z2 root entry, subject to owner approval, source identity,
+root-owned SHA256 manifest and runtime stop conditions. The old installed SWPC
+Bridge / separate approved-SHA PIN deployment is **not** a prerequisite. This
+does not prove that the route is enrolled on a particular Z2 or that a fresh
+real HIL run passed. Host-only still accurately labels the *offline tests*,
+not the entire Path 2 execution method.
 
 ## What is actually implemented
 
@@ -122,14 +131,13 @@ The GitHub-hosted offline tests use an injected fake FPGA Manager and
 cover multiple Download/Test/Restore actions in one session, exact
 three-word readback, no auto-chaining, changed boot or image, failures,
 and safe idempotent restore. **Host-only tests are not real HIL**.
-The three Task identities are now **registered** in the candidate
-Dispatcher (`z2-path2-download`, `z2-path2-testing`,
-`z2-path2-restore`) and map to the fixed SWPC Bridge executable path
-`/usr/local/libexec/plasma/z2-path2-f1b-bridge`. An absent root-owned
-Bridge fails with `PATH2_TRUSTED_BRIDGE_NOT_INSTALLED`; it does **not**
-execute the candidate PR as root. This is the single remaining physical
-activation blocker. The GitHub-hosted CI only tests a fake installed
-Bridge and cannot claim an actual authenticated Z2 execution.
+The historical candidate registered the three Task identities
+(`z2-path2-download`, `z2-path2-testing`, `z2-path2-restore`), but its then-
+planned SWPC Bridge installation prerequisite has been superseded. Current
+main uses the trusted Stage Transport and protected Z2 root entry, not
+`/usr/local/libexec/plasma/z2-path2-f1b-bridge`. Missing root installation,
+source-manifest mismatch, credentials, target ownership or recovery readiness
+must fail closed. GitHub-hosted fake-device CI cannot prove a real Z2 stage.
 
 ## Evidence reuse / target admission (as of 2026-10-21)
 
@@ -222,10 +230,12 @@ stages, immutable trusted source SHA, verified Bootgen execution provenance,
 durable one-time recovery intent, original-image validation, bounded/reaped
 native MMIO child, trustworthy actual loaded-image attribution, terminal
 unknown/manual-recovery handling, and checked successful Restore route.
-Those capabilities are **not yet installed/registered**. The existing
-Dispatcher still calls `PATH2_LIVE_PROVIDER_NOT_REGISTERED`; the
-Host-only implementation must not misrepresent a policy check as actual
-FPGA Manager Download or HIL PASS.
+This paragraph described the **original Gate 1 gap**, before the protected
+root entry and shared Stage Transport were wired into current main. Stage task
+registration exists now, but the live Z2 root installation and all current
+safety observations must be proved per authorized run. Neither the original
+offline contracts nor a Dispatcher policy check establish FPGA Manager Download
+or HIL PASS.
 
 ## Stage contracts and durable state
 
@@ -257,18 +267,19 @@ original services and UIO hashes before `RESTORED_VERIFIED`. On any
 uncertainty write `UNKNOWN_MANUAL_RECOVERY`; never blind retry or
 unconditional restore after SIGBUS, AXI stall, or unreaped child.
 
-## The missing *real* TargetPort: hardware NO_GO
+## Historical TargetPort admission gaps and continuing hardware safeguards
 
-This PR deliberately does **not** provide a trusted Z2-side root
-`TargetPort` implementation or register it in
-`scripts/plasma_path2_runtime_integration.py` or the Dispatcher.
-`z2-path2-download` and `z2-path2-testing` still fail closed with
-`PATH2_LIVE_PROVIDER_NOT_REGISTERED`. An injected callback/fake can never
-be treated as actual target observation. No Issue #981 command may be
-posted by GitHub-hosted CI.
+The original Gate 1 did not install the physical root provider; the old
+`PATH2_LIVE_PROVIDER_NOT_REGISTERED` description is a historical baseline,
+**not** the current trusted-main registration state. Current main uses
+`registered_hardware_stage` plus trusted Stage Transport and a protected
+Z2 root entry for fixed `download`, `test`, and `restore` actions. An injected
+callback/fake never authenticates target state. GitHub-hosted CI cannot post
+an Issue #981 hardware command merely to qualify these contracts.
 
-Before a real implementation may be registered, these **missing** facts must
-be established and independently reviewed:
+For each new owner-authorized physical attempt, the following safeguards
+remain applicable. Historical gaps are not automatically marked PASS merely
+because the Stage Transport now exists:
 1. A trusted **target-local** executable (root-owned, exact code SHA,
    non-world-writable), authenticated transport from the pinned SWPC command,
    actual root permissions, and protected immutable Z2 recovery file/hash.
@@ -293,13 +304,13 @@ be established and independently reviewed:
    is at most 900 s; **no watchdog, lease auto-extension, or unconditional
    timeout restore exists**.
 
-Hardware root/Z2 facts are unobservable from GitHub-hosted CI. Until a
-reviewed endpoint and all five items exist, **hardware operations are NO_GO**
-despite the user's Gate 1 scoped permission. No fake hardware PASS can be
-reported. The user authorized conditional real HIL, not bypassing these
-preconditions.
+Hardware root/Z2 facts are unobservable from GitHub-hosted CI. The original
+Gate 1 was hardware NO_GO; the current route is registered but may run only
+when the owner-authorized scope and live root/target prerequisites all pass.
+Any unverified or failed condition remains NO_GO / NOT_RUN for that attempt;
+no fake hardware PASS may be reported.
 
-## Validation scope / Gate reporting
+## Historical Gate 1 validation scope (not a fresh execution authorization)
 
 Review the exact PR HEAD, common workflow's `offline-contract` job, all
 GitHub-hosted CI, Rulesets and Review Threads. Do **not** invoke the shared
@@ -307,8 +318,8 @@ self-hosted Runner or owner Issue #981 merely to exercise callbacks. Do not
 merge, deploy, reprogram FPGA, use DUT/LA or alter power. The candidate
 should remain Draft until available evidence is independently reviewed.
 
-**Next required hardware milestone:** implement and qualify the concrete
-root-owned Z2 TargetPort + mutual hardware-owner lock and safe
-current-boot/AXI attestation, then submit a separate reviewed branch-SHA
-execution on SWPC **only if** all stop conditions pass. This Gate 1 has not
-made those target facts true.
+**Current acceptance requirement:** verify the installed root-owned Z2
+entry, source manifest, pinned work/source identity, hardware-global owner,
+recovery and per-run current-boot/AXI observations under the existing trusted
+Dispatcher. The original Gate 1 test results alone do not establish these
+facts and are not permission to operate SWPC/Z2.

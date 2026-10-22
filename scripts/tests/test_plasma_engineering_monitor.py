@@ -79,7 +79,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotIn("\x07", result)
             self.assertIn("BAD", result)
 
-    def test_real_codex_stream_preserves_evidence_and_live_bytes(self):
+    def test_real_codex_stream_redacts_event_payload_in_both_sinks(self):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             live = directory / "path3.log"
@@ -87,16 +87,24 @@ class EngineeringMonitorTests(unittest.TestCase):
             live.touch()
             command = [sys.executable, "-c",
                        "import sys; sys.stdin.read(); "
-                       "print('stdout marker',flush=True); "
-                       "print('stderr marker',file=sys.stderr,flush=True)"]
+                       "print('{\"type\":\"thread.started\",\"thread_id\":\"0199a213-81c0-7800-8aa1-bbab2a035a53\"}',flush=True); "
+                       "print('{\"type\":\"item.completed\",\"text\":\"PASSWORD_SECRET\"}',flush=True); "
+                       "print('{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":30,\"cached_input_tokens\":10,\"output_tokens\":4}}',flush=True); "
+                       "print('STDERR_SECRET',file=sys.stderr,flush=True)"]
+            usage = dev.CodexUsageCollector()
             rc = dev._run_codex_with_live_log(
                 command, b"tiny authorized test\n", directory,
-                evidence, str(live))
+                evidence, str(live), usage=usage)
             self.assertEqual(rc, 0)
-            self.assertIn(b"stdout marker", live.read_bytes())
-            self.assertIn(b"stderr marker", live.read_bytes())
-            self.assertIn(b"stdout marker", evidence.read_bytes())
-            self.assertIn(b"stderr marker", evidence.read_bytes())
+            self.assertIn(b"[codex turn.completed]", live.read_bytes())
+            self.assertIn(b"[codex turn.completed]", evidence.read_bytes())
+            self.assertNotIn(b"PASSWORD_SECRET", live.read_bytes())
+            self.assertNotIn(b"PASSWORD_SECRET", evidence.read_bytes())
+            self.assertNotIn(b"STDERR_SECRET", live.read_bytes())
+            self.assertNotIn(b"STDERR_SECRET", evidence.read_bytes())
+            self.assertEqual(usage.snapshot()["input_tokens"], 30)
+            self.assertEqual(usage.snapshot()["cached_input_tokens"], 10)
+            self.assertEqual(usage.snapshot()["output_tokens"], 4)
             # Synthetic timing goes only to the transient monitor sink.
             mon._append(live, "\n" + mon._monitor_time_mark(FIXED_NOW))
             self.assertIn(b"[MONITOR TIME MARK]", live.read_bytes())

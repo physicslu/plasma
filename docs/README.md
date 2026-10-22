@@ -24,9 +24,9 @@
 
 ## Engineering governance and execution paths
 
-- **Gate 1 Draft / Host-only; real hardware NO_GO** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：加入 BIT/BIN 映像來源分離、跨 Trigger Download／Testing／Restore 的 Lease 交易與 Host-only 故障注入，未註冊任何可操作 Z2 的實機 Provider；需通過獨立 AXI、權限、映像與 Recovery 驗證後才能實測。\n
+- **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
 
-- **Gate 1 / Host-only candidate** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：Build、Download、Testing 三階段獨立 Trigger 與兩個個別可選、預設關閉的自動銜接；只驗證受控 Adapter/Receipt 契約，不代表已啟用 SWPC 或實機執行能力。
+- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄 Build、Download、Testing 獨立 Trigger、兩段預設關閉的自動銜接與離線 Adapter／Receipt 測試；當前硬體權限取決於獨立受控 Dispatcher／Stage Transport 與 Work Order 授權，不由 Orchestrator 測試授予。
 
 - **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
 
@@ -37,7 +37,7 @@
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
 - **Gate 1 Draft / GitHub-hosted only** — [Unified FPGA Build & Diagnostic Engine v1.0](architecture/plasma-unified-fpga-build-diagnostics-v1.md)：Path 2／Path 3 共用 Vivado Driver、階段式錯誤診斷、License／目錄前置檢查、SHA256 Artifact；本次僅驗證離線測試，未在 SWPC 重新建置，硬體 M1 NO-GO。
-- **Path 2 / Gate 1 / Host Build NOT_RUN** — [Fixed CLI Host Build Capability](architecture/plasma-path2-fixed-host-build-capability.md)：Path 2 解除一般任務的 CPU-only 硬編碼，依受審核 Capability 支援 SWPC Vivado 固定 CLI；沿用現有 Dispatcher／Runner，不新增 Workflow，不代表已執行建置或授權 Z2／FPGA 操作。
+- **Historical Gate 1 fixed host-build capability** — [Fixed CLI Host Build Capability](architecture/plasma-path2-fixed-host-build-capability.md)：原始 Gate 1 規範 SWPC Vivado 固定 CLI 與 Capability 審核；該歷史文件的 NOT_RUN 標記不代表現有 Path 2 執行狀態。當前 Build／Download／Testing 仍依 Work Order、受信任來源及各階段安全守衛判定。
 - **Gate 1 / Runtime candidate / DEFAULT OFF** — [Reusable Engineering Runtime Dispatcher v1](architecture/plasma-engineering-runtime-dispatch-v1.md)：Path 2 SWPC CLI／Path 3 SWPC Codex 共用 Work Order、Capability、SHA 與一次性保護 Claim；PR 與 push 僅執行 GitHub-hosted 離線測試。尚未啟用 SWPC 執行，隔離 Runner／自動 Gate 1 Dispatch／真實 Publisher 未驗收，不代表可操作任何實體硬體。
 - **Plan / Offline-only Gate 1A** — [Unified Engineering Dispatch v1](architecture/plasma-engineering-dispatch-v1.md)：定義 versioned Work Order、SHA256 owner approval、Capability Policy、離線授權及去重契約；所有既有 Codex Workflows 不修改，僅在未來派工時逐條遷移，**尚未部署或啟用新的 Runtime Dispatcher**。
 - **Plan / Offline software-pr Gate 1** — [PLASMA Software-only PR Candidate + Mock Publisher Pilot](development/plasma-engineering-software-pr-pilot.md)：Issue #981 的受控 Work Order、離線檔案變更、SHA256 證據與 Mock PR Publisher；GitHub-hosted FAKE Codex 驗證，不代表已運行真實 Codex、自動建立 PR 或啟用 Dispatcher。
@@ -125,15 +125,16 @@
 
 ## Development and validation
 
-- **Gate 1 / SWPC real monitor NOT_RUN** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 左右並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。現階段需先完成 Host-only CI，並在受控 Gate 1 啟用後驗證真正 SWPC 的觀察結果；此文件不授權部署或硬體操作。
+- **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
+- **Gate 1 / Local-only Tool; Desktop Telemetry NOT_RUN** — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 
-- **Gate 1 / Host-only Integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：重用既有 Dispatcher、Workflow、Vivado Build、三階段 Orchestrator、F1-B Adapter 與 Persistent Lease；建立獨立 Build/Download/Testing 任務身分與實際檔案 Hash 的 Host-only Build Qualification，實機 Provider 未授權且必須 fail closed。\n\n- **Gate 1 / Host-only Draft** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：跨階段 Loaded State、Lease、映像來源、Restore Intent、Timeout、不可盲目重試及 Testing 重入之離線安全契約；不提供實機下載或恢復權限。
+- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 Host-side Build Qualification、離線 F1-B Adapter／Lease 測試；目前有獨立的受控 Stage Transport。每次 Build／Download／Testing 仍須通過固定 Work Order SHA、映像 Hash、Sandbox 及硬體授權檢查。\n\n- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
 
-- **Gate 1 / Host-only Draft** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：重用 Vivado Host Build、F1-B Hardware Profile、FPGA Supervisor 與三暫存器 Test Callback；維持 Build／Download／Testing 獨立 Trigger 與兩個預設關閉的自動銜接。僅 Mock/Schema Contract，不提供實機權限。
+- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；當前受控 Stage Transport 的授權與證據檢查獨立成立。
 
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
 - **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
-- **Gate 1 / Z2 live handoff / NOT RUN** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：固定 F1-B／base.bin SHA、既有 SWPC→Z2 受信任 Root 執行交接與獨立 Download／Testing／Restore 實機證據要求；PR 本身不安裝、派工或宣稱硬體通過。
+- **Path 2 guarded Z2 execution / historical handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：現行可信路徑保留 Work Order 固定 SHA、映像 Hash、Z2 Root SHA256 Manifest 及 Download／Testing／Restore 逐次證據要求；歷史 NOT_RUN 不等於目前狀態，舊 Bridge/PIN 部署步驟已由受信任 Stage Transport 取代。
 
 - **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)

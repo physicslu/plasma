@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """PLASMA reusable Path 2/3 dispatcher candidate.
 
-Separate adapter to the immutable Gate 1A contract; runtime defaults OFF.
+Qualification-only adapter to the immutable Gate 1A contract; runtime defaults
+OFF. This is not the active Development Mode Path 3 dispatcher; its restrictive
+software-pr isolation profile must not be interpreted as a blanket Path 3
+Host-only policy. No runtime capability or permission is enabled here.
 Never invokes GitHub APIs or creates a claim. GitHub's trusted hosted job
 must authorize, atomically create the protected one-shot claim, and only
 then release a job to a separately provisioned isolated worker.
@@ -22,6 +25,8 @@ import plasma_engineering_dispatch_v1 as contract
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_VERSION = "plasma.engineering.runtime_request.v1"
 DENIED = "NO_GO_RUNTIME_DISPATCH"
+# Qualification-only, disabled-by-default capability mapping. Development
+# Mode Path 3 uses the separate owner-approved codex-workspace Work Order.
 PATHS = {"path2-cli": "software-readonly", "path3-codex": "software-pr"}
 TASK_FIELDS = frozenset({"kind", "script", "argv", "prompt"})
 BUNDLE_FIELDS = frozenset({
