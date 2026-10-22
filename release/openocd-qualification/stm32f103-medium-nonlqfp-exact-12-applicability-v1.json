@@ -1,0 +1,218 @@
+{
+  "schema_version": "1.0.0",
+  "applicability_id": "st-stm32f103-medium-nonlqfp-exact-12-v1",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "manufacturer": "STMicroelectronics",
+  "family": "STM32F1",
+  "series": "STM32F103",
+  "density_class": "medium",
+  "scope": "Explicit 8 direct + 4 TR exact ICPNs: C UFQFPN48, R TFBGA64 and V LFBGA100; no T VFQFPN36, no customer R/RTR suffix",
+  "manufacturer_authority": {
+    "ordering": {
+      "path": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+      "git_blob_sha1": "0c4b4b1d2e727726d0431ef89d687a6b6d2e98cf",
+      "document": "DS5319 Rev 20",
+      "band": "medium"
+    },
+    "production_exact_identity": {
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+      "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3",
+      "source_authority": "STMicroelectronics official"
+    },
+    "manufacturer_source_lock": {
+      "path": "data/ic-support/benchmarks/stm32f103c/source-lock.json",
+      "source_id": "st_ds5319_rev20",
+      "sha256": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc"
+    },
+    "programming_review": {
+      "path": "data/ic-support/benchmarks/stm32f103c/vendor-neutral-admission-contract-v1.json",
+      "git_blob_sha1": "eb136aca6119c9d5b6696285fb57434b0c4c4f62"
+    },
+    "programming_profile": {
+      "path": "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
+      "git_blob_sha1": "e869dd9e4494677080e3474ad9b55f4c00b3bea6"
+    }
+  },
+  "shared_programming_semantics": {
+    "openocd_device_id": "0x410",
+    "programming_profile_id": "stm32f1-medium-density-flash-v0",
+    "main_flash_start": "0x08000000",
+    "erase_unit_bytes": 1024,
+    "program_unit_bytes": 2,
+    "operations": [
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ]
+  },
+  "targets": [
+    {
+      "icpn": "STM32F103CBU6",
+      "base_device": "STM32F103CB",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103cb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "6603eca3490d09cb93ecee37008891f945b24dd9",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103R8H6",
+      "base_device": "STM32F103R8",
+      "package": "TFBGA",
+      "pin_count": "64",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "851171147296f574dbe66ded56e2887db12d458e",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103R8H7",
+      "base_device": "STM32F103R8",
+      "package": "TFBGA",
+      "pin_count": "64",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103r8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103r8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "851171147296f574dbe66ded56e2887db12d458e",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103RBH6",
+      "base_device": "STM32F103RB",
+      "package": "TFBGA",
+      "pin_count": "64",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103RBH7",
+      "base_device": "STM32F103RB",
+      "package": "TFBGA",
+      "pin_count": "64",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103rb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103rb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "eff170be3ff71046252cbcbd193329fe6d97cb7f",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103V8H6",
+      "base_device": "STM32F103V8",
+      "package": "LFBGA",
+      "pin_count": "100",
+      "flash_size": "64 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103v8-64k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103v8-64k-v0.json",
+      "memory_geometry_git_blob_sha1": "9d1b1578b62225f144856f7aa4674d158fa34203",
+      "main_flash_size_bytes": 65536,
+      "page_count": 64
+    },
+    {
+      "icpn": "STM32F103VBH6",
+      "base_device": "STM32F103VB",
+      "package": "LFBGA",
+      "pin_count": "100",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 85 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "64799b571bb6a80258355f86c906d052b18dc242",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    },
+    {
+      "icpn": "STM32F103VBH7",
+      "base_device": "STM32F103VB",
+      "package": "LFBGA",
+      "pin_count": "100",
+      "flash_size": "128 KiB",
+      "temperature_grade": "-40 to 105 C",
+      "option_suffix": "",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "memory_geometry_profile_id": "stm32f103vb-128k-v0",
+      "memory_geometry_path": "data/ic-support/profiles/memory-geometry/stm32f103vb-128k-v0.json",
+      "memory_geometry_git_blob_sha1": "64799b571bb6a80258355f86c906d052b18dc242",
+      "main_flash_size_bytes": 131072,
+      "page_count": 128
+    }
+  ],
+  "packing_variants": [
+    {
+      "icpn": "STM32F103CBU6TR",
+      "equivalent_to_icpn": "STM32F103CBU6",
+      "base_device": "STM32F103CB",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103R8H6TR",
+      "equivalent_to_icpn": "STM32F103R8H6",
+      "base_device": "STM32F103R8",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103RBH6TR",
+      "equivalent_to_icpn": "STM32F103RBH6",
+      "base_device": "STM32F103RB",
+      "packing_suffix": "TR"
+    },
+    {
+      "icpn": "STM32F103V8H6TR",
+      "equivalent_to_icpn": "STM32F103V8H6",
+      "base_device": "STM32F103V8",
+      "packing_suffix": "TR"
+    }
+  ],
+  "non_claims": {
+    "customer_dedicated_suffix_qualified": false,
+    "other_packages_qualified": false,
+    "vfqfpn36_qualified": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "execution_authorized": false
+  },
+  "explicit_non_targets": [
+    "STM32F103RBH6R",
+    "STM32F103RBH6RTR",
+    "STM32F103T8U6",
+    "STM32F103T8U6TR",
+    "STM32F103T8U7",
+    "STM32F103T8U7TR",
+    "STM32F103TBU6",
+    "STM32F103TBU6TR",
+    "STM32F103TBU7"
+  ]
+}
