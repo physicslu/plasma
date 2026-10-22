@@ -98,14 +98,25 @@ def test_real_upstream_openocd_remote_bitbang_reads_virtual_dpidr():
             "-c", "remote_bitbang port 0",
             "-c", "transport select swd",
             "-c", "swd newdap blue cpu -expected-id 0x2ba01477",
-            "-c", "dap create blue.dap -chain-position blue.cpu",
+            "-c", "dap create blue.dap -tap blue.cpu",
             "-c", "init",
             "-c", "shutdown",
         ]
         result = subprocess.run(args, capture_output=True, text=True, timeout=20)
         thread.join(timeout=13)
         stdout = result.stdout + result.stderr
-        assert result.returncode == 0, stdout[-6000:]
+        diagnostics = (
+            f"return={result.returncode}, writes={port.writes}, "
+            f"barriers={port.barriers}, target_state={port.target.state}, "
+            f"target_connected={port.target.connected}, "
+            f"target_resets={port.target.resets}, "
+            f"wire_count={len(port.target.wire)}, "
+            f"headers={port.target.headers[-20:]}, "
+            f"recent_events={port.target.events[-25:]}, "
+            f"recent_wire={port.target.wire[-30:]}, "
+            f"bridge_errors={errors!r}\\n"
+        )
+        assert result.returncode == 0, diagnostics + stdout[-6000:]
         assert port.target.connected, (
             "The virtual target never received a valid DPIDR SWD transfer\n"
             + stdout[-4000:]
