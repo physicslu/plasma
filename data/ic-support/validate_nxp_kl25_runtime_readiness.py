@@ -55,7 +55,7 @@ def sha256_file(path: Path) -> str:
 
 
 def git_blob_sha1(data: bytes) -> str:
-    return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\\0" + data).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -73,7 +73,7 @@ def binary_architecture(path: Path) -> str:
             h = stream.read(20)
     except OSError as exc:
         raise Kl25ReadinessError("binary not readable") from exc
-    require(len(h) == 20 and h[:4] == b"\\x7fELF" and h[5] in (1, 2),
+    require(len(h) == 20 and h[:4] == b"\x7fELF" and h[5] in (1, 2),
             "invalid ELF header")
     machine = struct.unpack("<H" if h[5] == 1 else ">H", h[18:20])[0]
     require(machine in (40, 62), "unexpected OpenOCD architecture")
@@ -202,7 +202,7 @@ def run_acceptance(
         raise Kl25ReadinessError("failed binary version probe") from exc
     banner = (version.stdout or "") + (version.stderr or "")
     require(version.returncode == 0
-            and re.search(r"Open On-Chip Debugger\\s+0\\.12\\.0(?:\\s|$)", banner) is not None,
+            and re.search(r"Open On-Chip Debugger\s+0\.12\.0(?:\s|$)", banner) is not None,
             "installed binary version differs from pinned release")
     argv = build_safe_argv(binary, scripts_root)
     validate_argv(argv, binary, scripts_root)
