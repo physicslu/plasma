@@ -1,0 +1,15 @@
+app host tests PASS
+test_firmware_identity (test_cdc_probe.MonitorTests) ... ok
+test_host_port_pause_is_opt_in (test_cdc_probe.MonitorTests) ... ok
+test_ignores_commands_and_other_versions (test_cdc_probe.MonitorTests) ... ok
+test_live_loop_prints_each_heartbeat_without_default_pause (test_cdc_probe.MonitorTests) ... ok
+test_live_loop_rejects_uninterrupted_sequence_gap (test_cdc_probe.MonitorTests) ... ok
+test_opt_in_host_port_pause_allows_only_one_gap (test_cdc_probe.MonitorTests) ... ok
+test_rejects_sequence_interval_and_uptime_failures (test_cdc_probe.MonitorTests) ... ok
+test_sequence_interval_uptime_and_interruption (test_cdc_probe.MonitorTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.001s
+
+OK
+Documentation integrity: PASS (630 Markdown files)

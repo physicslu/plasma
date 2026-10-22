@@ -1,0 +1,3 @@
+artifacts/*.hex -diff
+artifacts/*.map -diff
+*.log -diff
