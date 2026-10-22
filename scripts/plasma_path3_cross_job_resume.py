@@ -117,7 +117,7 @@ def require_pinned_clean_checkout(workspace: Path, identity: dict) -> None:
 def test_exit(project: Path) -> int:
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "unittest", "-q", "test_mock_page_chunks.py"],
+            [sys.executable, "-B", "-m", "unittest", "-q", "test_mock_page_chunks.py"],
             cwd=project, capture_output=True, timeout=30, check=False)
         return result.returncode
     except (OSError, subprocess.TimeoutExpired):
@@ -275,7 +275,7 @@ def clean_fixture(project: Path, expected: str, *, proof_allowed: bool = False) 
             and test.is_file() and not test.is_symlink()
             and test.read_text(encoding="utf-8") == TEST_SOURCE,
             "RESUME_WORKSPACE_HASH_MISMATCH")
-    permitted = {"mock_page_chunks.py", "test_mock_page_chunks.py", "__pycache__"}
+    permitted = {"mock_page_chunks.py", "test_mock_page_chunks.py"}
     if proof_allowed:
         permitted.add("resume-proof.txt")
     require({p.name for p in project.iterdir()} <= permitted,
@@ -366,7 +366,7 @@ def run_stage(phase: str, *, identity: dict, workspace: Path, state_base: Path,
             "RESUME_CONTEXT_NOT_RESTORED")
     extra = {p.name for p in project.iterdir()}
     require(extra <= {"mock_page_chunks.py", "test_mock_page_chunks.py",
-                      "resume-proof.txt", "__pycache__"},
+                      "resume-proof.txt"},
             "RESUME_WORKSPACE_EXTRA_FILES")
     record["status"] = "RESUME_VERIFIED"
     record["resume_usage"] = usage
