@@ -223,7 +223,7 @@ def sandbox_command(state: Path, project: Path, home: Path) -> list[str]:
         "--setenv", "HOME", "/codex-home",
         "--setenv", "CODEX_HOME", "/codex-home",
         "--setenv", "PATH",
-        f"{codex_real.parent}:/usr/local/bin:/usr/bin:/bin",
+        f"{Path(codex).parent}:{codex_real.parent}:/usr/local/bin:/usr/bin:/bin",
         "--setenv", "PYTHONDONTWRITEBYTECODE", "1",
         "--chdir", "/work", "--",
     ])
