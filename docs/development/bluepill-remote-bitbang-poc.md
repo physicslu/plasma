@@ -90,6 +90,29 @@ exclusive owner/electrical/rollback admission provider, reviewed native
 ARMv7 port and physically connected bridge before ANY positive
 real-hardware Job is permitted.
 
+### Real OpenOCD Job process candidate (still Host-only and NOT Flash PASS)
+
+`software/python/plasma_interfaces/bluepill_openocd_session.py` is the
+opt-in process/socket lifecycle around the **existing**
+`OpenOCDPlanExecutor` and an explicitly injected qualified
+`WordPort`. It launches the pinned executable with
+`specs/bluepill-poc/openocd-remote-bitbang-adapter-only.cfg`,
+provides a private UNIX socket, and then loads canonical
+`target/stm32f1x.cfg`. It cannot load a Z2 FPGA image or acquire
+live MMIO by itself, and is **not installed by the default SiteManager**.
+
+`software/python/tests/test_bluepill_web_ps_real_openocd.py`
+submits a canonical WEB Job to the real PS/SiteWorker, uses a real
+pinned OpenOCD subprocess, and connects to the independent **virtual
+DPIDR-only** responder. Because this responder does **not** implement
+Flash, an Erase Job MUST be terminal failure, even if SWD DPIDR
+is correctly read. The test also checks private socket teardown and
+PPU execution lease cleanup. The new test is separate from the
+positive synthetic-Executor WEB Job test. **Passing this negative
+Host-only integration test does not qualify real Erase/Program/Verify**.
+At the current stage, the test's actual hosted CI result must be
+reported from its specific run; source presence is not a PASS claim.
+
 Host-only admission can test this seam without claiming a connected IC.
 The current isolated candidate and hosted tests cannot supply an actual
 electrical / hardware-ownership proof. No CI PASS may reclassify it.
