@@ -7,6 +7,7 @@ on:
       - 'scripts/build-openocd-bluepill-poc.sh'
       - 'software/python/plasma_interfaces/bluepill_remote_bitbang.py'
       - 'software/python/tests/test_bluepill_remote_bitbang.py'
+      - 'software/python/tests/test_bluepill_openocd_virtual_target.py'
       - 'pl/rtl/bus/plasma_poc_swd_gpio_axi_lite.sv'
       - 'pl/verification/test_bluepill_remote_bitbang_rtl.py'
       - 'pl/verification/cocotb/test_bluepill_remote_bitbang_axi.py'
@@ -37,6 +38,10 @@ jobs:
         run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
       - name: Build exact upstream OpenOCD candidate and verify SWD adapter admission
         run: bash scripts/build-openocd-bluepill-poc.sh build/bluepill-openocd
+      - name: Real OpenOCD through virtual PS/PL SWD target
+        env:
+          PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
+        run: python -m pytest -q software/python/tests/test_bluepill_openocd_virtual_target.py
       - name: Publish source and SWD adapter admission evidence
         if: always()
         uses: actions/upload-artifact@v4
