@@ -16,21 +16,44 @@ Path 3 real run: https://github.com/physicslu/plasma/actions/runs/39768663770
   cached_input_tokens = 192896; output_tokens = 2664; codex_exit_code = 0.
 - Scope: one Codex CLI exec run; not the entire GitHub Actions workflow.
 
-Codex Desktop run, based on the owner's reported benchmark:
-- Benchmark start: 2026-10-22T11:17:20Z.
-- Benchmark end: 2026-10-22T11:18:59.994904Z.
-- 81/81 PASS; ~100 seconds wall-clock including checks.
-- Session ID, precise model, reasoning effort, token counts: NOT_AVAILABLE
-  until the owner runs the local-only extraction and verifies the source.
-- No private Codex Desktop rollout or other Mac-local data was read for this PR.
+Codex Direct session benchmark — **owner-reported local telemetry**, not
+independently reproduced from the private rollout:
+- The 9x9 CPU-only task finished with 81/81 PASS. Original task wall-clock
+  measurement: 2026-10-22T11:17:20Z to 11:18:59.994904Z (~100 seconds).
+- **Actual completed Turn boundary**: 2026-10-22T11:17:12.611Z to
+  11:19:19.038Z (~126.427 seconds). The original ~100-second timing window
+  omits these boundary events and correctly produces TURN_START_NOT_FOUND;
+  use the independently established enclosing Turn window when extracting.
+- Reported REPORTED metrics from 16 unique response records:
+  input_tokens = 1951915; cached_input_tokens = 1927680;
+  output_tokens = 6339. Non-cached input = 24235.
+- Reported model = gpt-6-sol; reasoning_effort = medium. Session and Turn
+  IDs were resolved locally, but are intentionally omitted from this public
+  document; the private summary is not committed.
+- **Execution host was Linux**. The record supports a Codex Direct session
+  comparison, **not** verified Mac-native Codex Desktop runtime identity.
+  Neither the private session nor its raw messages were available to this
+  reviewer; arithmetic and CI can be independently checked, raw provenance
+  cannot. Mark Mac Desktop identity NOT_VERIFIED rather than falsely PASS.
 
-Do not attribute the difference between these runs to Dispatcher overhead:
-Desktop single turn and Path 3 exec have different execution scopes, and
-model/effort, initial context and timing boundaries are not established.
+Comparison invariants (descriptive only):
+- Desktop/Direct reported input is 7.76x the Path 3 exec input, but the
+  cached proportion is 98.76% versus 76.66%.
+- Non-cached input is **24235 versus 58718** (Direct versus Path 3).
+  Cached input is already included in input_tokens in both environments.
+- Output is 6339 versus 2664; different task/turn scopes and model settings
+  prevent an objective cost or efficiency ranking.
 
-## Run the approved offline extractor on your own Mac
+Do not attribute either token delta to Dispatcher overhead: the Direct
+completed Turn and Path 3 exec have different execution scopes, initial
+context, timing, and not-yet-matched Path 3 model/effort. Pricing differs
+for cached and non-cached tokens. An authenticated model/effort pair and
+fresh-context A/B would be needed to attribute overhead.
 
-Use a PLASMA checkout containing this script and Python 3.10+.
+## Run the approved offline extractor on the host with the rollout
+
+Use a PLASMA checkout containing this script and Python 3.10+ on the
+local host where the correct Codex rollout resides (Linux or macOS).
 Search filenames only; do not cat, grep transcript bodies or upload raw
 sessions. The default CODEX_HOME is under the home directory.
 
@@ -45,8 +68,8 @@ Run from the PLASMA checkout (replace the placeholder with a **local** path):
 
     python3 scripts/plasma_codex_benchmark_usage.py \
       --session '/absolute/path/to/selected/rollout-...jsonl' \
-      --start '2026-10-22T11:17:20Z' \
-      --end '2026-10-22T11:18:59.994904Z'
+      --start '2026-10-22T11:17:12.611Z' \
+      --end '2026-10-22T11:19:19.038Z'
 
 For the optional comparison, first download the GitHub Artifact from
 Run 39768663770 and locally extract plasma-path3-receipt.json.
