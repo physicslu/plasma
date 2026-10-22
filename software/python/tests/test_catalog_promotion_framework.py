@@ -208,18 +208,18 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         self.assertEqual(report["discovered_exact_icpns"], 5885)
         self.assertEqual(
             report["catalog_level_counts"],
-            {"0": 315, "1": 5505, "2": 65, "3": 0},
+            {"0": 204, "1": 5616, "2": 65, "3": 0},
         )
         self.assertEqual(
             report["promotion_evidence_counts"],
             {
-                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 1377,
+                EVIDENCE_BACKEND_CANDIDATE_ROUTE: 1488,
                 EVIDENCE_CATALOG_MAPPED_ROUTE: 4127,
-                EVIDENCE_IDENTITY_ONLY: 315,
+                EVIDENCE_IDENTITY_ONLY: 204,
                 EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 66,
             },
         )
-        self.assertEqual(report["selector_visible_exact_icpns"], 5570)
+        self.assertEqual(report["selector_visible_exact_icpns"], 5681)
         self.assertEqual(report["job_selectable_exact_icpns"], 65)
 
         self.assertEqual(
@@ -228,7 +228,7 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             by_manufacturer["NXP"]["catalog_level_counts"],
-            {"0": 212, "1": 29, "2": 0, "3": 0},
+            {"0": 101, "1": 140, "2": 0, "3": 0},
         )
         self.assertEqual(
             by_manufacturer["Microchip"]["catalog_level_counts"],
@@ -244,7 +244,8 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
         )
         self.assertEqual(
             by_manufacturer["NXP"]["promotion_blocker_counts"][EDGE_L1_TO_L2],
-            {MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 28,
+            {BACKEND_CANDIDATE_NOT_PROVIDER_QUALIFIED: 111,
+             MAPPED_ROUTE_NOT_PROVIDER_QUALIFIED: 28,
              PROVIDER_QUALIFICATION_INCOMPLETE: 1},
         )
         self.assertEqual(

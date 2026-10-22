@@ -84,9 +84,23 @@ class AdmittedRouteCandidateRegistry:
                           "route applicability has not been validated")
             self._require(bool(item.applicability_source.strip()), "missing applicability provenance")
             if catalog.status == "production":
+                # Some official exact-part catalogs have no separate base-part
+                # field: the canonical base_device is the exact order code.
+                # Accept that identity form only when its pinned manufacturer
+                # page, URL and digest all agree. This does not establish the
+                # programming route; VERIFIED_FAMILY still needs its own proof.
+                exact_part_identity = (
+                    row.vendor == "NXP"
+                    and row.base_device == row.identifier == item.base_device
+                    and row.source_type == "official_nxp_independent_exact_part_html_replay"
+                    and row.source_authority == f"https://www.nxp.com/part/{row.identifier}"
+                    and f"page /part/{row.identifier}" in (row.source_reference or "")
+                    and f"manufacturer HTML SHA256 {item.identity_sha256}" in (row.source_reference or "")
+                )
                 self._require(isinstance(row.source_reference, str)
                               and item.identity_sha256 in row.source_reference
-                              and f"basePartNumber={item.base_device}" in row.source_reference
+                              and (f"basePartNumber={item.base_device}" in row.source_reference
+                                   or exact_part_identity)
                               and bool(row.source_authority),
                               "production route identity provenance not bound to canonical row")
             self._by_key[key] = {
