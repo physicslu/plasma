@@ -1,12 +1,14 @@
-// Gate 1 simulation-only SWD Site-1 v1 PIO AXI4-Lite vertical slice.
+// Gate 1 simulation-only SWD Site v1 PIO AXI4-Lite vertical slice.
 // Not a PPU image, not a real UIO device, not a universal multi-site endpoint.
 // No power, OE, NRST, FPGA Manager, PL reload, external pin constraints or SPI.
 // Reuses the established swd_transaction_master; master protocol has a narrower
 // precisely 64 driven-high line-reset clocks; the ABI now requires 64.
-// A synthesized fixed-image product must add global Identity and qualify
-// timing/resource/AXI before any board or DUT operation.
+// SITE_ID defaults to 1 to preserve the existing Site1 ABI; Gate 1A SIM
+// instantiates Site2 with ID 2 and independent engine state. A synthesized
+// fixed-image product must separately qualify timing/resource/AXI and pins.
 module fixed_fpga_swd_site_axi_lite #(
-    parameter logic [31:0] AXI_BASE_ADDRESS = 32'h40004000
+    parameter logic [31:0] AXI_BASE_ADDRESS = 32'h40004000,
+    parameter logic [31:0] SITE_ID = 32'd1
 ) (
     input logic s_axi_aclk, s_axi_aresetn,
     input logic [31:0] s_axi_awaddr,
@@ -33,7 +35,7 @@ module fixed_fpga_swd_site_axi_lite #(
     output logic site_ready_o, site_fault_o
 );
     localparam logic [1:0] OKAY=2'b00, SLVERR=2'b10;
-    localparam logic [31:0] SITE_ID=32'd1, ABI=32'h00010000;
+    localparam logic [31:0] ABI=32'h00010000;
     localparam logic [31:0] CAP_SWD=32'd1;
     localparam logic [31:0] CMD_XFER=32'd1, CMD_RESET=32'd2;
     localparam logic [31:0] PROTO_SWD=32'd1;
@@ -69,7 +71,7 @@ module fixed_fpga_swd_site_axi_lite #(
     assign s_axi_awready=s_axi_aresetn && !aw_hold && !s_axi_bvalid;
     assign s_axi_wready=s_axi_aresetn && !w_hold && !s_axi_bvalid;
     assign s_axi_arready=s_axi_aresetn && !s_axi_rvalid;
-    // Physical RTL Site 1 status, not a synthetic Global readiness constant.
+    // Actual RTL instance status, not a synthetic Global readiness constant.
     assign site_fault_o = fault_latched;
     assign site_ready_o = s_axi_aresetn && master_ready && !active;
 
