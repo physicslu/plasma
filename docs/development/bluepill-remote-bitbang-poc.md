@@ -60,6 +60,16 @@ Until such a provider, image upload, job-stage telemetry, OpenOCD-to-bridge
 UNIX socket startup and verified boot-bound PS/PL port exist, WEB→PS→PL
 **end-to-end is NOT_RUN**.
 
+The canonical WEB REST -> real PS Protocol v3.3 route has now been
+included in the same Host-only CI as a **negative execution test**:
+`software/python/tests/test_bluepill_web_ps_admission.py` starts actual
+loopback HTTP and Plasma Server listeners, sends an immutable SHA-256-bound
+Programming Asset to `POST /api/jobs`, and verifies the OpenOCD route is
+refused before Job registry/queue/lease creation. It also forbids caller-
+supplied runtime admission metadata. This is proof of the **existing WEB/PS
+request path and truthful refusal only**; it is not proof of a positive
+OpenOCD Programming Job, a browser UI interaction, or any connected PL.
+
 Host-only admission can test this seam without claiming a connected IC.
 The current isolated lower-layer candidate and hosted OpenOCD build do
 not close that integration by themselves. No CI PASS may reclassify it.
