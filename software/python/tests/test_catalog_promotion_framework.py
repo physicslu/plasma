@@ -219,7 +219,7 @@ class CatalogPromotionFrameworkTests(unittest.TestCase):
                 EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER: 66,
             },
         )
-        self.assertEqual(report["selector_visible_exact_icpns"], 6573
+        self.assertEqual(report["selector_visible_exact_icpns"], 6573)
         self.assertEqual(report["job_selectable_exact_icpns"], 65)
 
         self.assertEqual(
