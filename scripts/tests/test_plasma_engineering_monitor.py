@@ -553,7 +553,9 @@ if op in ("new-session", "new-window"):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
         self.assertIn("plasma_engineering_monitor.py run path3 --", workflow)
-        self.assertEqual(workflow.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+        self.assertEqual(workflow.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertIn("  development-codex-resume:", workflow)
+        self.assertIn("needs: [development-authorize, development-codex]", workflow)
         shell = ROOT / "scripts/plasma-engineering-monitor.sh"
         self.assertEqual(subprocess.run(["bash", "-n", str(shell)],
                                         check=False).returncode, 0)
