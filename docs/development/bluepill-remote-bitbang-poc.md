@@ -29,8 +29,9 @@ PS GPIO shortcut is acceptable as evidence for this route.
   read), Q (quit), r (no reset asserted), B/b (no-op). All active reset,
   JTAG, remote sleep and unknown commands are refused, not emulated.
 - It only receives an injected `read32/write32/write_barrier` port.
-  It never creates a privileged device mapping, opens a socket listener
-  or declares any board safe. A caller must independently prove one
+  It never creates a privileged device mapping or declares any board
+  safe. A private owner-controlled UNIX listener exists only when
+  `serve_local_unix_once` is invoked with an already qualified port. A caller must independently prove one
   exclusive PS word-port owner, manifest/bitstream/board identity, power,
   external pins, signal level and rollback.
 - The separate Host-only RTL candidate is
