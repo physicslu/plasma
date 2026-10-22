@@ -2105,7 +2105,9 @@ class CrossJobCodexResumeContracts(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             manifest = state_base / ("run-" + identity["github_run_id"]) / "manifest.json"
             self.assertEqual(manifest.stat().st_mode & 0o777, 0o600)
-            self.assertNotIn(nonce, manifest.read_text())
+            self.assertEqual(json.loads(manifest.read_text())["challenge_sha256"],
+                             c.digest(nonce.encode()))
+            self.assertNotIn('"challenge":', manifest.read_text())
             with self.assertRaisesRegex(c.ResumeDenied, "RESUME_STATE_ALREADY_EXISTS"):
                 c.run_stage(
                     "new", identity=identity, workspace=fixture,
