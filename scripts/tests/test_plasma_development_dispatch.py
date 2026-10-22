@@ -2322,6 +2322,46 @@ class CrossJobCodexResumeContracts(unittest.TestCase):
             self.assertNotIn("danger-full-access", cmd)
             self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", cmd)
 
+    def test_codex_event_usage_and_thread_negative_contract(self):
+        c = self.probe()
+        sid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+        good = [
+            {"type": "thread.started", "thread_id": sid},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 50, "cached_input_tokens": 45, "output_tokens": 3}},
+        ]
+        transcript = "".join(json.dumps(item)+"\n" for item in good)
+        session, usage = c.parse_codex_events(transcript)
+        self.assertEqual(session, sid)
+        self.assertEqual(usage["cached_input_tokens"], 45)
+        bad = [
+            (good[:1], "RESUME_EVENTS_INCOMPLETE"),
+            (good + good[1:], "RESUME_EVENTS_INCOMPLETE"),
+            (good[:1] + [{"type": "turn.completed", "usage": {
+                "input_tokens": 2, "cached_input_tokens": 3, "output_tokens": 0}}],
+             "RESUME_USAGE_INVALID"),
+            ([{"type": "thread.started", "thread_id": "not-a-uuid"}] + good[1:],
+             "RESUME_THREAD_INVALID"),
+        ]
+        for messages, code in bad:
+            with self.subTest(code=code), self.assertRaisesRegex(c.ResumeDenied, code):
+                c.parse_codex_events("".join(json.dumps(x)+"\n" for x in messages))
+
+    def test_missing_private_state_cannot_start_resume(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_root = root/"state"
+            state_root.mkdir(mode=0o700)
+            candidate = root/"candidate"
+            candidate.mkdir()
+            with patch.object(c, "require_pinned_clean_checkout"):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_STATE_MISSING"):
+                    c.run_stage(
+                        "resume", identity=self.identity(), workspace=candidate,
+                        state_base=state_root, execute=lambda *_: self.fail(
+                            "No model calls permitted when state is missing"))
+
     def test_existing_workflow_has_only_one_added_conditional_job(self):
         workflow = WORKFLOW.read_text()
         self.assertEqual(workflow.count("  development-codex-resume:"), 1)
