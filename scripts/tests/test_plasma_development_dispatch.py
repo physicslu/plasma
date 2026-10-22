@@ -1049,7 +1049,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1763,7 +1763,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"path2-stage-contract"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
@@ -1994,6 +1994,391 @@ class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
         self.assertIn("scripts/tests/test_plasma_development_dispatch.py",
                       workflow)
         self.assertNotIn("plasma-path3-session-resume.yml", workflow)
+
+
+class CrossJobCodexResumeContracts(unittest.TestCase):
+    """CPU-only fake subprocesses: two separately invoked Job stages."""
+
+    @staticmethod
+    def probe():
+        import plasma_path3_cross_job_resume as c
+        return c
+
+    @staticmethod
+    def identity():
+        return {
+            "owner": "physicslu",
+            "github_run_id": "39830123456",
+            "comment_id": 5180001,
+            "runner_name": "SWPC-plasma-codex",
+            "trusted_sha": "a" * 40,
+            "source_sha": "b" * 40,
+            "registry_sha256": "c" * 64,
+            "work_order_sha256": "d" * 64,
+        }
+
+    @staticmethod
+    def make_order():
+        return {
+            "schema": dev.WORK_ORDER_SCHEMA,
+            "objective": "Diagnose a CPU-only page-boundary failure in the first job.",
+            "acceptance": "Resume the exact session in a second job and pass the test.",
+            "execution_path": "path3-codex",
+            "capability": "codex-workspace",
+            "scope": "host-only",
+            "continuity_probe": "page-boundary-v1",
+        }
+
+    def test_exact_work_order_admits_only_cpu_only_proof(self):
+        c = self.probe()
+        order = self.make_order()
+        event = {"comment": {"body": dev.WORK_ORDER_PREFIX + json.dumps(order)}}
+        parsed = dev.parse_dynamic_work_order(event)
+        self.assertEqual(parsed["continuity_probe"], c.FIXTURE)
+        task = dev.task_for_request(
+            {"schema_version": dev.VERSION, "mode": "development", "tasks": {}},
+            {"task_id": dev.DYNAMIC_TASKS["path3-codex"],
+             "work_order_sha256": dev.work_order_digest(parsed)},
+            event)
+        self.assertEqual(task["continuity_probe"], c.FIXTURE)
+        for extra in (
+            {"scope": "guarded-hardware"},
+            {"continuity_probe": "arbitrary-route"},
+            {"script": "evil.py"},
+            {"argv": ["--hardware"]},
+        ):
+            with self.subTest(extra=extra):
+                bad = order | extra
+                event["comment"]["body"] = dev.WORK_ORDER_PREFIX + json.dumps(bad)
+                with self.assertRaises(dev.Denied):
+                    dev.parse_dynamic_work_order(event)
+        event["comment"]["body"] = dev.WORK_ORDER_PREFIX + json.dumps(
+            {k: v for k, v in order.items() if k != "scope"})
+        with self.assertRaises(dev.Denied):
+            dev.parse_dynamic_work_order(event)
+
+    def stages(self, td, *, wrong_uuid=False, lose_challenge=False):
+        c = self.probe()
+        base = Path(td)
+        state_base = base / "state"
+        state_base.mkdir(mode=0o700)
+        fixture = base / "candidate"
+        fixture.mkdir()
+        identity = self.identity()
+        known_thread = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+        nonce = "a" * 32
+        calls = []
+
+        def fake(command, prompt, state):
+            calls.append((command, prompt))
+            project = state / "project"
+            if len(calls) == 1:
+                self.assertIn("exec", command)
+                self.assertNotIn("resume", command)
+                self.assertIn(nonce, prompt)
+                self.assertEqual(c.test_exit(project), 1)
+                return known_thread, {
+                    "input_tokens": 90, "cached_input_tokens": 30,
+                    "output_tokens": 9}
+            if len(calls) == 2:
+                self.assertIn("resume", command)
+                self.assertEqual(command[command.index("resume") + 1], known_thread)
+                self.assertNotIn(nonce, prompt)
+                (project / "mock_page_chunks.py").write_text(c.FIXED_SOURCE)
+                if not lose_challenge:
+                    (project / "resume-proof.txt").write_text(nonce + "\n")
+                return (
+                    ("00000000-0000-4000-8000-000000000001"
+                     if wrong_uuid else known_thread),
+                    {"input_tokens": 200, "cached_input_tokens": 150,
+                     "output_tokens": 17})
+            self.fail("Unexpected third model call")
+
+        with patch.object(c, "require_pinned_clean_checkout"):
+            first = c.run_stage(
+                "new", identity=identity, workspace=fixture,
+                state_base=state_base, execute=fake,
+                nonce_factory=lambda n: nonce)
+            self.assertEqual(first["phase_result"], "READY_FOR_RESUME")
+            self.assertEqual(first["after_exit"], 1)
+            self.assertEqual(first["codex_usage"]["input_tokens"], 90)
+            self.assertEqual(len(calls), 1)
+            manifest = state_base / ("run-" + identity["github_run_id"]) / "manifest.json"
+            self.assertEqual(manifest.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(manifest.read_text())["challenge_sha256"],
+                             c.digest(nonce.encode()))
+            self.assertNotIn('"challenge":', manifest.read_text())
+            with self.assertRaisesRegex(c.ResumeDenied, "RESUME_STATE_ALREADY_EXISTS"):
+                c.run_stage(
+                    "new", identity=identity, workspace=fixture,
+                    state_base=state_base, execute=fake)
+            try:
+                second = c.run_stage(
+                    "resume", identity=identity, workspace=fixture,
+                    state_base=state_base, execute=fake)
+                self.assertEqual(second["phase_result"], "VERIFIED_PASS")
+                self.assertTrue(second["same_thread"])
+                self.assertEqual(second["context_continuity"], "VERIFIED")
+                self.assertEqual(second["after_exit"], 0)
+            except c.ResumeDenied as exc:
+                if wrong_uuid:
+                    self.assertEqual(str(exc), "RESUME_THREAD_MISMATCH")
+                elif lose_challenge:
+                    self.assertEqual(str(exc), "RESUME_PROOF_INVALID")
+                else:
+                    raise
+            if not wrong_uuid and not lose_challenge:
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_BINDING_MISMATCH"):
+                    c.run_stage(
+                        "resume", identity=identity, workspace=fixture,
+                        state_base=state_base, execute=fake)
+            self.assertEqual(len(calls), 2)
+
+    def test_new_and_resume_two_calls_positive(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.stages(td)
+
+    def test_wrong_thread_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.stages(td, wrong_uuid=True)
+
+    def test_lost_challenge_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.stages(td, lose_challenge=True)
+
+    def test_reject_work_order_runner_source_and_run_id_changes(self):
+        c = self.probe()
+        baseline = self.identity()
+        bads = [
+            {"owner": "other"},
+            {"runner_name": "different-runner"},
+            {"github_run_id": "not-digits"},
+            {"trusted_sha": "wrong"},
+            {"source_sha": "1" * 39},
+            {"work_order_sha256": "f" * 63},
+            {"comment_id": -1},
+        ]
+        for change in bads:
+            with self.subTest(change=change), self.assertRaises(c.ResumeDenied):
+                c.validate_identity(baseline | change)
+        for bad in ("wrong", "", None):
+            with self.subTest(bad=bad), self.assertRaises(c.ResumeDenied):
+                c.command_for_stage("resume", bad)
+
+    def test_identity_mismatch_denied_before_resume(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_base = root / "state"
+            state_base.mkdir(mode=0o700)
+            fixture = root / "candidate"
+            fixture.mkdir()
+            ident = self.identity()
+            thread = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+            def first(command, prompt, state):
+                return thread, {"input_tokens": 1,
+                                "cached_input_tokens": 0, "output_tokens": 1}
+            with patch.object(c, "require_pinned_clean_checkout"):
+                c.run_stage(
+                    "new", identity=ident, workspace=fixture,
+                    state_base=state_base, execute=first,
+                    nonce_factory=lambda n: "a" * 32)
+                for key, val in (
+                    ("source_sha", "9"*40),
+                    ("trusted_sha", "9"*40),
+                    ("work_order_sha256", "9"*64),
+                    ("registry_sha256", "9"*64),
+                    ("comment_id", 5180002),
+                    ("runner_name", "different-runner"),
+                    ("owner", "attacker"),
+                ):
+                    def forbidden(*_):
+                        self.fail("Resume model must never run")
+                    with self.subTest(key=key), self.assertRaises(c.ResumeDenied):
+                        c.run_stage(
+                            "resume", identity=ident | {key:val},
+                            workspace=fixture, state_base=state_base,
+                            execute=forbidden)
+
+    def test_resume_requires_original_workspace_hash(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state = root/"state"
+            state.mkdir(mode=0o700)
+            work = root/"candidate"
+            work.mkdir()
+            ident = self.identity()
+            tid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+            def fake(*_):
+                return tid, {"input_tokens": 10,
+                             "cached_input_tokens": 2, "output_tokens": 1}
+            with patch.object(c, "require_pinned_clean_checkout"):
+                c.run_stage(
+                    "new", identity=ident, workspace=work,
+                    state_base=state, execute=fake,
+                    nonce_factory=lambda n: "a"*32)
+                project = state/("run-"+ident["github_run_id"])/"project"
+                (project/"test_mock_page_chunks.py").write_text("tampered")
+                with self.assertRaisesRegex(
+                        c.ResumeDenied, "RESUME_WORKSPACE_HASH_MISMATCH"):
+                    c.run_stage(
+                        "resume", identity=ident, workspace=work,
+                        state_base=state, execute=lambda *_: self.fail(
+                            "Model must not run"))
+
+    def test_bwrap_mounts_exclude_host_repo_and_real_devices(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root / "home"
+            auth = home / ".codex" / "auth.json"
+            auth.parent.mkdir(parents=True)
+            auth.write_text("{}")
+            state = root / "state"
+            state.mkdir()
+            (state/"codex-home").mkdir()
+            project = state / "project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else "/usr/bin/codex"
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                cmd = c.sandbox_command(state, project, home)
+            self.assertIn("--dev", cmd)
+            self.assertEqual(cmd[cmd.index("--dev")+1], "/dev")
+            self.assertIn("--proc", cmd)
+            self.assertEqual(cmd[cmd.index("--proc")+1], "/proc")
+            self.assertIn("--clearenv", cmd)
+            self.assertIn("--unshare-user", cmd)
+            self.assertIn("--unshare-pid", cmd)
+            self.assertEqual(cmd[cmd.index("--bind")+1:cmd.index("--bind")+3],
+                             [str(project), "/work"])
+            self.assertIn(str(auth), cmd)
+            self.assertEqual(cmd[cmd.index("--ro-bind", cmd.index(str(state/"codex-home"))) + 1],
+                             str(auth))
+            self.assertNotIn("/sys", cmd)
+            self.assertNotIn("/storage/projects/plasma", cmd)
+            self.assertNotIn("--share-net", cmd)
+            self.assertNotIn("--bind-try", cmd)
+
+    def test_bwrap_rejects_root_and_missing_auth(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root/"home"
+            home.mkdir()
+            state = root/"state"
+            state.mkdir()
+            project = state/"project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else "/usr/bin/codex"
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_ROOT_DENIED"):
+                    c.sandbox_command(state, project, home)
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_AUTH_UNAVAILABLE"):
+                    c.sandbox_command(state, project, home)
+
+    def test_bwrap_nvm_launcher_and_node_bin_remain_visible(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root / "home"
+            auth = home / ".codex" / "auth.json"
+            auth.parent.mkdir(parents=True)
+            auth.write_text("{}")
+            nvm_bin = home / ".nvm" / "versions" / "node" / "v20" / "bin"
+            nvm_bin.mkdir(parents=True)
+            state = root / "state"
+            state.mkdir()
+            (state / "codex-home").mkdir()
+            project = state / "project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else str(nvm_bin / "codex")
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                cmd = c.sandbox_command(state, project, home)
+            self.assertIn(str(home / ".nvm"), cmd)
+            self.assertIn("--ro-bind", cmd)
+            self.assertTrue(any(str(nvm_bin) in x for x in cmd))
+            self.assertIn("CODEX_HOME", cmd)
+            self.assertIn("PATH", cmd)
+            self.assertIn(str(nvm_bin), cmd[cmd.index("PATH") + 1])
+
+    def test_cli_explicitly_reasserts_network_policy_on_both_turns(self):
+        c = self.probe()
+        sid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+        for phase,thread in (("new", None), ("resume", sid)):
+            cmd = c.command_for_stage(phase, thread)
+            self.assertIn('sandbox_mode="workspace-write"', cmd)
+            self.assertIn("sandbox_workspace_write.network_access=false", cmd)
+            self.assertIn("--ask-for-approval", cmd)
+            self.assertIn("never", cmd)
+            self.assertNotIn("danger-full-access", cmd)
+            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", cmd)
+
+    def test_codex_event_usage_and_thread_negative_contract(self):
+        c = self.probe()
+        sid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+        good = [
+            {"type": "thread.started", "thread_id": sid},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 50, "cached_input_tokens": 45, "output_tokens": 3}},
+        ]
+        transcript = "".join(json.dumps(item)+"\n" for item in good)
+        session, usage = c.parse_codex_events(transcript)
+        self.assertEqual(session, sid)
+        self.assertEqual(usage["cached_input_tokens"], 45)
+        bad = [
+            (good[:1], "RESUME_EVENTS_INCOMPLETE"),
+            (good + good[1:], "RESUME_EVENTS_INCOMPLETE"),
+            (good[:1] + [{"type": "turn.completed", "usage": {
+                "input_tokens": 2, "cached_input_tokens": 3, "output_tokens": 0}}],
+             "RESUME_USAGE_INVALID"),
+            ([{"type": "thread.started", "thread_id": "not-a-uuid"}] + good[1:],
+             "RESUME_THREAD_INVALID"),
+        ]
+        for messages, code in bad:
+            with self.subTest(code=code), self.assertRaisesRegex(c.ResumeDenied, code):
+                c.parse_codex_events("".join(json.dumps(x)+"\n" for x in messages))
+
+    def test_missing_private_state_cannot_start_resume(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_root = root/"state"
+            state_root.mkdir(mode=0o700)
+            candidate = root/"candidate"
+            candidate.mkdir()
+            with patch.object(c, "require_pinned_clean_checkout"):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_STATE_MISSING"):
+                    c.run_stage(
+                        "resume", identity=self.identity(), workspace=candidate,
+                        state_base=state_root, execute=lambda *_: self.fail(
+                            "No model calls permitted when state is missing"))
+
+    def test_existing_workflow_has_only_one_added_conditional_job(self):
+        workflow = WORKFLOW.read_text()
+        self.assertEqual(workflow.count("  development-codex-resume:"), 1)
+        first = workflow.split("  development-codex:", 1)[1].split(
+            "  development-codex-resume:", 1)[0]
+        second = workflow.split("  development-codex-resume:", 1)[1].split(
+            "\n  authorize:", 1)[0]
+        self.assertIn("--resume-phase new", first)
+        self.assertIn("--resume-phase resume", second)
+        self.assertIn("needs: [development-authorize, development-codex]",
+                      second)
+        self.assertIn("outputs.continuity_probe == 'page-boundary-v1'",
+                      second)
+        self.assertNotIn("include-hidden-files: true", second)
+        self.assertEqual(workflow.count(
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertNotIn("plasma-path3-resume-workflow.yml", workflow)
 
 
 if __name__ == "__main__":

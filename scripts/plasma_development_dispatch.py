@@ -203,7 +203,8 @@ def parse_dynamic_work_order(event: object) -> dict:
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage"},
+                               "expected_stdout_sha256", "project", "stage",
+                               "continuity_probe"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -224,7 +225,10 @@ def parse_dynamic_work_order(event: object) -> dict:
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
         require(capability == "codex-workspace" and
-                set(order) <= (base - {"scope"}) | optional_ref,
+                (set(order) <= (base - {"scope"}) | optional_ref or
+                 (order.get("scope") == "host-only" and
+                  order.get("continuity_probe") == "page-boundary-v1" and
+                  set(order) <= base | optional_ref | {"continuity_probe"})),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only":
         require(scope == "host-only" and
@@ -294,7 +298,7 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order["scope"]
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage"):
+                "project", "stage", "continuity_probe"):
         if key in order:
             task[key] = order[key]
     return task
@@ -450,6 +454,7 @@ def authorize(event: object, context: dict, registry: object,
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
+        "continuity_probe": task.get("continuity_probe", ""),
         "execution_capability": (
             "z2-cpu-only" if req["task_id"] == "hil-a2-cpu-only"
             else task.get("capability", "cpu-only")
@@ -1181,6 +1186,7 @@ def main() -> int:
     parser.add_argument("--execution-capability")
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
+    parser.add_argument("--resume-phase", choices=("new", "resume"))
     args = parser.parse_args()
     try:
         event = parse_json(args.event)
@@ -1204,18 +1210,47 @@ def main() -> int:
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
-                receipt = (
-                    (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
-                     if req["task_id"] == "f1b-path3-codex-vivado-build"
-                     else run_codex_task(task, workspace=args.workspace,
-                                   task_id=req["task_id"])
+                if task.get("continuity_probe"):
+                    require(args.action == "execute-codex" and
+                            args.resume_phase in ("new", "resume") and
+                            task["continuity_probe"] == "page-boundary-v1" and
+                            req["task_id"] == DYNAMIC_TASKS["path3-codex"],
+                            "RESUME_PHASE_ADMISSION_DENIED")
+                    require(os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
+                            os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted",
+                            "RESUME_RUNNER_ADMISSION_DENIED")
+                    import plasma_path3_cross_job_resume as continuation
+                    identity = {
+                        "owner": OWNER,
+                        "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+                        "comment_id": req["comment_id"],
+                        "runner_name": os.environ.get("RUNNER_NAME", ""),
+                        "trusted_sha": req["trusted_sha"],
+                        "source_sha": req["source_sha"],
+                        "registry_sha256": args.registry_sha256,
+                        "work_order_sha256": req["work_order_sha256"],
+                    }
+                    try:
+                        receipt = continuation.run_stage(
+                            args.resume_phase, identity=identity,
+                            workspace=args.workspace,
+                            state_base=continuation.state_root_for_runner())
+                    except continuation.ResumeDenied as exc:
+                        raise Denied(str(exc)) from None
+                else:
+                    require(args.resume_phase is None,
+                            "UNEXPECTED_RESUME_PHASE")
+                    receipt = (
+                        (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
+                         if req["task_id"] == "f1b-path3-codex-vivado-build"
+                         else run_codex_task(task, workspace=args.workspace,
+                                             task_id=req["task_id"]))
+                        if args.action == "execute-codex"
+                        else run_task(task, workspace=args.workspace,
+                                      evidence_dir=args.evidence_dir,
+                                      approval=task_approval,
+                                      sandbox=task.get("capability", "cpu-only") == "cpu-only")
                     )
-                    if args.action == "execute-codex"
-                    else run_task(task, workspace=args.workspace,
-                                  evidence_dir=args.evidence_dir,
-                                  approval=task_approval,
-                                  sandbox=task.get("capability", "cpu-only") == "cpu-only")
-                )
                 plan = {
                     **receipt, **req,
                     "task_id": req["task_id"],

@@ -251,7 +251,11 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         self.assertIn("development-claim:", workflow)
         self.assertIn("needs: [development-authorize, development-claim]", workflow)
         self.assertIn("needs.development-claim.result == 'success'", workflow)
-        self.assertNotIn("needs.development-codex.result == 'success'", workflow)
+        hardware_job = workflow.split("  development-execute:", 1)[1].split("\n  development-codex:", 1)[0]
+        self.assertNotIn("needs.development-codex.result == 'success'", hardware_job)
+        resume_job = workflow.split("  development-codex-resume:", 1)[1].split("\n  authorize:", 1)[0]
+        self.assertIn("needs.development-codex.result == 'success'", resume_job)
+        self.assertIn("outputs.continuity_probe == 'page-boundary-v1'", resume_job)
         self.assertIn("needs.development-claim.outputs.claim_ref == needs.development-authorize.outputs.claim_ref", workflow)
         self.assertIn("github.rest.git.createRef", workflow)
         self.assertIn("github.rest.git.getRef", workflow)
