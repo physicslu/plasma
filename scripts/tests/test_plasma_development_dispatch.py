@@ -1800,5 +1800,201 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertIn("Owner Work Order SHA256", calls[0])
 
 
+class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
+    """Synthetic two-process proof: no real Codex, SWPC or device calls."""
+
+    PIN = "b" * 40
+    SID = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+    NONCE = "a" * 32
+
+    @staticmethod
+    def module():
+        import plasma_path3_session_resume_probe as probe
+        return probe
+
+    def workspace(self, td):
+        repo = Path(td)
+        (repo / "AGENTS.md").write_text("Test-only AGENTS entrypoint.\n")
+        return repo
+
+    def state(self, root):
+        scratch = root / self.module().ROOT_FOLDER
+        entries = (["?? " + self.module().ROOT_FOLDER + "/" + x.name
+                    for x in scratch.iterdir() if x.is_file()]
+                   if scratch.is_dir() else [])
+        return self.PIN, entries
+
+    def fake(self, repo, *, change_id=False, no_proof=False,
+             first_nonzero=False, premature_fix=False, outside_change=False):
+        probe = self.module()
+        calls = []
+        first_prompt = []
+
+        def invoke(command, **kwargs):
+            calls.append(command)
+            scratch = Path(kwargs["cwd"])
+            prompt = kwargs["input"]
+            self.assertTrue(kwargs["capture_output"])
+            self.assertTrue(kwargs["text"])
+            self.assertEqual(kwargs["timeout"], 240)
+            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+            self.assertIn("sandbox_workspace_write.network_access=false", command)
+            self.assertIn('sandbox_mode="workspace-write"', command)
+            if len(calls) == 1:
+                self.assertNotIn("resume", command)
+                self.assertIn("DO NOT fix anything", prompt)
+                self.assertIn(self.NONCE, prompt)
+                first_prompt.append(prompt)
+                if premature_fix:
+                    f = scratch / probe.SOURCE_NAME
+                    f.write_text(f.read_text().replace(
+                        "len(data) - 1", "len(data)"))
+                if first_nonzero:
+                    return subprocess.CompletedProcess(command, 1, "", "")
+                session = self.SID
+            elif len(calls) == 2:
+                self.assertEqual(command[command.index("resume") + 1], self.SID)
+                self.assertNotIn(self.NONCE, prompt)
+                self.assertNotIn("--sandbox", command)
+                # The fake CLI is the only actor which edits the approved source.
+                source = scratch / probe.SOURCE_NAME
+                source.write_text(source.read_text().replace(
+                    "len(data) - 1", "len(data)"))
+                if not no_proof:
+                    (scratch / probe.PROOF_NAME).write_text(self.NONCE + "\n")
+                session = (str(__import__("uuid").uuid4())
+                           if change_id else self.SID)
+            else:
+                self.fail("Unexpected third Codex process")
+            events = [
+                {"type": "thread.started", "thread_id": session},
+                {"type": "turn.completed",
+                 "usage": {"input_tokens": 120, "cached_input_tokens": 80,
+                           "output_tokens": 20}},
+            ]
+            return subprocess.CompletedProcess(
+                command, 0,
+                "".join(json.dumps(e) + "\n" for e in events), "")
+        return invoke, calls
+
+    def test_two_distinct_processes_reuse_thread_and_fix_bug(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(report["result"], "PASS", report)
+            self.assertNotEqual(report["test_before"], 0)
+            self.assertNotEqual(report["test_after_first"], 0)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertTrue(report["same_thread"])
+            self.assertEqual(report["context_continuity"], "VERIFIED")
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(report["usage"]), 2)
+            self.assertEqual(report["usage"][0]["input_tokens"], 120)
+            receipt = (repo / probe.ROOT_FOLDER / "receipt.json")
+            self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn(self.NONCE, receipt.read_text())
+            self.assertNotIn(self.SID, receipt.read_text())
+            self.assertTrue(report["thread_id_sha256"])
+            self.assertEqual(
+                (repo / probe.ROOT_FOLDER / probe.TEST_NAME).read_text(),
+                probe.TEST_SOURCE)
+
+    def test_mismatched_thread_fails_even_when_bug_fixed(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo, change_id=True)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertEqual(report["result"], "FAIL")
+            self.assertEqual(report["failure_reason"], "RESUMED_THREAD_MISMATCH")
+
+    def test_same_thread_without_prior_challenge_is_not_pass(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo, no_proof=True)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertEqual(report["result"], "FAIL")
+            self.assertEqual(report["failure_reason"], "CHALLENGE_NOT_RECOVERED")
+
+    def test_first_turn_nonzero_and_unexpected_fix_do_not_resume(self):
+        probe = self.module()
+        for flags,reason in [
+            ({"first_nonzero": True}, "CODEX_NONZERO"),
+            ({"premature_fix": True}, "FIRST_TURN_PREMATURE_FIX"),
+        ]:
+            with self.subTest(reason=reason), tempfile.TemporaryDirectory() as td:
+                repo = self.workspace(td)
+                executor, calls = self.fake(repo, **flags)
+                report = probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=self.state, nonce_factory=lambda: self.NONCE)
+                self.assertEqual(report["result"], "FAIL")
+                self.assertEqual(report["failure_reason"], reason)
+                self.assertEqual(len(calls), 1)
+
+    def test_dirty_pin_and_existing_probe_fail_before_codex(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo)
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "SOURCE_NOT_CLEAN_OR_PINNED"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: ("c" * 40, []))
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "SOURCE_NOT_CLEAN_OR_PINNED"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: (self.PIN, [" M docs/README.md"]))
+            (repo / probe.ROOT_FOLDER).mkdir()
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "PROBE_ALREADY_EXISTS"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: (self.PIN, []))
+            self.assertFalse(calls)
+
+    def test_missing_bounded_jsonl_events_fail_closed(self):
+        probe = self.module()
+        for events,reason in [
+            ([], "THREAD_ID_NOT_UNIQUE"),
+            ([{"type":"thread.started","thread_id":self.SID}],
+             "TURN_USAGE_NOT_UNIQUE"),
+            ([{"type":"thread.started","thread_id":self.SID},
+              {"type":"turn.completed",
+               "usage":{"input_tokens":3, "cached_input_tokens":4,
+                        "output_tokens":1}}], "USAGE_INVALID"),
+        ]:
+            with self.subTest(reason=reason), self.assertRaisesRegex(
+                    probe.ProbeDenied, reason):
+                probe.parse_events("".join(json.dumps(x) + "\n" for x in events))
+
+    def test_no_unapproved_runner_or_workflow_resume(self):
+        probe = self.module()
+        self.assertNotIn("resume", dev.run_codex_task.__code__.co_names)
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox",
+                         " ".join(probe.cmd(self.SID)))
+        workflow = WORKFLOW.read_text()
+        self.assertIn("github.event_name == 'pull_request'", workflow)
+        self.assertIn("runs-on: ubuntu-24.04", workflow)
+        self.assertIn("scripts/tests/test_plasma_development_dispatch.py",
+                      workflow)
+        self.assertNotIn("plasma-path3-session-resume.yml", workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
