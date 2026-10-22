@@ -17,6 +17,10 @@ EVIDENCE_FILES = (
     "release/openocd.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json",
+    "release/openocd-qualification/stm32f103-medium-nonlqfp-exact-12-applicability-v1.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-nonlqfp-12-v1.json",
+    "data/ic-support/benchmarks/stm32f103c/source-lock.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json",
     "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json",
     "release/openocd-qualification/stm32f103-medium-density-tr-ordering-equivalence-v3.json",
@@ -135,6 +139,21 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103ZET6TR",
             "STM32F103ZET7",
         )
+        extra = (
+            "STM32F103CBU6",
+            "STM32F103CBU6TR",
+            "STM32F103R8H6",
+            "STM32F103R8H6TR",
+            "STM32F103R8H7",
+            "STM32F103RBH6",
+            "STM32F103RBH6TR",
+            "STM32F103RBH7",
+            "STM32F103V8H6",
+            "STM32F103V8H6TR",
+            "STM32F103VBH6",
+            "STM32F103VBH7",
+        )
+        expected = tuple(sorted((*expected, *extra)))
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
             expected,
@@ -356,7 +375,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                     expected_pages,
                 )
 
-        unreviewed = self.registry.describe("STMicroelectronics", "STM32F103V8H6")
+        unreviewed = self.registry.describe("STMicroelectronics", "STM32F103T8U6")
         self.assertEqual(unreviewed["software_state"], "UNKNOWN")
         self.assertFalse(unreviewed["reviewed"])
         self.assertIsNone(unreviewed["provider"])
@@ -383,21 +402,87 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 65)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 65)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 77)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 77)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 65,
+            registry.summary["catalog_exact_icpns"] - 77,
         )
         self.assertEqual(
             registry.summary["qualification_id"],
-            "adr0002-phase2-openocd-012-stm32f103-v8",
+            "adr0002-phase2-openocd-012-stm32f103-v9",
         )
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
-        self.assertEqual(len(registry.reviewed_exact_keys), 65)
+        self.assertEqual(len(registry.reviewed_exact_keys), 77)
+
+    def test_new_exact_non_lqfp_medium_cohort_is_bounded(self):
+        expected = {
+            "STM32F103CBU6": ("stm32f103cb-128k-v0", 131072, 128),
+            "STM32F103CBU6TR": ("stm32f103cb-128k-v0", 131072, 128),
+            "STM32F103R8H6": ("stm32f103r8-64k-v0", 65536, 64),
+            "STM32F103R8H6TR": ("stm32f103r8-64k-v0", 65536, 64),
+            "STM32F103R8H7": ("stm32f103r8-64k-v0", 65536, 64),
+            "STM32F103RBH6": ("stm32f103rb-128k-v0", 131072, 128),
+            "STM32F103RBH6TR": ("stm32f103rb-128k-v0", 131072, 128),
+            "STM32F103RBH7": ("stm32f103rb-128k-v0", 131072, 128),
+            "STM32F103V8H6": ("stm32f103v8-64k-v0", 65536, 64),
+            "STM32F103V8H6TR": ("stm32f103v8-64k-v0", 65536, 64),
+            "STM32F103VBH6": ("stm32f103vb-128k-v0", 131072, 128),
+            "STM32F103VBH7": ("stm32f103vb-128k-v0", 131072, 128),
+        }
+        for icpn, (geom, size, pages) in expected.items():
+            with self.subTest(icpn=icpn):
+                row = self.registry.describe("STMicroelectronics", icpn)
+                self.assertEqual(row["software_state"], "SUPPORTED")
+                self.assertTrue(row["reviewed"])
+                self.assertEqual(row["programming"]["memory_geometry_profile_id"], geom)
+                self.assertEqual(row["programming"]["flash_geometry"]["main_flash_size_bytes"], size)
+                self.assertEqual(row["programming"]["flash_geometry"]["page_count"], pages)
+                self.assertEqual(set(row["operations"]), set(REQUIRED_OPERATIONS))
+                self.assertFalse(row["installed_runtime_attested"])
+                self.assertFalse(row["physical_programming_qualified"])
+
+        excluded = (
+            "STM32F103RBH6R", "STM32F103RBH6RTR",
+            "STM32F103T8U6", "STM32F103T8U6TR",
+            "STM32F103T8U7", "STM32F103T8U7TR",
+            "STM32F103TBU6", "STM32F103TBU6TR", "STM32F103TBU7",
+        )
+        for icpn in excluded:
+            with self.subTest(excluded=icpn):
+                result = self.registry.describe("STMicroelectronics", icpn)
+                self.assertEqual(result["software_state"], "UNKNOWN")
+                self.assertFalse(result["reviewed"])
+                self.assertIsNone(result["programming"])
+                self.assertEqual(result["operations"], {})
+
+    def test_non_lqfp_applicability_integrity_fails_closed(self):
+        self.assertIsNotNone(ROOT)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            copy_evidence_tree(root)
+            rel = "release/openocd-qualification/stm32f103-medium-nonlqfp-exact-12-applicability-v1.json"
+            file = root / rel
+            file.write_bytes(file.read_bytes() + b"\n")
+            with self.assertRaisesRegex(DeviceCatalogIntegrityError, "source/applicability blob drift"):
+                OpenOCDSoftwareQualificationRegistry(self.catalog, root)
+
+    def test_non_lqfp_v9_total_must_match(self):
+        import json
+        self.assertIsNotNone(ROOT)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            copy_evidence_tree(root)
+            rel = "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json"
+            file = root / rel
+            content = json.loads(file.read_text())
+            content["supported_exact_icpn_count"] = 89
+            file.write_text(json.dumps(content))
+            with self.assertRaisesRegex(DeviceCatalogIntegrityError, "v9 admission manifest drift"):
+                OpenOCDSoftwareQualificationRegistry(self.catalog, root)
 
     def test_local_evidence_blob_drift_fails_closed(self):
         self.assertIsNotNone(ROOT)
