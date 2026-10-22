@@ -2283,6 +2283,32 @@ class CrossJobCodexResumeContracts(unittest.TestCase):
                 with self.assertRaisesRegex(c.ResumeDenied, "RESUME_AUTH_UNAVAILABLE"):
                     c.sandbox_command(state, project, home)
 
+    def test_bwrap_nvm_launcher_and_node_bin_remain_visible(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root / "home"
+            auth = home / ".codex" / "auth.json"
+            auth.parent.mkdir(parents=True)
+            auth.write_text("{}")
+            nvm_bin = home / ".nvm" / "versions" / "node" / "v20" / "bin"
+            nvm_bin.mkdir(parents=True)
+            state = root / "state"
+            state.mkdir()
+            (state / "codex-home").mkdir()
+            project = state / "project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else str(nvm_bin / "codex")
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                cmd = c.sandbox_command(state, project, home)
+            self.assertIn(str(home / ".nvm"), cmd)
+            self.assertIn("--ro-bind", cmd)
+            self.assertTrue(any(str(nvm_bin) in x for x in cmd))
+            self.assertEqual(cmd[cmd.index("--setenv", cmd.index(
+                "--setenv", cmd.index("--setenv") + 1) + 1) + 1], "CODEX_HOME")
+
     def test_cli_explicitly_reasserts_network_policy_on_both_turns(self):
         c = self.probe()
         sid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
