@@ -6,9 +6,11 @@ and 48 MHz USB clock. PC13 drives the common active-low Blue Pill LED.
 
 This Phase A source builds against ST's STM32CubeF1 HAL and USB Device CDC
 middleware. It does not program a board. The USB descriptor uses provisional
-lab VID/PID `CAFE:4001`; obtain an assigned VID/PID before any distribution or
-physical acceptance. The common Blue Pill has a fixed D+ pull-up, so firmware
-does not emulate USB detach. Physical unplug/replug and board-specific D+
+experimental VID/PID `CAFE:4001`. PLASMA has no documented ownership or
+authorization for this pair. It is **not an official PLASMA USB ID**. Obtain
+an assigned or otherwise authorized VID/PID before distribution, formal
+release, or physical acceptance. The common Blue Pill has a fixed D+ pull-up,
+so firmware does not emulate USB detach. Physical unplug/replug and board-specific D+
 pull-up behavior remain untested.
 
 ## Wire behavior
@@ -92,9 +94,13 @@ gcc -std=c11 -Wall -Wextra -Werror -fsanitize=undefined \
 python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p 'test_*.py' -v
 ```
 
-`host/cdc_probe.py` is a future serial-port test using pyserial. It checks
-unsolicited heartbeat sequence/interval/uptime, the `ID` reply, and continuity
-after a deliberate host-port close/reopen. **It is not run in Phase A.** Neither
+`host/cdc_probe.py` is a future serial-port test using pyserial. It prints each
+heartbeat immediately and checks exact consecutive sequence/interval/uptime
+and the `ID` reply. Normal continuous observation leaves the Host Port open.
+An optional `--host-port-pause-seconds <seconds>` closes and reopens only the
+host serial port, allowing a sequence gap across that deliberate interruption.
+It does not disconnect USB power or prove a physical USB reconnect. **The
+live probe is not run in Phase A.** Neither
 these tests nor the static artifact check prove enumeration, real USB timing,
 electrical behavior, disconnect/reconnect, LED operation, or physical CDC
 transmission on a Blue Pill. Those outcomes are `NOT_RUN` in Phase A.

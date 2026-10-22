@@ -51,6 +51,10 @@ int main(void) {
     assert(app_next(&app, 5499, output, sizeof(output), &heartbeat) == 0);
     assert(app_next(&app, 5500, output, sizeof(output), &heartbeat) != 0);
     assert(strstr(output, "seq=3") != NULL);
+    app_sent(&app, 5500, true);
+    assert(app_next(&app, 5999, output, sizeof(output), &heartbeat) == 0);
+    assert(app_next(&app, 6000, output, sizeof(output), &heartbeat) != 0);
+    assert(heartbeat && strstr(output, "seq=4") != NULL);
     /* RX parsing and replies continue while an unsolicited heartbeat is due. */
     app_t concurrent;
     app_init(&concurrent);
@@ -59,6 +63,14 @@ int main(void) {
     expect_reply(&concurrent, 1500, "PONG\r\n");
     assert(app_next(&concurrent, 1500, output, sizeof(output), &heartbeat) != 0);
     assert(heartbeat && strstr(output, "seq=1") != NULL);
+    rx(&concurrent, "LED ");
+    app_process(&concurrent, 1500);
+    rx(&concurrent, "ON\n");
+    expect_reply(&concurrent, 1500, "LED ON\r\n");
+    assert(concurrent.led_on);
+    rx(&concurrent, "LED OFF\n");
+    expect_reply(&concurrent, 1500, "LED OFF\r\n");
+    assert(!concurrent.led_on);
     /* Tick wrap and RX overflow are bounded. */
     app_init(&app);
     app_link(&app, true, UINT32_MAX - 100u);

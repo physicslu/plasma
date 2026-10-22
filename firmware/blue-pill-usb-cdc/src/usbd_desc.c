@@ -23,6 +23,7 @@
 
 /* Private typedef ----------------------------------------------------------- */
 /* Private define ------------------------------------------------------------ */
+/* Experimental placeholder only: no PLASMA ownership or release authorization. */
 #define USBD_VID                      0xCAFE
 #define USBD_PID                      0x4001
 #define USBD_LANGID_STRING            0x409

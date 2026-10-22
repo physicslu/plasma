@@ -125,6 +125,8 @@
 
 ## Development and validation
 
+- **Gate 1 / Path 3 / Phase A / Host-only** — [Blue Pill USB CDC Firmware v0.1 Evidence](evidence/blue-pill-usb-cdc-phase-a-20261023/README.md)：STM32F103C8T6 韌體編譯、ELF／HEX／BIN 靜態核對、Heartbeat／命令 Host 測試與 SHA256；實體 USB、LED、ST-LINK 與 Flash 均為 NOT_RUN，暫用 VID/PID 不是正式 PLASMA USB ID。
+
 - **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
 - **Gate 1 / RCA archival closure (PR pending Gate 2)** — [PLASMA Path 3 Token Optimization RCA Closure](development/plasma-path3-token-optimization-rca-closure-2026-10-23.md)：固定 PR #1128 與兩次 SWPC 9×9 Run ID、Token/時間/81 成功率、Artifact SHA-256 與尚未完成的模型／Effort 因果歸因；Repo-first 工作流 DONE，逐請求 Token Attribution 保留低優先級技術債。
 - **Path 3 Repo-first instruction optimization / full normative reference** — [PLASMA Detailed Autonomous Development Contract](development/plasma-autonomous-development-contract-full.md)：完整保留原根目錄 AGENTS.md 的詳細規範；目前根目錄 AGENTS.md 為低於 Codex 預設 32 KiB 專案指令上限的精簡入口。針對實際任務按需讀取此完整條款，不代表 SWPC 已驗證載入來源或 Token 效率改善。
