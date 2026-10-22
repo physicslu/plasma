@@ -906,32 +906,24 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         ".txt" if task.get("output_format") == "text" else ".csv"
     ) if source is not None else None)
     test_log = source.with_suffix(".test.log") if source is not None else None
+    # Codex loads the concise root AGENTS.md as the normative entrypoint.
+    # Keep task details in reviewed repository Work Orders and read large
+    # detailed clauses only when relevant to the approved engineering goal.
     prompt = (
-        "PLASMA Development Mode Path 3: you are the autonomous engineer. "
-        "Prioritize completing the user-approved engineering goal quickly. "
-        "Run tools, diagnose failures, edit RTL/Tcl/Python/build scripts/docs, "
-        "repeat tests and host builds as needed within this SAME Codex job "
-        "and existing Gate 1 scope, without another user approval. "
-        "Retry recoverable software/test failures only after diagnosing them; "
-        "do not repeat unsafe hardware writes or bypass denied permissions. "
-        "Stop on missing authorization, physical ownership conflict, SIGBUS, "
-        "unreaped child or uncertain FPGA restoration. "
-        "Do not stop at an offline "
-        "mock when an actual Vivado build is needed.\n"
+        "PLASMA Path 3 Development Mode. Follow root AGENTS.md and the "
+        "owner-approved Work Order at its pinned source SHA. Read only "
+        "task-relevant detailed clauses linked from AGENTS.md, including "
+        "nested AGENTS.md when affected. Do not preload unrelated runbooks. "
+        "Within the existing Gate 1, diagnose, edit RTL/Tcl/Python, run "
+        "required builds/tests and fix/retest without another user approval. "
+        "Vivado 2026.1 is available only for work within approved scope. "
+        "Do not retry unsafe hardware writes; respect live ownership, "
+        "root-executor, electrical and rollback guards. Report inaccessible "
+        "SWPC/Z2 operations as NOT_RUN, never PASS. "
+        "Record actual commands, exits, results and hashes in "
+        ".plasma-path3-evidence/engineering-report.md. Do not commit, push "
+        "or change Git refs.\n"
         "Goal:\n" + task["objective"] + "\n"
-        "You may edit files inside this candidate workspace and run "
-        "commands required for development, including Vivado 2026.1 "
-        "synthesis/implementation/timing/DRC and BIT/HWH generation. "
-        "A successful Vivado build does not authorize FPGA loading or other "
-        "physical hardware operations.\n"
-        "Record actual commands, exit codes, observed errors, proven versus "
-        "hypothesized root causes, minimal fixes, retries, final build "
-        "stage results and hashes in .plasma-path3-evidence/engineering-report.md. "
-        "Include a chronological problem/solution ledger. Do not fabricate "
-        "PASS or claim BIT/HWH if not produced. Preserve relevant raw build "
-        "logs/reports/artifacts under the workspace. The workflow captures "
-        "your complete tracked-source Git diff, newly created files and "
-        "this report for review; do not commit, push or change Git refs.\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
@@ -955,12 +947,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
         )
     prompt += (
-        "Choose engineering tools and build commands as needed for the owner goal. "
-        "Physical effects require owner authorization and the existing trusted "
-        "root executor. Do not call sudo, SSH, FPGA Manager, /dev/mem or UIO "
-        "from this sandbox. Never claim delegated hardware acceptance without "
-        "an authentic real Z2 receipt. Report an unavailable protected execution "
-        "route as NOT_RUN.\n"
+        "Physical actions require the approved trusted root executor; "
+        "no sudo, SSH, FPGA Manager, /dev/mem or UIO from this sandbox. "
+        "Never claim Z2 acceptance without an authentic receipt.\n"
     )
     if output_path:
         prompt += (
