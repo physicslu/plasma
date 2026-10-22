@@ -2227,6 +2227,74 @@ class CrossJobCodexResumeContracts(unittest.TestCase):
                         state_base=state, execute=lambda *_: self.fail(
                             "Model must not run"))
 
+    def test_bwrap_mounts_exclude_host_repo_and_real_devices(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root / "home"
+            auth = home / ".codex" / "auth.json"
+            auth.parent.mkdir(parents=True)
+            auth.write_text("{}")
+            state = root / "state"
+            state.mkdir()
+            (state/"codex-home").mkdir()
+            project = state / "project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else "/usr/bin/codex"
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                cmd = c.sandbox_command(state, project, home)
+            self.assertIn("--dev", cmd)
+            self.assertEqual(cmd[cmd.index("--dev")+1], "/dev")
+            self.assertIn("--proc", cmd)
+            self.assertEqual(cmd[cmd.index("--proc")+1], "/proc")
+            self.assertIn("--clearenv", cmd)
+            self.assertIn("--unshare-user", cmd)
+            self.assertIn("--unshare-pid", cmd)
+            self.assertEqual(cmd[cmd.index("--bind")+1:cmd.index("--bind")+3],
+                             [str(project), "/work"])
+            self.assertIn(str(auth), cmd)
+            self.assertEqual(cmd[cmd.index("--ro-bind", cmd.index(str(state/"codex-home"))) + 1],
+                             str(auth))
+            self.assertNotIn("/sys", cmd)
+            self.assertNotIn("/storage/projects/plasma", cmd)
+            self.assertNotIn("--share-net", cmd)
+            self.assertNotIn("--bind-try", cmd)
+
+    def test_bwrap_rejects_root_and_missing_auth(self):
+        c = self.probe()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            home = root/"home"
+            home.mkdir()
+            state = root/"state"
+            state.mkdir()
+            project = state/"project"
+            project.mkdir()
+            def which(name):
+                return "/usr/bin/bwrap" if name == "bwrap" else "/usr/bin/codex"
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_ROOT_DENIED"):
+                    c.sandbox_command(state, project, home)
+            with patch.object(c.shutil, "which", side_effect=which), \
+                    patch.object(c.os, "geteuid", return_value=1000):
+                with self.assertRaisesRegex(c.ResumeDenied, "RESUME_AUTH_UNAVAILABLE"):
+                    c.sandbox_command(state, project, home)
+
+    def test_cli_explicitly_reasserts_network_policy_on_both_turns(self):
+        c = self.probe()
+        sid = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+        for phase,thread in (("new", None), ("resume", sid)):
+            cmd = c.command_for_stage(phase, thread)
+            self.assertIn('sandbox_mode="workspace-write"', cmd)
+            self.assertIn("sandbox_workspace_write.network_access=false", cmd)
+            self.assertIn("--ask-for-approval", cmd)
+            self.assertIn("never", cmd)
+            self.assertNotIn("danger-full-access", cmd)
+            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", cmd)
+
     def test_existing_workflow_has_only_one_added_conditional_job(self):
         workflow = WORKFLOW.read_text()
         self.assertEqual(workflow.count("  development-codex-resume:"), 1)
