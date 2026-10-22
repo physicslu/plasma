@@ -47,7 +47,11 @@ def verify(hw: dict, socket: dict, l2: dict) -> None:
     assert hw["scope"] == {
         "manufacturer":"STMicroelectronics", "series":"STM32F103",
         "package":"LQFP", "pin_count":100,
-        "applicable_base_devices":["STM32F103V8"],
+        "applicable_base_devices":["STM32F103V8", "STM32F103VB"],
+        "applicability_basis":{
+            "STM32F103V8":"ST DS5319 Rev 20 Table 1 x8 device summary + Figure 4 common medium-density LQFP100 pinout",
+            "STM32F103VB":"ST DS5319 Rev 20 Table 1 xB device summary + Figure 4 common medium-density LQFP100 pinout",
+        },
     }
     assert {e["source_id"] for e in hw["evidence"]} == {"st_ds5319_rev20"}
     d = hw["data"]
@@ -160,7 +164,7 @@ def main() -> int:
     for mutate in (
         lambda h: h["data"]["power"]["analog_reference"]["contacts"][0].update(tie_to="VSS"),
         lambda h: h["data"]["socket_contacts"]["not_connected"].clear(),
-        lambda h: h["scope"]["applicable_base_devices"].append("STM32F103VB"),
+        lambda h: h["scope"]["applicable_base_devices"].append("STM32F103VC"),
     ):
         corrupted = deepcopy(hw)
         mutate(corrupted)
