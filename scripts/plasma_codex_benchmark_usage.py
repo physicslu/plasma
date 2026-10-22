@@ -89,6 +89,22 @@ def read_rollout(path: Path):
                        (b"token_usage_record", b"token_count", b"task_started",
                         b"task_complete", b"turn_aborted")):
                 continue
+            # Completion envelopes can contain last_agent_message (a full
+            # conversation response). Extract only its header metadata rather
+            # than JSON-decoding that message into memory.
+            if re.search(rb'"type"\s*:\s*"(?:task_complete|turn_aborted)"', line):
+                try:
+                    top_type = re.search(rb'"type"\s*:\s*"event_msg"', line)
+                    kind = re.search(rb'"type"\s*:\s*"(task_complete|turn_aborted)"', line)
+                    ts = re.search(rb'"timestamp"\s*:\s*"([^"\\]{1,80})"', line)
+                    turn = re.search(rb'"turn_id"\s*:\s*"([a-zA-Z0-9._:/-]{1,100})"', line)
+                    if top_type and kind and ts:
+                        yield {"type": kind.group(1).decode("ascii"),
+                               "timestamp": ts.group(1).decode("ascii"),
+                               "turn_id": turn.group(1).decode("ascii") if turn else None}
+                except UnicodeError:
+                    pass
+                continue
             try:
                 obj = json.loads(line)
             except (UnicodeError, ValueError):
