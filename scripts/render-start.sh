@@ -198,10 +198,11 @@ if result.get("icpn") != "STM32F103C8T6" or not isinstance(selected_profile, dic
 if selected_profile.get("icpn") != "STM32F103C8T6":
     raise SystemExit("[render-start] IC Selector selected_profile identity mismatch")
 
-# Public readiness verifies only customer-visible Catalog Levels. NXP KL25
-# is Level 1 in the active runtime; Level 0 MCX evidence was checked internally above.
+# Public readiness checks the exact KL25 commercial identity, not a broad NXP
+# search whose first result changes as other NXP L1 cohorts are admitted.
+# Level 0 MCX evidence was checked internally above.
 with urlopen(
-    f"http://127.0.0.1:{port}/api/devices/search?q=NXP&limit=1",
+    f"http://127.0.0.1:{port}/api/devices/search?q=MKL25Z128VLK4&limit=1",
     timeout=3,
 ) as response:
     nxp_search = json.loads(response.read())
@@ -209,6 +210,7 @@ if nxp_search.get("total_count", 0) < 1 or not nxp_search.get("results"):
     raise SystemExit("[render-start] customer-visible NXP search unexpectedly empty")
 nxp_row = nxp_search["results"][0]
 if (nxp_row.get("vendor") != "NXP"
+        or nxp_row.get("icpn") != "MKL25Z128VLK4"
         or nxp_row.get("catalog_level") != 1
         or nxp_row.get("family") != "KL25"):
     raise SystemExit("[render-start] NXP customer-selector Level 1 boundary drift")
