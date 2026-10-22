@@ -19,6 +19,14 @@ PIC32_BASE_EXPECTED = 85
 PIC32_SOURCE_INDEX_BLOB = "2f7a2b1b768e2c4ccb0eb184330c405cc3826357"
 PIC32_DRIVER_BLOB = "9a1a6341256039bf9fd68e41a109e7483a5f694e"
 PIC32_PINNED_COMMIT = "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c"
+SAM_PHASE2_COHORTS = {
+    "SAMDCRL0": (538, 59, "src/flash/nor/at91samd.c",
+                "33e86c76e9f8310510844793da3f3074ed5dae8f"),
+    "SAMD5E5": (354, 25, "src/flash/nor/atsame5.c",
+                "fdd610f5f38bcbeddd3131105f046c7b67f30381"),
+}
+SAM_PHASE2_ORIGINAL_BLOB = PIC32_SOURCE_INDEX_BLOB
+
 _SHA256 = re.compile(r"original_response_sha256=([0-9a-f]{64})(?:;|\\s|$)")
 
 
@@ -55,7 +63,51 @@ def admitted_microchip_phase1_count(catalog: DeviceCatalog) -> int:
         )
 
     pic = [r for r in rows if r.family == "PIC32MX"]
-    _require(len(rows) == len(sam) + len(pic), "unknown Microchip family bypass")
+    phase2 = [r for r in rows if r.family in SAM_PHASE2_COHORTS]
+    _require(len(rows) == len(sam) + len(pic) + len(phase2),
+             "unknown Microchip family bypass")
+    allowed_counts = {family: sum(row.family == family for row in phase2)
+                      for family in SAM_PHASE2_COHORTS}
+    # Never accept a partially landed Phase-2 source/manifest.
+    _require(allowed_counts in (
+        {"SAMDCRL0": 0, "SAMD5E5": 0},
+        {"SAMDCRL0": 538, "SAMD5E5": 354},
+    ), "partial Microchip SAM Phase-2 official identity cohort")
+    for family, (expected, base_count, driver_path, driver_sha) in SAM_PHASE2_COHORTS.items():
+        subset = [r for r in phase2 if r.family == family]
+        if not subset:
+            continue
+        _require(len(subset) == expected
+                 and len({r.identifier.casefold() for r in subset}) == expected
+                 and len({r.base_device for r in subset}) == base_count,
+                 f"{family}: manufacturer identities/Base Device set drift")
+        for row in subset:
+            ref = row.source_reference or ""
+            _require(
+                row.production_admitted
+                and row.identifier_kind == "manufacturer_part_number"
+                and row.identifier.startswith("AT")
+                and bool(row.base_device)
+                and row.base_device.startswith("AT")
+                and row.mapping_status == "no_mapping"
+                and not row.target_config
+                and f"partNumber={row.identifier}" in ref
+                and f"basePartNumber={row.base_device}" in ref
+                and f"original_replay_index_git_blob={SAM_PHASE2_ORIGINAL_BLOB}" in ref
+                and f"source_commit={PIC32_PINNED_COMMIT}" in ref
+                and f"driver_path={driver_path}" in ref
+                and f"driver_blob={driver_sha}" in ref
+                and f"explicit_driver_part={row.base_device[2:]}" in ref
+                and "driver_devsel=0x" in ref
+                and "candidate_only_no_executable_mapping" in ref
+                and _SHA256.search(ref) is not None
+                and row.source_type ==
+                    "microchip_official_mcp_replayed_identity_openocd_driver_devsel"
+                and row.source_authority == "Microchip Technology official"
+                and row.verification_status ==
+                    "verified_microchip_mcp_exact_ordering_and_pinned_driver_part_devsel",
+                f"{row.identifier}: SAM Phase-2 exact identity/source guard rejected",
+            )
     # Both old 122-member fixtures and new independently admitted 893 cohort
     # are valid. Partial/changed Product source membership fails closed.
     _require(len(pic) in (0, PIC32_EXPECTED), "partial PIC32MX identity admission")
