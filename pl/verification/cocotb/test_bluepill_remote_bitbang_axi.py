@@ -154,15 +154,23 @@ async def production_bridge_controls_actual_gpio_rtl(dut):
             # Only host BFM ordering, not a native ARMv7 DMB proof.
             self.barriers += 1
 
-    port = Port()
-    bridge = RemoteBitbangSWD(port, base=BASE)
-    bridge.admit()
-    assert bridge.exchange(b"Odefgc") == b"1"
-    assert (int(dut.swclk.value), int(dut.swdio_out.value),
-            int(dut.swdio_oe.value)) == (1, 1, 1)
-    dut.swdio_in.value = 0
-    assert bridge.exchange(b"c") == b"0"
-    bridge.exchange(b"oQ")
+    # RemoteBitbangSWD deliberately exposes a synchronous MMIO protocol.
+    # Cocotb 1.9.x requires it to execute in an @external worker thread;
+    # the @function wrappers then safely schedule AXI BFM coroutines.
+    # Calling a @function from the simulator thread raises:
+    # "queue_function called from unrecognized thread".
+    @cocotb.external
+    def exercise_bridge():
+        port = Port()
+        bridge = RemoteBitbangSWD(port, base=BASE)
+        bridge.admit()
+        assert bridge.exchange(b"Odefgc") == b"1"
+        assert port.read32(BASE + 12) == 0x0F
+        assert bridge.exchange(b"oQ") == b""
+        assert port.read32(BASE + 12) == 0x09
+        return port.barriers
+
+    barriers = await exercise_bridge()
     assert (int(dut.swclk.value), int(dut.swdio_out.value),
             int(dut.swdio_oe.value)) == (0, 1, 0)
-    assert port.barriers >= 7
+    assert barriers >= 7
