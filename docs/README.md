@@ -149,6 +149,7 @@
 - **Plan / Host activation** — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：複製原 Codex 經驗證的 Z2／Hub／KINGST 所需 Linux 裝置權限及已鎖定 sigrok AppImage；僅由 SWPC 受信任管理員在 Gate 2 後啟用，保留原設備權限與兩階段合併審核。
 - **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
 - **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
+- **Gate 1 Draft / Host-only B1 contract / Z2 NOT_RUN** — [F1-B HIL-B1 Read-only Identity One-shot Contract](development/f1b-hil-b1-one-shot.md)：針對 F1-B 單一 64 KiB Unified ABI 的唯讀 Identity、完整 UIO/PL Owner 排除與原映像復原做注入式負向測試；未新增實體執行入口，候選 BIN 與可執行 Supervisor 尚待合格，不授權 Z2 FPGA Load。
 - **Plan / supervised SWD-05** — [PLASMA Codex Z2 SSH-based SWD-05 One-shot](development/plasma-codex-z2-swd05.md)：依 Gate 1 將既有四 Aperture SWD-05 實機測試封裝為帶完整 SHA256、FCLK/驅動使用權檢查及 FPGA 原始映像恢復的單次 Supervisor；Gate 2 前僅離線測試。
 - **Plan / Agent HIL acceptance** — [PLASMA Codex Agent → KINGST LA2016](development/plasma-codex-la2016.md)：Issue #981 受限 Codex 意圖請求、bubblewrap USB 隔離、PWM1→CH0 兩組波形與 OFF 實證、SHA-256 證據；僅 Gate 2 後允許實機執行。
 - **Plan / Read-only diagnostics** — [PLASMA Codex LA2016 Worker Failure Diagnostics](development/plasma-codex-la2016-diagnose.md)：Issue #981 專用 Codex Runner 的 AppImage、USB 被動存取、bubblewrap 與唯讀 Agent 請求診斷；不執行 PWM、CH0 擷取或硬體操作。

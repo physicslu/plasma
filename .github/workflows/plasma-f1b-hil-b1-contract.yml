@@ -1,0 +1,48 @@
+name: PLASMA F1-B HIL-B1 host-only one-shot contract
+on:
+  pull_request:
+    paths:
+      - 'pl/hil/fixed_b1_contract.py'
+      - 'pl/hil/fixed_b1_staging.py'
+      - 'pl/hil/fixed_b1_identity_child.py'
+      - 'pl/hil/fixed_b1_supervisor.py'
+      - 'pl/tests/test_fixed_b1_staging.py'
+      - 'pl/tests/test_fixed_b1_supervisor.py'
+      - 'pl/tests/test_fixed_b1_contract.py'
+      - 'docs/development/f1b-hil-b1-one-shot.md'
+      - '.github/workflows/plasma-f1b-hil-b1-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'pl/hil/fixed_b1_contract.py'
+      - 'pl/hil/fixed_b1_staging.py'
+      - 'pl/hil/fixed_b1_identity_child.py'
+      - 'pl/hil/fixed_b1_supervisor.py'
+      - 'pl/tests/test_fixed_b1_staging.py'
+      - 'pl/tests/test_fixed_b1_supervisor.py'
+      - 'pl/tests/test_fixed_b1_contract.py'
+      - 'docs/development/f1b-hil-b1-one-shot.md'
+      - '.github/workflows/plasma-f1b-hil-b1-contract.yml'
+permissions:
+  contents: read
+jobs:
+  b1-host-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Compile and run fixed-image B1 mock-only negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            pl/hil/fixed_b1_contract.py pl/hil/fixed_b1_staging.py \
+            pl/hil/fixed_b1_identity_child.py pl/hil/fixed_b1_supervisor.py \
+            pl/tests/test_fixed_b1_contract.py pl/tests/test_fixed_b1_staging.py \
+            pl/tests/test_fixed_b1_supervisor.py
+          python3 -m unittest -v \
+            pl.tests.test_fixed_b1_contract \
+            pl.tests.test_fixed_b1_staging \
+            pl.tests.test_fixed_b1_supervisor
