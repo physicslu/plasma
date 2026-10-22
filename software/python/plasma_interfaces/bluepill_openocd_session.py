@@ -104,14 +104,25 @@ class BluepillOpenOCDSessionExecutor:
                         await asyncio.sleep(0.01)
 
                     async def launch(*argv, **kwargs):
-                        # OpenOCD registers the remote_bitbang host command at
-                        # startup; the adapter-only -f is independently pinned
-                        # and must not declare a second target.
+                        # OpenOCD must select/register remote_bitbang through
+                        # its adapter -f BEFORE the 'remote_bitbang host'
+                        # subcommand is interpreted. Keep the canonical
+                        # target -f after that, and do not accept alternative
+                        # adapter/target commands from a plan or caller.
+                        if (len(argv) < 5
+                                or tuple(argv[1:3]) != ("-f", str(self.adapter_config))
+                                or tuple(argv[3:5]) != ("-f", "target/stm32f1x.cfg")
+                                or argv[0] != str(self.executable)):
+                            raise PlasmaError(
+                                ErrorCode.CONFIG_INVALID,
+                                "Blue Pill OpenOCD argv violates pinned adapter/target order",
+                            )
                         args = (
                             str(self.executable),
                             "-s", str(self.scripts_root),
+                            *argv[1:3],
                             "-c", f"remote_bitbang host {socket_path}",
-                            *argv[1:],
+                            *argv[3:],
                         )
                         self.last_process_argv = tuple(args)
                         return await asyncio.create_subprocess_exec(*args, **kwargs)
