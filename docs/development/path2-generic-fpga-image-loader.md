@@ -24,6 +24,25 @@ SSH/sudo route, project selector in `main`, or arbitrary privileged
 Hosted fake backend PASS tests prove ordering/negative contracts only.
 They do not prove physical reconfiguration, bus quiescence or recovery.
 
+## Already-implemented generic one-shot API (not a Path 2 stage route)
+
+`pl/hil/swd04/one_shot.py::run_live(inputs, profile=...,
+test_callback=..., admission_check=...)` **already allows an injected
+hardware profile, test callback, and independent admission callback**.
+It has existing FPGA Manager write/rollback and owner-lock primitives, so
+this Draft must not be described as inventing a new physical loader.
+However, that call runs a **one-shot load/test/restore**, not the held
+three independent Path 2 stage transactions. Its legacy result schema
+also explicitly assumes external DUT/SWD **NOT_RUN**, and its loaded
+receipt/ownership checks require profile-specific hardware qualification.
+A PYNQ-Z2 image driving external SWD must not reuse the internal-only
+proof as authorization to connect or program Blue Pill.
+
+The new `ImageProfile` and byte-level contract are an **offline immutable
+manifest/admission layer**. `supervised_one_shot` delegates the stage order
+to the existing `one_shot.run_sequence` and requires an externally
+injected, protected backend; it does not clone FPGA Manager writes.
+
 ## Why this is not yet an operational generic Path 2 loader
 
 The present trusted `scripts/plasma_development_stage_transport.py`
