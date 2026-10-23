@@ -24,7 +24,7 @@
 
 ## Engineering governance and execution paths
 
-- **Gate 1 / Draft / Backend default OFF** — [Path 2 Generic FPGA Image Loader Core](development/path2-generic-fpga-image-loader.md)：可重用的 BIT/HWH/BIN、原始映像回復、Source SHA 嚴格核對與既有 One-shot 順序控制；受保護的 Z2 Root Backend 尚未註冊，不能視為已可實際載入 FPGA。
+- **Gate 1 / Draft / 未部署** — [Path 2／3 共用 Z2 Protected Root Entry](development/path2-generic-fpga-image-loader.md)：沿用既有 Stage Transport／Root 執行路徑，將 F1-B 專用入口改為 Root-owned Project＋Source SHA 綁定；不另建 Executor／Loader，SWPC／Z2 實機驗收仍 NOT_RUN。
 
 - **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
 
