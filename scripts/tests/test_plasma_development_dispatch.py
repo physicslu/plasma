@@ -1049,7 +1049,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
