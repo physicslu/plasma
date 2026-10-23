@@ -127,3 +127,16 @@ gap narrowly defined: a trusted-main Dispatcher-to-installed-root
 Profile binding, independent current-boot/AXI and external SWD electrical
 admission, and a profile-specific DPIDR test executor. The existing
 F1-B `download/test/restore` stages remain unchanged and safe by default.
+
+
+### HWH-to-native-aperture validation (continued)
+
+The protected read-only Preflight now parses the **actual SHA-pinned**
+candidate HWH `MEMRANGE` records and requires exact instance, PS7
+`M_AXI_GP0`, 32-bit base and range equivalence to the separately
+reviewed source-defined `trusted_apertures` used by the native Linux
+MMIO ownership guard. Extra AXI regions, wrong bus, alias, offset
+or range mismatch block admission. A synthetic unit-test XML does not
+prove that Vivado produced such a handoff; actual #1142 generated
+BIT/HWH remains NOT_RUN. This additional schema check never writes
+FPGA Manager or authorizes external IO.

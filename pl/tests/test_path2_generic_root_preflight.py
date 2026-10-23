@@ -12,7 +12,7 @@ from pl.hil.path2_generic_image_loader import (
     ImageProfile, LoaderDenied, VerifiedBundle,
 )
 from pl.hil.path2_generic_root_preflight import (
-    collect_root_preflight, hardware_profile,
+    collect_root_preflight, hardware_profile, verify_gp0_hwh_apertures,
 )
 from pl.hil.swd04 import one_shot
 
@@ -43,6 +43,10 @@ def sample(tmp_path: Path):
         p.recovery_bin_sha256)
     manifest = tmp_path / "approved.json"
     manifest.write_text(json.dumps(raw))
+    (tmp_path / "candidate.hwh").write_text(
+        '<HWH><MEMRANGE MASTERBUSINTERFACE="M_AXI_GP0" '
+        'INSTANCE="swd_0" BASEVALUE="0x40008000" '
+        'HIGHVALUE="0x40008FFF"/></HWH>')
     inputs = one_shot.Inputs(
         tmp_path / "candidate.bit",
         tmp_path / "candidate.hwh",
@@ -57,8 +61,8 @@ def sample(tmp_path: Path):
 
 def test_hardware_profile_is_native_and_inert(tmp_path):
     b, _, _ = sample(tmp_path)
-    p = hardware_profile(b, trusted_apertures=(("swd", 0x40008000, 4096),))
-    assert p.apertures == (("swd", 0x40008000, 4096),)
+    p = hardware_profile(b, trusted_apertures=(("swd_0", 0x40008000, 4096),))
+    assert p.apertures == (("swd_0", 0x40008000, 4096),)
     assert p.bin_sha256 == b.candidate_bin_sha256
     assert p.recovery_sha256 == b.recovery_bin_sha256
     assert p.identity_words == ()
@@ -70,11 +74,11 @@ def test_hardware_profile_is_native_and_inert(tmp_path):
     (("swd", 0x40008000, 0),),
     (("swd", 0x40008000, 2048),),
     (("swd", 0x90000000, 4096),),
-    (("swd", 0x40008000, 4096), ("alias", 0x40008000, 4096)),
+    (("swd_0", 0x40008000, 4096), ("alias", 0x40008000, 4096)),
     (("swd", 0x40008000, True),),
     (("swd", 0x40008000, 4096, "unexpected"),),
     (("../escape", 0x40008000, 4096),),
-    (("swd", 0x40008000, 4096),) * 9,
+    (("swd_0", 0x40008000, 4096),) * 9,
 ])
 def test_invalid_apertures_rejected(tmp_path, apertures):
     b, _, _ = sample(tmp_path)
@@ -111,7 +115,7 @@ def test_root_preflight_reuses_existing_native_guards_no_write(tmp_path):
          patch.object(Path, "read_bytes", read_bytes):
         result = collect_root_preflight(
             bundle, inputs, approved_source_sha="a" * 40,
-            trusted_apertures=(("swd", 0x40008000, 4096),))
+            trusted_apertures=(("swd_0", 0x40008000, 4096),))
     assert order == ["verify", "protected", "clock_ownership", "services", "manager_log"]
     assert result["status"] == "NO_GO"
     assert result["hardware_write_authorized"] is False
@@ -126,7 +130,7 @@ def test_wrong_source_blocked_before_native_guards(tmp_path):
         with pytest.raises(LoaderDenied, match="ROOT_APPROVED_SOURCE"):
             collect_root_preflight(
                 b, inputs, approved_source_sha="b" * 40,
-                trusted_apertures=(("swd", 0x40008000, 4096),))
+                trusted_apertures=(("swd_0", 0x40008000, 4096),))
         guard.assert_not_called()
 
 
@@ -141,7 +145,7 @@ def test_manifest_tamper_rejected_before_any_hardware_observation(tmp_path):
         with pytest.raises(LoaderDenied, match="ROOT_INSTALLED_MANIFEST"):
             collect_root_preflight(
                 bundle, inputs, approved_source_sha="a" * 40,
-                trusted_apertures=(("swd", 0x40008000, 4096),))
+                trusted_apertures=(("swd_0", 0x40008000, 4096),))
         clk.assert_not_called()
         write.assert_not_called()
 
@@ -154,6 +158,37 @@ def test_root_preflight_existing_native_guard_fail_closed(tmp_path):
         with pytest.raises(ValueError, match="NOT_ARMV7"):
             collect_root_preflight(
                 b, inputs, approved_source_sha="a" * 40,
-                trusted_apertures=(("swd", 0x40008000, 4096),))
+                trusted_apertures=(("swd_0", 0x40008000, 4096),))
         clk.assert_not_called()
         write.assert_not_called()
+
+
+@pytest.mark.parametrize("fragment,apertures", [
+    ('<HWH/>', (("swd_0", 0x40008000, 4096),)),
+    ('<HWH><MEMRANGE MASTERBUSINTERFACE="S_AXI_HP0" INSTANCE="swd_0" '
+     'BASEVALUE="0x40008000" HIGHVALUE="0x40008FFF"/></HWH>',
+     (("swd_0", 0x40008000, 4096),)),
+    ('<HWH><MEMRANGE MASTERBUSINTERFACE="M_AXI_GP0" INSTANCE="swd_0" '
+     'BASEVALUE="0x40008000" HIGHVALUE="0x40009FFF"/></HWH>',
+     (("swd_0", 0x40008000, 4096),)),
+    ('<HWH><MEMRANGE MASTERBUSINTERFACE="M_AXI_GP0" INSTANCE="swd_0" '
+     'BASEVALUE="0x40008000" HIGHVALUE="0x40008FFF"/></HWH>',
+     (("other_0", 0x40008000, 4096),)),
+    ('<HWH><MEMRANGE MASTERBUSINTERFACE="M_AXI_GP0" INSTANCE="swd_0" '
+     'BASEVALUE="bogus" HIGHVALUE="0x40008FFF"/></HWH>',
+     (("swd_0", 0x40008000, 4096),)),
+])
+def test_hwh_mismatch_and_unsupported_bus_fail_closed(tmp_path, fragment, apertures):
+    hwh = tmp_path / "candidate.hwh"
+    hwh.write_text(fragment)
+    with pytest.raises(LoaderDenied, match="HWH"):
+        verify_gp0_hwh_apertures(hwh, apertures)
+
+
+def test_hwh_exact_map_success(tmp_path):
+    hwh = tmp_path / "candidate.hwh"
+    hwh.write_text('<HWH><MEMRANGE MASTERBUSINTERFACE="M_AXI_GP0" '
+                   'INSTANCE="swd_0" BASEVALUE="0x40008000" '
+                   'HIGHVALUE="0x40008FFF"/></HWH>')
+    assert verify_gp0_hwh_apertures(
+        hwh, (("swd_0", 0x40008000, 4096),)) is None

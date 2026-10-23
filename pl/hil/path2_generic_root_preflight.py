@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 from pl.hil.path2_generic_image_loader import (
     ImageProfile, LoaderDenied, VerifiedBundle, need,
@@ -63,6 +64,42 @@ def hardware_profile(bundle: VerifiedBundle, *,
     )
 
 
+def verify_gp0_hwh_apertures(
+    hwh: Path, trusted_apertures: tuple[tuple[str, int, int], ...]
+) -> None:
+    """Check *actual pinned* Vivado HWH against exact trusted AXI topology.
+
+    Hash/source protection and expected aperture policy are established by
+    the caller before this parser. A host-manufactured/synthetic HWH does
+    not qualify its physical truth, but a mismatched real HWH fails closed.
+    """
+    need(hwh.is_file() and not hwh.is_symlink() and
+         0 < hwh.stat().st_size <= 4_000_000,
+         "ROOT_HWH_FILE_DENIED")
+    try:
+        root = ET.fromstring(hwh.read_bytes())
+    except (OSError, ET.ParseError, ValueError) as exc:
+        raise LoaderDenied("ROOT_HWH_XML_DENIED") from exc
+    ranges = list(root.iter("MEMRANGE"))
+    need(len(ranges) == len(trusted_apertures), "ROOT_HWH_RANGE_COUNT_DENIED")
+    actual = []
+    for item in ranges:
+        need(item.get("MASTERBUSINTERFACE") == "M_AXI_GP0",
+             "ROOT_HWH_NOT_PS7_GP0")
+        instance = item.get("INSTANCE")
+        try:
+            base = int(item.get("BASEVALUE", ""), 0)
+            high = int(item.get("HIGHVALUE", ""), 0)
+        except ValueError as exc:
+            raise LoaderDenied("ROOT_HWH_ADDRESS_DENIED") from exc
+        need(instance is not None and high >= base and
+             high < GP0_LIMIT, "ROOT_HWH_ADDRESS_DENIED")
+        actual.append((instance, base, high - base + 1))
+    need(len(set(actual)) == len(actual) and
+         sorted(actual) == sorted(trusted_apertures),
+         "ROOT_HWH_APERTURE_MISMATCH")
+
+
 def collect_root_preflight(
     bundle: VerifiedBundle, inputs: one_shot.Inputs, *,
     approved_source_sha: str,
@@ -100,6 +137,7 @@ def collect_root_preflight(
     installed = ImageProfile.from_protected_manifest(
         manifest, approved_source_sha=approved_source_sha)
     need(installed == p, "ROOT_INSTALLED_MANIFEST_MISMATCH")
+    verify_gp0_hwh_apertures(inputs.candidate_hwh, trusted_apertures)
 
     boot_path = Path("/proc/sys/kernel/random/boot_id")
     boot_before = boot_path.read_text().strip()
