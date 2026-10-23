@@ -202,7 +202,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "script", "argv",
+                               "pr_number", "source_sha", "session_resume", "script", "argv",
                                "expected_stdout_sha256", "project", "stage"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
@@ -223,8 +223,18 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        require(capability == "codex-workspace" and
-                set(order) <= (base - {"scope"}) | optional_ref,
+        if "session_resume" in order:
+            require(order["session_resume"] == "page-boundary-off-by-one"
+                    and scope == "host-only"
+                    and set(order) <= base | optional_ref | {"session_resume"}
+                    and type(order.get("pr_number")) is int
+                    and order["pr_number"] > 0,
+                    "WORK_ORDER_RESUME_SCOPE_DENIED")
+        else:
+            require(capability == "codex-workspace" and
+                    set(order) <= (base - {"scope"}) | optional_ref,
+                    "WORK_ORDER_PATH3_FIELDS_DENIED")
+        require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only":
         require(scope == "host-only" and
@@ -293,6 +303,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     }
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order["scope"]
+    if "session_resume" in order:
+        task["session_resume"] = order["session_resume"]
     for key in ("script", "argv", "expected_stdout_sha256",
                 "project", "stage"):
         if key in order:
@@ -343,6 +355,8 @@ def request(event: object, context: dict) -> dict:
             "comment_id": comment["id"],
             "issue_number": ISSUE,
             "work_order_sha256": work_order_digest(order),
+            **({"session_resume": order["session_resume"]}
+               if "session_resume" in order else {}),
         }
     require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
@@ -1179,6 +1193,7 @@ def main() -> int:
     parser.add_argument("--registry-sha256")
     parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
+    parser.add_argument("--resume-phase", choices=("new", "resume"))
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
@@ -1204,18 +1219,33 @@ def main() -> int:
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
-                receipt = (
-                    (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
-                     if req["task_id"] == "f1b-path3-codex-vivado-build"
-                     else run_codex_task(task, workspace=args.workspace,
-                                   task_id=req["task_id"])
+                # This exact CPU-only fixture is the ONLY cross-Job route.
+                # Unflagged Path 3 retains its existing single-exec behavior.
+                if task.get("session_resume") or args.resume_phase:
+                    require(args.action == "execute-codex" and
+                            task.get("session_resume") == "page-boundary-off-by-one"
+                            and args.resume_phase in ("new", "resume"),
+                            "RESUME_EXPLICIT_PHASE_DENIED")
+                    import plasma_path3_cross_job_resume as crossjob
+                    try:
+                        receipt = crossjob.execute(
+                            args.resume_phase,
+                            {**req, "execution_path": task["execution_path"]},
+                            args.workspace)
+                    except crossjob.ResumeDenied as exc:
+                        raise Denied(str(exc)) from None
+                else:
+                    receipt = (
+                        (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
+                         if req["task_id"] == "f1b-path3-codex-vivado-build"
+                         else run_codex_task(task, workspace=args.workspace,
+                                             task_id=req["task_id"]))
+                        if args.action == "execute-codex"
+                        else run_task(task, workspace=args.workspace,
+                                      evidence_dir=args.evidence_dir,
+                                      approval=task_approval,
+                                      sandbox=task.get("capability", "cpu-only") == "cpu-only")
                     )
-                    if args.action == "execute-codex"
-                    else run_task(task, workspace=args.workspace,
-                                  evidence_dir=args.evidence_dir,
-                                  approval=task_approval,
-                                  sandbox=task.get("capability", "cpu-only") == "cpu-only")
-                )
                 plan = {
                     **receipt, **req,
                     "task_id": req["task_id"],
@@ -1226,7 +1256,10 @@ def main() -> int:
                 }
                 task_failed = (
                     args.action == "execute-codex"
-                    and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED"
+                    and receipt.get("status") != (
+                        "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
+                        else "RESUME_FIX_PASS" if args.resume_phase == "resume"
+                        else "EVIDENCE_READY_REVIEW_REQUIRED")
                 )
             else:
                 plan = authorize(event, os.environ, registry, pr)
