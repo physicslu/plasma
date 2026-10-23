@@ -312,8 +312,9 @@ class NativePreflightWorkOrder(unittest.TestCase):
             native.inspect(home=home, which=which)
         binary.chmod(0o755)
         original = binary.read_bytes()
-        modified = bytearray(original)
-        struct.pack_into("<I", modified, 64, 3)  # PT_INTERP observed, not executed
+        modified = bytearray(original + b"\x00" * 56)
+        struct.pack_into("<H", modified, 56, 2)  # Keep executable PT_LOAD
+        struct.pack_into("<I", modified, 120, 3)  # Add PT_INTERP separately
         binary.write_bytes(modified)
         with patch.object(native, "fixed_readonly_tool", return_value=None):
             result = native.inspect(home=home, which=which)
