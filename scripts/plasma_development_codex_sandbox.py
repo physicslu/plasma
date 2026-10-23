@@ -113,3 +113,73 @@ def codex_command(
         "--sandbox", "danger-full-access", "-",
     ]
     return argv
+
+
+def readonly_probe(workspace: Path) -> dict:
+    """Real outer-namespace smoke check; no Codex, no device opens or writes.
+
+    Intended for manual owner-controlled pre-merge execution as the actual
+    non-root SWPC runner user on an exact candidate checkout. The operation
+    cannot prove Linux DAC, device IO, model API or HIL acceptance.
+    """
+    import subprocess
+    import sys
+
+    try:
+        cmd = codex_command(workspace)
+        # Preserve the exact reviewed OS namespace/mount configuration, but
+        # replace Codex with a deterministic, non-actuating Python assertion.
+        marker = cmd.index("--")
+        expr = (
+            "from pathlib import Path; "
+            "usb=Path('/dev/bus/usb'); "
+            "assert usb.is_dir(); "
+            "assert all(p.is_char_device() for p in usb.glob('*/*')); "
+            "assert all(p.is_char_device() for stem in ('ttyACM','ttyUSB') "
+            "for p in Path('/dev').glob(stem+'*')); "
+            "assert not Path('/dev/mem').exists(); "
+            "assert not Path('/dev/uio0').exists(); "
+            "assert not Path('/run/plasma-codex').exists(); "
+            "assert not Path('/run/docker.sock').exists(); "
+            "assert Path('/etc/resolv.conf').is_file(); "
+            "print('PATH3_NAMESPACE_VISIBLE')"
+        )
+        check = subprocess.run(
+            [*cmd[:marker], "--", sys.executable, "-I", "-c", expr],
+            cwd=workspace, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=20, check=False,
+        )
+        if check.returncode != 0 or check.stdout != b"PATH3_NAMESPACE_VISIBLE\\n":
+            return {"schema": "plasma.path3.namespace_probe.v1",
+                    "status": "NOT_RUN_OR_FAIL",
+                    "reason": "CODEX_SANDBOX_PROBE_FAILED"}
+        return {"schema": "plasma.path3.namespace_probe.v1",
+                "status": "NAMESPACE_VISIBLE_ONLY",
+                "hardware_io": "NOT_RUN",
+                "codex_model": "NOT_RUN"}
+    except (CodexSandboxDenied, OSError, ValueError,
+            subprocess.SubprocessError) as exc:
+        if (isinstance(exc, CodexSandboxDenied) and
+                re.fullmatch(r"CODEX_SANDBOX_[A-Z0-9_]{3,80}", str(exc))):
+            code = str(exc)
+        else:
+            code = "CODEX_SANDBOX_PROBE_ERROR"
+        return {"schema": "plasma.path3.namespace_probe.v1",
+                "status": "NOT_RUN_OR_FAIL", "reason": code}
+
+
+def main(argv: list[str] | None = None) -> int:
+    import json
+    import sys
+
+    args = sys.argv[1:] if argv is None else argv
+    if args != ["--probe"]:
+        return 2
+    receipt = readonly_probe(Path.cwd())
+    print(json.dumps(receipt, sort_keys=True))
+    return 0 if receipt["status"] == "NAMESPACE_VISIBLE_ONLY" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
