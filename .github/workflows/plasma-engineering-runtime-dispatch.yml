@@ -122,6 +122,8 @@ jobs:
           set -euo pipefail
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
+          python3 -m py_compile scripts/plasma_development_codex_sandbox.py scripts/tests/test_plasma_development_codex_sandbox.py
+          python3 scripts/tests/test_plasma_development_codex_sandbox.py
           python3 scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_path3_cross_job_resume.py
           python3 scripts/tests/test_plasma_development_blocking.py
