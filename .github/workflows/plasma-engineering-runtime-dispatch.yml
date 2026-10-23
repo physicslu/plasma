@@ -21,6 +21,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_path3_cross_job_resume.py"
+      - "scripts/tests/test_plasma_path3_cross_job_resume.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
@@ -61,6 +63,8 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_path3_cross_job_resume.py"
+      - "scripts/tests/test_plasma_path3_cross_job_resume.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
@@ -119,6 +123,7 @@ jobs:
           python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_path3_cross_job_resume.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
           python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py
@@ -210,6 +215,7 @@ jobs:
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
       work_order_sha256: ${{ steps.approve.outputs.work_order_sha256 }}
+      session_resume: ${{ steps.approve.outputs.session_resume }}
     steps:
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -278,7 +284,7 @@ jobs:
               for k in ("pinned_sha","trusted_sha","pr_number",
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
-              for k in ("comment_id","claim_ref","work_order_sha256"):
+              for k in ("comment_id","claim_ref","work_order_sha256","session_resume"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -562,11 +568,18 @@ jobs:
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_FPGA_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PLASMA_FPGA_PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
+          SESSION_RESUME: ${{ needs.development-authorize.outputs.session_resume }}
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
           test -z "$(git -C candidate status --porcelain --untracked-files=all)"
+          phase_args=()
+          if [ "$SESSION_RESUME" = page-boundary-off-by-one ]; then
+            phase_args+=(--resume-phase new)
+          else
+            test -z "$SESSION_RESUME"
+          fi
           python3 trusted/scripts/plasma_engineering_monitor.py run path3 -- \
             python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
             --event "$GITHUB_EVENT_PATH" \
@@ -576,6 +589,7 @@ jobs:
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
             --work-order-sha256 "$WORK_ORDER_SHA256" \
             --execution-capability "$EXECUTION_CAPABILITY" \
+            "${phase_args[@]}" \
             > "$RUNNER_TEMP/plasma-path3-receipt.json"
           # Runner exits nonzero when Codex failed/incomplete. Do not put
           # evidence extraction here: 'set -e' would skip it on failure.
