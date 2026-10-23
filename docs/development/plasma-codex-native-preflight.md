@@ -36,6 +36,21 @@ The read-only collector is locked to the observed NVM Node v22.23.2 global npm l
 
 A missing installed binary, unexpected symlink, writable source, absent package metadata or unsafe executable rejects or reports `INCOMPLETE`; no fallback to arbitrary paths, no npm install, chmod/chown, sudo, real hardware /dev, /sys, /run, or model API. This is a trusted Host read-only **observation exception** from the generic Path 2 Bubblewrap script executor, not an expansion of generic Path 2.
 
+## Run #39960534505 — fail-closed permission diagnostic (Gate 1 candidate)
+
+Original one-time Owner Work Order on [Issue #981](https://github.com/physicslu/plasma/issues/981#issuecomment-6365869067) resulted in actual [Run #39960534505](https://github.com/physicslu/plasma/actions/runs/39960534505): owner `development-authorize` SUCCESS, `development-execute` FAILURE (exit 2), Codex and Resume jobs SKIPPED. Artifact #12503979029 contained only `{"reason":"NATIVE_PATH_PERMISSIONS_DENIED","status":"NOT_RUN_OR_FAIL"}`. No native hash or ELF status was obtained. The fixed Codex CLI entry and expected wrapper-target validation were passed before this error; **the failing path component is UNKNOWN**.
+
+For this **independent, not-yet-merged Gate 1 diagnostic PR**, retain the exact existing `owned_path` rejection policy (root or effective Runner UID and no group/other writable bits) and the same fixed NVM Node/CLI/version/ELF scope. The only added information on that denial is a bounded, hardcoded **sanitized** classification:
+
+- `denial_stage`: `CLI_WRAPPER`, `CLI_MANIFEST`, `PLATFORM_MANIFEST`, or `NATIVE_BINARY`;
+- `denial_cause`: `OWNER_MISMATCH` or `PEER_WRITABLE`;
+- `denial_component_index`: 1-based position below the configured Runner home, 1–24, **not a path string**.
+- The original `reason=NATIVE_PATH_PERMISSIONS_DENIED` and `status=NOT_RUN_OR_FAIL` remain unchanged; `development-execute` still exits **2**. Receipt also says model/hardware `NOT_RUN` and `sha256_pin_authorized=false`.
+
+A diagnostic exception is not evidence that installation is trusted: do **not** run chmod/chown, relax permissions, retarget the Node version, bind NVM/Home, turn off the Runner checks, install tools, launch Codex, or automatically retry. Neither `stat` raw data, owner/group numeric IDs, username, absolute Home path, arbitrary tool stdout nor Auth/Session content is published. Denials that are not the exact permission error retain the existing generic Fail-closed receipt. Synthetic GitHub-hosted tests prove only the classification logic, **not** the actual SWPC failure component.
+
+This Draft PR needs its own exact-HEAD Gate 2 authorization if validated. It does not authorize publishing another Issue #981 Work Order, triggering SWPC or unblocking #1135. After any later merge, a **separate** exact-main owner instruction would be required to perform another real read-only preflight.
+
 ## Gate boundary and acceptance
 
 Before any SWPC observation: implement Host-only positive/negative tests, necessary GitHub-hosted CI, exact-HEAD Code Review and a separate Owner Gate 2 for this Draft bootstrap PR. The currently approved Gate 1 explicitly **does not authorize SWPC execution before merge**. A later SWPC execution requires its own clear owner Work Order and main SHA. No automatic retry, background trigger or model Session.
