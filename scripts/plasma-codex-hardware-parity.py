@@ -36,17 +36,20 @@ VID_PIDS = (
     ("0403", "6010"),  # Xilinx FT2232 USB/JTAG/UART
     ("8564", "4100"),  # Transcend USB2/USB3 companion Hub
     ("77a1", "01a2"),  # KINGST LA2016
+    ("0483", "374f"),  # STLINK-V3SET
+    ("cafe", "4001"),  # development Blue Pill USB CDC firmware
 )
+LEGACY_VID_PIDS = VID_PIDS[:3]
 
 
-def render_rules(group: str = GROUP) -> str:
+def render_rules(group: str = GROUP, *, legacy: bool = False) -> str:
     if not group or not all(c.isalnum() or c in "-_" for c in group):
         raise ValueError("invalid device group")
     items = [
         "# PLASMA SWPC prototype HIL: only owner-approved USB models",
         "# Both USB 2.x and 3.x companion hub identities intentionally match.",
     ]
-    for vid, pid in VID_PIDS:
+    for vid, pid in (LEGACY_VID_PIDS if legacy else VID_PIDS):
         items.append(
             f'SUBSYSTEM=="usb", ENV{{DEVTYPE}}=="usb_device", '
             f'ATTR{{idVendor}}=="{vid}", ATTR{{idProduct}}=="{pid}", '
@@ -57,6 +60,12 @@ def render_rules(group: str = GROUP) -> str:
         'ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6010", '
         f'GROUP="{group}", MODE="0660"'
     )
+    if not legacy:
+        items.append(
+            'SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", '
+            'ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4001", '
+            f'GROUP="{group}", MODE="0660"'
+        )
     return "\n".join(items) + "\n"
 
 
@@ -89,6 +98,14 @@ def file_state(path: Path, content: str | None = None) -> str:
     return "EXACT" if content is not None else "PRESENT"
 
 
+def managed_rule_state() -> str:
+    current = file_state(RULE_FILE, render_rules())
+    if current == "CONFLICT_REFUSED" and \
+            file_state(RULE_FILE, render_rules(legacy=True)) == "EXACT":
+        return "LEGACY_EXACT_UPGRADE_AVAILABLE"
+    return current
+
+
 def current_groups(user: str) -> list[str]:
     account = pwd.getpwnam(user)
     return sorted(grp.getgrgid(i).gr_name for i in os.getgrouplist(user, account.pw_gid))
@@ -117,7 +134,8 @@ def device_dac_comparison() -> dict:
 
     observed: dict[str, list[dict]] = {
         "z2_ft2232": [], "usb_hub_companions": [], "kingst_la2016": [],
-        "ft2232_tty": [],
+        "stlink_v3": [], "blue_pill_cdc": [], "ft2232_tty": [],
+        "blue_pill_tty": [],
     }
 
     def append_metadata(label: str, node: Path) -> None:
@@ -141,6 +159,8 @@ def device_dac_comparison() -> dict:
         ("0403", "6010"): "z2_ft2232",
         ("8564", "4100"): "usb_hub_companions",
         ("77a1", "01a2"): "kingst_la2016",
+        ("0483", "374f"): "stlink_v3",
+        ("cafe", "4001"): "blue_pill_cdc",
     }
     for entry in entries:
         try:
@@ -156,7 +176,8 @@ def device_dac_comparison() -> dict:
         except (OSError, ValueError):
             continue
 
-    for tty in Path("/sys/class/tty").glob("ttyUSB*"):
+    for tty in (*Path("/sys/class/tty").glob("ttyUSB*"),
+                *Path("/sys/class/tty").glob("ttyACM*")):
         try:
             parent = (tty / "device").resolve(strict=True)
             for component in (parent, *parent.parents):
@@ -169,6 +190,8 @@ def device_dac_comparison() -> dict:
                     continue
                 if (vid, pid) == ("0403", "6010"):
                     append_metadata("ft2232_tty", Path("/dev") / tty.name)
+                elif (vid, pid) == ("cafe", "4001"):
+                    append_metadata("blue_pill_tty", Path("/dev") / tty.name)
                 break
         except OSError:
             continue
@@ -231,7 +254,7 @@ def audit() -> dict:
         "device_mode_comparison": device_dac_comparison(),
         "worker_io_group_present": GROUP in groups.get(WORKER, []),
         "operator_io_group_present": GROUP in groups.get(OPERATOR, []),
-        "udev_rules": file_state(RULE_FILE, render_rules()),
+        "udev_rules": managed_rule_state(),
         "kingst_appimage": (
             "EXACT_PINNED" if LA_BINARY.is_file() and not LA_BINARY.is_symlink()
             and sha256(LA_BINARY) == LA_DIGEST else "NOT_EXACT_PINNED"
@@ -268,9 +291,12 @@ def run_admin(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, timeout=20)
 
 
-def install_exact(path: Path, content: str, mode: int) -> str:
+def install_exact(path: Path, content: str, mode: int,
+                  *, previous: str | None = None) -> str:
     state = file_state(path, content)
-    if state not in ("MISSING", "EXACT"):
+    upgrade = state == "CONFLICT_REFUSED" and previous is not None \
+        and file_state(path, previous) == "EXACT"
+    if state not in ("MISSING", "EXACT") and not upgrade:
         raise RuntimeError(f"conflicting existing managed file: {path.name}")
     if state == "EXACT":
         return "UNCHANGED"
@@ -289,7 +315,7 @@ def install_exact(path: Path, content: str, mode: int) -> str:
     finally:
         if os.path.exists(name):
             os.unlink(name)
-    return "INSTALLED"
+    return "UPDATED" if upgrade else "INSTALLED"
 
 
 def install_appimage(source: Path) -> str:
@@ -321,7 +347,8 @@ def install_appimage(source: Path) -> str:
 def apply(appimage: Path | None = None) -> None:
     require_safe_admin()
     # Reject unmanaged udev conflicts before making any group changes.
-    if file_state(RULE_FILE, render_rules()) not in ("MISSING", "EXACT"):
+    if managed_rule_state() not in (
+            "MISSING", "EXACT", "LEGACY_EXACT_UPGRADE_AVAILABLE"):
         raise RuntimeError("existing udev rule differs, no overwrite")
     if appimage is not None:
         if not appimage.is_file() or appimage.is_symlink() or sha256(appimage) != LA_DIGEST:
@@ -339,7 +366,8 @@ def apply(appimage: Path | None = None) -> None:
     for user in (OPERATOR, WORKER):
         if GROUP not in current_groups(user):
             run_admin(["usermod", "--append", "--groups", GROUP, user])
-    print("udev_rules=" + install_exact(RULE_FILE, render_rules(), 0o644))
+    print("udev_rules=" + install_exact(
+        RULE_FILE, render_rules(), 0o644, previous=render_rules(legacy=True)))
     if appimage is not None:
         print("kingst_appimage=" + install_appimage(appimage))
     run_admin(["udevadm", "control", "--reload"])
@@ -353,8 +381,8 @@ def apply(appimage: Path | None = None) -> None:
 
 def self_test() -> None:
     rules = render_rules()
-    assert rules.count('SUBSYSTEM=="usb"') == 3
-    assert rules.count('SUBSYSTEM=="tty"') == 1
+    assert rules.count('SUBSYSTEM=="usb"') == 5
+    assert rules.count('SUBSYSTEM=="tty"') == 2
     for vid, pid in VID_PIDS:
         assert f'ATTR{{idVendor}}=="{vid}"' in rules
         assert f'ATTR{{idProduct}}=="{pid}"' in rules
@@ -362,6 +390,8 @@ def self_test() -> None:
     assert 'MODE="0666"' not in rules
     assert 'ATTRS{idVendor}=="0403"' in rules
     assert 'ATTRS{idProduct}=="6010"' in rules
+    assert 'ATTRS{idVendor}=="cafe"' in rules
+    assert 'ATTRS{idProduct}=="4001"' in rules
     assert 'sudo' not in rules
     assert render_wrapper().count("--appimage-extract-and-run") == 1
     try:

@@ -17,10 +17,13 @@ No additional HIL Gateway, Controller, device driver or REST API.
 With `--apply` on trusted **SWPC**:
 - Creates dedicated group `plasma-codex-io`, adds both existing operator `<trusted-operator>` and `plasma-codex`, preserving original operator usability.
 - Creates an exact guarded `/etc/udev/rules.d/99-plasma-codex-io.rules` with GROUP `plasma-codex-io`, MODE 0660 only for FT2232 0403:6010, Hub 8564:4100, LA2016 77a1:01a2, and FT2232-descendant ttyUSB nodes. No wildcard all-USB, `sudoers`, `docker`, or blanket `dialout` membership.
+- The Blue Pill development extension adds STLINK-V3SET `0483:374f`, the firmware's provisional `cafe:4001` USB device, and only `ttyACM*` descendants of `cafe:4001`. It does not grant access to ST-LINK's CDC interface or unrelated serial devices. The installer accepts an atomic upgrade only when the current rule file exactly matches its prior managed content; owner edits still fail closed. This is a new physical-device grant requiring owner review before root-side application.
 - Reloads udev rules **without** re-enumerating devices, changing active device-node modes, opening USB, operating power/FPGA, or restarting the Runner. Existing conflicting files and symlinks fail closed.
 - Optional `--la-appimage <OWNER_LOCAL_PATH>` verifies exact previously proven binary digest and atomically copies it to `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage`, exposing wrapper `/usr/local/bin/plasma-la2016-sigrok`. It does not invent a new firmware path. `SIGROK_FIRMWARE_PATH` may still need to be configured privately.
 
 `--audit` compares the operator and worker against USB/FT2232-TTY permission mode bits (not ACL/LSM), groups, managed rules, installed LA digest and **file metadata only** for the existing private Z2 credential-store convention. It never reads, parses, displays or copies passwords, SSH keys, environment values, unique USB serial numbers or machine-specific paths.
+
+For the Blue Pill task, the audit additionally reports ST-LINK, Blue Pill USB and its `ttyACM*` nodes. The observed 2026-10-23 SWPC state was: Host `gordon` could open ST-LINK and LA under existing ACL/group, but `/dev/ttyACM0` belonged to `dialout` and neither `gordon` nor `plasma-codex` was a member. The current App Codex sandbox also hides `/dev/bus/usb` and CDC TTY independently of Host DAC. A rule upgrade alone does not expose devices inside that sandbox or add a Blue Pill stage to the Z2-only development transport.
 
 ## Deployment after Gate 2 (operator terminal; not PR workflow)
 
@@ -45,6 +48,8 @@ sudo python3 scripts/plasma-codex-hardware-parity.py --apply
 ```
 
 **This only stages udev rules and group membership.** Existing USB/TTY device nodes retain their old permission metadata until a carefully selected re-enumeration/udev event; no automatic USB disconnect or port toggle is allowed. Newly added group membership also requires a new login/service process. When the dedicated Runner shows **Idle**, restart **only** `actions.runner.physicslu-plasma.SWPC-plasma-codex.service` through an authorized operator channel, not the existing `SWPC-plasma-ci` service. Re-audit both worker and operator access.
+
+For the Blue Pill extension, owner review must cover the exact new rule diff, the root-side `--apply`, and a scoped way to activate only the specified device nodes. No broad `dialout` membership or unplug/replug is required. Before any Flash, independently verify target voltage, SWD wiring/exclusivity, device identity, rollback image and tool access. The Development stage transport currently allows only Z2 `download`, `test`, and `restore`; do not treat its existence as authorization for ST-LINK or LA. A Host-side Path 3 task must use an owner-approved device-capable context, not escape an App or Runner sandbox.
 
 Z2 SSH access: configure a **separate owner-authorized worker credential or key** in the `plasma-codex` private HOME using the established Z2 credential interface. Do not blindly copy the operator's whole `.ssh` or private credential file. The host script never accesses secrets.
 

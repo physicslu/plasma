@@ -19,10 +19,16 @@ class ParityTests(unittest.TestCase):
     def test_strict_udev_identity_and_tty_scope(self) -> None:
         p.self_test()
         rules = p.render_rules()
-        self.assertEqual(rules.count('MODE="0660"'), 4)
+        self.assertEqual(rules.count('MODE="0660"'), 7)
         self.assertNotIn('MODE="0666"', rules)
         self.assertNotIn("SUBSYSTEM==\"block\"", rules)
         self.assertIn("GROUP=\"plasma-codex-io\"", rules)
+        self.assertIn('ATTR{idVendor}=="0483", ATTR{idProduct}=="374f"', rules)
+        self.assertIn('ATTR{idVendor}=="cafe", ATTR{idProduct}=="4001"', rules)
+        self.assertIn('KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="cafe", '
+                      'ATTRS{idProduct}=="4001"', rules)
+        self.assertNotIn('KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="0483"', rules)
+        self.assertEqual(p.render_rules(legacy=True).count('MODE="0660"'), 4)
 
     def test_existing_conflict_and_symlink_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -57,6 +63,27 @@ class ParityTests(unittest.TestCase):
             self.assertEqual(p.install_exact(f, p.render_rules(), 0o644), "UNCHANGED")
             self.assertEqual(f.read_text(), p.render_rules())
             self.assertEqual(f.stat().st_mode & 0o777, 0o644)
+
+    def test_only_exact_prior_managed_udev_rules_can_upgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "rules"
+            old = p.render_rules(legacy=True)
+            new = p.render_rules()
+            path.write_text(old)
+            with patch.object(p, "RULE_FILE", path):
+                self.assertEqual(p.managed_rule_state(),
+                                 "LEGACY_EXACT_UPGRADE_AVAILABLE")
+                self.assertEqual(p.install_exact(path, new, 0o644, previous=old),
+                                 "UPDATED")
+                self.assertEqual(path.read_text(), new)
+                self.assertEqual(p.managed_rule_state(), "EXACT")
+                self.assertEqual(p.install_exact(path, new, 0o644, previous=old),
+                                 "UNCHANGED")
+                path.write_text(old + "# owner edit\n")
+                self.assertEqual(p.managed_rule_state(), "CONFLICT_REFUSED")
+                with self.assertRaises(RuntimeError):
+                    p.install_exact(path, new, 0o644, previous=old)
+                self.assertEqual(path.read_text(), old + "# owner edit\n")
 
     def test_la_exact_checksum_and_no_source_modification(self) -> None:
         with tempfile.TemporaryDirectory() as root:
