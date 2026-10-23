@@ -207,9 +207,9 @@ class ResumeTwoJobOffline(unittest.TestCase):
         def fake_run(args, **kw):
             seen["args"] = args
             seen["env"] = kw["env"]
-            return subprocess.CompletedProcess(args, 0, b"", b"Ran 2 tests in 0.0s\\nOK\\n")
+            return subprocess.CompletedProcess(args, 0, b"", b"Ran 2 tests in 0.0s\nOK\n")
         with patch.object(flow.shutil, "which", return_value="/usr/bin/bwrap"), \
-             patch.object(flow.subprocess, "run", side_effect=fake_run), \\
+             patch.object(flow.subprocess, "run", side_effect=fake_run), \
              patch.dict(os.environ, {"GH_TOKEN": "sensitive-fixture",
                                      "PYTHONPATH": "/untrusted"}, clear=False):
             result = flow.isolated_unittest(self.repo, self.repo)
