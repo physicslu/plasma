@@ -131,9 +131,14 @@ def _require_standalone_x64_elf(data):
             1 <= phnum <= 128 and
             phoff + phnum * phsize <= len(data),
             "RESUME_CODEX_NATIVE_ELF_DENIED")
+    has_executable_load = False
     for i in range(phnum):
-        kind, _, offset, _, _, length, _, _ = struct.unpack_from(
+        kind, flags, offset, _, _, length, _, _ = struct.unpack_from(
             "<IIQQQQQQ", data, phoff + i * phsize)
+        if kind == 1 and flags & 1:  # Executable PT_LOAD
+            has_executable_load = True
+            require(offset + length <= len(data),
+                    "RESUME_CODEX_NATIVE_ELF_DENIED")
         require(kind != 3, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED")
         if kind == 2:
             require(offset + length <= len(data) and length % 16 == 0,
@@ -143,6 +148,7 @@ def _require_standalone_x64_elf(data):
                 require(tag != 1, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED")
                 if tag == 0:
                     break
+    require(has_executable_load, "RESUME_CODEX_NATIVE_ELF_DENIED")
 
 
 def _nvm_native_codex(codex):
