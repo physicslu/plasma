@@ -119,6 +119,14 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                              ["bwrap", "--", "codex", "-"])
             self.assertEqual(receipt["codex_exit_code"], 0)
 
+    def test_sandbox_error_receipt_is_constant_not_a_host_path(self):
+        safe = dispatcher.safe_error_reason(
+            sandbox.CodexSandboxDenied("CODEX_SANDBOX_BWRAP_UNAVAILABLE"))
+        self.assertEqual(safe, "CODEX_SANDBOX_BWRAP_UNAVAILABLE")
+        unsafe = dispatcher.safe_error_reason(
+            sandbox.CodexSandboxDenied("CODEX_SANDBOX_ERROR /home/private"))
+        self.assertEqual(unsafe, "EXECUTION_ERROR")
+
     def test_normal_path3_has_no_new_capability_or_session(self):
         import inspect
         source = inspect.getsource(dispatcher.parse_dynamic_work_order)
