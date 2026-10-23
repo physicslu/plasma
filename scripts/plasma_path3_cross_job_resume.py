@@ -15,6 +15,7 @@ import secrets
 import shutil
 import subprocess
 import time
+import uuid
 
 import plasma_path3_session_resume_probe as probe
 
@@ -201,13 +202,16 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
                 previous.get("test_sha256") ==
                     hash_data(probe.TEST_SOURCE.encode()),
                 "RESUME_BINDING_MISMATCH")
-        thread = probe.parse_events(
-            json.dumps({"type": "thread.started",
-                        "thread_id": previous.get("thread_id")}) + "\n" +
-            json.dumps({"type": "turn.completed",
-                        "usage": {"input_tokens": 0,
-                                  "cached_input_tokens": 0,
-                                  "output_tokens": 0}}) + "\n")[0]
+        require(type(previous.get("challenge_sha256")) is str and
+                SHA256.fullmatch(previous["challenge_sha256"]) is not None and
+                type(previous.get("usage_new")) is dict,
+                "RESUME_STATE_INCOMPLETE")
+        try:
+            raw_thread = previous.get("thread_id")
+            thread = str(uuid.UUID(raw_thread))
+            require(raw_thread == thread, "RESUME_THREAD_INVALID")
+        except (TypeError, ValueError, AttributeError):
+            raise ResumeDenied("RESUME_THREAD_INVALID") from None
         prompt = probe.RESUME_PROMPT
         # One-shot consume BEFORE Codex starts. Immediately erase the raw
         # private Thread ID from the replay tombstone, even if Codex fails.
