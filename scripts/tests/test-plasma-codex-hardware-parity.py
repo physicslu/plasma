@@ -19,10 +19,15 @@ class ParityTests(unittest.TestCase):
     def test_strict_udev_identity_and_tty_scope(self) -> None:
         p.self_test()
         rules = p.render_rules()
-        self.assertEqual(rules.count('MODE="0660"'), 4)
+        self.assertEqual(rules.count('MODE="0660"'), 3)
+        self.assertEqual(rules.count('SUBSYSTEM=="usb"'), 1)
+        self.assertEqual(rules.count('SUBSYSTEM=="tty"'), 2)
         self.assertNotIn('MODE="0666"', rules)
         self.assertNotIn("SUBSYSTEM==\"block\"", rules)
+        self.assertNotIn("idVendor", rules)
+        self.assertIn('ttyACM[0-9]*', rules)
         self.assertIn("GROUP=\"plasma-codex-io\"", rules)
+        self.assertIn('ATTR{idVendor}=="0403"', p.render_previous_rules())
 
     def test_existing_conflict_and_symlink_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -39,6 +44,78 @@ class ParityTests(unittest.TestCase):
                 p.install_exact(link, p.render_wrapper(), 0o755)
             self.assertEqual(existing.read_text(), "owner-managed rules\n")
 
+
+    def test_existing_exact_legacy_rules_upgrade_only_with_root_owned_baseline(self) -> None:
+        import os
+        import stat
+        from unittest.mock import patch as mock_patch
+        with tempfile.TemporaryDirectory() as root:
+            rule = Path(root) / "99-plasma.rules"
+            rule.write_text(p.render_previous_rules())
+            rule.chmod(0o644)
+            native_lstat = Path.lstat
+            def fake_lstat(node):
+                result = native_lstat(node)
+                if node == rule:
+                    # Offline simulation: the real --apply is still strictly
+                    # root-only, never exercised on CI.
+                    values = list(result)
+                    values[4] = 0
+                    return os.stat_result(values)
+                return result
+            with patch.object(p, "RULE_FILE", rule), mock_patch.object(
+                Path, "lstat", fake_lstat
+            ):
+                self.assertEqual(p.install_managed_usb_rules(),
+                                 "UPGRADED_EXACT_LEGACY")
+            self.assertEqual(rule.read_text(), p.render_rules())
+            self.assertEqual(rule.stat().st_mode & 0o777, 0o644)
+            rule.write_text("third-party managed policy\n")
+            with patch.object(p, "RULE_FILE", rule):
+                with self.assertRaises(RuntimeError):
+                    p.install_managed_usb_rules()
+
+    def test_preflight_denies_foreign_rules_before_group_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            rules = Path(root) / "rules.d" / "99-plasma.rules"
+            rules.parent.mkdir()
+            rules.write_text("third-party udev rules\\n")
+            with (
+                patch.object(p, "RULE_FILE", rules),
+                patch.object(p, "require_safe_admin"),
+                patch.object(p, "run_admin") as admin,
+            ):
+                self.assertEqual(p.managed_usb_rules_state(), "CONFLICT_REFUSED")
+                with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                    p.apply()
+                admin.assert_not_called()
+            rules.unlink()
+            rules.symlink_to("/dev/null")
+            with (
+                patch.object(p, "RULE_FILE", rules),
+                patch.object(p, "require_safe_admin"),
+                patch.object(p, "run_admin") as admin,
+            ):
+                self.assertEqual(p.managed_usb_rules_state(), "CONFLICT_REFUSED")
+                with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                    p.apply()
+                admin.assert_not_called()
+
+    def test_exact_rule_with_untrusted_owner_or_mode_denied(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            rules = Path(root) / "99-plasma.rules"
+            rules.write_text(p.render_rules())
+            rules.chmod(0o666)
+            with patch.object(p, "RULE_FILE", rules):
+                self.assertEqual(p.managed_usb_rules_state(),
+                                 "OWNER_OR_MODE_DENIED")
+                with (
+                    patch.object(p, "require_safe_admin"),
+                    patch.object(p, "run_admin") as admin,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                        p.apply()
+                    admin.assert_not_called()
 
     def test_unix_mode_comparison_is_not_an_acl_claim(self) -> None:
         with tempfile.TemporaryDirectory() as root:

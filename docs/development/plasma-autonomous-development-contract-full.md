@@ -184,14 +184,18 @@ the actual command and physical effect, not the technology label `SW` or
   privilege, ownership, rollback and electrical guards; these are runtime
   checks, not new human approval Gates. Report PASS, FAIL or NOT_RUN from
   execution evidence, never from documentation or hosted mocks alone.
-- **Path 3 is not inherently Host-only.** A dynamically approved Path 3
-  Work Order may request guarded SWPC/Z2 development operations as well as
-  host-only engineering. Reuse the shared trusted-main development stage adapter and
-  live ownership/recovery checks; allow only the actions explicitly stated
-  by the owner. A work-order prompt grants no additional sudo rights and
-  must never bypass an executable hardware Runtime Guard. If an existing
-  protected entrypoint cannot enforce the requested operation, report the
-  concrete blocker rather than creating new administrative Gates.
+- **Path 3 is not Host-only.** The existing SWPC Codex Path 3, without
+  another mode, session or Work Order capability, can use owner-approved
+  USB/TTY engineering instruments through the worker's existing Linux
+  DAC/ACL rights. The rootless outer Codex device namespace presents
+  /dev/bus/usb and current /dev/ttyACM* and /dev/ttyUSB* device nodes.
+  This intentionally has no per-DUT or VID/PID visibility filter: the owner
+  operates a prototype laboratory and authorizes the work in Gate 1.
+  Device visibility is not an authorization to actuate outside that task.
+  Privileged Z2 FPGA Manager/MMIO/power and protected root stages continue to
+  use existing trusted-main stage adapters with live ownership/recovery checks,
+  not Codex sudo or an unchecked remote shell. An unavailable physical
+  route or actual DAC denial is NOT_RUN, not permission to bypass safeguards.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions
@@ -236,6 +240,11 @@ the actual command and physical effect, not the technology label `SW` or
   active rulesets, and unresolved review threads. Stop on a material change
   or unmet requirement; investigate only what changed. Never reuse a cached
   verdict to bypass an enforced guard, required real acceptance, or Gate 2.
+- **Minimum sufficient experiment.** A single complete authentic PASS
+  ends a Development Mode experiment. After FAIL or insufficient evidence,
+  diagnose the cause, correct it, then perform only a justified targeted
+  retest. No numerical Program/Readback/Verify quota, counter or reset logic
+  is required. Unsafe or unknown physical state still prohibits a repeat.
 - **Keep one obvious result.** A development smoke-test report should
   normally include: actual executor and Runner, GitHub run/job ID if used,
   command or task/ref, exit status, expected versus observed output, and
