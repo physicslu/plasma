@@ -255,6 +255,7 @@ def audit() -> dict:
         "worker_io_group_present": GROUP in groups.get(WORKER, []),
         "operator_io_group_present": GROUP in groups.get(OPERATOR, []),
         "udev_rules": file_state(RULE_FILE, render_rules()),
+        "managed_usb_rules_state": managed_usb_rules_state(),
         "kingst_appimage": (
             "EXACT_PINNED" if LA_BINARY.is_file() and not LA_BINARY.is_symlink()
             and sha256(LA_BINARY) == LA_DIGEST else "NOT_EXACT_PINNED"
@@ -341,18 +342,35 @@ def install_appimage(source: Path) -> str:
     return install_exact(LA_WRAPPER, render_wrapper(), 0o755)
 
 
-def install_managed_usb_rules() -> str:
-    """Install new rules; replace only an exact, root-owned legacy rule file."""
+def managed_usb_rules_state() -> str:
+    """Read-only managed rules preflight; no foreign file is overwritten."""
     state = file_state(RULE_FILE, render_rules())
-    if state in ("MISSING", "EXACT"):
-        return install_exact(RULE_FILE, render_rules(), 0o644)
-    legacy = file_state(RULE_FILE, render_previous_rules())
-    if legacy != "EXACT":
-        raise RuntimeError("unmanaged or conflicting udev rules, no overwrite")
+    if state == "MISSING":
+        return "MISSING"
+    if state == "EXACT":
+        version = "CURRENT"
+    elif file_state(RULE_FILE, render_previous_rules()) == "EXACT":
+        version = "EXACT_LEGACY"
+    else:
+        return "CONFLICT_REFUSED"
     info = RULE_FILE.lstat()
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
-            or (info.st_mode & 0o777) != 0o644):
-        raise RuntimeError("managed udev rule ownership/mode denied")
+            or stat.S_IMODE(info.st_mode) != 0o644):
+        return "OWNER_OR_MODE_DENIED"
+    return version
+
+
+def install_managed_usb_rules() -> str:
+    """Install all-device rules, upgrading only the exact managed predecessor."""
+    state = managed_usb_rules_state()
+    if state not in ("MISSING", "CURRENT", "EXACT_LEGACY"):
+        raise RuntimeError("managed udev rules preflight denied")
+    if state == "CURRENT":
+        return "UNCHANGED"
+    if state == "MISSING":
+        return install_exact(RULE_FILE, render_rules(), 0o644)
+    # Exact root-owned 0644 legacy content was checked above. Keep the
+    # replacement atomic and never silently repair operator-managed changes.
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
                                      dir=RULE_FILE.parent,
                                      prefix=".plasma-stage-", delete=False) as staged:
@@ -371,10 +389,10 @@ def install_managed_usb_rules() -> str:
 
 def apply(appimage: Path | None = None) -> None:
     require_safe_admin()
-    # Reject unmanaged udev conflicts before ANY group/device change.
-    if (file_state(RULE_FILE, render_rules()) not in ("MISSING", "EXACT")
-            and file_state(RULE_FILE, render_previous_rules()) != "EXACT"):
-        raise RuntimeError("existing udev rule differs, no overwrite")
+    # Check existing rule ownership, modes, symlinks and exact bytes BEFORE
+    # any group/user modifications. This is not a VID/PID allowlist.
+    if managed_usb_rules_state() not in ("MISSING", "CURRENT", "EXACT_LEGACY"):
+        raise RuntimeError("managed udev rules preflight denied")
     if appimage is not None:
         if not appimage.is_file() or appimage.is_symlink() or sha256(appimage) != LA_DIGEST:
             raise RuntimeError("selected LA AppImage is not the pinned real-test binary")
