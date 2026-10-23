@@ -18,6 +18,12 @@ on:
       - 'pl/verification/test_bluepill_remote_bitbang_rtl.py'
       - 'pl/verification/cocotb/test_bluepill_remote_bitbang_axi.py'
       - 'docs/development/bluepill-remote-bitbang-poc.md'
+      - 'pl/projects/z2-bluepill-rbb/**'
+      - 'pl/constraints/pynq-z2/z2-bluepill-rbb.xdc'
+      - 'pl/rtl/site/plasma_poc_swd_pmod.sv'
+      - 'software/python/plasma_interfaces/bluepill_z2_word_port.py'
+      - 'software/python/tests/test_bluepill_z2_word_port_host.py'
+      - 'pl/tests/test_bluepill_z2_source.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -44,6 +50,10 @@ jobs:
         run: python -m pytest -q software/python/tests/test_bluepill_web_ps_admission.py
       - name: WEB REST to SiteWorker opt-in PoC executor integration (synthetic host only)
         run: python -m pytest -q software/python/tests/test_bluepill_web_ps_job.py
+      - name: Z2 candidate word-port and HWH source contract (no hardware)
+        run: |
+          python -m pytest -q software/python/tests/test_bluepill_z2_word_port_host.py
+          python -m pytest -q pl/tests/test_bluepill_z2_source.py
       - name: Real AXI-Lite RTL Cocotb simulation
         run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
       - name: Build exact upstream OpenOCD candidate and verify SWD adapter admission
