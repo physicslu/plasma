@@ -3,10 +3,11 @@
 **Status: independent Draft source-only candidate.** No BIT/HWH has been
 built by this PR; no Vivado, FPGA load, physical target, SWD or Flash HIL PASS.
 This branch starts from main `0c1cf9b434b96d7ade530e31344196cb8b86437e`
-and imports 18 exact Git blobs from Draft PR #1126, excluding its stale
-`docs/README.md`. This is a superseding/integration candidate, **not**
-independent qualification of those copied modules. Never merge both PRs
-without resolving the duplicate patches and doing a fresh delta review.
+and selectively reuses only the direct SWD bridge, OpenOCD source
+build, RTL, protocol tests and low-level configuration from Draft PR #1126.
+WEB-specific Job/REST implementation remains solely in Draft PR #1126.
+This candidate is **not** independent qualification of reused code; merging
+must resolve duplication and revalidate latest main delta.
 
 ## Direct PS → PL SWD first (WEB explicitly deferred)
 

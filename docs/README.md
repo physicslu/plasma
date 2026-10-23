@@ -22,9 +22,8 @@
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
 
-## Blue Pill SWD OpenOCD development candidates
+## Blue Pill PS/PL Direct SWD candidate
 
-- **Gate 1 / Draft / Host-only** — [Blue Pill OpenOCD Remote-Bitbang PoC](development/bluepill-remote-bitbang-poc.md)：透過真實 upstream OpenOCD、私有 UNIX socket、虛擬 SWD DPIDR 的 Host-only 驗證；不可視為實體 FPGA／IC 燒錄。
 - **Gate 1 / Draft / Source-only** — [PYNQ-Z2 Blue Pill PS/PL SWD Candidate](../pl/projects/z2-bluepill-rbb/README.md)：隔離 GP0 AXI GPIO、PMODB XDC、SWDIO IOBUF、ARMv7 MMIO WordPort 與復原契約；Vivado BIT/HWH 與 Z2 HIL 均未執行。
 
 ## Engineering governance and execution paths
