@@ -119,3 +119,28 @@ Attempt #2 `stdout_matches_path3_expected = false`：**不等於算術失敗**�
 - **NOT_RUN — 實際指令載入內容與長期重複樣本 A/B：**當前不阻擋既有 Token 優化的階段性結案。
 
 **結案範圍：**`Repo-first Token Optimization = DONE`（PR #1128 merge + 兩組真實 SWPC CPU-only 驗證 + 證據歸檔），不代表此文件 PR 可以跳過 Gate 2。**殘餘工作：**`Per-response Token Attribution = TODO / LOW`，見 [Development Debt Register](todo.md)。只有在未來真實工程任務又出現成本或上下文異常時，才優先評估是否需要新的受保護、純數值 telemetry；不要因本結案新增 SWPC Runner、Dispatcher、監測 Agent 或讀取原始 Session。
+
+## SWPC Fresh vs Resume 配對 A/B（2026-10-23；Owner-reported）
+
+**證據等級：OWNER_REPORTED / NOT_INDEPENDENTLY_VERIFIED。** Owner 在 SWPC 互動式終端使用 `codex-cli 0.163.0` 執行一次 CPU-only Python page-boundary bug 配對測試，並提供完整的數值摘要及 `RESULT: PASS`。A、B 各有一回合 NEW 診斷，第二回合分別以 **Fresh (A)** 與 **Resume (B)** 修復；兩組的初始 fixture、診斷 Prompt、修復 Prompt 與指定 Model/Effort 均依同一測試腳本設定（要求 `gpt-6-sol` / `medium`）。腳本以不同暫存工作目錄隔離兩組並檢查 unittest、測試檔未被修改與 Session ID 身分。這是 **SWPC 手動 Codex CLI 實驗，不是 GitHub Actions Path 3 Runner 的 Cross-Job E2E**。審查者未獨立取得原始 Session、stdout JSONL、計時來源或有效 Model/Effort，故 CLI 輸出與功能 PASS 均維持 Owner-reported，不升格為獨立實機驗證。
+
+| 回合 | Input（含 Cached） | Cached Input | Non-cached Input | Output | 秒數 | Owner 回報功能結果 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| A diagnosis（NEW） | 56,290 | 41,344 | 14,946 | 479 | 16.44 | PASS |
+| A repair（Fresh） | 74,228 | 66,560 | 7,668 | 494 | 17.32 | PASS |
+| B diagnosis（NEW） | 43,699 | 39,552 | 4,147 | 463 | 15.99 | PASS |
+| B repair（Resume） | 91,735 | 86,400 | 5,335 | 728 | 11.38 | PASS |
+
+| 指標 | A：Fresh 修復 | B：Resume 修復 | B 相對 A |
+| --- | ---: | ---: | ---: |
+| Input（含 Cached） | 74,228 | 91,735 | **+23.59%** |
+| Cached Input | 66,560 | 86,400 | +29.81% |
+| Non-cached Input | 7,668 | 5,335 | **−30.43%** |
+| Output | 494 | 728 | +47.37% |
+| 修復回合耗時 | 17.32 秒 | 11.38 秒 | **−34.30%** |
+
+**兩回合全流程合計：** A / B Input = 130,518 / 135,434（B **+3.77%**）；Cached = 107,904 / 125,952；Non-cached = 22,614 / 9,482（B **−58.07%**）；Output = 973 / 1,191；耗時 = 33.76 / 27.37 秒（B **−18.93%**）。Input 已含 Cached，不得再相加；Reasoning 若已包含於 Output 也不可重複計數。第二回合 Non-cached 與耗時較低是**單次觀察訊號**，不是成本或普遍因果效應證明。
+
+**解讀限制：** 即使同一腳本對兩組使用逐位元組相同的階段 Prompt，Fresh 和 Resume 收到的實際**完整模型 Context 不相同**，因 Resume 有診斷歷史；這是待比較的處理效果，不代表所有有效輸入條件相同。第一回合兩組都是 NEW，但 Non-cached 已相差 **10,799**（14,946 vs 4,147），占全流程 Non-cached 差額 13,132 的 **82.23%**；因此不可把全流程 −58.07% 歸因 Resume。只有一組配對、模型非決定性、Prompt Cache 暖機／執行順序、模型有效設定與工具迭代皆未受充分控制，無法估算穩定節省率或實際費用。未提交私有 Session、憑證、原始 Prompt 或轉錄資料。
+
+**Development Mode 決策：** 原有 Path 3 仍預設 **Fresh Session**；Resume 只保留作為同一未完成工作延續的候選選項。本次 A/B 不解鎖跨 GitHub Actions Job 的 Resume，**PR #1135 維持 Draft / BLOCKED、不得藉此宣稱 SWPC Cross-Job E2E PASS**。不新增 Dispatcher、Workflow、Runner、監控或測試框架；如未來實際工作再出現可量化的 Context 浪費，才考慮進一步量測。
