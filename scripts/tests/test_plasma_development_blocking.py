@@ -234,6 +234,12 @@ class NativePreflightWorkOrder(unittest.TestCase):
                 inspected.assert_called_once()
                 model.assert_not_called()
                 run_script.assert_not_called()
+                with patch.object(native, "inspect",
+                                  return_value={**receipt, "status": "INCOMPLETE"}):
+                    with redirect_stdout(StringIO()) as partial:
+                        self.assertEqual(dispatch.main(), 2)
+                    self.assertEqual(json.loads(partial.getvalue())["status"],
+                                     "INCOMPLETE")
                 for name, value in (("GITHUB_JOB", "development-codex"),
                                     ("GITHUB_RUN_ATTEMPT", "2"),
                                     ("RUNNER_NAME", "another-runner"),
