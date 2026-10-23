@@ -10,6 +10,7 @@ from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.bluepill_openocd_job import BluepillPoCOpenOCDInterface
 from plasma_interfaces.compiler_registry import (
     CompilerBinding,
     CompilerRegistry,
@@ -192,25 +193,30 @@ class SiteExecutionRouter:
             request,
             configured_target_config=self.site.openocd.get("target_cfg"),
         )
-        return self._decorate(
-            request,
-            route={
-                **support_payload,
-                "mode": OPENOCD_ROUTE,
-                "selected_programming_profile_id": programming_profile_id,
-                "selected_openocd_target_config": plan.target_config,
-                "operation_admission_id": selection.admission.operation_admission_id,
-                "operation_admission_digest": selection.admission.operation_admission_digest,
-                "operation_contract_id": selection.admission.operation_contract_id,
-                "operation_contract_digest": selection.admission.operation_contract_digest,
-                "compiler_id": selection.admission.compiler_id,
-                "backend_id": selection.admission.backend_id,
-                "backend_lock_digest": selection.admission.backend_lock_digest,
-                "backend_implementation_state": "plan_compiled_not_executable",
-                "openocd_execution_plan": plan.to_dict(),
-                "hardware_runtime_ready": False,
-            },
-        )
+        route = {
+            **support_payload,
+            "mode": OPENOCD_ROUTE,
+            "selected_programming_profile_id": programming_profile_id,
+            "selected_openocd_target_config": plan.target_config,
+            "operation_admission_id": selection.admission.operation_admission_id,
+            "operation_admission_digest": selection.admission.operation_admission_digest,
+            "operation_contract_id": selection.admission.operation_contract_id,
+            "operation_contract_digest": selection.admission.operation_contract_digest,
+            "compiler_id": selection.admission.compiler_id,
+            "backend_id": selection.admission.backend_id,
+            "backend_lock_digest": selection.admission.backend_lock_digest,
+            "backend_implementation_state": "plan_compiled_not_executable",
+            "openocd_execution_plan": plan.to_dict(),
+            "hardware_runtime_ready": False,
+        }
+        # Production OpenOCDInterface stays strictly non-executable.
+        # The one-Site PoC adapter is never created by the default factory:
+        # only trusted runtime injection plus live owner admission may enable it.
+        if (isinstance(self.interface, BluepillPoCOpenOCDInterface)
+                and self.interface.runtime_admitted(request, route)):
+            route["hardware_runtime_ready"] = True
+            route["backend_implementation_state"] = "poc_externally_admitted"
+        return self._decorate(request, route=route)
 
     def _resolve_fpga(self, request: JobRequest) -> JobRequest:
         programming_profile_id, _support, support_payload = self._resolved_support(request)

@@ -1,0 +1,70 @@
+name: Blue Pill OpenOCD SWD remote-bitbang PoC (Host only)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bluepill-remote-bitbang-host.yml'
+      - 'specs/bluepill-poc/**'
+      - 'scripts/build-openocd-bluepill-poc.sh'
+      - 'software/python/plasma_interfaces/bluepill_remote_bitbang.py'
+      - 'software/python/tests/test_bluepill_remote_bitbang.py'
+      - 'software/python/tests/test_bluepill_openocd_virtual_target.py'
+      - 'software/python/tests/test_bluepill_web_ps_admission.py'
+      - 'software/python/tests/test_bluepill_web_ps_job.py'
+      - 'software/python/plasma_interfaces/bluepill_openocd_job.py'
+      - 'software/python/plasma_interfaces/bluepill_openocd_session.py'
+      - 'software/python/tests/test_bluepill_web_ps_real_openocd.py'
+      - 'software/python/plasma_server/execution_router.py'
+      - 'pl/rtl/bus/plasma_poc_swd_gpio_axi_lite.sv'
+      - 'pl/verification/test_bluepill_remote_bitbang_rtl.py'
+      - 'pl/verification/cocotb/test_bluepill_remote_bitbang_axi.py'
+      - 'docs/development/bluepill-remote-bitbang-poc.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bluepill-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated host-test and OpenOCD source build prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog git build-essential autoconf automake libtool pkg-config tcl libgpiod-dev
+          python -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
+          python -m pip install -e ./software/python
+      - name: Host-only remote_bitbang wire and negative tests
+        run: python -m pytest -q software/python/tests/test_bluepill_remote_bitbang.py
+      - name: WEB REST to real PS route pre-admission (no hardware)
+        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_admission.py
+      - name: WEB REST to SiteWorker opt-in PoC executor integration (synthetic host only)
+        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_job.py
+      - name: Real AXI-Lite RTL Cocotb simulation
+        run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
+      - name: Build exact upstream OpenOCD candidate and verify SWD adapter admission
+        run: bash scripts/build-openocd-bluepill-poc.sh build/bluepill-openocd
+      - name: Real OpenOCD through virtual PS/PL SWD target
+        env:
+          PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
+        run: python -m pytest -q software/python/tests/test_bluepill_openocd_virtual_target.py
+      - name: Real OpenOCD via WEB/PS/SiteWorker must fail on IDR-only target
+        env:
+          PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
+        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_real_openocd.py
+      - name: Publish source and SWD adapter admission evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bluepill-remote-bitbang-host-evidence
+          if-no-files-found: ignore
+          path: |
+            specs/bluepill-poc/openocd-remote-bitbang-v1.json
+            build/bluepill-openocd/adapter-list.txt
+            build/bluepill-openocd/swd-admission.txt
+            build/bluepill-openocd/openocd-binary.sha256
+            build/bluepill-openocd/openocd-source-sha.txt
