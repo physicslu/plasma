@@ -996,9 +996,15 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
         )
     prompt += (
-        "Physical actions require the existing trusted root executor; "
-        "no sudo, SSH, FPGA Manager, /dev/mem or UIO from this sandbox. "
-        "Never claim Z2 acceptance without an authentic receipt.\n"
+        "In Development Mode, the existing Path 3 engineer may use accessible "
+        "SWPC USB and TTY tools for hardware operations explicitly covered "
+        "by the Owner's Gate 1 objective. Linux DAC/ACL still applies. "
+        "Use the minimum sufficient experiment: stop after one genuine PASS; "
+        "after FAIL diagnose and make a targeted retest. No Program, Readback "
+        "or Verify quota applies. Privileged Z2 FPGA Manager/MMIO and protected "
+        "stages still require the existing trusted root executor; no sudo, "
+        "root, /dev/mem or UIO access is granted to Codex. "
+        "Never claim a physical PASS without actual evidence.\n"
     )
     if output_path:
         prompt += (
@@ -1012,6 +1018,12 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "-c", "sandbox_workspace_write.network_access=false",
         "exec", "--json", "--sandbox", "workspace-write", "-",
     ]
+    if executor is subprocess.run:
+        # Production Path 3: one rootless OS-level device-visible namespace.
+        # The inner Codex sandbox cannot access the real host's other /dev.
+        # Offline tests inject an inert executor and retain the legacy argv.
+        import plasma_development_codex_sandbox as codex_sandbox
+        command = codex_sandbox.codex_command(root)
     usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
