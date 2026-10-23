@@ -11,7 +11,7 @@ without resolving the duplicate patches and doing a fresh delta review.
 ## Direct PS → PL SWD first (WEB explicitly deferred)
 
 Engineering execution order is now **direct PS/PL SWD**, *not* WEB
-\`/api/jobs\`: Z2 Linux PS → existing owner-admitted native word-port →
+`/api/jobs`: Z2 Linux PS → existing owner-admitted native word-port →
 PS7 GP0 AXI GPIO → PMODB JB[0]/JB[1] → STM32F103C8T6.
 The host workflow tests upstream real OpenOCD against a separate virtual
 SWD target, plus actual RTL simulation and native regular-file word-port
@@ -30,10 +30,14 @@ material scope change requiring revised Gate 1 approval under AGENTS.md.
 
 ## Exact single-Site design
 
-WEB /api/jobs → PS Protocol v3.3 / SiteWorker → opt-in real OpenOCD 0.12.0+dev
-→ private UNIX socket → RemoteBitbangSWD → **qualified, injected Linux
+Z2 Linux PS → explicitly authorized real OpenOCD 0.12.0+dev
+→ private UNIX socket → RemoteBitbangSWD → **owner-qualified, injected Linux
 word-port** → Zynq PS7 M_AXI_GP0 → `plasma_poc_swd_gpio_axi_lite`
-→ `plasma_poc_swd_pmod` → PMODB JB. This design does not use EMIO GPIO
+→ `plasma_poc_swd_pmod` → PMODB JB.
+The direct path currently has source/test primitives, not a proven
+hardware-admitted PS launch, production Flash executor, or Z2 HIL receipt.
+The WEB /api/jobs → SiteWorker integration is deferred and is NOT
+part of direct PS/PL acceptance. This design does not use EMIO GPIO
 or the ST-LINK reference programmer; it does not replace the eight-Site
 fixed PPU production ABI.
 
