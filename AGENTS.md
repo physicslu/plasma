@@ -1,6 +1,6 @@
 # Plasma Autonomous Development Contract
 
-This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. The [complete detailed clauses](docs/development/plasma-autonomous-development-contract-full.md) remain normative and are incorporated by reference. Read **relevant detailed sections on demand**; do not preload the entire detailed document for unrelated tasks. If an operation touches privileges, electrical safety, deployment, Git history or architecture, read the matching detailed clauses before acting. An abbreviated instruction never grants permissions that the full contract or an executable guard denies. For hardware operations, only the existing trusted root executor may run owner-approved protected stages.
+This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. The [complete detailed clauses](docs/development/plasma-autonomous-development-contract-full.md) remain normative and are incorporated by reference. Read **relevant detailed sections on demand**; do not preload the entire detailed document for unrelated tasks. If an operation touches privileges, electrical safety, deployment, Git history or architecture, read the matching detailed clauses before acting. An abbreviated instruction never grants permissions that the full contract or an executable guard denies. For privileged Z2 FPGA Manager/MMIO operations, only the existing trusted protected executor may run approved stages; normal owner-approved SWPC USB/TTY development tools run without a new Stage.
 
 **Exactly two owner approval gates:** Gate 1 — Plan Approval *before any new implementation*; Gate 2 — Merge Approval for a specific merge-ready PR. No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approved, autonomously complete all in-scope work and actual acceptance, including fixes and CI; do not request repeated approval. Material scope change requires a revised Gate 1. **Never merge without Gate 2.**
 
@@ -22,7 +22,7 @@ For healthy normal development aim for at most 180 seconds of pre-experiment che
 
 - **No overengineering.** Prefer the current Work Order, generic Dispatcher, trusted-main stage adapter, existing scripts and Runner. Do not introduce a per-task Workflow, Registry ID, Runner, security platform, evidence system or third approval gate for ordinary development. A genuinely new mechanism with new consequences needs explicit approval in Gate 1.
 - **Choose an appropriate Path at Gate 1.** Path 1: ChatGPT Direct for code/docs/Host-only CI. Path 2: SWPC fixed CLI for deterministic real SWPC work. Path 3: existing SWPC Codex CLI for real SWPC plus autonomous diagnosis/repair. Prefer Path 1 unless SWPC required; prefer Path 2 unless agentic iteration needed.
-- **Path 3 is not inherently Host-only.** An explicit owner-approved Work Order may include guarded hardware stages through the trusted protected executor. A Prompt, Runner account or credential does not authorize privileged Z2/SWD/USB/LA/MMIO/Power access. Do not bypass runtime guards; report NOT_RUN if a route is unavailable.
+- **Path 3 is not Host-only.** Under an owner-approved Gate 1 Work Order, the existing Path 3 Codex on SWPC may use ordinary USB/TTY tools directly, including OpenOCD, sigrok and CDC, within actual Linux device permissions. Do not add a separate Lab Mode, Session, per-DUT core Stage or execution path. Privileged Z2 FPGA Manager/MMIO, power changes and protected stages still require their existing authorization and executor. If access fails, report NOT_RUN, not PASS.
 - Path 2 and Path 3 may share existing SWPC-plasma-codex Runner when the approved task and current host permissions allow. Do not require extra OS/Runner isolation without demonstrated risk.
 - **One full readiness review per unchanged PR HEAD.** Revalidate affected deltas and dependencies only. Immediately before an authorized Gate 2 merge, check live HEAD/main, necessary CI, Rulesets, Reviews, unresolved Threads, dependencies and Mergeability. Stop on changes.
 - If approved Path 2/3 acceptance requires real SWPC, execute/review it in Gate 1 before merge; GitHub-hosted simulation and a proposed Run ID do not qualify. Preserve actual exit, Run/Job ID, evidence and recovery outcome. Do not merge untested changes merely to trigger a main-only dispatcher. Explicit owner-approved deferral must be documented.
@@ -30,7 +30,7 @@ For healthy normal development aim for at most 180 seconds of pre-experiment che
 
 ### 1A.2 Development Mode — shared execution and safety
 
-Use the existing trusted-main Dispatcher and Work Order route, not speculative alternate infrastructure. Physical stages demand B1 owner/source authorization, B2 ownership/electrical/recovery verification and B3 authentic result/recovery receipts. Guard failures are blockers, not authorization opportunities. The [full contract](docs/development/plasma-autonomous-development-contract-full.md) contains exact stage/restore/source checks; read them for hardware/transport tasks.
+Use the existing trusted-main Dispatcher, existing Work Order and Runner, not speculative alternate infrastructure. SWPC's ordinary USB/TTY development tools are available to the approved Path 3 Codex process, subject to the worker's real OS privileges, B1 owner/scope authorization and electrical/device-ownership safety. Privileged protected stages retain B1/B2/B3 and their trusted executor. Authentic exits, hashes and physical evidence are required for any PASS; unknown electrical/recovery state stops unsafe repeats. The [full contract](docs/development/plasma-autonomous-development-contract-full.md) remains authoritative for protected operations.
 
 ## 1B. Canonical Codex task/SSH execution contract (normative)
 
@@ -49,7 +49,7 @@ When statements disagree: (1) executable code/check-in config, (2) scripts/plasm
 ## 4. Execution zones
 
 - **Cloud / GitHub-hosted:** source changes, deterministic host-only tests, PR/CI. Never claim real SWPC, FPGA, voltage, Z2 or DUT success from these.
-- **SWPC / integration host:** licensed builds, scoped host validation, currently authorized operations only. Check workspace branch/state before changes; never overwrite unrelated work.
+- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. The rootless Codex device namespace exposes /dev/bus/usb and current /dev/ttyACM* and /dev/ttyUSB* nodes without per-VID/PID core allowlists; real Linux DAC/ACL continues to apply. Check workspace branch/state before changes; never overwrite unrelated work.
 - **Z2 / hardware:** real FPGA/PS/PL/DUT operations only with explicit Gate 1 and effective guard/ownership/recovery checks. Hardware observations are not inherited from software success.
 - Default workspace is the PLASMA repository. Do not inspect unrelated personal files, system settings, credential stores or external repos except already-authorized task-specific resources.
 
@@ -95,8 +95,8 @@ Use up to four explicit scoped choices when appropriate, but buttons do not them
 
 - Path 1: ChatGPT Direct Work -> GitHub PR -> GitHub-hosted CI; for software/docs/Host-only engineering.
 - Path 2: existing GitHub Actions -> authorized SWPC fixed CLI -> real exit/evidence, when deterministic commands suffice.
-- Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> Codex CLI autonomous work -> authentic evidence -> PR/CI.
-- Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Owner-approved real hardware requires protected transport/executor and actual safety checks.
+- Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> rootless USB/TTY-visible Codex CLI autonomous work -> authentic evidence -> PR/CI. Device visibility is not blanket approval to actuate; the existing Gate 1 defines permitted experiments.
+- Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Ordinary Gate 1-authorized USB/TTY experiments require actual Linux permissions and safety checks; privileged Z2/MMIO/FPGA stages still require the protected executor.
 - The detailed Three-Path design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
 
 ### 11.2 Routine autonomous work after Gate 1
@@ -117,7 +117,7 @@ Use feature branch and PR, preserve other contributors' changes. No direct featu
 
 ## 15. Validation policy
 
-Run smallest focused tests first and full relevant CI before readiness. Python and PL source tests, Web lint/test/artifact checks, cross-stack integration and physical HIL are distinct layers; a lower layer does not certify a higher one. Never infer hardware acceptance from hosted mocks.
+Development Mode uses the minimum sufficient authentic experiment. Stop after one complete PASS; only FAIL or insufficient evidence warrants targeted diagnosis, repair and retest. Program/Readback/Verify have no numerical retry quota; this is not permission for uncontrolled loops or unsafe repeats. Never automatically repeat an operation after uncertain electrical state, unreaped process or uncertain recovery. Run smallest focused tests first and full relevant CI before readiness. Python and PL source tests, Web lint/test/artifact checks, cross-stack integration and physical HIL are distinct layers; a lower layer does not certify a higher one. Never infer hardware acceptance from hosted mocks.
 
 ## 16. FPGA / PL rules
 
