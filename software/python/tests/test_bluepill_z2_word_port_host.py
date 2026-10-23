@@ -46,7 +46,7 @@ def test_bridge_uses_real_native_file_word_port_and_explicit_barriers(port_fixtu
     bridge = RemoteBitbangSWD(port, base=BASE)
     bridge.admit()
     bridge.exchange(b"Odf")
-    assert read_word(f, 0x08) == 7
+    assert read_word(f, 0x08) == 5  # Odf: OE=1, SWCLK=1, SWDIO=0
     bridge.exchange(b"oQ")
     assert read_word(f, 0x08) == 2
     assert len(barriers) >= 4
