@@ -14,7 +14,8 @@ BIT/HWH/BIN and original recovery BIN/HWH; rejects arbitrary file paths,
 symlinks, digest mismatch, manifest extras or reused candidate/recovery image.
 It reuses **existing** `one_shot.run_sequence` for ordered
 preflight → durable recovery intent → candidate load → test →
-restore original → verify restoration, with a protected RootBackend
+restore original → verify restoration; an uncertain restore is elevated to
+`UNKNOWN_MANUAL_RECOVERY_REQUIRED`, with a protected RootBackend
 supplied only by trusted installed code.
 
 It does **not** register a new CLI, Runner, Workflow, Dispatcher Task,

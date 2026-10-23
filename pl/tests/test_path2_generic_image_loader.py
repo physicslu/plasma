@@ -149,7 +149,7 @@ class FakeRootBackend:
               "restore", "verify_restored"], "FAIL_OR_BLOCKED"),
     ("durable_intent", ["preflight", "durable_intent"], "FAIL_OR_BLOCKED"),
     ("restore", ["preflight", "durable_intent", "load", "test",
-                 "restore"], "FAIL_OR_BLOCKED"),
+                 "restore"], "UNKNOWN_MANUAL_RECOVERY_REQUIRED"),
 ])
 def test_exact_stage_order_and_safe_failure(tmp_path, fail, expected, overall):
     profile, paths = verified(tmp_path)

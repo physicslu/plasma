@@ -187,7 +187,7 @@ def supervised_one_shot(bundle: VerifiedBundle,
         state["test"] = "PASS"
 
     assert backend is not None
-    return one_shot.run_sequence(
+    result = one_shot.run_sequence(
         preflight=preflight,
         load_candidate=lambda: backend.load_candidate(bundle),
         test_callback=test_callback,
@@ -195,3 +195,9 @@ def supervised_one_shot(bundle: VerifiedBundle,
         restore=lambda: backend.restore_original(bundle),
         verify_restoration=lambda: backend.verify_restoration(bundle),
     )
+    # Reconfiguration may have occurred. An unverified restore is not merely
+    # a routine NO_GO; require trusted manual state inspection, never retry.
+    if (result["preflight"] == "PASS" and
+            result["restoration_verified"] != "PASS"):
+        result["overall"] = "UNKNOWN_MANUAL_RECOVERY_REQUIRED"
+    return result
