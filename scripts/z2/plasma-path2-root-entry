@@ -39,7 +39,13 @@ module_leaf="$(printf '%s' "$module" | sed -n 's/^pl\.hil\.//p')"
 module_file="pl/hil/$module_leaf.py"
 
 # Only root-installed, hash-checked source may run under sudo.
-for file in "$root" "$manifest" "$profile" "$root/$module_file"; do
+# Every import-path ancestor is root-owned, so a non-root account cannot
+# swap a checked Python module or a package directory between verification
+# and interpreter startup.
+for file in /root "$root" "$root/pl" "$root/pl/hil" \
+  "$root/pl/hil/swd04" "$root/software" "$root/software/python" \
+  "$root/software/python/plasma_interfaces" \
+  "$manifest" "$profile" "$root/$module_file"; do
   [[ -e "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
     { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
   perm="$(stat -c '%a' "$file")"
