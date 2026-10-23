@@ -51,6 +51,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertNotIn("/dev/mem", args)
         self.assertNotIn("/dev/uio0", args)
         self.assertIn("--ro-bind", args)
+        self.assertEqual(args[args.index("--tmpfs") + 1], "/run")
         self.assertIn("--unsetenv", args)
         self.assertIn("--sandbox", args)
         self.assertEqual(args[args.index("--sandbox") + 1],
@@ -96,6 +97,27 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                 ):
                     sandbox.codex_command(work, home=home,
                                           usb_root=usb, dev_root=dev)
+
+    def test_real_runner_launch_calls_outer_namespace_not_raw_codex(self):
+        # Production path selection is selected by the actual subprocess.run
+        # identity, not by a prompt or a new Work Order/Session field.
+        class Result:
+            returncode = 0
+            stdout = b""
+            stderr = b""
+        with tempfile.TemporaryDirectory() as temp:
+            work, _, _, _ = self.roots(temp)
+            with patch.object(dispatcher.subprocess, "run",
+                              return_value=Result()) as run, \
+                 patch.object(sandbox, "codex_command",
+                              return_value=["bwrap", "--", "codex", "-"]) as outer:
+                receipt = dispatcher.run_codex_task(
+                    {"objective": "Owner approved development work."},
+                    workspace=work, executor=run)
+            outer.assert_called_once_with(work)
+            self.assertEqual(run.call_args.args[0],
+                             ["bwrap", "--", "codex", "-"])
+            self.assertEqual(receipt["codex_exit_code"], 0)
 
     def test_normal_path3_has_no_new_capability_or_session(self):
         import inspect
