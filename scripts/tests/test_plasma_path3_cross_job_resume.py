@@ -202,6 +202,23 @@ class ResumeTwoJobOffline(unittest.TestCase):
                                         "RESUME_TEST_BWRAP_UNAVAILABLE"):
                 flow.isolated_unittest(self.repo, self.repo / flow.probe.ROOT_FOLDER)
 
+    def test_sandboxed_test_does_not_inherit_runner_tokens(self):
+        seen = {}
+        def fake_run(args, **kw):
+            seen["args"] = args
+            seen["env"] = kw["env"]
+            return subprocess.CompletedProcess(args, 0, b"", b"Ran 2 tests in 0.0s\\nOK\\n")
+        with patch.object(flow.shutil, "which", return_value="/usr/bin/bwrap"), \
+             patch.object(flow.subprocess, "run", side_effect=fake_run), \\
+             patch.dict(os.environ, {"GH_TOKEN": "sensitive-fixture",
+                                     "PYTHONPATH": "/untrusted"}, clear=False):
+            result = flow.isolated_unittest(self.repo, self.repo)
+        self.assertEqual(result, 0)
+        self.assertNotIn("GH_TOKEN", seen["env"])
+        self.assertNotIn("PYTHONPATH", seen["env"])
+        self.assertIn("--unshare-net", seen["args"])
+        self.assertIn("--dev", seen["args"])
+
     def test_only_existing_workflow_and_runner(self):
         wf = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
         self.assertIn("development-codex-resume:", wf)
