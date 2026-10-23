@@ -1049,7 +1049,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1763,7 +1763,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"path2-stage-contract"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
