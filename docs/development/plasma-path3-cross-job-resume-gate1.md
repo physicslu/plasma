@@ -12,7 +12,7 @@ capability, deployment, or additional owner approval gate.
 
 Actual SWPC development-codex Job #120372762671 FAILED; development-codex-resume
 was SKIPPED. The receipt was RESUME_CODEX_INSTALL_UNMOUNTED. The real log
-shows the CLI ENTRY `/home/plasma-codex/.nvm/versions/node/v22.23.2/bin/codex`
+shows the CLI ENTRY `$RUNNER_HOME/.nvm/versions/node/v22.23.2/bin/codex`
 and `codex-cli 0.162.1`. Neither its resolved JS path nor the Native ELF
 SHA-256 has been observed on SWPC; do not assume either value.
 
