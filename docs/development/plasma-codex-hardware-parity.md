@@ -22,27 +22,30 @@ With `--apply` on trusted **SWPC**:
 
 `--audit` compares the operator and worker against all enumerated USB and USB-serial node permission mode bits (not ACL/LSM), retains historical FT2232/LA subgroups, groups, managed rules, installed LA digest and **file metadata only** for the existing private Z2 credential-store convention. It never reads, parses, displays or copies passwords, SSH keys, environment values, unique USB serial numbers or machine-specific paths.
 
-## Deployment after Gate 2 (operator terminal; not PR workflow)
+## Controlled SWPC access activation under the approved Gate 1 (operator terminal only)
 
-Use **reviewed main** on SWPC; preserve local work. Read current context without making changes first:
-
-```sh
-cd "${PLASMA_REPO:?set trusted SWPC checkout path}"
-git status --short
-git fetch origin main
-git merge --ff-only origin/main
-python3 scripts/plasma-codex-hardware-parity.py --audit
-```
-
-Compare `<trusted-operator>` group/permission baseline against `plasma-codex` and verify the previously used AppImage (do not assume the root-run audit proves original Codex's historical UID).
-
-Then apply from the owner's **trusted administrative terminal** (not from GitHub Actions):
+The owner may validate and activate this **existing** generic SWPC hardware-parity policy on the **reviewed exact candidate PR HEAD** before Gate 2. This is not a third approval Gate, does not merge the PR, and does not route administrative access through the untrusted GitHub Actions Runner. Do **not** update the operator's main checkout just to obtain this script. Keep an isolated detached candidate worktree and require its clean state and exact owner-reviewed SHA before execution:
 
 ```sh
-sudo python3 scripts/plasma-codex-hardware-parity.py --apply
-# If the verified source AppImage is present locally:
-# sudo python3 scripts/plasma-codex-hardware-parity.py --apply --la-appimage "$SIGROK_APPIMAGE"
+cd "${PLASMA_CANDIDATE_WORKTREE:?set the separately reviewed PR worktree}"
+test -z "$(git status --porcelain --untracked-files=all)"
+test "$(git rev-parse HEAD)" = "${REVIEWED_PR_HEAD_SHA:?pin the reviewed 40-hex SHA}"
+python3 -B scripts/plasma-codex-hardware-parity.py --self-test
+python3 -B scripts/plasma-codex-hardware-parity.py --audit
 ```
+
+The `--audit` receipt now includes `managed_usb_rules_state`: `MISSING`, `CURRENT` or `EXACT_LEGACY` is eligible for managed activation. `OWNER_OR_MODE_DENIED` and `CONFLICT_REFUSED` must stop all changes. Do not overwrite other udev files, change unrelated modes, or apply a per-VID/PID exception.
+
+Only after source identity and preflight checks pass, the owner may run this **root-only** administrative operation from the trusted local operator terminal (not Codex, not any CI job). The exact candidate source must be treated as privileged code and reviewed accordingly:
+
+```sh
+sudo -H python3 -B scripts/plasma-codex-hardware-parity.py --apply
+sudo -H python3 -B scripts/plasma-codex-hardware-parity.py --audit
+```
+
+This applies the generic `GROUP=plasma-codex-io`, `MODE=0660` rule to **all USB device nodes** and `ttyACM*`/`ttyUSB*`, with **no VID/PID allowlist**. It stages rules and current group membership only; it does **not** re-enumerate devices, update existing device-node metadata, reboot, reset the board, disconnect USB, toggle Hub power, or restart a Runner. Device access is not PASS until the actual dedicated worker process confirms it. Do not interpret `udevadm control --reload` as a retroactive update of nodes that already exist. Future controlled device re-enumeration/trigger or an independently reviewed generic current-node mode update may be needed; do not perform one merely to force this test to PASS.
+
+Compare operator/worker permissions and the existing KINGST AppImage state without reading any private credentials.
 
 **This only stages udev rules and group membership.** Existing USB/TTY device nodes retain their old permission metadata until a carefully selected re-enumeration/udev event; no automatic USB disconnect or port toggle is allowed. Newly added group membership also requires a new login/service process. When the dedicated Runner shows **Idle**, restart **only** `actions.runner.physicslu-plasma.SWPC-plasma-codex.service` through an authorized operator channel, not the existing `SWPC-plasma-ci` service. Re-audit both worker and operator access.
 
