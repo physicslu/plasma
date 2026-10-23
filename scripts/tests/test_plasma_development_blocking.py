@@ -259,6 +259,24 @@ class NativePreflightWorkOrder(unittest.TestCase):
                     self.assertNotIn("auth.json", json.dumps(record))
                     model.assert_not_called()
                     run_script.assert_not_called()
+                for stage, cause, index in (
+                    ("../../private", "PEER_WRITABLE", 1),
+                    ("CLI_WRAPPER", "/leak/private", 1),
+                    ("NATIVE_BINARY", "OWNER_MISMATCH", 999),
+                ):
+                    with self.subTest(stage=stage, cause=cause, index=index):
+                        bad = native.PreflightDenied(
+                            "NATIVE_PATH_PERMISSIONS_DENIED",
+                            stage=stage, cause=cause, component_index=index)
+                        with patch.object(native, "inspect", side_effect=bad):
+                            with redirect_stdout(StringIO()) as denied:
+                                self.assertEqual(dispatch.main(), 2)
+                            rejected = json.loads(denied.getvalue())
+                            self.assertEqual(rejected["status"], "NOT_RUN_OR_FAIL")
+                            self.assertEqual(rejected["reason"],
+                                             "NATIVE_DIAGNOSTIC_FIELDS_DENIED")
+                            self.assertNotIn(stage, json.dumps(rejected))
+                            self.assertNotIn(cause, json.dumps(rejected))
                 for name, value in (("GITHUB_JOB", "development-codex"),
                                     ("GITHUB_RUN_ATTEMPT", "2"),
                                     ("RUNNER_NAME", "another-runner"),
