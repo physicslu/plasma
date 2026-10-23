@@ -66,28 +66,38 @@ assignment**, not the historical evidence, from
   LA2016 (`1-1.4`). Historic `Port 2 = Z2` is no longer valid.
 - Z2 AX88179 USB Ethernet currently enumerates directly under SWPC `2-8`,
   **not under this Transcend hub**; avoid the old Port 3 = Ethernet assumption.
-- Owner states **Z2 Power OFF**, but `Port 3 power` and FT2232 enumeration
-  prove only the hub's USB side, **not** Zynq PS boot or board power rails.
-- Official [Xilinx PYNQ-Z2 setup](https://pynq.readthedocs.io/en/v2.5/getting_started/pynq_z2_setup.html)
-  requires the **SW1 power switch ON** for boot, and the power-source
-  **J9 jumper** is set to **USB** or **REG** depending on source; the
-  [TUL PYNQ-Z2 manual](https://dpoauwgwqsy2x.cloudfront.net/Download/PYNQ_Z2_User_Manual_v1.1.pdf)
-  also identifies USB J8, external DC1 and J7 VIN as distinct power-source
-  routes. **Current physical J9, SW1, DC1, J7/VIN and power-rail states
-  have not been observed.**
-- Historical Port 2 or Port 3 `uhubctl -a off/on` commands must never be
-  copied into current HIL tasks: Port 2 now selects Blue Pill USB and
-  Port 3 selects Z2 FT2232; neither equates to Z2 whole-board power.
-  The direct USB Ethernet path is outside that hub. A hub's `ppps`
-  capability alone does not qualify physical VBUS removal or recovery.
+- **Owner confirmation (2026-10-24):** this Z2 setup is **USB powered**;
+  interrupting and restoring its USB supply makes the Z2 boot again. This
+  establishes the intended operational **USB-power-cycle recovery route** in
+  the present owner-operated prototype. It is owner-reported wiring/behavior,
+  **not** a newly executed instrumented Z2 power/boot qualification.
+- Under the **observed current wiring**, Transcend physical **Port 3** is
+  the Z2 USB power/control connection via FT2232 (`1-1.3`). Port 2 is
+  **Blue Pill**, not Z2; Port 1 is ST-LINK, Port 4 is LA2016. Z2's separate
+  Ethernet adapter on SWPC `2-8` is **outside** this hub; its own USB
+  enumeration does not demonstrate that Z2 Linux has booted.
+- Manufacturer documents describe J9 source selection and SW1 power
+  switching ([PYNQ-Z2 setup](https://pynq.readthedocs.io/en/v2.5/getting_started/pynq_z2_setup.html);
+  [TUL manual](https://dpoauwgwqsy2x.cloudfront.net/Download/PYNQ_Z2_User_Manual_v1.1.pdf)).
+  The owner-confirmed **working USB-power-cycle arrangement** supersedes
+  our previous speculative demand to re-check J9/SW1 before acknowledging
+  that this setup can boot via USB. It does not prove rail discharge time,
+  electrical VBUS zero, maximum load/current budget or independent emergency
+  recovery under abnormal PS/PL faults.
+- Any *future authorized* USB power-cycle shall resolve the **current physical
+  hub/port mapping** rather than reuse historic Port 2 commands, stop if
+  mapping changed or ambiguous, avoid toggling ST-LINK/Blue Pill/LA2016
+  ports, and verify Z2 Linux readiness through its actual PS status rather
+  than FT2232 enumeration alone. Interrupting Port 3 temporarily removes
+  the Z2 JTAG/UART recovery path. No repeated power cycling on failure.
 
-**Bounded next step:** observe the actual **J9** selection, **SW1** position,
-external **DC1/J7** source and recovery setup **without moving any
-switch/jumper/cable**, and record findings privately with only sanitized
-summary in PR. Until that hardware state and independent recovery are
-verified, no hub ON/OFF, Z2 boot, UART login, JTAG operation, MMIO, FPGA
-Manager or DUT action is qualified as part of this Port/power audit.
-No new Path/Mode/Session/Runner or per-device USB admission logic is needed.
+**Observed acceptance so far:** owner-reported generic USB/TTY worker ACL
+`16/16 PASS`; passive `uhubctl` and current topology observed; owner
+confirms USB Power OFF/ON boots Z2. **A newly witnessed Port 3 OFF/ON →
+Z2 PS boot/identity and the real Codex-in-namespace command remain
+NOT_RUN** for PR #1140. No hardware state was changed in this documentation
+update. These are ordinary approved Development Mode capabilities, **not**
+new USB VID/PID admission filters, Path/Mode/Session/Runner or merge permission.
 
 ## Bounded nondestructive acceptance
 
