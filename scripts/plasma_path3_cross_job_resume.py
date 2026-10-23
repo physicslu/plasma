@@ -121,8 +121,13 @@ def isolated_unittest(workspace, scratch):
                *mounts, "--bind", str(workspace), "/work",
                "--chdir", "/work/" + probe.ROOT_FOLDER,
                "--", "python3", "-m", "unittest", "-q", probe.TEST_NAME]
+    # Do not leak Actions credentials or inherit Python import hooks into a
+    # test that executes model-edited Python code in the sandbox.
+    safe_env = {"PATH": "/usr/local/bin:/usr/bin:/bin",
+                "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+                "PYTHONNOUSERSITE": "1"}
     try:
-        proc = subprocess.run(command, cwd=scratch,
+        proc = subprocess.run(command, cwd=scratch, env=safe_env,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=30, check=False)
     except (OSError, subprocess.TimeoutExpired):
