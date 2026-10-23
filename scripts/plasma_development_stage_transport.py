@@ -28,8 +28,8 @@ PRIVATE = HOME / ".config/plasma"
 LOGIN = PRIVATE / "z2-login-smoke.json"
 KNOWN_HOSTS = PRIVATE / "z2-login-known_hosts"
 SUDO = PRIVATE / "z2-swd05-oneshot.json"
-ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-f1b-root-entry"
-MARK = "PLASMA_F1B_PATH2_DEV="
+ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"
+MARK = "PLASMA_PATH2_STAGE="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
 TIMEOUT = 105
 MAX_OUTPUT = 8192
@@ -53,6 +53,7 @@ SAFE_FAILURE_CODES = frozenset({
     "REMOTE_EXIT_OR_PRIVILEGE_FAILED", "REMOTE_PTY_NOT_DRAINED",
     "REMOTE_OUTPUT_TOO_LARGE", "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED",
     "REMOTE_RESULT_NOT_VERIFIED", "F1B_IMAGE_NOT_LOADED",
+    "PROJECT_NOT_ALLOWLISTED",
 })
 
 
@@ -72,6 +73,8 @@ ROOT_MANIFEST_DIAGNOSTICS = frozenset({
     "PATH2_PINNED_PYTHON_NOT_INSTALLED", "PATH2_SOURCE_NOT_ROOT_OWNED",
     "PATH2_SOURCE_WRITABLE_BY_OTHERS", "PATH2_REQUIRED_SOURCE_NOT_PINNED",
     "PATH2_APPROVED_SOURCE_HASH_MISMATCH",
+    "PATH2_APPROVED_PROFILE_INVALID", "PATH2_APPROVED_PROFILE_MISMATCH",
+    "PATH2_REQUEST_NOT_PINNED",
 })
 
 
@@ -117,7 +120,8 @@ def remote_failure(returncode: int, output: bytes) -> str:
     return "REMOTE_EXIT_OR_PRIVILEGE_FAILED"
 
 
-def parse_receipt(stage: str, source_sha: str, output: bytes) -> dict:
+def parse_receipt(stage: str, source_sha: str, output: bytes,
+                  project: str) -> dict:
     text = output.decode("utf-8", "replace")
     matched = re.findall(
         re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
@@ -128,15 +132,16 @@ def parse_receipt(stage: str, source_sha: str, output: bytes) -> dict:
     except (ValueError, RecursionError):
         raise Blocked("REMOTE_RECEIPT_INVALID") from None
     need(type(data) is dict and data.get("stage") == stage
+         and data.get("project") == project
          and type(data.get("boot_id")) is str
          and re.fullmatch(r"[a-zA-Z0-9-]{8,64}", data["boot_id"]) is not None
          and data.get("result") in {
              "download": ("LOADED_AND_HELD",),
-             "test": ("IDENTITY_PASS",),
+             "test": ("IDENTITY_PASS", "DPIDR_PASS"),
              "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
          }[stage], "REMOTE_RESULT_NOT_VERIFIED")
     return {"stage": stage, "source_sha": source_sha,
-            "real_z2": True, "boot_id": data["boot_id"],
+            "project": project, "real_z2": True, "boot_id": data["boot_id"],
             "result": data["result"]}
 
 
@@ -183,9 +188,12 @@ def enrollment() -> tuple[str, str, str]:
     return ssh["ssh_host"], ssh["ssh_password"], sudo["sudo_password"]
 
 
-def execute(stage: str, source_sha: str) -> dict:
+def execute(stage: str, source_sha: str, project: str) -> dict:
     need(stage in STAGES, "STAGE_NOT_ALLOWLISTED")
     need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
+    need(type(project) is str and re.fullmatch(
+        r"pl/projects/[a-z0-9][a-z0-9-]{2,69}", project) is not None,
+        "PROJECT_NOT_ALLOWLISTED")
     try:
         host, password, sudo_password = enrollment()
     except Blocked:
@@ -194,7 +202,8 @@ def execute(stage: str, source_sha: str) -> dict:
         raise Blocked("LOCAL_ENROLLMENT_DENIED") from None
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
-    remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage)
+    remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " +
+              stage + " " + project + " " + source_sha)
     argv = [
         "/usr/bin/ssh", "-F", "/dev/null", "-T",
         "-o", "StrictHostKeyChecking=yes",
@@ -263,7 +272,7 @@ def execute(stage: str, source_sha: str) -> dict:
         except subprocess.TimeoutExpired:
             raise Blocked("CHILD_OWNERSHIP_UNCERTAIN") from None
         need(returncode == 0, remote_failure(returncode, bytes(response)))
-        return parse_receipt(stage, source_sha, bytes(response))
+        return parse_receipt(stage, source_sha, bytes(response), project)
 
     finally:
         try:
