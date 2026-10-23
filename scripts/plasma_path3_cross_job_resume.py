@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import stat
+import struct
 import subprocess
 import time
 import uuid
@@ -23,6 +25,16 @@ JOBS = {"new": "development-codex", "resume": "development-codex-resume"}
 STATE_DIR = ".local/state/plasma-path3-crossjob"
 RUN_ID = re.compile(r"[1-9][0-9]{0,19}\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+
+# The SWPC native binary hash is not independently available from Run
+# #39941174584. Keep home-installed executables DENIED until a reviewed
+# constant is pinned from authorized read-only host evidence.
+NVM_NATIVE_SHA256 = None
+NVM_NODE_VERSION = "v22.23.2"
+CODEX_NPM_VERSION = "0.162.1"
+NATIVE_TARGET = "x86_64-unknown-linux-musl"
+NATIVE_MOUNT = "/plasma-native/codex"
+MAX_NATIVE_BYTES = 128 * 1024 * 1024
 
 class ResumeDenied(ValueError):
     """Constant diagnostic only; never expose raw Session, home, or prompt."""
@@ -75,6 +87,110 @@ def runner_binding(phase, req, workspace, env):
             "work_order_sha256": req["work_order_sha256"],
             "workspace_sha256": hash_data(str(workspace).encode())}
 
+
+def _safe_nvm_node(path, home, *, directory=False):
+    """Ensure all path components are owner/root-controlled and no symlinks."""
+    require(path.is_relative_to(home), "RESUME_CODEX_SOURCE_DENIED")
+    current = home
+    for part in path.relative_to(home).parts:
+        current = current / part
+        require(not current.is_symlink(), "RESUME_CODEX_SOURCE_DENIED")
+        try:
+            meta = current.stat()
+        except OSError:
+            raise ResumeDenied("RESUME_CODEX_SOURCE_DENIED") from None
+        require(meta.st_uid in (0, os.geteuid()) and
+                not (meta.st_mode & 0o022) and
+                (stat.S_ISDIR(meta.st_mode) if
+                 current != path or directory else stat.S_ISREG(meta.st_mode)),
+                "RESUME_CODEX_SOURCE_DENIED")
+
+
+def _package_metadata(path, home, name):
+    _safe_nvm_node(path, home)
+    require(path.stat().st_size <= 65536, "RESUME_CODEX_PACKAGE_INVALID")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        raise ResumeDenied("RESUME_CODEX_PACKAGE_INVALID") from None
+    require(type(data) is dict and data.get("name") == name and
+            data.get("version") in (
+                CODEX_NPM_VERSION, CODEX_NPM_VERSION + "-linux-x64"),
+            "RESUME_CODEX_PACKAGE_INVALID")
+    return data
+
+
+def _require_standalone_x64_elf(data):
+    """Reject PT_INTERP and DT_NEEDED: never import unmounted shared objects."""
+    require(len(data) >= 64 and data[:6] == b"\x7fELF\x02\x01",
+            "RESUME_CODEX_NATIVE_ELF_DENIED")
+    etype, machine = struct.unpack_from("<HH", data, 16)
+    phoff = struct.unpack_from("<Q", data, 32)[0]
+    phsize, phnum = struct.unpack_from("<HH", data, 54)
+    require(etype in (2, 3) and machine == 62 and phsize == 56 and
+            1 <= phnum <= 128 and
+            phoff + phnum * phsize <= len(data),
+            "RESUME_CODEX_NATIVE_ELF_DENIED")
+    for i in range(phnum):
+        kind, _, offset, _, _, length, _, _ = struct.unpack_from(
+            "<IIQQQQQQ", data, phoff + i * phsize)
+        require(kind != 3, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED")
+        if kind == 2:
+            require(offset + length <= len(data) and length % 16 == 0,
+                    "RESUME_CODEX_NATIVE_ELF_DENIED")
+            for j in range(offset, offset + length, 16):
+                tag = struct.unpack_from("<q", data, j)[0]
+                require(tag != 1, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED")
+                if tag == 0:
+                    break
+
+
+def _nvm_native_codex(codex):
+    """Fixed observed NVM + upstream npm layout; never mount its parent tree."""
+    home = Path.home().resolve(strict=True)
+    prefix = home / ".nvm" / "versions" / "node" / NVM_NODE_VERSION
+    entry = prefix / "bin" / "codex"
+    package = prefix / "lib" / "node_modules" / "@openai" / "codex"
+    wrapper = package / "bin" / "codex.js"
+    require(Path(codex) == entry and entry.is_symlink() and
+            Path(os.path.realpath(codex)) == wrapper,
+            "RESUME_CODEX_SOURCE_DENIED")
+    _safe_nvm_node(wrapper, home)
+    metadata = _package_metadata(package / "package.json", home,
+                                 "@openai/codex")
+    require(metadata.get("bin") == {"codex": "bin/codex.js"},
+            "RESUME_CODEX_PACKAGE_INVALID")
+    candidates = [
+        package / "node_modules" / "@openai" / "codex-linux-x64",
+        package.parent / "codex-linux-x64",
+        package,
+    ]
+    found = []
+    for root in candidates:
+        native = root / "vendor" / NATIVE_TARGET / "bin" / "codex"
+        if native.exists() or native.is_symlink():
+            found.append((root, native))
+    require(len(found) == 1, "RESUME_CODEX_NATIVE_AMBIGUOUS")
+    root, native = found[0]
+    _safe_nvm_node(native, home)
+    if root != package:
+        _package_metadata(root / "package.json", home,
+                          "@openai/codex-linux-x64")
+    require(native.stat().st_mode & 0o111 and
+            native.stat().st_size <= MAX_NATIVE_BYTES,
+            "RESUME_CODEX_NATIVE_ELF_DENIED")
+    require(type(NVM_NATIVE_SHA256) is str and
+            SHA256.fullmatch(NVM_NATIVE_SHA256) is not None,
+            "RESUME_CODEX_SHA256_UNPINNED")
+    raw = native.read_bytes()
+    require(hash_data(raw) == NVM_NATIVE_SHA256,
+            "RESUME_CODEX_SHA256_MISMATCH")
+    _require_standalone_x64_elf(raw)
+    require(hash_data(native.read_bytes()) == NVM_NATIVE_SHA256,
+            "RESUME_CODEX_SHA256_MISMATCH")
+    return native
+
+
 def isolated_command(workspace, private_root, session):
     """Explicit bwrap mounts: no host hardware /dev, /sys, /run, or home.
 
@@ -83,13 +199,14 @@ def isolated_command(workspace, private_root, session):
     """
     wrap, codex = shutil.which("bwrap"), shutil.which("codex")
     require(bool(wrap and codex), "RESUME_BWRAP_OR_CODEX_UNAVAILABLE")
-    # The model binary must resolve inside a read-only system mount. Common
-    # per-user npm/nvm paths are deliberately NOT allowed into the namespace
-    # without an independently reviewed host-only admission contract.
     codex_binary = os.path.realpath(codex)
-    require(any(codex_binary.startswith(prefix) for prefix in (
-                "/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/opt/")),
-            "RESUME_CODEX_INSTALL_UNMOUNTED")
+    native_mounts = []
+    if not any(codex_binary.startswith(prefix) for prefix in (
+            "/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/opt/")):
+        binary = _nvm_native_codex(codex)
+        native_mounts = ["--dir", "/plasma-native",
+                         "--ro-bind", str(binary), NATIVE_MOUNT]
+        codex_binary = NATIVE_MOUNT
     auth = Path.home() / ".codex" / "auth.json"
     require(auth.is_file() and not auth.is_symlink(),
             "RESUME_AUTH_FILE_UNAVAILABLE")
@@ -109,7 +226,7 @@ def isolated_command(workspace, private_root, session):
             mounts += ["--ro-bind", path, path]
     args = [wrap, "--die-with-parent", "--new-session", "--unshare-pid",
             "--unshare-ipc", "--dev", "/dev", "--proc", "/proc",
-            "--tmpfs", "/tmp", *mounts, "--dir", "/home",
+            "--tmpfs", "/tmp", *mounts, *native_mounts, "--dir", "/home",
             "--dir", "/home/plasma",
             "--bind", str(ch), "/home/plasma/.codex",
             "--ro-bind", str(auth), "/home/plasma/.codex/auth.json",
