@@ -47,10 +47,15 @@ this is part of its action scope, not a general rerun policy.
 The shared workflow routes by the authorized Path/capability. It does not
 repeat the task catalogue or require an unrelated A2 claim job to be skipped.
 The active generic Path 3 Workflow executes Codex and captures its evidence;
-it has **no automatic post-Codex hardware stage job**. An owner-approved
-physical operation still requires an available trusted Stage Transport route,
-B1/B2/B3 checks and an authentic protected Z2 root receipt. Generic dynamic
-Path 3 hardware delegation remains unimplemented; if the route is unavailable,
+it has **no automatic post-Codex hardware stage job**. In Development Mode,
+that SAME Path 3 uses a rootless Codex namespace with the SWPC USB bus and
+current USB serial device nodes visible. This is device visibility, NOT a
+new Lab Mode, a privileged executor, a per-DUT Stage, or authorization to
+operate arbitrary equipment. Actual Linux DAC/ACL and the owner-approved
+Gate 1 objective still apply. Privileged Z2 FPGA Manager/MMIO actions still
+require the existing trusted Stage Transport and authentic root receipts;
+generic protected-stage delegation from an arbitrary Codex command remains
+unimplemented. If Linux device access or a protected route is unavailable,
 report `NOT_RUN`. Report completeness is review metadata, not stage authority.
 
 A successful CPU-only command may write diagnostics to stderr. Its return
