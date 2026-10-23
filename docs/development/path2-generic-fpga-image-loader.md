@@ -73,3 +73,28 @@ program/readback remain **NOT_RUN / UNKNOWN**. The archived F1-B
 
 No WEB testing, merge, deployment, SWPC/Z2/DUT operation or Flash writing
 is performed by this PR.
+
+## Gate 1 continued: generic Profile → existing held Provider contract
+
+The new `pl/hil/path2_generic_held_binding.py` **does not add a second
+lease engine**. It binds the already checked candidate/recovery bytes
+and source SHA to the existing exact `plasma_path2_persistent_lease`
+intent and `plasma_path2_held_provider` BIT/HWH/BIN provenance schema.
+The in-memory `HeldBinding` explicitly returns
+`hardware_authorized=False`, and no privileged execution endpoint,
+TargetPort factory, or real hardware authority exists here.
+
+**Important integration discovery:** `scripts/plasma_path2_held_provider.py`
+reuses F1-B-specific `read_f1b_identity_child`, while
+`plasma_path2_persistent_lease.test_evidence()` requires exactly 3
+readonly identity words (0x4D534C50 / 0x00010000 / 1). An external Blue
+Pill SWD DPIDR check has different semantics and **must be rejected**
+until a reviewed generic test adapter and independent physical admission
+are registered. Existing F1-B protected Root entry continues unchanged.
+
+No owner-supplied JSON Boolean, offline SHA256 or simulated receipt can
+substitute independent AXI isolation, passive electrical observation,
+current-boot recovery provenance or a trusted root executor. Current
+remaining blockers are still a real #1142 BIT/HWH/BIN build, reviewed
+protected per-Profile Root Port, safe physical SWD admission and authentic
+SWPC/Z2 HIL receipts.
