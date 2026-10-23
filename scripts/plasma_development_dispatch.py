@@ -1311,11 +1311,13 @@ def main() -> int:
                     "worker_admission": admission,
                 }
                 task_failed = (
-                    args.action == "execute-codex"
-                    and receipt.get("status") != (
-                        "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
-                        else "RESUME_FIX_PASS" if args.resume_phase == "resume"
-                        else "EVIDENCE_READY_REVIEW_REQUIRED")
+                    (args.action == "execute-codex"
+                     and receipt.get("status") != (
+                         "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
+                         else "RESUME_FIX_PASS" if args.resume_phase == "resume"
+                         else "EVIDENCE_READY_REVIEW_REQUIRED"))
+                    or (task.get("native_preflight") == NATIVE_PREFLIGHT
+                        and receipt.get("status") != "OBSERVED")
                 )
             else:
                 plan = authorize(event, os.environ, registry, pr)
@@ -1323,7 +1325,7 @@ def main() -> int:
                     args.registry.read_bytes()
                 ).hexdigest()
         print(json.dumps(plan, sort_keys=True))
-        return 2 if args.action == "execute-codex" and task_failed else 0
+        return 2 if args.action in ("execute", "execute-codex") and task_failed else 0
     except (Denied, OSError, UnicodeError, json.JSONDecodeError,
             subprocess.SubprocessError, ValueError) as exc:
         print(json.dumps({
