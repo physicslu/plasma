@@ -75,6 +75,46 @@ class ParityTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     p.install_managed_usb_rules()
 
+    def test_preflight_denies_foreign_rules_before_group_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            rules = Path(root) / "rules.d" / "99-plasma.rules"
+            rules.parent.mkdir()
+            rules.write_text("third-party udev rules\\n")
+            with (
+                patch.object(p, "RULE_FILE", rules),
+                patch.object(p, "require_safe_admin"),
+                patch.object(p, "run_admin") as admin,
+            ):
+                self.assertEqual(p.managed_usb_rules_state(), "CONFLICT_REFUSED")
+                with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                    p.apply()
+                admin.assert_not_called()
+            rules.unlink()
+            rules.symlink_to("/dev/null")
+            with (
+                patch.object(p, "RULE_FILE", rules),
+                patch.object(p, "require_safe_admin"),
+                patch.object(p, "run_admin") as admin,
+            ):
+                self.assertEqual(p.managed_usb_rules_state(), "CONFLICT_REFUSED")
+                with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                    p.apply()
+                admin.assert_not_called()
+
+    def test_exact_rule_with_untrusted_owner_or_mode_denied(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            rules = Path(root) / "99-plasma.rules"
+            rules.write_text(p.render_rules())
+            rules.chmod(0o666)
+            with patch.object(p, "RULE_FILE", rules):
+                self.assertEqual(p.managed_usb_rules_state(),
+                                 "OWNER_OR_MODE_DENIED")
+                with patch.object(p, "require_safe_admin"), \\
+                     patch.object(p, "run_admin") as admin:
+                    with self.assertRaisesRegex(RuntimeError, "preflight denied"):
+                        p.apply()
+                    admin.assert_not_called()
+
     def test_unix_mode_comparison_is_not_an_acl_claim(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "usb-mock"
