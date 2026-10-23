@@ -217,10 +217,15 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
     before = test_runner(workspace, scratch)
     require(before == 1, "RESUME_FIXTURE_NOT_FAILING")
     command = command_builder(workspace, session_root, thread)
+    # Do not inherit GitHub/ACTIONS tokens, owner CLI environment or Node
+    # injection variables into the model-facing subprocess.
+    child_env = {"PATH": "/usr/local/bin:/usr/bin:/bin",
+                 "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+                 "TERM": "dumb"}
     try:
         proc = executor(command, input=prompt, cwd=scratch,
-                        capture_output=True, text=True, timeout=240,
-                        check=False)
+                        env=child_env, capture_output=True, text=True,
+                        timeout=240, check=False)
     except (OSError, subprocess.TimeoutExpired):
         raise ResumeDenied("RESUME_CODEX_INVOKE_FAILED") from None
     require(proc.returncode == 0, "RESUME_CODEX_NONZERO")
