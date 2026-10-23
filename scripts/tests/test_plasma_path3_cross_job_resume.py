@@ -585,7 +585,7 @@ class ResumeTwoJobOffline(unittest.TestCase):
             native.unlink()
             native.write_bytes(original)
             native.chmod(0o755)
-            second = (platform.parent.parent.parent /
+            second = (platform.parent.parent.parent.parent /
                       "codex-linux-x64" / "vendor" /
                       flow.NATIVE_TARGET / "bin" / "codex")
             second.parent.mkdir(parents=True)
