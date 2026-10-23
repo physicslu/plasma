@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void app_init(app_t *app) { memset(app, 0, sizeof(*app)); }
+void app_init(app_t *app) { memset(app, 0, sizeof(*app)); app->led_on = true; }
 
 void app_receive_irq(app_t *app, const uint8_t *data, size_t size) {
     for (size_t i = 0; i < size; ++i) {
@@ -48,11 +48,18 @@ static void command(app_t *app, uint32_t now_ms) {
     } else if (strcmp(app->line, "PING") == 0) {
         queue_reply(app, "PONG");
     } else if (strcmp(app->line, "LED ON") == 0) {
+        app->led_manual = true;
         app->led_on = true;
         queue_reply(app, "LED ON");
     } else if (strcmp(app->line, "LED OFF") == 0) {
+        app->led_manual = true;
         app->led_on = false;
         queue_reply(app, "LED OFF");
+    } else if (strcmp(app->line, "LED AUTO") == 0) {
+        app->led_manual = false;
+        app->led_on = true;
+        app->led_last_ms = now_ms;
+        queue_reply(app, "LED AUTO");
     } else if (strcmp(app->line, "UPTIME") == 0) {
         snprintf(response, sizeof(response), "UPTIME %lu", (unsigned long)now_ms);
         queue_reply(app, response);
@@ -70,6 +77,12 @@ static void command(app_t *app, uint32_t now_ms) {
 }
 
 void app_process(app_t *app, uint32_t now_ms) {
+    /* Independent of link/TX state; unsigned elapsed time survives tick wrap. */
+    if (!app->led_manual && (uint32_t)(now_ms - app->led_last_ms) >= 500u) {
+        uint32_t periods = (uint32_t)(now_ms - app->led_last_ms) / 500u;
+        if (periods & 1u) app->led_on = !app->led_on;
+        app->led_last_ms += periods * 500u;
+    }
     while (app->rx_tail != app->rx_head) {
         uint8_t c = app->rx[app->rx_tail];
         app->rx_tail = (uint16_t)((app->rx_tail + 1u) % APP_RX_CAPACITY);

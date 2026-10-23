@@ -28,6 +28,8 @@ typedef struct {
     uint32_t next_heartbeat_ms;
     bool linked;
     bool led_on;
+    bool led_manual;
+    uint32_t led_last_ms;
 } app_t;
 
 void app_init(app_t *app);

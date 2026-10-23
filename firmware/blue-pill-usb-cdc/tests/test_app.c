@@ -82,6 +82,40 @@ int main(void) {
     app_process(&app, 400u);
     rx(&app, "\n");
     expect_reply(&app, 400u, "ERR LINE_TOO_LONG\r\n");
+    /* Autonomous LED: unconfigured boot, connection, CDC busy, manual and wrap. */
+    app_init(&app);
+    assert(app.led_on && !app.led_manual);
+    app_process(&app, 499u);
+    assert(app.led_on);
+    app_process(&app, 500u);
+    assert(!app.led_on);
+    app_link(&app, true, 600u);
+    app_process(&app, 1000u);
+    assert(app.led_on);
+    assert(app_next(&app, 1099u, output, sizeof(output), &heartbeat) == 0);
+    assert(app_next(&app, 1100u, output, sizeof(output), &heartbeat) != 0);
+    assert(heartbeat); /* LED timing has not moved the CDC deadline. */
+    app_process(&app, 1500u); /* TX still busy: LED continues. */
+    assert(!app.led_on);
+    rx(&app, "LED ON\n");
+    expect_reply(&app, 1500u, "LED ON\r\n");
+    app_process(&app, 2500u);
+    assert(app.led_on && app.led_manual);
+    rx(&app, "LED OFF\n");
+    expect_reply(&app, 2500u, "LED OFF\r\n");
+    app_link(&app, false, 2500u);
+    app_process(&app, 3500u);
+    assert(!app.led_on && app.led_manual);
+    app_link(&app, true, UINT32_MAX - 100u);
+    rx(&app, "LED AUTO\n");
+    expect_reply(&app, UINT32_MAX - 100u, "LED AUTO\r\n");
+    assert(app.led_on && !app.led_manual);
+    app_process(&app, 398u);
+    assert(app.led_on);
+    app_process(&app, 399u);
+    assert(!app.led_on);
+    app_process(&app, 1399u); /* Two missed periods retain phase. */
+    assert(!app.led_on);
     puts("app host tests PASS");
     return 0;
 }

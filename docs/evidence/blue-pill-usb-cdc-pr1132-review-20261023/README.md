@@ -43,3 +43,37 @@ toolchain and ST dependency revisions remain as recorded in the original
 Phase A evidence. The live Python probe was **not** run against a serial port.
 
 The PR remains Draft. This evidence does not claim real USB or HIL acceptance.
+
+## Gate 1 / Path 3 post-review Blue Pill LED diagnostic — 2026-10-23
+
+The owner flashed an independent Blue Pill PC13 Blinky test using a Mac/ST-LINK
+and observed LED blinking, while the original PLASMA USB CDC firmware did not
+produce a new macOS CDC device. This proves only basic board startup and PC13,
+**not** the HSE/USB clock, D+/D- electrical route or USB enumeration.
+
+[SWPC Path 3 Run #39926444502](https://github.com/physicslu/plasma/actions/runs/39926444502)
+and [its downloaded build evidence](https://github.com/physicslu/plasma/actions/runs/39926444502/artifacts/12489826706)
+include an independently rebuilt diagnostic firmware image and source patch at
+input HEAD `827a734267fcb0c618f25de47c029f94b63b572c`.
+SWPC ARM build/static inspection, host C UBSan tests and 11 Python tests all
+PASS; Flash 18,636/65,536 bytes, RAM 5,944/20,480 bytes.
+Diagnostic HEX SHA256:
+`1d4eae03a76dd27cbab91cbf7f8e50f3a64d09938815c61f94fe1b0ae11cd863`.
+BIN SHA256:
+`2a6c642a9f8628c7a259e86a88a9cf199d15bed13f4908e779bd410fe5798092`.
+
+The new PC13 autonomous LED heartbeat starts on before HAL/PLL/USB init;
+normal mode toggles every 500 ms, manual LED ON/OFF overrides it, LED AUTO
+restores the heartbeat, and Error_Handler uses a double-flash fault pattern.
+The pinned USB Core ignores several lower-level status returns; PCD
+initialization, PMA and start failures now enter Error_Handler. This is
+diagnostic hardening, **not a confirmed fix of Mac USB enumeration**.
+The published source fixes match the SWPC candidate; SWPC test results are from
+the pre-publication candidate at the pinned input HEAD. GitHub-hosted CI on the
+published HEAD must be verified independently.
+
+Physical flashing of this diagnostic build, USB enumeration, CDC 60-second
+output and LED pattern **NOT_RUN by SWPC**; owner Mac tests are separately
+reported, not asserted as platform HIL. The provisional CAFE:4001 pair is
+retained solely for this isolated development PoC; no release or VID ownership
+claim. PR #1132 remains Draft; no merge, deployment, or remote hardware action.

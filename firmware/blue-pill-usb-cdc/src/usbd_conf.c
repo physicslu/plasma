@@ -225,6 +225,8 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
   /* Initialize LL Driver */
   if (HAL_PCD_Init((PCD_HandleTypeDef *) pdev->pData) != HAL_OK)
   {
+    /* Pinned usbd_core.c ignores USBD_LL_Init failures. */
+    Error_Handler();
     return USBD_FAIL;
   }
 
@@ -234,6 +236,8 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
       HAL_PCDEx_PMAConfig(pdev->pData, CDC_OUT_EP, PCD_SNG_BUF, 0x110) != HAL_OK ||
       HAL_PCDEx_PMAConfig(pdev->pData, CDC_CMD_EP, PCD_SNG_BUF, 0x100) != HAL_OK)
   {
+    /* Pinned usbd_core.c ignores USBD_LL_Init failures. */
+    Error_Handler();
     return USBD_FAIL;
   }
 
@@ -258,7 +262,13 @@ USBD_StatusTypeDef USBD_LL_DeInit(USBD_HandleTypeDef * pdev)
   */
 USBD_StatusTypeDef USBD_LL_Start(USBD_HandleTypeDef * pdev)
 {
-  return HAL_PCD_Start((PCD_HandleTypeDef *) pdev->pData) == HAL_OK ? USBD_OK : USBD_FAIL;
+  /* Pinned USBD_Start also discards the LL status. */
+  if (HAL_PCD_Start((PCD_HandleTypeDef *) pdev->pData) != HAL_OK)
+  {
+    Error_Handler();
+    return USBD_FAIL;
+  }
+  return USBD_OK;
 }
 
 /**

@@ -13,6 +13,22 @@ release, or physical acceptance. The common Blue Pill has a fixed D+ pull-up,
 so firmware does not emulate USB detach. Physical unplug/replug and board-specific D+
 pull-up behavior remain untested.
 
+## Independent PC13 diagnostics
+
+PC13 is initialized active-low ON before HAL, HSE/PLL and USB initialization.
+After initialization the main loop toggles it every 500 ms in AUTO mode,
+including while USB is unconfigured, suspended or transmitting. The unsigned
+elapsed-tick timer handles 32-bit wrap and catches up missed periods without
+blocking USB service. This timer is separate from the CDC heartbeat.
+`LED ON` and `LED OFF` take persistent manual precedence, including across USB
+reset/reconnect; `LED AUTO` restarts ON with a new 500 ms LED deadline. Reboot
+also restores AUTO. Terminal errors override all modes with repeating double
+flashes and a long dark gap. The fault pattern uses a volatile busy loop,
+no SysTick or interrupts; its speed depends on the clock at failure and is
+not a calibrated timing measurement. Early boot ON is a marker, not proof
+that clock setup or USB completed. A stalled HAL tick or unexpected CPU fault
+is not diagnosed by this main-loop heartbeat.
+
 ## Wire behavior
 
 After USB reaches `CONFIGURED`, a heartbeat is due 500 ms later, without a
@@ -33,7 +49,8 @@ it independently of TX availability. Supported commands:
 | --- | --- | --- |
 | `ID` | `ID PLASMA_BLUE_PILL_CDC/0.1` | Firmware identity |
 | `PING` | `PONG` | Transport response |
-| `LED ON` / `LED OFF` | Same text | Set PC13 LED state |
+| `LED ON` / `LED OFF` | Same text | Latch manual LED state until AUTO or reboot |
+| `LED AUTO` | Same text | Resume autonomous blink, starting ON |
 | `UPTIME` | `UPTIME <ms>` | HAL tick, wraps at 32 bits |
 | `COUNT` | `COUNT <n>` | Complete command lines received since boot |
 | `RX_DROPS` | `RX_DROPS <n>` | RX ring bytes, overlong line bytes, or replies dropped since boot |

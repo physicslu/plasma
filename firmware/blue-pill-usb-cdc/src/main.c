@@ -59,17 +59,23 @@ static void system_clock_config(void) {
     if (HAL_RCCEx_PeriphCLKConfig(&peripheral) != HAL_OK) Error_Handler();
 }
 
-int main(void) {
-    HAL_Init();
-    system_clock_config();
+static void led_init(void) {
     __HAL_RCC_GPIOC_CLK_ENABLE();
+    /* Preload active-low ON before switching to output. No tick dependency. */
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
     GPIO_InitTypeDef led = {0};
     led.Pin = GPIO_PIN_13;
     led.Mode = GPIO_MODE_OUTPUT_PP;
     led.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOC, &led);
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET); /* active low */
+}
+
+int main(void) {
+    led_init();
+    if (HAL_Init() != HAL_OK) Error_Handler();
+    system_clock_config();
     app_init(&app);
+    app.led_last_ms = HAL_GetTick();
     if (USBD_Init(&usb_device, &VCP_Desc, 0) != USBD_OK ||
         USBD_RegisterClass(&usb_device, USBD_CDC_CLASS) != USBD_OK ||
         USBD_CDC_RegisterInterface(&usb_device, &cdc_ops) != USBD_OK ||
@@ -108,6 +114,25 @@ int main(void) {
 
 void SysTick_Handler(void) { HAL_IncTick(); }
 void USB_LP_CAN1_RX0_IRQHandler(void) { extern PCD_HandleTypeDef hpcd; HAL_PCD_IRQHandler(&hpcd); }
-void Error_Handler(void) { __disable_irq(); for (;;) {} }
+/* Approximate timing only: works on HSI or PLL, with interrupts stopped. */
+static void fault_pause(uint32_t units) {
+    for (uint32_t i = 0; i < units; ++i)
+        for (volatile uint32_t n = 0; n < 150000u; ++n) __NOP();
+}
+
+void Error_Handler(void) {
+    __disable_irq();
+    led_init();
+    for (;;) {
+        /* Repeating double flash then a long dark gap; never HAL_Delay. */
+        for (unsigned pulse = 0; pulse < 2; ++pulse) {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+            fault_pause(1);
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+            fault_pause(1);
+        }
+        fault_pause(8);
+    }
+}
 void _init(void) {}
 void _fini(void) {}
