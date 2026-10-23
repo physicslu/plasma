@@ -150,7 +150,7 @@ def readonly_probe(workspace: Path) -> dict:
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             timeout=20, check=False,
         )
-        if check.returncode != 0 or check.stdout != b"PATH3_NAMESPACE_VISIBLE\\n":
+        if check.returncode != 0 or check.stdout != b"PATH3_NAMESPACE_VISIBLE\n":
             return {"schema": "plasma.path3.namespace_probe.v1",
                     "status": "NOT_RUN_OR_FAIL",
                     "reason": "CODEX_SANDBOX_PROBE_FAILED"}
