@@ -219,6 +219,33 @@ class ResumeTwoJobOffline(unittest.TestCase):
         self.assertIn("--unshare-net", seen["args"])
         self.assertIn("--dev", seen["args"])
 
+    def test_resume_work_order_schema_rejects_scope_expansion(self):
+        order = {
+            "schema": dev.WORK_ORDER_SCHEMA,
+            "objective": "CPU-only Page-boundary diagnosis with no hardware use.",
+            "acceptance": "Only a second Actions Job can resume and fix the unchanged test.",
+            "execution_path": "path3-codex",
+            "capability": "codex-workspace",
+            "scope": "host-only",
+            "session_resume": "page-boundary-off-by-one",
+            "pr_number": 1134,
+            "source_sha": SHA,
+        }
+        def parse(payload):
+            event = {"comment": {"body": dev.WORK_ORDER_PREFIX +
+                                          json.dumps(payload)}}
+            return dev.parse_dynamic_work_order(event)
+        self.assertEqual(parse(order)["session_resume"],
+                         "page-boundary-off-by-one")
+        for key, value in (("scope", "guarded-hardware"),
+                           ("session_resume", "any-session"),
+                           ("pr_number", 0),
+                           ("capability", "cpu-only")):
+            with self.subTest(key=key), self.assertRaises(dev.Denied):
+                parse(order | {key: value})
+        with self.assertRaises(dev.Denied):
+            parse(order | {"hardware_stages": ["flash"]})
+
     def test_only_existing_workflow_and_runner(self):
         wf = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
         self.assertIn("development-codex-resume:", wf)
