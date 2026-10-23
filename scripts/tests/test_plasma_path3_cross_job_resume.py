@@ -64,10 +64,13 @@ class ResumeTwoJobOffline(unittest.TestCase):
         root = Path(kw["cwd"])
         if args[1] == "new":
             self.assertIn(NONCE, kw["input"])
+            self.assertNotIn("No SWPC", kw["input"])
+            self.assertIn("isolated CPU-only workspace", kw["input"])
             self.assertNotIn("resume", args)
         else:
             self.assertEqual(args[2], SID)
             self.assertNotIn(NONCE, kw["input"])
+            self.assertNotIn("No network, Git writes, SWPC", kw["input"])
             source = root / flow.probe.SOURCE_NAME
             source.write_text(source.read_text().replace(
                 "len(data) - 1", "len(data)"))
@@ -202,6 +205,41 @@ class ResumeTwoJobOffline(unittest.TestCase):
                                         "RESUME_TEST_BWRAP_UNAVAILABLE"):
                 flow.isolated_unittest(self.repo, self.repo / flow.probe.ROOT_FOLDER)
 
+    def test_model_namespace_keeps_git_and_candidate_checkout_read_only(self):
+        scratch = self.repo / flow.probe.ROOT_FOLDER
+        scratch.mkdir()
+        isolated = self.private / "123456"
+        isolated.mkdir(parents=True)
+        auth_home = Path(self.tmp.name) / "safe-auth-home"
+        auth_file = auth_home / ".codex" / "auth.json"
+        auth_file.parent.mkdir(parents=True)
+        auth_file.write_text("{}")
+        with patch.object(flow.Path, "home", return_value=auth_home), \
+             patch.object(flow.shutil, "which",
+                          side_effect=lambda name: "/usr/bin/" + name):
+            command = flow.isolated_command(self.repo, isolated, None)
+        ro = ["--ro-bind", str(self.repo), "/work"]
+        writable_scratch = ["--bind", str(scratch),
+                            "/work/" + flow.probe.ROOT_FOLDER]
+        ro_idx = command.index("--ro-bind", command.index("--ro-bind") + 1)
+        self.assertIn(ro, [command[i:i + 3]
+                            for i in range(len(command) - 2)])
+        self.assertIn(writable_scratch,
+                      [command[i:i + 3] for i in range(len(command) - 2)])
+        self.assertNotIn(["--bind", str(self.repo), "/work"],
+                         [command[i:i + 3] for i in range(len(command) - 2)])
+        self.assertIn("--dev", command)
+        self.assertNotIn("--unshare-net", command)  # Real Codex model API
+        self.assertEqual(command[-2:], ["workspace-write", "-"])
+        with patch.object(flow.Path, "home", return_value=auth_home), \
+             patch.object(flow.shutil, "which",
+                          side_effect=lambda name: "/usr/bin/" + name):
+            broken = self.repo / flow.probe.ROOT_FOLDER
+            shutil.rmtree(broken)
+            with self.assertRaisesRegex(flow.ResumeDenied,
+                                        "RESUME_SCRATCH_DENIED"):
+                flow.isolated_command(self.repo, isolated, None)
+
     def test_sandboxed_test_does_not_inherit_runner_tokens(self):
         seen = {}
         def fake_run(args, **kw):
@@ -218,6 +256,12 @@ class ResumeTwoJobOffline(unittest.TestCase):
         self.assertNotIn("PYTHONPATH", seen["env"])
         self.assertIn("--unshare-net", seen["args"])
         self.assertIn("--dev", seen["args"])
+        self.assertIn(["--ro-bind", str(self.repo), "/work"],
+                      [seen["args"][i:i + 3]
+                       for i in range(len(seen["args"]) - 2)])
+        self.assertNotIn(["--bind", str(self.repo), "/work"],
+                         [seen["args"][i:i + 3]
+                          for i in range(len(seen["args"]) - 2)])
 
     def test_resume_work_order_schema_rejects_scope_expansion(self):
         order = {
