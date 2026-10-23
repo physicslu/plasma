@@ -39,6 +39,12 @@ set resets [get_bd_nets -quiet -of_objects [get_bd_pins swd_0/s_axi_aresetn]]
 if {[llength $clocks] != 1 || [llength $resets] != 1} {
     error "SWD AXI clock/reset not connected"
 }
+if {[lsearch -exact [get_bd_pins -quiet -of_objects $clocks]         [get_bd_pins ps7_0/FCLK_CLK0]] == -1} {
+    error "SWD AXI clock not sourced from PS7 FCLK0"
+}
+if {[lsearch -exact [get_bd_pins -quiet -of_objects $resets]         [get_bd_pins rst_ps7_0_100M/peripheral_aresetn]] == -1} {
+    error "SWD AXI reset is not PS7 synchronized peripheral_aresetn"
+}
 foreach p [get_bd_ports -quiet *] {
     set name [get_property NAME $p]
     if {![string match "DDR_*" $name] &&

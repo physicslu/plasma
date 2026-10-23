@@ -59,6 +59,11 @@ def test_source_wiring_keeps_real_iobuf_and_no_emio_shortcut():
     assert "OBUF swclk_pad" in pads
     assert "CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}" in block
     assert "0x40008000" in block and "4096" in block
+    rtl = (PL / "rtl/bus/plasma_poc_swd_gpio_axi_lite.sv").read_text()
+    assert "ASSOCIATED_BUSIF S_AXI" in rtl
+    assert "PROTOCOL AXI4LITE, DATA_WIDTH 32" in rtl
+    assert "SWD AXI clock not sourced from PS7 FCLK0" in block
+    assert "SWD AXI reset is not PS7 synchronized peripheral_aresetn" in block
     assert "validate_bd_design" in block
     assert "get_bd_ports swdio_io" in block
     assert "get_bd_ports swclk_io" in block
