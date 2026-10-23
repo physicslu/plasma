@@ -27,7 +27,18 @@ SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 
 
 class PreflightDenied(ValueError):
-    """Only constant denial identifiers may enter a public receipt."""
+    """Only constant denial identifiers and bounded category metadata.
+
+    No path, UID, GID, username, native file bytes or raw stat output may be
+    placed in a public receipt.
+    """
+
+    def __init__(self, code, *, stage="UNSPECIFIED", cause="UNSPECIFIED",
+                 component_index=0):
+        super().__init__(code)
+        self.stage = stage
+        self.cause = cause
+        self.component_index = component_index
 
 
 def require(predicate, code):
@@ -35,11 +46,18 @@ def require(predicate, code):
         raise PreflightDenied(code)
 
 
-def owned_path(root: Path, path: Path, *, kind: str):
-    """Do not follow unexpected npm/node_modules links or writable parents."""
+SAFE_PERMISSION_STAGES = frozenset((
+    "CLI_WRAPPER", "CLI_MANIFEST", "PLATFORM_MANIFEST", "NATIVE_BINARY",
+))
+SAFE_PERMISSION_CAUSES = frozenset(("OWNER_MISMATCH", "PEER_WRITABLE"))
+
+
+def owned_path(root: Path, path: Path, *, kind: str, phase: str):
+    """Preserve strict admission; classify DENY without leaking a host path."""
+    require(phase in SAFE_PERMISSION_STAGES, "NATIVE_PHASE_DENIED")
     require(path.is_relative_to(root), "NATIVE_PATH_OUTSIDE_HOME")
     here = root
-    for name in path.relative_to(root).parts:
+    for component_index, name in enumerate(path.relative_to(root).parts, 1):
         here = here / name
         try:
             meta = here.lstat()
@@ -49,14 +67,19 @@ def owned_path(root: Path, path: Path, *, kind: str):
         require(stat.S_ISDIR(meta.st_mode) if expect_dir
                 else stat.S_ISREG(meta.st_mode),
                 "NATIVE_PATH_TYPE_DENIED")
-        require(meta.st_uid in (0, os.geteuid()) and
-                meta.st_mode & 0o022 == 0,
-                "NATIVE_PATH_PERMISSIONS_DENIED")
+        if meta.st_uid not in (0, os.geteuid()):
+            raise PreflightDenied("NATIVE_PATH_PERMISSIONS_DENIED",
+                                  stage=phase, cause="OWNER_MISMATCH",
+                                  component_index=component_index)
+        if meta.st_mode & 0o022:
+            raise PreflightDenied("NATIVE_PATH_PERMISSIONS_DENIED",
+                                  stage=phase, cause="PEER_WRITABLE",
+                                  component_index=component_index)
     return path.stat()
 
 
-def manifest(root, path, expected_name):
-    info = owned_path(root, path, kind="file")
+def manifest(root, path, expected_name, *, phase):
+    info = owned_path(root, path, kind="file", phase=phase)
     require(info.st_size <= MAX_MANIFEST_SIZE, "NATIVE_MANIFEST_TOO_LARGE")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -140,8 +163,9 @@ def inspect(*, home=None, which=shutil.which):
     except (OSError, RuntimeError):
         raise PreflightDenied("NATIVE_ENTRY_DENIED") from None
     require(resolved == wrapper, "NATIVE_ENTRY_TARGET_DENIED")
-    owned_path(home, wrapper, kind="file")
-    metadata = manifest(home, package / "package.json", "@openai/codex")
+    owned_path(home, wrapper, kind="file", phase="CLI_WRAPPER")
+    metadata = manifest(home, package / "package.json", "@openai/codex",
+                        phase="CLI_MANIFEST")
     require(metadata.get("bin") == {"codex": "bin/codex.js"},
             "NATIVE_ENTRY_METADATA_DENIED")
     roots = (package / "node_modules" / "@openai" / "codex-linux-x64",
@@ -154,8 +178,9 @@ def inspect(*, home=None, which=shutil.which):
     require(len(candidates) == 1, "NATIVE_LOCATION_AMBIGUOUS")
     root, binary = candidates[0]
     if root != package:
-        manifest(home, root / "package.json", "@openai/codex-linux-x64")
-    info = owned_path(home, binary, kind="file")
+        manifest(home, root / "package.json", "@openai/codex-linux-x64",
+                 phase="PLATFORM_MANIFEST")
+    info = owned_path(home, binary, kind="file", phase="NATIVE_BINARY")
     require(info.st_size <= MAX_NATIVE_SIZE and info.st_size >= 120 and
             info.st_mode & 0o111,
             "NATIVE_EXECUTABLE_DENIED")
