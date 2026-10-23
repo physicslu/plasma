@@ -102,8 +102,43 @@ def isolated_command(workspace, private_root, session):
         args += ["resume", session, "-"]
     return args
 
+def isolated_unittest(workspace, scratch):
+    """NEVER execute model-edited Python directly on the SWPC host.
+
+    The child gets no physical host devices, unrelated home, /sys, /run, or
+    network. The trusted outer worker only interprets bounded exit evidence.
+    """
+    bwrap = shutil.which("bwrap")
+    require(bool(bwrap), "RESUME_TEST_BWRAP_UNAVAILABLE")
+    mounts = []
+    for path in ("/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"):
+        if Path(path).exists():
+            mounts += ["--ro-bind", path, path]
+    command = [bwrap, "--die-with-parent", "--new-session",
+               "--unshare-pid", "--unshare-ipc", "--unshare-net",
+               "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+               *mounts, "--bind", str(workspace), "/work",
+               "--chdir", "/work/" + probe.ROOT_FOLDER,
+               "--", "python3", "-m", "unittest", "-q", probe.TEST_NAME]
+    try:
+        proc = subprocess.run(command, cwd=scratch,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        raise ResumeDenied("RESUME_ISOLATED_TEST_FAILED") from None
+    # A failed Python interpreter or sandbox is NOT a legitimate test FAIL.
+    stderr = proc.stderr[:65536]
+    if proc.returncode == 0 and b"OK" in stderr:
+        return 0
+    if (proc.returncode == 1 and b"FAIL:" in stderr and
+            b"test_lengths" in stderr):
+        return 1
+    raise ResumeDenied("RESUME_ISOLATED_TEST_UNVERIFIED")
+
+
 def execute(phase, req, workspace, *, env=None, state_root=None,
             executor=subprocess.run, command_builder=isolated_command,
+            test_runner=isolated_unittest,
             nonce_factory=lambda: secrets.token_hex(16)):
     env = dict(os.environ if env is None else env)
     bound = runner_binding(phase, req, workspace, env)
@@ -160,8 +195,8 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
     scratch.mkdir(mode=0o700)
     (scratch / probe.SOURCE_NAME).write_text(probe.BROKEN_SOURCE)
     (scratch / probe.TEST_NAME).write_text(probe.TEST_SOURCE)
-    before = probe.test_result(scratch)
-    require(before != 0, "RESUME_FIXTURE_NOT_FAILING")
+    before = test_runner(workspace, scratch)
+    require(before == 1, "RESUME_FIXTURE_NOT_FAILING")
     command = command_builder(workspace, private, thread)
     try:
         proc = executor(command, input=prompt, cwd=scratch,
@@ -171,7 +206,7 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
         raise ResumeDenied("RESUME_CODEX_INVOKE_FAILED") from None
     require(proc.returncode == 0, "RESUME_CODEX_NONZERO")
     sid, tokens = probe.parse_events(proc.stdout)
-    after = probe.test_result(scratch)
+    after = test_runner(workspace, scratch)
     require(hash_data((scratch / probe.TEST_NAME).read_bytes()) ==
             hash_data(probe.TEST_SOURCE.encode()), "RESUME_TEST_MODIFIED")
     head, changed = probe.git_state(workspace)
@@ -187,7 +222,7 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
               "thread_id_sha256": hash_data(sid.encode()),
               "test_before": before, "test_after": after, "usage": tokens}
     if phase == "new":
-        require(after != 0, "RESUME_FIRST_TURN_PREMATURE_FIX")
+        require(after == 1, "RESUME_FIRST_TURN_PREMATURE_FIX")
         require(not (scratch / probe.PROOF_NAME).exists(),
                 "RESUME_FIRST_TURN_PROOF_WRITTEN")
         state = {**bound, "phase": "new", "thread_id": sid,
