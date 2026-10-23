@@ -42,8 +42,14 @@ Public receipts expose only a Thread ID SHA-256, a bounded numeric per-turn
 Token Usage, non-secret identifiers and test exit codes. Neither raw prompt,
 session rollout, challenge, credential nor stderr is archived.
 
-Bubblewrap uses explicit read-only system mounts, an isolated synthetic /dev,
-and no host /sys or broad host home binding. It is a filesystem/device
+Bubblewrap mounts the exact candidate Git checkout **read-only**, including
+its Git metadata; only the dedicated Page-boundary fixture directory and
+the Run-specific private Codex home are writable. The pre- and post-Model
+unittest subprocesses apply the same read-only checkout / writable scratch
+split, synthetic /dev and an isolated network namespace. The Codex CLI must
+retain model API connectivity, so its namespace does not claim network egress
+isolation. Bubblewrap also uses read-only system mounts and no host /sys or
+broad host-home binding. It is a filesystem/device
 boundary, NOT a proven network egress firewall. An unavailable isolation tool
 or Codex credential causes fail-closed NOT_RUN/FAIL. No Z2, FPGA, USB, MMIO,
 Power, DUT, real programming or physical hardware is authorized.
