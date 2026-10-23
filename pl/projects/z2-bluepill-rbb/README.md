@@ -37,8 +37,11 @@ legacy Z2 build trees and require existing pinned board files. The AXI map
 must be exported to `pl/build/z2-bluepill-rbb/generated/`.
 `build_bitstream.tcl` is an **offline manual Vivado candidate**, not
 automatically executed. If executed in a separately approved host build,
-review synth/impl/timing/DRC and require `verify_hwh.py` on actual HWH
-and nonempty bitstream before any physical qualification claim.
+review synth/impl/timing/DRC; the source build recipe now refuses to
+emit its success sentinel unless actual generated BIT/HWH are nonempty,
+the `verify_hwh.py` GP0/PS7/IO contract passes, and a candidate JSON receipt
+containing BIT/HWH SHA256 is written. Such offline evidence **does not**
+prove bitstream↔handoff equivalence, runtime safety or physical HIL.
 
 `BluepillZ2WordPort` reuses `LinuxMMIO`, `SiteMMIO` and the SHA-pinned
 `ARMv7DMBBarrier`. No `/dev/mem`, `/dev/uio`, FPGA Manager or service

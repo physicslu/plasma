@@ -30,4 +30,25 @@ file mkdir $report_dir
 report_timing_summary -file [file join $report_dir timing_summary.rpt]
 report_drc -file [file join $report_dir drc.rpt]
 report_utilization -file [file join $report_dir utilization.rpt]
+
+# The output is NEVER considered acceptable unless the implemented BIT and
+# exported HWH BOTH exist and the hardware handoff matches our exact PS7,
+# GP0 and external SWD topology. This stage does not open hardware.
+set bit_path [file join $project_dir z2_bluepill_rbb.runs impl_1 system_wrapper.bit]
+set hwh_path [file join $project_dir z2_bluepill_rbb.gen sources_1 bd system hw_handoff system.hwh]
+if {![file isfile $bit_path] || ![file isfile $hwh_path]} {
+    error "BLUEPILL_Z2_BIT_HWH_MISSING"
+}
+if {[catch {exec python3 [file join $script_dir verify_hwh.py] \
+    --hwh $hwh_path --bit $bit_path} inspection]} {
+    error "BLUEPILL_Z2_HWH_INSPECTION_FAILED: $inspection"
+}
+set receipt [file join $generated_dir artifact-inspection.json]
+if {[file exists $receipt]} {
+    error "BLUEPILL_Z2_RECEIPT_ALREADY_EXISTS"
+}
+set fd [open $receipt {WRONLY CREAT EXCL}]
+puts $fd $inspection
+close $fd
+puts "BLUEPILL_Z2_BIT_HWH_INSPECTION_PASS_OFFLINE_NOT_HIL"
 puts "BLUEPILL_Z2_VIVADO_HOST_ARTIFACT_CANDIDATE_NOT_HIL"

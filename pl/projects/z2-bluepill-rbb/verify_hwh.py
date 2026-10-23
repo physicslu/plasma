@@ -26,7 +26,15 @@ def _number(value: str | None) -> int:
     assert value is not None
     if len(value) == 32 and set(value) <= {"0", "1"}:
         return int(value, 2)
-    return int(value, 0)
+    lowered = value.strip().lower()
+    if lowered in {"true", "false"}:
+        return int(lowered == "true")
+    try:
+        return int(lowered, 0)
+    except ValueError:
+        numeric = float(lowered)
+        _need(numeric.is_integer(), "HWH_NUMBER_NOT_INTEGRAL")
+        return int(numeric)
 
 
 def _ports(module: ET.Element) -> dict[str, str | None]:
@@ -53,6 +61,17 @@ def verify_hwh_xml(xml: str) -> dict:
     _need(all(p in {"swclk_io", "swdio_io"} or
               p.startswith(("DDR_", "FIXED_IO_")) for p in pins),
           "HWH_UNEXPECTED_EXTERNAL")
+    ps7 = modules["ps7_0"]
+    config = {p.get("NAME"): p.get("VALUE")
+              for p in ps7.iter("PARAMETER")}
+    for key, expected in (
+        ("PCW_CRYSTAL_PERIPHERAL_FREQMHZ", 50),
+        ("PCW_FPGA0_PERIPHERAL_FREQMHZ", 100),
+        ("PCW_USE_M_AXI_GP0", 1),
+        ("PCW_GPIO_EMIO_GPIO_ENABLE", 0),
+    ):
+        _need(_number(config.get(key)) == expected,
+              "HWH_PS7_CONFIG_MISMATCH")
     swd = _ports(modules["swd_0"])
     pads = _ports(modules["pads_0"])
     for name in ("swclk", "swdio_out", "swdio_oe", "swdio_in"):
