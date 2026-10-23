@@ -57,9 +57,33 @@ def check(test: bool, reason: str) -> None:
     if not test:
         raise AssertionError(reason)
 
+# The real candidate CLI and owner/worker admission execute in a new process.
+# ONLY the Codex process launcher is an injected deterministic test stub; this
+# hosted fixture never constructs or runs the real SWPC bwrap device namespace.
+# The production Dispatcher has no environment-based mock bypass.
+HOSTED_STUB_CLI = r"""
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import patch
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "scripts"))
+import plasma_development_dispatch as dispatcher
+original = dispatcher.run_codex_task
+real_run = subprocess.run
+def fake_codex_run(command, **kwargs):
+    assert command[0] == "codex", "HOSTED_STUB_REQUIRES_CODEX"
+    return real_run(command, **kwargs)
+def hosted_stub(task, **kwargs):
+    return original(task, executor=fake_codex_run, **kwargs)
+with patch.object(dispatcher, "run_codex_task", side_effect=hosted_stub):
+    sys.argv = [str(root / "scripts/plasma_development_dispatch.py"), *sys.argv[2:]]
+    raise SystemExit(dispatcher.main())
+"""
+
 def invoke(arguments: list[str], env: dict[str, str]) -> tuple[int, dict]:
     proc = subprocess.run(
-        [sys.executable, str(DISPATCHER), *arguments],
+        [sys.executable, "-c", HOSTED_STUB_CLI, str(ROOT), *arguments],
         cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         check=False, timeout=20,
     )
