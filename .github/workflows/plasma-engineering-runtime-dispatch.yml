@@ -598,8 +598,17 @@ jobs:
       - name: Collect Path 3 evidence even when Codex or preflight fails
         if: always()
         shell: bash
+        env:
+          SESSION_RESUME: ${{ needs.development-authorize.outputs.session_resume }}
         run: |
           set -euo pipefail
+          # The generic untracked-files archive MUST NOT upload the private
+          # continuity challenge if a failed model wrote it into scratch.
+          # Resume jobs publish only the sanitized numeric/hash receipt.
+          if [ "$SESSION_RESUME" = page-boundary-off-by-one ]; then
+            exit 0
+          fi
+          test -z "$SESSION_RESUME"
           # Admission failure may leave no candidate checkout. Never fetch
           # additional source, rerun the agent, or access physical devices.
           if [ -d candidate/.git ]; then
