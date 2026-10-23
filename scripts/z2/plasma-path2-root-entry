@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Existing Z2 root entry: select ONLY an installed root-owned source-pinned project.
+# No dynamic shell, Work Order supplied module, SSH helper or new service.
+set -euo pipefail
+[[ $# -eq 3 ]] || { echo 'PATH2_STAGE_ARGUMENT_REQUIRED' >&2; exit 2; }
+case "$1" in
+  download|test|restore) stage="$1" ;;
+  *) echo 'PATH2_STAGE_NOT_ALLOWLISTED' >&2; exit 2 ;;
+esac
+project="$2"
+source_sha="$3"
+[[ "$project" =~ ^pl/projects/[a-z0-9][a-z0-9-]{2,69}$ &&
+   "$source_sha" =~ ^[0-9a-f]{40}$ ]] ||
+  { echo 'PATH2_REQUEST_NOT_PINNED' >&2; exit 2; }
+[[ "$(id -u)" == '0' ]] || { echo 'PATH2_ROOT_REQUIRED' >&2; exit 2; }
+
+root=/root/plasma-path2-approved
+python=/opt/plasma/python/3.12.13/bin/python3
+manifest="$root/.plasma-path2-source-sha256"
+profile="$root/.plasma-path2-profile"
+[[ -d "$root" && ! -L "$root" && -f "$manifest" && ! -L "$manifest" &&
+   -f "$profile" && ! -L "$profile" ]] ||
+  { echo 'PATH2_APPROVED_ROOT_SOURCE_NOT_INSTALLED' >&2; exit 2; }
+[[ -f "$python" && -x "$python" ]] ||
+  { echo 'PATH2_PINNED_PYTHON_NOT_INSTALLED' >&2; exit 2; }
+
+# Three exact lines: reviewed Project, project test/stage Python module,
+# reviewed source SHA. One protected active project, no dynamic registry.
+[[ "$(wc -l < "$profile")" -eq 3 ]] ||
+  { echo 'PATH2_APPROVED_PROFILE_INVALID' >&2; exit 2; }
+installed_project="$(sed -n '1p' "$profile")"
+module="$(sed -n '2p' "$profile")"
+installed_sha="$(sed -n '3p' "$profile")"
+[[ "$installed_project" == "$project" &&
+   "$installed_sha" == "$source_sha" &&
+   "$module" =~ ^pl\.hil\.[a-z][a-z0-9_]{3,72}$ ]] ||
+  { echo 'PATH2_APPROVED_PROFILE_MISMATCH' >&2; exit 2; }
+module_leaf="$(printf '%s' "$module" | sed -n 's/^pl\.hil\.//p')"
+module_file="pl/hil/$module_leaf.py"
+
+# Only root-installed, hash-checked source may run under sudo.
+for file in "$root" "$manifest" "$profile" "$root/$module_file"; do
+  [[ -e "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
+    { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
+  perm="$(stat -c '%a' "$file")"
+  (( (8#$perm & 0022) == 0 )) ||
+    { echo 'PATH2_SOURCE_WRITABLE_BY_OTHERS' >&2; exit 2; }
+done
+for required in \
+  .plasma-path2-profile \
+  "$module_file" \
+  pl/hil/path2_z2_target_guard.py \
+  pl/hil/swd04/one_shot.py \
+  pl/hil/swd04/development.py \
+  pl/hil/swd04/contract.py \
+  software/python/plasma_interfaces/linux_mmio.py; do
+  /usr/bin/awk -v path="$required" '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' "$manifest" ||
+    { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
+done
+(cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
+  { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
+
+# A candidate module is responsible for exact B2/B3 image, AXI, electrical
+# and recovery guards; the caller never selects an uninstalled module.
+cd "$root"
+exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+  PYTHONPATH="$root" \
+  "$python" -m "$module" "$stage"
