@@ -29,6 +29,8 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
+NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
@@ -202,7 +204,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "session_resume", "script", "argv",
+                               "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "project", "stage"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
@@ -237,6 +239,16 @@ def parse_dynamic_work_order(event: object) -> dict:
                     "WORK_ORDER_PATH3_FIELDS_DENIED")
         require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
+    elif capability == "cpu-only" and "native_preflight" in order:
+        # Existing Path 2 task_id and Runner. No candidate scripts, shell,
+        # path parameters, model or hardware under this one main-only route.
+        require(path == "path2-cli" and scope == "host-only" and
+                order["native_preflight"] == NATIVE_PREFLIGHT and
+                set(order) == base | optional_ref | {"native_preflight"} and
+                order.get("pr_number") == 0 and
+                type(order.get("pr_number")) is int and
+                type(order.get("source_sha")) is str,
+                "WORK_ORDER_NATIVE_PREFLIGHT_SCOPE_DENIED")
     elif capability == "cpu-only":
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
@@ -268,6 +280,11 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_SOURCE_DENIED")
+    elif order.get("native_preflight") == NATIVE_PREFLIGHT:
+        # Separate owner-scoped bootstrap: exact event main, Path 2 only.
+        require(type(order.get("source_sha")) is str and
+                SHA40.fullmatch(order["source_sha"]) is not None,
+                "WORK_ORDER_NATIVE_MAIN_SHA_REQUIRED")
     elif order.get("session_resume") == "page-boundary-off-by-one":
         # Exception for this exact CPU-only post-merge diagnostic only.
         # Main pinning is checked against trusted GITHUB_SHA by request().
@@ -312,6 +329,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["work_order_scope"] = order["scope"]
     if "session_resume" in order:
         task["session_resume"] = order["session_resume"]
+    if "native_preflight" in order:
+        task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
                 "project", "stage"):
         if key in order:
@@ -352,6 +371,10 @@ def request(event: object, context: dict) -> dict:
             "COMMAND_DENIED")
     if body.startswith(WORK_ORDER_PREFIX):
         order = parse_dynamic_work_order(event)
+        if (order.get("native_preflight") == NATIVE_PREFLIGHT and
+                order["pr_number"] == 0):
+            require(order["source_sha"] == sha,
+                    "WORK_ORDER_NATIVE_MAIN_SHA_MISMATCH")
         if (order.get("session_resume") == "page-boundary-off-by-one" and
                 order["pr_number"] == 0):
             # Never admit a different main commit, branch or omitted pin.
@@ -1231,9 +1254,30 @@ def main() -> int:
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
+                # One fixed main-only Path 2 observation. Executed by
+                # trusted main, not candidate code and NEVER by Codex.
+                if task.get("native_preflight") == NATIVE_PREFLIGHT:
+                    require(args.action == "execute" and
+                            req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+                            req["pr_number"] == 0 and
+                            req["source_sha"] == req["trusted_sha"] ==
+                                os.environ.get("GITHUB_SHA") and
+                            os.environ.get("GITHUB_JOB") == "development-execute" and
+                            os.environ.get("GITHUB_RUN_ATTEMPT") == "1" and
+                            os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
+                            os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted" and
+                            task["capability"] == "cpu-only" and
+                            task["work_order_scope"] == "host-only" and
+                            args.resume_phase is None,
+                            "NATIVE_PREFLIGHT_WORKER_DENIED")
+                    import plasma_codex_native_preflight as native
+                    try:
+                        receipt = native.inspect()
+                    except native.PreflightDenied as exc:
+                        raise Denied(str(exc)) from None
                 # This exact CPU-only fixture is the ONLY cross-Job route.
                 # Unflagged Path 3 retains its existing single-exec behavior.
-                if task.get("session_resume") or args.resume_phase:
+                elif task.get("session_resume") or args.resume_phase:
                     require(args.action == "execute-codex" and
                             task.get("session_resume") == "page-boundary-off-by-one"
                             and args.resume_phase in ("new", "resume"),
