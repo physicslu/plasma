@@ -531,6 +531,16 @@ class ResumeTwoJobOffline(unittest.TestCase):
                                   flow.hash_data(data)):
                     with self.assertRaisesRegex(flow.ResumeDenied, error):
                         flow.isolated_command(self.repo, state, None)
+            # A header-only ELF without an executable PT_LOAD is not a
+            # valid single-file executable, even with a matching checksum.
+            no_load = bytearray(valid)
+            struct.pack_into("<I", no_load, 64, 0)  # PT_NULL
+            native.write_bytes(no_load)
+            with patch.object(flow, "NVM_NATIVE_SHA256",
+                              flow.hash_data(no_load)):
+                with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_CODEX_NATIVE_ELF_DENIED"):
+                    flow.isolated_command(self.repo, state, None)
             # An ELF with a dynamic interpreter cannot be admitted as a
             # standalone single native executable.
             interpreter = bytearray(valid)
