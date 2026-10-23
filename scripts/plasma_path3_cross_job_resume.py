@@ -74,6 +74,13 @@ def isolated_command(workspace, private_root, session):
     """
     wrap, codex = shutil.which("bwrap"), shutil.which("codex")
     require(bool(wrap and codex), "RESUME_BWRAP_OR_CODEX_UNAVAILABLE")
+    # The model binary must resolve inside a read-only system mount. Common
+    # per-user npm/nvm paths are deliberately NOT allowed into the namespace
+    # without an independently reviewed host-only admission contract.
+    codex_binary = os.path.realpath(codex)
+    require(any(codex_binary.startswith(prefix) for prefix in (
+                "/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/opt/")),
+            "RESUME_CODEX_INSTALL_UNMOUNTED")
     auth = Path.home() / ".codex" / "auth.json"
     require(auth.is_file() and not auth.is_symlink(),
             "RESUME_AUTH_FILE_UNAVAILABLE")
@@ -84,7 +91,9 @@ def isolated_command(workspace, private_root, session):
                 workspace.resolve(strict=True) / probe.ROOT_FOLDER,
             "RESUME_SCRATCH_DENIED")
     ch.mkdir(mode=0o700, exist_ok=True)
-    require(ch.is_dir() and not ch.is_symlink(), "RESUME_CODEX_HOME_DENIED")
+    require(ch.is_dir() and not ch.is_symlink() and
+            not (ch / "auth.json").is_symlink(),
+            "RESUME_CODEX_HOME_DENIED")
     mounts = []
     for path in ("/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt"):
         if Path(path).exists():
@@ -100,7 +109,7 @@ def isolated_command(workspace, private_root, session):
             "--setenv", "HOME", "/home/plasma",
             "--setenv", "CODEX_HOME", "/home/plasma/.codex",
             "--chdir", "/work/" + probe.ROOT_FOLDER,
-            "--", "codex", "--ask-for-approval", "never",
+            "--", codex_binary, "--ask-for-approval", "never",
             "-c", 'sandbox_mode="workspace-write"',
             "-c", "sandbox_workspace_write.network_access=false",
             "exec", "--json"]
