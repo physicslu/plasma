@@ -1,0 +1,51 @@
+# sanitized derivative; source SHA256 145c7b418e58f3fae2f23d1e8cdd62fcbc3fac871e7c4b2c6f6225a80be0b358
+st-flash 1.7.0
+2026-10-23T20:10:53 INFO usb.c: Unable to match requested speed 100 kHz, using 50 kHz
+2026-10-23T20:10:53 INFO common.c: F1xx Medium-density: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.
+file <firmware-build>/plasma-blue-pill-cdc.bin md5 checksum: 49a867a03a5ac7e8c27a7d123c9b275, stlink checksum: 0x001ce9a2
+2026-10-23T20:10:53 INFO common.c: Attempting to write 18768 (0x4950) bytes to stm32 address: 134217728 (0x8000000)
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08000000 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08000400 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08000800 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08000c00 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08001000 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08001400 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08001800 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08001c00 erased
+2026-10-23T20:10:53 INFO common.c: Flash page at addr: 0x08002000 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08002400 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08002800 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08002c00 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08003000 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08003400 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08003800 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08003c00 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08004000 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08004400 erased
+2026-10-23T20:10:54 INFO common.c: Flash page at addr: 0x08004800 erased
+2026-10-23T20:10:54 INFO common.c: Finished erasing 19 pages of 1024 (0x400) bytes
+2026-10-23T20:10:54 INFO common.c: Starting Flash write for VL/F0/F3/F1_XL
+2026-10-23T20:10:54 INFO flash_loader.c: Successfully loaded flash loader in sram
+2026-10-23T20:10:54 INFO flash_loader.c: Clear DFSR
+
+  1/ 19 pages written
+  2/ 19 pages written
+  3/ 19 pages written
+  4/ 19 pages written
+  5/ 19 pages written
+  6/ 19 pages written
+  7/ 19 pages written
+  8/ 19 pages written
+  9/ 19 pages written
+ 10/ 19 pages written
+ 11/ 19 pages written
+ 12/ 19 pages written
+ 13/ 19 pages written
+ 14/ 19 pages written
+ 15/ 19 pages written
+ 16/ 19 pages written
+ 17/ 19 pages written
+ 18/ 19 pages written
+ 19/ 19 pages written
+2026-10-23T20:10:59 INFO common.c: Starting verification of write complete
+2026-10-23T20:11:01 INFO common.c: Flash written and verified! jolly good!

@@ -1,0 +1,15 @@
+{
+  "firmware_bin_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "firmware_source_merge_sha": "5949f371078a0f67c6fc3c0d99e85da738235d08",
+  "la": "KINGST LA2016 77a1:01a2; serial and bus address omitted",
+  "la_driver": "kingst-la2016",
+  "la_sample_rate_hz": 5000000,
+  "la_threshold_v": 1.4,
+  "openocd": "0.11.0",
+  "prewrite_full_flash_backup_sha256_only": "7e41a8b048e8ed67de84d868446d73344f0d09e662c6aea92ae936b18752336e",
+  "sigrok_appimage_sha256": "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475",
+  "sigrok_cli": "0.8.0-git-f44dd91",
+  "stlink": "STLINK-V3SET V3J17S1; serial redacted",
+  "stlink_tool": "st-flash 1.7.0",
+  "swclk_tool_reported_hz": 50000
+}

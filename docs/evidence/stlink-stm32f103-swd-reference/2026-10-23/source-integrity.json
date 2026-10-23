@@ -1,0 +1,47 @@
+{
+  "source_workspace": ".work/blue-pill-hil-unblock-20261023/",
+  "waveforms": [
+    {
+      "file": "round-01-program.sr",
+      "bytes": 716390,
+      "source_sha256": "ada6be5ffa87836750205072173b8950a13357e1e3c991da174d8df37fa0502b",
+      "archive_sha256": "ada6be5ffa87836750205072173b8950a13357e1e3c991da174d8df37fa0502b",
+      "byte_identical": true
+    },
+    {
+      "file": "round-01-verify.sr",
+      "bytes": 307562,
+      "source_sha256": "8790576e0ea341f100a9e81d0cd9789f24cb3b476aa42fafdbe06f5021800707",
+      "archive_sha256": "8790576e0ea341f100a9e81d0cd9789f24cb3b476aa42fafdbe06f5021800707",
+      "byte_identical": true
+    },
+    {
+      "file": "round-02-program.sr",
+      "bytes": 719043,
+      "source_sha256": "d01dd54faa10a9622c486583b479e5b6b82c44764ca7467c818d6450e4de2835",
+      "archive_sha256": "d01dd54faa10a9622c486583b479e5b6b82c44764ca7467c818d6450e4de2835",
+      "byte_identical": true
+    },
+    {
+      "file": "round-02-verify.sr",
+      "bytes": 307436,
+      "source_sha256": "efddfe31f0a355bc2793bf6d9dac43c84fdf6b198effa64a916e3bb84be1e9fc",
+      "archive_sha256": "efddfe31f0a355bc2793bf6d9dac43c84fdf6b198effa64a916e3bb84be1e9fc",
+      "byte_identical": true
+    },
+    {
+      "file": "round-03-program.sr",
+      "bytes": 717945,
+      "source_sha256": "36e0f7644b07318f33a211c3ae2e45b2c6981483a5576aa1c177dc5639a6be05",
+      "archive_sha256": "36e0f7644b07318f33a211c3ae2e45b2c6981483a5576aa1c177dc5639a6be05",
+      "byte_identical": true
+    },
+    {
+      "file": "round-03-verify.sr",
+      "bytes": 307381,
+      "source_sha256": "027f019a708a3af997d67d69d617cf56a52a4a6b38e00a5abaafa4d4c2a31d3e",
+      "archive_sha256": "027f019a708a3af997d67d69d617cf56a52a4a6b38e00a5abaafa4d4c2a31d3e",
+      "byte_identical": true
+    }
+  ]
+}
