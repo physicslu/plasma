@@ -240,6 +240,25 @@ class NativePreflightWorkOrder(unittest.TestCase):
                         self.assertEqual(dispatch.main(), 2)
                     self.assertEqual(json.loads(partial.getvalue())["status"],
                                      "INCOMPLETE")
+                diagnostic = native.PreflightDenied(
+                    "NATIVE_PATH_PERMISSIONS_DENIED",
+                    stage="CLI_MANIFEST", cause="PEER_WRITABLE",
+                    component_index=9)
+                with patch.object(native, "inspect", side_effect=diagnostic):
+                    with redirect_stdout(StringIO()) as denied:
+                        self.assertEqual(dispatch.main(), 2)
+                    record = json.loads(denied.getvalue())
+                    self.assertEqual(record["status"], "NOT_RUN_OR_FAIL")
+                    self.assertEqual(record["reason"],
+                                     "NATIVE_PATH_PERMISSIONS_DENIED")
+                    self.assertEqual(record["denial_stage"], "CLI_MANIFEST")
+                    self.assertEqual(record["denial_cause"], "PEER_WRITABLE")
+                    self.assertEqual(record["denial_component_index"], 9)
+                    self.assertEqual(record["model_session"], "NOT_RUN")
+                    self.assertNotIn(str(root), json.dumps(record))
+                    self.assertNotIn("auth.json", json.dumps(record))
+                    model.assert_not_called()
+                    run_script.assert_not_called()
                 for name, value in (("GITHUB_JOB", "development-codex"),
                                     ("GITHUB_RUN_ATTEMPT", "2"),
                                     ("RUNNER_NAME", "another-runner"),
@@ -308,6 +327,68 @@ class NativePreflightWorkOrder(unittest.TestCase):
         self.assertNotIn(str(home), json.dumps(result))
         self.assertNotIn(str(executable), json.dumps(result))
         self.assertNotIn("auth.json", json.dumps(result))
+
+    def test_permission_denial_stage_owner_and_component_index(self):
+        home, entry, binary, platform = self.fixture()
+        which = lambda _: str(entry)
+        package = (home / ".nvm" / "versions" / "node" /
+                   native.NODE_VERSION / "lib" / "node_modules" /
+                   "@openai" / "codex")
+        cases = (
+            (package / "bin", "CLI_WRAPPER"),
+            (package / "package.json", "CLI_MANIFEST"),
+            (platform / "package.json", "PLATFORM_MANIFEST"),
+            (binary, "NATIVE_BINARY"),
+        )
+        for node, stage in cases:
+            with self.subTest(stage=stage):
+                original_mode = node.stat().st_mode & 0o777
+                try:
+                    node.chmod(original_mode | 0o022)
+                    with self.assertRaises(native.PreflightDenied) as caught:
+                        native.inspect(home=home, which=which)
+                    err = caught.exception
+                    self.assertEqual(str(err),
+                                     "NATIVE_PATH_PERMISSIONS_DENIED")
+                    self.assertEqual(err.stage, stage)
+                    self.assertEqual(err.cause, "PEER_WRITABLE")
+                    self.assertEqual(err.component_index,
+                                     len(node.relative_to(home).parts))
+                    self.assertNotIn(str(home), str(err))
+                    self.assertNotIn(str(node), str(err))
+                finally:
+                    node.chmod(original_mode)
+
+        # Simulate an unexpected owner without requiring chown or root.
+        target = home / ".nvm"
+        actual_lstat = native.Path.lstat
+        def fake_lstat(path, *args, **kwargs):
+            metadata = actual_lstat(path, *args, **kwargs)
+            if path == target:
+                return type("StatForTest", (), {
+                    "st_mode": metadata.st_mode, "st_uid": 999999999})()
+            return metadata
+        with patch.object(native.Path, "lstat", fake_lstat):
+            with self.assertRaises(native.PreflightDenied) as caught:
+                native.inspect(home=home, which=which)
+        err = caught.exception
+        self.assertEqual(str(err), "NATIVE_PATH_PERMISSIONS_DENIED")
+        self.assertEqual(err.stage, "CLI_WRAPPER")
+        self.assertEqual(err.cause, "OWNER_MISMATCH")
+        self.assertEqual(err.component_index, 1)
+
+    def test_native_denial_receipt_never_uses_host_path_or_dynamic_code(self):
+        # Fail closed on malformed stage/cause/index metadata.
+        for stage, cause, idx in (
+            ("../../home", "PEER_WRITABLE", 1),
+            ("CLI_WRAPPER", "/private/path", 1),
+            ("NATIVE_BINARY", "OWNER_MISMATCH", 25),
+        ):
+            with self.subTest(stage=stage, cause=cause, index=idx):
+                self.assertFalse(
+                    stage in native.SAFE_PERMISSION_STAGES and
+                    cause in native.SAFE_PERMISSION_CAUSES and
+                    type(idx) is int and 1 <= idx <= 24)
 
     def test_native_missing_wrong_source_dynamic_and_unsafe_denied(self):
         home, entry, binary, platform = self.fixture()
