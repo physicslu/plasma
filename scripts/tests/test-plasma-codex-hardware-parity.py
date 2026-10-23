@@ -19,15 +19,14 @@ class ParityTests(unittest.TestCase):
     def test_strict_udev_identity_and_tty_scope(self) -> None:
         p.self_test()
         rules = p.render_rules()
-        self.assertEqual(rules.count('MODE="0660"'), 7)
+        self.assertEqual(rules.count('MODE="0660"'), 5)
         self.assertNotIn('MODE="0666"', rules)
         self.assertNotIn("SUBSYSTEM==\"block\"", rules)
         self.assertIn("GROUP=\"plasma-codex-io\"", rules)
-        self.assertIn('ATTR{idVendor}=="0483", ATTR{idProduct}=="374f"', rules)
-        self.assertIn('ATTR{idVendor}=="cafe", ATTR{idProduct}=="4001"', rules)
         self.assertIn('KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="cafe", '
                       'ATTRS{idProduct}=="4001"', rules)
         self.assertNotIn('KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="0483"', rules)
+        self.assertNotIn('ATTR{idVendor}=="cafe"', rules)
         self.assertEqual(p.render_rules(legacy=True).count('MODE="0660"'), 4)
 
     def test_existing_conflict_and_symlink_never_overwritten(self) -> None:

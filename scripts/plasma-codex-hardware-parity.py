@@ -36,10 +36,7 @@ VID_PIDS = (
     ("0403", "6010"),  # Xilinx FT2232 USB/JTAG/UART
     ("8564", "4100"),  # Transcend USB2/USB3 companion Hub
     ("77a1", "01a2"),  # KINGST LA2016
-    ("0483", "374f"),  # STLINK-V3SET
-    ("cafe", "4001"),  # development Blue Pill USB CDC firmware
 )
-LEGACY_VID_PIDS = VID_PIDS[:3]
 
 
 def render_rules(group: str = GROUP, *, legacy: bool = False) -> str:
@@ -49,7 +46,7 @@ def render_rules(group: str = GROUP, *, legacy: bool = False) -> str:
         "# PLASMA SWPC prototype HIL: only owner-approved USB models",
         "# Both USB 2.x and 3.x companion hub identities intentionally match.",
     ]
-    for vid, pid in (LEGACY_VID_PIDS if legacy else VID_PIDS):
+    for vid, pid in VID_PIDS:
         items.append(
             f'SUBSYSTEM=="usb", ENV{{DEVTYPE}}=="usb_device", '
             f'ATTR{{idVendor}}=="{vid}", ATTR{{idProduct}}=="{pid}", '
@@ -381,7 +378,7 @@ def apply(appimage: Path | None = None) -> None:
 
 def self_test() -> None:
     rules = render_rules()
-    assert rules.count('SUBSYSTEM=="usb"') == 5
+    assert rules.count('SUBSYSTEM=="usb"') == 3
     assert rules.count('SUBSYSTEM=="tty"') == 2
     for vid, pid in VID_PIDS:
         assert f'ATTR{{idVendor}}=="{vid}"' in rules
