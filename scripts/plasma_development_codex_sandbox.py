@@ -30,6 +30,7 @@ def codex_command(
     home: Path | None = None,
     usb_root: Path = Path("/dev/bus/usb"),
     dev_root: Path = Path("/dev"),
+    resolv_conf: Path = Path("/etc/resolv.conf"),
 ) -> list[str]:
     """Return rootless bubblewrap + Codex argv, with USB/TTY device visibility.
 
@@ -58,12 +59,31 @@ def codex_command(
             dev_root.is_dir() and not dev_root.is_symlink(),
             "CODEX_SANDBOX_USB_ROOT_DENIED")
 
+    # Mask host runtime sockets (/run, /var/run) even if their parent is
+    # read-only. A read-only Unix socket pathname can still allow IPC writes.
+    # Keep the proven SWPC systemd-resolved stub accessible for Codex API DNS.
+    try:
+        resolved = Path(resolv_conf).resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise CodexSandboxDenied("CODEX_SANDBOX_DNS_CONFIG_DENIED") from None
+    require(resolved.is_file() and os.access(resolved, os.R_OK),
+            "CODEX_SANDBOX_DNS_CONFIG_DENIED")
+    resolved_in_run = resolved == Path("/run") or Path("/run") in resolved.parents
+    if resolved_in_run:
+        require(resolved in {
+            Path("/run/systemd/resolve/stub-resolv.conf"),
+            Path("/run/systemd/resolve/resolv.conf"),
+        }, "CODEX_SANDBOX_DNS_RUN_TARGET_DENIED")
+
     argv = [
         bwrap, "--die-with-parent", "--new-session", "--unshare-pid",
         "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
-        "--tmpfs", "/tmp", "--dir", "/dev/bus",
+        "--tmpfs", "/run", "--tmpfs", "/tmp", "--dir", "/dev/bus",
         "--dev-bind", str(usb_root), "/dev/bus/usb",
     ]
+    if resolved_in_run:
+        argv += ["--dir", "/run/systemd", "--dir", "/run/systemd/resolve",
+                 "--ro-bind", str(resolved), str(resolved)]
     # No VID/PID filter. Available USB serial devices are exposed at the
     # start of each Codex invocation; re-enumeration needs fresh discovery.
     for node in sorted(dev_root.iterdir()):
