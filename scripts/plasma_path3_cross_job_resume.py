@@ -46,11 +46,20 @@ def runner_binding(phase, req, workspace, env):
             "RESUME_RUN_ID_DENIED")
     require(req.get("task_id") == "path3-work-order" and
             req.get("session_resume") == "page-boundary-off-by-one" and
-            req.get("pr_number", 0) > 0, "RESUME_WORK_ORDER_DENIED")
+            type(req.get("pr_number")) is int and
+            req["pr_number"] >= 0, "RESUME_WORK_ORDER_DENIED")
     for key in ("trusted_sha", "source_sha"):
         require(type(req.get(key)) is str and
                 probe.SHA40.fullmatch(req[key]) is not None,
                 "RESUME_SHA_DENIED")
+    if req["pr_number"] == 0:
+        # One-off main-pinned deferred acceptance: never allow an arbitrary
+        # candidate, a stale main SHA, or a spoofed runner event to execute.
+        require(req["source_sha"] == req["trusted_sha"] ==
+                env.get("GITHUB_SHA") and
+                env.get("GITHUB_REF") == "refs/heads/main" and
+                env.get("GITHUB_EVENT_NAME") == "issue_comment",
+                "RESUME_MAIN_SHA_MISMATCH")
     require(type(req.get("work_order_sha256")) is str and
             SHA256.fullmatch(req["work_order_sha256"]) is not None,
             "RESUME_WORK_ORDER_DIGEST_DENIED")
