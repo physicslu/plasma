@@ -109,8 +109,10 @@ class ParityTests(unittest.TestCase):
             with patch.object(p, "RULE_FILE", rules):
                 self.assertEqual(p.managed_usb_rules_state(),
                                  "OWNER_OR_MODE_DENIED")
-                with patch.object(p, "require_safe_admin"), \\
-                     patch.object(p, "run_admin") as admin:
+                with (
+                    patch.object(p, "require_safe_admin"),
+                    patch.object(p, "run_admin") as admin,
+                ):
                     with self.assertRaisesRegex(RuntimeError, "preflight denied"):
                         p.apply()
                     admin.assert_not_called()
