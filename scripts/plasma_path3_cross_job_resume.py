@@ -14,6 +14,7 @@ import re
 import secrets
 import shutil
 import subprocess
+import time
 
 import plasma_path3_session_resume_probe as probe
 
@@ -155,6 +156,17 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
             "RESUME_PRIVATE_PERMISSIONS_DENIED")
     state_file = private / (bound["github_run_id"] + ".json")
     consumed = private / (bound["github_run_id"] + ".consumed")
+    # Codex Session storage belongs to this immutable Actions Run, not a
+    # shared collection of unrelated sessions on the SWPC host.
+    session_root = private / bound["github_run_id"]
+    if phase == "new":
+        require(not session_root.exists() and not session_root.is_symlink(),
+                "RESUME_PRIVATE_RUN_EXISTS")
+        session_root.mkdir(mode=0o700)
+    require(session_root.is_dir() and not session_root.is_symlink() and
+            session_root.stat().st_uid == os.geteuid() and
+            session_root.stat().st_mode & 0o077 == 0,
+            "RESUME_PRIVATE_RUN_UNSAFE")
     scratch = workspace / probe.ROOT_FOLDER
     require(not scratch.exists() and not scratch.is_symlink(),
             "RESUME_PROBE_ALREADY_EXISTS")
@@ -177,8 +189,10 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
         require(type(previous) is dict and
                 all(previous.get(k) == v for k, v in bound.items()) and
                 previous.get("phase") == "new" and
-                previous.get("test_before") != 0 and
-                previous.get("test_after") != 0 and
+                type(previous.get("created_unix")) is int and
+                0 <= int(time.time()) - previous["created_unix"] <= 7200 and
+                previous.get("test_before") == 1 and
+                previous.get("test_after") == 1 and
                 previous.get("test_sha256") ==
                     hash_data(probe.TEST_SOURCE.encode()),
                 "RESUME_BINDING_MISMATCH")
@@ -190,14 +204,19 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
                                   "cached_input_tokens": 0,
                                   "output_tokens": 0}}) + "\n")[0]
         prompt = probe.RESUME_PROMPT
-        # One-shot consume BEFORE Codex starts. Never silently retry/new.
+        # One-shot consume BEFORE Codex starts. Immediately erase the raw
+        # private Thread ID from the replay tombstone, even if Codex fails.
         os.replace(state_file, consumed)
+        with consumed.open("w", encoding="utf-8") as stream:
+            json.dump({"consumed": True,
+                       "github_run_id": bound["github_run_id"]}, stream)
+            stream.write("\n")
     scratch.mkdir(mode=0o700)
     (scratch / probe.SOURCE_NAME).write_text(probe.BROKEN_SOURCE)
     (scratch / probe.TEST_NAME).write_text(probe.TEST_SOURCE)
     before = test_runner(workspace, scratch)
     require(before == 1, "RESUME_FIXTURE_NOT_FAILING")
-    command = command_builder(workspace, private, thread)
+    command = command_builder(workspace, session_root, thread)
     try:
         proc = executor(command, input=prompt, cwd=scratch,
                         capture_output=True, text=True, timeout=240,
@@ -205,9 +224,17 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
     except (OSError, subprocess.TimeoutExpired):
         raise ResumeDenied("RESUME_CODEX_INVOKE_FAILED") from None
     require(proc.returncode == 0, "RESUME_CODEX_NONZERO")
-    sid, tokens = probe.parse_events(proc.stdout)
+    try:
+        sid, tokens = probe.parse_events(proc.stdout)
+    except probe.ProbeDenied as exc:
+        raise ResumeDenied(str(exc)) from None
     after = test_runner(workspace, scratch)
-    require(hash_data((scratch / probe.TEST_NAME).read_bytes()) ==
+    test_path = scratch / probe.TEST_NAME
+    source_path = scratch / probe.SOURCE_NAME
+    require(test_path.is_file() and not test_path.is_symlink() and
+            source_path.is_file() and not source_path.is_symlink(),
+            "RESUME_SOURCE_FILE_INVALID")
+    require(hash_data(test_path.read_bytes()) ==
             hash_data(probe.TEST_SOURCE.encode()), "RESUME_TEST_MODIFIED")
     head, changed = probe.git_state(workspace)
     require(head == bound["source_sha"] and
@@ -223,9 +250,13 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
               "test_before": before, "test_after": after, "usage": tokens}
     if phase == "new":
         require(after == 1, "RESUME_FIRST_TURN_PREMATURE_FIX")
+        require(hash_data(source_path.read_bytes()) ==
+                hash_data(probe.BROKEN_SOURCE.encode()),
+                "RESUME_FIRST_TURN_MODIFIED_SOURCE")
         require(not (scratch / probe.PROOF_NAME).exists(),
                 "RESUME_FIRST_TURN_PROOF_WRITTEN")
         state = {**bound, "phase": "new", "thread_id": sid,
+                 "created_unix": int(time.time()),
                  "challenge_sha256": hash_data(nonce.encode()),
                  "test_sha256": hash_data(probe.TEST_SOURCE.encode()),
                  "test_before": before, "test_after": after,
@@ -244,9 +275,13 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
         require(after == 0, "RESUME_TEST_NOT_PASSING")
         proof = scratch / probe.PROOF_NAME
         require(proof.is_file() and not proof.is_symlink() and
+                proof.stat().st_size <= 128 and
                 proof.read_bytes().endswith(b"\n") and
                 hash_data(proof.read_bytes()[:-1]) ==
                   previous["challenge_sha256"], "RESUME_CHALLENGE_NOT_RECOVERED")
         public.update(status="RESUME_FIX_PASS", same_thread=True,
                       continuity="VERIFIED", usage_new=previous["usage_new"])
+        # No retained model Session is needed once continuity is proven.
+        # Remove only this Run's own private, owner-only Session directory.
+        shutil.rmtree(session_root)
     return public
