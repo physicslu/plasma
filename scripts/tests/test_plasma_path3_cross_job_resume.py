@@ -229,6 +229,7 @@ class ResumeTwoJobOffline(unittest.TestCase):
         self.assertNotIn(["--bind", str(self.repo), "/work"],
                          [command[i:i + 3] for i in range(len(command) - 2)])
         self.assertIn("--dev", command)
+        self.assertIn("/usr/bin/codex", command)
         self.assertNotIn("--unshare-net", command)  # Real Codex model API
         self.assertEqual(command[-2:], ["workspace-write", "-"])
         with patch.object(flow.Path, "home", return_value=auth_home), \
@@ -238,6 +239,19 @@ class ResumeTwoJobOffline(unittest.TestCase):
             shutil.rmtree(broken)
             with self.assertRaisesRegex(flow.ResumeDenied,
                                         "RESUME_SCRATCH_DENIED"):
+                flow.isolated_command(self.repo, isolated, None)
+
+    def test_model_install_outside_readonly_mount_denied(self):
+        # Never bind an arbitrary user home to enable a non-system CLI.
+        scratch = self.repo / flow.probe.ROOT_FOLDER
+        scratch.mkdir()
+        isolated = self.private / "123456"
+        isolated.mkdir(parents=True)
+        with patch.object(flow.shutil, "which",
+                          side_effect=lambda name:
+                              str(Path(self.tmp.name) / "unmounted" / name)):
+            with self.assertRaisesRegex(flow.ResumeDenied,
+                                        "RESUME_CODEX_INSTALL_UNMOUNTED"):
                 flow.isolated_command(self.repo, isolated, None)
 
     def test_sandboxed_test_does_not_inherit_runner_tokens(self):
