@@ -1200,6 +1200,10 @@ def safe_error_reason(exc: Exception) -> str:
     if isinstance(exc, Denied):
         return str(exc)
     detail = str(exc)
+    if (type(exc).__name__ == "CodexSandboxDenied" and
+            re.fullmatch(r"CODEX_SANDBOX_[A-Z0-9_]{3,80}", detail) is not None):
+        # Auditable fixed category, not the host path or exception traceback.
+        return detail
     if type(exc).__name__ in ("RuntimeDenied", "QualificationDenied"):
         if re.fullmatch(r"PATH2_[A-Z0-9_]{3,80}|BUILD_[A-Z0-9_]{3,80}", detail):
             return detail
