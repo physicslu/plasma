@@ -1274,7 +1274,27 @@ def main() -> int:
                     try:
                         receipt = native.inspect()
                     except native.PreflightDenied as exc:
-                        raise Denied(str(exc)) from None
+                        if str(exc) != "NATIVE_PATH_PERMISSIONS_DENIED":
+                            raise Denied(str(exc)) from None
+                        # Only static, separately validated category fields.
+                        # Never include any observed host path or uid/gid.
+                        require(exc.stage in native.SAFE_PERMISSION_STAGES and
+                                exc.cause in native.SAFE_PERMISSION_CAUSES and
+                                type(exc.component_index) is int and
+                                1 <= exc.component_index <= 24,
+                                "NATIVE_DIAGNOSTIC_FIELDS_DENIED")
+                        receipt = {
+                            "schema": "plasma.codex.native_preflight.v1",
+                            "status": "NOT_RUN_OR_FAIL",
+                            "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                            "denial_stage": exc.stage,
+                            "denial_cause": exc.cause,
+                            "denial_component_index": exc.component_index,
+                            "model_session": "NOT_RUN",
+                            "hardware_access": "NOT_RUN",
+                            "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+                            "sha256_pin_authorized": False,
+                        }
                 # This exact CPU-only fixture is the ONLY cross-Job route.
                 # Unflagged Path 3 retains its existing single-exec behavior.
                 elif task.get("session_resume") or args.resume_phase:
