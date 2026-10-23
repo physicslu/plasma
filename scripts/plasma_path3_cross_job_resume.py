@@ -78,6 +78,11 @@ def isolated_command(workspace, private_root, session):
     require(auth.is_file() and not auth.is_symlink(),
             "RESUME_AUTH_FILE_UNAVAILABLE")
     ch = private_root / "codex-home"
+    scratch = workspace / probe.ROOT_FOLDER
+    require(scratch.is_dir() and not scratch.is_symlink() and
+            scratch.resolve(strict=True) ==
+                workspace.resolve(strict=True) / probe.ROOT_FOLDER,
+            "RESUME_SCRATCH_DENIED")
     ch.mkdir(mode=0o700, exist_ok=True)
     require(ch.is_dir() and not ch.is_symlink(), "RESUME_CODEX_HOME_DENIED")
     mounts = []
@@ -90,7 +95,8 @@ def isolated_command(workspace, private_root, session):
             "--dir", "/home/plasma",
             "--bind", str(ch), "/home/plasma/.codex",
             "--ro-bind", str(auth), "/home/plasma/.codex/auth.json",
-            "--bind", str(workspace), "/work",
+            "--ro-bind", str(workspace), "/work",
+            "--bind", str(scratch), "/work/" + probe.ROOT_FOLDER,
             "--setenv", "HOME", "/home/plasma",
             "--setenv", "CODEX_HOME", "/home/plasma/.codex",
             "--chdir", "/work/" + probe.ROOT_FOLDER,
@@ -119,7 +125,8 @@ def isolated_unittest(workspace, scratch):
     command = [bwrap, "--die-with-parent", "--new-session",
                "--unshare-pid", "--unshare-ipc", "--unshare-net",
                "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
-               *mounts, "--bind", str(workspace), "/work",
+               *mounts, "--ro-bind", str(workspace), "/work",
+               "--bind", str(scratch), "/work/" + probe.ROOT_FOLDER,
                "--chdir", "/work/" + probe.ROOT_FOLDER,
                "--", "python3", "-m", "unittest", "-q", probe.TEST_NAME]
     # Do not leak Actions credentials or inherit Python import hooks into a
@@ -183,7 +190,10 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
         require(type(nonce) is str and re.fullmatch("[a-f0-9]{32}", nonce),
                 "RESUME_CHALLENGE_INVALID")
         thread = None
-        prompt = probe.first_prompt(nonce)
+        prompt = probe.first_prompt(nonce).replace(
+            "No SWPC, hardware, network, deployment or Git writes.",
+            "Running in SWPC's isolated CPU-only workspace. No host-device "
+            "access, network tools, deployment or Git writes.")
     else:
         require(not consumed.exists() and state_file.is_file() and
                 not state_file.is_symlink() and
@@ -212,7 +222,10 @@ def execute(phase, req, workspace, *, env=None, state_root=None,
             require(raw_thread == thread, "RESUME_THREAD_INVALID")
         except (TypeError, ValueError, AttributeError):
             raise ResumeDenied("RESUME_THREAD_INVALID") from None
-        prompt = probe.RESUME_PROMPT
+        prompt = probe.RESUME_PROMPT.replace(
+            "No network, Git writes, SWPC, FPGA, USB, target power or real IC operations.",
+            "No host-device access, network tools, Git writes, FPGA, USB, "
+            "target power or real IC operations.")
         # One-shot consume BEFORE Codex starts. Immediately erase the raw
         # private Thread ID from the replay tombstone, even if Codex fails.
         os.replace(state_file, consumed)
