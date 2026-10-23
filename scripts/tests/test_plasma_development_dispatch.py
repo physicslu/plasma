@@ -1763,7 +1763,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"path2-stage-contract"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
