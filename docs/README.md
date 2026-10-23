@@ -22,6 +22,11 @@
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
 
+## Blue Pill SWD OpenOCD development candidates
+
+- **Gate 1 / Draft / Host-only** — [Blue Pill OpenOCD Remote-Bitbang PoC](development/bluepill-remote-bitbang-poc.md)：透過真實 upstream OpenOCD、私有 UNIX socket、虛擬 SWD DPIDR 的 Host-only 驗證；不可視為實體 FPGA／IC 燒錄。
+- **Gate 1 / Draft / Source-only** — [PYNQ-Z2 Blue Pill PS/PL SWD Candidate](../pl/projects/z2-bluepill-rbb/README.md)：隔離 GP0 AXI GPIO、PMODB XDC、SWDIO IOBUF、ARMv7 MMIO WordPort 與復原契約；Vivado BIT/HWH 與 Z2 HIL 均未執行。
+
 ## Engineering governance and execution paths
 
 - **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
