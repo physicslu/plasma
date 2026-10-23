@@ -59,6 +59,26 @@ static void system_clock_config(void) {
     if (HAL_RCCEx_PeriphCLKConfig(&peripheral) != HAL_OK) Error_Handler();
 }
 
+/* Boot only: F103 has no software-controlled internal D+ pull-up.
+ * Briefly sink the fixed board pull-up before the USB peripheral owns PA12.
+ * Never call this from the running USB stack or the main loop. */
+static void usb_boot_disconnect(void) {
+    /* Refuse to contend with an unexpectedly active USB peripheral. */
+    if (__HAL_RCC_USB_IS_CLK_ENABLED()) Error_Handler();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+    GPIO_InitTypeDef dp = {0};
+    dp.Pin = GPIO_PIN_12;
+    dp.Mode = GPIO_MODE_OUTPUT_OD;
+    dp.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &dp);
+    HAL_Delay(30); /* SysTick is running; startup only, not a runtime retry. */
+    /* Floating input releases D+ without driving it high or touching SWD. */
+    dp.Mode = GPIO_MODE_INPUT;
+    dp.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &dp);
+}
+
 static void led_init(void) {
     __HAL_RCC_GPIOC_CLK_ENABLE();
     /* Preload active-low ON before switching to output. No tick dependency. */
@@ -74,6 +94,7 @@ int main(void) {
     led_init();
     if (HAL_Init() != HAL_OK) Error_Handler();
     system_clock_config();
+    usb_boot_disconnect();
     app_init(&app);
     app.led_last_ms = HAL_GetTick();
     if (USBD_Init(&usb_device, &VCP_Desc, 0) != USBD_OK ||

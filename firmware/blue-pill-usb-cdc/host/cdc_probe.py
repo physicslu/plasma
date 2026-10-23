@@ -2,6 +2,7 @@
 """Future CDC serial probe; Phase A runs host-only tests, never opens a port."""
 
 import argparse
+import math
 import re
 import time
 
@@ -45,12 +46,59 @@ class HeartbeatMonitor:
         return True
 
 
+class ReceptionWindow:
+    """Wall-clock acceptance independent of sequence and per-frame timing.
+
+    Allow 3s for initial enumeration/reception, then at most 1.5s silence.
+    Require 90% of 2Hz coverage outside startup and one explicit port pause.
+    """
+    startup_grace = 3.0
+    max_silence = 1.5
+    coverage = 0.9
+
+    def __init__(self, started_at, duration):
+        self.started_at = started_at
+        self.duration = duration
+        self.last_at = None
+        self.resume_at = None
+        self.excluded = 0.0
+
+    def check(self, now):
+        if self.resume_at is not None:
+            assert now - self.resume_at <= self.max_silence, "silence after host-port reopen"
+        elif self.last_at is None:
+            assert now - self.started_at <= self.startup_grace, "first heartbeat startup timeout"
+        else:
+            assert now - self.last_at <= self.max_silence, "prolonged heartbeat silence"
+
+    def heartbeat(self, now):
+        self.check(now)  # A late frame must not erase an already excessive gap.
+        self.last_at = now
+        self.resume_at = None
+
+    def host_pause(self, closed_at, reopened_at):
+        self.check(closed_at)
+        self.resume_at = reopened_at
+        # Only the deliberate close/open and bounded reacquisition are exempt.
+        self.excluded += reopened_at - closed_at + self.max_silence
+
+    def finish(self, now, samples):
+        self.check(now)
+        active = max(0.0, self.duration - self.startup_grace - self.excluded)
+        minimum = max(3, math.floor(active / 0.5 * self.coverage))
+        assert samples >= minimum, f"insufficient heartbeat coverage: {samples} < {minimum}"
+
+
 def run_live(port, duration, tolerance, host_port_pause_seconds=0):
+    if not __debug__:
+        raise RuntimeError("probe requires assertions; run Python without -O")
     import serial  # pyserial is needed only for a future physical test.
 
     monitor = HeartbeatMonitor(tolerance=tolerance)
-    with serial.Serial(port, 115200, timeout=1) as device:
-        deadline = time.monotonic() + duration
+    with serial.Serial(port, 115200, timeout=0.1) as device:
+        started_at = time.monotonic()
+        deadline = started_at + duration
+        window = ReceptionWindow(started_at, duration)
         sent_id = False
         got_id = False
         pause_performed = False
@@ -59,9 +107,13 @@ def run_live(port, duration, tolerance, host_port_pause_seconds=0):
         while time.monotonic() < deadline:
             line = device.readline().decode("ascii", errors="strict").strip()
             now = time.monotonic()
+            window.check(min(now, deadline))
+            if now > deadline:
+                break
             if line.startswith("HB "):
                 print(line, flush=True)
-                monitor.observe(line, now, host_port_interrupted=pending_host_port_gap)
+                assert monitor.observe(line, now, host_port_interrupted=pending_host_port_gap), "invalid heartbeat"
+                window.heartbeat(now)
                 if pending_host_port_gap:
                     resumed_after_pause = True
                     pending_host_port_gap = False
@@ -76,14 +128,19 @@ def run_live(port, duration, tolerance, host_port_pause_seconds=0):
                 # This only interrupts host reception. USB power and the MCU
                 # remain connected; physical disconnect is a separate test.
                 print("HOST_PORT_PAUSE: closing and reopening serial port", flush=True)
+                closed_at = time.monotonic()
                 device.close()
                 time.sleep(host_port_pause_seconds)
                 device.open()
+                reopened_at = time.monotonic()
+                assert reopened_at + window.max_silence + 1.0 < deadline, "host-port pause leaves insufficient observation time"
+                window.host_pause(closed_at, reopened_at)
                 pause_performed = True
                 pending_host_port_gap = True
-        assert monitor.samples >= 3, "too few unsolicited heartbeats"
+        window.finish(deadline, monitor.samples)
         assert got_id, "firmware ID reply absent"
-        if pause_performed:
+        if host_port_pause_seconds > 0:
+            assert pause_performed, "requested host-port pause not exercised"
             assert resumed_after_pause, "no heartbeat after host-port reopen"
         pause_status = "PASS" if pause_performed else "NOT_RUN"
         print(f"PASS: {monitor.samples} heartbeats, firmware ID; "
@@ -93,12 +150,14 @@ def run_live(port, duration, tolerance, host_port_pause_seconds=0):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", required=True)
-    parser.add_argument("--duration", type=float, default=8.0)
+    parser.add_argument("--duration", type=float, default=60.0)
     parser.add_argument("--tolerance", type=float, default=0.2)
     parser.add_argument("--host-port-pause-seconds", type=float, default=0.0,
                         help="opt-in host serial close/reopen; does not disconnect USB")
     args = parser.parse_args(argv)
-    if args.duration <= 0 or args.tolerance < 0 or args.host_port_pause_seconds < 0:
+    if (not all(math.isfinite(value) for value in
+                (args.duration, args.tolerance, args.host_port_pause_seconds)) or
+            args.duration <= 0 or args.tolerance < 0 or args.host_port_pause_seconds < 0):
         parser.error("duration must be positive; tolerance and pause must be nonnegative")
     return args
 

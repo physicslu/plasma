@@ -464,7 +464,8 @@ void USBD_static_free(void *p)
   */
 void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state)
 {
-  /* Standard Blue Pill has a fixed D+ pull-up; only physical unplug detaches. */
+  /* Fixed D+ pull-up: runtime HAL connection control is unavailable.
+   * main.c applies a bounded GPIO disconnect only before USB initialization. */
   (void)hpcd;
   (void)state;
 }

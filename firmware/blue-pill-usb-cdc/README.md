@@ -10,8 +10,38 @@ experimental VID/PID `CAFE:4001`. PLASMA has no documented ownership or
 authorization for this pair. It is **not an official PLASMA USB ID**. Obtain
 an assigned or otherwise authorized VID/PID before distribution, formal
 release, or physical acceptance. The common Blue Pill has a fixed D+ pull-up,
-so firmware does not emulate USB detach. Physical unplug/replug and board-specific D+
-pull-up behavior remain untested.
+so boot now briefly sinks PA12 D+ with an open-drain GPIO for 30 ms after
+HAL/clock setup and before `USBD_Init`. It preloads LOW, enables only the
+PA12 output, then releases it to floating input before USB HAL takes over.
+An unexpectedly enabled USB clock stops startup before touching D+. This is
+reset-entry firmware, not a supported jump from an active USB bootloader.
+There is no runtime disconnect retry, PA13/PA14 remap, or physical rework.
+
+[ST AN4879](https://www.st.com/content/st_com/en/technical-documents/an4879-introduction-to-usb-hardware-and-pcb-guidelines-using-stm32-mcus-stmicroelectronics_asset/chunk-001-topic-an4879-usb-on-stm32-products.html)
+documents the F103 external 1.5 kΩ D+ pull-up. The pinned F1 HAL's
+`USB_DevConnect`/`USB_DevDisconnect` do nothing for this USB FS peripheral.
+[STM32duino's upstream implementation](https://github.com/stm32duino/Arduino_Core_STM32/blob/main/libraries/USBDevice/src/usbd_if.c)
+describes a brief startup D+ low pulse followed by floating input for fixed
+pull-ups, and warns that it is a workaround rather than a standards-compliant
+switched pull-up; it also warns against attempting it with F103 USB active.
+Here open-drain avoids driving D+ HIGH. With the expected 1.5 kΩ to 3.3 V,
+static sink current is approximately 2.2 mA. Board wiring/pull-up value and
+host behavior still require physical verification; this does not repair a
+wrong resistor, cable, host driver, or arbitrary CDC stall.
+
+MCU RESET restarts the stack but does not remove the fixed pull-up by itself.
+Host serial close/open (which may toggle DTR) does not reset the MCU or remove
+USB power; firmware does not gate transmission on DTR. Physical USB unplug
+removes the bus connection and may remove power. These are separate tests.
+The owner's prior Mac test reported 121 heartbeats plus ID over 60 seconds
+on the preceding diagnostic firmware; it does not validate this new pulse.
+RESET recovery and physical unplug/replug on this candidate remain NOT_RUN.
+A controlled pull-up or physical unplug is an alternative, but hardware
+rework is outside this patch. Failure rollback is the previous diagnostic
+firmware via the owner's existing authorized flashing route; no automatic
+flash or hardware operation is performed here. A missing HAL tick can stall
+the boot delay; the output is released on MCU reset. Runtime LED/USB service
+has no added blocking delay.
 
 ## Independent PC13 diagnostics
 
@@ -113,9 +143,19 @@ python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p 'test_*.py' -
 
 `host/cdc_probe.py` is a future serial-port test using pyserial. It prints each
 heartbeat immediately and checks exact consecutive sequence/interval/uptime
-and the `ID` reply. Normal continuous observation leaves the Host Port open.
+and the exact `ID PLASMA_BLUE_PILL_CDC/0.1` reply. Default duration is 60s.
+It allows 3s for the first heartbeat, rejects silence exceeding 1.5s (including
+a silent tail), and requires at least `max(3, floor(0.9 * active_seconds / 0.5))`
+frames. Active seconds exclude the 3s startup allowance. Thus a normal 60s
+run requires at least 102 frames as well as interval/sequence checks.
+A late arriving frame cannot erase an excessive gap. The live probe refuses Python `-O` before importing pyserial,
+since these diagnostic checks use assertions. Normal continuous observation leaves the Host Port open.
 An optional `--host-port-pause-seconds <seconds>` closes and reopens only the
 host serial port, allowing a sequence gap across that deliberate interruption.
+Only actual close/open time plus a bounded 1.5s reacquisition allowance is
+excluded from coverage. Reopening must leave more than 2.5s of observation;
+recovery must arrive within 1.5s, and the requested pause must actually occur.
+The exception does not exempt later silence or subsequent sequence gaps.
 It does not disconnect USB power or prove a physical USB reconnect. **The
 live probe is not run in Phase A.** Neither
 these tests nor the static artifact check prove enumeration, real USB timing,
