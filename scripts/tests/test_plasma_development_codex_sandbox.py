@@ -138,7 +138,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                 "--", "codex", "exec", "-"
             ]) as builder, patch.object(subprocess, "run",
                 return_value=subprocess.CompletedProcess(
-                    ["bwrap"], 0, b"PATH3_NAMESPACE_VISIBLE\\n", b"")
+                    ["bwrap"], 0, b"PATH3_NAMESPACE_VISIBLE\n", b"")
             ) as runner:
                 result = sandbox.readonly_probe(work)
             builder.assert_called_once_with(work)
