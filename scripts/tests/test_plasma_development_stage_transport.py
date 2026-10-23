@@ -14,6 +14,7 @@ import plasma_path2_runtime_integration as r
 import plasma_development_dispatch as d
 
 SHA = 'a' * 40
+PROJECT = 'pl/projects/z2-fixed-unified-site1'
 
 class Contracts(unittest.TestCase):
     def test_no_installed_host_dependency_or_candidate_import(self):
@@ -21,6 +22,8 @@ class Contracts(unittest.TestCase):
         for forbidden in ('/usr/local/libexec/plasma/z2-path2-f1b-bridge',
                           'z2-path2-f1b.approved-sha', 'importlib', 'exec_module'):
             self.assertNotIn(forbidden, source)
+        self.assertEqual(t.ROOT_ENTRY, '/usr/local/libexec/plasma/z2-path2-root-entry')
+        self.assertEqual(t.MARK, 'PLASMA_PATH2_STAGE=')
         self.assertIn('StrictHostKeyChecking=yes', source)
         self.assertIn('GlobalKnownHostsFile=/dev/null', source)
 
@@ -43,7 +46,7 @@ class Contracts(unittest.TestCase):
              patch.object(t, 'private_json', return_value={}), \
              patch.object(t.subprocess, 'Popen') as launch:
             with self.assertRaisesRegex(t.Blocked, 'NOT_ENROLLED'):
-                t.execute('test', SHA)
+                t.execute('test', SHA, PROJECT)
             launch.assert_not_called()
 
     def test_host_key_missing_or_mismatch_never_launches_ssh(self):
@@ -61,7 +64,7 @@ class Contracts(unittest.TestCase):
                  patch.object(t.os,'geteuid',return_value=os.geteuid() or 1000), \
                  patch.object(t.subprocess,'run',return_value=Mock(returncode=1)), \
                  patch.object(t.subprocess,'Popen') as remote:
-                with self.assertRaises(t.Blocked): t.execute('test',SHA)
+                with self.assertRaises(t.Blocked): t.execute('test',SHA,PROJECT)
                 remote.assert_not_called()
 
     def test_candidate_python_is_not_loaded_for_stage(self):
@@ -74,11 +77,11 @@ class Contracts(unittest.TestCase):
                         'pinned_sha':SHA,'trusted_sha':SHA,'pr_number':0}
             task = {'capability':'path2-stage-contract','stage':'test',
                     'project':'pl/projects/z2-fixed-unified-site1'}
-            payload = {'stage':'test','source_sha':SHA,'real_z2':True,
+            payload = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
                        'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
             with patch.object(t,'execute',return_value=payload) as call:
                 d.run_task(task, workspace=root, approval=approval)
-                call.assert_called_once_with('test', SHA)
+                call.assert_called_once_with('test', SHA, PROJECT)
 
     def test_live_pr_changed_head_owner_repo_base_rejected(self):
         req = {'pr_number':123, 'source_sha':SHA}
@@ -105,12 +108,12 @@ class Contracts(unittest.TestCase):
                     'auto_test_after_download_success':True}
         task = {'capability':'path2-stage-contract','stage':'test',
                 'project':'pl/projects/z2-fixed-unified-site1'}
-        receipt = {'stage':'test','source_sha':SHA,'real_z2':True,
+        receipt = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
                    'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
         with patch.object(t,'execute',return_value=receipt) as call:
             result = r.registered_hardware_stage(task,approval)
             self.assertFalse(result['auto_next_stage'])
-            call.assert_called_once_with('test',SHA)
+            call.assert_called_once_with('test',SHA,PROJECT)
         with patch.object(t,'execute') as call:
             with self.assertRaises(r.RuntimeDenied):
                 r.registered_hardware_stage(task | {'stage':'restore'},approval)
@@ -127,8 +130,43 @@ class Contracts(unittest.TestCase):
              patch.object(t.time,'monotonic',side_effect=[0,200]), \
              patch.object(t.os,'killpg') as kill:
             with self.assertRaisesRegex(t.Blocked,'REMOTE_TIMEOUT'):
-                t.execute('test', SHA)
+                t.execute('test', SHA, PROJECT)
             self.assertEqual(kill.call_count,2)
             self.assertEqual(proc.wait.call_count,2)
+
+
+    def test_generic_root_entry_is_pinned_and_syntax_valid(self):
+        path = Path(__file__).resolve().parents[1] / 'z2/plasma-path2-root-entry'
+        code = path.read_text()
+        self.assertNotIn('plasma-path2-f1b-site1-approved', code)
+        self.assertNotIn('pl.hil.path2_f1b_minimal_stage', code)
+        self.assertNotIn('PLASMA_DEV_RISK_ACK', code)
+        self.assertIn('.plasma-path2-profile', code)
+        self.assertIn('PATH2_APPROVED_PROFILE_MISMATCH', code)
+        self.assertIn('sha256sum --check --status', code)
+        self.assertIn('exec /usr/bin/env -i', code)
+        subprocess.run(['/usr/bin/bash', '-n', str(path)], check=True)
+        for args in [[], ['download'], ['test', '../escape', SHA],
+                     ['test', PROJECT, 'bad'], ['arbitrary', PROJECT, SHA]]:
+            result = subprocess.run(['/usr/bin/bash', str(path), *args],
+                                    capture_output=True, check=False)
+            self.assertEqual(result.returncode, 2)
+
+    def test_project_pinned_receipt_and_no_duplicate(self):
+        receipt = {'stage': 'test', 'project': PROJECT,
+                   'boot_id': 'test-boot-id', 'result': 'IDENTITY_PASS'}
+        encoded = (t.MARK + json.dumps(receipt) + chr(10)).encode()
+        self.assertEqual(t.parse_receipt(
+            'test', SHA, encoded, PROJECT)['project'], PROJECT)
+        with self.assertRaisesRegex(t.Blocked, 'REMOTE_RESULT_NOT_VERIFIED'):
+            t.parse_receipt('test', SHA, encoded, 'pl/projects/z2-bluepill-rbb')
+        with self.assertRaises(t.Blocked):
+            t.parse_receipt('test', SHA, encoded + encoded, PROJECT)
+
+    def test_bad_project_never_attempts_ssh(self):
+        with patch.object(t, 'enrollment') as enrollment:
+            with self.assertRaisesRegex(t.Blocked, 'PROJECT_NOT_ALLOWLISTED'):
+                t.execute('test', SHA, '../unreviewed')
+            enrollment.assert_not_called()
 
 if __name__ == '__main__': unittest.main()

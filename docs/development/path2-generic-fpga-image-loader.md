@@ -1,142 +1,58 @@
-# Path 2 — project-agnostic FPGA image loader core (Gate 1)
+# Path 2 / Path 3 — existing Z2 trusted Root Entry
 
-**Status: source-only core; trusted-root backend and live Path 2 routing
-NOT REGISTERED.** This draft corrects the mistaken idea that Path 2 itself
-is entirely F1-B-specific: the Dispatcher/Work Order and host Build Engine
-are shared, but existing selected host build and privileged target root
-entry remain F1-B/fixed-project-bound.
+**Gate 1 implementation Draft; no root installation or hardware activation.**
 
-## Scope and minimal reuse
+The shared existing Work Order, trusted-main Dispatcher, SWPC Runner and
+Stage Transport remain unchanged in purpose. Path 2 runs a pinned fixed
+CLI; Path 3 lets Codex choose commands under the same Gate 1 and OS
+permissions. For privileged Z2 operations both must use the existing
+protected Root execution boundary and preserve B1/B2/B3.
 
-`pl/hil/path2_generic_image_loader.py` provides a typed, exact immutable
-project/image/recovery manifest; exact SHA-256 verification of candidate
-BIT/HWH/BIN and original recovery BIN/HWH; rejects arbitrary file paths,
-symlinks, digest mismatch, manifest extras or reused candidate/recovery image.
-It reuses **existing** `one_shot.run_sequence` for ordered
-preflight → durable recovery intent → candidate load → test →
-restore original → verify restoration; an uncertain restore is elevated to
-`UNKNOWN_MANUAL_RECOVERY_REQUIRED`, with a protected RootBackend
-supplied only by trusted installed code.
+The protected Root Entry source is now
+`scripts/z2/plasma-path2-root-entry`, installed path
+`/usr/local/libexec/plasma/z2-path2-root-entry`. The old
+F1-B-named Root Entry is removed from the **candidate source**, not
+uninstalled from the live Z2.
 
-It does **not** register a new CLI, Runner, Workflow, Dispatcher Task,
-SSH/sudo route, project selector in `main`, or arbitrary privileged
-`fpga_manager` write. No branch-supplied manifest grants admission.
-Hosted fake backend PASS tests prove ordering/negative contracts only.
-They do not prove physical reconfiguration, bus quiescence or recovery.
+The new entry binds exactly three fixed arguments:
+`download|test|restore`, authorized project name and pinned Git SHA.
+It reads one **root-owned, SHA256-manifest-pinned active project**
+from `/root/plasma-path2-approved/.plasma-path2-profile` with
+exactly three newline-terminated lines:
 
-## Already-implemented generic one-shot API (not a Path 2 stage route)
+```text
+pl/projects/z2-fixed-unified-site1
+pl.hil.path2_f1b_minimal_stage
+<reviewed 40-hex Git source SHA>
+```
 
-`pl/hil/swd04/one_shot.py::run_live(inputs, profile=...,
-test_callback=..., admission_check=...)` **already allows an injected
-hardware profile, test callback, and independent admission callback**.
-It has existing FPGA Manager write/rollback and owner-lock primitives, so
-this Draft must not be described as inventing a new physical loader.
-However, that call runs a **one-shot load/test/restore**, not the held
-three independent Path 2 stage transactions. Its legacy result schema
-also explicitly assumes external DUT/SWD **NOT_RUN**, and its loaded
-receipt/ownership checks require profile-specific hardware qualification.
-A PYNQ-Z2 image driving external SWD must not reuse the internal-only
-proof as authorization to connect or program Blue Pill.
+The example is **not an installed profile**. The authenticated source
+manifest must enumerate the profile, selected Python module, existing
+FPGA safeguards and Linux MMIO driver. Caller-provided paths, modules
+and shell commands are rejected. This is a single per-Z2 installed
+project selection, not another registry, service or Root Executor.
 
-The new `ImageProfile` and byte-level contract are an **offline immutable
-manifest/admission layer**. `supervised_one_shot` delegates the stage order
-to the existing `one_shot.run_sequence` and requires an externally
-injected, protected backend; it does not clone FPGA Manager writes.
+The existing F1-B Python module remains only as project-specific HIL
+implementation; it emits the now-shared receipt marker
+`PLASMA_PATH2_STAGE=` and the exact Project. The Stage Transport
+validates that Project along with the stage, current-boot identifier
+and allowlisted stage result. A prospective Blue Pill SWD DPIDR
+backend must implement its own independently verified target safety;
+it cannot inherit F1-B's Development-only risk exception.
 
-## Why this is not yet an operational generic Path 2 loader
+**Non-negotiable:** the installed Root Entry and Project module must
+independently enforce hardware ownership, AXI isolation, reliable
+current-boot image and recovery evidence, process/FPGA lock and electrical
+limits. A root-owned file manifest and CI green check cannot prove
+physical safety. Root installation and Z2 hardware operation remain
+**NOT_RUN**. This Draft must not be merged until Gate 2.
 
-The present trusted `scripts/plasma_development_stage_transport.py`
-still targets `/usr/local/libexec/plasma/z2-path2-f1b-root-entry`, and
-`pl/hil/path2_f1b_minimal_stage.py` implements held Download/Test/Restore
-for exactly F1-B. `scripts/plasma_path2_runtime_integration.py` also
-guards its Build and Stage project as `z2-fixed-unified-site1`.
-Replacing a filename to bypass those checks is prohibited.
+## Scope reduction
 
-The second step must be a separately code-reviewed **protected-root
-profile backend** and exact reviewed Work Order binding, reusing the
-current shared Runner/Stage Transport rather than adding an alternate
-privileged path. It must enforce root-owned source+firmware manifest,
-immutable source SHA, original-image hash, device/clock/driver/proc
-ownership and AXI safety, current boot and FPGA Manager state, durable
-intent before any write, bounded child/lock, and independently verified
-restoration. Development acceptance must include real SWPC/Z2 receipts
-before Gate 2 readiness; do not treat these mocked callbacks as that proof.
-
-### Direct Blue Pill application
-
-The requested project is
-`pl/projects/z2-bluepill-rbb` (Draft PR #1142) with a candidate 4-KiB
-GP0 aperture at `0x40008000`. Candidate BIT/HWH/BIN SHA256, original
-image current-boot availability, SWD wiring/VTref/GND, real DPIDR and
-program/readback remain **NOT_RUN / UNKNOWN**. The archived F1-B
-`base.bin` hash is not a live admission.
-
-No WEB testing, merge, deployment, SWPC/Z2/DUT operation or Flash writing
-is performed by this PR.
-
-## Gate 1 continued: generic Profile → existing held Provider contract
-
-The new `pl/hil/path2_generic_held_binding.py` **does not add a second
-lease engine**. It binds the already checked candidate/recovery bytes
-and source SHA to the existing exact `plasma_path2_persistent_lease`
-intent and `plasma_path2_held_provider` BIT/HWH/BIN provenance schema.
-The in-memory `HeldBinding` explicitly returns
-`hardware_authorized=False`, and no privileged execution endpoint,
-TargetPort factory, or real hardware authority exists here.
-
-**Important integration discovery:** `scripts/plasma_path2_held_provider.py`
-reuses F1-B-specific `read_f1b_identity_child`, while
-`plasma_path2_persistent_lease.test_evidence()` requires exactly 3
-readonly identity words (0x4D534C50 / 0x00010000 / 1). An external Blue
-Pill SWD DPIDR check has different semantics and **must be rejected**
-until a reviewed generic test adapter and independent physical admission
-are registered. Existing F1-B protected Root entry continues unchanged.
-
-No owner-supplied JSON Boolean, offline SHA256 or simulated receipt can
-substitute independent AXI isolation, passive electrical observation,
-current-boot recovery provenance or a trusted root executor. Current
-remaining blockers are still a real #1142 BIT/HWH/BIN build, reviewed
-protected per-Profile Root Port, safe physical SWD admission and authentic
-SWPC/Z2 HIL receipts.
-
-## Gate 1 continuation — executable read-only generic Z2 root preflight
-
-`pl/hil/path2_generic_root_preflight.py` provides a **real, reusable,
-non-actuating root-side preflight function** for a separately installed
-root-owned executor. It composes the existing `one_shot.verify_inputs`
-(root identity, native interpreter, protected file ownership and all
-BIT/HWH/BIN/recovery digest checks), `one_shot.clock_and_owner` (FCLK0,
-FPGA Manager, scoped driver/MMIO ownership), `service_snapshot` and
-`manager_last_load` for **the same boot**. It checks the protected JSON
-manifest against the reviewed Source SHA and profile and accepts only
-static, reviewed, aligned and non-overlapping Zynq GP0 apertures
-(such as `0x40008000/4096` for #1142), never a Work Order-selected
-arbitrary MMIO range.
-
-A successful run returns `status=NO_GO`, with a truthful readonly
-system inventory and distinct `UNPROVEN` / `NOT_ATTESTED` fields.
-Manager kernel logs do **not** attest loaded FPGA silicon, and protected
-file hashes do **not** prove AXI isolation or pin voltage.
-There is **no** registered privileged Runner stage or root installation
-in this PR. This helper never writes FPGA Manager, powers DUT or runs SWD.
-Host-only tests mock kernel readings and inspect the call sequence;
-their PASS must not be transposed into actual Z2 acceptance.
-
-This removes duplicated preflight logic and leaves the next *operational*
-gap narrowly defined: a trusted-main Dispatcher-to-installed-root
-Profile binding, independent current-boot/AXI and external SWD electrical
-admission, and a profile-specific DPIDR test executor. The existing
-F1-B `download/test/restore` stages remain unchanged and safe by default.
-
-
-### HWH-to-native-aperture validation (continued)
-
-The protected read-only Preflight now parses the **actual SHA-pinned**
-candidate HWH `MEMRANGE` records and requires exact instance, PS7
-`M_AXI_GP0`, 32-bit base and range equivalence to the separately
-reviewed source-defined `trusted_apertures` used by the native Linux
-MMIO ownership guard. Extra AXI regions, wrong bus, alias, offset
-or range mismatch block admission. A synthetic unit-test XML does not
-prove that Vivado produced such a handoff; actual #1142 generated
-BIT/HWH remains NOT_RUN. This additional schema check never writes
-FPGA Manager or authorizes external IO.
+The earlier PR #1143 `generic_image_loader`,
+`generic_held_binding`, `generic_root_preflight` wrappers and their
+three test modules were removed. They were source-only abstractions not
+connected to the existing trusted Root execution path. The retained
+change directly edits only existing trusted code and the existing Root
+Entry source, with no new Runner, Workflow, SSH path, sudo capability or
+alternative image loader.
