@@ -127,6 +127,52 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
             sandbox.CodexSandboxDenied("CODEX_SANDBOX_ERROR /home/private"))
         self.assertEqual(unsafe, "EXECUTION_ERROR")
 
+    def test_readonly_probe_launches_namespace_not_codex_or_device_operation(self):
+        import subprocess
+        from unittest.mock import call
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            with patch.object(sandbox, "codex_command", return_value=[
+                "bwrap", "--dev", "/dev", "--dev-bind",
+                "/dev/bus/usb", "/dev/bus/usb", "--chdir", str(work),
+                "--", "codex", "exec", "-"
+            ]) as builder, patch.object(subprocess, "run",
+                return_value=subprocess.CompletedProcess(
+                    ["bwrap"], 0, b"PATH3_NAMESPACE_VISIBLE\\n", b"")
+            ) as runner:
+                result = sandbox.readonly_probe(work)
+            builder.assert_called_once_with(work)
+            self.assertEqual(result["status"], "NAMESPACE_VISIBLE_ONLY")
+            self.assertEqual(result["hardware_io"], "NOT_RUN")
+            self.assertEqual(result["codex_model"], "NOT_RUN")
+            args = runner.call_args.args[0]
+            self.assertEqual(args[0], "bwrap")
+            self.assertEqual(args[args.index("--") + 1], sys.executable)
+            self.assertNotIn("codex", args)
+            self.assertEqual(runner.call_args.kwargs["timeout"], 20)
+            self.assertEqual(runner.call_args.kwargs["stdin"], subprocess.DEVNULL)
+
+    def test_readonly_probe_rejects_bad_exit_and_omits_stderr(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            with patch.object(sandbox, "codex_command",
+                              return_value=["bwrap", "--", "codex"]), \
+                 patch.object(subprocess, "run",
+                              return_value=subprocess.CompletedProcess(
+                                  ["bwrap"], 1, b"", b"secret /home/operator")):
+                result = sandbox.readonly_probe(work)
+            self.assertEqual(result["status"], "NOT_RUN_OR_FAIL")
+            self.assertEqual(result["reason"], "CODEX_SANDBOX_PROBE_FAILED")
+            self.assertNotIn("secret", str(result))
+            with patch.object(sandbox, "codex_command",
+                              side_effect=sandbox.CodexSandboxDenied(
+                                  "CODEX_SANDBOX_BWRAP_UNAVAILABLE")):
+                denied = sandbox.readonly_probe(work)
+            self.assertEqual(denied["reason"],
+                             "CODEX_SANDBOX_BWRAP_UNAVAILABLE")
+            self.assertEqual(sandbox.main(["--unknown"]), 2)
+
     def test_normal_path3_has_no_new_capability_or_session(self):
         import inspect
         source = inspect.getsource(dispatcher.parse_dynamic_work_order)
