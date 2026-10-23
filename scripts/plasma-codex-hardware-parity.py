@@ -30,23 +30,24 @@ LA_DIGEST = "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475"
 LA_BINARY = Path("/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage")
 LA_WRAPPER = Path("/usr/local/bin/plasma-la2016-sigrok")
 
-# Device group covers only already observed USB VID/PID and their FTDI serial
-# children. Match DEVTYPE so USB interfaces do not appear as extra devices.
-VID_PIDS = (
-    ("0403", "6010"),  # Xilinx FT2232 USB/JTAG/UART
-    ("8564", "4100"),  # Transcend USB2/USB3 companion Hub
-    ("77a1", "01a2"),  # KINGST LA2016
-)
+# Compatibility for exact managed-rule migration ONLY. Current Development
+# Mode no longer adds per-vendor VID/PID rules for USB/TTY device access.
+PREVIOUS_VID_PIDS = (("0403", "6010"), ("8564", "4100"), ("77a1", "01a2"))
 
 
-def render_rules(group: str = GROUP) -> str:
+def _group_name(group: str) -> None:
     if not group or not all(c.isalnum() or c in "-_" for c in group):
         raise ValueError("invalid device group")
+
+
+def render_previous_rules(group: str = GROUP) -> str:
+    """Exact v1 managed rules; only recognized as an atomic upgrade source."""
+    _group_name(group)
     items = [
         "# PLASMA SWPC prototype HIL: only owner-approved USB models",
         "# Both USB 2.x and 3.x companion hub identities intentionally match.",
     ]
-    for vid, pid in VID_PIDS:
+    for vid, pid in PREVIOUS_VID_PIDS:
         items.append(
             f'SUBSYSTEM=="usb", ENV{{DEVTYPE}}=="usb_device", '
             f'ATTR{{idVendor}}=="{vid}", ATTR{{idProduct}}=="{pid}", '
@@ -58,6 +59,24 @@ def render_rules(group: str = GROUP) -> str:
         f'GROUP="{group}", MODE="0660"'
     )
     return "\n".join(items) + "\n"
+
+
+def render_rules(group: str = GROUP) -> str:
+    """Owner's dedicated SWPC development USB/TTY equipment access.
+
+    This intentionally permits ALL USB device and USB serial nodes to the
+    dedicated group (0660, NOT world-writable). It includes storage/network
+    devices if attached: an explicit owner-accepted Development Mode tradeoff.
+    Actual permissions require a separately authorized root-only --apply.
+    """
+    _group_name(group)
+    return "\n".join([
+        "# PLASMA DEVELOPMENT MODE: generic USB and USB-serial access",
+        "# Private developer group only; not globally writable.",
+        f'SUBSYSTEM=="usb", ENV{{DEVTYPE}}=="usb_device", GROUP="{group}", MODE="0660"',
+        f'SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", GROUP="{group}", MODE="0660"',
+        f'SUBSYSTEM=="tty", KERNEL=="ttyUSB[0-9]*", GROUP="{group}", MODE="0660"',
+    ]) + "\n"
 
 
 def render_wrapper() -> str:
@@ -318,10 +337,39 @@ def install_appimage(source: Path) -> str:
     return install_exact(LA_WRAPPER, render_wrapper(), 0o755)
 
 
+def install_managed_usb_rules() -> str:
+    """Install new rules; replace only an exact, root-owned legacy rule file."""
+    state = file_state(RULE_FILE, render_rules())
+    if state in ("MISSING", "EXACT"):
+        return install_exact(RULE_FILE, render_rules(), 0o644)
+    legacy = file_state(RULE_FILE, render_previous_rules())
+    if legacy != "EXACT":
+        raise RuntimeError("unmanaged or conflicting udev rules, no overwrite")
+    info = RULE_FILE.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+            or (info.st_mode & 0o777) != 0o644):
+        raise RuntimeError("managed udev rule ownership/mode denied")
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                     dir=RULE_FILE.parent,
+                                     prefix=".plasma-stage-", delete=False) as staged:
+        staged.write(render_rules())
+        staged.flush()
+        os.fsync(staged.fileno())
+        name = staged.name
+    try:
+        os.chmod(name, 0o644)
+        os.replace(name, RULE_FILE)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+    return "UPGRADED_EXACT_LEGACY"
+
+
 def apply(appimage: Path | None = None) -> None:
     require_safe_admin()
-    # Reject unmanaged udev conflicts before making any group changes.
-    if file_state(RULE_FILE, render_rules()) not in ("MISSING", "EXACT"):
+    # Reject unmanaged udev conflicts before ANY group/device change.
+    if (file_state(RULE_FILE, render_rules()) not in ("MISSING", "EXACT")
+            and file_state(RULE_FILE, render_previous_rules()) != "EXACT"):
         raise RuntimeError("existing udev rule differs, no overwrite")
     if appimage is not None:
         if not appimage.is_file() or appimage.is_symlink() or sha256(appimage) != LA_DIGEST:
@@ -339,7 +387,7 @@ def apply(appimage: Path | None = None) -> None:
     for user in (OPERATOR, WORKER):
         if GROUP not in current_groups(user):
             run_admin(["usermod", "--append", "--groups", GROUP, user])
-    print("udev_rules=" + install_exact(RULE_FILE, render_rules(), 0o644))
+    print("udev_rules=" + install_managed_usb_rules())
     if appimage is not None:
         print("kingst_appimage=" + install_appimage(appimage))
     run_admin(["udevadm", "control", "--reload"])
@@ -353,15 +401,14 @@ def apply(appimage: Path | None = None) -> None:
 
 def self_test() -> None:
     rules = render_rules()
-    assert rules.count('SUBSYSTEM=="usb"') == 3
-    assert rules.count('SUBSYSTEM=="tty"') == 1
-    for vid, pid in VID_PIDS:
-        assert f'ATTR{{idVendor}}=="{vid}"' in rules
-        assert f'ATTR{{idProduct}}=="{pid}"' in rules
+    assert rules.count('SUBSYSTEM=="usb"') == 1
+    assert rules.count('SUBSYSTEM=="tty"') == 2
+    assert 'ttyACM[0-9]*' in rules
+    assert 'ttyUSB[0-9]*' in rules
+    assert 'ATTR{idVendor}' not in rules
+    assert 'ATTR{idProduct}' not in rules
     assert 'MODE="0660"' in rules
     assert 'MODE="0666"' not in rules
-    assert 'ATTRS{idVendor}=="0403"' in rules
-    assert 'ATTRS{idProduct}=="6010"' in rules
     assert 'sudo' not in rules
     assert render_wrapper().count("--appimage-extract-and-run") == 1
     try:
