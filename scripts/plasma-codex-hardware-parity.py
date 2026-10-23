@@ -136,7 +136,7 @@ def device_dac_comparison() -> dict:
 
     observed: dict[str, list[dict]] = {
         "z2_ft2232": [], "usb_hub_companions": [], "kingst_la2016": [],
-        "ft2232_tty": [],
+        "ft2232_tty": [], "all_usb_nodes": [], "all_usb_serial_nodes": [],
     }
 
     def append_metadata(label: str, node: Path) -> None:
@@ -167,15 +167,19 @@ def device_dac_comparison() -> dict:
                 entry / "idProduct"
             ).read_text().strip().lower()
             label = mapping.get(key)
-            if label is None:
-                continue
             bus = int((entry / "busnum").read_text())
             device = int((entry / "devnum").read_text())
-            append_metadata(label, Path(f"/dev/bus/usb/{bus:03d}/{device:03d}"))
+            node = Path(f"/dev/bus/usb/{bus:03d}/{device:03d}")
+            append_metadata("all_usb_nodes", node)
+            if label is not None:
+                append_metadata(label, node)
         except (OSError, ValueError):
             continue
 
-    for tty in Path("/sys/class/tty").glob("ttyUSB*"):
+    ttys = (list(Path("/sys/class/tty").glob("ttyUSB*")) +
+            list(Path("/sys/class/tty").glob("ttyACM*")))
+    for tty in ttys:
+        append_metadata("all_usb_serial_nodes", Path("/dev") / tty.name)
         try:
             parent = (tty / "device").resolve(strict=True)
             for component in (parent, *parent.parents):
