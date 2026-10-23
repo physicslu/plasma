@@ -98,3 +98,32 @@ current-boot recovery provenance or a trusted root executor. Current
 remaining blockers are still a real #1142 BIT/HWH/BIN build, reviewed
 protected per-Profile Root Port, safe physical SWD admission and authentic
 SWPC/Z2 HIL receipts.
+
+## Gate 1 continuation — executable read-only generic Z2 root preflight
+
+`pl/hil/path2_generic_root_preflight.py` provides a **real, reusable,
+non-actuating root-side preflight function** for a separately installed
+root-owned executor. It composes the existing `one_shot.verify_inputs`
+(root identity, native interpreter, protected file ownership and all
+BIT/HWH/BIN/recovery digest checks), `one_shot.clock_and_owner` (FCLK0,
+FPGA Manager, scoped driver/MMIO ownership), `service_snapshot` and
+`manager_last_load` for **the same boot**. It checks the protected JSON
+manifest against the reviewed Source SHA and profile and accepts only
+static, reviewed, aligned and non-overlapping Zynq GP0 apertures
+(such as `0x40008000/4096` for #1142), never a Work Order-selected
+arbitrary MMIO range.
+
+A successful run returns `status=NO_GO`, with a truthful readonly
+system inventory and distinct `UNPROVEN` / `NOT_ATTESTED` fields.
+Manager kernel logs do **not** attest loaded FPGA silicon, and protected
+file hashes do **not** prove AXI isolation or pin voltage.
+There is **no** registered privileged Runner stage or root installation
+in this PR. This helper never writes FPGA Manager, powers DUT or runs SWD.
+Host-only tests mock kernel readings and inspect the call sequence;
+their PASS must not be transposed into actual Z2 acceptance.
+
+This removes duplicated preflight logic and leaves the next *operational*
+gap narrowly defined: a trusted-main Dispatcher-to-installed-root
+Profile binding, independent current-boot/AXI and external SWD electrical
+admission, and a profile-specific DPIDR test executor. The existing
+F1-B `download/test/restore` stages remain unchanged and safe by default.
