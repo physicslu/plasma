@@ -297,12 +297,141 @@ class ResumeTwoJobOffline(unittest.TestCase):
                          "page-boundary-off-by-one")
         for key, value in (("scope", "guarded-hardware"),
                            ("session_resume", "any-session"),
-                           ("pr_number", 0),
+                           ("pr_number", -1),
                            ("capability", "cpu-only")):
             with self.subTest(key=key), self.assertRaises(dev.Denied):
                 parse(order | {key: value})
         with self.assertRaises(dev.Denied):
             parse(order | {"hardware_stages": ["flash"]})
+
+    def test_main_pinned_work_order_admission_and_fail_closed_variants(self):
+        order = {
+            "schema": dev.WORK_ORDER_SCHEMA,
+            "objective": "CPU-only page boundary cross-Job session resume.",
+            "acceptance": "Both authentic GitHub Jobs must preserve continuity.",
+            "execution_path": "path3-codex",
+            "capability": "codex-workspace",
+            "scope": "host-only",
+            "session_resume": "page-boundary-off-by-one",
+            "pr_number": 0,
+            "source_sha": SHA,
+        }
+        context = {
+            "GITHUB_EVENT_NAME": "issue_comment",
+            "GITHUB_ACTOR": "physicslu",
+            "GITHUB_REPOSITORY": "physicslu/plasma",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_SHA": SHA,
+        }
+        registry = {"schema_version": dev.VERSION, "mode": "development",
+                    "tasks": {}}
+
+        def event_for(candidate):
+            return {
+                "action": "created", "issue": {"number": 981},
+                "comment": {"id": 1001, "user": {"login": "physicslu"},
+                            "body": dev.WORK_ORDER_PREFIX +
+                                    json.dumps(candidate)},
+                "sender": {"login": "physicslu"},
+                "repository": {"full_name": "physicslu/plasma"},
+            }
+
+        event = event_for(order)
+        req = dev.request(event, context)
+        self.assertEqual(req["source_sha"], SHA)
+        self.assertEqual(req["trusted_sha"], SHA)
+        self.assertEqual(req["pr_number"], 0)
+        self.assertEqual(req["session_resume"], "page-boundary-off-by-one")
+        approved = dev.authorize(event, context, registry)
+        self.assertEqual(approved["pinned_sha"], SHA)
+        self.assertEqual(approved["trusted_sha"], SHA)
+        self.assertEqual(approved["pr_number"], 0)
+        self.assertEqual(approved["execution_capability"], "codex-workspace")
+        self.assertEqual(dev.task_for_request(registry, req, event)
+                         ["session_resume"], "page-boundary-off-by-one")
+
+        with self.assertRaisesRegex(dev.Denied,
+                                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH"):
+            dev.request(event, context | {"GITHUB_SHA": "f" * 40})
+        with self.assertRaisesRegex(dev.Denied, "EVENT_CONTEXT_DENIED"):
+            dev.request(event, context | {"GITHUB_REF": "refs/heads/other"})
+        with self.assertRaisesRegex(dev.Denied, "EVENT_CONTEXT_DENIED"):
+            dev.request(event, context | {"GITHUB_ACTOR": "untrusted"})
+        for altered in (
+            {k: v for k, v in order.items() if k != "source_sha"},
+            order | {"source_sha": "f" * 40},
+            order | {"source_sha": "short"},
+            order | {"pr_number": True},
+            order | {"pr_number": -1},
+            order | {"scope": "guarded-hardware"},
+            order | {"session_resume": "another-fixture"},
+            order | {"capability": "path2-stage-contract"},
+            order | {"hardware_stages": ["flash"]},
+        ):
+            with self.subTest(altered=altered), self.assertRaises(dev.Denied):
+                dev.request(event_for(altered), context)
+        # The original PR-based flow is still restricted to an OPEN PR.
+        pr_req = req | {"pr_number": 1134, "source_sha": "f" * 40}
+        closed_pr = {
+            "number": 1134, "state": "closed", "merged_at": "2026-10-23",
+            "user": {"login": "physicslu"},
+            "head": {"ref": "agent/test", "sha": "f" * 40,
+                     "repo": {"full_name": "physicslu/plasma"}},
+            "base": {"ref": "main",
+                     "repo": {"full_name": "physicslu/plasma"}},
+        }
+        with self.assertRaisesRegex(dev.Denied, "PR_NOT_OPEN"):
+            dev.verify_pr(closed_pr, pr_req)
+
+    def test_main_pinned_runner_binding_and_two_job_continuity(self):
+        main_req = dict(self.req, pr_number=0, source_sha=SHA,
+                        trusted_sha=SHA)
+        context = {
+            "GITHUB_JOB": "development-codex",
+            "GITHUB_RUN_ID": "123456",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_EVENT_NAME": "issue_comment",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_SHA": SHA,
+            "RUNNER_NAME": "SWPC-plasma-codex",
+            "RUNNER_ENVIRONMENT": "self-hosted",
+        }
+        with patch.object(flow.os, "geteuid", return_value=1000), \
+             patch.object(flow.probe, "git_state", return_value=(SHA, [])):
+            bound = flow.runner_binding("new", main_req, self.repo, context)
+            self.assertEqual(bound["source_sha"], bound["trusted_sha"])
+            for key, value in (
+                ("GITHUB_SHA", "f" * 40),
+                ("GITHUB_REF", "refs/heads/feature"),
+                ("GITHUB_EVENT_NAME", "workflow_dispatch"),
+            ):
+                with self.subTest(key=key):
+                    with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_MAIN_SHA_MISMATCH"
+                    ):
+                        flow.runner_binding("new", main_req, self.repo,
+                                            context | {key: value})
+            for edited in (
+                main_req | {"trusted_sha": "f" * 40},
+                main_req | {"source_sha": "f" * 40},
+                main_req | {"pr_number": -1},
+            ):
+                with self.subTest(req=edited), self.assertRaises(
+                    flow.ResumeDenied
+                ):
+                    flow.runner_binding("new", edited, self.repo, context)
+
+        # Verify the same private state/Thread proof path works for main mode.
+        self.req = main_req
+        self.binding["trusted_sha"] = SHA
+        first = self.phase("new")
+        self.assertEqual(first["status"], "NEW_EXPECTED_TEST_FAIL")
+        self.clean_second_checkout()
+        second = self.phase("resume")
+        self.assertEqual(second["status"], "RESUME_FIX_PASS")
+        self.assertEqual(second["continuity"], "VERIFIED")
+        self.assertEqual(first["thread_id_sha256"], second["thread_id_sha256"])
+        self.assertEqual(self.calls, ["new", "resume"])
 
     def test_only_existing_workflow_and_runner(self):
         wf = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
