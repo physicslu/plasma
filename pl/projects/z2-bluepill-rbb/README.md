@@ -8,6 +8,26 @@ and imports 18 exact Git blobs from Draft PR #1126, excluding its stale
 independent qualification of those copied modules. Never merge both PRs
 without resolving the duplicate patches and doing a fresh delta review.
 
+## Direct PS → PL SWD first (WEB explicitly deferred)
+
+Engineering execution order is now **direct PS/PL SWD**, *not* WEB
+\`/api/jobs\`: Z2 Linux PS → existing owner-admitted native word-port →
+PS7 GP0 AXI GPIO → PMODB JB[0]/JB[1] → STM32F103C8T6.
+The host workflow tests upstream real OpenOCD against a separate virtual
+SWD target, plus actual RTL simulation and native regular-file word-port
+contracts. This deliberately does not execute the WEB admission, WEB Job
+or WEB-to-OpenOCD test cases. Their earlier evidence is historical only.
+
+The physical HIL sequence is staged: first prove trusted Z2 boot and PS/PL
+BIT/HWH/source identity with the original FPGA image recoverable; then
+independently confirm VTref/GND and SWDIO turnaround, directly read a real
+Blue Pill DPIDR via PS/PL, and only then consider a bounded owner-authorized
+Flash erase/program/readback SHA256 compare. **Do not erase or modify a
+connected chip without a separately reviewed physical admission and the
+current hardware scope.** The existing Gate 1 explicitly forbids loading
+FPGA, SWPC/Z2/Blue Pill operation or Flash writing. Any such activity is a
+material scope change requiring revised Gate 1 approval under AGENTS.md.
+
 ## Exact single-Site design
 
 WEB /api/jobs → PS Protocol v3.3 / SiteWorker → opt-in real OpenOCD 0.12.0+dev

@@ -1,4 +1,4 @@
-name: Blue Pill OpenOCD SWD remote-bitbang PoC (Host only)
+name: Blue Pill PS/PL direct SWD remote-bitbang (Host only)
 on:
   pull_request:
     paths:
@@ -49,10 +49,6 @@ jobs:
           python -m pip install -e ./software/python
       - name: Host-only remote_bitbang wire and negative tests
         run: python -m pytest -q software/python/tests/test_bluepill_remote_bitbang.py
-      - name: WEB REST to real PS route pre-admission (no hardware)
-        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_admission.py
-      - name: WEB REST to SiteWorker opt-in PoC executor integration (synthetic host only)
-        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_job.py
       - name: Z2 candidate word-port and HWH source contract (no hardware)
         run: |
           python -m pytest -q software/python/tests/test_bluepill_z2_word_port_host.py
@@ -67,10 +63,6 @@ jobs:
         env:
           PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
         run: python -m pytest -q software/python/tests/test_bluepill_openocd_virtual_target.py
-      - name: Real OpenOCD via WEB/PS/SiteWorker must fail on IDR-only target
-        env:
-          PLASMA_BLUEPILL_OPENOCD: build/bluepill-openocd/runtime/bin/openocd
-        run: python -m pytest -q software/python/tests/test_bluepill_web_ps_real_openocd.py
       - name: Publish source and SWD adapter admission evidence
         if: always()
         uses: actions/upload-artifact@v4
