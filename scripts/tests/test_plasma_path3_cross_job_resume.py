@@ -92,6 +92,7 @@ class ResumeTwoJobOffline(unittest.TestCase):
                 stage, self.req, self.repo, env={},
                 state_root=self.private, executor=self.fake_codex,
                 command_builder=self.fake_command,
+                test_runner=lambda _workspace, scratch: self.fake_test(scratch),
                 nonce_factory=lambda: NONCE)
 
     def clean_second_checkout(self):
@@ -197,6 +198,9 @@ class ResumeTwoJobOffline(unittest.TestCase):
             with self.assertRaisesRegex(flow.ResumeDenied,
                                         "RESUME_BWRAP_OR_CODEX_UNAVAILABLE"):
                 flow.isolated_command(self.repo, self.private, None)
+            with self.assertRaisesRegex(flow.ResumeDenied,
+                                        "RESUME_TEST_BWRAP_UNAVAILABLE"):
+                flow.isolated_unittest(self.repo, self.repo / flow.probe.ROOT_FOLDER)
 
     def test_only_existing_workflow_and_runner(self):
         wf = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
