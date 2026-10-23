@@ -51,6 +51,44 @@ Compare operator/worker permissions and the existing KINGST AppImage state witho
 
 Z2 SSH access: configure a **separate owner-authorized worker credential or key** in the `plasma-codex` private HOME using the established Z2 credential interface. Do not blindly copy the operator's whole `.ssh` or private credential file. The host script never accesses secrets.
 
+## Current USB Hub / Z2 power topology (owner-reported, 2026-10-23)
+
+This is a **current read-only observation**, not a fixed software port
+allowlist and not authorization to switch power. It supersedes the **port
+assignment**, not the historical evidence, from
+[`hil-hardware-inventory.md`](hil-hardware-inventory.md) (2026-10-15).
+
+- Transcend hub USB2 companion `1-1` and USB3 companion `2-1` are the
+  same physical hub (8564:4100; `ppps`). `uhubctl` **without action
+  arguments** reported `power` on all four ports of both companions.
+- **Current** physical USB2 Port 1 = ST-LINK V3; Port 2 = PLASMA Blue Pill
+  CDC; Port 3 = **Z2 FT2232 JTAG/UART** (`1-1.3`); Port 4 = KINGST
+  LA2016 (`1-1.4`). Historic `Port 2 = Z2` is no longer valid.
+- Z2 AX88179 USB Ethernet currently enumerates directly under SWPC `2-8`,
+  **not under this Transcend hub**; avoid the old Port 3 = Ethernet assumption.
+- Owner states **Z2 Power OFF**, but `Port 3 power` and FT2232 enumeration
+  prove only the hub's USB side, **not** Zynq PS boot or board power rails.
+- Official [Xilinx PYNQ-Z2 setup](https://pynq.readthedocs.io/en/v2.5/getting_started/pynq_z2_setup.html)
+  requires the **SW1 power switch ON** for boot, and the power-source
+  **J9 jumper** is set to **USB** or **REG** depending on source; the
+  [TUL PYNQ-Z2 manual](https://dpoauwgwqsy2x.cloudfront.net/Download/PYNQ_Z2_User_Manual_v1.1.pdf)
+  also identifies USB J8, external DC1 and J7 VIN as distinct power-source
+  routes. **Current physical J9, SW1, DC1, J7/VIN and power-rail states
+  have not been observed.**
+- Historical Port 2 or Port 3 `uhubctl -a off/on` commands must never be
+  copied into current HIL tasks: Port 2 now selects Blue Pill USB and
+  Port 3 selects Z2 FT2232; neither equates to Z2 whole-board power.
+  The direct USB Ethernet path is outside that hub. A hub's `ppps`
+  capability alone does not qualify physical VBUS removal or recovery.
+
+**Bounded next step:** observe the actual **J9** selection, **SW1** position,
+external **DC1/J7** source and recovery setup **without moving any
+switch/jumper/cable**, and record findings privately with only sanitized
+summary in PR. Until that hardware state and independent recovery are
+verified, no hub ON/OFF, Z2 boot, UART login, JTAG operation, MMIO, FPGA
+Manager or DUT action is qualified as part of this Port/power audit.
+No new Path/Mode/Session/Runner or per-device USB admission logic is needed.
+
 ## Bounded nondestructive acceptance
 
 1. Re-run dedicated-worker inventory to verify actual USB and tty permissions, and query `uhubctl` status **without toggling power**.
