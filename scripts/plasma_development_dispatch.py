@@ -228,7 +228,8 @@ def parse_dynamic_work_order(event: object) -> dict:
                     and scope == "host-only"
                     and set(order) <= base | optional_ref | {"session_resume"}
                     and type(order.get("pr_number")) is int
-                    and order["pr_number"] > 0,
+                    and order["pr_number"] >= 0
+                    and "source_sha" in order,
                     "WORK_ORDER_RESUME_SCOPE_DENIED")
         else:
             require(capability == "codex-workspace" and
@@ -267,6 +268,12 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_SOURCE_DENIED")
+    elif order.get("session_resume") == "page-boundary-off-by-one":
+        # Exception for this exact CPU-only post-merge diagnostic only.
+        # Main pinning is checked against trusted GITHUB_SHA by request().
+        require(type(order.get("source_sha")) is str and
+                SHA40.fullmatch(order["source_sha"]) is not None,
+                "WORK_ORDER_RESUME_MAIN_SHA_REQUIRED")
     else:
         require("source_sha" not in order,
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
@@ -345,6 +352,11 @@ def request(event: object, context: dict) -> dict:
             "COMMAND_DENIED")
     if body.startswith(WORK_ORDER_PREFIX):
         order = parse_dynamic_work_order(event)
+        if (order.get("session_resume") == "page-boundary-off-by-one" and
+                order["pr_number"] == 0):
+            # Never admit a different main commit, branch or omitted pin.
+            require(order["source_sha"] == sha,
+                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH")
         return {
             "task_id": DYNAMIC_TASKS[order["execution_path"]],
             "auto_download_after_build_success": False,
