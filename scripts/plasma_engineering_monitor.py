@@ -56,7 +56,7 @@ MAX_DISPLAY_COLUMNS = 100
 MONITOR_STAGES = frozenset({
     "CPU-only CLI", "Native preflight", "Vivado host build",
     "Guarded Download", "Guarded Test", "Guarded Restore",
-    "Guarded Full HIL",
+    "Guarded Full HIL", "Codex workspace",
 })
 STATIC_GUARDED_STAGES = {
     "z2-path2-download": "Guarded Download",
@@ -181,9 +181,14 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
          WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None) or
         STATIC_GUARDED_STAGES.get(task) == stage
     )
-    if (path != "path2" or type(stage) is not str or
-            stage not in MONITOR_STAGES or
-            (guarded and not guarded_verified)):
+    if path == "path3":
+        # Validated Work Order category, NOT an inferred Vivado/build phase.
+        stage = ("Codex workspace" if task == "path3-work-order" and
+                 WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None
+                 else "")
+    elif (type(stage) is not str or stage not in MONITOR_STAGES or
+          stage == "Codex workspace" or
+          (guarded and not guarded_verified)):
         stage = ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
@@ -337,9 +342,8 @@ def render_snapshot(directory: Path, path: str, *,
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    lines = [name,
-             "KEYS: C Clear | %s 1/2 Switch" % prefix,
-             "      %s D Detach" % prefix,
+    lines = ["%s | C Clear | %s 1/2 Switch | %s D Detach" %
+             (name, prefix, prefix),
              "=" * 35,
              "STATUS: %s    RUN: %s" % (status, state.get("run_id", "-")),
              "TASK: %s" % state.get("task", "-")]
@@ -355,10 +359,12 @@ def render_snapshot(directory: Path, path: str, *,
             lines.append("GOAL: " + summary)
         else:
             lines.append("GOAL: (operator summary not provided)")
-    if path == "path2":
-        stage = state.get("monitor_stage", "")
-        lines.append("STAGE: " + stage if type(stage) is str and
-                     stage in MONITOR_STAGES else "STAGE: (not available)")
+    stage = state.get("monitor_stage", "")
+    if (type(stage) is not str or stage not in MONITOR_STAGES or
+        (path == "path3" and stage != "Codex workspace") or
+        (path == "path2" and stage == "Codex workspace")):
+        stage = ""
+    lines.append("STAGE: " + (stage or "(not available)"))
     if status == "RUNNING":
         started = state.get("started", "")
         try:
@@ -368,7 +374,8 @@ def render_snapshot(directory: Path, path: str, *,
         except (TypeError, ValueError):
             pass
     else:
-        lines.append("LAST: %s  EXIT: %s" %
+        # The monitor wrapper's return code is NOT a verification receipt.
+        lines.append("WRAPPER: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
     if path in PATHS:
         clock = dt.datetime.now().astimezone() if now is None else now
@@ -385,36 +392,37 @@ def render_snapshot(directory: Path, path: str, *,
     if height is not None:
         # Preserve at least one latest log row plus a spare bottom row.
         # Sacrifice decoration before truncating trusted status/goal/stage.
-        for decoration in (
-                "-" * 35, "", "      %s D Detach" % prefix,
-                "KEYS: C Clear | %s 1/2 Switch" % prefix):
+        for decoration in ("-" * 35, ""):
             if height > len(lines) + 1:
                 break
             if decoration in lines:
                 lines.remove(decoration)
+    # Scan more than the visible tail so a prior observed failure survives
+    # subsequent successful steps. This is bounded history, not a receipt.
+    # The actual task result and failure cause remain in GitHub evidence.
+    history_lines = []
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
             raise OSError("invalid log")
         with log_file.open("rb") as f:
             st = os.fstat(f.fileno())
-            start = max(0, st.st_size - 32768)
+            scan_start = max(0, st.st_size - 524288)
+            f.seek(scan_start)
+            history_lines = f.read().decode("utf-8", errors="replace").splitlines()
+            log_lines = history_lines[-30:]
             if clear_from is not None:
                 dev, ino, offset, run_start = clear_from
                 if ((st.st_dev, st.st_ino, state.get("started")) ==
                         (dev, ino, run_start) and st.st_size >= offset):
-                    start = max(start, offset)
-                # A new job/log or truncated log is new content, not old history.
-            f.seek(start)
-            log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
+                    f.seek(max(scan_start, offset))
+                    log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
     except OSError:
         log_lines = ["(no local output yet)"]
-    # Only the trusted producer can emit these operator-public records.
-    # Revalidate them on read; malformed/untrusted log rows are not parsed
-    # into commands, files or terminal control sequences.
-    activity_rows = []
     active_items = {}
+    last_step = None
+    last_error = None
     last_sequence = 0
-    for original in log_lines:
+    for original in history_lines:
         event = engineering_activity.parse_public_line(original)
         if event is None or event["seq"] <= last_sequence:
             continue
@@ -423,15 +431,26 @@ def render_snapshot(directory: Path, path: str, *,
             active_items[event["id"]] = event
         else:
             active_items.pop(event["id"], None)
-        outcome = event["state"]
+            last_step = event
+            if event["state"] == "FAIL":
+                last_error = event
+
+    def _step_label(event: dict) -> str:
+        result = event["state"]
         if event["exit_code"] is not None:
-            outcome += " (exit %d)" % event["exit_code"]
-        activity_rows.append(
-            "%s [%s] %s %s | %s" %
-            (event["time"], event["source"], event["kind"],
-             outcome, event["detail"]))
+            result += " (exit %d)" % event["exit_code"]
+        return "[%s] %s %s | %s" % (
+            event["source"], event["kind"], result, event["detail"])
+
+    activity_rows = []
+    visible_sequence = 0
+    for original in log_lines:
+        event = engineering_activity.parse_public_line(original)
+        if event is None or event["seq"] <= visible_sequence:
+            continue
+        visible_sequence = event["seq"]
+        activity_rows.append("%s %s" % (event["time"], _step_label(event)))
     if activity_rows:
-        # Trust class C = Codex JSON event, never VERIFIED receipt.
         log_lines = activity_rows[-30:]
     else:
         # Invalid structured records are never echoed as raw terminal lines.
@@ -440,8 +459,32 @@ def render_snapshot(directory: Path, path: str, *,
             if not line.startswith(engineering_activity.PREFIX)]
     if status == "RUNNING" and active_items:
         last = next(reversed(active_items.values()))
-        doing = "%s | %s" % (last["kind"], last["detail"])
-        lines[lines.index("DOING: —")] = "DOING: " + doing
+        lines[lines.index("DOING: —")] = (
+            "DOING: %s | %s" % (last["kind"], last["detail"]))
+    insert_at = lines.index("DOING: —") + 1 if "DOING: —" in lines else (
+        next(i for i, line in enumerate(lines) if line.startswith("DOING:")) + 1)
+    if last_step is not None:
+        lines.insert(insert_at, "LAST STEP: " + _step_label(last_step))
+        insert_at += 1
+    if last_error is not None:
+        lines.insert(insert_at, "LAST ERROR: " + _step_label(last_error))
+    if height is not None:
+        # Keep diagnostic failures ahead of optional last-step and decoration.
+        # A short pane still reserves one physical row for recent output.
+        while len(lines) > max(0, height - 2):
+            optional = next((i for i, line in enumerate(lines)
+                             if line.startswith("LAST STEP:")), None)
+            if optional is not None:
+                lines.pop(optional)
+            elif "" in lines:
+                lines.remove("")
+            elif "-" * 35 in lines:
+                lines.remove("-" * 35)
+            elif any(line.startswith("LAST ERROR:") for line in lines):
+                # Short panes must retain the observed failure, if present.
+                break
+            else:
+                break
     if height is not None:
         # Reserve the bottom row to prevent tmux scrolling on a repaint.
         visible_log_rows = max(0, height - 1 - len(lines))
