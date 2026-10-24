@@ -55,7 +55,7 @@ class FailureCodes(unittest.TestCase):
         for host in ('-option','bad host','host;id','host\nsecret',''):
             with patch.object(t.pwd,'getpwuid',return_value=Mock(pw_name=t.WORKER)), \
                  patch.object(t.os,'geteuid',return_value=1000), \
-                 patch.object(t,'private_json',side_effect=[{'ssh_host':host,'ssh_username':'xilinx','ssh_password':'fake'}, {'sudo_password':'fake'}]), \
+                 patch.object(t,'private_json',return_value={'ssh_host':host,'ssh_username':'xilinx','ssh_password':'fake'}), \
                  patch.object(t.subprocess,'Popen') as launch:
                 with self.assertRaisesRegex(t.Blocked,'SSH_OR_SUDO_ROUTE_NOT_ENROLLED'):
                     t.execute('test',SHA,TASK['project'])

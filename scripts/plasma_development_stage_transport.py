@@ -27,7 +27,6 @@ HOME = Path("/home/plasma-codex")
 PRIVATE = HOME / ".config/plasma"
 LOGIN = PRIVATE / "z2-login-smoke.json"
 KNOWN_HOSTS = PRIVATE / "z2-login-known_hosts"
-SUDO = PRIVATE / "z2-swd05-oneshot.json"
 ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"
 MARK = "PLASMA_PATH2_STAGE="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
@@ -161,17 +160,20 @@ def private_json(path: Path) -> dict:
 def enrollment() -> tuple[str, str, str]:
     need(pwd.getpwuid(os.geteuid()).pw_name == WORKER and
          os.geteuid() != 0, "SWPC_RUNNER_IDENTITY_DENIED")
+    # The ONLY Z2 login/sudo credential file shared by Path 2 and Path 3.
+    # Do not select another host through a legacy per-task or operator file.
     ssh = private_json(LOGIN)
-    sudo = private_json(SUDO)
-    need(type(ssh) is dict and set(ssh) == {
-         "ssh_host", "ssh_username", "ssh_password"} and
+    sudo_password = ssh.get("sudo_password", ssh.get("ssh_password")) \
+        if type(ssh) is dict else None
+    need(type(ssh) is dict and
+         {"ssh_host", "ssh_username", "ssh_password"} <= set(ssh) <=
+         {"ssh_host", "ssh_username", "ssh_password", "sudo_password"} and
          ssh["ssh_username"] == "xilinx" and
          type(ssh["ssh_host"]) is str and
          re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,250}", ssh["ssh_host"]) and
          type(ssh["ssh_password"]) is str and ssh["ssh_password"] and
-         type(sudo) is dict and
-         type(sudo.get("sudo_password")) is str and
-         sudo["sudo_password"], "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
+         type(sudo_password) is str and sudo_password,
+         "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
     kh = KNOWN_HOSTS.lstat()
     need(stat.S_ISREG(kh.st_mode) and
          kh.st_uid == os.geteuid() and
@@ -181,7 +183,7 @@ def enrollment() -> tuple[str, str, str]:
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         check=False, timeout=5)
     need(chk.returncode == 0, "HOST_KEY_NOT_PINNED")
-    return ssh["ssh_host"], ssh["ssh_password"], sudo["sudo_password"]
+    return ssh["ssh_host"], ssh["ssh_password"], sudo_password
 
 
 def execute(stage: str, source_sha: str, project: str) -> dict:

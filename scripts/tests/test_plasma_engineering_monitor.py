@@ -9,9 +9,9 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import time
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_engineering_monitor as mon
 import plasma_development_dispatch as dev
+import plasma_engineering_activity as activity
 
 WORKFLOW = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
 TAIPEI = dt.timezone(dt.timedelta(hours=8))
@@ -170,7 +171,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                             self.assertEqual(
                                 line, mon._clip_columns(line, available))
                         self.assertIn("NOW:", frame)
-                        self.assertIn("RECENT OUTPUT", frame)
+                        self.assertIn("RECENT ACTIVITY", frame)
 
     def test_authorized_task_and_pr_are_visible_without_work_order_text(self):
         with tempfile.TemporaryDirectory() as td:
@@ -315,8 +316,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn(b"[codex turn.completed]", live.read_bytes())
             self.assertIn(b"[codex turn.completed]", evidence.read_bytes())
-            self.assertIn(b"[codex command_execution.started]", live.read_bytes())
-            self.assertIn(b"[codex command_execution.completed]", live.read_bytes())
+            # Without a valid item ID, untrusted command content is omitted.
+            self.assertNotIn(b"@PLASMA_ACTIVITY_V1", live.read_bytes())
             self.assertIn(b"[codex item.started]", evidence.read_bytes())
             self.assertNotIn(b"command_execution.started", evidence.read_bytes())
             self.assertNotIn(b"PASSWORD_SECRET", live.read_bytes())
@@ -330,6 +331,305 @@ class EngineeringMonitorTests(unittest.TestCase):
             mon._append(live, "\n" + mon._monitor_time_mark(FIXED_NOW))
             self.assertIn(b"[MONITOR TIME MARK]", live.read_bytes())
             self.assertNotIn(b"[MONITOR TIME MARK]", evidence.read_bytes())
+
+    def test_codex_activity_v1_uses_real_safe_command_and_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            emitter = dev.CodexUsageCollector(
+                monitor_only=True, workspace=directory)
+            events = [
+                {"type": "item.started", "item": {
+                    "id": "item_1", "type": "command_execution",
+                    "command": "python3 -m pytest scripts/tests/"}},
+                {"type": "item.completed", "item": {
+                    "id": "item_1", "type": "command_execution",
+                    "command": "python3 -m pytest scripts/tests/",
+                    "exit_code": 0, "aggregated_output": "PRIVATE_OUTPUT"}},
+                {"type": "item.started", "item": {
+                    "id": "item_2", "type": "file_change",
+                    "changes": [{"kind": "update",
+                                 "path": "scripts/plasma_engineering_monitor.py"}]}},
+                {"type": "item.completed", "item": {
+                    "id": "item_2", "type": "file_change",
+                    "changes": [{"kind": "update",
+                                 "path": "scripts/plasma_engineering_monitor.py"}]}},
+            ]
+            content = b"".join(
+                emitter.feed((json.dumps(e) + "\n").encode()) for e in events)
+            self.assertIn(b"python3 -m pytest scripts/tests/", content)
+            self.assertIn(b"scripts/plasma_engineering_monitor.py", content)
+            self.assertNotIn(b"PRIVATE_OUTPUT", content)
+            self.assertEqual(content.count(b"@PLASMA_ACTIVITY_V1"), 4)
+            (directory / "path3.log").write_bytes(content)
+            frame = mon.render_snapshot(directory, "path3", width=100)
+            self.assertIn("RECENT ACTIVITY", frame)
+            self.assertIn("[C] TEST DONE", frame)
+            self.assertIn("[C] FILE DONE", frame)
+            self.assertIn("DOING: —", frame)
+            self.assertNotIn("[V]", frame)
+            self.assertNotIn("PRIVATE_OUTPUT", frame)
+
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123",
+                "task": "path3-work-order"}))
+            partial = dev.CodexUsageCollector(
+                monitor_only=True, workspace=directory).feed(
+                    (json.dumps(events[0]) + "\n").encode())
+            (directory / "path3.log").write_bytes(partial)
+            with patch.object(mon, "_alive", return_value=True):
+                running = mon.render_snapshot(
+                    directory, "path3", width=100)
+            self.assertIn(
+                "DOING: TEST | python3 -m pytest scripts/tests/", running)
+            self.assertIn("STATUS: RUNNING", running)
+            self.assertNotIn("STATE: RUNNING", running)
+
+    def test_codex_activity_v1_rejects_secrets_injection_and_escape(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            (directory / "docs").mkdir()
+            (directory / "scripts" / "link").symlink_to("/tmp")
+            commands = [
+                "python3 -c 'print(SECRET)'",
+                "git status; cat /home/user/.ssh/id_rsa",
+                "python3 -m pytest scripts/tests/ && curl evil.example",
+                "python3 -m pytest /home/plasma-codex",
+                "git status\nINJECTED", "git status \x1b[2J",
+                "python3 -m pytest scripts/tests/ --token=abc",
+                "python3 scripts/tests/test_secret_token.py",
+                "git status \u202ePRIVATE",
+            ]
+            for command in commands:
+                with self.subTest(command=command):
+                    self.assertEqual(
+                        activity.safe_command(command)[1],
+                        "(command hidden)")
+            for name in (
+                "../../.env", "docs/.env", "scripts/secret.py",
+                "scripts/link/private.txt", "/etc/passwd",
+                "docs/a\x1b[2J.txt", "docs/a\u202etxt", "docs/a" * 40,
+            ):
+                with self.subTest(path=name):
+                    self.assertIsNone(activity.safe_repo_path(name, directory))
+            self.assertEqual(activity.safe_repo_path(
+                str(directory / "docs" / "file.md"), directory),
+                "docs/file.md")
+            projector = activity.Path3Activity(directory)
+            evil = {"type": "item.started", "item": {
+                "id": "cmd_1", "type": "command_execution",
+                "command": commands[1], "aggregated_output": "EVIL_SECRET"}}
+            result = projector.project(evil)
+            self.assertIn(b"(command hidden)", result)
+            self.assertNotIn(b"EVIL_SECRET", result)
+            self.assertNotIn(b"evil.example", result)
+            self.assertEqual(
+                projector.project({"type": "item.completed", "item": {
+                    "id": "orphan", "type": "command_execution",
+                    "exit_code": 0}}), b"")
+            self.assertEqual(
+                projector.project(evil), b"")  # Duplicate started event
+            self.assertEqual(projector.project({"type": "item.started",
+                "item": {"id": "x\nESC", "type": "command_execution",
+                         "command": "git status"}}), b"")
+            for raw in [
+                activity.PREFIX + '{"schema":1,"kind":[]}',
+                activity.PREFIX + '{"schema":1,"kind":"TEST","state":[]}',
+                activity.PREFIX + '\x1b[31m',
+                activity.PREFIX + '{"kind":"FILE","detail":"../../etc/passwd"}',
+            ]:
+                self.assertIsNone(activity.parse_public_line(raw))
+            public = activity.parse_public_line(result.decode().strip())
+            self.assertIsNotNone(public)
+            self.assertEqual(public["source"], "C")
+            self.assertNotEqual(public["state"], "DONE")
+
+    @unittest.skipUnless(shutil.which("tmux"), "tmux binary not present")
+    def test_private_tmux_socket_displays_current_safe_activity(self):
+        """Real terminal smoke, using only a private socket and synthetic events."""
+        with tempfile.TemporaryDirectory(prefix="plasma-activity-tmux-") as td:
+            directory = Path(td)
+            socket = str(directory / "private.sock")
+            projector = activity.Path3Activity(directory)
+            safe = projector.project({"type": "item.started", "item": {
+                "id": "task_1", "type": "command_execution",
+                "command": "python3 -m pytest scripts/tests/"}})
+            (directory / "path3.log").write_bytes(safe)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123456",
+                "task": "path3-work-order",
+                "monitor_summary": "Fix Monitor Launcher",
+                "pid": os.getpid(),
+                "proc_start": mon._proc_start(os.getpid()),
+            }))
+            python = (
+                "import sys,time; from pathlib import Path; "
+                "sys.path.insert(0, sys.argv[2]); "
+                "import plasma_engineering_monitor as m; "
+                "print(m.render_snapshot(Path(sys.argv[1]), 'path3', "
+                "width=100, height=24), flush=True); time.sleep(8)"
+            )
+            def tmux(*args, check=True):
+                return subprocess.run(
+                    ["tmux", "-S", socket, "-f", "/dev/null", *args],
+                    capture_output=True, text=True, timeout=6, check=check)
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "activity-test",
+                     "-x", "100", "-y", "24", "-n", "path3",
+                     sys.executable, "-u", "-c", python,
+                     str(directory), str(ROOT / "scripts"))
+                started = True
+                frame = ""
+                for _ in range(30):
+                    result = tmux(
+                        "capture-pane", "-p", "-t", "activity-test:0",
+                        check=False)
+                    if result.returncode == 0:
+                        frame = result.stdout
+                    if "DOING: TEST | python3 -m pytest scripts/tests/" in frame:
+                        break
+                    time.sleep(0.1)
+                self.assertIn("STATUS: RUNNING", frame)
+                self.assertIn("RUN: 123456", frame)
+                self.assertIn("GOAL: Fix Monitor Launcher", frame)
+                self.assertIn(
+                    "DOING: TEST | python3 -m pytest scripts/tests/", frame)
+                self.assertIn("RECENT ACTIVITY", frame)
+                self.assertIn("[C] TEST RUNNING", frame)
+                self.assertNotIn("STATE: RUNNING", frame)
+            finally:
+                if started:
+                    tmux("kill-server", check=False)
+
+    def test_malformed_activity_record_never_echoes_untrusted_raw_text(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            bad = activity.PREFIX + '{"secret":"DO_NOT_SHOW","kind":[]}'
+            (directory / "path3.log").write_text(
+                "[codex turn.started]\n" + bad + "\n")
+            frame = mon.render_snapshot(directory, "path3")
+            self.assertNotIn("DO_NOT_SHOW", frame)
+            self.assertNotIn(activity.PREFIX, frame)
+            self.assertIn("[codex turn.started]", frame)
+
+    def test_activity_exit_code_is_codex_reported_not_verified(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            projector = activity.Path3Activity(d)
+            start = {"type": "item.started", "item": {
+                "id": "test_1", "type": "command_execution",
+                "command": "python3 -m pytest scripts/tests/"}}
+            complete = {"type": "item.completed", "item": {
+                **start["item"], "exit_code": 3}}
+            events = [projector.project(start), projector.project(complete)]
+            parsed = [activity.parse_public_line(x.decode().strip())
+                      for x in events]
+            self.assertEqual(parsed[0]["state"], "RUNNING")
+            self.assertIsNone(parsed[0]["exit_code"])
+            self.assertEqual(parsed[1]["state"], "FAIL")
+            self.assertEqual(parsed[1]["exit_code"], 3)
+            (d / "path3.log").write_bytes(b"".join(events))
+            frame = mon.render_snapshot(d, "path3", width=100)
+            self.assertIn("[C] TEST FAIL (exit 3)", frame)
+            self.assertNotIn("[V]", frame)
+
+            # Unknown and boolean exit codes must never fabricate PASS/FAIL.
+            missing = {"type": "item.started", "item": {
+                "id": "unknown", "type": "command_execution",
+                "command": "git status"}}
+            projector.project(missing)
+            unknown = projector.project({"type": "item.completed",
+                                         "item": {**missing["item"],
+                                                  "exit_code": True}})
+            result = activity.parse_public_line(unknown.decode().strip())
+            self.assertEqual(result["state"], "UNKNOWN")
+            self.assertIsNone(result["exit_code"])
+
+    def test_activity_projection_is_bounded_under_orphaned_items(self):
+        with tempfile.TemporaryDirectory() as td:
+            projector = activity.Path3Activity(Path(td))
+            for n in range(activity.MAX_ACTIVE_ITEMS):
+                event = {"type": "item.started", "item": {
+                    "id": "task_" + str(n),
+                    "type": "command_execution",
+                    "command": "git status"}}
+                self.assertTrue(projector.project(event))
+            self.assertEqual(len(projector.active), activity.MAX_ACTIVE_ITEMS)
+            overflow = {"type": "item.started", "item": {
+                "id": "overflow", "type": "command_execution",
+                "command": "git status"}}
+            self.assertEqual(projector.project(overflow), b"")
+            self.assertEqual(len(projector.active), activity.MAX_ACTIVE_ITEMS)
+            # A completed Item frees capacity without reauthorizing execution.
+            self.assertTrue(projector.project({
+                "type": "item.completed", "item": {
+                    "id": "task_0", "type": "command_execution",
+                    "exit_code": 0, "command": "git status"}}))
+            self.assertTrue(projector.project(overflow))
+            self.assertLessEqual(len(projector.active),
+                                 activity.MAX_ACTIVE_ITEMS)
+
+    def test_activity_viewer_drops_replayed_or_reordered_sequences(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            emitter = activity.Path3Activity(d)
+            first = emitter.project({"type": "item.started", "item": {
+                "id": "first", "type": "command_execution",
+                "command": "git diff --check"}})
+            second = emitter.project({"type": "item.started", "item": {
+                "id": "second", "type": "command_execution",
+                "command": "git status"}})
+            (d / "path3.log").write_bytes(second + first + second)
+            frame = mon.render_snapshot(d, "path3", width=100)
+            self.assertIn("[C] COMMAND RUNNING | git status", frame)
+            self.assertNotIn("git diff --check", frame)
+            self.assertEqual(frame.count("git status"), 1)
+            base = json.loads(second.decode().split(" ", 1)[1])
+            for code, state in ((True, "DONE"), (1.2, "FAIL"),
+                                (999, "FAIL"), (-999, "FAIL")):
+                with self.subTest(code=code):
+                    invalid = dict(base, exit_code=code, state=state)
+                    line = activity.PREFIX + json.dumps(invalid)
+                    self.assertIsNone(activity.parse_public_line(line))
+            for time_value in ("24:00", "29:50", "99:00"):
+                line = activity.PREFIX + json.dumps(
+                    dict(base, time=time_value))
+                self.assertIsNone(activity.parse_public_line(line))
+
+    def test_activity_is_observer_only_evidence_keeps_type_names(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            live = directory / "path3.log"
+            evidence = directory / "codex.log"
+            live.touch()
+            events = [
+                {"type": "item.started", "item": {
+                    "id": "cmd_1", "type": "command_execution",
+                    "command": "git diff --check"}},
+                {"type": "item.completed", "item": {
+                    "id": "cmd_1", "type": "command_execution",
+                    "command": "git diff --check",
+                    "exit_code": 1, "aggregated_output": "TOP_SECRET"}},
+            ]
+            payload = "\n".join(json.dumps(e) for e in events) + "\n"
+            command = [sys.executable, "-c",
+                       "import sys; sys.stdin.read(); "
+                       "sys.stdout.write(" + repr(payload) + "); sys.stdout.flush()"]
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                command, b"non-secret test\n", directory,
+                evidence, str(live), usage=usage)
+            self.assertEqual(rc, 0)
+            live_bytes, proof_bytes = live.read_bytes(), evidence.read_bytes()
+            self.assertIn(b"git diff --check", live_bytes)
+            self.assertIn(b'"state":"FAIL"', live_bytes)
+            self.assertNotIn(b"TOP_SECRET", live_bytes + proof_bytes)
+            self.assertNotIn(b"git diff --check", proof_bytes)
+            self.assertIn(b"[codex item.completed]", proof_bytes)
+            self.assertNotIn(b"@PLASMA_ACTIVITY_V1", proof_bytes)
 
     def test_monitor_setup_failure_is_only_pre_execution(self):
         with tempfile.TemporaryDirectory() as td:
@@ -464,7 +764,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                               get_size=lambda: os.terminal_size((80, 24)),
                               sleep=fake_sleep, get_now=lambda: FIXED_NOW)
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
-            self.assertIn("RUN: 12345  TASK: test-task", out.getvalue())
+            self.assertIn("RUN: 12345", out.getvalue())
+            self.assertIn("TASK: test-task", out.getvalue())
             self.assertIn("LAST: PASS  EXIT: 0", out.getvalue())
 
     def test_log_is_clipped_to_pane_without_scrolling_status_offscreen(self):
@@ -480,7 +781,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertTrue(all(mon._clip_columns(line, 37) == line
                                 for line in lines))
             self.assertIn("STATUS: IDLE", frame)
-            self.assertIn("RECENT OUTPUT", frame)
+            self.assertIn("RECENT ACTIVITY", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
 
@@ -511,7 +812,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         self.assertIn("STAGE: CPU-only CLI", frame)
                     self.assertIn("LAST: NOT_RUN", frame)
                     self.assertIn("NOW: 2026-10-21 16:10", frame)
-                    self.assertIn("RECENT OUTPUT", frame)
+                    self.assertIn("RECENT ACTIVITY", frame)
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
 
@@ -950,9 +1251,6 @@ if op in ("new-session", "new-window"):
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
         self.assertIn("exec bash", script)
-        self.assertIn("grep -Fxq path3", script)
-        self.assertNotIn(
-            'if ! tmux display-message -p -t "$session:path3"', script)
 
 
 

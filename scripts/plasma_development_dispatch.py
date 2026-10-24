@@ -19,6 +19,8 @@ import subprocess
 import sys
 import uuid
 
+import plasma_engineering_activity as engineering_activity
+
 REPO = "physicslu/plasma"
 OWNER = "physicslu"
 ISSUE = 981
@@ -827,8 +829,11 @@ class CodexUsageCollector:
         "mcp_tool_call", "web_search", "collab_tool_call",
     })
 
-    def __init__(self, *, monitor_only: bool = False):
+    def __init__(self, *, monitor_only: bool = False,
+                 workspace: Path | None = None):
         self.monitor_only = monitor_only
+        self.activity = (engineering_activity.Path3Activity(workspace)
+                         if monitor_only and workspace is not None else None)
         self.pending = bytearray()
         self.dropping = False
         self.session_id = None
@@ -874,6 +879,8 @@ class CodexUsageCollector:
                 self.turns += 1
         label = kind if type(kind) is str and kind in self.EVENTS else "unrecognized event"
         if self.monitor_only and kind in ("item.started", "item.updated", "item.completed"):
+            if self.activity is not None:
+                return self.activity.project(event)
             item = event.get("item")
             category = item.get("type") if type(item) is dict else None
             if type(category) is str and category in self.MONITOR_ITEM_TYPES:
@@ -928,7 +935,7 @@ class CodexUsageCollector:
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                              evidence: Path, live_log: str,
                              usage: CodexUsageCollector | None = None) -> int:
-    """Stream sanitized Codex event names into evidence and the monitor.
+    """Stream existing type-only evidence and projected safe Monitor events.
 
     Only a trusted main worker supplies the fixed monitor path. Loss of the
     secondary monitor sink must never discard local engineering evidence.
@@ -943,7 +950,7 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         usage = usage if usage is not None else CodexUsageCollector()
-        monitor_events = CodexUsageCollector(monitor_only=True)
+        monitor_events = CodexUsageCollector(monitor_only=True, workspace=cwd)
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,

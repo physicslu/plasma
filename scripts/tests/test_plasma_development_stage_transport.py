@@ -50,16 +50,70 @@ class Contracts(unittest.TestCase):
                 t.execute('test', SHA, PROJECT)
             launch.assert_not_called()
 
+    def _expect_login(self, record, *, key_lookup=0):
+        """Patch one worker-owned login and known_hosts, never an SSH session."""
+        fake_login = Mock()
+        fake_keys = Mock()
+        fake_keys.lstat.return_value = Mock(st_mode=0o100600, st_uid=1000)
+        return fake_login, fake_keys, [
+            patch.object(t, 'LOGIN', fake_login),
+            patch.object(t, 'KNOWN_HOSTS', fake_keys),
+            patch.object(t, 'private_json', return_value=record),
+            patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)),
+            patch.object(t.os, 'geteuid', return_value=1000),
+            patch.object(t.subprocess, 'run', return_value=Mock(returncode=key_lookup)),
+        ]
+
+    def test_only_path3_login_credentials_are_consumed(self):
+        record = {'ssh_host': 'z2.example', 'ssh_username': 'xilinx',
+                  'ssh_password': 'test-login'}
+        login, keys, patches = self._expect_login(record)
+        with patches[0], patches[1], patches[2] as reader, \
+             patches[3], patches[4], patches[5]:
+            self.assertEqual(t.enrollment(),
+                             ('z2.example', 'test-login', 'test-login'))
+            reader.assert_called_once_with(login)
+
+    def test_optional_sudo_secret_also_comes_from_only_login(self):
+        record = {'ssh_host': 'z2.example', 'ssh_username': 'xilinx',
+                  'ssh_password': 'test-login', 'sudo_password': 'different-sudo'}
+        login, keys, patches = self._expect_login(record)
+        with patches[0], patches[1], patches[2] as reader, \
+             patches[3], patches[4], patches[5]:
+            self.assertEqual(t.enrollment(),
+                             ('z2.example', 'test-login', 'different-sudo'))
+            reader.assert_called_once_with(login)
+
+    def test_missing_or_malformed_login_never_attempts_remote(self):
+        for record in ({}, {'ssh_host':'z2.example'},
+                       {'ssh_host':'z2.example', 'ssh_username':'xilinx',
+                        'ssh_password':'fake', 'extra':'not-allowed'},
+                       {'ssh_host':'z2.example', 'ssh_username':'xilinx',
+                        'ssh_password':'fake', 'sudo_password':''}):
+            with self.subTest(record=sorted(record)), \
+                 patch.object(t, 'private_json', return_value=record), \
+                 patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+                 patch.object(t.os, 'geteuid', return_value=1000), \
+                 patch.object(t.subprocess, 'Popen') as remote:
+                with self.assertRaises(t.Blocked):
+                    t.execute('test', SHA, PROJECT)
+                remote.assert_not_called()
+        with patch.object(t, 'private_json', side_effect=FileNotFoundError), \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'Popen') as remote:
+            with self.assertRaisesRegex(t.Blocked, 'LOCAL_ENROLLMENT_DENIED'):
+                t.execute('test', SHA, PROJECT)
+            remote.assert_not_called()
+
     def test_host_key_missing_or_mismatch_never_launches_ssh(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td); root.chmod(0o700)
-            login = root / 'login'; sudo = root / 'sudo'; keys = root / 'known_hosts'
+            login = root / 'login'; keys = root / 'known_hosts'
             login.write_text(json.dumps({'ssh_host':'fake.example', 'ssh_username':'xilinx', 'ssh_password':'fake'}))
-            sudo.write_text(json.dumps({'sudo_password':'fake'}))
             keys.write_text('fake.example ssh-ed25519 FAKE-TEST-KEY\n')
-            for file in (login,sudo,keys): file.chmod(0o600)
-            with patch.object(t,'LOGIN',login), patch.object(t,'SUDO',sudo), \
-                 patch.object(t,'KNOWN_HOSTS',keys), \
+            for file in (login,keys): file.chmod(0o600)
+            with patch.object(t,'LOGIN',login), patch.object(t,'KNOWN_HOSTS',keys), \
                  patch.object(t.pwd,'getpwnam',return_value=Mock(pw_uid=os.geteuid())), \
                  patch.object(t.pwd,'getpwuid',return_value=Mock(pw_name=t.WORKER)), \
                  patch.object(t.os,'geteuid',return_value=os.geteuid() or 1000), \

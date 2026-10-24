@@ -26,6 +26,8 @@ import time
 import tty
 import unicodedata
 
+import plasma_engineering_activity as engineering_activity
+
 BASE = Path("/run/plasma-codex")
 MONITOR = BASE / "engineering-monitor"
 RUNNER = "SWPC-plasma-codex"
@@ -338,12 +340,13 @@ def render_snapshot(directory: Path, path: str, *,
     lines = [name,
              "KEYS: C Clear | %s 1/2 Switch" % prefix,
              "      %s D Detach" % prefix,
-             "=" * 35, "STATUS: " + status,
-             "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
+             "=" * 35,
+             "STATUS: %s    RUN: %s" % (status, state.get("run_id", "-")),
+             "TASK: %s" % state.get("task", "-")]
     pr_number = state.get("pr_number")
     if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
             pr_number != "0"):
-        lines.append("PR: #" + pr_number)
+        lines[-1] += "  PR: #" + pr_number
     if path in PATHS:
         summary = state.get("monitor_summary", "")
         if (type(summary) is str and
@@ -375,7 +378,10 @@ def render_snapshot(directory: Path, path: str, *,
         # separator or UTC offset; keep minute cadence and timestamp inputs
         # timezone-aware. Evidence and monitor time marks are unchanged.
         lines.append("NOW: " + clock.strftime("%Y-%m-%d %H:%M"))
-    lines.extend(["", "RECENT OUTPUT", "-" * 35])
+    # Activity is recomputed from the already sanitized, bounded log tail.
+    # It never becomes a new job authorizer or a trusted result receipt.
+    lines.append("DOING: —")
+    lines.extend(["", "RECENT ACTIVITY", "-" * 35])
     if height is not None:
         # Preserve at least one latest log row plus a spare bottom row.
         # Sacrifice decoration before truncating trusted status/goal/stage.
@@ -402,6 +408,40 @@ def render_snapshot(directory: Path, path: str, *,
             log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
     except OSError:
         log_lines = ["(no local output yet)"]
+    # Only the trusted producer can emit these operator-public records.
+    # Revalidate them on read; malformed/untrusted log rows are not parsed
+    # into commands, files or terminal control sequences.
+    activity_rows = []
+    active_items = {}
+    last_sequence = 0
+    for original in log_lines:
+        event = engineering_activity.parse_public_line(original)
+        if event is None or event["seq"] <= last_sequence:
+            continue
+        last_sequence = event["seq"]
+        if event["state"] == "RUNNING":
+            active_items[event["id"]] = event
+        else:
+            active_items.pop(event["id"], None)
+        outcome = event["state"]
+        if event["exit_code"] is not None:
+            outcome += " (exit %d)" % event["exit_code"]
+        activity_rows.append(
+            "%s [%s] %s %s | %s" %
+            (event["time"], event["source"], event["kind"],
+             outcome, event["detail"]))
+    if activity_rows:
+        # Trust class C = Codex JSON event, never VERIFIED receipt.
+        log_lines = activity_rows[-30:]
+    else:
+        # Invalid structured records are never echoed as raw terminal lines.
+        log_lines = [
+            line for line in log_lines
+            if not line.startswith(engineering_activity.PREFIX)]
+    if status == "RUNNING" and active_items:
+        last = next(reversed(active_items.values()))
+        doing = "%s | %s" % (last["kind"], last["detail"])
+        lines[lines.index("DOING: —")] = "DOING: " + doing
     if height is not None:
         # Reserve the bottom row to prevent tmux scrolling on a repaint.
         visible_log_rows = max(0, height - 1 - len(lines))

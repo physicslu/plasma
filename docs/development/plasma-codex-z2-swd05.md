@@ -40,9 +40,9 @@ This asks once for these **actual Z2 absolute paths**:
 - `candidate_bin`: pinned raw Zynq FPGA-Manager BIN directly under `/lib/firmware/`, not BOOT.BIN, not .bit.
 - `recovery_bin`: original pinned `base.bin` directly under `/lib/firmware/`, plus `recovery_hwh` original `base.hwh`.
 - `output`: fresh unique private directory below `/root/`; its parent must exist and be root-owned/non-group-writeable.
-- `sudo_password`: Z2 sudo credential entered via hidden getpass; not assumed equal to SSH password, never posted to GitHub.
+- Z2 sudo 認證使用共用 `z2-login-smoke.json` 的可選 `sudo_password`；若缺省則使用已登錄的 SSH 密碼。不在 Route JSON 中另存密碼。
 
-Worker file: `<dedicated-worker-home>/.config/plasma/z2-swd05-oneshot.json`, 0600; enrollment does not overwrite. If it is absent, invalid or remote source/artifacts are not staged and pinned, **NO_GO**; do not guess values or weaken checks. Development default `xilinx` SSH credentials are already separately enrolled; no recopy.
+Worker 路徑設定檔：`<dedicated-worker-home>/.config/plasma/z2-swd05-oneshot.json`，0600，**只含非認證路徑**。舊版已含 sudo 密碼時，須先使用可信本機遷移命令清除後才執行；不得把它當作第二個 SSH 登入來源。 If it is absent, invalid or remote source/artifacts are not staged and pinned, **NO_GO**; do not guess values or weaken checks. Development default `xilinx` SSH credentials are already separately enrolled; no recopy.
 
 Before Gate 2, **do not enroll or dispatch unless expressly authorized as part of a trusted operator setup**. GitHub Actions PR events always run **hosted offline contract tests only**, not remote Z2 or Worker execution.
 
