@@ -47,6 +47,23 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["run_id"], "39546002")
             self.assertIn("LAST: PASS", mon.render_snapshot(Path(td), "path2"))
 
+    def test_authorized_task_and_pr_are_visible_without_work_order_text(self):
+        with tempfile.TemporaryDirectory() as td:
+            with patch.dict(os.environ, {
+                "GITHUB_RUN_ID": "40056557048",
+                "PLASMA_MONITOR_TASK": "path3-work-order",
+                "PR_NUMBER": "1143",
+            }):
+                self.assertEqual(mon.run_job(
+                    "path3", [sys.executable, "-c", "pass"],
+                    directory=Path(td)), 0)
+            state = json.loads((Path(td) / "path3.json").read_text())
+            self.assertEqual(state["task"], "path3-work-order")
+            self.assertEqual(state["pr_number"], "1143")
+            frame = mon.render_snapshot(Path(td), "path3")
+            self.assertIn("TASK: path3-work-order", frame)
+            self.assertIn("PR: #1143", frame)
+
     def test_path3_failure_preserves_real_exit_and_idle(self):
         with tempfile.TemporaryDirectory() as td:
             rc = mon.run_job("path3", [sys.executable, "-c",
@@ -90,6 +107,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                        "print('{\"type\":\"thread.started\",\"thread_id\":\"0199a213-81c0-7800-8aa1-bbab2a035a53\"}',flush=True); "
                        "print('{\"type\":\"item.completed\",\"text\":\"PASSWORD_SECRET\"}',flush=True); "
                        "print('{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":30,\"cached_input_tokens\":10,\"output_tokens\":4}}',flush=True); "
+                       "print('{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"command\":\"PASSWORD_SECRET\"}}',flush=True); "
+                       "print('{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\",\"command\":\"PASSWORD_SECRET\"}}',flush=True); "
                        "print('STDERR_SECRET',file=sys.stderr,flush=True)"]
             usage = dev.CodexUsageCollector()
             rc = dev._run_codex_with_live_log(
@@ -98,6 +117,10 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn(b"[codex turn.completed]", live.read_bytes())
             self.assertIn(b"[codex turn.completed]", evidence.read_bytes())
+            self.assertIn(b"[codex command_execution.started]", live.read_bytes())
+            self.assertIn(b"[codex command_execution.completed]", live.read_bytes())
+            self.assertIn(b"[codex item.started]", evidence.read_bytes())
+            self.assertNotIn(b"command_execution.started", evidence.read_bytes())
             self.assertNotIn(b"PASSWORD_SECRET", live.read_bytes())
             self.assertNotIn(b"PASSWORD_SECRET", evidence.read_bytes())
             self.assertNotIn(b"STDERR_SECRET", live.read_bytes())
@@ -219,6 +242,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 mon.view_loop("path2", directory=Path(td), output=out,
                               get_size=lambda: next(sizes), sleep=fake_sleep)
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
+            self.assertEqual(out.getvalue().count("\x1b[H\x1b[J"), 2)
             self.assertNotIn("\x1b[2J", out.getvalue())
 
     def test_view_repaints_when_status_changes(self):
@@ -255,7 +279,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             lines = frame.splitlines()
             # One spare row prevents scrolling even with a trailing clear.
             self.assertLessEqual(len(lines), 11)
-            self.assertTrue(all(mon._clip_columns(line, 38) == line
+            self.assertTrue(all(mon._clip_columns(line, 37) == line
                                 for line in lines))
             self.assertIn("STATUS: IDLE", frame)
             self.assertIn("RECENT OUTPUT", frame)
@@ -563,6 +587,8 @@ if op in ("new-session", "new-window"):
         self.assertIn('tmux new-window -d -t "$session:2"', script)
         self.assertIn("tmux move-window -d", script)
         self.assertIn('tmux select-window -t "$session:1"', script)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 3)
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
