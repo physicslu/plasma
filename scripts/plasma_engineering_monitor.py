@@ -177,6 +177,8 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
             print("MONITOR_UNAVAILABLE: %s" % type(exc).__name__, file=sys.stderr)
             live = False
     env = os.environ.copy()
+    # Operator-only metadata never enters the engineering/Codex process env.
+    env.pop("PLASMA_MONITOR_SUMMARY", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
