@@ -885,6 +885,7 @@ if op in ("new-session", "new-window"):
             wrapper = bin_dir / "tmux"
             wrapper.write_text(
                 '#!/bin/bash\n'
+                'printf "%s\\n" "$*" >> "$TEST_TMUX_CALL_LOG"\n'
                 'if [[ "$1" == attach-session ]]; then exit 0; fi\n'
                 'exec "$TEST_REAL_TMUX" -S "$TEST_SOCKET" '
                 '-f /dev/null "$@"\n')
@@ -900,7 +901,8 @@ if op in ("new-session", "new-window"):
                 stub.write_text("#!/bin/bash\n" + body)
                 stub.chmod(0o755)
             env = dict(os.environ, TEST_REAL_TMUX=tmux_binary,
-                       TEST_SOCKET=sock)
+                       TEST_SOCKET=sock,
+                       TEST_TMUX_CALL_LOG=str(d / "calls.log"))
             env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
 
             def tmux(*args, check=True):
@@ -937,6 +939,7 @@ if op in ("new-session", "new-window"):
                 self.assertEqual(
                     launch.returncode, 0,
                     "Launcher stderr=" + launch.stderr +
+                    " calls=" + (d / "calls.log").read_text() +
                     " windows=" + windows_snapshot.stdout +
                     " pane=" + diagnostic.stdout + diagnostic.stderr)
                 last = ""
