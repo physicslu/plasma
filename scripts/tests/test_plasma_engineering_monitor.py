@@ -168,7 +168,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                             self.assertEqual(
                                 line, mon._clip_columns(line, available))
                         self.assertIn("NOW:", frame)
-                        self.assertIn("RECENT OUTPUT", frame)
+                        self.assertIn("RECENT ACTIVITY", frame)
 
     def test_authorized_task_and_pr_are_visible_without_work_order_text(self):
         with tempfile.TemporaryDirectory() as td:
@@ -313,8 +313,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn(b"[codex turn.completed]", live.read_bytes())
             self.assertIn(b"[codex turn.completed]", evidence.read_bytes())
-            self.assertIn(b"[codex command_execution.started]", live.read_bytes())
-            self.assertIn(b"[codex command_execution.completed]", live.read_bytes())
+            # Without a valid item ID, untrusted command content is omitted.
+            self.assertNotIn(b"@PLASMA_ACTIVITY_V1", live.read_bytes())
             self.assertIn(b"[codex item.started]", evidence.read_bytes())
             self.assertNotIn(b"command_execution.started", evidence.read_bytes())
             self.assertNotIn(b"PASSWORD_SECRET", live.read_bytes())
@@ -462,7 +462,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                               get_size=lambda: os.terminal_size((80, 24)),
                               sleep=fake_sleep, get_now=lambda: FIXED_NOW)
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
-            self.assertIn("RUN: 12345  TASK: test-task", out.getvalue())
+            self.assertIn("RUN: 12345", out.getvalue())
+            self.assertIn("TASK: test-task", out.getvalue())
             self.assertIn("LAST: PASS  EXIT: 0", out.getvalue())
 
     def test_log_is_clipped_to_pane_without_scrolling_status_offscreen(self):
@@ -478,7 +479,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertTrue(all(mon._clip_columns(line, 37) == line
                                 for line in lines))
             self.assertIn("STATUS: IDLE", frame)
-            self.assertIn("RECENT OUTPUT", frame)
+            self.assertIn("RECENT ACTIVITY", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
 
@@ -509,7 +510,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         self.assertIn("STAGE: CPU-only CLI", frame)
                     self.assertIn("LAST: NOT_RUN", frame)
                     self.assertIn("NOW: 2026-10-21 16:10", frame)
-                    self.assertIn("RECENT OUTPUT", frame)
+                    self.assertIn("RECENT ACTIVITY", frame)
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
 
