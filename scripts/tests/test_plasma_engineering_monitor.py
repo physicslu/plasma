@@ -7,7 +7,9 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import time
 import sys
 import tempfile
 import unittest
@@ -652,10 +654,15 @@ class EngineeringMonitorTests(unittest.TestCase):
 
     def test_launcher_retains_window_on_immediate_viewer_exit(self):
         """An sg/view failure must remain visible, never race the tmux layout check."""
-        for failing in ("path2", "path3"):
-            with self.subTest(failing=failing):
-                result = self._run_mock_launcher([], fail_viewer=failing)
+        cases = [([], "path2", ("path2", "path3")),
+                 ([], "path3", ("path2", "path3")),
+                 ([{"index": 1, "name": "path2", "panes": ["%1"]}],
+                  "path3", ("path3",))]
+        for windows, failing, new_viewers in cases:
+            with self.subTest(windows=windows, failing=failing):
+                result = self._run_mock_launcher(windows, fail_viewer=failing)
                 self.assertEqual(result["rc"], 0, result["stderr"])
+                self.assertEqual(result["viewers"], new_viewers)
                 self.assertIn(
                     f"MONITOR_VIEWER_EXIT path={failing} exit=7",
                     result["stderr"])
@@ -782,10 +789,14 @@ else:
     sys.exit(2)
 with open(p, "w") as f: json.dump(state, f)
 if op in ("new-session", "new-window"):
-    # Real tmux detaches its pane from the launcher. Never inherit the
-    # interactive SWPC terminal: the intentional exec-bash failure fallback
-    # would otherwise wait for keyboard input and hang the mock launcher.
-    subprocess.run(["bash", "-c", args[-1]], check=True,
+    # A single tmux shell-command invokes its default-shell -c and can
+    # introduce an extra parsing layer. Demand direct argv (bash -c SCRIPT).
+    require(args[-3:-1] == ["bash", "-c"])
+    require("MONITOR_VIEWER_EXIT" in args[-1] and
+            "exec bash -i" in args[-1])
+    # Detached tmux owns a PTY. The mock cannot do that; stdin must not
+    # inherit the caller's interactive SSH terminal or block this test.
+    subprocess.run(args[-3:], check=True,
                    stdin=subprocess.DEVNULL, timeout=5)
 ''', python=True)
             env = dict(os.environ)
@@ -814,6 +825,46 @@ if op in ("new-session", "new-window"):
                     for x in sg_file.read_text().splitlines()),
             }
 
+    @unittest.skipUnless(shutil.which("tmux"), "tmux executable not installed")
+    def test_real_tmux_private_socket_retains_direct_argv_failure_window(self):
+        """Use only an isolated socket: never touch any default tmux server."""
+        with tempfile.TemporaryDirectory(prefix="plasma-tmux-argv-") as td:
+            socket = str(Path(td) / "private.sock")
+
+            def tmux(*args, check=True):
+                return subprocess.run(
+                    ["tmux", "-S", socket, *args],
+                    text=True, capture_output=True, timeout=6,
+                    check=check)
+
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "test-monitor",
+                     "-x", "80", "-y", "24", "-n", "path2",
+                     "sleep", "12")
+                started = True
+                tmux("new-window", "-d", "-t", "test-monitor:2",
+                     "-n", "path3", "bash", "-c",
+                     'printf "MONITOR_VIEWER_EXIT path=path3 exit=7\n"; '
+                     "exec bash -i")
+                seen = ""
+                for _ in range(30):
+                    pane = tmux("capture-pane", "-p",
+                                "-t", "test-monitor:2", check=False)
+                    if pane.returncode == 0:
+                        seen = pane.stdout
+                    if "MONITOR_VIEWER_EXIT path=path3 exit=7" in seen:
+                        break
+                    time.sleep(0.1)
+                self.assertIn("MONITOR_VIEWER_EXIT path=path3 exit=7", seen)
+                result = tmux("list-windows", "-t", "test-monitor",
+                              "-F", "#{window_index}:#{window_name}")
+                self.assertIn("2:path3", result.stdout)
+                self.assertIn("1:path2", result.stdout)
+            finally:
+                if started:
+                    tmux("kill-server", check=False)
+
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
@@ -840,7 +891,10 @@ if op in ("new-session", "new-window"):
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
-        self.assertIn("exec bash", script)
+        self.assertIn("exec bash -i", script)
+        self.assertIn('tmux new-session -d -s "$session" -n path2 -c "$repo" bash -c "$left"', script)
+        self.assertIn('tmux new-window -d -t "$session:2" -n path3 -c "$repo" bash -c "$right"', script)
+        self.assertNotIn("printf 'bash -c %q'", script)
 
 
 
