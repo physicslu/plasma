@@ -1,0 +1,43 @@
+{
+  "schema": "plasma.fpga.image_descriptor.v1",
+  "project": "pl/projects/z2-bluepill-rbb",
+  "purpose": "single_site_swd_gpio_offline_poc",
+  "site_count": 1,
+  "board": "pynq-z2:xc7z020clg400-1",
+  "axi_base": 1073774592,
+  "axi_bytes": 4096,
+  "fclk_hz": 100000000,
+  "pin_map": {
+    "swclk": "W14",
+    "swdio": "Y14"
+  },
+  "read_only_identity": [
+    {
+      "offset": 0,
+      "value": 1346523991,
+      "mask": 4294967295
+    },
+    {
+      "offset": 4,
+      "value": 65536,
+      "mask": 4294967295
+    },
+    {
+      "offset": 12,
+      "value": 8,
+      "mask": 4294967294
+    }
+  ],
+  "offline_image": {
+    "build_source_sha": "65555410f171e425e61d87ebd42dc4709755f389",
+    "bit_sha256": "f2e59f31bacf6e8ab0ee9325a07125bc155647a261db3f84e67ba71bb0105891",
+    "hwh_sha256": "84894ae5791a65ec16bd6146779faec4496d47833fd0ad294149d5c46571b510",
+    "bin_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+    "github_run_id": 40090390292,
+    "github_artifact_id": 12558474564,
+    "evidence": "SWPC_VIVADO_2026_1_OFFLINE_ONLY"
+  },
+  "recovery_sha256": null,
+  "runtime_admitted": false,
+  "external_io_timing": "NOT_QUALIFIED"
+}
