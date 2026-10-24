@@ -146,3 +146,68 @@ formal image-source binding. Three `TIMING-18` external SWD timing warnings
 remain **NOT_QUALIFIED**: without measured board/target timing, no guessed
 I/O delays or false-path exceptions may be introduced. Z2 FPGA load,
 protected Restore, PMODB connection, Blue Pill DPIDR and Flash stay NOT_RUN.
+
+## 2026-10-24 Gate 1 Path 1 — Blue Pill Protected Stage (Host-only)
+
+**Exact-source image evidence:** SWPC Path 3 Run
+[#40090390292](https://github.com/physicslu/plasma/actions/runs/40090390292)
+built the actual BIT/HWH/BIN for the **immutable input source**
+`65555410f171e425e61d87ebd42dc4709755f389`, with Vivado 2026.1,
+GP0/FCLK0 100 MHz in generated HWH, WNS +3.070 ns, WHS +0.072 ns and
+zero blocking DRC. The authentic artifact is
+[#12558474564](https://github.com/physicslu/plasma/actions/runs/40090390292/artifacts/12558474564).
+Three TIMING-18 external pin timing warnings remain **NOT_QUALIFIED**.
+
+**Important image identity boundary:** the new Protected Stage source/test
+commits change PR #1142 HEAD beyond that image's input source commit.
+The historical BIT/HWH/BIN may still be evidence of the *old* design, but
+are **not an exact-source build for the current PR HEAD**. A newly authorized
+SWPC Vivado build and independent artifact SHA256/metadata review are
+required before considering the latest source for any Z2 deployment. Do
+not silently rewrite build manifest or treat an unchanged RTL diff as
+equivalent qualification.
+
+`pl/hil/bluepill_protected_stage.py` is the **Blue Pill-specific pure
+Host-only policy/transition model**, with tests in
+`pl/tests/test_bluepill_protected_stage.py`.
+It deliberately does not import F1-B's accepted development UIO exception,
+does not install or call the trusted generic Root Entry, and cannot open
+FPGA Manager, MMIO, sockets, USB, SWD or any external target. The CLI
+entrypoint always exits nonzero with
+`BLUEPILL_LIVE_STAGE_BACKEND_NOT_IMPLEMENTED`; **no authentic
+`PLASMA_PATH2_STAGE=` receipt is emitted**.
+
+- Lock model: exact 40-hex reviewed/installed/image-build Source SHA
+  must all match; host-only BIT/HWH/BIN/original bytes must match
+  independent SHA256 pins. Strings or mocked SHA alone never prove an
+  installed root-owned immutable image.
+- Simulated preflight: exact Board, current-boot ID, FPGA Manager identity,
+  recovery/candidate hash, GP0 base `0x40008000` / 4 KiB, FCLK0 100 MHz,
+  W14/Y14 pin assignment, isolated AXI, no conflicting consumers,
+  exclusive owner, independently retained recovery and safe disconnected
+  external PMOD. Synthetic positive fixtures are never hardware
+  admission; unknown evidence fails closed.
+- Three independent Host-only Stage plans: `download` (BASE→HELD),
+  `test` (HELD→read-only ABI identity, no Flash/SWD output), `restore`
+  (HELD→BASE or verified no-op). After-state checks enforce the exact
+  image/boot and read-only `MAGIC`/`ABI`/SWDIO Hi-Z sample; failures
+  or in-flight/UNKNOWN state require an independently qualified manual
+  recovery path. The model emits only `SIMULATED_*` receipts with
+  `real_z2=false` and `runtime_admitted=false`.
+- The production-grade owner/auditor, actual installed root-owned
+  source/manifest/profile, FPGA Manager transition journaling,
+  AXI isolation/drain proof, actual ARMv7 MMIO/ABI, and independently
+  restored original image remain **NOT_IMPLEMENTED / NOT_RUN** for
+  Blue Pill. No live `download/test/restore` adapter is authorized.
+  Current kernel-specific isolation is still unproven; F1-B waiver is
+  explicitly not transferable.
+
+The user confirms the existing breadboard, Blue Pill and LA2016 have been
+wired for a previously successful **SWPC/ST-LINK reference SWD** observation.
+**Pmod BB J1 remains DISCONNECTED from Z2 JB**, and must stay disconnected
+until an explicit, separately reviewed physical-connection instruction.
+Before changing the SWD master, ST-LINK output must not contend with Z2;
+no PMOD 3.3 V feed, NRST remains unconnected and passive LA/electrical
+checks precede real DPIDR. Nothing in this Gate 1 operates SWPC, Z2,
+ST-LINK, LA2016, FPGA Manager, MMIO, Blue Pill, USB or DUT; PR remains
+Draft, unmerged, Gate 2/HIL **NO-GO**.
