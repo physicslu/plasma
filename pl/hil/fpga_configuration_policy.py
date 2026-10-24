@@ -20,10 +20,10 @@ import re
 import sys
 
 STAGES = frozenset(("download", "test", "restore"))
-SOURCE = re.compile(r"[a-f0-9]{40}\\Z")
-DIGEST = re.compile(r"[a-f0-9]{64}\\Z")
-PROJECT = re.compile(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}\\Z")
-PIN = re.compile(r"[A-Z][A-Z0-9]{0,9}\\Z")
+SOURCE = re.compile(r"[a-f0-9]{40}\Z")
+DIGEST = re.compile(r"[a-f0-9]{64}\Z")
+PROJECT = re.compile(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}\Z")
+PIN = re.compile(r"[A-Z][A-Z0-9]{0,9}\Z")
 STAGE_RESULTS = {
     "PLAN_DOWNLOAD": "SIMULATED_LOADED_AND_HELD",
     "PLAN_READ_ONLY_ABI": "SIMULATED_IDENTITY_PASS",
