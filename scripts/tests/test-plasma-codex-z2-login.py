@@ -138,6 +138,36 @@ class Z2LoginContracts(unittest.TestCase):
                 self.assertEqual(legacy.read_bytes(), before)
                 self.assertNotIn("sudo_password", json.loads(login.read_text()))
 
+    def test_retired_dedicated_workflow_cannot_be_redispatched(self) -> None:
+        # GitHub-hosted offline only: preserve protected shared source, retire
+        # only the historical owner-triggered SWD-05 dispatch path.
+        retired = (
+            ".github/workflows/plasma-codex-z2-swd05.yml",
+            "scripts/plasma-codex-z2-swd05-contract.py",
+            "scripts/plasma-codex-z2-swd05.py",
+            "scripts/plasma-codex-z2-swd05.sh",
+            "scripts/plasma-codex-z2-swd05-inner.sh",
+            "scripts/tests/test-plasma-codex-z2-swd05.py",
+        )
+        for path in retired:
+            with self.subTest(path=path):
+                self.assertFalse((HERE / path).exists())
+        for needed in (
+            "pl/hil/swd04/one_shot.py",
+            "pl/hil/path2_z2_target_guard.py",
+            "scripts/z2/plasma-path2-root-entry",
+            "scripts/plasma_development_stage_transport.py",
+            "software/python/plasma_interfaces/swd_transaction.py",
+            ".github/workflows/pl-swd05-linux-driver.yml",
+        ):
+            with self.subTest(needed=needed):
+                self.assertTrue((HERE / needed).is_file())
+        for wf in (HERE / ".github/workflows").glob("*.yml"):
+            with self.subTest(workflow=wf.name):
+                self.assertNotIn("/plasma-codex z2-swd05 981", wf.read_text())
+        self.assertNotIn("z2-swd05-oneshot.json",
+                         (HERE / "scripts/plasma-codex-z2-login.py").read_text())
+
     def test_no_hardware_activity_during_self_test(self) -> None:
         with patch.object(subject, "ssh_login", side_effect=AssertionError):
             with patch.object(subject, "uart_login", side_effect=AssertionError):
