@@ -37,7 +37,7 @@ LOGIN = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(LOGIN)
 ROUTE = Path("/home/plasma-codex/.config/plasma/z2-swd05-oneshot.json")
 FIELDS = ("source_root", "candidate_bit", "candidate_hwh", "manifest",
-          "candidate_bin", "recovery_bin", "recovery_hwh", "output", "sudo_password")
+          "candidate_bin", "recovery_bin", "recovery_hwh", "output")
 MARKER = "PLASMA_SWD05_REPORT="
 REVIEWED_SOURCES = (
     "pl/hil/swd04/one_shot.py",
@@ -70,10 +70,8 @@ def load_route() -> dict[str, str]:
         data = json.loads(LOGIN.private_file(ROUTE))
         if type(data) is not dict or set(data) != set(FIELDS):
             raise ValueError("ROUTE_SCHEMA")
-        if not all(valid_target_path(data[key]) for key in FIELDS if key != "sudo_password"):
+        if not all(valid_target_path(data[key]) for key in FIELDS):
             raise ValueError("ROUTE_PATHS")
-        if not isinstance(data["sudo_password"], str) or not data["sudo_password"]:
-            raise ValueError("SUDO_SECRET_MISSING")
         root = data["source_root"]
         if not root.startswith("/opt/plasma/"):
             raise ValueError("SOURCE_ROOT_NOT_PROTECTED")
@@ -93,10 +91,9 @@ def enroll() -> None:
     if ROUTE.exists() or ROUTE.is_symlink():
         raise ValueError("ROUTE_EXISTS_DO_NOT_OVERWRITE")
     print("Enter already reviewed, root-owned Z2 remote paths. No hardware action.")
-    data = {key: input(key + ": ").strip() for key in FIELDS if key != "sudo_password"}
-    data["sudo_password"] = getpass.getpass("Z2 sudo password: ")
+    data = {key: input(key + ": ").strip() for key in FIELDS}
     # Duplicate validation semantics before writing immutable 0600 file.
-    if not all(valid_target_path(data[key]) for key in FIELDS if key != "sudo_password") or not data["sudo_password"]:
+    if not all(valid_target_path(data[key]) for key in FIELDS):
         raise ValueError("ROUTE_INVALID")
     if not data["source_root"].startswith("/opt/plasma/") or not data["output"].startswith("/root/"):
         raise ValueError("ROUTE_ROOT_INVALID")
@@ -133,7 +130,7 @@ def fixed_remote_cmd(route: dict[str, str]) -> str:
         "-m", "pl.hil.swd04.one_shot",
     ]
     for key in FIELDS:
-        if key == "sudo_password" or key == "source_root":
+        if key == "source_root":
             continue
         argv.extend(["--" + key.replace("_", "-"), route[key]])
     argv.extend(["--execute-live", "--ack-unrecoverable-axi-stall-risk"])
@@ -231,7 +228,7 @@ def ssh_execute(record: dict[str, str], route: dict[str, str]) -> dict:
                     os.write(master, record["ssh_password"].encode() + b"\n")
                     ssh_sent = True
                 elif not sudo_sent and tail.endswith("PLASMA_SWD05_SUDO_PROMPT:"):
-                    os.write(master, route["sudo_password"].encode() + b"\n")
+                    os.write(master, record.get("sudo_password", record["ssh_password"]).encode() + b"\n")
                     sudo_sent = True
             if proc.poll() is not None:
                 break
