@@ -1,14 +1,55 @@
 # Path 3 Cross-Job Resume — Gate 1 Candidate (CPU-only)
 
-**Status: UNMERGED Draft candidate / real SWPC two-Job acceptance DEFERRED, NOT_RUN.**
-The owner approved a one-time Gate 1 sequencing revision on 2026-10-23 for this PR only.
-This does not change the general AGENTS.md rule. Gate 2 has NOT been granted.
+**Status: PR #1134 MERGED (30cf3c035f0d7afd7bce9207db3ba99d7976e2e1); real SWPC Cross-Job E2E FAILED/NOT_RUN (Run #39941174584).**
+The owner-approved one-time deferral for #1134 does not transfer to this separate repair PR.
 
 This change reuses Issue #981, the existing reusable runtime-dispatch Workflow,
 the existing SWPC-plasma-codex Runner, trusted main dispatcher, and dynamic
 Work Order. It introduces NO new workflow, runner, registry ID, hardware
 capability, deployment, or additional owner approval gate.
 
+## Run #39941174584 — NVM Codex path failure and repair Gate 1
+
+Actual SWPC development-codex Job #120372762671 FAILED; development-codex-resume
+was SKIPPED. The receipt was RESUME_CODEX_INSTALL_UNMOUNTED. The real log
+shows the CLI ENTRY `$RUNNER_HOME/.nvm/versions/node/v22.23.2/bin/codex`
+and `codex-cli 0.162.1`. Neither its resolved JS path nor the Native ELF
+SHA-256 has been observed on SWPC; do not assume either value.
+
+Upstream @openai/codex/bin/codex.js uses Node to locate a Linux x64
+native executable under `vendor/x86_64-unknown-linux-musl/bin/codex`.
+The current repair candidate is deliberately stricter than a blanket
+NVM allowlist. It admits only the exact observed NVM Node v22.23.2 global
+npm layout and a single unambiguous 0.162.1 Codex native executable:
+
+- Root and platform package.json names, versions and entry metadata must
+  match; all components must be regular directories/files with controlled
+  ownership and permissions, no intermediate symlinks or peer-writable paths
+- ELF must be 64-bit little-endian x86-64, executable and self-contained:
+  PT_INTERP and DT_NEEDED requirements are denied, not silently mounted
+- Trusted `NVM_NATIVE_SHA256` must equal two file digests. **This literal
+  currently remains None**: without separately authorized SWPC read-only
+  evidence and an independently reviewed expected digest, NVM execution
+  remains fail-closed (`RESUME_CODEX_SHA256_UNPINNED`). Computing a fresh
+  digest from the same untrusted file is not evidence of provenance
+- Only a successful exact-match native file gets one read-only bind mount
+  at `/plasma-native/codex`; never mount NVM, the npm tree, full home,
+  host /dev, /sys, /run or Node runtime. Existing sandbox, private Session
+  and Auth mounts are not expanded. Model API network remains necessary
+  and is not an egress firewall
+
+**Acceptance dependency:** Hosted positive/negative tests, relevant CI and
+Code Review can qualify only the implementation. The exact SWPC native
+realpath, package layout, SHA-256, ELF/static dependencies and actual
+Bubblewrap smoke test are NOT_RUN until a separate explicit owner-approved
+read-only SWPC preflight; this Gate 1 approval authorizes no SWPC run.
+Pinning a verified digest in code requires subsequent reviewed evidence.
+If discovery fails, keep BLOCKED, do not auto-install or widen mounts.
+PR #1134's earlier E2E deferral does NOT authorize deferral for this repair.
+
+Evidence: https://github.com/physicslu/plasma/actions/runs/39941174584
+Receipt: https://github.com/physicslu/plasma/actions/runs/39941174584/artifacts/12495577875
+Upstream: https://github.com/openai/codex/blob/main/codex-cli/bin/codex.js
 ## Exact two-Job contract
 
 The one approved owner Issue command opts into the fixed

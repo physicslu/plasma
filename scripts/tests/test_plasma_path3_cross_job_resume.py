@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -251,7 +252,7 @@ class ResumeTwoJobOffline(unittest.TestCase):
                           side_effect=lambda name:
                               str(Path(self.tmp.name) / "unmounted" / name)):
             with self.assertRaisesRegex(flow.ResumeDenied,
-                                        "RESUME_CODEX_INSTALL_UNMOUNTED"):
+                                        "RESUME_CODEX_SOURCE_DENIED"):
                 flow.isolated_command(self.repo, isolated, None)
 
     def test_sandboxed_test_does_not_inherit_runner_tokens(self):
@@ -432,6 +433,176 @@ class ResumeTwoJobOffline(unittest.TestCase):
         self.assertEqual(second["continuity"], "VERIFIED")
         self.assertEqual(first["thread_id_sha256"], second["thread_id_sha256"])
         self.assertEqual(self.calls, ["new", "resume"])
+
+    def _nvm_fixture(self):
+        home = Path(self.tmp.name) / "nvm-home"
+        prefix = (home / ".nvm" / "versions" / "node" /
+                  flow.NVM_NODE_VERSION)
+        wrapper = (prefix / "lib" / "node_modules" / "@openai" /
+                   "codex" / "bin" / "codex.js")
+        wrapper.parent.mkdir(parents=True)
+        wrapper.write_text("#!/usr/bin/env node\n")
+        (wrapper.parent.parent / "package.json").write_text(json.dumps({
+            "name": "@openai/codex",
+            "version": flow.CODEX_NPM_VERSION,
+            "bin": {"codex": "bin/codex.js"},
+        }))
+        entry = prefix / "bin" / "codex"
+        entry.parent.mkdir()
+        entry.symlink_to(wrapper)
+        plat = (wrapper.parent.parent / "node_modules" /
+                "@openai" / "codex-linux-x64")
+        plat.mkdir(parents=True)
+        (plat / "package.json").write_text(json.dumps({
+            "name": "@openai/codex-linux-x64",
+            "version": flow.CODEX_NPM_VERSION,
+        }))
+        native = plat / "vendor" / flow.NATIVE_TARGET / "bin" / "codex"
+        native.parent.mkdir(parents=True)
+        # Minimal valid ELF64 LE x86_64 with one static PT_LOAD.
+        elf = bytearray(120)
+        elf[:7] = b"\x7fELF\x02\x01\x01"
+        struct.pack_into("<HH", elf, 16, 2, 62)
+        struct.pack_into("<Q", elf, 32, 64)
+        struct.pack_into("<HH", elf, 54, 56, 1)
+        struct.pack_into("<IIQQQQQQ", elf, 64,
+                         1, 5, 0, 0, 0, 120, 120, 4096)
+        native.write_bytes(elf)
+        native.chmod(0o755)
+        auth = home / ".codex" / "auth.json"
+        auth.parent.mkdir()
+        auth.write_text("{}")
+        scratch = self.repo / flow.probe.ROOT_FOLDER
+        scratch.mkdir()
+        state = self.private / "123456"
+        state.mkdir(parents=True)
+        return home, entry, native, plat, state
+
+    def test_nvm_native_pinned_single_file_and_no_home_mount(self):
+        home, entry, native, _, state = self._nvm_fixture()
+        def which(name):
+            return "/usr/bin/bwrap" if name == "bwrap" else str(entry)
+        with patch.object(flow.Path, "home", return_value=home), \
+             patch.object(flow.shutil, "which", side_effect=which):
+            # No unreviewed digest can authorize an executable from user home.
+            with self.assertRaisesRegex(
+                    flow.ResumeDenied, "RESUME_CODEX_SHA256_UNPINNED"):
+                flow.isolated_command(self.repo, state, None)
+            with patch.object(flow, "NVM_NATIVE_SHA256",
+                              flow.hash_data(native.read_bytes())):
+                command = flow.isolated_command(self.repo, state, None)
+                resumed = flow.isolated_command(self.repo, state, SID)
+        self.assertIn(["--ro-bind", str(native), flow.NATIVE_MOUNT],
+                      [command[i:i+3] for i in range(len(command)-2)])
+        self.assertEqual(command[command.index("--") + 1],
+                         flow.NATIVE_MOUNT)
+        self.assertEqual(resumed[-3:], ["resume", SID, "-"])
+        forbidden = [str(home), str(home / ".nvm"),
+                     str(native.parent.parent.parent)]
+        for directory in forbidden:
+            self.assertNotIn(["--ro-bind", directory, directory],
+                             [command[i:i+3] for i in range(len(command)-2)])
+            self.assertNotIn(["--bind", directory, directory],
+                             [command[i:i+3] for i in range(len(command)-2)])
+        self.assertIn(["--ro-bind", str(self.repo), "/work"],
+                      [command[i:i+3] for i in range(len(command)-2)])
+        self.assertIn("--dev", command)
+        self.assertNotIn("--unshare-net", command)  # Model API only
+
+    def test_nvm_native_rejects_invalid_digest_and_dynamic_dependency(self):
+        home, entry, native, _, state = self._nvm_fixture()
+        def which(name):
+            return "/usr/bin/bwrap" if name == "bwrap" else str(entry)
+        valid = native.read_bytes()
+        with patch.object(flow.Path, "home", return_value=home), \
+             patch.object(flow.shutil, "which", side_effect=which):
+            with patch.object(flow, "NVM_NATIVE_SHA256", "f" * 64):
+                with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_CODEX_SHA256_MISMATCH"):
+                    flow.isolated_command(self.repo, state, None)
+            # Checksum alone never admits a script or wrong architecture.
+            for data, error in (
+                (b"#!/bin/sh\n" + b"x" * 120, "NATIVE_ELF_DENIED"),
+                (valid[:18] + b"\x28\x00" + valid[20:],
+                 "NATIVE_ELF_DENIED"),
+            ):
+                native.write_bytes(data)
+                with patch.object(flow, "NVM_NATIVE_SHA256",
+                                  flow.hash_data(data)):
+                    with self.assertRaisesRegex(flow.ResumeDenied, error):
+                        flow.isolated_command(self.repo, state, None)
+            # A header-only ELF without an executable PT_LOAD is not a
+            # valid single-file executable, even with a matching checksum.
+            no_load = bytearray(valid)
+            struct.pack_into("<I", no_load, 64, 0)  # PT_NULL
+            native.write_bytes(no_load)
+            with patch.object(flow, "NVM_NATIVE_SHA256",
+                              flow.hash_data(no_load)):
+                with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_CODEX_NATIVE_ELF_DENIED"):
+                    flow.isolated_command(self.repo, state, None)
+            # An ELF with a dynamic interpreter cannot be admitted as a
+            # standalone single native executable.
+            interpreter = bytearray(valid)
+            struct.pack_into("<I", interpreter, 64, 3)  # PT_INTERP
+            native.write_bytes(interpreter)
+            with patch.object(flow, "NVM_NATIVE_SHA256",
+                              flow.hash_data(interpreter)):
+                with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED"):
+                    flow.isolated_command(self.repo, state, None)
+            # A DT_NEEDED shared library is also denied, even without PT_INTERP.
+            dynamic = bytearray(valid + b"\x01" + b"\x00" * 15)
+            struct.pack_into("<I", dynamic, 64, 2)
+            struct.pack_into("<Q", dynamic, 72, len(valid))
+            struct.pack_into("<Q", dynamic, 96, 16)
+            native.write_bytes(dynamic)
+            with patch.object(flow, "NVM_NATIVE_SHA256",
+                              flow.hash_data(dynamic)):
+                with self.assertRaisesRegex(
+                        flow.ResumeDenied, "RESUME_CODEX_NATIVE_DEPENDENCY_DENIED"):
+                    flow.isolated_command(self.repo, state, None)
+
+    def test_nvm_native_rejects_package_tampering_links_and_ambiguity(self):
+        home, entry, native, platform, state = self._nvm_fixture()
+        def which(name):
+            return "/usr/bin/bwrap" if name == "bwrap" else str(entry)
+        manifest = platform / "package.json"
+        raw = manifest.read_text()
+        with patch.object(flow.Path, "home", return_value=home), \
+             patch.object(flow.shutil, "which", side_effect=which), \
+             patch.object(flow, "NVM_NATIVE_SHA256",
+                          flow.hash_data(native.read_bytes())):
+            manifest.write_text(raw.replace("@openai/codex-linux-x64",
+                                            "@attacker/alias"))
+            with self.assertRaisesRegex(
+                    flow.ResumeDenied, "RESUME_CODEX_PACKAGE_INVALID"):
+                flow.isolated_command(self.repo, state, None)
+            manifest.write_text(raw)
+            native.chmod(0o777)
+            with self.assertRaisesRegex(
+                    flow.ResumeDenied, "RESUME_CODEX_SOURCE_DENIED"):
+                flow.isolated_command(self.repo, state, None)
+            native.chmod(0o755)
+            original = native.read_bytes()
+            native.unlink()
+            outside = Path(self.tmp.name) / "injected"
+            outside.write_bytes(original)
+            native.symlink_to(outside)
+            with self.assertRaisesRegex(
+                    flow.ResumeDenied, "RESUME_CODEX_SOURCE_DENIED"):
+                flow.isolated_command(self.repo, state, None)
+            native.unlink()
+            native.write_bytes(original)
+            native.chmod(0o755)
+            second = (platform.parent.parent.parent.parent /
+                      "codex-linux-x64" / "vendor" /
+                      flow.NATIVE_TARGET / "bin" / "codex")
+            second.parent.mkdir(parents=True)
+            second.write_bytes(original)
+            with self.assertRaisesRegex(
+                    flow.ResumeDenied, "RESUME_CODEX_NATIVE_AMBIGUOUS"):
+                flow.isolated_command(self.repo, state, None)
 
     def test_only_existing_workflow_and_runner(self):
         wf = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
