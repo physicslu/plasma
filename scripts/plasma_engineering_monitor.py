@@ -35,6 +35,7 @@ PATHS = ("path2", "path3")
 CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 RUN_ID = re.compile(r"[0-9]{1,20}\Z")
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
+PR_NUMBER = re.compile(r"(?:0|[1-9][0-9]{0,7})\Z")
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -134,9 +135,13 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         run_id = "unknown"
     if not TASK_ID.fullmatch(task):
         task = "unknown"
+    pr_number = os.environ.get("PR_NUMBER", "")
+    if not PR_NUMBER.fullmatch(pr_number):
+        pr_number = "-"
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
-        "task": task, "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
+        "task": task, "pr_number": pr_number,
+        "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
     if live:
@@ -285,6 +290,10 @@ def render_snapshot(directory: Path, path: str, *,
              "      %s D Detach" % prefix,
              "=" * 35, "STATUS: " + status,
              "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
+    pr_number = state.get("pr_number")
+    if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
+            pr_number != "0"):
+        lines.append("PR: #" + pr_number)
     if status == "RUNNING":
         started = state.get("started", "")
         try:
@@ -331,7 +340,8 @@ def render_snapshot(directory: Path, path: str, *,
     if height is not None:
         lines = lines[:max(0, height - 1)]
     if width is not None:
-        lines = [_clip_columns(str(line), width) for line in lines]
+        # Leave one physical cell unused to avoid terminal autowrap.
+        lines = [_clip_columns(str(line), max(0, width - 1)) for line in lines]
     return CONTROL.sub("", "\n".join(str(x) for x in lines))
 
 
@@ -377,7 +387,8 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
                 clear_from=clear_from, prefix=prefix)
             if frame != previous or size != previous_size:
                 # Only repaint this tmux pane, not global terminal scrollback.
-                output.write("\033[H" + frame + "\033[J")
+                # Clear old cells BEFORE painting shorter replacement lines.
+                output.write("\033[H\033[J" + frame)
                 output.flush()
                 previous = frame
                 previous_size = size
