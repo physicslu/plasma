@@ -64,6 +64,75 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("TASK: path3-work-order", frame)
             self.assertIn("PR: #1143", frame)
 
+    def test_path3_only_displays_digest_bound_public_summary(self):
+        with tempfile.TemporaryDirectory() as td:
+            data = {
+                "GITHUB_RUN_ID": "40056557048",
+                "PLASMA_MONITOR_TASK": "path3-work-order",
+                "PR_NUMBER": "1143",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_SUMMARY":
+                    "STM32F103 Low-density L1-L2 provider audit",
+            }
+            with patch.dict(os.environ, data, clear=True):
+                self.assertEqual(mon.run_job(
+                    "path3", [sys.executable, "-c", "pass"],
+                    directory=Path(td)), 0)
+            state = json.loads((Path(td) / "path3.json").read_text())
+            frame = mon.render_snapshot(Path(td), "path3")
+            self.assertEqual(
+                state["monitor_summary"], data["PLASMA_MONITOR_SUMMARY"])
+            self.assertIn(
+                "GOAL: STM32F103 Low-density L1-L2 provider audit", frame)
+            self.assertNotIn("WORK_ORDER_SHA256", frame)
+            self.assertNotIn(data["WORK_ORDER_SHA256"], frame)
+            self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
+                             (Path(td) / "path3.log").read_text())
+
+    def test_path3_summary_fail_closed_without_authorization_binding(self):
+        cases = [
+            ("", "STM32F103 Low-density provider audit"),
+            ("not-a-sha", "STM32F103 Low-density provider audit"),
+            ("a" * 64, "token SECRET in text"),
+            ("a" * 64, "Run \x1b[31mcommand"),
+            ("a" * 64, "STM32F103\nmalicious display"),
+            ("a" * 64, "https://example.com/key"),
+        ]
+        for sha, summary in cases:
+            with self.subTest(sha=sha, summary=repr(summary)):
+                with tempfile.TemporaryDirectory() as td:
+                    with patch.dict(os.environ, {
+                        "GITHUB_RUN_ID": "40056557048",
+                        "PLASMA_MONITOR_TASK": "path3-work-order",
+                        "WORK_ORDER_SHA256": sha,
+                        "PLASMA_MONITOR_SUMMARY": summary,
+                    }, clear=True):
+                        self.assertEqual(mon.run_job(
+                            "path3", [sys.executable, "-c", "pass"],
+                            directory=Path(td)), 0)
+                    state = json.loads((Path(td) / "path3.json").read_text())
+                    self.assertEqual(state["monitor_summary"], "")
+                    frame = mon.render_snapshot(Path(td), "path3")
+                    self.assertIn(
+                        "GOAL: (operator summary not provided)", frame)
+                    self.assertNotIn(summary, frame)
+                    self.assertNotIn("\x1b", frame)
+
+    def test_path3_summary_fits_narrow_terminal(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "IDLE", "run_id": "123", "task": "path3-work-order",
+                "monitor_summary":
+                    "STM32F103 小容量 L1-L2 Provider Audit",
+            }))
+            frame = mon.render_snapshot(
+                directory, "path3", width=28, height=16)
+            self.assertIn("GOAL:", frame)
+            self.assertTrue(all(
+                mon._clip_columns(line, 27) == line
+                for line in frame.splitlines()))
+
     def test_path3_failure_preserves_real_exit_and_idle(self):
         with tempfile.TemporaryDirectory() as td:
             rc = mon.run_job("path3", [sys.executable, "-c",
@@ -589,6 +658,11 @@ if op in ("new-session", "new-window"):
         self.assertIn('tmux select-window -t "$session:1"', script)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 3)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
+        self.assertIn(
+            'monitor_summary: ${{ steps.approve.outputs.monitor_summary }}',
+            workflow)
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
