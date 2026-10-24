@@ -2,9 +2,8 @@ name: PLASMA Codex SWPC bootstrap preflight (Issue 981)
 
 # Owner-triggered, read-only inventory using the EXISTING trusted main-only
 # integration runner. This never executes Codex or changes SWPC settings.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-swpc-preflight.yml"

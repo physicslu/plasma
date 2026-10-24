@@ -73,9 +73,10 @@ def check() -> None:
         assert not authorized(altered, OWNER, REPO, "refs/heads/main"), key
 
     workflow = WF.read_text(encoding="utf-8")
+    assert "\n  issue_comment:\n" not in workflow, "RETIRED_ISSUE_DISPATCH_REENABLED"
     checker = SCRIPT.read_text(encoding="utf-8")
     for required in (
-        "issue_comment:", "github.actor == 'physicslu'",
+        "pull_request:", "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
         "github.event.comment.body == '/plasma-codex hil-tools 981'",
         "needs: authorize", "needs.authorize.outputs.reviewed_sha",

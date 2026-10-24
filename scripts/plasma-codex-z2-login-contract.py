@@ -71,11 +71,12 @@ def check() -> None:
         assert not authorized(bad, OWNER, REPO, "refs/heads/main"), key
 
     wf = WORKFLOW.read_text()
+    assert "\n  issue_comment:\n" not in wf, "RETIRED_ISSUE_DISPATCH_REENABLED"
     src = SCRIPT.read_text()
     outer = WRAPPER.read_text()
     inner = INNER.read_text()
     for required in (
-        "issue_comment:", "github.actor == 'physicslu'",
+        "pull_request:", "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
         "github.event.comment.body == '/plasma-codex z2-login 981'",
         "needs.authorize.outputs.reviewed_sha",

@@ -2,9 +2,8 @@ name: PLASMA Codex LA2016 read-only diagnostics (Issue 981)
 
 # No hardware-capable PR jobs. Dispatch is possible only from merged main
 # after separate Gate 2, via exact trusted owner comment on Issue #981.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-la2016-diagnose.yml"

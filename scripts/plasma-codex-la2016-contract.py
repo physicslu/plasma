@@ -58,11 +58,12 @@ def check() -> None:
         assert not authorized(bad, OWNER, REPO, "refs/heads/main"), path
 
     wf = (ROOT / ".github/workflows/plasma-codex-la2016.yml").read_text()
+    assert "\n  issue_comment:\n" not in wf, "RETIRED_ISSUE_DISPATCH_REENABLED"
     src = (ROOT / "scripts/plasma-codex-la2016.py").read_text()
     sh = (ROOT / "scripts/plasma-codex-la2016.sh").read_text()
     inner = (ROOT / "scripts/plasma-codex-la2016-inner.sh").read_text()
     for required in (
-        "issue_comment:", "github.actor == 'physicslu'",
+        "pull_request:", "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
         "github.event.comment.body == '/plasma-codex la2016 981'",
         "needs.authorize.outputs.reviewed_sha",

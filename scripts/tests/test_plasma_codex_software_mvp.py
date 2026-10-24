@@ -198,8 +198,8 @@ class MVPTests(unittest.TestCase):
         self.assertNotIn("codex --",publisher)
         self.assertIn("runs-on: ubuntu-24.04",authorize)
         # Historical SW uses the SAME one-operator Issue dispatch pattern as LA.
-        self.assertIn("issue_comment:",wf)
-        self.assertIn("types: [created]",wf)
+        self.assertNotIn("\n  issue_comment:\n",wf)
+        self.assertNotIn("\n    types: [created]\n",wf)
         self.assertIn(mvp.COMMAND,wf)
         self.assertIn("github.event_name == 'issue_comment'",authorize)
         self.assertIn("github.actor == 'physicslu'",authorize)
@@ -241,6 +241,30 @@ class MVPTests(unittest.TestCase):
         self.assertNotIn("gh pr merge",sw)
         self.assertNotIn("sudo bash",sw)
         self.assertNotIn("uhubctl ",sw)
+
+    def test_all_nine_legacy_codex_issue_dispatch_triggers_retired(self):
+        # Archived worker guards remain; the GitHub event entry must not.
+        names = (
+            "plasma-codex-pilot.yml",
+            "plasma-codex-software-mvp.yml",
+            "plasma-codex-la2016.yml",
+            "plasma-codex-la2016-direct.yml",
+            "plasma-codex-la2016-diagnose.yml",
+            "plasma-codex-z2-login.yml",
+            "plasma-codex-z2-readiness.yml",
+            "plasma-codex-swpc-preflight.yml",
+            "plasma-codex-hil-tool-inventory.yml",
+        )
+        self.assertEqual(len(names), 9)
+        for name in names:
+            with self.subTest(workflow=name):
+                wf = (ROOT / ".github/workflows" / name).read_text()
+                self.assertNotIn("\n  issue_comment:\n", wf)
+                self.assertNotIn("\n  workflow_dispatch:\n", wf)
+                self.assertNotIn("\n  workflow_call:\n", wf)
+                self.assertIn("\n  pull_request:\n", wf)
+                self.assertIn("\n  push:\n", wf)
+                self.assertIn("github.event_name == 'issue_comment'", wf)
 
     def test_unified_hil_does_not_authorize_hardware_from_pr_or_main_push(self):
         for path in (
