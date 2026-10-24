@@ -11,7 +11,7 @@
   },
   "pending_cohort": {
     "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-low-density-12-v1.json",
-    "git_blob_sha1": "80022ed097136a02913cda3347b4f6a104c86768",
+    "git_blob_sha1": "0e7717b7de7fc098bb8d3f3f66eaf7d7d67bd31c",
     "candidate_exact_icpn_count": 12,
     "supported_exact_icpn_count": 0,
     "blocked": true
