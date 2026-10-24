@@ -94,6 +94,11 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotIn("/private/DO_NOT_SHOW", frame)
             self.assertNotIn("a" * 64, frame)
             self.assertNotIn("RECEIPT:", (d / "path2.log").read_text())
+            compact = mon.render_snapshot(d, "path2", width=88, height=12)
+            self.assertIn("WRAPPER: FAIL", compact)
+            self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED", compact)
+            self.assertIn("RECENT ACTIVITY", compact)
+            self.assertIn("FAIL | exit=2", compact)
 
     def test_native_preflight_receipt_hint_fail_closed(self):
         source = {
