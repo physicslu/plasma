@@ -28,6 +28,32 @@ running on that path. When a task runs the pane shows its Run ID, task ID,
 elapsed time, and recent output. When it finishes, the pane returns to IDLE
 and retains LAST: PASS or LAST: FAIL and process exit code.
 
+Both panes use the same operator layout: status, Run, Task, PR, GOAL,
+the active-stage category (when applicable), elapsed time or
+LAST/EXIT, local timezone-aware NOW and recent output. Rows are clipped
+by display **cells** (CJK full-width characters consume two cells),
+not by Python character count. The content uses at most 100 display columns
+and reserves the terminal's last physical column to avoid autowrap;
+smaller terminals clip rather than wrap. This affects only the viewer,
+not stored monitor files, Source, Work Order or Evidence.
+
+PATH 2 additionally shows `STAGE`: a fixed label from the already-authorized
+execution capability: `CPU-only CLI`, `Native preflight`,
+`Vivado host build`, or `Guarded Download/Test/Restore` for a
+previously authorized exact stage. This describes the **approved CLI
+category**, not confirmed physical progress. It never reveals a shell
+command, argv, raw stdout or hidden script arguments. If there is no
+recognized category, the pane shows `STAGE: (not available)`.
+
+A dynamic Path 2 or Path 3 owner Work Order may explicitly include an
+optional `monitor_summary` string: 8–80 simple display-safe characters.
+It is validated and SHA-256-bound with the immutable Work Order by the
+existing Authorizer and passed as operator-only metadata. Do not place
+secrets, network addresses, commands or private task content in this field.
+Older Work Orders remain valid but show
+`GOAL: (operator summary not provided)`; the renderer never guesses from
+raw `objective`, `acceptance`, prompt or command arguments.
+
 ### Viewer startup failure and recovery
 
 The launcher preserves a Path 2/3 tmux window if its `sg` or Python viewer
@@ -62,9 +88,10 @@ in the existing restricted /run/plasma-codex/engineering-monitor/ location.
 
 The wrapper updates status to RUNNING and records an active process.
 Path 2 sends a periodic heartbeat; detailed subprocess output remains
-governed by task/build evidence policy. Path 3 uses `codex exec --json`
-and streams **event type names only** to both its
-`.plasma-path3-evidence/codex.log` and the observer log. JSON event bodies
+governed by task/build evidence policy. Path 3 uses `codex exec --json`.
+Its persisted `.plasma-path3-evidence/codex.log` remains **event type
+names only**; the transient operator observer log additionally identifies
+fixed allowlisted item category / lifecycle labels. JSON event bodies
 (including commands, prompt content, model text and potential credentials)
 and unstructured stderr are not copied into these logs. The dispatcher
 extracts only `thread.started.thread_id` as the Codex Session ID and the
@@ -102,7 +129,8 @@ merely to enable a monitor.
 1. SSH to SWPC, start or attach the two-window tmux session.
 2. With no observed Path task, confirm both windows show IDLE.
 3. Run an already authorized Path 2 CPU-only task; confirm Run ID,
-   RUNNING, IDLE, exit/result and independent GitHub evidence.
+   RUNNING, IDLE, GOAL/fallback, the fixed CLI STAGE, timezone NOW,
+   exit/result and independent GitHub evidence.
 4. Repeat for an authorized Path 3 CPU-only job and verify sanitized
    Codex event types appear while running (not only after it exits).
 5. Verify switch (prefix+1 / prefix+2), C clear (new messages still appear,
