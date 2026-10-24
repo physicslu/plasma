@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import json
+import re
 import stat
 import subprocess
 import sys
@@ -125,7 +126,9 @@ def stage_contract(task: dict, approval: dict) -> str:
     require(stage is not None and type(task) is dict
             and task.get("capability") == "path2-stage-contract"
             and task.get("stage") == stage
-            and task.get("project") == "pl/projects/z2-fixed-unified-site1",
+            and type(task.get("project")) is str
+            and re.fullmatch(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}",
+                             task["project"]) is not None,
             "PATH2_STAGE_TASK_DENIED")
     # A single-stage adapter never consumes automation options. Exact stage
     # authorization above bounds the only physical call for both Paths.
@@ -140,7 +143,8 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
     """
     stage = stage_contract(task, approval)
     try:
-        payload = transport.execute(stage, approval["pinned_sha"])
+        payload = transport.execute(stage, approval["pinned_sha"],
+                                    task["project"])
     except transport.Blocked as exc:
         raise RuntimeDenied(transport.failure_code(exc)) from None
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -148,12 +152,13 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
     require(type(payload) is dict and
             payload.get("stage") == stage and
             payload.get("source_sha") == approval["pinned_sha"] and
+            payload.get("project") == task["project"] and
             payload.get("real_z2") is True and
             type(payload.get("boot_id")) is str and
             len(payload["boot_id"]) >= 8 and
             payload.get("result") in ({
                 "download": {"LOADED_AND_HELD"},
-                "test": {"IDENTITY_PASS"},
+                "test": {"IDENTITY_PASS", "DPIDR_PASS"},
                 "restore": {"RESTORED_VERIFIED", "ALREADY_RESTORED"},
             }[stage]),
             # Historical failure code retained for callers; the required
@@ -164,6 +169,7 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
         "status": "REAL_Z2_STAGE_EVIDENCE_REVIEW_REQUIRED",
         "stage": stage,
         "source_sha": approval["pinned_sha"],
+        "project": task["project"],
         "boot_id": payload["boot_id"],
         "result": payload["result"],
         "real_z2": True,
