@@ -346,7 +346,7 @@ def render_snapshot(directory: Path, path: str, *,
     pr_number = state.get("pr_number")
     if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
             pr_number != "0"):
-        lines.append("PR: #" + pr_number)
+        lines[-1] += "  PR: #" + pr_number
     if path in PATHS:
         summary = state.get("monitor_summary", "")
         if (type(summary) is str and
