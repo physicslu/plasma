@@ -39,5 +39,5 @@
   },
   "recovery_sha256": null,
   "runtime_admitted": false,
-  "external_swd_timing": "NOT_QUALIFIED"
+  "external_io_timing": "NOT_QUALIFIED"
 }
