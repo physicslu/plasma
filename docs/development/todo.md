@@ -159,6 +159,25 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ## Deferred architecture evolution
 
+### F1-B Legacy Retirement — P1, after Path 2 Main Cutover
+
+**Status:** TODO / not started; documentation of backlog only, no retirement or hardware changes authorized by this entry.
+
+**Layer:** Z2 Path 2/3 FPGA Provider / generic runtime boundaries / engineering dispatch / CI and documentation.
+
+**Prerequisite (P0):** Complete and verify the post-PR #1143 **main-based Path 2 Cutover** first: align the Z2 root-owned Source/Manifest/Profile pin with the reviewed `main` source using an independently approved, protected deployment; then demonstrate the actual trusted Dispatcher → SWPC Stage Transport → Z2 Generic Root Entry → Download/Test/Restore and confirmed `base.bin` recovery. PR #1143 pre-merge Development-only F1-B HIL PASS is **not** this post-merge end-to-end acceptance. Do not change installed Z2 source or trigger FPGA/DUT operations as part of this TODO update.
+
+**P1 retirement and decoupling scope:**
+
+- Inventory live imports/callers, fixed Work Orders, workflow path filters, tests, and protected-source dependencies before deleting or moving any F1-B file.
+- **Retain** the currently useful F1-B project Provider and safety guards (`pl/hil/path2_f1b_minimal_stage.py`, `pl/hil/path2_f1b_dev_risk.py`, `pl/hil/f1b.py`), their regression tests, and immutable historical execution/recovery evidence while they remain the qualified development reference.
+- Remove F1-B coupling from **generic** build/dispatch/runtime interfaces only where it is actually a generic-layer dependency. Review `scripts/plasma_path2_runtime_integration.py`, `scripts/plasma_path2_f1b_adapters.py`, `scripts/plasma_vivado_host_build.py`, and `specs/engineering-dispatch/development-tasks-v1.json`; do not remove the required fixed F1-B build and safety behavior without a tested replacement.
+- Independently classify archival or apparently unused F1-B one-shot and Build/Provenance helpers (including `pl/hil/f1b_owner_once.py`, `scripts/plasma_path2_build_qualification.py`, `scripts/plasma_path2_bin_provenance.py`, and `scripts/plasma_path2_held_provider.py`). Delete only after proving no current caller, installed-root manifest dependency, protected recovery obligation, or required test depends on them.
+- Remove stale `scripts/z2/plasma-path2-f1b-root-entry` source-path filters/references from CI **only after** ensuring CI covers the merged `scripts/z2/plasma-path2-root-entry`. Correct documentation still describing the merged Generic Root Entry as Draft or its completed pre-merge Z2 installation/HIL as NOT_RUN; preserve historical snapshots explicitly marked historical.
+
+**Closure evidence:** dependency/call-site inventory; minimal reviewable refactor; relevant positive and negative Host/CI tests; no regression of project/source-SHA admission, Root Entry allowlists, FPGA lock/AXI safety, or protected Restore; current post-cutover Path 2 and existing Path 3 acceptance unaffected. Real Z2 requalification is required only if the change affects the installed protected runtime or hardware behavior and must be separately in-scope under Gate 1. Keep historical F1-B evidence and existing safeguards; no cleanup-by-filename.
+
+
 ### Mock Runtime Core Convergence
 
 **Status:** TODO / medium-term architecture cleanup; no immediate runtime merge required
