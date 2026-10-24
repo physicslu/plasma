@@ -36,7 +36,8 @@ MAX_EVENT_BYTES = 640
 
 
 def safe_command(value: object) -> tuple[str, str]:
-    if type(value) is str and len(value) <= 125 and value.isascii():
+    if (type(value) is str and len(value) <= 125 and value.isascii() and
+            SENSITIVE.search(value) is None):
         for grammar, kind in COMMANDS:
             if grammar.fullmatch(value) is not None:
                 return kind, value
@@ -158,7 +159,8 @@ def parse_public_line(line: str) -> dict | None:
     if type(obj) is not dict or set(obj) != {
             "schema", "seq", "id", "kind", "detail", "state", "source", "time"}:
         return None
-    if (obj["schema"] != 1 or type(obj["seq"]) is not int or
+    if (type(obj["schema"]) is not int or obj["schema"] != 1 or
+            type(obj["seq"]) is not int or
             not 0 < obj["seq"] <= 10000000 or
             type(obj["id"]) is not str or ITEM_ID.fullmatch(obj["id"]) is None or
             type(obj["kind"]) is not str or obj["kind"] not in KINDS or
