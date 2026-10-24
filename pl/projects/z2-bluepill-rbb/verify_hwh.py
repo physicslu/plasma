@@ -68,6 +68,7 @@ def verify_hwh_xml(xml: str) -> dict:
         ("PCW_CRYSTAL_PERIPHERAL_FREQMHZ", 50),
         ("PCW_FPGA0_PERIPHERAL_FREQMHZ", 100),
         ("PCW_USE_M_AXI_GP0", 1),
+        ("PCW_M_AXI_GP0_FREQMHZ", 100),
         ("PCW_GPIO_EMIO_GPIO_ENABLE", 0),
     ):
         _need(_number(config.get(key)) == expected,
