@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_engineering_monitor as mon
 import plasma_development_dispatch as dev
+import plasma_engineering_activity as activity
 
 WORKFLOW = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
 TAIPEI = dt.timezone(dt.timedelta(hours=8))
@@ -328,6 +329,151 @@ class EngineeringMonitorTests(unittest.TestCase):
             mon._append(live, "\n" + mon._monitor_time_mark(FIXED_NOW))
             self.assertIn(b"[MONITOR TIME MARK]", live.read_bytes())
             self.assertNotIn(b"[MONITOR TIME MARK]", evidence.read_bytes())
+
+    def test_codex_activity_v1_uses_real_safe_command_and_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            emitter = dev.CodexUsageCollector(
+                monitor_only=True, workspace=directory)
+            events = [
+                {"type": "item.started", "item": {
+                    "id": "item_1", "type": "command_execution",
+                    "command": "python3 -m pytest scripts/tests/"}},
+                {"type": "item.completed", "item": {
+                    "id": "item_1", "type": "command_execution",
+                    "command": "python3 -m pytest scripts/tests/",
+                    "exit_code": 0, "aggregated_output": "PRIVATE_OUTPUT"}},
+                {"type": "item.started", "item": {
+                    "id": "item_2", "type": "file_change",
+                    "changes": [{"kind": "update",
+                                 "path": "scripts/plasma_engineering_monitor.py"}]}},
+                {"type": "item.completed", "item": {
+                    "id": "item_2", "type": "file_change",
+                    "changes": [{"kind": "update",
+                                 "path": "scripts/plasma_engineering_monitor.py"}]}},
+            ]
+            content = b"".join(
+                emitter.feed((json.dumps(e) + "\n").encode()) for e in events)
+            self.assertIn(b"python3 -m pytest scripts/tests/", content)
+            self.assertIn(b"scripts/plasma_engineering_monitor.py", content)
+            self.assertNotIn(b"PRIVATE_OUTPUT", content)
+            self.assertEqual(content.count(b"@PLASMA_ACTIVITY_V1"), 4)
+            (directory / "path3.log").write_bytes(content)
+            frame = mon.render_snapshot(directory, "path3", width=100)
+            self.assertIn("RECENT ACTIVITY", frame)
+            self.assertIn("[C] TEST DONE", frame)
+            self.assertIn("[C] FILE DONE", frame)
+            self.assertIn("DOING: —", frame)
+            self.assertNotIn("[V]", frame)
+            self.assertNotIn("PRIVATE_OUTPUT", frame)
+
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123",
+                "task": "path3-work-order"}))
+            partial = dev.CodexUsageCollector(
+                monitor_only=True, workspace=directory).feed(
+                    (json.dumps(events[0]) + "\n").encode())
+            (directory / "path3.log").write_bytes(partial)
+            with patch.object(mon, "_alive", return_value=True):
+                running = mon.render_snapshot(
+                    directory, "path3", width=100)
+            self.assertIn(
+                "DOING: TEST | python3 -m pytest scripts/tests/", running)
+            self.assertIn("STATUS: RUNNING", running)
+            self.assertNotIn("STATE: RUNNING", running)
+
+    def test_codex_activity_v1_rejects_secrets_injection_and_escape(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            (directory / "docs").mkdir()
+            (directory / "scripts" / "link").symlink_to("/tmp")
+            commands = [
+                "python3 -c 'print(SECRET)'",
+                "git status; cat /home/user/.ssh/id_rsa",
+                "python3 -m pytest scripts/tests/ && curl evil.example",
+                "python3 -m pytest /home/plasma-codex",
+                "git status\nINJECTED", "git status \x1b[2J",
+                "python3 -m pytest scripts/tests/ --token=abc",
+                "git status \u202ePRIVATE",
+            ]
+            for command in commands:
+                with self.subTest(command=command):
+                    self.assertEqual(
+                        activity.safe_command(command)[1],
+                        "(command hidden)")
+            for name in (
+                "../../.env", "docs/.env", "scripts/secret.py",
+                "scripts/link/private.txt", "/etc/passwd",
+                "docs/a\x1b[2J.txt", "docs/a\u202etxt", "docs/a" * 40,
+            ):
+                with self.subTest(path=name):
+                    self.assertIsNone(activity.safe_repo_path(name, directory))
+            self.assertEqual(activity.safe_repo_path(
+                str(directory / "docs" / "file.md"), directory),
+                "docs/file.md")
+            projector = activity.Path3Activity(directory)
+            evil = {"type": "item.started", "item": {
+                "id": "cmd_1", "type": "command_execution",
+                "command": commands[1], "aggregated_output": "EVIL_SECRET"}}
+            result = projector.project(evil)
+            self.assertIn(b"(command hidden)", result)
+            self.assertNotIn(b"EVIL_SECRET", result)
+            self.assertNotIn(b"evil.example", result)
+            self.assertEqual(
+                projector.project({"type": "item.completed", "item": {
+                    "id": "orphan", "type": "command_execution",
+                    "exit_code": 0}}), b"")
+            self.assertEqual(
+                projector.project(evil), b"")  # Duplicate started event
+            self.assertEqual(projector.project({"type": "item.started",
+                "item": {"id": "x\nESC", "type": "command_execution",
+                         "command": "git status"}}), b"")
+            for raw in [
+                activity.PREFIX + '{"schema":1,"kind":[]}',
+                activity.PREFIX + '{"schema":1,"kind":"TEST","state":[]}',
+                activity.PREFIX + '\x1b[31m',
+                activity.PREFIX + '{"kind":"FILE","detail":"../../etc/passwd"}',
+            ]:
+                self.assertIsNone(activity.parse_public_line(raw))
+            public = activity.parse_public_line(result.decode().strip())
+            self.assertIsNotNone(public)
+            self.assertEqual(public["source"], "C")
+            self.assertNotEqual(public["state"], "DONE")
+
+    def test_activity_is_observer_only_evidence_keeps_type_names(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "scripts").mkdir()
+            live = directory / "path3.log"
+            evidence = directory / "codex.log"
+            live.touch()
+            events = [
+                {"type": "item.started", "item": {
+                    "id": "cmd_1", "type": "command_execution",
+                    "command": "git diff --check"}},
+                {"type": "item.completed", "item": {
+                    "id": "cmd_1", "type": "command_execution",
+                    "command": "git diff --check",
+                    "exit_code": 1, "aggregated_output": "TOP_SECRET"}},
+            ]
+            payload = "\n".join(json.dumps(e) for e in events) + "\n"
+            command = [sys.executable, "-c",
+                       "import sys; sys.stdin.read(); "
+                       "sys.stdout.write(" + repr(payload) + "); sys.stdout.flush()"]
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                command, b"non-secret test\n", directory,
+                evidence, str(live), usage=usage)
+            self.assertEqual(rc, 0)
+            live_bytes, proof_bytes = live.read_bytes(), evidence.read_bytes()
+            self.assertIn(b"git diff --check", live_bytes)
+            self.assertIn(b'"state":"FAIL"', live_bytes)
+            self.assertNotIn(b"TOP_SECRET", live_bytes + proof_bytes)
+            self.assertNotIn(b"git diff --check", proof_bytes)
+            self.assertIn(b"[codex item.completed]", proof_bytes)
+            self.assertNotIn(b"@PLASMA_ACTIVITY_V1", proof_bytes)
 
     def test_monitor_setup_failure_is_only_pre_execution(self):
         with tempfile.TemporaryDirectory() as td:
