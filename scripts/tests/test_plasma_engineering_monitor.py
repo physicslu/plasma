@@ -7,9 +7,11 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -441,6 +443,64 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIsNotNone(public)
             self.assertEqual(public["source"], "C")
             self.assertNotEqual(public["state"], "DONE")
+
+    @unittest.skipUnless(shutil.which("tmux"), "tmux binary not present")
+    def test_private_tmux_socket_displays_current_safe_activity(self):
+        """Real terminal smoke, using only a private socket and synthetic events."""
+        with tempfile.TemporaryDirectory(prefix="plasma-activity-tmux-") as td:
+            directory = Path(td)
+            socket = str(directory / "private.sock")
+            projector = activity.Path3Activity(directory)
+            safe = projector.project({"type": "item.started", "item": {
+                "id": "task_1", "type": "command_execution",
+                "command": "python3 -m pytest scripts/tests/"}})
+            (directory / "path3.log").write_bytes(safe)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123456",
+                "task": "path3-work-order",
+                "monitor_summary": "Fix Monitor Launcher",
+                "pid": os.getpid(),
+                "proc_start": mon._proc_start(os.getpid()),
+            }))
+            python = (
+                "import sys,time; from pathlib import Path; "
+                "sys.path.insert(0, sys.argv[2]); "
+                "import plasma_engineering_monitor as m; "
+                "print(m.render_snapshot(Path(sys.argv[1]), 'path3', "
+                "width=100, height=24), flush=True); time.sleep(8)"
+            )
+            def tmux(*args, check=True):
+                return subprocess.run(
+                    ["tmux", "-S", socket, "-f", "/dev/null", *args],
+                    capture_output=True, text=True, timeout=6, check=check)
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "activity-test",
+                     "-x", "100", "-y", "24", "-n", "path3",
+                     sys.executable, "-u", "-c", python,
+                     str(directory), str(ROOT / "scripts"))
+                started = True
+                frame = ""
+                for _ in range(30):
+                    result = tmux(
+                        "capture-pane", "-p", "-t", "activity-test:0",
+                        check=False)
+                    if result.returncode == 0:
+                        frame = result.stdout
+                    if "DOING: TEST | python3 -m pytest scripts/tests/" in frame:
+                        break
+                    time.sleep(0.1)
+                self.assertIn("STATUS: RUNNING", frame)
+                self.assertIn("RUN: 123456", frame)
+                self.assertIn("GOAL: Fix Monitor Launcher", frame)
+                self.assertIn(
+                    "DOING: TEST | python3 -m pytest scripts/tests/", frame)
+                self.assertIn("RECENT ACTIVITY", frame)
+                self.assertIn("[C] TEST RUNNING", frame)
+                self.assertNotIn("STATE: RUNNING", frame)
+            finally:
+                if started:
+                    tmux("kill-server", check=False)
 
     def test_activity_is_observer_only_evidence_keeps_type_names(self):
         with tempfile.TemporaryDirectory() as td:
