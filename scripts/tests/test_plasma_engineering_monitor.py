@@ -955,10 +955,15 @@ class EngineeringMonitorTests(unittest.TestCase):
 
     def test_launcher_retains_window_on_immediate_viewer_exit(self):
         """An sg/view failure must remain visible, never race the tmux layout check."""
-        for failing in ("path2", "path3"):
-            with self.subTest(failing=failing):
-                result = self._run_mock_launcher([], fail_viewer=failing)
+        cases = [([], "path2", ("path2", "path3")),
+                 ([], "path3", ("path2", "path3")),
+                 ([{"index": 1, "name": "path2", "panes": ["%1"]}],
+                  "path3", ("path3",))]
+        for windows, failing, expected in cases:
+            with self.subTest(windows=windows, failing=failing):
+                result = self._run_mock_launcher(windows, fail_viewer=failing)
                 self.assertEqual(result["rc"], 0, result["stderr"])
+                self.assertEqual(result["viewers"], expected)
                 self.assertIn(
                     f"MONITOR_VIEWER_EXIT path={failing} exit=7",
                     result["stderr"])
@@ -1051,7 +1056,12 @@ elif op == "list-panes":
     require(w is not None)
     for pane in w["panes"]: print(pane)
 elif op == "display-message":
-    w = get(args[args.index("-t")+1])
+    target = args[args.index("-t")+1]
+    w = get(target)
+    # Reproduce observed real tmux fallback: even for a non-existent path3,
+    # display-message can return success with path2's current index.
+    if w is None and target.endswith(":path3"):
+        w = get("path2")
     require(w is not None)
     print(w["index"])
 elif op == "new-session":
@@ -1116,6 +1126,103 @@ if op in ("new-session", "new-window"):
                     "path2" if "view path2" in x else "path3"
                     for x in sg_file.read_text().splitlines()),
             }
+
+    @unittest.skipUnless(shutil.which("tmux"), "tmux executable not installed")
+    def test_real_tmux_launcher_only_adds_missing_path3_on_private_socket(self):
+        """Exercise the actual launcher; PATH 2 is preserved; PATH 3 fails visibly."""
+        with tempfile.TemporaryDirectory(prefix="plasma-tmux-launcher-") as td:
+            d = Path(td)
+            sock = str(d / "private.sock")
+            tmux_binary = shutil.which("tmux")
+            bin_dir = d / "bin"
+            bin_dir.mkdir()
+            # Every tmux command made by the real launcher is redirected
+            # into this private socket; interception of attach is deliberate.
+            wrapper = bin_dir / "tmux"
+            wrapper.write_text(
+                '#!/bin/bash\n'
+                'printf "%s\\n" "$*" >> "$TEST_TMUX_CALL_LOG"\n'
+                'if [[ "$1" == attach-session ]]; then exit 0; fi\n'
+                'exec "$TEST_REAL_TMUX" -S "$TEST_SOCKET" '
+                '-f /dev/null "$@"\n')
+            wrapper.chmod(0o755)
+            for name, body in (
+                ("id", '[[ "$1" == "-un" ]] && { echo operator; exit; }\n'
+                 '[[ "$1" == "-nG" ]] && { echo "operator plasma-monitor"; exit; }\n'
+                 'exit 2\n'),
+                ("getent", '[[ "$1" == group && "$2" == plasma-monitor ]]\n'),
+                ("sg", 'echo "STUB_PATH3_SG_FAILURE" >&2\nexit 7\n'),
+            ):
+                stub = bin_dir / name
+                stub.write_text("#!/bin/bash\n" + body)
+                stub.chmod(0o755)
+            env = dict(os.environ, TEST_REAL_TMUX=tmux_binary,
+                       TEST_SOCKET=sock,
+                       TEST_TMUX_CALL_LOG=str(d / "calls.log"))
+            env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+
+            def tmux(*args, check=True):
+                return subprocess.run(
+                    [tmux_binary, "-S", sock, "-f", "/dev/null", *args],
+                    capture_output=True, text=True, timeout=8, check=check)
+
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "plasma-monitor",
+                     "-x", "80", "-y", "24", "-n", "path2",
+                     "sleep", "30")
+                started = True
+                # Capture dead panes during diagnosis; assert they are alive
+                # rather than accepting a retained-but-terminated window.
+                tmux("set-option", "-g", "remain-on-exit", "on")
+                # Existing private server was created before the launcher;
+                # explicitly supply the fake sg PATH to only this socket.
+                tmux("set-environment", "-g", "PATH", env["PATH"])
+                tmux("move-window", "-d",
+                     "-s", "plasma-monitor:0", "-t", "plasma-monitor:1")
+                original = tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:1",
+                    "#{pane_id}").stdout.strip()
+                launch = subprocess.run(
+                    ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
+                    env=env, capture_output=True, text=True, timeout=12)
+                windows_snapshot = tmux(
+                    "list-windows", "-t", "plasma-monitor",
+                    "-F", "#{window_index}:#{window_name}", check=False)
+                diagnostic = tmux(
+                    "capture-pane", "-p", "-S", "-50",
+                    "-t", "plasma-monitor:2", check=False)
+                self.assertEqual(
+                    launch.returncode, 0,
+                    "Launcher stderr=" + launch.stderr +
+                    " calls=" + (d / "calls.log").read_text() +
+                    " windows=" + windows_snapshot.stdout +
+                    " pane=" + diagnostic.stdout + diagnostic.stderr)
+                last = ""
+                for _ in range(30):
+                    cap = tmux("capture-pane", "-p",
+                               "-t", "plasma-monitor:2", check=False)
+                    if cap.returncode == 0:
+                        last = cap.stdout
+                    if "MONITOR_VIEWER_EXIT path=path3 exit=7" in last:
+                        break
+                    time.sleep(0.1)
+                self.assertIn("STUB_PATH3_SG_FAILURE", last)
+                self.assertIn("MONITOR_VIEWER_EXIT path=path3 exit=7", last)
+                self.assertEqual(tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:2",
+                    "#{pane_dead}").stdout.strip(), "0",
+                    "Diagnostic shell exited after viewer failure")
+                self.assertEqual(tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:1",
+                    "#{pane_id}").stdout.strip(), original)
+                windows = tmux("list-windows", "-t", "plasma-monitor",
+                               "-F", "#{window_index}:#{window_name}").stdout
+                self.assertIn("1:path2", windows)
+                self.assertIn("2:path3", windows)
+            finally:
+                if started:
+                    tmux("kill-server", check=False)
 
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
