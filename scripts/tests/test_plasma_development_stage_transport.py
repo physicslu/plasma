@@ -50,6 +50,91 @@ class Contracts(unittest.TestCase):
                 t.execute('test', SHA, PROJECT)
             launch.assert_not_called()
 
+    def _mock_dev_credential_sources(self, *, canonical, login, sudo):
+        """Existing credential sources are injected; no real host or SSH."""
+        owned_key = Mock()
+        owned_key.st_mode = 0o100600
+        owned_key.st_uid = 1000
+        keyfile = Mock()
+        keyfile.lstat.return_value = owned_key
+        canonical_file = Mock()
+        canonical_file.exists.return_value = canonical is not None
+        canonical_file.is_symlink.return_value = False
+        login_file = Mock()
+        sudo_file = Mock()
+        sudo_file.exists.return_value = sudo is not None
+        sudo_file.is_symlink.return_value = False
+
+        def load(path):
+            if path is canonical_file:
+                return canonical
+            if path is login_file:
+                return login
+            if path is sudo_file:
+                return sudo
+            raise AssertionError("unexpected credential path")
+
+        return (canonical_file, login_file, sudo_file, keyfile, load)
+
+    def test_reuse_canonical_development_credentials_without_split_enrollment(self):
+        shared = {'ssh_host': 'z2.example', 'ssh_username': 'xilinx',
+                  'ssh_password': 'test-login', 'sudo_password': 'test-sudo'}
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical=shared, login=None, sudo=None)
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load) as reader, \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run', return_value=Mock(returncode=0)):
+            self.assertEqual(t.enrollment(), ('z2.example', 'test-login', 'test-sudo'))
+            self.assertEqual(reader.call_count, 1)
+            reader.assert_called_once_with(dev)
+
+    def test_login_only_reuses_password_without_independent_sudo_enrollment(self):
+        ssh = {'ssh_host':'z2.example', 'ssh_username':'xilinx',
+               'ssh_password':'test-password'}
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical=None, login=ssh, sudo=None)
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load) as reader, \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run', return_value=Mock(returncode=0)):
+            self.assertEqual(t.enrollment(), ('z2.example', 'test-password', 'test-password'))
+            reader.assert_called_once_with(login)
+
+    def test_explicit_legacy_sudo_remains_valid_when_different(self):
+        ssh = {'ssh_host':'z2.example', 'ssh_username':'xilinx',
+               'ssh_password':'test-login'}
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical=None, login=ssh, sudo={'sudo_password':'test-distinct'})
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load), \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run', return_value=Mock(returncode=0)):
+            self.assertEqual(t.enrollment(), ('z2.example', 'test-login', 'test-distinct'))
+
+    def test_malformed_canonical_source_fails_without_legacy_fallback(self):
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical={'ssh_host':'z2.example'}, login={'ssh_host':'other'},
+            sudo={'sudo_password':'test-value'})
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load) as reader, \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run') as ssh_key, \
+             patch.object(t.subprocess, 'Popen') as remote:
+            with self.assertRaisesRegex(t.Blocked, 'NOT_ENROLLED'):
+                t.execute('test', SHA, PROJECT)
+            self.assertEqual(reader.call_count, 1)
+            ssh_key.assert_not_called()
+            remote.assert_not_called()
+
     def test_host_key_missing_or_mismatch_never_launches_ssh(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td); root.chmod(0o700)
