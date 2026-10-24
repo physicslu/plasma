@@ -126,6 +126,23 @@ def test_build_source_requires_actual_bit_hwh_inspection():
     assert "BLUEPILL_Z2_BIT_HWH_INSPECTION_PASS_OFFLINE_NOT_HIL" in script
 
 
+def test_vivado_build_fail_closed_on_critical_drc_before_artifact_pass():
+    # Source-only contract: the real Vivado implementation is NOT_RUN here.
+    script = (PROJECT / "build_bitstream.tcl").read_text()
+    for required in (
+        "report_drc -file",
+        "report_methodology -file",
+        "check_timing -verbose -file",
+        "get_drc_violations -quiet",
+        'get_property SEVERITY $violation',
+        "{Error {Critical Warning}}",
+        "BLUEPILL_Z2_BLOCKING_DRC",
+    ):
+        assert required in script
+    assert (script.index("BLUEPILL_Z2_BLOCKING_DRC")
+            < script.index("BLUEPILL_Z2_BIT_HWH_INSPECTION_PASS_OFFLINE_NOT_HIL"))
+
+
 def test_synthetic_hwh_bit_inspection_denies_admission(tmp_path):
     source = tmp_path / "fixture.hwh"
     bit = tmp_path / "fixture.bit"
