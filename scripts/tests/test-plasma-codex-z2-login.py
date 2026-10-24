@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import Mock, call, patch
 
 HERE = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -72,6 +74,69 @@ class Z2LoginContracts(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 subject.atomic_private_create(target, b"new secret")
             self.assertEqual(target.read_bytes(), b"secret")
+
+    def test_consolidation_ignores_retired_swd05_route(self) -> None:
+        """An obsolete/malformed SWD-05 path file must not block SSH consolidation."""
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            base.chmod(0o700)
+            login = base / "z2-login-smoke.json"
+            pinned = base / "z2-login-known_hosts"
+            legacy = base / "z2-dev-credentials.json"
+            retired = base / "z2-swd05-oneshot.json"
+            current = {"ssh_host": "z2.example", "ssh_username": "xilinx",
+                       "ssh_password": "fake-ssh"}
+            for path, data in (
+                (login, json.dumps(current)),
+                (pinned, "z2.example ssh-ed25519 TEST-ONLY-KEY\\n"),
+                (legacy, json.dumps(dict(current, sudo_password="fake-sudo"))),
+                (retired, '{"legacy-swd05":"not-a-valid-route"}'),
+            ):
+                path.write_text(data)
+                path.chmod(0o600)
+            with patch.object(subject, "FILE", login), \
+                 patch.object(subject, "KNOWN_HOSTS", pinned), \
+                 patch.object(subject, "expect_worker"), \
+                 patch.object(subject.sys, "stdin", Mock(isatty=lambda: True)), \
+                 patch.dict(os.environ, {"GITHUB_ACTIONS": "", "RUNNER_NAME": ""}), \
+                 patch.object(subject.pwd, "getpwnam", return_value=Mock(pw_uid=os.geteuid())), \
+                 patch.object(subject.subprocess, "Popen") as ssh_key:
+                ssh_key.return_value.__enter__.return_value.wait.return_value = 0
+                subject.consolidate_credentials()
+                self.assertFalse(legacy.exists())
+                self.assertEqual(json.loads(login.read_text())["sudo_password"],
+                                 "fake-sudo")
+                self.assertEqual(retired.read_text(),
+                                 '{"legacy-swd05":"not-a-valid-route"}')
+
+    def test_conflicting_legacy_login_does_not_delete_anything(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            base.chmod(0o700)
+            login = base / "z2-login-smoke.json"
+            pinned = base / "z2-login-known_hosts"
+            legacy = base / "z2-dev-credentials.json"
+            original = {"ssh_host": "z2.example", "ssh_username": "xilinx",
+                        "ssh_password": "fake-ssh"}
+            login.write_text(json.dumps(original))
+            legacy.write_text(json.dumps(dict(original, ssh_host="different.example",
+                                              sudo_password="fake-sudo")))
+            pinned.write_text("z2.example ssh-ed25519 TEST-ONLY-KEY\\n")
+            for p in (login, pinned, legacy):
+                p.chmod(0o600)
+            with patch.object(subject, "FILE", login), \
+                 patch.object(subject, "KNOWN_HOSTS", pinned), \
+                 patch.object(subject, "expect_worker"), \
+                 patch.object(subject.sys, "stdin", Mock(isatty=lambda: True)), \
+                 patch.dict(os.environ, {"GITHUB_ACTIONS": "", "RUNNER_NAME": ""}), \
+                 patch.object(subject.pwd, "getpwnam", return_value=Mock(pw_uid=os.geteuid())), \
+                 patch.object(subject.subprocess, "Popen") as ssh_key:
+                ssh_key.return_value.__enter__.return_value.wait.return_value = 0
+                before = legacy.read_bytes()
+                with self.assertRaisesRegex(ValueError, "LEGACY_Z2_CREDENTIAL_CONFLICT"):
+                    subject.consolidate_credentials()
+                self.assertEqual(legacy.read_bytes(), before)
+                self.assertNotIn("sudo_password", json.loads(login.read_text()))
 
     def test_no_hardware_activity_during_self_test(self) -> None:
         with patch.object(subject, "ssh_login", side_effect=AssertionError):
