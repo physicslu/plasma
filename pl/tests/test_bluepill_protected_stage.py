@@ -211,9 +211,11 @@ def test_directly_forged_stage_plan_must_fail(modifications):
 
 def test_no_real_stage_entrypoint_or_accidental_f1b_waiver():
     # Calling it as an installed root-entry module must fail before ANY action.
-    script = Path(bp.__file__)
-    result = subprocess.run([sys.executable, str(script), "download"],
-                            capture_output=True, text=True, timeout=8)
+    script = Path(bp.__file__).resolve()
+    # Existing protected Root Entry invokes reviewed stages as -m modules.
+    result = subprocess.run(
+        [sys.executable, "-m", "pl.hil.bluepill_protected_stage", "download"],
+        cwd=script.parents[2], capture_output=True, text=True, timeout=8)
     assert result.returncode == 2
     assert "BLUEPILL_LIVE_STAGE_BACKEND_NOT_IMPLEMENTED" in result.stderr
     assert "PLASMA_PATH2_STAGE=" not in result.stdout
