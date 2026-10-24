@@ -1713,12 +1713,13 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 event = self._event(self._order(monitor_summary=value))
                 with self.assertRaises(dev.Denied):
                     dev.request(event, self._context())
-        # A Path 2 objective is not allowed to introduce a Path 3 viewer field.
-        event = self._event(self._order(
-            "path2-cli", monitor_summary="Authorized metadata only"))
-        with self.assertRaisesRegex(
-                dev.Denied, "WORK_ORDER_PATH2_FIELDS_DENIED"):
-            dev.request(event, self._context())
+        # Both Paths share the same strictly validated public summary.
+        # Neither Path may publish unsafe payloads or actual commands.
+        for path in ("path2-cli", "path3-codex"):
+            event = self._event(self._order(
+                path, monitor_summary="token sent to monitor"))
+            with self.assertRaises(dev.Denied):
+                dev.request(event, self._context())
 
     def test_monitor_summary_is_unicode_one_line_operator_metadata(self):
         order = self._order(
@@ -1727,6 +1728,68 @@ class GenericWorkOrderContracts(unittest.TestCase):
             dev.authorize(
                 self._event(order), self._context(),
                 self.registry)["monitor_summary"], order["monitor_summary"])
+
+    def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
+        summary = "PATH2 Host-only CLI regression"
+        case = self._order("path2-cli", monitor_summary=summary)
+        event = self._event(case)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        self.assertEqual(approval["monitor_summary"], summary)
+        self.assertEqual(approval["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(case))
+        tampered = self._event(case | {
+            "monitor_summary": "PATH2 Unauthorized changed objective"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        # Old Work Orders remain admitted and display no invented goal.
+        old = self._event(self._order("path2-cli"))
+        old_approval = dev.authorize(old, self._context(), self.registry)
+        self.assertEqual(old_approval["monitor_summary"], "")
+        self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
+
+    def test_path2_protected_stage_labels_are_exact_and_non_authorizing(self):
+        for stage, expected in (
+            ("download", "Guarded Download"),
+            ("test", "Guarded Test"),
+            ("restore", "Guarded Restore"),
+        ):
+            with self.subTest(stage=stage):
+                order = self._order(
+                    "path2-cli", capability="path2-stage-contract",
+                    scope="guarded-hardware",
+                    project="pl/projects/z2-fixed-unified-site1",
+                    stage=stage,
+                    monitor_summary="Guarded FPGA provider validation")
+                for k in ("script", "argv", "expected_stdout_sha256"):
+                    order.pop(k, None)
+                event = self._event(order)
+                approval = dev.authorize(
+                    event, self._context(), self.registry)
+                self.assertEqual(approval["monitor_stage"], expected)
+                self.assertEqual(
+                    approval["monitor_summary"],
+                    "Guarded FPGA provider validation")
+                self.assertEqual(approval["authorized_stage"], stage)
+        bad = self._order(
+            "path2-cli", capability="path2-stage-contract",
+            scope="guarded-hardware",
+            project="pl/projects/z2-fixed-unified-site1",
+            stage="program", monitor_summary="Unauthorized stage test")
+        for k in ("script", "argv", "expected_stdout_sha256"):
+            bad.pop(k, None)
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
+            dev.request(self._event(bad))
+
+    def test_path3_does_not_report_path2_cli_stage(self):
+        a = dev.authorize(
+            self._event(self._order()), self._context(), self.registry)
+        self.assertEqual(a["monitor_stage"], "")
+        static = dev.authorize(
+            DevelopmentPath2Contracts().event(),
+            DevelopmentPath2Contracts().context(), self.registry)
+        self.assertEqual(static["monitor_stage"], "CPU-only CLI")
 
     def test_path2_cpu_only_uses_existing_checked_script(self):
         event = self._event(self._order("path2-cli"))
