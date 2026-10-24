@@ -24,6 +24,7 @@ class Contracts(unittest.TestCase):
             self.assertNotIn(forbidden, source)
         self.assertEqual(t.ROOT_ENTRY, '/usr/local/libexec/plasma/z2-path2-root-entry')
         self.assertEqual(t.MARK, 'PLASMA_PATH2_STAGE=')
+        self.assertNotIn('F1B_IMAGE_NOT_LOADED', source)
         self.assertIn('StrictHostKeyChecking=yes', source)
         self.assertIn('GlobalKnownHostsFile=/dev/null', source)
 
@@ -166,6 +167,15 @@ class Contracts(unittest.TestCase):
             t.parse_receipt('test', SHA, encoded, 'pl/projects/z2-bluepill-rbb')
         with self.assertRaises(t.Blocked):
             t.parse_receipt('test', SHA, encoded + encoded, PROJECT)
+
+    def test_project_specific_target_failure_is_never_generic_authority(self):
+        # A particular project may report its own error, but Stage Transport
+        # must not treat a project's stderr as a privileged root receipt.
+        failed = b"LiveStageDenied: F1B_IMAGE_NOT_LOADED" + bytes([10])
+        self.assertEqual(t.remote_failure(1, failed),
+                         'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
+        self.assertEqual(t.remote_failure(2, failed),
+                         'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
 
     def test_bad_project_never_attempts_ssh(self):
         with patch.object(t, 'enrollment') as enrollment:

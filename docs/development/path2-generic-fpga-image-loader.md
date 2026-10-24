@@ -60,3 +60,10 @@ connected to the existing trusted Root execution path. The retained
 change directly edits only existing trusted code and the existing Root
 Entry source, with no new Runner, Workflow, SSH path, sudo capability or
 alternative image loader.
+
+
+The shared Stage Transport deliberately does not special-case F1-B's
+private error strings as generic safety/identity evidence. A project
+stage failure without the exact verified Root receipt is classified
+as a generic remote failure; specific diagnostic analysis belongs to
+the project module and approved root-side evidence.

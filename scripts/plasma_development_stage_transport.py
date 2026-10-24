@@ -52,8 +52,7 @@ SAFE_FAILURE_CODES = frozenset({
     "HOST_KEY_NOT_PINNED", "STAGE_NOT_ALLOWLISTED", "SOURCE_SHA_INVALID",
     "REMOTE_EXIT_OR_PRIVILEGE_FAILED", "REMOTE_PTY_NOT_DRAINED",
     "REMOTE_OUTPUT_TOO_LARGE", "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED",
-    "REMOTE_RESULT_NOT_VERIFIED", "F1B_IMAGE_NOT_LOADED",
-    "PROJECT_NOT_ALLOWLISTED",
+    "REMOTE_RESULT_NOT_VERIFIED", "PROJECT_NOT_ALLOWLISTED",
 })
 
 
@@ -110,13 +109,10 @@ def remote_failure(returncode: int, output: bytes) -> str:
     # Reject mixed/duplicate root diagnostic claims and all arbitrary stderr.
     # Do not interpret diagnostics on SSH's own failure exit (255).
     lines = text.splitlines()
-    root_codes = [line for line in lines if line in ROOT_MANIFEST_DIAGNOSTICS
-                  or line == "LiveStageDenied: F1B_IMAGE_NOT_LOADED"]
+    root_codes = [line for line in lines
+                  if line in ROOT_MANIFEST_DIAGNOSTICS]
     if returncode == 2 and len(root_codes) == 1:
-        if root_codes[0] in ROOT_MANIFEST_DIAGNOSTICS:
-            return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
-    if returncode == 1 and root_codes == ["LiveStageDenied: F1B_IMAGE_NOT_LOADED"]:
-        return "F1B_IMAGE_NOT_LOADED"
+        return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
     return "REMOTE_EXIT_OR_PRIVILEGE_FAILED"
 
 
