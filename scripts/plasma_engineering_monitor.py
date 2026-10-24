@@ -36,6 +36,19 @@ CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 RUN_ID = re.compile(r"[0-9]{1,20}\Z")
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 PR_NUMBER = re.compile(r"(?:0|[1-9][0-9]{0,7})\Z")
+WORK_ORDER_SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+# Defense-in-depth: hosted Authorizer independently validates the source.
+# The monitor may display only an explicitly submitted public metadata field.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -138,9 +151,18 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     pr_number = os.environ.get("PR_NUMBER", "")
     if not PR_NUMBER.fullmatch(pr_number):
         pr_number = "-"
+    work_order_sha = os.environ.get("WORK_ORDER_SHA256", "")
+    summary = os.environ.get("PLASMA_MONITOR_SUMMARY", "")
+    summary_valid = (
+        path == "path3" and task == "path3-work-order" and
+        WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+        type(summary) is str and MONITOR_SUMMARY.fullmatch(summary) is not None
+        and MONITOR_SENSITIVE.search(summary) is None
+    )
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
         "task": task, "pr_number": pr_number,
+        "monitor_summary": summary if summary_valid else "",
         "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
@@ -294,6 +316,14 @@ def render_snapshot(directory: Path, path: str, *,
     if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
             pr_number != "0"):
         lines.append("PR: #" + pr_number)
+    if path == "path3" and state.get("task") == "path3-work-order":
+        summary = state.get("monitor_summary", "")
+        if (type(summary) is str and
+                MONITOR_SUMMARY.fullmatch(summary) is not None and
+                MONITOR_SENSITIVE.search(summary) is None):
+            lines.append("GOAL: " + summary)
+        else:
+            lines.append("GOAL: (operator summary not provided)")
     if status == "RUNNING":
         started = state.get("started", "")
         try:
