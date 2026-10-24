@@ -118,3 +118,79 @@ def test_generic_module_has_no_privileged_live_entrypoint():
     assert p.returncode == 2
     assert "GENERIC_FPGA_CONFIGURATION_LIVE_BACKEND_NOT_IMPLEMENTED" in p.stderr
     assert "PLASMA_PATH2_STAGE=" not in p.stdout
+
+# Additive candidate contract: deliberately no candidate Git SHA/executor SHA.
+def candidate_args():
+    hardware = cfg.CandidateHardware(
+        board="pynq-z2", fpga_part="xc7z020clg400-1", abi="swd-gpio-v1",
+        axi_base=0x40008000, axi_bytes=4096, fclk_hz=100_000_000,
+        site_count=1, pin_map=(("swclk", "W14"), ("swdio", "Y14")))
+    return dict(image=BIN, image_sha256=sha(BIN), descriptor=hardware,
+                measured=hardware, recovery=RECOVERY,
+                recovery_sha256=sha(RECOVERY), exclusive_owner=True,
+                consumers_quiesced=True, axi_isolated=True,
+                external_io_isolated=True, all_sites_idle=True,
+                admission_locked=True)
+
+
+def test_candidate_integrity_without_image_source_provenance():
+    assert cfg.validate_candidate(**candidate_args()) is None
+
+
+@pytest.mark.parametrize("field", [
+    "exclusive_owner", "consumers_quiesced", "axi_isolated",
+    "external_io_isolated", "all_sites_idle", "admission_locked"])
+@pytest.mark.parametrize("value", [False, None, 1, "true"])
+def test_candidate_requires_each_real_owner_input(field, value):
+    args = candidate_args()
+    args[field] = value
+    with pytest.raises(cfg.StageDenied):
+        cfg.validate_candidate(**args)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("board", "other-board"), ("fpga_part", "xc7z010clg400-1"),
+    ("abi", "incompatible-v2"), ("axi_base", 0x40000000),
+    ("axi_bytes", 8192), ("fclk_hz", 10_000_000), ("site_count", 2),
+    ("pin_map", (("swclk", "Y14"), ("swdio", "W14")))])
+def test_candidate_checks_measured_descriptor_compatibility(field, value):
+    from dataclasses import replace
+    args = candidate_args()
+    args["measured"] = replace(args["measured"], **{field: value})
+    with pytest.raises(cfg.StageDenied, match="CANDIDATE_HARDWARE_MISMATCH"):
+        cfg.validate_candidate(**args)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("image", b"tampered"), ("recovery", b"tampered"),
+    ("image", b""), ("recovery", b""),
+    ("image_sha256", None), ("image_sha256", "0" * 64),
+    ("recovery_sha256", None), ("descriptor", None), ("measured", None)])
+def test_candidate_fails_closed_on_missing_or_bad_bytes(field, value):
+    args = candidate_args()
+    args[field] = value
+    with pytest.raises(cfg.StageDenied):
+        cfg.validate_candidate(**args)
+
+
+def test_candidate_rejects_recovery_as_candidate():
+    args = candidate_args()
+    args.update(image=RECOVERY, image_sha256=sha(RECOVERY))
+    with pytest.raises(cfg.StageDenied, match="CANDIDATE_IS_RECOVERY"):
+        cfg.validate_candidate(**args)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("board", None), ("fpga_part", ""), ("abi", True),
+    ("axi_base", True), ("axi_base", 0x40008001),
+    ("axi_bytes", 0), ("fclk_hz", True), ("site_count", 0),
+    ("pin_map", ()), ("pin_map", (["swclk", "W14"],)),
+    ("pin_map", (("swclk", "W14"), ("swdio", "W14"))),
+    ("pin_map", (("swclk", "W14"), ("swclk", "Y14"))),
+])
+def test_candidate_malformed_descriptor_denied(field, value):
+    from dataclasses import replace
+    args = candidate_args()
+    args["descriptor"] = replace(args["descriptor"], **{field: value})
+    with pytest.raises(cfg.StageDenied):
+        cfg.validate_candidate(**args)

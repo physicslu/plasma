@@ -224,3 +224,86 @@ simultaneously. NRST remains unconnected. In this Path 1 no SWPC,
 Z2, FPGA Manager, MMIO, ST-LINK, LA2016, USB or DUT was operated,
 and no deployment or merge was performed. PR remains Draft;
 Gate 2/HIL **NO-GO**.
+
+## Gate 1 CODE/HOST continuation: minimal candidate and physical PoC plan
+
+`validate_candidate` in the generic policy is an additive, **pure host**
+compatibility/integrity check. It takes image bytes/SHA256, an expected
+board/FPGA-part/ABI/aperture/clock/Site/pin descriptor, independently measured
+hardware facts, and recovery/ownership inputs. It does not take an image Git
+SHA, uploader role, image Root Profile or image Source Manifest. SHA256 proves
+byte integrity, not trust or physical safety. It neither acquires the admission
+lock nor grants runtime admission. The old `ImageDescriptor`/`ImageLock` path
+retains its legacy build/executor source coupling; it is deliberately unconverted.
+Historical artifact fields remain legacy development provenance, not requirements
+of the new candidate contract. Root Entry source integrity pins still protect
+privileged executable code; the additive validator is not wired into Root Entry.
+No deployed behavior or broader Gateway access control changes here.
+
+Future staging contract (documentation only, Web/API deferred until physical
+DPIDR/Flash PoC): under the **same PPU admission mutex used by new Jobs**, check
+actual board/part/ABI compatibility and all-Site idle, then atomically close
+Job admission **before accepting any upload bytes**. `IDLE -> RECEIVING -> STAGED`
+holds immutable checked bytes and their PS-calculated SHA256. Staged != active.
+Keep admission blocked while staged; explicit discard may release it without
+changing the active image. Failed/incomplete upload discards partial bytes and
+releases admission only when the unchanged active state is known safe. A separate
+explicit activation request rechecks all AXI/driver/mapping consumers, exclusive
+ownership, electrical isolation and exact known-good rollback before the existing
+protected FPGA Manager owner loads anything: `STAGED -> ACTIVATING -> VALIDATING
+-> IDLE`, or `RECOVERING -> IDLE` only after verified restore; uncertain recovery
+stays `FAULT` with admission closed. Validation includes current-boot loaded
+identity/ABI; FPGA Manager OPERATING alone proves neither. No new uploader
+permission layer, protected executor, workflow or service is proposed. One image
+is active at PPU level; normal Erase/Program/Read/Verify Jobs never reload it.
+ADR-0003 remains **Proposed**, fixed-image first-generation baseline unchanged;
+future multiple maintenance images are deferred, not a per-IC switch mechanism.
+
+- **P0 — offline build and owned restoration readiness:** build this exact source
+  snapshot with pinned Vivado 2026.1/board files; check 100 MHz GP0/FCLK0, HWH
+  `0x40008000`/4 KiB, W14/Y14 LVCMOS33 and IOBUF turnaround; retain BIT/HWH/BIN
+  digests. Three historical TIMING-18 external-I/O warnings are not exempted or
+  qualified by internal timing. Before any later load, owner must supply actual
+  board/ABI, exclusive consumer disposition and exact original image/recovery
+  SHA plus verified restoration procedure. Current descriptor recovery_sha256 is
+  null; installed root-only profile is not inspectable by this task. Existing
+  UIO driver ownership is unresolved for loading; no unbind/restart is authorized.
+- **P1 — real DPIDR, only under physical scope:** owner must connect **Pmod BB J1
+  to Z2 JB** (currently not connected), verify target VTref and common GND,
+  measured legal **3.3 V** power and pin mapping; ST-LINK must be disconnected
+  or demonstrably tri-stated. NRST is absent. Confirm passive measured edges,
+  SWDIO/OE turnaround and exclusive drive before bounded real DPIDR. Use the
+  existing one-shot UNIX socket and already-owned word port after protected
+  image/ownership/recovery admission. No guessed external timing values.
+- **P2 — exact Flash experiment:** after genuine DPIDR and safe restoration
+  readiness, bind a known exact STM32F103C8T6 asset SHA256, confirmed chip ID,
+  actual capacity and reviewed erase/program/readback address/length geometry
+  (nominal C8 64 KiB Flash at 0x08000000, 1 KiB pages; verify actual silicon).
+  Explicitly request Erase, Program (write-only), Readback and Verify stages;
+  compare exact readback bytes/SHA256. No arbitrary asset or assumed clone
+  capacity, automatic unsafe retry, or claim from a virtual target.
+
+The combined local UNIX-socket/LinuxMMIO/SiteMMIO/word-port regression uses only
+a sparse regular file, with bounded startup/timeout and cleanup. No new PS
+launcher is needed for this host fixture; a real hardware-admitted launch remains
+unproven. The engineering report records current execution and blockers; all
+physical stages and original-image restore remain NOT_RUN in this Work Order.
+
+### Current continuation offline evidence
+
+Path 3 Run [40112584242](https://github.com/physicslu/plasma/actions/runs/40112584242),
+job `development-codex`, SWPC-plasma-codex: actual Vivado 2026.1 build of the
+unchanged FPGA inputs at candidate `65dca783f51be36d4783ef0ff0e6d8cfbf6c8dc1`
+passed synthesis, implementation, HWH and DRC (zero checks), with internal
+WNS +3.070 ns / WHS +0.072 ns. The three TIMING-18 warnings persist.
+BIT SHA256 `81a27a46407aa0ad8b21c93c0416509ac36cfd4c89ae2baa04f79c4ce8dd9ec4`,
+HWH `6f0d252e12834ae4274619c2d21f0b61bd11d354ea1017cdd1771eb39671d40c`,
+Bootgen BIN `bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1`.
+The policy/test/document changes in this continuation are uncommitted; the
+engineering evidence preserves their patch and hashes, not a fabricated new
+commit. Historical descriptor provenance above remains unchanged. Read-only
+Z2 SSH baseline passed with fabric/audio UIO bound, active-image identity
+unqualified. Offline build success grants no runtime or physical admission.
+Full commands, failures/retests, artifacts and per-stage outcomes are in the
+Path 3 evidence `engineering-report.md`; GitHub PR CI is not claimed for this
+uncommitted patch. PR #1142 remains Draft; no publish/merge/deployment occurred.

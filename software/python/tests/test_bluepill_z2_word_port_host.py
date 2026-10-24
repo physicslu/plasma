@@ -132,3 +132,55 @@ def test_barrier_failure_poison_and_fail_closed(port_fixture):
     with pytest.raises(MMIOError, match="poisoned"):
         port.read32(BASE)
     assert mmio._poisoned
+
+
+def test_one_shot_unix_startup_with_linux_word_port(port_fixture, tmp_path):
+    """Full local startup wire-up, regular file only; no target model/DPIDR."""
+    import socket
+    import threading
+    from plasma_interfaces.bluepill_remote_bitbang import serve_local_unix_once
+
+    f, _, lease = port_fixture
+    word(f, 0, RemoteBitbangSWD.MAGIC)
+    word(f, 4, RemoteBitbangSWD.VERSION)
+    word(f, 12, 8)
+    directory = tmp_path / "private"
+    directory.mkdir(mode=0o700)
+    location = directory / "swd.sock"
+    bridge = RemoteBitbangSWD(
+        BluepillZ2WordPort(lease, host_test_barrier=lambda: None), base=BASE)
+    result = []
+    ready = threading.Event()
+
+    def client():
+        # A bounded connect loop handles listener startup without touching devices.
+        import time
+        try:
+            with socket.socket(socket.AF_UNIX) as connection:
+                connection.settimeout(2)
+                for _ in range(200):
+                    try:
+                        connection.connect(str(location))
+                        break
+                    except FileNotFoundError:
+                        time.sleep(0.01)
+                else:
+                    raise RuntimeError("listener did not start")
+                connection.sendall(b"Odfoc")
+                assert connection.recv(1) == b"0"
+                connection.sendall(b"Q")
+        except BaseException as exc:
+            result.append(exc)
+        finally:
+            ready.set()
+
+    worker = threading.Thread(target=client)
+    worker.start()
+    try:
+        count = serve_local_unix_once(location, bridge, idle_timeout_s=3)
+    finally:
+        worker.join(timeout=4)
+    assert ready.is_set() and not worker.is_alive()
+    assert result == []
+    assert count == 6 and bridge.closed and not location.exists()
+    assert read_word(f, 8) == 2  # SWCLK low, OE disabled

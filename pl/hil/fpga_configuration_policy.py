@@ -184,6 +184,75 @@ def load_descriptor(path: Path) -> ImageDescriptor:
         raise StageDenied("IMAGE_DESCRIPTOR_FILE_INVALID") from exc
 
 
+
+@dataclass(frozen=True)
+class CandidateHardware:
+    """Expected descriptor or independently measured host input, not attestation.
+
+    No build provenance, uploader role, source manifest or executor SHA belongs
+    to this image compatibility contract. A live owner must supply measurements.
+    """
+    board: str
+    fpga_part: str
+    abi: str
+    axi_base: int
+    axi_bytes: int
+    fclk_hz: int
+    site_count: int
+    pin_map: tuple[tuple[str, str], ...]
+
+    def validate(self) -> None:
+        need(all(type(v) is str and 1 <= len(v) <= 100
+                 for v in (self.board, self.fpga_part, self.abi)),
+             "CANDIDATE_BOARD_PART_ABI_INVALID")
+        need(_u32(self.axi_base) and self.axi_base % 4096 == 0 and
+             type(self.axi_bytes) is int and 4096 <= self.axi_bytes <= 65536
+             and self.axi_bytes % 4096 == 0 and
+             self.axi_base + self.axi_bytes <= 0x100000000 and
+             type(self.fclk_hz) is int and 1_000_000 <= self.fclk_hz <= 300_000_000
+             and type(self.site_count) is int and 1 <= self.site_count <= 8,
+             "CANDIDATE_HARDWARE_INVALID")
+        need(type(self.pin_map) is tuple and 1 <= len(self.pin_map) <= 32
+             and all(type(pair) is tuple and len(pair) == 2
+                     and all(type(v) is str for v in pair)
+                     for pair in self.pin_map) and
+             _pins(dict(self.pin_map)) == self.pin_map and
+             len(dict(self.pin_map)) == len(self.pin_map),
+             "IMAGE_DESCRIPTOR_PINS_INVALID")
+
+
+def validate_candidate(*, image: bytes, image_sha256: str,
+                       descriptor: CandidateHardware, measured: CandidateHardware,
+                       recovery: bytes, recovery_sha256: str,
+                       exclusive_owner: bool, consumers_quiesced: bool,
+                       axi_isolated: bool, external_io_isolated: bool,
+                       all_sites_idle: bool, admission_locked: bool) -> None:
+    """Pure host candidate check; no load, upload, lock acquisition or authority.
+
+    Inputs must be derived by the existing owner under its shared admission
+    lock. Success is compatibility/integrity only, never runtime admission.
+    Protected executable source pins remain enforced by the existing root entry.
+    Historical ImageLock below retains its legacy build/executor coupling until
+    explicitly migrated; this function is not wired to that privileged path.
+    """
+    need(type(descriptor) is CandidateHardware and
+         type(measured) is CandidateHardware, "CANDIDATE_DESCRIPTOR_REQUIRED")
+    descriptor.validate()
+    measured.validate()
+    need(descriptor == measured, "CANDIDATE_HARDWARE_MISMATCH")
+    need(type(image) is bytes and bool(image) and
+         type(recovery) is bytes and bool(recovery), "BUNDLE_BYTES_MISSING")
+    need(hex_pin(image_sha256, 64) and hex_pin(recovery_sha256, 64),
+         "IMAGE_SHA_INVALID")
+    need(hashlib.sha256(image).hexdigest() == image_sha256 and
+         hashlib.sha256(recovery).hexdigest() == recovery_sha256,
+         "IMAGE_BUNDLE_HASH_MISMATCH")
+    need(image_sha256 != recovery_sha256, "CANDIDATE_IS_RECOVERY")
+    need(all(type(v) is bool and v for v in (
+        exclusive_owner, consumers_quiesced, axi_isolated, external_io_isolated,
+        all_sites_idle, admission_locked)), "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN")
+
+
 def validate_source_lock(*, project: str, expected_project: str,
                          reviewed_sha: str, installed_sha: str, build_sha: str,
                          bit_sha: str, hwh_sha: str, bin_sha: str,
