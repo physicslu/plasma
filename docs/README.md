@@ -210,6 +210,8 @@
 - **Plan** — [OpenOCD Part-number Expansion Plan](development/openocd-part-number-expansion-plan.md)
 - **Plan** — [Development Debt Register](development/todo.md)
 
+- **Gate 1 / Host-only Research, L2 BLOCKED** — [NXP MCXN236VKLT ROM ISP/blhost Compatibility PoC](development/nxp-mcxn236-blhost-l2-compat-poc-gate1.md)：固定 MCXN23x／SEC 26.06／SPSDK 3.10.0 來源與 Mock-only 燒錄契約，未註冊 Provider、不提升 L1/L2、不操作硬體。
+
 ## Deployment
 
 - **Current** — [Deployment Index](deployment/README.md)
