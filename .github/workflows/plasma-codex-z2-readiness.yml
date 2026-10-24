@@ -2,9 +2,8 @@ name: PLASMA dedicated Codex Z2 SSH-only PS/PL readiness (Issue 981)
 
 # User-approved lab prototype: only exact trusted owner Issue command on main.
 # Do not execute untrusted PR code on the hardware-enabled self-hosted runner.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-z2-readiness.yml"

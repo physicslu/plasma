@@ -2,9 +2,8 @@ name: PLASMA Codex Agent guarded KINGST LA2016 loopback (Issue 981)
 
 # PR CI is hosted/offline only. Trusted owner exact Issue command on merged main
 # is the sole route to the hardware-capable dedicated SWPC runner.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-la2016.yml"

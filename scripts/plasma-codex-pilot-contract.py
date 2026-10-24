@@ -80,10 +80,10 @@ def check() -> None:
         assert not authorize(altered, ACTOR, REPO, "refs/heads/main"), key
 
     workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "\n  issue_comment:\n" not in workflow, "RETIRED_ISSUE_DISPATCH_REENABLED"
     shell = OUTER.read_text(encoding="utf-8")
     inner = INNER.read_text(encoding="utf-8")
     needed_workflow = [
-        "issue_comment:",
         "pull_request:",
         "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
